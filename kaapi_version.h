@@ -1,1 +1,1 @@
-#define GIT_HASH v0.1-72-gf34e3e44cf875ebe
+#define GIT_HASH ab1a2fecd466f844
