@@ -62,7 +62,6 @@ typedef double CFloat64_t;
 #  error "Blas library undefined"
 #endif
 #define KAAPI_NO_DEFAULT_BLAS_ENUM
-#include <lapacke.h>
 #endif
 
 #include "xkblas.h"

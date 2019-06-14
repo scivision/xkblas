@@ -98,28 +98,28 @@ static void (*cblas_zgemm_dl)(
 
 /* gemmt */
 static void (*cblas_sgemmt_dl)(
-  CBLAS_LAYOUT order, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
+  CBLAS_LAYOUT order, CBLAS_UPLO Uplo, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
   int N, int K,
   const float alpha, const float *A, int lda,
                      const float *B, int ldb,
   const float beta,  float *C, int ldc ) = 0;
 
 static void (*cblas_dgemmt_dl)(
-  CBLAS_LAYOUT order, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
+  CBLAS_LAYOUT order, CBLAS_UPLO Uplo, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
   int N, int K,
   const double alpha, const double *A, int lda,
                       const double *B, int ldb,
   const double beta,  double *C, int ldc) = 0;
 
 static void (*cblas_cgemmt_dl)(
-  CBLAS_LAYOUT order, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
+  CBLAS_LAYOUT order, CBLAS_UPLO Uplo, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
   int N, int K,
   const void *alpha, const void *A, int lda,
                      const void *B, int ldb,
   const void *beta,        void *C, int ldc ) = 0;
 
 static void (*cblas_zgemmt_dl)(
-  CBLAS_LAYOUT order, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
+  CBLAS_LAYOUT order, CBLAS_UPLO Uplo, CBLAS_TRANSPOSE transa, CBLAS_TRANSPOSE transb,
   int N, int K,
   const void *alpha, const void *A, int lda,
                      const void *B, int ldb,
@@ -682,7 +682,8 @@ extern void BLAS_NAME(z,gemmt)(
 #if defined(KAAPI_BLAS_USE_MKL)
     if (cblas_zgemmt_dl ==0) xkblas_load_sym((void**)&cblas_zgemmt_dl,"cblas_zgemmt");
     cblas_zgemmt_dl(CblasColMajor,
-                xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb),
+                xkblas_blas2cblas_fill(uplo),
+                xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb),
                 *n, *k,
                 (double complex *)alpha, (double complex *)A, *lda,
                 (double complex *)B, *ldb,
