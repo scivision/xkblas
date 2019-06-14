@@ -27,6 +27,6 @@ BLAS_LDFLAGS=$(shell pkg-config --libs openblas)
 
 
 # Option
-#OPT=-O3 -std=gnu99 -DKAAPI_DEBUG=0 ${EXTRA} -DNDEBUG
-OPT=-O0 -g -std=gnu99 -DKAAPI_DEBUG=1 ${EXTRA}
+OPT=-O3 -std=gnu99 -DKAAPI_DEBUG=0 ${EXTRA} -DNDEBUG
+#OPT=-O0 -g -std=gnu99 -DKAAPI_DEBUG=1 ${EXTRA}
 
