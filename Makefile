@@ -401,6 +401,10 @@ dist:  .generated .generated_testing
 	tar cfvz xkblas-${GIT_HASH}.tgz xkblas
 	rm -rf xkblas
 	@echo "Version: xkblas-${GIT_HASH}.tgz"
+
+distclean: clean
+	rm -f ${XKBLAS_ALL_GENFILES} .generated
+
 #END_DONOT_EXPORT
 
 install: all
@@ -476,6 +480,4 @@ clean:
 	rm -f libkaapi.a libkaapi.so libxkblas.so libxkblas_blaswrapper.so *.o blas/*.o \
 		libkaapi_plugin_host.so.1 libkaapi_plugin_cuda.so.1
 
-distclean: clean
-	rm -f ${XKBLAS_ALL_GENFILES} .generated
 
