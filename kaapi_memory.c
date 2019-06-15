@@ -873,7 +873,7 @@ static int kaapi_memory_cache_evict(
      but not pinned.
   */
 
-#if 1//KAAPI_DEBUG
+#if 0//KAAPI_DEBUG
   if (size !=0)
    _kaapi_memory_cache_print(cache);
 #endif
@@ -1013,7 +1013,7 @@ static void kaapi_memory_freehashmap( kaapi_hashmap_t* ht, kaapi_address_space_i
         entry = _pop_hashmap_entry(ht, i);
         if (entry ==0) break;
         kaapi_metadata_info_t* mdi = KAAPI_HASHENTRIES_GET(entry, kaapi_metadata_info_t*);
-#warning "How it possible that mdi ==0 here ?"
+//#warning "How it possible that mdi ==0 here ?"
         if (mdi !=0)
         {
           _kaapi_dsm_deallocate_replica(&kaapi_the_dsm, mdi);
@@ -1561,8 +1561,8 @@ uint16_t _kaapi_get_valid_lid(
      - warning: only replica with valid bit, not in transit are
      ensured to be send to the device
   */
-  #warning "Here store topology between GPUs through a better_peer() function"
-  #warning "Here protocol is not concurrent with eviction !!!! "
+  //#warning "Here store topology between GPUs through a better_peer() function"
+  //#warning "Here protocol is not concurrent with eviction !!!! "
 reload:
   valid_bit= KAAPI_ATOMIC_READ(&mdi->valid);
 
