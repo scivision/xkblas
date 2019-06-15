@@ -1481,13 +1481,14 @@ static int _kaapi_dsm_allocate_replica(
     int retry_cnt = 0;
     
     kdr->ptr = kaapi_memory_alloc( asid, size );
-    while (kaapi_pointer_isnull( kdr->ptr ) && (++retry_cnt <32))
+    while (kaapi_pointer_isnull( kdr->ptr ))// && (++retry_cnt <32))
     {
       int err = kaapi_memory_cache_evict(dsm->nodes[lid]->device, dsm->nodes[lid]->cache, size);
       if (err == 0)
         kdr->ptr = kaapi_memory_alloc( asid, size );
-      if (kaapi_pointer_isnull( kdr->ptr ))
+      if (err == ENOMEM || kaapi_pointer_isnull( kdr->ptr ))
         kaapi_offload_poll_devices();
+      retry_cnt++;
     }
   }
 
