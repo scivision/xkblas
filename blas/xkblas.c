@@ -922,7 +922,6 @@ int xkblas_sync(void)
 #if KAAPI_DEBUG
       ++cnt_activated_handle;
 #endif
-      //kaapi_handle_init(_xkblas_thread, curr, curr->sync0.data);
     }
     curr = next;
   }
