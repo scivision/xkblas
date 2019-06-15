@@ -346,14 +346,18 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
           &view
       );
 
-      /* findaccess has already allocated the replica for asid with the right view */
-      err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
+      do {
+        /* findaccess has already allocated the replica for asid with the right view */
+        err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
             task,
             mp,
             mdi,
             callback_set_valid,
             (void*)mdi, (void*)task, (void*)frame
-      );
+        );
+        if (err == ENOMEM)
+          kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
+      } while (err == ENOMEM);
       kaapi_assert((err ==0) || (err ==EINPROGRESS));
 
 #if KAAPI_USE_PREFETCH
