@@ -278,7 +278,7 @@ static int kaapi_offload_device_prepare_execute_task(
  )
 {
   KAAPI_OFFLOAD_TRACE_IN
-
+  int err;
   uint16_t lid = kaapi_memory_asid_get_lid( device->memdev.asid );
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
 
@@ -347,13 +347,14 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
       );
 
       /* findaccess has already allocated the replica for asid with the right view */
-      kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
+      err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
             task,
             mp,
             mdi,
             callback_set_valid,
             (void*)mdi, (void*)task, (void*)frame
       );
+      kaapi_assert((err ==0) || (err ==EINPROGRESS));
 
 #if KAAPI_USE_PREFETCH
       if (KAAPI_ACCESS_IS_WRITE(mp))

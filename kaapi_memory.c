@@ -855,7 +855,7 @@ uint64_t kaapi_memory_writeback_all(
 
 
 /* Evict some memory to make room for more allocations (at least of size size).
- * Return the total space freed.
+ * Return 0 in case of success, else ENOMEM
  */
 static int kaapi_memory_cache_evict(
   kaapi_memory_device_t* device,
@@ -864,27 +864,10 @@ static int kaapi_memory_cache_evict(
 )
 {
   if (size >0)
-  {
-    //printf("[%s] cannot evicted enough data from ro list\n", __FUNCTION__);
-#if 0
-    printf("%2i:: [%s] try to evict from ro list\n", lid, __FUNCTION__);
-#endif
     size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->ro);
-  }
-#if 0
-  printf("%2i:: [%s] end eviction size: %lu\n", lid, __FUNCTION__, size);
-#endif
 
   if (size >0)
-  {
-#if 0
-    uint16_t lid = kaapi_memory_asid_get_lid(cache->asid);
-    kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
-
-    printf("%2i:: [%s] size_limit:%lu, size_used:%lu: try to evict from rw list\n", lid, __FUNCTION__, cache->size_limit, cache->size_used );
-#endif
     size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->rw);
-  }
 
   /* here if size >0 then it could be necessary to write back valid bloc on the cache
      but not pinned.
@@ -894,11 +877,10 @@ static int kaapi_memory_cache_evict(
   if (size !=0)
    _kaapi_memory_cache_print(cache);
 #endif
-  kaapi_assert(size ==0);
 
-  device->f_memsync( device, 1 );
-  return 0;
+  return size ==0 ? 0 : ENOMEM;
 }
+
 
 /* Force to invalidate all blocs of the cache
 */
@@ -918,7 +900,6 @@ int kaapi_memory_cache_invalidate_bloc(
     cache = kaapi_the_dsm.nodes[lid]->cache;
 
   kaapi_assert( kaapi_memory_replica_is_allocated( mdi, lidhost ));
-  //TG is valid: kaapi_assert( kaapi_memory_replica_is_valid( curr->mdi, lidhost ));
   kaapi_memory_replica_set_all_dirty_except(mdi, lidhost);
 
   size_t size = kaapi_memory_view_size(&mdi->replicas[lid]->view);
@@ -1456,6 +1437,10 @@ return_value:
    - else new data is allocated from the memory allocator
    On return the alloc bit field of mdi is updated to reflect that data on asid is
    allocated.
+   Return value is:
+     - 0 in case of success
+     - else possible error:
+      - ENOMEM: cannot allocate memory on the device
 */
 static int _kaapi_dsm_allocate_replica(
     kaapi_dsm_t* dsm,
@@ -1496,11 +1481,13 @@ static int _kaapi_dsm_allocate_replica(
     int retry_cnt = 0;
     
     kdr->ptr = kaapi_memory_alloc( asid, size );
-    while (kaapi_pointer_isnull( kdr->ptr ) && (++retry_cnt <8))
+    while (kaapi_pointer_isnull( kdr->ptr ) && (++retry_cnt <32))
     {
-      kaapi_memory_cache_evict(dsm->nodes[lid]->device, dsm->nodes[lid]->cache, size);
-      kdr->ptr = kaapi_memory_alloc( asid, size );
-      if (kaapi_pointer_isnull( kdr->ptr )) kaapi_offload_poll_devices();
+      int err = kaapi_memory_cache_evict(dsm->nodes[lid]->device, dsm->nodes[lid]->cache, size);
+      if (err == 0)
+        kdr->ptr = kaapi_memory_alloc( asid, size );
+      if (kaapi_pointer_isnull( kdr->ptr ))
+        kaapi_offload_poll_devices();
     }
   }
 
@@ -1803,6 +1790,7 @@ static int kaapi_dsm_fetch_on(
 
 
 /* ~ to pin/unpin memory location
+   may return ENOMEM if no more memory on the device
 */
 int kaapi_dsm_acquire_data(
       kaapi_dsm_t* dsm,
@@ -1828,7 +1816,7 @@ int kaapi_dsm_acquire_data(
   /* here on return there is possible error if device memory is full (ENOMEM).
      TODO: process this error
   */
-  kaapi_assert( err == 0);
+  if (err !=0) return err;
 
   /* if read then make copy on device->memorydevice.asid */
   if (KAAPI_ACCESS_IS_READ(mp))
@@ -1891,7 +1879,9 @@ if (lid ==0)
 }
 
 
-/*
+/* May returns:
+     EINPROGRESS : if data not yet on asid
+     ENOMEM : not possible to allocate replica
 */
 int kaapi_dsm_prefetch_on(
       kaapi_dsm_t* dsm,
@@ -1905,7 +1895,8 @@ int kaapi_dsm_prefetch_on(
   kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
 
   /* if not allocated: do allocation. Use view on 0 to determine size and layout */
-  _kaapi_dsm_allocate_replica( dsm, mdi, asid, &mdi->replicas[0]->view );
+  int err = _kaapi_dsm_allocate_replica( dsm, mdi, asid, &mdi->replicas[0]->view );
+  if (err !=0) return err;
 
   if (!kaapi_memory_replica_is_valid(mdi, lid))
     return kaapi_dsm_fetch_on( dsm, asid, mdi,
