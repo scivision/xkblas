@@ -1256,28 +1256,22 @@ int xkblas_auto_map(
 {
   switch (kernel)
   {
-    case KERN_SYRK:
-    case KERN_SYR2K:
-    case KERN_HEMM:
-    case KERN_HERK:
-    case KERN_HER2K:
-/*
-      break;
-*/
-
+    case KERN_TRMM:
     case KERN_TRSM:
-/*
       xkblas_map_1Dblock_cyclic(
         1, CblasColMajor, 0,
         Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
         1, xkblas_get_ngpus(), 0
       );
       break;
-*/
 
+    case KERN_SYRK:
+    case KERN_SYR2K:
+    case KERN_HEMM:
+    case KERN_HERK:
+    case KERN_HER2K:
     case KERN_GEMMT:
     case KERN_GEMM:
-    case KERN_TRMM:
     case KERN_SYMM:
     { /* 2D Bloc cyclic */
       size_t Blkm = 1;
