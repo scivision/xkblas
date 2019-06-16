@@ -59,7 +59,7 @@ static inline int sys_futex(void *addr1, int op, int val1, struct timespec *time
   return syscall(SYS_futex, addr1, op, val1, timeout, addr2, val3);
 }
 #else /* active pool */
-#  warning "Use active pooling"
+//#  warning "Use active pooling"
 #endif
 
 #include <string.h>
