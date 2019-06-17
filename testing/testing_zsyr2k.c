@@ -143,7 +143,7 @@ int testing_zsyr2k(int argc, char **argv)
 
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZSYR2K */
-              xkblas_zsyr2k_async(uplo[u], trans[t], N, K, alpha, A, LDA, B, LDB, beta, Cfinal, LDC);
+              xkblas_zsyr2k_async(uplo[u], trans[t], N, K, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(uplo[u], 0, N, N, Cfinal, LDC, sizeof(Complex64_t));
               xkblas_sync();
               double t1 = xkblas_elapsedtime();

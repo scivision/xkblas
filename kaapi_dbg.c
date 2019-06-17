@@ -440,7 +440,7 @@ static void _kaapi_dump_dot_visit_task(
             /* add version edge */
             if (pp->tag >1)
               fprintf(file,"%lu00%lu -> %lu00%lu [style=dotted];\n",
-                  pp->tag-1, (uintptr_t)entry->key, pp->tag, (uintptr_t)entry->key );
+                  (long unsigned int)(pp->tag-1), (uintptr_t)entry->key, (long unsigned int)pp->tag, (uintptr_t)entry->key );
           }
         }
       }

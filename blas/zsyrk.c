@@ -94,8 +94,8 @@
 #define C(m, n) C##h,  m,  n
 
 int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
-                 Complex64_t alpha, Complex64_t *A, int LDA,
-                 Complex64_t beta,  Complex64_t *C, int LDC )
+                 Complex64_t* alpha, Complex64_t *A, int LDA,
+                 Complex64_t* beta,  Complex64_t *C, int LDC )
 {
     size_t Am, An;
 
@@ -132,7 +132,7 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
 
     /* Quick return */
     if (N == 0 ||
-        ((alpha == (Complex64_t)0.0 || K == 0.0) && beta == (Complex64_t)1.0))
+        ((*alpha == (Complex64_t)0.0 || K == 0.0) && *beta == (Complex64_t)1.0))
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
@@ -193,11 +193,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
         if (trans == CblasNoTrans) {
             for (k = 0; k < Ant; k++) {
                 tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                zbeta = k == 0 ? beta : zone;
+                zbeta = k == 0 ? *beta : zone;
                 INSERT_TASK_zsyrk(
                     uplo, trans,
                     tempnn, tempkn, 
-                    alpha, A(n, k), ldan, /* ldan * K */
+                    *alpha, A(n, k), ldan, /* ldan * K */
                     zbeta, C(n, n), ldcn); /* ldc  * N */
             }
             /*
@@ -210,11 +210,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
                     ldcm = LDC;//BLKLDD(C, m);
                     for (k = 0; k < Ant; k++) {
                         tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasTrans,
                             tempmm, tempnn, tempkn, 
-                            alpha, A(m, k), ldam,  /* ldam * K */
+                            *alpha, A(m, k), ldam,  /* ldam * K */
                                    A(n, k), ldan,  /* ldan * K */
                             zbeta, C(m, n), ldcm); /* ldc  * N */
                     }
@@ -229,11 +229,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
                     ldam = LDA;//BLKLDD(A, m);
                     for (k = 0; k < Ant; k++) {
                         tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasTrans,
                             tempnn, tempmm, tempkn, 
-                            alpha, A(n, k), ldan,  /* ldan * K */
+                            *alpha, A(n, k), ldan,  /* ldan * K */
                                    A(m, k), ldam,  /* ldam * M */
                             zbeta, C(n, m), ldcn); /* ldc  * M */
                     }
@@ -247,11 +247,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
             for (k = 0; k < Amt; k++) {
                 tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                 ldak = LDA;//BLKLDD(A, k);
-                zbeta = k == 0 ? beta : zone;
+                zbeta = k == 0 ? *beta : zone;
                 INSERT_TASK_zsyrk(
                     uplo, trans,
                     tempnn, tempkm, 
-                    alpha, A(k, n), ldak,  /* lda * N */
+                    *alpha, A(k, n), ldak,  /* lda * N */
                     zbeta, C(n, n), ldcn); /* ldc * N */
             }
             /*
@@ -264,11 +264,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
                     for (k = 0; k < Amt; k++) {
                         tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasNoTrans,
                             tempmm, tempnn, tempkm,
-                            alpha, A(k, m), ldak,  /* lda * M */
+                            *alpha, A(k, m), ldak,  /* lda * M */
                                    A(k, n), ldak,  /* lda * N */
                             zbeta, C(m, n), ldcm); /* ldc * N */
                     }
@@ -283,11 +283,11 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
                     for (k = 0; k < Amt; k++) {
                         tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasNoTrans,
                             tempnn, tempmm, tempkm, 
-                            alpha, A(k, n), ldak,  /* lda * K */
+                            *alpha, A(k, n), ldak,  /* lda * K */
                                    A(k, m), ldak,  /* lda * M */
                             zbeta, C(n, m), ldcn); /* ldc * M */
                     }

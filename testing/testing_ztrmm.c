@@ -139,7 +139,7 @@ int testing_ztrmm(int argc, char **argv)
                       double t0 = xkblas_elapsedtime();
                       /* XKBLAS ZTRMM */
                       xkblas_ztrmm_async(side[s], uplo[u], trans[t], diag[d],
-                                   M, N, alpha, A, LDA, Bfinal, LDB);
+                                   M, N, &alpha, A, LDA, Bfinal, LDB);
                       xkblas_memory_coherent_async(0, 0, M, N, Bfinal, LDB, sizeof(Complex64_t));
 
                       xkblas_sync();

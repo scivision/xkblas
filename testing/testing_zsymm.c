@@ -147,7 +147,7 @@ int testing_zsymm(int argc, char **argv)
 
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZSYMM */
-              xkblas_zsymm_async(side[s], uplo[u], M, N, alpha, A, LDA, B, LDB, beta, Cfinal, LDC);
+              xkblas_zsymm_async(side[s], uplo[u], M, N, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(0, 0, M, N, Cfinal, LDC, sizeof(Complex64_t));
               xkblas_sync();
               double t1 = xkblas_elapsedtime();

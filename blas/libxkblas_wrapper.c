@@ -1004,7 +1004,7 @@ extern void BLAS_NAME(z,trmm)(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, B, *ldb, sizeof(double complex));
@@ -1038,7 +1038,7 @@ extern void BLAS_NAME(c,trmm)(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, B, *ldb, sizeof(float complex));
@@ -1072,7 +1072,7 @@ extern void BLAS_NAME(d,trmm)(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, B, *ldb, sizeof(double));
@@ -1098,7 +1098,7 @@ extern void BLAS_NAME(s,trmm)(
       xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
       *alpha, A, *lda,
-             B, *ldb
+              B, *ldb
     );
   }
   else {
@@ -1106,7 +1106,7 @@ extern void BLAS_NAME(s,trmm)(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, B, *ldb, sizeof(float));
@@ -1143,9 +1143,9 @@ extern void BLAS_NAME(z,symm)(
     xkblas_zsymm_async(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb,
-      *beta,  C, *ldc
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, C, *ldc, sizeof(double complex));
     xkblas_sync();
@@ -1177,9 +1177,9 @@ extern void BLAS_NAME(c,symm)(
     xkblas_csymm_async(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb,
-      *beta,  C, *ldc
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, C, *ldc, sizeof(float complex));
     xkblas_sync();
@@ -1211,9 +1211,9 @@ extern void BLAS_NAME(d,symm)(
     xkblas_dsymm_async(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb,
-      *beta,  C, *ldc
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, C, *ldc, sizeof(double));
     xkblas_sync();
@@ -1245,9 +1245,9 @@ extern void BLAS_NAME(s,symm)(
     xkblas_ssymm_async(
       xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo),
       *m, *n,
-      *alpha, A, *lda,
+      alpha, A, *lda,
              B, *ldb,
-      *beta,  C, *ldc
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *m, *n, C, *ldc, sizeof(float));
     xkblas_sync();
@@ -1280,8 +1280,8 @@ extern void BLAS_NAME(z,syrk)(
     xkblas_zsyrk_async(
       xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa),
       *n, *k,
-      *alpha, A, *lda,
-      *beta,  C, *ldc
+      alpha, A, *lda,
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *n, *n, C, *ldc, sizeof(double complex));
     xkblas_sync();
@@ -1309,8 +1309,8 @@ extern void BLAS_NAME(c,syrk)(
     xkblas_csyrk_async(
       xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa),
       *n, *k,
-      *alpha, A, *lda,
-      *beta,  C, *ldc
+      alpha, A, *lda,
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *n, *n, C, *ldc, sizeof(float complex));
     xkblas_sync();
@@ -1338,8 +1338,8 @@ extern void BLAS_NAME(d,syrk)(
     xkblas_dsyrk_async(
       xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa),
       *n, *k,
-      *alpha, A, *lda,
-      *beta,  C, *ldc
+      alpha, A, *lda,
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *n, *n, C, *ldc, sizeof(double));
     xkblas_sync();
@@ -1367,8 +1367,8 @@ extern void BLAS_NAME(s,syrk)(
     xkblas_ssyrk_async(
       xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa),
       *n, *k,
-      *alpha, A, *lda,
-      *beta,  C, *ldc
+      alpha, A, *lda,
+      beta,  C, *ldc
     );
     xkblas_memory_coherent_async(0, 0, *n, *n, C, *ldc, sizeof(float));
     xkblas_sync();

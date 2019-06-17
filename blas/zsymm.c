@@ -104,9 +104,9 @@
 #define C(m,n) Ch,  m,  n
 
 int xkblas_zsymm_async( int side, int uplo, int M, int N,
-                 Complex64_t alpha, Complex64_t *A, int LDA,
+                 Complex64_t* alpha, Complex64_t *A, int LDA,
                  Complex64_t *B, int LDB,
-                 Complex64_t beta,  Complex64_t *C, int LDC )
+                 Complex64_t* beta,  Complex64_t *C, int LDC )
 {
     size_t Am;
 
@@ -143,7 +143,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
 
     /* Quick return */
     if (M == 0 || N == 0 ||
-        ((alpha == (Complex64_t)0.0) && beta == (Complex64_t)1.0))
+        ((*alpha == (Complex64_t)0.0) && *beta == (Complex64_t)1.0))
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
@@ -212,7 +212,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
             tempkm = k == Cmt-1 ? Cm-k*Cmb : Cmb;
             ldak = LDA;//BLKLDD(A, k);
             ldbk = LDB;//BLKLDD(B, k);
-            zbeta = k == 0 ? beta : zone;
+            zbeta = k == 0 ? *beta : zone;
 
             for (n = 0; n < Cnt; n++) {
                 tempnn = n == Cnt-1 ? Cn-n*Cnb : Cnb;
@@ -230,7 +230,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                             INSERT_TASK_zgemm(
                                 CblasNoTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkm, 
-                                alpha, A(m, k), ldam,
+                                *alpha, A(m, k), ldam,
                                        B(k, n), ldbk,
                                 zbeta, C(m, n), ldcm);
                         }
@@ -239,7 +239,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zsymm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,
+                                    *alpha, A(k, k), ldak,
                                            B(k, n), ldbk,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -247,7 +247,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkm, 
-                                    alpha, A(k, m), ldak,
+                                    *alpha, A(k, m), ldak,
                                            B(k, n), ldbk,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -261,7 +261,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                             INSERT_TASK_zgemm(
                                 CblasTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkm, 
-                                alpha, A(k, m), ldak,
+                                *alpha, A(k, m), ldak,
                                        B(k, n), ldbk,
                                 zbeta, C(m, n), ldcm);
                         }
@@ -270,7 +270,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zsymm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,
+                                    *alpha, A(k, k), ldak,
                                            B(k, n), ldbk,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -278,7 +278,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkm, 
-                                    alpha, A(m, k), ldam,
+                                    *alpha, A(m, k), ldam,
                                            B(k, n), ldbk,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -295,7 +295,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
         for (k = 0; k < Cnt; k++) {
             tempkn = k == Cnt-1 ? Cn-k*Cnb : Cnb;
             ldak = LDA;//BLKLDD(A, k);
-            zbeta = k == 0 ? beta : zone;
+            zbeta = k == 0 ? *beta : zone;
 
             for (m = 0; m < Cmt; m++) {
                 tempmm = m == Cmt-1 ? Cm-m*Cmb : Cmb;
@@ -314,7 +314,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                            INSERT_TASK_zgemm(
                                CblasNoTrans, CblasTrans,
                                tempmm, tempnn, tempkn, 
-                               alpha, B(m, k), ldbm,
+                               *alpha, B(m, k), ldbm,
                                       A(n, k), ldan,
                                zbeta, C(m, n), ldcm);
                         }
@@ -323,7 +323,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                INSERT_TASK_zsymm(
                                    CblasRight, uplo,
                                    tempmm, tempnn, 
-                                   alpha, A(k, k), ldak,
+                                   *alpha, A(k, k), ldak,
                                           B(m, k), ldbm,
                                    zbeta, C(m, n), ldcm);
                             }
@@ -331,7 +331,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkn, 
-                                    alpha, B(m, k), ldbm,
+                                    *alpha, B(m, k), ldbm,
                                            A(k, n), ldak,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -345,7 +345,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                             INSERT_TASK_zgemm(
                                 CblasNoTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkn, 
-                                alpha, B(m, k), ldbm,
+                                *alpha, B(m, k), ldbm,
                                        A(k, n), ldak,
                                 zbeta, C(m, n), ldcm);
                         }
@@ -354,7 +354,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zsymm(
                                     CblasRight, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,
+                                    *alpha, A(k, k), ldak,
                                            B(m, k), ldbm,
                                     zbeta, C(m, n), ldcm);
                             }
@@ -362,7 +362,7 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasTrans,
                                     tempmm, tempnn, tempkn, 
-                                    alpha, B(m, k), ldbm,
+                                    *alpha, B(m, k), ldbm,
                                            A(n, k), ldan,
                                     zbeta, C(m, n), ldcm);
                             }
