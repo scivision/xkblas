@@ -94,7 +94,7 @@ kaapi_rtparam_t kaapi_default_param = {
   .cuda_conc_strem_kernel = 2,
   .cuda_conc_kernel      = 1,
   .cuda_conc_output      = 1,   /* output: H2D */
-  .cuda_cache_limit      = 0.95
+  .cuda_cache_limit      = 1.00
 };
 
 kaapi_address_space_id_t kaapi_local_asid = 0;
@@ -179,9 +179,9 @@ int kaapi_setup_param(void)
 
   if (getenv("KAAPI_CUDA_CACHE_LIMIT")) /* percent */
   {
-    float cuda_cache_limit = atoi(getenv("KAAPI_CUDA_CACHE_LIMIT"))/100.0;
-    if (cuda_cache_limit > 100) cuda_cache_limit = 100;
-    if (cuda_cache_limit < 0) cuda_cache_limit = 10;
+    float cuda_cache_limit = atof(getenv("KAAPI_CUDA_CACHE_LIMIT"))/100.0;
+    if (cuda_cache_limit > 1) cuda_cache_limit = 1.00;
+    if (cuda_cache_limit < 0.10) cuda_cache_limit = 0.10;
     kaapi_default_param.cuda_cache_limit = cuda_cache_limit;
   }
 
@@ -272,7 +272,7 @@ int kaapi_finalize(void)
   kaapi_default_param.cuda_conc_strem_kernel= 2;
   kaapi_default_param.cuda_conc_kernel      = 1;
   kaapi_default_param.cuda_conc_output      = 1;
-  kaapi_default_param.cuda_cache_limit     = 0.95;
+  kaapi_default_param.cuda_cache_limit      = 1.00;
 
   return 0;
 }
