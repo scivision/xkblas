@@ -11,19 +11,19 @@ KAAPI_HOME=$(PWD)
 #HWLOC_HOME=/usr
 
 # For MKL
-EXTRA=-DKAAPI_BLAS_USE_MKL
-BLAS_LIBDIR=${MKLROOT}/lib
-BLAS_LIB_SO=${MKLROOT}/lib/intel64/libmkl_intel_ilp64.so
-BLAS_CPPFLAGS=-I${MKLROOT}/include
-BLAS_LDFLAGS=-L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+#EXTRA=-DKAAPI_BLAS_USE_MKL
+#BLAS_LIBDIR=${MKLROOT}/lib
+#BLAS_LIB_SO=${MKLROOT}/lib/intel64/libmkl_intel_ilp64.so
+#BLAS_CPPFLAGS=-I${MKLROOT}/include
+#BLAS_LDFLAGS=-L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
 #BLAS_LDFLAGS=-L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_gnu_thread -lmkl_core -lpthread -lm -ldl
 
 # For OpenBLAS:
-#EXTRA=-DKAAPI_BLAS_USE_OPENBLAS
-#BLAS_LIBDIR=$(shell pkg-config --libs-only-L openblas|cut -c3-)
-#BLAS_LIB_SO=${BLAS_LIBDIR}/libopenblas.so
-#BLAS_CPPFLAGS=$(shell pkg-config --cflags openblas)
-#BLAS_LDFLAGS=$(shell pkg-config --libs openblas)
+EXTRA=-DKAAPI_BLAS_USE_OPENBLAS
+BLAS_LIBDIR=$(shell pkg-config --libs-only-L openblas|cut -c3-)
+BLAS_LIB_SO=${BLAS_LIBDIR}/libopenblas.so
+BLAS_CPPFLAGS=$(shell pkg-config --cflags openblas)
+BLAS_LDFLAGS=$(shell pkg-config --libs openblas)
 
 
 # Option
