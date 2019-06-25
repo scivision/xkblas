@@ -82,6 +82,7 @@ LDFLAGS=${CUDA_LIBS} ${HWLOC_LIBS}
 # UKAAPI sub library
 #
 UKAAPI_LIBNAME=libkaapi.so
+UKAAPI_LIBNAME_A=libkaapi.a
 UKAAPI_SRC=./kaapi_format.c ./kaapi_impl.c  ./kaapi_task.c ./kaapi_rt.c  ./kaapi_hashmap.c ./kaapi_barrier.c ./kaapi_memory.c ./kaapi_offload_stream.c ./kaapi_offload.c ./kaapi_offload_device.c  ./kaapi_ld.c ./kaapi_dbg.c
 UKAAPI_FILE_LIB=${UKAAPI_SRC} ./kaapi_impl.h ./kaapi.h kaapi_offload_stream.h kaapi_offload.h kaapi_offload_dbg.h kaapi_plugin.h ./kaapi_atomic.h ./kaapi_error.h ./kaapi_format.h ./kaapi_hashmap.h ./kaapi_memory.h  kaapi_version.h
 
@@ -297,14 +298,15 @@ XKBLAS_FILES=\
 XKBLAS_SRC=$(filter %.c, ${XKBLAS_FILES})
 XKBLAS_ALL_GENFILES=${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TASK} ${XKBLAS_GEN_TESTING}
 XKBLAS_CPPFLAGS=-I. -Iblas -DXKBLAS_BLASLIB='"${BLAS_LIB_SO}"' ${BLAS_CPPFLAGS} ${CPPFLAGS} 
-XKBLAS_LDFLAGS=-Wl,-rpath=${BLAS_LIBDIR} ${BLAS_LDFLAGS} -L${KAAPI_HOME} -lkaapi ${UKAAPI_LDFLAGS}
+XKBLAS_LDFLAGS=-Wl,-rpath=${BLAS_LIBDIR} ${BLAS_LDFLAGS} ${UKAAPI_LDFLAGS}
+#-L${KAAPI_HOME} -lkaapi 
 
 
 #
 # LIBXKBLAS_WRAPPER
 #
 XKBLAS_WRAPPER_SRC=blas/libxkblas_wrapper.c
-XKBLAS_WRAPPER_LDFLAGS=${XKBLAS_LDFLAGS} -lxkblas
+XKBLAS_WRAPPER_LDFLAGS=${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas
 XKBLAS_WRAPPER_CPPFLAGS=${CPPFLAGS}
 
 #
@@ -352,7 +354,7 @@ Please visit https://gitlab.inria.fr/xkblas.
 endef
 export todo_after_make
 
-all: .generated .generated_testing ${UKAAPI_LIBNAME} plugin libxkblas.so libxkblas_blaswrapper.so
+all: .generated .generated_testing ${UKAAPI_LIBNAME} plugin libxkblas.so libxkblas_blaswrapper.so libxkblas.a
 	@echo "$$todo_after_make"
 
 testing: testing_z testing_d testing_c testing_s
@@ -387,6 +389,7 @@ gitlastcommit:
 endif
 kaapi_version.h:  gitlastcommit
 
+DISTTAG=`git describe --tags  --abbrev=0`
 dist:  .generated .generated_testing
 	mkdir -p xkblas/blas xkblas/testing
 	cp ${UKAAPI_FILE_LIB} ${UKAAPI_FILE_PLUGIN} AUTHORS COPYING LICENCE README.md make.inc Makefile xkblas/
@@ -396,11 +399,12 @@ dist:  .generated .generated_testing
 	#update Makefile:
 	perl -i -pe 'BEGIN{undef $$/;} s/^#BEGIN_DONOT_EXPORT.*^#END_DONOT_EXPORT//smg' xkblas/Makefile
 	cat xkblas/Makefile|sed -e 's+.generated_testing++g; s+.generated++g' > xkblas/Make
+	echo ${GIT_HASH} > xkblas/VERSION
 	mv -f xkblas/Make xkblas/Makefile
 	rm -f xkblas/._*
-	tar cfvz xkblas-${GIT_HASH}.tgz xkblas
+	tar cfvz xkblas-${DISTTAG}.tgz xkblas
 	rm -rf xkblas
-	@echo "Version: xkblas-${GIT_HASH}.tgz"
+	@echo "Version: xkblas-${DISTTAG}.tgz"
 
 distclean: clean
 	rm -f ${XKBLAS_ALL_GENFILES} .generated
@@ -410,7 +414,7 @@ distclean: clean
 install: all
 	mkdir -p ${PREFIX}/include ${PREFIX}/lib ${PREFIX}/bin
 	cp kaapi.h kaapi_error.h kaapi_atomic.h blas/xkblas.h blas/xkblas_?.h ${PREFIX}/include
-	cp ${TARGET_PLUGIN} libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib
+	cp ${TARGET_PLUGIN} libxkblas.a libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib
 	cp testing_z testing_d testing_c testing_s ${PREFIX}/bin
 
 plugin: ${TARGET_PLUGIN}
@@ -419,65 +423,94 @@ plugin: ${TARGET_PLUGIN}
 echo:
 	echo ${GIT_HASH}
 
-kaapi_plugin_host.o: ${FILE_LIB} kaapi_plugin_host.c kaapi_plugin.h  Makefile 
-	gcc -c -fpic ${CPPFLAGS} ${OPT} ./kaapi_plugin_host.c
-
-kaapi_plugin_cuda.o: ${FILE_LIB} kaapi_plugin_cuda.c kaapi_plugin.h  Makefile 
-	gcc -c -fpic ${CPPFLAGS} -fopenmp ${OPT} ./kaapi_plugin_cuda.c
-
 libkaapi.so: ${UKAAPI_FILE_LIB:.c=.o} ${UKAAPI_SRC_PLUGIN:.c=.o} Makefile
-	gcc -shared -o libkaapi.so ${UKAAPI_SRC:%.c=%.o} ${UKAAPI_SRC_PLUGIN:.c=.o} ${UKAAPI_LDFLAGS}
+	$(CC) -shared -o libkaapi.so ${UKAAPI_SRC:%.c=%.o} ${UKAAPI_SRC_PLUGIN:.c=.o} ${UKAAPI_LDFLAGS}
 
-libkaapi.a: ${UKAAPI_FILE_LIB:.c=.o} Makefile
-	ar -crv libkaapi.a *.o
+libkaapi.a: ${UKAAPI_FILE_LIB:%.c=%_a.o} ${UKAAPI_SRC_PLUGIN:%.c=%_a.o} Makefile
+	$(AR) crv libkaapi.a ${UKAAPI_SRC:%.c=%_a.o} ${UKAAPI_SRC_PLUGIN:%.c=%_a.o}
+	$(RANLIB) libkaapi.a
 
 libkaapi_plugin_host.so.1: kaapi_plugin_host.o libkaapi.so
-	gcc -shared -o libkaapi_plugin_host.so.1 kaapi_plugin_host.o ${UKAAPI_LDFLAGS}
+	$(CC) -shared -o libkaapi_plugin_host.so.1 kaapi_plugin_host.o ${UKAAPI_LDFLAGS}
 
 libkaapi_plugin_cuda.so.1: kaapi_plugin_cuda.o libkaapi.so
-	gcc -shared -fopenmp -o libkaapi_plugin_cuda.so.1 kaapi_plugin_cuda.o ${UKAAPI_LDFLAGS} ${HWLOC_LIBS} ${CUDA_LIBS}
+	$(CC) -shared -fopenmp -o libkaapi_plugin_cuda.so.1 kaapi_plugin_cuda.o ${UKAAPI_LDFLAGS} ${HWLOC_LIBS} ${CUDA_LIBS}
 
 libxkblas.so: libkaapi.so .generated ${XKBLAS_ALL_GENFILES} ${XKBLAS_SRC:.c=.o} 
 	echo ${XKBLAS_SRC:.c=.o}
-	gcc -shared -o libxkblas.so ${XKBLAS_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -lm
+	$(CC) -shared -o libxkblas.so ${XKBLAS_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lkaapi -lm
+
+libxkblas.a: libkaapi.a .generated ${XKBLAS_ALL_GENFILES} ${XKBLAS_SRC:.c=_a.o} 
+	$(AR) crv libxkblas.a ${XKBLAS_SRC:.c=_a.o} ${UKAAPI_SRC:%.c=%_a.o} ${UKAAPI_SRC_PLUGIN:.c=_a.o} 
+	$(RANLIB) libxkblas.a
 
 libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o}
-	gcc -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -lxkblas
+	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lxkblas
 
 
 testing_z: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
-	gcc -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -lxkblas -lm
+	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
 testing_c: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
-	gcc -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -lxkblas -lm
+	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
 testing_d: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
-	gcc -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -lxkblas -lm
+	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
 testing_s: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
-	gcc -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -lxkblas -lm
+	$(CC) -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
+# Dynamic lib
+kaapi_plugin_host.o: ${FILE_LIB} kaapi_plugin_host.c kaapi_plugin.h  Makefile 
+	$(CC) -c -fPIC ${CPPFLAGS} ${OPT} ./kaapi_plugin_host.c
+
+kaapi_plugin_cuda.o: ${FILE_LIB} kaapi_plugin_cuda.c kaapi_plugin.h  Makefile 
+	$(CC) -c -fPIC ${CPPFLAGS} -fopenmp ${OPT} ./kaapi_plugin_cuda.c
 
 $(patsubst %.c,%.o,$(filter %.c,$(FILE_OTHER))): %.o:	 %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	gcc -fPIC ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+	$(CC) -fPIC ${XKBLAS_CPPFLAGS} ${OPT} -DXKBLAS_CFLAGS='"${XKBLAS_CPPFLAGS} ${OPT}"' -c $<  -o $@
 
 $(patsubst %.c,%.o,$(filter %.c, $(FILE_PRECISION_z))): %.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	gcc -fPIC -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+	$(CC) -fPIC -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
 
 $(patsubst %.c,%.o,$(filter %.c, $(FILE_PRECISION_c))): %.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	gcc -fPIC -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+	$(CC) -fPIC -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
 
 $(patsubst %.c,%.o,$(filter %.c, $(FILE_PRECISION_d))): %.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	gcc -fPIC -DPRECISION_d -UPRECISION_s -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+	$(CC) -fPIC -DPRECISION_d -UPRECISION_s -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
 
 $(patsubst %.c,%.o,$(filter %.c, $(FILE_PRECISION_s))): %.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	gcc -fPIC -DPRECISION_s -UPRECISION_d -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+	$(CC) -fPIC -DPRECISION_s -UPRECISION_d -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+
+# Static lib
+kaapi_plugin_host_a.o: ${FILE_LIB} kaapi_plugin_host.c kaapi_plugin.h  Makefile 
+	$(CC) -c ${CPPFLAGS} ${OPT} ./kaapi_plugin_host.c -o $@
+
+kaapi_plugin_cuda_a.o: ${FILE_LIB} kaapi_plugin_cuda.c kaapi_plugin.h  Makefile 
+	$(CC) -c ${CPPFLAGS} -fopenmp ${OPT} ./kaapi_plugin_cuda.c -o $@
+
+$(patsubst %.c,%_a.o,$(filter %.c,$(FILE_OTHER))): %_a.o:	 %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
+	$(CC) ${XKBLAS_CPPFLAGS} ${OPT} -DXKBLAS_CFLAGS='"${XKBLAS_CPPFLAGS} ${OPT}"' -c $<  -o $@
+
+$(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_z))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
+	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_c))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
+	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_d))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
+	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_s))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
+	$(CC) -DPRECISION_s -UPRECISION_d -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
 
 
 #${XKBLAS_GEN_TASK} ${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TESTING} .generated
 
 clean:
-	rm -f libkaapi.a libkaapi.so libxkblas.so libxkblas_blaswrapper.so *.o blas/*.o \
-		libkaapi_plugin_host.so.1 libkaapi_plugin_cuda.so.1
+	rm -f libkaapi.a libkaapi.so libxkblas.a libxkblas.so libxkblas_blaswrapper.so *.o blas/*.o \
+		libkaapi_plugin_host.so.1 libkaapi_plugin_cuda.so.1\
+		testing_z testing_c testing_d testing_s
 
 

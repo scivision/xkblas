@@ -49,8 +49,6 @@
 //#define LOGDEBUG(x) x
 
 
-/* do not use prefetch for successor task */
-#define KAAPI_USE_PREFETCH 1
 
 /*
 */
@@ -287,9 +285,8 @@ static int kaapi_offload_device_prepare_execute_task(
 
   //printf("%li: %s prepare task: %p  %s\n", kaapi_get_elapsedns(), __func__, task, fmt->name );
 #if KAAPI_USE_PREFETCH
-  #define MAX_PREFETCH_WINDOW 2
   int prefetch_taskcnt = 0;
-  kaapi_task_t* prefetch_tasklist[MAX_PREFETCH_WINDOW];
+  kaapi_task_t* prefetch_tasklist[KAAPI_MAX_PREFETCH_WINDOW];
 #endif
 
   /* take 'pseudo' lock to avoid activation of the task if a data
@@ -368,7 +365,7 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
         if ((an !=0))// && KAAPI_ACCESS_IS_READ(an->mode))
         {
           kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
-          if ((ldid == device->ld->ldid) && (prefetch_taskcnt < MAX_PREFETCH_WINDOW)) 
+          if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW)) 
             prefetch_tasklist[prefetch_taskcnt++] = an->task;
         }
       }

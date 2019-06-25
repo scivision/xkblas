@@ -37,7 +37,8 @@
 **/
 
 #include "kaapi_version.h"
-#include "kaapi_error.h"
+#include "kaapi_impl.h"
+//#include "kaapi_error.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -57,6 +58,39 @@ void kaapi_abort(unsigned long int line, const char* file, const char* msg)
   else
     printf("**** Aborting Line: %li, File: '%s'\n", line, file);
   abort();
+}
+
+/* How it was compiled */
+const char* get_kaapi_info(void)
+{ 
+  static char buffer[8192];
+  static int isinit = 0;
+  if (isinit ==0)
+    snprintf( buffer, 8192, 
+            "  Git last commit: %s\n"
+            "  BlasLib : %s\n"
+            "  Compiled: %s\n"
+            "  GPUSET  : %u\n"
+            "  NGPUS   : %i\n"
+            "  NSTREAMS: %i\n"
+            "  NKERNELS: %i\n" 
+            "  PREFETCH: %i\n" 
+            "  IO/THR  : %i\n", 
+         STR_EXP(GIT_HASH),
+         STR_EXP(XKBLAS_BLASLIB),
+         STR_EXP(XKBLAS_CFLAGS),
+         kaapi_default_param.gpu_set,
+         (int)kaapi_default_param.ngpus,
+         kaapi_default_param.cuda_conc_strem_kernel,
+         kaapi_default_param.cuda_conc_kernel,
+#if KAAPI_USE_PREFETCH
+         KAAPI_MAX_PREFETCH_WINDOW,
+#else
+         0,
+#endif 
+         KAAPI_HAVE_IO_THREADS
+    );
+  return buffer; 
 }
 
 /* autotools can prompt for this ... */

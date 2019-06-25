@@ -47,6 +47,10 @@
 #define KAAPI_USE_HOST_PLUGIN 1
 #define KAAPI_USE_CUDA_PLUGIN 1
 
+/* do not use prefetch for successor task */
+#define KAAPI_USE_PREFETCH 1
+#define KAAPI_MAX_PREFETCH_WINDOW 2
+
 
 /* Mark that we compile source of the library.
    Only used to avoid to include public definitition of some types.
