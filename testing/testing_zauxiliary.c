@@ -28,11 +28,13 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #endif
-#include "xkblas.h"
 #include "testing_zauxiliary.h"
+#include "xkblas.h"
 
-int   IONE     = 1;
-int   ISEED[5] = {0,0,0,1,0};   /* initial seed for zlarnv() */
+int   IONE  = 1;
+int   PAD[2048] = {0,0,0,0,0,0,0}; /* pad */
+lapack_int ISEED[5] = {0,0,0,1,1};   /* initial seed for zlarnv() */
+int   PAD2[2048] = {0,0,0,0,0,0,0}; /* pad */
 
 int     side[2]   = { CblasLeft,    CblasRight };
 int     uplo[2]   = { CblasUpper,   CblasLower };

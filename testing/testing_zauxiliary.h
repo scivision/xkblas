@@ -21,6 +21,7 @@
 #ifndef _testing_zauxiliary_h_
 #define _testing_zauxiliary_h_
 
+#include "common.h"
 //#include "testing.h"
 
 #define USAGE(name, args, details)                                      \
@@ -45,7 +46,7 @@
 #endif
 
 extern int IONE;
-extern int ISEED[5];
+extern lapack_int ISEED[5];
 
 extern int    trans[3];
 extern int    uplo[2];
