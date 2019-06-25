@@ -795,13 +795,13 @@ int xkblas_init(void)
       else if ((strcmp(p,"complex64") ==0) || (strcmp(p, "complex*8") ==0))
         precision = sizeof(Complex64_t);
       else {
-        fprintf(stderr,"[XKBLAS] XKBLAS_PRECISION must be = float|real*4|double|read*8|complex|complex32|complex*4|complex64|complex*8.\n");
+        fprintf(stderr,"[XKBlas] XKBLAS_PRECISION must be = float|real*4|double|read*8|complex|complex32|complex*4|complex64|complex*8.\n");
         exit(1); 
       }
     }
     if (getenv("KAAPI_VERBOSE"))
     {
-      printf("[XKBLAS] tile size: %lu, precision: %lu\n",tile_size, precision);
+      printf("[XKBlas] tile size: %lu, precision: %lu\n",tile_size, precision);
     }
     xkblas_set_param( tile_size, precision );
   }
@@ -813,10 +813,28 @@ int xkblas_init(void)
     setenv("KAAPI_GPUSET",getenv("XKBLAS_GPUSET"),1);
 
   if (getenv("XKBLAS_NCUDA_STREAMS"))
+  {
+    printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS', use 'XKBLAS_NSTREAMS'\n");
     setenv("KAAPI_CUDA_KERNEL_STREAM_NUMS",getenv("XKBLAS_NCUDA_STREAMS"),1);
+  } 
+  if (getenv("XKBLAS_NSTREAMS"))
+  {
+    if (getenv("XKBLAS_NCUDA_STREAMS"))
+      printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS' also defined use 'XKBLAS_NSTREAMS'\n");
+    setenv("KAAPI_CUDA_KERNEL_STREAM_NUMS",getenv("XKBLAS_NSTREAMS"),1);
+  }
 
   if (getenv("XKBLAS_NKERNELS_PER_STREAM"))
+  {
+    printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM', use 'XKBLAS_NKERNELS'\n");
     setenv("KAAPI_CUDA_KERNEL_PER_STREAM",getenv("XKBLAS_NKERNELS_PER_STREAM"),1);
+  }
+  if (getenv("XKBLAS_NKERNELS"))
+  {
+    if (getenv("XKBLAS_NKERNELS_PER_STREAM"))
+      printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM' also defined, use 'XKBLAS_NKERNELS'\n");
+    setenv("KAAPI_CUDA_KERNEL_PER_STREAM",getenv("XKBLAS_NKERNELS"),1);
+  }
 
   if (getenv("XKBLAS_CACHE_LIMIT"))
     setenv("KAAPI_CUDA_CACHE_LIMIT",getenv("XKBLAS_CACHE_LIMIT"),1);
@@ -828,9 +846,11 @@ int xkblas_init(void)
   kaapi_init();
 
   extern const char* get_kaapi_version(void);
-  printf("[XKBLAS init] %s\n", get_kaapi_version() );
+  extern const char* get_kaapi_info(void);
+  printf("[XKBlas init] %s\n", get_kaapi_version() );
+  printf("[XKBlas info]\n%s[XKBlas info]\n", get_kaapi_info() );
 
-  if (getenv("KAAPI_VERBOSE"))
+  if (getenv("KAAPI_VERBOSE")||getenv("XKBLAS_VERBOSE"))
   {
     /* Some information about hierarchy
     */
