@@ -145,7 +145,7 @@ typedef struct kaapi_metadata_info {
 struct kaapi_alloc_data;
 typedef struct kaapi_alloc_data kaapi_alloc_data_t;
 
-typedef struct kaapi_memory_device {
+struct kaapi_memory_device {
     kaapi_address_space_id_t asid;
     kaapi_device_t* device;
     kaapi_alloc_data_t* freelist_bloc;
@@ -178,7 +178,7 @@ typedef struct kaapi_memory_device {
     size_t size_free;
     size_t size_dev_alloc; /* size alloc / free to low level device */
     size_t size_dev_free;
-} kaapi_memory_device_t;
+};
 
 
 /* Return the memory device with the given asid
