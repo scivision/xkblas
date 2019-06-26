@@ -14,9 +14,8 @@ KAAPI_HOME=$(PWD)
 #EXTRA=-DKAAPI_BLAS_USE_MKL
 #BLAS_LIBDIR=${MKLROOT}/lib
 #BLAS_LIB_SO=${MKLROOT}/lib/intel64/libmkl_intel_ilp64.so
-#BLAS_CPPFLAGS=-I${MKLROOT}/include
+#BLAS_CPPFLAGS=-DMKL_ILP64 -m64 -I${MKLROOT}/include
 #BLAS_LDFLAGS=-L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
-#BLAS_LDFLAGS=-L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_gnu_thread -lmkl_core -lpthread -lm -ldl
 
 # For OpenBLAS:
 EXTRA=-DKAAPI_BLAS_USE_OPENBLAS
@@ -25,6 +24,13 @@ BLAS_LIB_SO=${BLAS_LIBDIR}/libopenblas.so
 BLAS_CPPFLAGS=$(shell pkg-config --cflags openblas)
 BLAS_LDFLAGS=$(shell pkg-config --libs openblas)
 
+
+# C Compiler:
+CC=gcc
+
+# Archive + ranlib for static libraries:
+AR=ar
+RANLIB=ranlib
 
 # Option
 OPT=-O3 -std=gnu99 -DKAAPI_DEBUG=0 ${EXTRA} -DNDEBUG

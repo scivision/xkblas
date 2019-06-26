@@ -57,7 +57,7 @@ endif
 
 ifdef CUDA_HOME
   CUDA_FLAGS=-I${CUDA_HOME}/include -DKAAPI_USE_CUDA=1
-  CUDA_LIBS=-Wl,-rpath=${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64 -lcublas -lculibos -lcuda -lcudart -lnvToolsExt
+  CUDA_LIBS=-Wl,-rpath=${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64 -lcublas -lcuda -lcudart
   CUDA_KAAPI_PLUGIN=libkaapi_plugin_cuda.so.1
   CUDA_KAAPI_PLUGIN_C=./kaapi_plugin_cuda.c
   CUDA_KAAPI_PLUGIN=libkaapi_plugin_cuda.so.1
@@ -344,6 +344,18 @@ ALL_FILE=\
 .PHONY: clean gitlastcommit
 
 
+define todo_make
+
+----------------
+XKBLAS $(GIT_HASH) has to be compiled: Please enter either make all or make dynamic or make static. 
+Then you can install the library into your repository with make install PREFIX="<your repository>"
+Any question, suggestion or comment may be send to authors.
+Please visit https://gitlab.inria.fr/xkblas.
+----------------
+endef
+export todo_make
+
+
 define todo_after_make
 
 ----------------
@@ -354,8 +366,16 @@ Please visit https://gitlab.inria.fr/xkblas.
 endef
 export todo_after_make
 
-all: .generated .generated_testing ${UKAAPI_LIBNAME} plugin libxkblas.so libxkblas_blaswrapper.so libxkblas.a
+whattodo:
+	@echo "$$todo_make"
+
+all: alldeps dynamic static
 	@echo "$$todo_after_make"
+
+alldeps: .generated .generated_testing ${UKAAPI_LIBNAME} plugin 
+
+dynamic: libxkblas.so libxkblas_blaswrapper.so 
+static: libxkblas.a
 
 testing: testing_z testing_d testing_c testing_s
 	@echo "$$todo_after_make"
@@ -411,11 +431,38 @@ distclean: clean
 
 #END_DONOT_EXPORT
 
-install: all
-	mkdir -p ${PREFIX}/include ${PREFIX}/lib ${PREFIX}/bin
-	cp kaapi.h kaapi_error.h kaapi_atomic.h blas/xkblas.h blas/xkblas_?.h ${PREFIX}/include
-	cp ${TARGET_PLUGIN} libxkblas.a libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib
-	cp testing_z testing_d testing_c testing_s ${PREFIX}/bin
+install:
+	@if test -e libxkblas.a || test -e libxkblas.so -a -e libkaapi.so ; then \
+		mkdir -p ${PREFIX}/include ${PREFIX}/lib ${PREFIX}/bin; \
+		cp kaapi.h kaapi_error.h kaapi_atomic.h blas/xkblas.h blas/xkblas_?.h ${PREFIX}/include; \
+		echo "XKBlas - Include files installed in ${PREFIX}/include";\
+	        if test -e libxkblas.a ; then \
+	  	  cp -f libxkblas.a ${PREFIX}/lib; \
+		  echo "XKBlas - Static library libxklas.a installed in ${PREFIX}/lib"; \
+        	fi;\
+	        if test -e libxkblas.so -a -e libkaapi.so ; then \
+	  	  cp -f ${TARGET_PLUGIN} a libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib; \
+		  echo "XKBlas - Dynamic libraries libkaapi.so libxklas.so libxkblas_blaswrapper.so installed in ${PREFIX}/lib"; \
+ 		fi;\
+ 		if test -e testing_z; then \
+			cp testing_z ${PREFIX}/bin; \
+                	echo "XKBlas - Testing Z programs installed in ${PREFIX}/bin";\
+		fi;\
+ 		if test -e testing_c; then \
+			cp testing_c ${PREFIX}/bin; \
+                	echo "XKBlas - Testing C programs installed in ${PREFIX}/bin";\
+		fi;\
+ 		if test -e testing_d; then \
+			cp testing_d ${PREFIX}/bin; \
+                	echo "XKBlas - Testing D programs installed in ${PREFIX}/bin";\
+		fi;\
+ 		if test -e testing_s; then \
+			cp testing_s ${PREFIX}/bin; \
+                	echo "XKBlas - Testing S programs installed in ${PREFIX}/bin";\
+		fi;\
+	else \
+		echo "Neither dynamic or static library is compiled"; \
+	fi
 
 plugin: ${TARGET_PLUGIN}
 
@@ -448,16 +495,16 @@ libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o}
 	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lxkblas
 
 
-testing_z: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
+testing_z: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
 	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
-testing_c: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
+testing_c: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
 	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
-testing_d: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
+testing_d: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
 	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
-testing_s: libxkblas.so $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
+testing_s: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
 	$(CC) -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
 # Dynamic lib
@@ -491,7 +538,7 @@ kaapi_plugin_cuda_a.o: ${FILE_LIB} kaapi_plugin_cuda.c kaapi_plugin.h  Makefile
 	$(CC) -c ${CPPFLAGS} -fopenmp ${OPT} ./kaapi_plugin_cuda.c -o $@
 
 $(patsubst %.c,%_a.o,$(filter %.c,$(FILE_OTHER))): %_a.o:	 %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
-	$(CC) ${XKBLAS_CPPFLAGS} ${OPT} -DXKBLAS_CFLAGS='"${XKBLAS_CPPFLAGS} ${OPT}"' -c $<  -o $@
+	$(CC) ${XKBLAS_CPPFLAGS} ${OPT} -DXKBLAS_CFLAGS='"${XKBLAS_CPPFLAGS} ${OPT}"' -c $<  -o $@ 
 
 $(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_z))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
 	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
@@ -509,7 +556,7 @@ $(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_s))): %_a.o: %.c Makefile ka
 #${XKBLAS_GEN_TASK} ${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TESTING} .generated
 
 clean:
-	rm -f libkaapi.a libkaapi.so libxkblas.a libxkblas.so libxkblas_blaswrapper.so *.o blas/*.o \
+	rm -f libkaapi.a libkaapi.so libxkblas.a libxkblas.so libxkblas_blaswrapper.so *.o blas/*.o testing/*.o\
 		libkaapi_plugin_host.so.1 libkaapi_plugin_cuda.so.1\
 		testing_z testing_c testing_d testing_s
 
