@@ -45,6 +45,7 @@
 #include "kaapi_offload.h"
 
 #if KAAPI_USE_CUDA
+//#include <cuda.h>
 #include <cuda_runtime_api.h>
 #endif
 
@@ -278,6 +279,8 @@ void* xkblas_malloc( size_t size )
 {
 #if KAAPI_USE_CUDA
   void* ptr = 0;
+  //CUresult err = cuMemHostAlloc(&ptr, size, CU_MEMHOSTALLOC_PORTABLE);
+  //kaapi_assert_m(CUDA_SUCCESS== err, "cuMemHostAlloc failed");
   kaapi_assert_m(cudaSuccess== cudaHostAlloc(&ptr, size, cudaHostAllocPortable),"cudaHostAlloc failed");
   return ptr;
 #else
@@ -290,6 +293,7 @@ void* xkblas_malloc( size_t size )
 void xkblas_free( void* ptr, size_t sz )
 {
 #if KAAPI_USE_CUDA
+  //kaapi_assert_m(CUDA_SUCCESS==  cuMemFreeHost(ptr),"cuMemFreeHost failed");
   kaapi_assert_m(cudaSuccess== cudaFreeHost(ptr),"cudaFreeHost failed");
 #else
   free(ptr);
