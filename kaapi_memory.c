@@ -1487,7 +1487,7 @@ static int _kaapi_dsm_allocate_replica(
       if (err == 0)
         kdr->ptr = kaapi_memory_alloc( asid, size );
       if (err == ENOMEM || kaapi_pointer_isnull( kdr->ptr ))
-        kaapi_offload_poll_devices();
+        kaapi_offload_poll_device( dsm->nodes[lid]->device->device );
       retry_cnt++;
     }
   }
