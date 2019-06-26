@@ -149,7 +149,7 @@ int testing_zher2k(int argc, char **argv)
 
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZHER2K */
-              xkblas_zher2k_async(uplo[u], trans[t], N, K, alpha, A, LDA, B, LDB, beta, Cfinal, LDC);
+              xkblas_zher2k_async(uplo[u], trans[t], N, K, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(uplo[u], 0, N, N, Cfinal, LDC, sizeof(Complex64_t));
               xkblas_sync();
               double t1 = xkblas_elapsedtime();

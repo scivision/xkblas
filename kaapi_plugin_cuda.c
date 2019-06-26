@@ -1103,6 +1103,7 @@ static int cuda_stream_advance_pending(
         break;
 
       default:
+        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, ios->ok_p);
         kaapi_assert(0);
         break;
     }
@@ -1182,6 +1183,7 @@ static int cuda_stream_process_pending(
         break;
 
       default:
+        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, pos);
         kaapi_assert(0);
         break;
     }
@@ -1752,7 +1754,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_start)(kaapi_device_t*
 
   CPU_ZERO(&schedset);
   cpuset = hwloc_bitmap_alloc();
-  err = hwloc_cudart_get_device_cpuset( topology, dev->device_id, cpuset );
+  err = hwloc_cudart_get_device_cpuset( topology, kaapi_device_ids[dev->device_id], cpuset );
   if (err == 0)
   {
 #if 0

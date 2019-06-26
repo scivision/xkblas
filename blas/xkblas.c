@@ -495,7 +495,6 @@ int xkblas_map_1Dblock_cyclic(
       force
     );
   }
-  printf("[%s] invalid colrow argument\n");
 #if KAAPI_DEBUG
   abort();
 #endif

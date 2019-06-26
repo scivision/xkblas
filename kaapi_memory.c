@@ -47,9 +47,6 @@
 /* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map */
 #define KAAPI_SIZE_DSM_MAP 20
 
-/* cache limit is 90% of the device size */
-#define KAAPI_PERCENT_CACHELIMIT 0.9
-
 /* DSM node representation
 */
 struct kaapi_dsm_node {
@@ -458,7 +455,7 @@ static kaapi_memory_cache_t* kaapi_memory_cache_init(
 {
   kaapi_memory_cache_t* cache = malloc(sizeof(kaapi_memory_cache_t));
   cache->asid  = asid;
-  cache->size_limit = KAAPI_PERCENT_CACHELIMIT*device->f_get_free_mem(device);
+  cache->size_limit = kaapi_default_param.cuda_cache_limit*device->f_get_free_mem(device);
   cache->size_used  = 0;
   cache->ro.beg = cache->ro.end = 0;
   cache->rw.beg = cache->rw.end = 0;
@@ -864,10 +861,31 @@ static int kaapi_memory_cache_evict(
 )
 {
   if (size >0)
-    size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->ro);
+  {
+    int cnt = 0;
+    do {
+      size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->ro);
+      if (size >0)
+      {
+        ++cnt;
+        kaapi_offload_poll_devices();
+      }
+    } while ((size >0) && (cnt <32));
+  }
 
   if (size >0)
-    size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->rw);
+  {
+    int cnt = 0;
+    do {
+      size = kaapi_memory_cache_evict_fromlist(device, cache, size, &cache->rw);
+      if (size >0)
+      {
+        ++cnt;
+        kaapi_offload_poll_devices();
+      }
+    } while ((size >0) && (cnt <2));
+  }
+
 
   /* here if size >0 then it could be necessary to write back valid bloc on the cache
      but not pinned.
@@ -1583,10 +1601,13 @@ reload:
   }
 #endif
 
-#if 0 // TOPO DGX1
+#if 0
+#if 0 // for DGX1
+// TOPO DGX1
 /* 4 levels of affinity. LID=0 == CPU, so shift value +1*/
+#define HLEVEL_AFFINITY 4
 #define BIT(x) (1<<(1+(x)))
-static int affinity[8][4] = {
+static int affinity[9][HLEVEL_AFFINITY] = {
   { 0, ~0,         0,             0,                   0},
   { 0, BIT(3)|BIT(4), BIT(1)|BIT(2), BIT(5)|BIT(6)|BIT(7)},
   { 1, BIT(2)|BIT(5), BIT(0)|BIT(3), BIT(4)|BIT(6)|BIT(7)},
@@ -1597,7 +1618,23 @@ static int affinity[8][4] = {
   { 6, BIT(5)|BIT(7), BIT(2)|BIT(4), BIT(0)|BIT(1)|BIT(3)},
   { 7, BIT(4)|BIT(6), BIT(3)|BIT(5), BIT(0)|BIT(1)|BIT(2)}
 };
-  for (int i=1; i<4; ++i)
+
+#else // for BLAISE
+
+// TOPO BLAISE
+/* 3 levels of affinity. LID=0 == CPU, so shift value +1*/
+#define BIT(x) (1<<(1+(x)))
+#define HLEVEL_AFFINITY 3
+static int affinity[5][HLEVEL_AFFINITY] = {
+  { 0, ~0,         0,       },
+  { 0, BIT(3), BIT(1)|BIT(2)},
+  { 1, BIT(2), BIT(0)|BIT(3)},
+  { 2, BIT(1), BIT(0)|BIT(3)},
+  { 3, BIT(0), BIT(1)|BIT(2)}
+};
+#endif
+
+  for (int i=1; i<HLEVEL_AFFINITY; ++i)
   {
     if (valid_bit & affinity[lid_dest][i])
     {

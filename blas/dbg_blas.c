@@ -55,7 +55,7 @@ int xkblas_dbg_setname(
     for (size_t n = 0; n < Ant; n++) 
     {
       char buffer[64];
-      snprintf(buffer,64,"%s(%i,%i)",name,m,n);
+      snprintf(buffer,64,"%s(%i,%i)",name, (int)m, (int)n);
       kaapi_dbg_register_name( (void*)( (uintptr_t)Ah->addr + Ah->eltsize*(m*Ah->mb + n*Ah->nb*Ah->ld)), buffer );
     }
   return 0;

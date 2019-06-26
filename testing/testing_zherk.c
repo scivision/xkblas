@@ -59,8 +59,8 @@ int testing_zherk(int argc, char **argv)
         return -1;
     }
 
-    double alpha = (double) atol(argv[0]);
-    double beta  = (double) atol(argv[1]);
+    CFloat64_t alpha = (double) atol(argv[0]);
+    CFloat64_t beta  = (double) atol(argv[1]);
     int N     = atoi(argv[2]);
     int K     = atoi(argv[3]);
     int LDA   = atoi(argv[4]);
@@ -132,12 +132,19 @@ int testing_zherk(int argc, char **argv)
               memcpy(Cinit,  C, LDCxN*sizeof(Complex64_t));
               memcpy(Cfinal, C, LDCxN*sizeof(Complex64_t));
 
+#if defined(PRECISION_z)
               LAPACKE_dlarnv_work(1, ISEED, 1, &alpha);
               LAPACKE_dlarnv_work(1, ISEED, 1, &beta);
+#elif defined(PRECISION_c)
+              LAPACKE_slarnv_work(1, ISEED, 1, &alpha);
+              LAPACKE_slarnv_work(1, ISEED, 1, &beta);
+#else
+  #error "here"
+#endif
 
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZHERK */
-              xkblas_zherk_async(uplo[u], trans[t], N, K, alpha, A, LDA, beta, Cfinal, LDC);
+              xkblas_zherk_async(uplo[u], trans[t], N, K, &alpha, A, LDA, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(uplo[u], 0, N, N, Cfinal, LDC, sizeof(Complex64_t));
               xkblas_sync();
               double t1 = xkblas_elapsedtime();

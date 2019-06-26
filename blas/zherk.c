@@ -94,8 +94,8 @@
 #define C(m, n) C##h,  m,  n
 
 int xkblas_zherk_async( int uplo, int trans, int N, int K,
-                 CFloat64_t alpha, Complex64_t *A, int LDA,
-                 CFloat64_t beta,  Complex64_t *C, int LDC )
+                 CFloat64_t* alpha, Complex64_t *A, int LDA,
+                 CFloat64_t* beta,  Complex64_t *C, int LDC )
 {
     size_t Am, An;
 
@@ -132,7 +132,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
 
     /* Quick return */
     if (N == 0 ||
-        ((alpha == (CFloat64_t)0.0 || K == 0.0) && beta == (CFloat64_t)1.0))
+        ((*alpha == (CFloat64_t)0.0 || K == 0.0) && *beta == (CFloat64_t)1.0))
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
@@ -172,7 +172,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
     size_t tempnn, tempmm, tempkn, tempkm;
 
     Complex64_t zone   = (Complex64_t)1.0;
-    Complex64_t zalpha = (Complex64_t)alpha;
+    Complex64_t zalpha = (Complex64_t)*alpha;
     Complex64_t zbeta;
     double dbeta;
 
@@ -195,11 +195,11 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
         if (trans == CblasNoTrans) {
             for (k = 0; k < Ant; k++) {
                 tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                dbeta = k == 0 ? beta : 1.0;
+                dbeta = k == 0 ? *beta : 1.0;
                 INSERT_TASK_zherk(
                     uplo, trans,
                     tempnn, tempkn, 
-                    alpha, A(n, k), ldan, /* ldan * K */
+                    *alpha, A(n, k), ldan, /* ldan * K */
                     dbeta, C(n, n), ldcn); /* ldc  * N */
             }
             /*
@@ -212,7 +212,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
                     ldcm = LDC;//BLKLDD(C, m);
                     for (k = 0; k < Ant; k++) {
                         tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        zbeta = k == 0 ? (Complex64_t)beta : zone;
+                        zbeta = k == 0 ? (Complex64_t)*beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasConjTrans,
                             tempmm, tempnn, tempkn, 
@@ -231,7 +231,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
                     ldam = LDA;//BLKLDD(A, m);
                     for (k = 0; k < Ant; k++) {
                         tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        zbeta = k == 0 ? (Complex64_t)beta : zone;
+                        zbeta = k == 0 ? (Complex64_t)*beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasConjTrans,
                             tempnn, tempmm, tempkn, 
@@ -249,11 +249,11 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
             for (k = 0; k < Amt; k++) {
                 tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                 ldak = LDA;//BLKLDD(A, k);
-                dbeta = k == 0 ? beta : 1.0;
+                dbeta = k == 0 ? *beta : 1.0;
                 INSERT_TASK_zherk(
                     uplo, trans,
                     tempnn, tempkm, 
-                    alpha, A(k, n), ldak,  /* lda * N */
+                    *alpha, A(k, n), ldak,  /* lda * N */
                     dbeta, C(n, n), ldcn); /* ldc * N */
             }
             /*
@@ -266,7 +266,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
                     for (k = 0; k < Amt; k++) {
                         tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? (Complex64_t)beta : zone;
+                        zbeta = k == 0 ? (Complex64_t)*beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasNoTrans,
                             tempmm, tempnn, tempkm, 
@@ -285,7 +285,7 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
                     for (k = 0; k < Amt; k++) {
                         tempkm = k == Amt-1 ? Am-k*Amb : Amb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? (Complex64_t)beta : zone;
+                        zbeta = k == 0 ? (Complex64_t)*beta : zone;
                         INSERT_TASK_zgemm(
                             trans, CblasNoTrans,
                             tempnn, tempmm, tempkm, 

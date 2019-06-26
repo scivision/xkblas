@@ -103,9 +103,9 @@
 #define C(m,n) Ch,  m,  n
 
 int xkblas_zhemm_async( int side, int uplo, int M, int N,
-                 Complex64_t alpha, Complex64_t *A, int LDA,
+                 Complex64_t* alpha, Complex64_t *A, int LDA,
                  Complex64_t *B, int LDB,
-                 Complex64_t beta,  Complex64_t *C, int LDC )
+                 Complex64_t* beta,  Complex64_t *C, int LDC )
 {
     int Am;
 
@@ -142,7 +142,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
 
     /* Quick return */
     if (M == 0 || N == 0 ||
-        ((alpha == (Complex64_t)0.0) && beta == (Complex64_t)1.0))
+        ((*alpha == (Complex64_t)0.0) && *beta == (Complex64_t)1.0))
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
@@ -218,12 +218,12 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                         tempkm = k == Cmt-1 ? Cm-k*Cmb : Cmb;
                         ldak = LDA;//BLKLDD(A, k);
                         ldbk = LDB;//BLKLDD(B, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         if (k < m) {
                             INSERT_TASK_zgemm(
                                 CblasNoTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkm, 
-                                alpha, A(m, k), ldam,  /* lda * K */
+                                *alpha, A(m, k), ldam,  /* lda * K */
                                        B(k, n), ldbk,  /* ldb * Y */
                                 zbeta, C(m, n), ldcm); /* ldc * Y */
                         }
@@ -232,7 +232,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zhemm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,  /* ldak * X */
+                                    *alpha, A(k, k), ldak,  /* ldak * X */
                                            B(k, n), ldbk,  /* ldb  * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -240,7 +240,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasConjTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkm, 
-                                    alpha, A(k, m), ldak,  /* ldak * X */
+                                    *alpha, A(k, m), ldak,  /* ldak * X */
                                            B(k, n), ldbk,  /* ldb  * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -255,12 +255,12 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                         tempkm = k == Cmt-1 ? Cm-k*Cmb : Cmb;
                         ldak = LDA;//BLKLDD(A, k);
                         ldbk = LDB;//BLKLDD(B, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         if (k < m) {
                             INSERT_TASK_zgemm(
                                 CblasConjTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkm, 
-                                alpha, A(k, m), ldak,  /* ldak * X */
+                                *alpha, A(k, m), ldak,  /* ldak * X */
                                        B(k, n), ldbk,  /* ldb  * Y */
                                 zbeta, C(m, n), ldcm); /* ldc  * Y */
                         }
@@ -269,7 +269,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zhemm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,  /* ldak * K */
+                                    *alpha, A(k, k), ldak,  /* ldak * K */
                                            B(k, n), ldbk,  /* ldb  * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -277,7 +277,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkm, 
-                                    alpha, A(m, k), ldam,  /* lda * K */
+                                    *alpha, A(m, k), ldam,  /* lda * K */
                                            B(k, n), ldbk,  /* ldb * Y */
                                     zbeta, C(m, n), ldcm); /* ldc * Y */
                             }
@@ -295,12 +295,12 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                     for (k = 0; k < Cnt; k++) {
                         tempkn = k == Cnt-1 ? Cn-k*Cnb : Cnb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         if (k < n) {
                             INSERT_TASK_zgemm(
                                 CblasNoTrans, CblasConjTrans,
                                 tempmm, tempnn, tempkn, 
-                                alpha, B(m, k), ldbm,  /* ldb * K */
+                                *alpha, B(m, k), ldbm,  /* ldb * K */
                                        A(n, k), ldan,  /* lda * K */
                                 zbeta, C(m, n), ldcm); /* ldc * Y */
                         }
@@ -309,7 +309,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zhemm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,  /* ldak * Y */
+                                    *alpha, A(k, k), ldak,  /* ldak * Y */
                                            B(m, k), ldbm,  /* ldb  * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -317,7 +317,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasNoTrans,
                                     tempmm, tempnn, tempkn, 
-                                    alpha, B(m, k), ldbm,  /* ldb  * K */
+                                    *alpha, B(m, k), ldbm,  /* ldb  * K */
                                            A(k, n), ldak,  /* ldak * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -331,12 +331,12 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                     for (k = 0; k < Cnt; k++) {
                         tempkn = k == Cnt-1 ? Cn-k*Cnb : Cnb;
                         ldak = LDA;//BLKLDD(A, k);
-                        zbeta = k == 0 ? beta : zone;
+                        zbeta = k == 0 ? *beta : zone;
                         if (k < n) {
                             INSERT_TASK_zgemm(
                                 CblasNoTrans, CblasNoTrans,
                                 tempmm, tempnn, tempkn, 
-                                alpha, B(m, k), ldbm,  /* ldb  * K */
+                                *alpha, B(m, k), ldbm,  /* ldb  * K */
                                        A(k, n), ldak,  /* ldak * Y */
                                 zbeta, C(m, n), ldcm); /* ldc  * Y */
                         }
@@ -345,7 +345,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zhemm(
                                     side, uplo,
                                     tempmm, tempnn, 
-                                    alpha, A(k, k), ldak,  /* ldak * Y */
+                                    *alpha, A(k, k), ldak,  /* ldak * Y */
                                            B(m, k), ldbm,  /* ldb  * Y */
                                     zbeta, C(m, n), ldcm); /* ldc  * Y */
                             }
@@ -353,7 +353,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
                                 INSERT_TASK_zgemm(
                                     CblasNoTrans, CblasConjTrans,
                                     tempmm, tempnn, tempkn, 
-                                    alpha, B(m, k), ldbm,  /* ldb * K */
+                                    *alpha, B(m, k), ldbm,  /* ldb * K */
                                            A(n, k), ldan,  /* lda * K */
                                     zbeta, C(m, n), ldcm); /* ldc * Y */
                             }
