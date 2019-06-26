@@ -1602,7 +1602,7 @@ reload:
 #endif
 
 #if 0
-#if 0
+#if 0 // for DGX1
 // TOPO DGX1
 /* 4 levels of affinity. LID=0 == CPU, so shift value +1*/
 #define HLEVEL_AFFINITY 4
@@ -1618,7 +1618,8 @@ static int affinity[9][HLEVEL_AFFINITY] = {
   { 6, BIT(5)|BIT(7), BIT(2)|BIT(4), BIT(0)|BIT(1)|BIT(3)},
   { 7, BIT(4)|BIT(6), BIT(3)|BIT(5), BIT(0)|BIT(1)|BIT(2)}
 };
-#endif
+
+#else // for BLAISE
 
 // TOPO BLAISE
 /* 3 levels of affinity. LID=0 == CPU, so shift value +1*/
@@ -1631,6 +1632,7 @@ static int affinity[5][HLEVEL_AFFINITY] = {
   { 2, BIT(1), BIT(0)|BIT(3)},
   { 3, BIT(0), BIT(1)|BIT(2)}
 };
+#endif
 
   for (int i=1; i<HLEVEL_AFFINITY; ++i)
   {
