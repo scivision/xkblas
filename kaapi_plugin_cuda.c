@@ -1107,6 +1107,7 @@ static int cuda_stream_advance_pending(
         break;
 
       default:
+        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, ios->ok_p);
         kaapi_assert(0);
         break;
     }
@@ -1186,6 +1187,7 @@ static int cuda_stream_process_pending(
         break;
 
       default:
+        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, pos);
         kaapi_assert(0);
         break;
     }
