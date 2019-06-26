@@ -374,6 +374,7 @@ static int _kaapi_offload_onestream_process_instruction(
 {
   KAAPI_OFFLOAD_TRACE_IN
   int err = 0;
+  kaapi_assert_debug( ios->pos_r <= ios->pos_wp );
   while (!kaapi_io_stream_emptyinstr(ios))
   {
     int p  = ios->pos_r  % ios->count;
