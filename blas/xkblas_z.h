@@ -62,13 +62,19 @@ extern int xkblas_zsyrk_async(
 extern int xkblas_zsyr2k_async( 
   int uplo, int trans, int N, int K,
   Complex64_t* alpha, Complex64_t *A, int LDA,
-                     Complex64_t *B, int LDB, 
+                      Complex64_t *B, int LDB,
   Complex64_t* beta,  Complex64_t *C, int LDC );
 
 extern int xkblas_zsymm_async( 
   int side, int uplo, int M, int N,
   Complex64_t* alpha, Complex64_t *A, int LDA,
-                     Complex64_t *B, int LDB,
+                      Complex64_t *B, int LDB,
+  Complex64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zhemm_async(
+  int side, int uplo, int M, int N,
+  Complex64_t* alpha, Complex64_t *A, int LDA,
+                      Complex64_t *B, int LDB,
   Complex64_t* beta,  Complex64_t *C, int LDC );
 
 extern int xkblas_zherk_async( 
@@ -79,12 +85,7 @@ extern int xkblas_zherk_async(
 extern int xkblas_zher2k_async( 
   int uplo, int trans, int N, int K,
   Complex64_t* alpha, Complex64_t *A, int LDA,
-                     Complex64_t *B, int LDB,
+                      Complex64_t *B, int LDB,
   CFloat64_t* beta,   Complex64_t *C, int LDC);
 
-extern int xkblas_zhemm_async( 
-  int side, int uplo, int M, int N,
-  Complex64_t* alpha, Complex64_t *A, int LDA,
-                     Complex64_t *B, int LDB,
-  Complex64_t* beta,  Complex64_t *C, int LDC );
 
