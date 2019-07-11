@@ -94,8 +94,8 @@
 #define C(m, n) C##h,  m,  n
 
 int xkblas_zherk_async( int uplo, int trans, int N, int K,
-                 CFloat64_t* alpha, Complex64_t *A, int LDA,
-                 CFloat64_t* beta,  Complex64_t *C, int LDC )
+                 const CFloat64_t* alpha, const Complex64_t *A, int LDA,
+                 const CFloat64_t* beta,  Complex64_t *C, int LDC )
 {
     size_t Am, An;
 

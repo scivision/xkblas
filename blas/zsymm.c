@@ -104,9 +104,9 @@
 #define C(m,n) Ch,  m,  n
 
 int xkblas_zsymm_async( int side, int uplo, int M, int N,
-                 Complex64_t* alpha, Complex64_t *A, int LDA,
-                 Complex64_t *B, int LDB,
-                 Complex64_t* beta,  Complex64_t *C, int LDC )
+                 const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                                           const Complex64_t *B, int LDB,
+                 const Complex64_t* beta,  Complex64_t *C, int LDC )
 {
     size_t Am;
 

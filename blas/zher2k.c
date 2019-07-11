@@ -104,9 +104,9 @@
 #define C(m, n) C##h,  m,  n
 
 int xkblas_zher2k_async( int uplo, int trans, int N, int K,
-                 Complex64_t* alpha, Complex64_t *A, int LDA,
-                                     Complex64_t *B, int LDB,
-                 CFloat64_t* beta,   Complex64_t *C, int LDC
+                 const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                                           const Complex64_t *B, int LDB,
+                 const CFloat64_t* beta,   Complex64_t *C, int LDC
 )
 {
     int Am, An;

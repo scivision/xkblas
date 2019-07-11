@@ -102,9 +102,8 @@ int xkblas_ztrsm_async(
     int side, int uplo,
     int transA, int diag,
     int N, int NRHS,
-    const Complex64_t* alpha,
-    const Complex64_t* A, int LDA,
-    Complex64_t* B, int LDB )
+    const Complex64_t* alpha, const Complex64_t* A, int LDA,
+                              Complex64_t* B, int LDB )
 {
     int NA;
     int status;

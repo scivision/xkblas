@@ -99,8 +99,8 @@
 
 int xkblas_ztrmm_async( int side, int uplo,
                  int transA, int diag,
-                 int N, int NRHS, Complex64_t* alpha,
-                 Complex64_t *A, int LDA,
+                 int N, int NRHS, 
+                 const Complex64_t* alpha, const Complex64_t *A, int LDA,
                  Complex64_t *B, int LDB )
 {
     int NA;
