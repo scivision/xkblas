@@ -124,6 +124,21 @@ static void (*dl_zher2k)(
 
 
 /* ================================  GEMM  =============================================== */
+extern void CATSTR(xkblas,zgemm)(
+    const char * transa, const char * transb,
+    const int * m, const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+{
+  if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
+  dl_zgemm( transa, transb,
+            m, n, k,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc);
+}
+
 /* F77 name
 */
 extern void BLAS_NAME(zgemm)(
@@ -139,12 +154,11 @@ extern void BLAS_NAME(zgemm)(
 
   if (FLOPS_ZGEMM(*m,*n,*k)/DATA_ZGEMM(*m,*n,*k) < threshold_kern[ZGEMM])
   {
-    if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
-    dl_zgemm( transa, transb,
-              m, n, k,
-              alpha, A, lda,
-                     B, ldb,
-              beta,  C, ldc);
+    CATSTR(xkblas,zgemm)( transa, transb,
+                          m, n, k,
+                          alpha, A, lda,
+                                 B, ldb,
+                          beta,  C, ldc);
   }
   else {
     xkblas_zgemm_async(xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb), *m, *n, *k,
@@ -159,7 +173,33 @@ extern void BLAS_NAME(zgemm)(
 
 
 
+
+
 /* ================================  GEMMT  =============================================== */
+extern void CATSTR(xkblas,zgemmt)(
+    const char* uplo, const char * transa, const char * transb,
+    const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+{
+#if defined(KAAPI_BLAS_USE_MKL)
+  if (dl_zgemmt ==0) xkblas_load_sym((void**)&dl_zgemmt,SYMBLAS_NAME(zgemmt));
+  dl_zgemmt( uplo, transa, transb,
+             n, k,
+             alpha, A, lda,
+                    B, ldb,
+             sbeta, C, ldc);
+#else
+  if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
+  dl_zgemm( transa, transb,
+            n, n, k,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc);
+#endif
+}
+
 /* F77 name
 */
 extern void BLAS_NAME(zgemmt)(
@@ -175,21 +215,11 @@ extern void BLAS_NAME(zgemmt)(
 
   if (FLOPS_ZGEMMT(*n,*n,*k)/DATA_ZGEMMT(*n,*n,*k) < threshold_kern[ZGEMMT])
   {
-#if defined(KAAPI_BLAS_USE_MKL)
-    if (dl_zgemmt ==0) xkblas_load_sym((void**)&dl_zgemmt,SYMBLAS_NAME(zgemmt));
-    dl_zgemmt( uplo, transa, transb,
+    CATSTR(xkblas,zgemmt)( uplo, transa, transb,
                n, k,
                alpha, A, lda,
                       B, ldb,
                sbeta, C, ldc);
-#else
-    if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
-    dl_zgemm( transa, transb,
-              n, n, k,
-              alpha, A, lda,
-                     B, ldb,
-              beta,  C, ldc);
-#endif
   }
   else {
     xkblas_zgemmt_async(xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb),
@@ -206,7 +236,21 @@ extern void BLAS_NAME(zgemmt)(
 
 
 /* ================================  TRSM  =============================================== */
-/*
+extern void CATSTR(xkblas,ztrsm)(
+    const char * side, const char *uplo, const char* transa, const char* diag,
+    const int* m, const int* n,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              Complex64_t* B, const int * ldb )
+{
+  if (dl_ztrsm ==0) xkblas_load_sym((void**)&dl_ztrsm,SYMBLAS_NAME(ztrsm));
+  dl_ztrsm( side, uplo, transa, diag,
+            m, n,
+            alpha, A, lda,
+                   B, ldb
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(ztrsm)(
     const char * side, const char *uplo, const char* transa, const char* diag,
@@ -217,8 +261,7 @@ extern void BLAS_NAME(ztrsm)(
   if (FLOPS_ZTRSM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZTRSM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZTRSM])
   {
-    if (dl_ztrsm ==0) xkblas_load_sym((void**)&dl_ztrsm,SYMBLAS_NAME(ztrsm));
-    dl_ztrsm( side, uplo, transa, diag,
+    CATSTR(xkblas,ztrsm)( side, uplo, transa, diag,
               m, n,
               alpha, A, lda,
                      B, ldb
@@ -239,7 +282,22 @@ extern void BLAS_NAME(ztrsm)(
 
 
 /* ================================  TRMM  =============================================== */
-/*
+extern void CATSTR(xkblas,ztrmm)(
+  const char * side, const char *uplo, const char *transa, const char * diag,
+  const int *m, const int * n,
+  const Complex64_t* alpha,  const Complex64_t *A, const int *lda,
+                            Complex64_t *B, const int *ldb
+)
+{
+  if (dl_ztrmm ==0) xkblas_load_sym((void**)&dl_ztrmm,SYMBLAS_NAME(ztrmm));
+  dl_ztrmm( side, uplo, transa, diag,
+            m, n,
+            alpha, A, lda,
+                   B, ldb
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(ztrmm)(
   const char * side, const char *uplo, const char *transa, const char * diag,
@@ -251,8 +309,7 @@ extern void BLAS_NAME(ztrmm)(
   if (FLOPS_ZTRMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZTRMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZTRMM])
   {
-    if (dl_ztrmm ==0) xkblas_load_sym((void**)&dl_ztrmm,SYMBLAS_NAME(ztrmm));
-    dl_ztrmm( side, uplo, transa, diag,
+    CATSTR(xkblas,ztrmm)( side, uplo, transa, diag,
               m, n,
               alpha, A, lda,
                      B, ldb
@@ -275,7 +332,24 @@ extern void BLAS_NAME(ztrmm)(
 
 
 /* ================================  SYMM  =============================================== */
-/*
+extern void CATSTR(xkblas,zsymm)(
+  const char * side, const char * uplo,
+  const int * m, const int * n,
+  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
+                            const Complex64_t* B, const int *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const int *ldc
+)
+{
+  if (dl_zsymm ==0) xkblas_load_sym((void**)&dl_zsymm,SYMBLAS_NAME(zsymm));
+  dl_zsymm( side, uplo,
+            m, n,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zsymm)(
   const char * side, const char * uplo,
@@ -288,8 +362,7 @@ extern void BLAS_NAME(zsymm)(
   if (FLOPS_ZSYMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZSYMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZSYMM])
   {
-    if (dl_zsymm ==0) xkblas_load_sym((void**)&dl_zsymm,SYMBLAS_NAME(zsymm));
-    dl_zsymm( side, uplo,
+    CATSTR(xkblas,zsymm)( side, uplo,
               m, n,
               alpha, A, lda,
                      B, ldb,
@@ -313,7 +386,21 @@ extern void BLAS_NAME(zsymm)(
 
 
 /* ================================  SYRK  =============================================== */
-/*
+extern void CATSTR(xkblas,zsyrk)(
+  const char * uplo, const char * transa,
+  const int *n, const int *k,
+  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
+  const Complex64_t *beta,  Complex64_t *C, const int* ldc)
+{
+  if (dl_zsyrk ==0) xkblas_load_sym((void**)&dl_zsyrk,SYMBLAS_NAME(zsyrk));
+  dl_zsyrk( uplo, transa,
+            n, k,
+            alpha, A, lda,
+            beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zsyrk)(
   const char * uplo, const char * transa,
@@ -323,8 +410,7 @@ extern void BLAS_NAME(zsyrk)(
 {
   if (FLOPS_ZSYRK(*n,*k)/ DATA_ZSYRK(*n,*k) < threshold_kern[ZSYRK])
   {
-    if (dl_zsyrk ==0) xkblas_load_sym((void**)&dl_zsyrk,SYMBLAS_NAME(zsyrk));
-    dl_zsyrk( uplo, transa,
+    CATSTR(xkblas,zsyrk)( uplo, transa,
               n, k,
               alpha, A, lda,
               beta,  C, ldc
@@ -345,7 +431,23 @@ extern void BLAS_NAME(zsyrk)(
 
 
 /* ================================  SYR2K  =============================================== */
-/*
+extern void CATSTR(xkblas,zsyr2k)(
+  const char * uplo, const char * transa,
+  const int *n, const int *k,
+  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
+                            const Complex64_t *B, const int* ldb,
+  const Complex64_t *beta,  Complex64_t *C, const int* ldc)
+{
+  if (dl_zsyr2k ==0) xkblas_load_sym((void**)&dl_zsyr2k,SYMBLAS_NAME(zsyr2k));
+  dl_zsyr2k( uplo, transa,
+             n, k,
+             alpha, A, lda,
+                    B, ldb,
+             beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zsyr2k)(
   const char * uplo, const char * transa,
@@ -356,8 +458,7 @@ extern void BLAS_NAME(zsyr2k)(
 {
   if (FLOPS_ZSYR2K(*n,*k)/ DATA_ZSYR2K(*n,*k) < threshold_kern[ZSYR2K])
   {
-    if (dl_zsyr2k ==0) xkblas_load_sym((void**)&dl_zsyr2k,SYMBLAS_NAME(zsyr2k));
-    dl_zsyr2k( uplo, transa,
+    CATSTR(xkblas,zsyr2k)( uplo, transa,
                n, k,
                alpha, A, lda,
                       B, ldb,
@@ -382,7 +483,24 @@ extern void BLAS_NAME(zsyr2k)(
 
 #if defined(PRECISION_Z)||defined(PRECISION_C)
 /* ================================  HEMM  =============================================== */
-/*
+extern void CATSTR(xkblas,zhemm)(
+  const char * side, const char * uplo,
+  const int * m, const int * n,
+  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
+                            const Complex64_t* B, const int *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const int *ldc
+)
+{
+  if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zsymm));
+  dl_zhemm( side, uplo,
+            m, n,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zhemm)(
   const char * side, const char * uplo,
@@ -395,8 +513,7 @@ extern void BLAS_NAME(zhemm)(
   if (FLOPS_ZHEMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZHEMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZHEMM])
   {
-    if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zsymm));
-    dl_zhemm( side, uplo,
+    CATSTR(xkblas,zhemm)( side, uplo,
               m, n,
               alpha, A, lda,
                      B, ldb,
@@ -420,7 +537,21 @@ extern void BLAS_NAME(zhemm)(
 
 
 /* ================================  HERK  =============================================== */
-/*
+extern void CATSTR(xkblas,zherk)(
+  char * uplo, char * transa,
+  int *n, int *k,
+  CFloat64_t *alpha, Complex64_t *A, int* lda,
+  CFloat64_t *beta,  Complex64_t *C, int* ldc)
+{
+  if (dl_zherk ==0) xkblas_load_sym((void**)&dl_zherk,SYMBLAS_NAME(zherk));
+  dl_zherk( uplo, transa,
+            n, k,
+            alpha, A, lda,
+            beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zherk)(
   char * uplo, char * transa,
@@ -430,8 +561,7 @@ extern void BLAS_NAME(zherk)(
 {
   if (FLOPS_ZHERK(*n,*k)/ DATA_ZHERK(*n,*k) < threshold_kern[ZHERK])
   {
-    if (dl_zherk ==0) xkblas_load_sym((void**)&dl_zherk,SYMBLAS_NAME(zherk));
-    dl_zherk( uplo, transa,
+    CATSTR(xkblas,zherk)( uplo, transa,
               n, k,
               alpha, A, lda,
               beta,  C, ldc
@@ -453,7 +583,23 @@ extern void BLAS_NAME(zherk)(
 
 
 /* ================================  HER2K  =============================================== */
-/*
+extern void CATSTR(xkblas,zher2k)(
+  char * uplo, char * transa,
+  int *n, int *k,
+  Complex64_t *alpha, Complex64_t *A, int* lda,
+                      Complex64_t *B, int* ldb,
+  CFloat64_t *beta,   Complex64_t *C, int* ldc)
+{
+  if (dl_zher2k ==0) xkblas_load_sym((void**)&dl_zher2k,SYMBLAS_NAME(zher2k));
+  dl_zher2k( uplo, transa,
+             n, k,
+             alpha, A, lda,
+                    B, ldb,
+             beta,  C, ldc
+  );
+}
+
+/* F77 name
 */
 extern void BLAS_NAME(zher2k)(
   char * uplo, char * transa,
@@ -464,8 +610,7 @@ extern void BLAS_NAME(zher2k)(
 {
   if (FLOPS_ZHER2K(*n,*k)/ DATA_ZHER2K(*n,*k) < threshold_kern[ZHER2K])
   {
-    if (dl_zher2k ==0) xkblas_load_sym((void**)&dl_zher2k,SYMBLAS_NAME(zher2k));
-    dl_zher2k( uplo, transa,
+    CATSTR(xkblas,zher2k)( uplo, transa,
                n, k,
                alpha, A, lda,
                       B, ldb,

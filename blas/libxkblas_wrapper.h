@@ -48,6 +48,8 @@
 
 #define STR_EXPAND2(tok) #tok
 #define STR_EXPAND(tok) STR_EXPAND2(tok)
+#define CATSTR2(x,y) x##y
+#define CATSTR(x,y) CATSTR2(x,y)
 #define XCAT2(w,x,y,z) w##x##y##z
 #define XCAT(w,x,y,z) XCAT2(w,x,y,z)
 #define BLAS_NAME(name)   XCAT(,name,_,)
