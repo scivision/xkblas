@@ -357,3 +357,41 @@ int xkblas_zher2k_async( int uplo, int trans, int N, int K,
         }
     }
 }
+
+
+/* her2k */
+static void (*dl_zher2k)(
+  const char* uplo, const char* transa,
+  const int* n, const int* k,
+  const Complex64_t* alpha, const Complex64_t* A, const int* lda,
+                            const Complex64_t* B, const int* ldb,
+  const CFloat64_t* beta,   Complex64_t* C, const int* ldc) = 0;
+
+/* CPU driver */
+extern void xkblas_zher2k_native_(
+  const char * uplo, const char * transa,
+  const int *n, const int *k,
+  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
+                            const Complex64_t *B, const int* ldb,
+  const CFloat64_t *beta,   Complex64_t *C, const int* ldc)
+{
+  if (dl_zher2k ==0) xkblas_load_sym((void**)&dl_zher2k,SYMBLAS_NAME(zher2k));
+  dl_zher2k( uplo, transa,
+             n, k,
+             alpha, A, lda,
+                    B, ldb,
+             beta,  C, ldc
+  );
+}
+
+extern int xkblas_zher2k_native(
+  int uplo, int trans, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const CFloat64_t* beta,   Complex64_t *C, int LDC)
+{
+  char u = cblas2blas_fill(uplo);
+  char trA = cblas2blas_op(trans);
+  xkblas_zher2k_native_( &u, &trA, &N, &K, alpha, A, &LDA, B, &LDB, beta, C, &LDC );
+  return 0;
+}

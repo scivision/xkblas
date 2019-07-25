@@ -298,3 +298,36 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
     return 0;
 }
 
+
+/* syrk */
+static void (*dl_zsyrk)(
+  const char * uplo, const char * transa,
+  const int *n, const int *k,
+  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
+  const Complex64_t *beta,  Complex64_t *C, const int* ldc) = 0;
+
+/* CPU driver */
+extern void xkblas_zsyrk_native_(
+  const char * uplo, const char * transa,
+  const int *n, const int *k,
+  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
+  const Complex64_t *beta,  Complex64_t *C, const int* ldc)
+{
+  if (dl_zsyrk ==0) xkblas_load_sym((void**)&dl_zsyrk,SYMBLAS_NAME(zsyrk));
+  dl_zsyrk( uplo, transa,
+            n, k,
+            alpha, A, lda,
+            beta,  C, ldc
+  );
+}
+
+extern int xkblas_zsyrk_native(
+  int uplo, int trans, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t* beta,  Complex64_t *C, int LDC )
+{
+  char u = cblas2blas_fill(uplo);
+  char trA = cblas2blas_op(trans);
+  xkblas_zsyrk_native_( &u, &trA, &N, &K, alpha, A, &LDA, beta, C, &LDC );
+  return 0;
+}

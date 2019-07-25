@@ -364,3 +364,42 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
         }
     }
 }
+
+/* hemm */
+static void (*dl_zhemm)(
+  const char* side, const char* uplo,
+  const int* m, const int* n,
+  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
+                            const Complex64_t* B, const int *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const int *ldc ) = 0;
+
+/* CPU driver */
+extern void xkblas_zhemm_native_(
+  const char * side, const char * uplo,
+  const int * m, const int * n,
+  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
+                            const Complex64_t* B, const int *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const int *ldc
+)
+{
+  if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zsymm));
+  dl_zhemm( side, uplo,
+            m, n,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc
+  );
+}
+
+extern int xkblas_zhemm_native(
+  int side, int uplo, int M, int N,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC )
+{
+  char s = cblas2blas_side(side);
+  char u = cblas2blas_fill(uplo);
+  xkblas_zhemm_native_( &s, &u, &M, &N, alpha, A, &LDA, B, &LDB, beta, C, &LDC);
+  return 0;
+}
+

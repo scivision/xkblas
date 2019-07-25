@@ -113,7 +113,8 @@ XKBLAS_BLAS_PRECISION_s=\
   blas/ssyrk.c \
   blas/ssyr2k.c \
   blas/spotrf.c \
-  blas/xkblas_s.h
+  blas/xkblas_s.h\
+  blas/xkblas_f77_s.h
 
 XKBLAS_BLAS_PRECISION_d=\
   blas/dgemm.c\
@@ -124,7 +125,8 @@ XKBLAS_BLAS_PRECISION_d=\
   blas/dsyrk.c\
   blas/dsyr2k.c\
   blas/dpotrf.c\
-  blas/xkblas_d.h
+  blas/xkblas_d.h\
+  blas/xkblas_f77_d.h
 
 XKBLAS_BLAS_PRECISION_c=\
   blas/cgemm.c\
@@ -138,7 +140,8 @@ XKBLAS_BLAS_PRECISION_c=\
   blas/cherk.c \
   blas/cher2k.c \
   blas/cpotrf.c\
-  blas/xkblas_c.h
+  blas/xkblas_c.h\
+  blas/xkblas_f77_c.h
 
 XKBLAS_BLAS_PRECISION_z=\
   blas/zgemm.c\
@@ -152,7 +155,8 @@ XKBLAS_BLAS_PRECISION_z=\
   blas/zherk.c \
   blas/zher2k.c \
   blas/zpotrf.c\
-  blas/xkblas_z.h
+  blas/xkblas_z.h\
+  blas/xkblas_f77_z.h
 
 XKBLAS_GEN_BLAS=blas/internal_register.h\
   ${XKBLAS_BLAS_PRECISION_s}\
@@ -395,7 +399,7 @@ alldeps: .generated .generated_testing ${UKAAPI_LIBNAME} plugin
 dynamic: libxkblas.so libxkblas_blaswrapper.so 
 static: libxkblas.a
 
-testing: testing_z testing_d testing_c testing_s
+testing: testing_z testing_d testing_c testing_s testing_z_wrapper testing_d_wrapper testing_c_wrapper testing_s_wrapper
 	@echo "$$todo_after_make"
 
 #BEGIN_DONOT_EXPORT
@@ -438,7 +442,7 @@ DISTTAG=`git describe --tags  --abbrev=0`
 dist:  .generated .generated_testing
 	mkdir -p xkblas/blas xkblas/testing
 	cp ${UKAAPI_FILE_LIB} ${UKAAPI_FILE_PLUGIN} AUTHORS COPYING LICENCE README.md make.inc Makefile xkblas/
-	cp blas/flops.h blas/task_format.h blas/xkblas_z.h blas/task_z.h blas/task_z_internal.h ${XKBLAS_FILES} ${XKBLAS_WRAPPER_SRC} xkblas/blas
+	cp blas/flops.h blas/task_format.h blas/xkblas_z.h blas/xkblas_f77_z.h blas/task_z.h blas/task_z_internal.h ${XKBLAS_FILES} ${XKBLAS_WRAPPER_SRC} xkblas/blas
 	cp ${XKBLAS_TESTING} xkblas/testing
 	echo ${GIT_HASH} > xkblas/version
 	#update Makefile:
@@ -530,14 +534,30 @@ libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAP
 testing_z: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
 	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
+testing_z_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+
 testing_c: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
 	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+
+testing_c_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
 testing_d: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
 	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
 
+testing_d_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+
 testing_s: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
 	$(CC) -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+
+testing_s_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER  -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+
+$(filter %.c,${XKBLAS_TESTING}): testing/testing_zauxiliary.h
+
+
 
 # Dynamic lib
 kaapi_plugin_host.o: ${FILE_LIB} kaapi_plugin_host.c kaapi_plugin.h  Makefile 
@@ -583,6 +603,21 @@ $(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_d))): %_a.o: %.c Makefile ka
 
 $(patsubst %.c,%_a.o,$(filter %.c, $(FILE_PRECISION_s))): %_a.o: %.c Makefile kaapi_impl.h kaapi.h kaapi_offload.h kaapi_memory.h kaapi_atomic.h kaapi_error.h kaapi_offload_stream.h kaapi_version.h blas/xkblas.h blas/common.h .generated
 	$(CC) -DPRECISION_s -UPRECISION_d -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+
+# Wrapper file for testing
+$(patsubst %.c,%_wrap.o,$(filter %.c, $(FILE_PRECISION_z))): %_wrap.o: %.c Makefile blas/xkblas.h blas/common.h .generated
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_wrap.o,$(filter %.c, $(FILE_PRECISION_c))): %_wrap.o: %.c Makefile blas/xkblas.h blas/common.h .generated
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_wrap.o,$(filter %.c, $(FILE_PRECISION_d))): %_wrap.o: %.c Makefile blas/xkblas.h blas/common.h .generated
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_d -UPRECISION_s -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
+$(patsubst %.c,%_wrap.o,$(filter %.c, $(FILE_PRECISION_s))): %_wrap.o: %.c Makefile  blas/xkblas.h blas/common.h .generated
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_s -UPRECISION_d -UPRECISION_c -UPRECISION_z ${XKBLAS_CPPFLAGS} ${OPT} -c $<  -o $@
+
 
 
 #${XKBLAS_GEN_TASK} ${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TESTING} .generated

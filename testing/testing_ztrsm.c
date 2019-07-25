@@ -37,7 +37,12 @@
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
-#if TESTING_API_XKBLAS==0
+#if 0 
+// xkblas_malloc is an malloc + host register for fast communication
+// with GPU and better overlapping capability.
+// Either the pure XKBLAS API and Wrapper API may use this capability.
+// If you want to make it available only with XKBLAS API, replace the
+// #if 0 by #if defined(TESTING_API_XKBLAS_WRAPPER)
 #define xkblas_malloc(s) malloc(s)
 #define xkblas_free(p,s) free(p)
 #endif
@@ -94,7 +99,12 @@ int testing_ztrsm(int argc, char **argv)
     eps = LAPACKE_dlamch_work('e');
 
     printf("\n");
-    printf("------ TESTS FOR CHAMELEON ZTRSM ROUTINE -------  \n");
+#if defined(TESTING_API_XKBLAS_WRAPPER)
+    printf("------ TESTS FOR XKBLAS WRAPPER API ZTRSM ROUTINE -------  \n");
+#else
+    printf("------ TESTS FOR XKBLAS ZTRSM ROUTINE -------  \n");
+#endif
+
     printf("            Size of the Matrix B : %d by %d\n", M, N);
     printf("\n");
     printf(" The matrix A is randomly generated for each test.\n");
@@ -145,7 +155,7 @@ int testing_ztrsm(int argc, char **argv)
                       /* XKBLAS ZTRSM */
                       LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
                       double t0 = xkblas_elapsedtime();
                       xkblas_ztrsm_async(side[s], uplo[u], trans[t], diag[d], M, N, &alpha, A, LDA, Bfinal, LDB);
                       xkblas_memory_coherent_async(0, 0, M, N, Bfinal, LDB, sizeof(Complex64_t));
@@ -153,6 +163,13 @@ int testing_ztrsm(int argc, char **argv)
                       double t1 = xkblas_elapsedtime();
                       xkblas_memory_invalidate_caches();
 #else
+                      /* test for F77 native call */
+                      extern void ztrsm_(
+                          const char * side, const char *uplo, const char* transa, const char* diag,
+                          const int* m, const int* n,
+                          const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                                                          Complex64_t* B, const int * ldb );
+
                       double t0 = time_get_elapsedtime();
                       char sd = cblas2blas_side( side[s] );
                       char up = cblas2blas_fill( uplo[u] );
@@ -228,17 +245,7 @@ static int check_solution(int side, int uplo, int trans, int diag,
     Binitnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref,  LDB, work);
     Bchamnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bcham, LDB, work);
 
-    extern void _xkblas_ztrsm(
-        const char * side, const char *uplo, const char* transa, const char* diag,
-        const int* m, const int* n,
-        const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                                        Complex64_t* B, const int * ldb );
-
-    char sd = cblas2blas_side( side );
-    char up = cblas2blas_fill( uplo );
-    char tr = cblas2blas_op( trans );
-    char dg = cblas2blas_diag( diag );
-    _xkblas_ztrsm(&sd, &up, &tr, &dg, &M, &N, &alpha, A, &LDA, Bref, &LDB);
+    xkblas_ztrsm_native(side, uplo, trans, diag, M, N, &alpha, A, LDA, Bref, LDB);
 
     Blapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref, LDB, work);
 

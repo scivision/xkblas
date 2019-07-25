@@ -35,7 +35,18 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+/* Naming convention:
+   * XX_async -> multiGPU asynchronous version
+   * XX_native -> call to the native blas CPU variant
+*/
+
 extern int xkblas_zgemm_async(
+  int transA, int transB, int M, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zgemm_native(
   int transA, int transB, int M, int N, int K,
   const Complex64_t* alpha, const Complex64_t *A, int LDA,
   const Complex64_t *B, int LDB,
@@ -47,7 +58,17 @@ extern int xkblas_zgemmt_async(
   const Complex64_t *B, int LDB,
   const Complex64_t* beta,  Complex64_t *C, int LDC );
 
+extern int xkblas_zgemmt_native(
+  int uplo, int transA, int transB, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
 extern int xkblas_ztrsm_async( 
+  int side, int uplo, int transA, int diag, int N, int NRHS,
+  const Complex64_t* alpha, const Complex64_t* A, int LDA, Complex64_t* B, int LDB );
+
+extern int xkblas_ztrsm_native(
   int side, int uplo, int transA, int diag, int N, int NRHS,
   const Complex64_t* alpha, const Complex64_t* A, int LDA, Complex64_t* B, int LDB );
 
@@ -55,9 +76,31 @@ extern int xkblas_ztrmm_async(
   int side, int uplo, int transA, int diag, int N, int NRHS, 
   const Complex64_t* alpha, const Complex64_t *A, int LDA, Complex64_t *B, int LDB );
 
-extern int xkblas_zsyrk_async( 
+extern int xkblas_ztrmm_native(
+  int side, int uplo, int transA, int diag, int N, int NRHS,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA, Complex64_t *B, int LDB );
+
+extern int xkblas_zsymm_async(
+  int side, int uplo, int M, int N,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zsymm_native(
+  int side, int uplo, int M, int N,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zsyrk_async(
   int uplo, int trans, int N, int K,
-  const Complex64_t* alpha, const Complex64_t *A, int LDA, const Complex64_t* beta,  Complex64_t *C, int LDC );
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zsyrk_native(
+  int uplo, int trans, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
 
 extern int xkblas_zsyr2k_async( 
   int uplo, int trans, int N, int K,
@@ -65,8 +108,8 @@ extern int xkblas_zsyr2k_async(
                             const Complex64_t *B, int LDB,
   const Complex64_t* beta,  Complex64_t *C, int LDC );
 
-extern int xkblas_zsymm_async( 
-  int side, int uplo, int M, int N,
+extern int xkblas_zsyr2k_native(
+  int uplo, int trans, int N, int K,
   const Complex64_t* alpha, const Complex64_t *A, int LDA,
                             const Complex64_t *B, int LDB,
   const Complex64_t* beta,  Complex64_t *C, int LDC );
@@ -77,7 +120,18 @@ extern int xkblas_zhemm_async(
                             const Complex64_t *B, int LDB,
   const Complex64_t* beta,  Complex64_t *C, int LDC );
 
+extern int xkblas_zhemm_native(
+  int side, int uplo, int M, int N,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC );
+
 extern int xkblas_zherk_async( 
+  int uplo, int trans, int N, int K,
+  const CFloat64_t* alpha, const Complex64_t *A, int LDA,
+  const CFloat64_t* beta,  Complex64_t *C, int LDC );
+
+extern int xkblas_zherk_native(
   int uplo, int trans, int N, int K,
   const CFloat64_t* alpha, const Complex64_t *A, int LDA,
   const CFloat64_t* beta,  Complex64_t *C, int LDC );
@@ -88,4 +142,8 @@ extern int xkblas_zher2k_async(
                             const Complex64_t *B, int LDB,
   const CFloat64_t* beta,   Complex64_t *C, int LDC);
 
-
+extern int xkblas_zher2k_native(
+  int uplo, int trans, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+                            const Complex64_t *B, int LDB,
+  const CFloat64_t* beta,   Complex64_t *C, int LDC);

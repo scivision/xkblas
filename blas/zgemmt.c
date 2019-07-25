@@ -364,3 +364,56 @@ int xkblas_zgemmt_async(
     }
     return 0;
 }
+
+/* gemmt */
+static void (*dl_zgemmt)(
+    const char* uplo, const char * transa, const char * transb,
+    const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+
+
+/* CPU driver */
+extern void xkblas_zgemmt_native_(
+    const char* uplo, const char * transa, const char * transb,
+    const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+{
+#if defined(KAAPI_BLAS_USE_MKL)
+  if (dl_zgemmt ==0) xkblas_load_sym((void**)&dl_zgemmt,SYMBLAS_NAME(zgemmt));
+  dl_zgemmt( uplo, transa, transb,
+             n, k,
+             alpha, A, lda,
+                    B, ldb,
+             sbeta, C, ldc);
+#else
+  extern void xkblas_zgemm_native_(
+    const char * transa, const char * transb,
+    const int * m, const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc);
+
+  xkblas_zgemm_native_( transa, transb,
+            n, n, k,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc);
+#endif
+}
+
+extern int xkblas_zgemmt_native(
+  int uplo, int transA, int transB, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC )
+{
+  char u = cblas2blas_fill(uplo);
+  char trA = cblas2blas_op(transA);
+  char trB = cblas2blas_op(transB);
+  xkblas_zgemmt_native_( &u, &trA, &trB, &N, &K, alpha, A, &LDA, B, &LDB, beta, C, &LDC );
+  return 0;
+}

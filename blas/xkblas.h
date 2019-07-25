@@ -143,6 +143,10 @@ extern int xkblas_finalize(void);
 
 /*
 */
+extern void xkblas_load_sym(void** ptr, const char* name);
+
+/*
+*/
 extern int xkblas_sync(void);
 
 /*

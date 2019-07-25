@@ -66,7 +66,7 @@ done
 # avoid using z here : zfiles are source files
 for p in c d s;
 do
-  for f in xkblas_z.h task_z.h task_z_internal.h\
+  for f in xkblas_z.h xkblas_f77_z.h task_z.h task_z_internal.h\
            zgemm.c task_zgemm.c \
            zgemmt.c task_zgemmt.c\
            ztrsm.c task_ztrsm.c \

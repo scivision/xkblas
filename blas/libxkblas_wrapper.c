@@ -36,20 +36,19 @@
 **/
 
 #define _GNU_SOURCE
-#include <dlfcn.h>
 //#include <stdlib.h>
 //#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
 
-#define LIBNAME "[xkblas]"
 #define TRACE_MSG 1
 
 #define KAAPI_NO_INCLUDE_BLAS_H
 #include "common.h"
 #include "kaapi_impl.h"
 
+#define LIBNAME "[xkblaswrapper]"
 
 #ifndef XKBLAS_BLASLIB
 #error "XKBLAS_BLASLIB macro should point to the (absolute) path of the libblas to load "
@@ -83,7 +82,6 @@ enum {
   ZHER2K, CHER2K, DHER2K, SHER2K,
   LAST
 };
-static void* handle_blas = 0;
 static long threshold = 1600;
 double threshold_kern[LAST];
 const char* name_kern[LAST] = {
@@ -116,10 +114,6 @@ __attribute__((constructor)) void toto_constructor(void)
   if (getenv("XKBLAS_NGPUS"))
     setenv("KAAPI_NUM_GPUS",getenv("XKBLAS_NGPUS"),1);
 
-  /* */
-  for (int i=0; i<LAST; ++i)
-    threshold_kern[i] = threshold;
-
   if (0 != xkblas_init())
   {
     printf(LIBNAME ": cannot initialize\n");
@@ -133,10 +127,12 @@ __attribute__((constructor)) void toto_constructor(void)
   {
     threshold=atol(getenv("XKBLAS_THRESHOLD"));
     if (threshold <0) threshold = 0;
-    for (int i=0; i<LAST; ++i)
-      threshold_kern[i] = threshold;
   }
   printf(LIBNAME ": threshold :%i\n", threshold);
+
+  /* Threshold per kernels */
+  for (int i=0; i<LAST; ++i)
+    threshold_kern[i] = threshold;
 
   if ((kaapi_default_param.ngpus>0) && (getenv("XKBLAS_THRESHOLD")))
   {
@@ -167,34 +163,13 @@ __attribute__((constructor)) void toto_constructor(void)
     }
   }
 
-  handle_blas = dlopen(XKBLAS_BLASLIB,RTLD_LAZY);
-  if (handle_blas ==0)
-  {
-    printf(LIBNAME ": cannot load liblas '%s'\n", XKBLAS_BLASLIB);
-    abort();
-  }
   printf(LIBNAME ": library initialized.\n");
-}
-
-extern void xkblas_load_sym(void** ptr, const char* name)
-{
-  printf(LIBNAME ": load symbol %s.\n",name);
-  *ptr = dlsym( handle_blas, name );
-  if (*ptr ==0)
-  {
-    fprintf(stderr,"*** Error: " LIBNAME " cannot load symbol '%s' from '%s'\n", name, XKBLAS_BLASLIB);
-    abort();
-  }
-  printf(LIBNAME ": end load symbol %s.\n",name);
 }
 
 /*
 */
-__attribute__((destructor)) void toto_destructor(void) 
+__attribute__((destructor)) void toto_destructor(void)
 {
-  if (handle_blas == 0) return;
-  dlclose(handle_blas);
-  handle_blas = 0;
   xkblas_finalize();
 }
 

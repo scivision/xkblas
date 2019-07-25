@@ -70,6 +70,15 @@ typedef double CFloat64_t;
 #endif
 #include "kaapi.h"
 
+
+/* Common Macro... be carrefull, name not so clear */
+#define _XKBLAS_STR_EXPAND2(tok) #tok
+#define _XKBLAS_STR_EXPAND(tok) _XKBLAS_STR_EXPAND2(tok)
+#define _XKBLAS_XCAT2(w,x,y,z) w##x##y##z
+#define _XKBLAS_XCAT(w,x,y,z) _XKBLAS_XCAT2(w,x,y,z)
+#define BLAS_NAME(name)   _XKBLAS_XCAT(,name,_,)
+#define SYMBLAS_NAME(name) _XKBLAS_STR_EXPAND(_XKBLAS_XCAT(,name,_,))
+
 /* List of kernel implemented in the runtime */
 typedef enum {
   KERN_VOID,

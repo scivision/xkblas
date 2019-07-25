@@ -318,3 +318,41 @@ int xkblas_zgemm_async(
     }
     return 0;
 }
+
+
+/* gemm native pointer */
+static void (*dl_zgemm)(
+    const char * transa, const char * transb,
+    const int * m, const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+
+
+/* CPU driver */
+extern void xkblas_zgemm_native_(
+    const char * transa, const char * transb,
+    const int * m, const int * n, const int * k,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+{
+  if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
+  dl_zgemm( transa, transb,
+            m, n, k,
+            alpha, A, lda,
+                   B, ldb,
+            beta,  C, ldc);
+}
+
+extern int xkblas_zgemm_native(
+  int transA, int transB, int M, int N, int K,
+  const Complex64_t* alpha, const Complex64_t *A, int LDA,
+  const Complex64_t *B, int LDB,
+  const Complex64_t* beta,  Complex64_t *C, int LDC )
+{
+  char trA = cblas2blas_op(transA);
+  char trB = cblas2blas_op(transB);
+  xkblas_zgemm_native_( &trA, &trB, &M, &N, &K, alpha, A, &LDA, B, &LDB, beta, C, &LDC );
+  return 0;
+}

@@ -38,7 +38,12 @@
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
-#if TESTING_API_XKBLAS==0
+#if 0
+// xkblas_malloc is an malloc + host register for fast communication
+// with GPU and better overlapping capability.
+// Either the pure XKBLAS API and Wrapper API may use this capability.
+// If you want to make it available only with XKBLAS API, replace the
+// #if 0 by #if defined(TESTING_API_XKBLAS_WRAPPER)
 #define xkblas_malloc(s) malloc(s)
 #define xkblas_free(p,s) free(p)
 #endif
@@ -91,7 +96,11 @@ int testing_zgemm(int argc, char **argv)
     eps = LAPACKE_dlamch_work('e');
 
     printf("\n");
-    printf("------ TESTS FOR CHAMELEON ZGEMM ROUTINE -------  \n");
+#if defined(TESTING_API_XKBLAS_WRAPPER)
+    printf("------ TESTS FOR XKBLAS WRAPPER API ZGEMM ROUTINE -------  \n");
+#else
+    printf("------ TESTS FOR XKBLAS ZGEMM ROUTINE -------  \n");
+#endif
     printf("            Size of the Matrix %d by %d\n", M, N);
     printf("\n");
     printf(" The matrix A is randomly generated for each test.\n");
@@ -160,7 +169,7 @@ int testing_zgemm(int argc, char **argv)
               LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
               LAPACKE_zlarnv_work(1, ISEED, 1, &beta );
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
               double t0 = xkblas_elapsedtime();
               xkblas_zgemm_async(trans[ta], trans[tb], M, N, K, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(0, 0, M, N, Cfinal, LDC, sizeof(Complex64_t));
@@ -168,9 +177,15 @@ int testing_zgemm(int argc, char **argv)
               double t1 = xkblas_elapsedtime();
               xkblas_memory_invalidate_caches();
 #else
+              /* test for F77 native call */
+              extern void zgemm_(
+                  const char * transa, const char * transb,
+                  const int * m, const int * n, const int * k,
+                  const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                                  const Complex64_t * B, const int * ldb,
+                  const Complex64_t* beta,  Complex64_t * C, const int * ldc);
+
               double t0 = time_get_elapsedtime();
-              //dgemm_(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
-              //cblas_dgemm(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
               char transa = cblas2blas_op(trans[ta]);
               char transb = cblas2blas_op(trans[tb]);
 
@@ -261,20 +276,10 @@ static int check_solution(
 
 
     /* call to original BLAS version */
-    extern void _xkblas_zgemm(
-        const char * transa, const char * transb,
-        const int * m, const int * n, const int * k,
-        const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                                  const Complex64_t * B, const int * ldb,
-        const Complex64_t* beta,  Complex64_t * C, const int * ldc);
-
-    char ta = cblas2blas_op(transA);
-    char tb = cblas2blas_op(transB);
-      
-    _xkblas_zgemm(&ta, &tb, &M, &N, &K, 
-                &alpha, A, &LDA, 
-                B, &LDB, 
-                &beta, Cref, &LDC);
+    xkblas_zgemm_native(transA, transB, M, N, K,
+                &alpha, A, LDA,
+                B, LDB, 
+                &beta, Cref, LDC);
 
     Clapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Cref, LDC, work);
 

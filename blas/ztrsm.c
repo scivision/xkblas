@@ -458,3 +458,37 @@ int xkblas_ztrsm_async(
         }
     }
   }
+
+/* trsm */
+static void (*dl_ztrsm)(
+    const char * side, const char *uplo, const char* transa, const char* diag,
+    const int* m, const int* n,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              Complex64_t* B, const int * ldb ) = 0;
+
+/* CPU driver */
+extern void xkblas_ztrsm_native_(
+    const char * side, const char *uplo, const char* transa, const char* diag,
+    const int* m, const int* n,
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              Complex64_t* B, const int * ldb )
+{
+  if (dl_ztrsm ==0) xkblas_load_sym((void**)&dl_ztrsm,SYMBLAS_NAME(ztrsm));
+  dl_ztrsm( side, uplo, transa, diag,
+            m, n,
+            alpha, A, lda,
+                   B, ldb
+  );
+}
+
+extern int xkblas_ztrsm_native(
+  int side, int uplo, int transA, int diag, int N, int NRHS,
+  const Complex64_t* alpha, const Complex64_t* A, int LDA, Complex64_t* B, int LDB )
+{
+  char s = cblas2blas_side(side);
+  char u = cblas2blas_fill(uplo);
+  char trA = cblas2blas_op(transA);
+  char d = cblas2blas_diag(diag);
+  xkblas_ztrsm_native_( &s, &u, &trA, &d, &N, &NRHS, alpha, A, &LDA, B, &LDB );
+  return 0;
+}

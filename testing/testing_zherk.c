@@ -37,7 +37,12 @@
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
-#if TESTING_API_XKBLAS==0
+#if 0 
+// xkblas_malloc is an malloc + host register for fast communication
+// with GPU and better overlapping capability.
+// Either the pure XKBLAS API and Wrapper API may use this capability.
+// If you want to make it available only with XKBLAS API, replace the
+// #if 0 by #if defined(TESTING_API_XKBLAS_WRAPPER)
 #define xkblas_malloc(s) malloc(s)
 #define xkblas_free(p,s) free(p)
 #endif
@@ -97,7 +102,11 @@ int testing_zherk(int argc, char **argv)
     eps = LAPACKE_dlamch_work('e');
 
     printf("\n");
-    printf("------ TESTS FOR CHAMELEON ZHERK ROUTINE -------  \n");
+#if defined(TESTING_API_XKBLAS_WRAPPER)
+    printf("------ TESTS FOR XKBLAS WRAPPER API ZHERK ROUTINE -------  \n");
+#else
+    printf("------ TESTS FOR XKBLAS ZHERK ROUTINE -------  \n");
+#endif
     printf("            Size of the Matrix A %d by %d\n", N, K);
     printf("\n");
     printf(" The matrix A is randomly generated for each test.\n");
@@ -147,7 +156,7 @@ int testing_zherk(int argc, char **argv)
   #error "here"
 #endif
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZHERK */
               xkblas_zherk_async(uplo[u], trans[t], N, K, &alpha, A, LDA, &beta, Cfinal, LDC);
@@ -156,6 +165,12 @@ int testing_zherk(int argc, char **argv)
               double t1 = xkblas_elapsedtime();
               xkblas_memory_invalidate_caches();
 #else
+              /* test for F77 native call */
+              extern void zherk_(
+                const char * uplo, const char * transa,
+                const int *n, const int *k,
+                const CFloat64_t *alpha, const Complex64_t *A, const int* lda,
+                const CFloat64_t *beta,  Complex64_t *C, const int* ldc);
               double t0 = time_get_elapsedtime();
               char up = cblas2blas_fill( uplo[u] );
               char tr = cblas2blas_op( trans[t] );
@@ -221,15 +236,9 @@ static int check_solution(int uplo, int trans, int N, int K,
     Cinitnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', N, N, Cref,    LDC, work);
     Cchamnorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', N, N, Ccham, LDC, work);
 
-    extern void _xkblas_zherk(
-      const char * uplo, const char * transa,
-      const int *n, const int *k,
-      const double *alpha, const Complex64_t *A, const int* lda,
-      const double *beta,  Complex64_t *C, const int* ldc);
-
-    char up = cblas2blas_fill( uplo );
-    char tr = cblas2blas_op( trans );
-    _xkblas_zherk(&up, &tr, &N, &K, &alpha, A, &LDA, &beta, Cref, &LDC);
+    CFloat64_t a = alpha;
+    CFloat64_t b = beta;
+    xkblas_zherk_native(uplo, trans, N, K, &a, A, LDA, &b, Cref, LDC);
 
     Clapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', N, N, Cref, LDC, work);
 

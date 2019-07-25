@@ -23,17 +23,6 @@
 
 #include "common.h"
 
-#define _xkblas_zgemm zgemm_
-#define _xkblas_zhemm zhemm_
-#define _xkblas_zher2k zher2k_
-#define _xkblas_zherk zherk_
-#define _xkblas_zsymm zsymm_
-#define _xkblas_zsyr2k zsyr2k_
-#define _xkblas_zsyrk zsyrk_
-#define _xkblas_ztrmm ztrmm_
-#define _xkblas_ztrsm ztrsm_
-
-
 #define USAGE(name, args, details)                                      \
     printf(" Proper Usage is : ./testing_z ncores ngpus nb ib " name " " args " with\n" \
            "   - ncores : number of cores\n"                            \

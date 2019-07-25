@@ -35,6 +35,7 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+#include <dlfcn.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <string.h>
@@ -69,6 +70,10 @@ __thread kaapi_thread_t* _xkblas_self_thread = 0;
 kaapi_handle_t* _xkblas_list_sync0 = 0; /* re-used unused sync0->sync field as ptr to handle */
 static xkblas_matrix_descr_t* _xkblas_matrix_descr_list = 0;
 static uint64_t _xkblas_generation_cache = 0;
+
+/*
+*/
+static void* handle_cpublas = 0;
 
 /*
 */
@@ -918,6 +923,10 @@ int xkblas_finalize(void)
   err = kaapi_hashmap_destroy(&_kblas_ptr2handle);
   kaapi_assert(err ==0);
 
+  if (handle_cpublas != 0) 
+    dlclose(handle_cpublas);
+  handle_cpublas = 0;
+
   kaapi_finalize();
 }
 
@@ -1344,3 +1353,25 @@ double xkblas_elapsedtime(void)
   return kaapi_get_elapsedtime();
 }
 
+/* Load symbol in the sub cpu BLAS library
+*/
+extern void xkblas_load_sym(void** ptr, const char* name)
+{
+  if (handle_cpublas ==0)
+  {
+    handle_cpublas = dlopen(XKBLAS_BLASLIB,RTLD_LAZY);
+    if (handle_cpublas ==0)
+    {
+      printf("[xkblas]: cannot load liblas '%s'\n", XKBLAS_BLASLIB);
+      abort();
+    }
+  }
+  //printf("[xkblas]: load symbol %s.\n",name);
+  *ptr = dlsym( handle_cpublas, name );
+  if (*ptr ==0)
+  {
+    fprintf(stderr,"*** Error: [xkblas] cannot load symbol '%s' from '%s'\n", name, XKBLAS_BLASLIB);
+    abort();
+  }
+  //printf("[xkblas]: end load symbol %s.\n",name);
+}

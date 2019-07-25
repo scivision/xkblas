@@ -63,7 +63,7 @@ typedef struct timeval struct_time;
 
 #include "testing_zauxiliary.h"
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
 #include "xkblas.h"
 #endif
 
@@ -127,7 +127,7 @@ int main (int argc, char **argv)
     argv += 6;
     info  = 0;
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
     xkblas_set_param( nb, sizeof(Complex64_t) );
 
     /* Initialize Kaapi */
@@ -175,7 +175,7 @@ int main (int argc, char **argv)
         printf( "TESTING %s FAILED : not enough memory\n", func);
     }
 
-#if TESTING_API_XKBLAS
+#if !defined(TESTING_API_XKBLAS_WRAPPER)
     xkblas_finalize();
 #endif
 
