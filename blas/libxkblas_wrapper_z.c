@@ -96,7 +96,7 @@ static void (*dl_zsyr2k)(
                             const Complex64_t *B, const int* ldb,
   const Complex64_t *beta,  Complex64_t *C, const int* ldc) = 0;
 
-#if defined(PRECISION_Z)||defined(PRECISION_C)
+#if defined(PRECISION_z)||defined(PRECISION_c)
 /* hemm */
 static void (*dl_zhemm)(
   const char* side, const char* uplo,
@@ -124,19 +124,21 @@ static void (*dl_zher2k)(
 
 
 /* ================================  GEMM  =============================================== */
-extern void CATSTR(xkblas,zgemm)(
+extern void CATSTR(_xkblas_,zgemm)(
     const char * transa, const char * transb,
     const int * m, const int * n, const int * k,
     const Complex64_t* alpha, const Complex64_t* A, const int * lda,
                               const Complex64_t * B, const int * ldb,
     const Complex64_t* beta,  Complex64_t * C, const int * ldc)
 {
+  printf("In: %s\n",__func__);
   if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
   dl_zgemm( transa, transb,
             m, n, k,
             alpha, A, lda,
                    B, ldb,
             beta,  C, ldc);
+  printf("Out: %s\n",__func__);
 }
 
 /* F77 name
@@ -152,9 +154,10 @@ extern void BLAS_NAME(zgemm)(
     ((*alpha == 0.0 || *k == 0) && *beta == 1.0))
     return;
 
+  printf("In: %s\n",__func__);
   if (FLOPS_ZGEMM(*m,*n,*k)/DATA_ZGEMM(*m,*n,*k) < threshold_kern[ZGEMM])
   {
-    CATSTR(xkblas,zgemm)( transa, transb,
+    CATSTR(_xkblas_,zgemm)( transa, transb,
                           m, n, k,
                           alpha, A, lda,
                                  B, ldb,
@@ -169,6 +172,7 @@ extern void BLAS_NAME(zgemm)(
     xkblas_sync();
     xkblas_memory_invalidate_caches();
   }
+  printf("Out: %s\n",__func__);
 }
 
 
@@ -176,7 +180,7 @@ extern void BLAS_NAME(zgemm)(
 
 
 /* ================================  GEMMT  =============================================== */
-extern void CATSTR(xkblas,zgemmt)(
+extern void CATSTR(_xkblas_,zgemmt)(
     const char* uplo, const char * transa, const char * transb,
     const int * n, const int * k,
     const Complex64_t* alpha, const Complex64_t* A, const int * lda,
@@ -215,7 +219,7 @@ extern void BLAS_NAME(zgemmt)(
 
   if (FLOPS_ZGEMMT(*n,*n,*k)/DATA_ZGEMMT(*n,*n,*k) < threshold_kern[ZGEMMT])
   {
-    CATSTR(xkblas,zgemmt)( uplo, transa, transb,
+    CATSTR(_xkblas_,zgemmt)( uplo, transa, transb,
                n, k,
                alpha, A, lda,
                       B, ldb,
@@ -236,7 +240,7 @@ extern void BLAS_NAME(zgemmt)(
 
 
 /* ================================  TRSM  =============================================== */
-extern void CATSTR(xkblas,ztrsm)(
+extern void CATSTR(_xkblas_,ztrsm)(
     const char * side, const char *uplo, const char* transa, const char* diag,
     const int* m, const int* n,
     const Complex64_t* alpha, const Complex64_t* A, const int * lda,
@@ -261,7 +265,7 @@ extern void BLAS_NAME(ztrsm)(
   if (FLOPS_ZTRSM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZTRSM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZTRSM])
   {
-    CATSTR(xkblas,ztrsm)( side, uplo, transa, diag,
+    CATSTR(_xkblas_,ztrsm)( side, uplo, transa, diag,
               m, n,
               alpha, A, lda,
                      B, ldb
@@ -282,7 +286,7 @@ extern void BLAS_NAME(ztrsm)(
 
 
 /* ================================  TRMM  =============================================== */
-extern void CATSTR(xkblas,ztrmm)(
+extern void CATSTR(_xkblas_,ztrmm)(
   const char * side, const char *uplo, const char *transa, const char * diag,
   const int *m, const int * n,
   const Complex64_t* alpha,  const Complex64_t *A, const int *lda,
@@ -309,7 +313,7 @@ extern void BLAS_NAME(ztrmm)(
   if (FLOPS_ZTRMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZTRMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZTRMM])
   {
-    CATSTR(xkblas,ztrmm)( side, uplo, transa, diag,
+    CATSTR(_xkblas_,ztrmm)( side, uplo, transa, diag,
               m, n,
               alpha, A, lda,
                      B, ldb
@@ -332,7 +336,7 @@ extern void BLAS_NAME(ztrmm)(
 
 
 /* ================================  SYMM  =============================================== */
-extern void CATSTR(xkblas,zsymm)(
+extern void CATSTR(_xkblas_,zsymm)(
   const char * side, const char * uplo,
   const int * m, const int * n,
   const Complex64_t* alpha, const Complex64_t* A, const int *lda,
@@ -362,7 +366,7 @@ extern void BLAS_NAME(zsymm)(
   if (FLOPS_ZSYMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZSYMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZSYMM])
   {
-    CATSTR(xkblas,zsymm)( side, uplo,
+    CATSTR(_xkblas_,zsymm)( side, uplo,
               m, n,
               alpha, A, lda,
                      B, ldb,
@@ -386,7 +390,7 @@ extern void BLAS_NAME(zsymm)(
 
 
 /* ================================  SYRK  =============================================== */
-extern void CATSTR(xkblas,zsyrk)(
+extern void CATSTR(_xkblas_,zsyrk)(
   const char * uplo, const char * transa,
   const int *n, const int *k,
   const Complex64_t *alpha, const Complex64_t *A, const int* lda,
@@ -410,7 +414,7 @@ extern void BLAS_NAME(zsyrk)(
 {
   if (FLOPS_ZSYRK(*n,*k)/ DATA_ZSYRK(*n,*k) < threshold_kern[ZSYRK])
   {
-    CATSTR(xkblas,zsyrk)( uplo, transa,
+    CATSTR(_xkblas_,zsyrk)( uplo, transa,
               n, k,
               alpha, A, lda,
               beta,  C, ldc
@@ -431,7 +435,7 @@ extern void BLAS_NAME(zsyrk)(
 
 
 /* ================================  SYR2K  =============================================== */
-extern void CATSTR(xkblas,zsyr2k)(
+extern void CATSTR(_xkblas_,zsyr2k)(
   const char * uplo, const char * transa,
   const int *n, const int *k,
   const Complex64_t *alpha, const Complex64_t *A, const int* lda,
@@ -458,7 +462,7 @@ extern void BLAS_NAME(zsyr2k)(
 {
   if (FLOPS_ZSYR2K(*n,*k)/ DATA_ZSYR2K(*n,*k) < threshold_kern[ZSYR2K])
   {
-    CATSTR(xkblas,zsyr2k)( uplo, transa,
+    CATSTR(_xkblas_,zsyr2k)( uplo, transa,
                n, k,
                alpha, A, lda,
                       B, ldb,
@@ -481,9 +485,9 @@ extern void BLAS_NAME(zsyr2k)(
 
 
 
-#if defined(PRECISION_Z)||defined(PRECISION_C)
+#if defined(PRECISION_z)||defined(PRECISION_c)
 /* ================================  HEMM  =============================================== */
-extern void CATSTR(xkblas,zhemm)(
+extern void CATSTR(_xkblas_,zhemm)(
   const char * side, const char * uplo,
   const int * m, const int * n,
   const Complex64_t* alpha, const Complex64_t* A, const int *lda,
@@ -513,7 +517,7 @@ extern void BLAS_NAME(zhemm)(
   if (FLOPS_ZHEMM(xkblas_blas2cblas_side(side),*m,*n)
      / DATA_ZHEMM(xkblas_blas2cblas_side(side),*m,*n) < threshold_kern[ZHEMM])
   {
-    CATSTR(xkblas,zhemm)( side, uplo,
+    CATSTR(_xkblas_,zhemm)( side, uplo,
               m, n,
               alpha, A, lda,
                      B, ldb,
@@ -537,7 +541,7 @@ extern void BLAS_NAME(zhemm)(
 
 
 /* ================================  HERK  =============================================== */
-extern void CATSTR(xkblas,zherk)(
+extern void CATSTR(_xkblas_,zherk)(
   char * uplo, char * transa,
   int *n, int *k,
   CFloat64_t *alpha, Complex64_t *A, int* lda,
@@ -561,7 +565,7 @@ extern void BLAS_NAME(zherk)(
 {
   if (FLOPS_ZHERK(*n,*k)/ DATA_ZHERK(*n,*k) < threshold_kern[ZHERK])
   {
-    CATSTR(xkblas,zherk)( uplo, transa,
+    CATSTR(_xkblas_,zherk)( uplo, transa,
               n, k,
               alpha, A, lda,
               beta,  C, ldc
@@ -583,7 +587,7 @@ extern void BLAS_NAME(zherk)(
 
 
 /* ================================  HER2K  =============================================== */
-extern void CATSTR(xkblas,zher2k)(
+extern void CATSTR(_xkblas_,zher2k)(
   char * uplo, char * transa,
   int *n, int *k,
   Complex64_t *alpha, Complex64_t *A, int* lda,
@@ -610,7 +614,7 @@ extern void BLAS_NAME(zher2k)(
 {
   if (FLOPS_ZHER2K(*n,*k)/ DATA_ZHER2K(*n,*k) < threshold_kern[ZHER2K])
   {
-    CATSTR(xkblas,zher2k)( uplo, transa,
+    CATSTR(_xkblas_,zher2k)( uplo, transa,
                n, k,
                alpha, A, lda,
                       B, ldb,

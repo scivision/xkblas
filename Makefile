@@ -524,7 +524,7 @@ blas/libxkblas_wrapper_d.c: blas/libxkblas_wrapper.h
 blas/libxkblas_wrapper_s.c: blas/libxkblas_wrapper.h
 
 libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAPPER_PRECISION:.c=.o}
-	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAPPER_PRECISION:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lxkblas
+	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAPPER_PRECISION:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -Wl,-rpath=${PWD} -lxkblas -lkaapi -ldl
 
 
 testing_z: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing

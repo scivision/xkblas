@@ -197,11 +197,48 @@ static inline cublasOperation_t cblas2cublas_diag( int diag )
 
 /*
 */
-static inline char* cblas2blas_fill( int uplo )
+static inline char cblas2blas_op( int trans )
+{
+  switch (trans)
+  {
+    case CblasNoTrans: return 'N';
+    case CblasTrans:  return 'T';
+    case CblasConjTrans: return 'C';
+  }
+  abort();
+}
+
+/*
+*/
+static inline char cblas2blas_side( int side )
+{
+  switch (side)
+  {
+    case CblasLeft: return 'L';
+    case CblasRight: return 'R';
+  }
+  abort();
+}
+
+/*
+*/
+static inline char cblas2blas_diag( int diag )
+{
+  switch (diag)
+  {
+    case CblasNonUnit: return 'N';
+    case CblasUnit: return 'U';
+  }
+  abort();
+}
+
+/*
+*/
+static inline char cblas2blas_fill( int uplo )
 {
   switch (uplo) {
-    case CblasLower: return "L";
-    case CblasUpper: return "U";
+    case CblasLower: return 'L';
+    case CblasUpper: return 'U';
     default:
       abort();
   }

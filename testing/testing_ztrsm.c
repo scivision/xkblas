@@ -29,13 +29,18 @@
 
 #include <lapacke.h>
 #include <cblas.h>
+
 #define KAAPI_NO_DEFAULT_BLAS_ENUM
 #define KAAPI_NO_INCLUDE_BLAS_H
 #include "common.h"
 #include "xkblas.h"
-
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
+
+#if TESTING_API_XKBLAS==0
+#define xkblas_malloc(s) malloc(s)
+#define xkblas_free(p,s) free(p)
+#endif
 
 #include "flops.h"
 
@@ -43,24 +48,6 @@ static int check_solution(int side, int uplo, int trans, int diag,
                           int M, int N, Complex64_t alpha,
                           Complex64_t *A, int LDA,
                           Complex64_t *Bref, Complex64_t *Bcham, int LDB);
-
-static void print_matrix(Complex64_t* A, int M, int N, int ld)
-{
-  printf("matrix(c(");
-  for (size_t i = 0; i< M; ++i)
-  {
-    for (size_t j = 0; j< N; ++j)
-      //printf("%10f ",A[i+j*ld]);
-#if defined(PRECISION_d) || defined(PRECISION_s)
-      printf("%10f%s",A[i+j*ld], (((i==M-1) && (j==N-1)) ? "":","));
-#else
-      printf("%10f%+10fI%s",A[i+j*ld], (((i==M-1) && (j==N-1)) ? "":","));
-#endif
-    printf(" ");
-  }
-  printf("), nrow=%i, ncol=%i);\n",M,N);
-}
-
 
 int testing_ztrsm(int argc, char **argv)
 {
@@ -158,32 +145,22 @@ int testing_ztrsm(int argc, char **argv)
                       /* XKBLAS ZTRSM */
                       LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
 
-if ((M<=16) && (N<=16))
-{
-  printf("A<-\n");
-  print_matrix(A, M, N, LDA);
-  printf("B<-\n");
-  print_matrix(Bfinal, M, N, LDB);
-#if defined(PRECISION_d) || defined(PRECISION_s)
-  printf("alpha<- %f;\n", alpha);
-#else
-  printf("alpha<- %f%+fI;\n", alpha);
-#endif
-}
-
+#if TESTING_API_XKBLAS
                       double t0 = xkblas_elapsedtime();
                       xkblas_ztrsm_async(side[s], uplo[u], trans[t], diag[d], M, N, &alpha, A, LDA, Bfinal, LDB);
                       xkblas_memory_coherent_async(0, 0, M, N, Bfinal, LDB, sizeof(Complex64_t));
                       xkblas_sync();
                       double t1 = xkblas_elapsedtime();
                       xkblas_memory_invalidate_caches();
-
-if ((M<=16) && (N<=16))
-{
-  printf("Res <- \n");
-  print_matrix(Bfinal, M, N, LDB);
-}
-
+#else
+                      double t0 = time_get_elapsedtime();
+                      char sd = cblas2blas_side( side[s] );
+                      char up = cblas2blas_fill( uplo[u] );
+                      char tr = cblas2blas_op( trans[t] );
+                      char dg = cblas2blas_diag( diag[d] );
+                      ztrsm_(&sd, &up, &tr, &dg, &M, &N, &alpha, A, &LDA, Bfinal, &LDB);
+                      double t1 = time_get_elapsedtime();
+#endif
 
                       fadds = (double)(FADDS_TRSM( side[s], M, N ));
                       fmuls = (double)(FMULS_TRSM( side[s], M, N ));
@@ -251,14 +228,17 @@ static int check_solution(int side, int uplo, int trans, int diag,
     Binitnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref,  LDB, work);
     Bchamnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bcham, LDB, work);
 
-    cblas_ztrsm(CblasColMajor, (CBLAS_SIDE)side, (CBLAS_UPLO)uplo, (CBLAS_TRANSPOSE)trans,
-                (CBLAS_DIAG)diag, M, N, CBLAS_SADDR(alpha), A, LDA, Bref, LDB);
+    extern void _xkblas_ztrsm(
+        const char * side, const char *uplo, const char* transa, const char* diag,
+        const int* m, const int* n,
+        const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                                        Complex64_t* B, const int * ldb );
 
-if ((M<=16) && (N<=16))
-{
-  printf("Rref <- \n");
-  print_matrix(Bref, M, N, LDB);
-}
+    char sd = cblas2blas_side( side );
+    char up = cblas2blas_fill( uplo );
+    char tr = cblas2blas_op( trans );
+    char dg = cblas2blas_diag( diag );
+    _xkblas_ztrsm(&sd, &up, &tr, &dg, &M, &N, &alpha, A, &LDA, Bref, &LDB);
 
     Blapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref, LDB, work);
 

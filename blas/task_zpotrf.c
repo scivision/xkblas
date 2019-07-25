@@ -90,9 +90,10 @@ void INSERT_TASK_zpotrf(
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
+  char uplo = cblas2blas_fill(arg->uplo);
   LAPACKE_zpotrf_work(
       LAPACK_COL_MAJOR,
-      cblas2blas_fill(arg->uplo)[0],
+      uplo,
       arg->n,
       arg->A.data, arg->lda);
 }

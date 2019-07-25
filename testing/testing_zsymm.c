@@ -37,6 +37,11 @@
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
+#if TESTING_API_XKBLAS==0
+#define xkblas_malloc(s) malloc(s)
+#define xkblas_free(p,s) free(p)
+#endif
+
 #include "flops.h"
 
 static int
@@ -145,6 +150,7 @@ int testing_zsymm(int argc, char **argv)
               LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
               LAPACKE_zlarnv_work(1, ISEED, 1, &beta);
 
+#if TESTING_API_XKBLAS
               double t0 = xkblas_elapsedtime();
               /* XKBLAS ZSYMM */
               xkblas_zsymm_async(side[s], uplo[u], M, N, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
@@ -152,7 +158,13 @@ int testing_zsymm(int argc, char **argv)
               xkblas_sync();
               double t1 = xkblas_elapsedtime();
               xkblas_memory_invalidate_caches();
-
+#else
+              double t0 = time_get_elapsedtime();
+              char sd = cblas2blas_side( side[s] );
+              char up = cblas2blas_fill( uplo[u] );
+              zsymm_(&sd, &up, &M, &N, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
+              double t1 = time_get_elapsedtime();
+#endif
               fadds = (double)(FADDS_SYMM(side[s],M,N));
               fmuls = (double)(FMULS_SYMM(side[s],M,N));
               flops[k] = 1e-9 * (fmuls * fp_per_mul + fadds * fp_per_add);
@@ -211,8 +223,17 @@ check_solution( int side, int uplo, int M, int N,
     Cinitnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,     N,     Cref,    LDC, work);
     Cchamnorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,     N,     Ccham, LDC, work);
 
-    cblas_zsymm(CblasColMajor, (CBLAS_SIDE)side, (CBLAS_UPLO)uplo, M, N, CBLAS_SADDR(alpha), 
-                       A, LDA, B, LDB, CBLAS_SADDR(beta), Cref, LDC);
+    extern void _xkblas_zsymm(
+      const char * side, const char * uplo,
+      const int * m, const int * n,
+      const Complex64_t* alpha, const Complex64_t* A, const int *lda,
+                                const Complex64_t* B, const int *ldb,
+      const Complex64_t* beta,  Complex64_t* C, const int *ldc
+    );
+
+    char sd = cblas2blas_side( side );
+    char up = cblas2blas_fill( uplo );
+    _xkblas_zsymm(&sd, &up, &M, &N, &alpha, A, &LDA, B, &LDB, &beta, Cref, &LDC);
 
     Clapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Cref, LDC, work);
 

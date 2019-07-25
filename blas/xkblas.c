@@ -771,9 +771,11 @@ static void xkblas_create_distribute(
 static int init_count = 0;
 int xkblas_init(void)
 {
+printf("Xblas_init\n");
   if (init_count++ !=0) return 0;
 
-//printf("Xblas_init, hashmap:%p\n",&_kblas_ptr2handle);
+printf("Xblas_init: do it\n");
+
   int err = kaapi_hashmap_init(&_kblas_ptr2handle, _kblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
   kaapi_assert(err ==0);
 

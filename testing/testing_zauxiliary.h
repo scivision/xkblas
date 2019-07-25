@@ -21,23 +21,21 @@
 #ifndef _testing_zauxiliary_h_
 #define _testing_zauxiliary_h_
 
-#if TESTING_API_XKBLAS
 #include "common.h"
-//#include "testing.h"
-#else
-#  if defined(__STDC_NO_COMPLEX__)
-#    error "Compiler support for complex number is required."
-#  else
-#    include <complex.h>
-     typedef float complex Complex32_t;
-     typedef double complex Complex64_t;
-     typedef double CFloat64_t;
-#  endif
-#endif
+
+#define _xkblas_zgemm zgemm_
+#define _xkblas_zhemm zhemm_
+#define _xkblas_zher2k zher2k_
+#define _xkblas_zherk zherk_
+#define _xkblas_zsymm zsymm_
+#define _xkblas_zsyr2k zsyr2k_
+#define _xkblas_zsyrk zsyrk_
+#define _xkblas_ztrmm ztrmm_
+#define _xkblas_ztrsm ztrsm_
 
 
 #define USAGE(name, args, details)                                      \
-    printf(" Proper Usage is : ./ztesting ncores ngpus nb ib " name " " args " with\n" \
+    printf(" Proper Usage is : ./testing_z ncores ngpus nb ib " name " " args " with\n" \
            "   - ncores : number of cores\n"                            \
            "   - ngpus  : number of GPUs\n"                             \
            "   - nb     : define the tile size\n"                       \

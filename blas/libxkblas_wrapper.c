@@ -86,7 +86,7 @@ enum {
 static void* handle_blas = 0;
 static long threshold = 1600;
 double threshold_kern[LAST];
-char* name_kern[LAST] = {
+const char* name_kern[LAST] = {
   "GEN",
   "ZGEMM", "CGEMM", "DGEMM", "SGEMM",
   "ZGEMMT", "CGEMMT", "DGEMMT", "SGEMMT",
@@ -103,8 +103,12 @@ char* name_kern[LAST] = {
 
 /*
 */
+static int toto_called = 0;
 __attribute__((constructor)) void toto_constructor(void) 
 {
+  if (toto_called) return;
+  toto_called = 1;
+
   printf(LIBNAME ": library loaded. Blas library '%s'\n",XKBLAS_BLASLIB);
 
   if (getenv("XKBLAS_HELP"))
@@ -140,23 +144,26 @@ __attribute__((constructor)) void toto_constructor(void)
     if (threshold <0) threshold = 0;
     threshold_kern[GEN] = threshold;
   }
-  printf(LIBNAME ": threshold :%i\n", threshold);
   if (kaapi_default_param.ngpus>0)
   {
-    char* name = "XKBLAS_THRESHOLD_PXXYYZZ";
+    char name[32];
+    strcpy(name, "XKBLAS_THRESHOLD_PXXYYZZ");
     for (int i=0; i<LAST; ++i)
     {
       strcpy( &name[17], name_kern[i] );
       name[17+strlen(name_kern[i])]=0;
       if (getenv(name))
       {
+        printf("Env threshold %s defined\n", name);
         long th=atol(getenv(name));
         if (th <0) th = 0;
         threshold_kern[i] = th;
       }
       else
+      {
         threshold_kern[i] = threshold;
-      printf(LIBNAME ": %i =%i\n", name, threshold_kern[i] );
+      }
+      printf(LIBNAME ": %s =%li\n", name, (long)threshold_kern[i] );
     }
   }
 
@@ -166,23 +173,27 @@ __attribute__((constructor)) void toto_constructor(void)
     printf(LIBNAME ": cannot load liblas '%s'\n", XKBLAS_BLASLIB);
     abort();
   }
+  printf(LIBNAME ": library initialized.\n");
 }
 
 extern void xkblas_load_sym(void** ptr, const char* name)
 {
+  printf(LIBNAME ": load symbol %s.\n",name);
   *ptr = dlsym( handle_blas, name );
   if (*ptr ==0)
   {
     fprintf(stderr,"*** Error: " LIBNAME " cannot load symbol '%s' from '%s'\n", name, XKBLAS_BLASLIB);
     abort();
   }
+  printf(LIBNAME ": end load symbol %s.\n",name);
 }
 
 /*
 */
 __attribute__((destructor)) void toto_destructor(void) 
 {
-  if (handle_blas !=0) dlclose(handle_blas);
+  if (handle_blas == 0) return;
+  dlclose(handle_blas);
   handle_blas = 0;
   xkblas_finalize();
 }

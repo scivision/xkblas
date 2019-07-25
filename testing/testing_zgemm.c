@@ -30,14 +30,18 @@
 #include <lapacke.h>
 #include <cblas.h>
 
-#if TESTING_API_XKBLAS
+
 #define KAAPI_NO_DEFAULT_BLAS_ENUM
 #define KAAPI_NO_INCLUDE_BLAS_H
 #include "common.h"
 #include "xkblas.h"
-#endif
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
+
+#if TESTING_API_XKBLAS==0
+#define xkblas_malloc(s) malloc(s)
+#define xkblas_free(p,s) free(p)
+#endif
 
 #include "flops.h"
 /* See Lawn 41 page 120 */
@@ -126,10 +130,6 @@ int testing_zgemm(int argc, char **argv)
 	    int suspicious = 0;
 	    for (k=0; k<ITER; ++k)
 	    {
-#if TESTING_API_XKBLAS==0
-#define xkblas_malloc(s) malloc(s)
-#define xkblas_free(p,s) free(p)
-#endif
               Complex64_t *A      = (Complex64_t *)xkblas_malloc(LDAxK*sizeof(Complex64_t));
               Complex64_t *B      = (Complex64_t *)xkblas_malloc(LDBxN*sizeof(Complex64_t));
               Complex64_t *C      = (Complex64_t *)xkblas_malloc(LDCxN*sizeof(Complex64_t));
@@ -171,11 +171,13 @@ int testing_zgemm(int argc, char **argv)
               double t0 = time_get_elapsedtime();
               //dgemm_(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
               //cblas_dgemm(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
-              cblas_zgemm(CblasColMajor, trans[ta], trans[tb], M, N, K, 
-                  CBLAS_SADDR(alpha), A, LDA,
-                  B, LDB,
-                  CBLAS_SADDR(beta), Cfinal, LDC);
+              char transa = cblas2blas_op(trans[ta]);
+              char transb = cblas2blas_op(trans[tb]);
 
+              zgemm_(&transa, &transb, &M, &N, &K,
+                     &alpha, A, &LDA,
+                             B, &LDB,
+                     &beta,  Cfinal, &LDC);
               double t1 = time_get_elapsedtime();
 #endif
 
@@ -266,9 +268,10 @@ static int check_solution(
                                   const Complex64_t * B, const int * ldb,
         const Complex64_t* beta,  Complex64_t * C, const int * ldc);
 
-    char ta, tb;  
+    char ta = cblas2blas_op(transA);
+    char tb = cblas2blas_op(transB);
       
-    _xkblas_zgemm(&transA, &transB, &M, &N, &K, 
+    _xkblas_zgemm(&ta, &tb, &M, &N, &K, 
                 &alpha, A, &LDA, 
                 B, &LDB, 
                 &beta, Cref, &LDC);

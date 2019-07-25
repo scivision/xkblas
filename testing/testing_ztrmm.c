@@ -37,6 +37,11 @@
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
+#if TESTING_API_XKBLAS==0
+#define xkblas_malloc(s) malloc(s)
+#define xkblas_free(p,s) free(p)
+#endif
+
 #include "flops.h"
 
 
@@ -136,6 +141,7 @@ int testing_ztrmm(int argc, char **argv)
 
                       LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
 
+#if TESTING_API_XKBLAS
                       double t0 = xkblas_elapsedtime();
                       /* XKBLAS ZTRMM */
                       xkblas_ztrmm_async(side[s], uplo[u], trans[t], diag[d],
@@ -145,6 +151,17 @@ int testing_ztrmm(int argc, char **argv)
                       xkblas_sync();
                       double t1 = xkblas_elapsedtime();
                       xkblas_memory_invalidate_caches();
+#else
+                      double t0 = time_get_elapsedtime();
+                      char sd = cblas2blas_side( side[s] );
+                      char up = cblas2blas_fill( uplo[u] );
+                      char tr = cblas2blas_op( trans[t] );
+                      char dg = cblas2blas_diag( diag[d] );
+                      ztrmm_(&sd, &up, &tr, &dg,
+                             &M, &N, &alpha, A, &LDA, Bfinal, &LDB);
+                      double t1 = time_get_elapsedtime();
+#endif
+
 
                       fadds = (double)(FADDS_TRMM(side[s],M,N));
                       fmuls = (double)(FMULS_TRMM(side[s],M,N));
@@ -211,8 +228,16 @@ static int check_solution(int side, int uplo, int trans, int diag,
     Binitnorm   = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref,    LDB, work);
     Bchamnorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bcham, LDB, work);
 
-    cblas_ztrmm(CblasColMajor, (CBLAS_SIDE)side, (CBLAS_UPLO)uplo, (CBLAS_TRANSPOSE)trans,
-                (CBLAS_DIAG)diag, M, N, CBLAS_SADDR(alpha), A, LDA, Bref, LDB);
+    extern void _xkblas_ztrmm(
+        const char * side, const char *uplo, const char* transa, const char* diag,
+        const int* m, const int* n,
+        const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                                        Complex64_t* B, const int * ldb );
+    char sd = cblas2blas_side( side );
+    char up = cblas2blas_fill( uplo );
+    char tr = cblas2blas_op( trans );
+    char dg = cblas2blas_diag( diag );
+    _xkblas_ztrmm(&sd, &up, &tr, &dg, &M, &N, &alpha, A, &LDA, Bref, &LDB);
 
     Blapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Bref, LDB, work);
 

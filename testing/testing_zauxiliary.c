@@ -134,7 +134,6 @@ int main (int argc, char **argv)
     xkblas_init();
 #endif
 
-
     /*
      * Blas Level 3
      */
