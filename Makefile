@@ -227,6 +227,23 @@ XKBLAS_TASK=\
   ${XKBLAS_GEN_TASK}
 
 
+#
+# LIBXKBLAS_WRAPPER
+#
+XKBLAS_WRAPPER_SRC=blas/libxkblas_wrapper.c 
+XKBLAS_WRAPPER_PRECISION_z=blas/libxkblas_wrapper_z.c 
+XKBLAS_WRAPPER_PRECISION_c=blas/libxkblas_wrapper_c.c 
+XKBLAS_WRAPPER_PRECISION_d=blas/libxkblas_wrapper_d.c 
+XKBLAS_WRAPPER_PRECISION_s=blas/libxkblas_wrapper_s.c
+XKBLAS_WRAPPER_PRECISION=${XKBLAS_WRAPPER_PRECISION_z} ${XKBLAS_WRAPPER_PRECISION_c} ${XKBLAS_WRAPPER_PRECISION_d} ${XKBLAS_WRAPPER_PRECISION_s}
+XKBLAS_WRAPPER_GENFILES=blas/libxkblas_wrapper_c.c blas/libxkblas_wrapper_d.c blas/libxkblas_wrapper_s.c 
+XKBLAS_WRAPPER_LDFLAGS=${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas
+XKBLAS_WRAPPER_CPPFLAGS=${CPPFLAGS}
+
+
+#
+# Testing files
+#
 XKBLAS_TESTING_PRECISION_s=\
   testing/testing_sgemm.c\
   testing/testing_strsm.c\
@@ -296,18 +313,13 @@ XKBLAS_FILES=\
   ${XKBLAS_BLAS}\
   ${XKBLAS_TASK}
 XKBLAS_SRC=$(filter %.c, ${XKBLAS_FILES})
-XKBLAS_ALL_GENFILES=${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TASK} ${XKBLAS_GEN_TESTING}
 XKBLAS_CPPFLAGS=-I. -Iblas -DXKBLAS_BLASLIB='"${BLAS_LIB_SO}"' ${BLAS_CPPFLAGS} ${CPPFLAGS} 
 XKBLAS_LDFLAGS=-Wl,-rpath=${BLAS_LIBDIR} ${BLAS_LDFLAGS} ${UKAAPI_LDFLAGS}
 #-L${KAAPI_HOME} -lkaapi 
 
 
-#
-# LIBXKBLAS_WRAPPER
-#
-XKBLAS_WRAPPER_SRC=blas/libxkblas_wrapper.c
-XKBLAS_WRAPPER_LDFLAGS=${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas
-XKBLAS_WRAPPER_CPPFLAGS=${CPPFLAGS}
+
+XKBLAS_ALL_GENFILES=${XKBLAS_GEN_BLAS} ${XKBLAS_GEN_TASK} ${XKBLAS_GEN_TESTING} ${XKBLAS_WRAPPER_GENFILES}
 
 #
 # File per precision
@@ -315,22 +327,28 @@ XKBLAS_WRAPPER_CPPFLAGS=${CPPFLAGS}
 FILE_PRECISION_s=\
             ${XKBLAS_TESTING_PRECISION_s}\
             ${XKBLAS_TASK_PRECISION_s}\
-            ${XKBLAS_BLAS_PRECISION_s}
+            ${XKBLAS_BLAS_PRECISION_s}\
+	    ${XKBLAS_WRAPPER_PRECISION_s}
 FILE_PRECISION_d=\
             ${XKBLAS_TESTING_PRECISION_d}\
             ${XKBLAS_TASK_PRECISION_d}\
-            ${XKBLAS_BLAS_PRECISION_d}
+            ${XKBLAS_BLAS_PRECISION_d}\
+	    ${XKBLAS_WRAPPER_PRECISION_d}
 FILE_PRECISION_c=\
             ${XKBLAS_TESTING_PRECISION_c}\
             ${XKBLAS_TASK_PRECISION_c}\
-            ${XKBLAS_BLAS_PRECISION_c}
+            ${XKBLAS_BLAS_PRECISION_c}\
+	    ${XKBLAS_WRAPPER_PRECISION_c}
 FILE_PRECISION_z=\
             ${XKBLAS_TESTING_PRECISION_z}\
             ${XKBLAS_TASK_PRECISION_z}\
-            ${XKBLAS_BLAS_PRECISION_z}
+            ${XKBLAS_BLAS_PRECISION_z}\
+	    ${XKBLAS_WRAPPER_PRECISION_z}
+
 FILE_OTHER=blas/xkblas.h blas/common.h\
   blas/xkblas.c blas/dbg_blas.c\
-  blas/libxkblas_wrapper.c blas/internal_register.h\
+  blas/libxkblas_wrapper.c\
+  blas/internal_register.h\
   ${UKAAPI_SRC}
 
 ALL_FILE=\
@@ -393,6 +411,13 @@ testing: testing_z testing_d testing_c testing_s
 	(cd testing ; ../gen_precision.sh)
 
 ${XKBLAS_ALL_GENFILES}: .generated .generated_testing
+
+blas/libxkblas_wrapper_c.c: gen_precision_one.sh blas/libxkblas_wrapper_z.c
+	(./gen_precision_one.sh c blas/libxkblas_wrapper_z.c)
+blas/libxkblas_wrapper_d.c: gen_precision_one.sh blas/libxkblas_wrapper_z.c
+	(./gen_precision_one.sh d blas/libxkblas_wrapper_z.c)
+blas/libxkblas_wrapper_s.c: gen_precision_one.sh blas/libxkblas_wrapper_z.c
+	(./gen_precision_one.sh s blas/libxkblas_wrapper_z.c)
 
 ifneq ('$(GIT_HASH)','')
 gitlastcommit:
@@ -491,8 +516,15 @@ libxkblas.a: libkaapi.a .generated ${XKBLAS_ALL_GENFILES} ${XKBLAS_SRC:.c=_a.o}
 	$(AR) crv libxkblas.a ${XKBLAS_SRC:.c=_a.o} ${UKAAPI_SRC:%.c=%_a.o} ${UKAAPI_SRC_PLUGIN:.c=_a.o} 
 	$(RANLIB) libxkblas.a
 
-libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o}
-	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lxkblas
+blas/libxkblas_wrapper.c: blas/libxkblas_wrapper_z.c blas/libxkblas_wrapper_c.c blas/libxkblas_wrapper_d.c blas/libxkblas_wrapper_s.c
+blas/libxkblas_wrapper.c: blas/libxkblas_wrapper.h
+blas/libxkblas_wrapper_z.c: blas/libxkblas_wrapper.h
+blas/libxkblas_wrapper_c.c: blas/libxkblas_wrapper.h
+blas/libxkblas_wrapper_d.c: blas/libxkblas_wrapper.h
+blas/libxkblas_wrapper_s.c: blas/libxkblas_wrapper.h
+
+libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAPPER_PRECISION:.c=.o}
+	$(CC) -shared -o libxkblas_blaswrapper.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAPPER_PRECISION:.c=.o} ${XKBLAS_LDFLAGS} ${XKBLAS_CPPFLAGS} -L${KAAPI_HOME} -lxkblas
 
 
 testing_z: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing

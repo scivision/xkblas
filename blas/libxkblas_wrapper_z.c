@@ -34,7 +34,7 @@
 ** The fact that you are presently reading this means that you have had
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
-
+#include "libxkblas_wrapper.h"
 
 /* Pointer for cblas_Xgemm to the loaded BLAS library
 */
@@ -42,18 +42,18 @@
 static void (*dl_zgemm)(
     const char * transa, const char * transb,
     const int * m, const int * n, const int * k,
-    Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                        const Complex64_t * B, const int * ldb,
-    Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
 
 
 /* gemmt */
 static void (*dl_zgemmt)(
     const char* uplo, const char * transa, const char * transb,
     const int * n, const int * k,
-    Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                        const Complex64_t * B, const int * ldb,
-    Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                              const Complex64_t * B, const int * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
 
 
 /* trsm */
@@ -96,6 +96,7 @@ static void (*dl_zsyr2k)(
                             const Complex64_t *B, const int* ldb,
   const Complex64_t *beta,  Complex64_t *C, const int* ldc) = 0;
 
+#if defined(PRECISION_Z)||defined(PRECISION_C)
 /* hemm */
 static void (*dl_zhemm)(
   const char* side, const char* uplo,
@@ -105,7 +106,7 @@ static void (*dl_zhemm)(
   const Complex64_t* beta,  Complex64_t* C, const int *ldc ) = 0;
 
 /* herk */
-extern void (*dl_zherk)(
+static void (*dl_zherk)(
   char * uplo, char * transa,
   int *n, int *k,
   const CFloat64_t *alpha, const Complex64_t *A, const int* lda,
@@ -118,7 +119,7 @@ static void (*dl_zher2k)(
   const Complex64_t* alpha, const Complex64_t* A, const int* lda,
                             const Complex64_t* B, const int* ldb,
   const CFloat64_t* beta,   Complex64_t* C, const int* ldc) = 0;
-
+#endif
 
 
 
@@ -379,6 +380,7 @@ extern void BLAS_NAME(zsyr2k)(
 
 
 
+#if defined(PRECISION_Z)||defined(PRECISION_C)
 /* ================================  HEMM  =============================================== */
 /*
 */
@@ -483,3 +485,5 @@ extern void BLAS_NAME(zher2k)(
     xkblas_memory_invalidate_caches();
  }
 }
+
+#endif
