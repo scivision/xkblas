@@ -28,8 +28,44 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #endif
+
+#if defined(KAAPI_BLAS_USE_OPENBLAS)
+#  include <cblas.h>
+#  include <lapacke.h>
+#elif defined(KAAPI_BLAS_USE_MKL)
+#  define lapack_complex_float Complex32_t
+#  define lapack_complex_double Complex64_t
+#  include <mkl.h>
+#  include <mkl_types.h>
+#  include <mkl_cblas.h>
+#  include <mkl_lapacke.h>
+#else
+#  error "Blas library undefined"
+#endif
+
+
+#if defined(HAVE_CLOCK_GETTIME) || defined(KMP_OS_LINUX)
+# include <time.h>
+#else
+# include <sys/time.h>
+#endif
+#if defined(HAVE_CLOCK_GETTIME) || defined(KMP_OS_LINUX)
+typedef struct timespec struct_time;
+#  define gettime(t) clock_gettime( CLOCK_REALTIME, t)
+#  define get_sub_second(t) (1e-9*(double)t.tv_nsec)
+#  define get_sub_second_ns(t) ((uint64_t)t.tv_nsec)
+#else
+typedef struct timeval struct_time;
+#  define gettime(t) gettimeofday( t, 0)
+#  define get_sub_second(t) (1e-6*(double)t.tv_usec)
+#  define get_sub_second_ns(t) (1000*(uint64_t)t.tv_usec)
+#endif
+
 #include "testing_zauxiliary.h"
+
+#if TESTING_API_XKBLAS
 #include "xkblas.h"
+#endif
 
 int   IONE  = 1;
 int   PAD[2048] = {0,0,0,0,0,0,0}; /* pad */
@@ -45,6 +81,15 @@ char *sidestr[2]  = { "Left ", "Right" };
 char *uplostr[2]  = { "Upper", "Lower" };
 char *diagstr[2]  = { "NonUnit", "Unit   " };
 char *transstr[3] = { "N", "T", "H" };
+
+
+double time_get_elapsedtime(void)
+{
+  struct_time st;
+  int err = gettime(&st);
+  if (err !=0) return 0;
+  return (double)st.tv_sec + get_sub_second(st);
+}
 
 
 int main (int argc, char **argv)
@@ -82,10 +127,12 @@ int main (int argc, char **argv)
     argv += 6;
     info  = 0;
 
+#if TESTING_API_XKBLAS
     xkblas_set_param( nb, sizeof(Complex64_t) );
 
     /* Initialize Kaapi */
     xkblas_init();
+#endif
 
 
     /*
@@ -129,7 +176,9 @@ int main (int argc, char **argv)
         printf( "TESTING %s FAILED : not enough memory\n", func);
     }
 
+#if TESTING_API_XKBLAS
     xkblas_finalize();
+#endif
 
     return info;
 }

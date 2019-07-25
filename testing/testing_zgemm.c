@@ -29,10 +29,13 @@
 
 #include <lapacke.h>
 #include <cblas.h>
+
+#if TESTING_API_XKBLAS
 #define KAAPI_NO_DEFAULT_BLAS_ENUM
 #define KAAPI_NO_INCLUDE_BLAS_H
 #include "common.h"
 #include "xkblas.h"
+#endif
 #include "testing_zauxiliary.h"
 #include "task_z_internal.h"
 
@@ -40,22 +43,6 @@
 /* See Lawn 41 page 120 */
 #define _FMULS FMULS_GEMM(M, N, K)
 #define _FADDS FADDS_GEMM(M, N, K)
-
-#if defined(PRECISION_d) || defined(PRECISION_s)
-static void print_matrix(Complex64_t* A, int M, int N, int ld)
-{
-  printf("matrix(c(");
-  for (size_t i = 0; i< M; ++i)
-  {
-    for (size_t j = 0; j< N; ++j)
-      //printf("%10f ",A[i+j*ld]);
-      printf("%10f%s",A[i+j*ld], (((i==M-1) && (j==N-1)) ? "":","));
-    printf(" ");
-  }
-  printf("), nrow=%i, ncol=%i);\n",M,N);
-}
-#endif
-
 
 static int check_solution(int transA, int transB, int M, int N, int K,
                           Complex64_t alpha, Complex64_t *A, int LDA,
@@ -139,6 +126,10 @@ int testing_zgemm(int argc, char **argv)
 	    int suspicious = 0;
 	    for (k=0; k<ITER; ++k)
 	    {
+#if TESTING_API_XKBLAS==0
+#define xkblas_malloc(s) malloc(s)
+#define xkblas_free(p,s) free(p)
+#endif
               Complex64_t *A      = (Complex64_t *)xkblas_malloc(LDAxK*sizeof(Complex64_t));
               Complex64_t *B      = (Complex64_t *)xkblas_malloc(LDBxN*sizeof(Complex64_t));
               Complex64_t *C      = (Complex64_t *)xkblas_malloc(LDCxN*sizeof(Complex64_t));
@@ -169,30 +160,23 @@ int testing_zgemm(int argc, char **argv)
               LAPACKE_zlarnv_work(1, ISEED, 1, &alpha);
               LAPACKE_zlarnv_work(1, ISEED, 1, &beta );
 
-#if defined(PRECISION_d) || defined(PRECISION_s)
-if ((M<=16) && (N<=16) && (K<=16))
-{
-  printf("A<-\n");
-  print_matrix(A, M, K, LDA);
-  printf("B<-\n");
-  print_matrix(B, K, N, LDA);
-  printf("C<-\n");
-  print_matrix(C, M, N, LDA);
-  printf("alpha<- %f;\nbeta<- %f;\n", alpha, beta);
-}
-#endif
+#if TESTING_API_XKBLAS
               double t0 = xkblas_elapsedtime();
               xkblas_zgemm_async(trans[ta], trans[tb], M, N, K, &alpha, A, LDA, B, LDB, &beta, Cfinal, LDC);
               xkblas_memory_coherent_async(0, 0, M, N, Cfinal, LDC, sizeof(Complex64_t));
               xkblas_sync();
               double t1 = xkblas_elapsedtime();
               xkblas_memory_invalidate_caches();
+#else
+              double t0 = time_get_elapsedtime();
+              //dgemm_(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
+              //cblas_dgemm(&trans[ta], &trans[tb], &M, &N, &K, &alpha, A, &LDA, B, &LDB, &beta, Cfinal, &LDC);
+              cblas_zgemm(CblasColMajor, trans[ta], trans[tb], M, N, K, 
+                  CBLAS_SADDR(alpha), A, LDA,
+                  B, LDB,
+                  CBLAS_SADDR(beta), Cfinal, LDC);
 
-#if defined(PRECISION_d) || defined(PRECISION_s)
-if ((M<=16) && (N<=16) && (K<=16))
-{
-  print_matrix(Cfinal, M, N, LDA);
-}
+              double t1 = time_get_elapsedtime();
 #endif
 
               fadds = (double)(FADDS_GEMM(M,N,K));
@@ -273,18 +257,21 @@ static int check_solution(
     Cinitnorm  = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,  N,  Cref,  LDC, work);
     Cchamnorm  = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,  N,  Ccham, LDC, work);
 
-    cblas_zgemm(CblasColMajor, (CBLAS_TRANSPOSE)transA, (CBLAS_TRANSPOSE)transB, M, N, K, 
-                CBLAS_SADDR(alpha), A, LDA, 
-                B, LDB, 
-                CBLAS_SADDR(beta), Cref, LDC);
 
-#if defined(PRECISION_d) || defined(PRECISION_s)
-if ((M<=16) && (N<=16) && (K<=16))
-{
-  printf("Ccblas:\n");
-  print_matrix(Cref, M, N, LDC);
-}
-#endif
+    /* call to original BLAS version */
+    extern void _xkblas_zgemm(
+        const char * transa, const char * transb,
+        const int * m, const int * n, const int * k,
+        const Complex64_t* alpha, const Complex64_t* A, const int * lda,
+                                  const Complex64_t * B, const int * ldb,
+        const Complex64_t* beta,  Complex64_t * C, const int * ldc);
+
+    char ta, tb;  
+      
+    _xkblas_zgemm(&transA, &transB, &M, &N, &K, 
+                &alpha, A, &LDA, 
+                B, &LDB, 
+                &beta, Cref, &LDC);
 
     Clapacknorm = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M, N, Cref, LDC, work);
 

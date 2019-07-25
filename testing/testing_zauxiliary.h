@@ -21,8 +21,20 @@
 #ifndef _testing_zauxiliary_h_
 #define _testing_zauxiliary_h_
 
+#if TESTING_API_XKBLAS
 #include "common.h"
 //#include "testing.h"
+#else
+#  if defined(__STDC_NO_COMPLEX__)
+#    error "Compiler support for complex number is required."
+#  else
+#    include <complex.h>
+     typedef float complex Complex32_t;
+     typedef double complex Complex64_t;
+     typedef double CFloat64_t;
+#  endif
+#endif
+
 
 #define USAGE(name, args, details)                                      \
     printf(" Proper Usage is : ./ztesting ncores ngpus nb ib " name " " args " with\n" \
@@ -58,6 +70,7 @@ extern char *uplostr[2];
 extern char *sidestr[2];
 extern char *diagstr[2];
 
+extern double time_get_elapsedtime(void);
 
 int testing_zgemm(int argc, char **argv);
 int testing_ztrsm(int argc, char **argv);

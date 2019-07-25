@@ -219,7 +219,7 @@ extern void BLAS_NAME(zgemmt)(
                n, k,
                alpha, A, lda,
                       B, ldb,
-               sbeta, C, ldc);
+               beta, C, ldc);
   }
   else {
     xkblas_zgemmt_async(xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb),

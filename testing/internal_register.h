@@ -42,4 +42,3 @@ void xkblas_register_task_format(void) {
   register_format_cpotrf();
   register_format_dpotrf();
   register_format_spotrf();
-}
