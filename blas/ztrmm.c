@@ -152,7 +152,7 @@ int xkblas_ztrmm_async( int side, int uplo,
         return 0;
 
     /* */
-    size_t NB = xkblas_auto_nb(KERN_TRMM,N,NRHS,NA);
+    size_t NB = xkblas_auto_tilesize(KERN_TRMM,N,NRHS,NA);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

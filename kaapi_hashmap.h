@@ -64,7 +64,7 @@ typedef struct NAME {\
 } NAME
 
 
-/* HashEntries was typped in order to add more semantics about stored valued.
+/* HashEntries was typed in order to add more semantics about stored valued.
 */
 typedef struct kaapi_hashentries_t {
   const void*                          key;

@@ -64,12 +64,20 @@ typedef void (*kaapi_io_cbk_fnc_t)(
     void*, void*, void*
 );
 
-/* io instruction bck
+/* io instruction bck: all differents instruction should have this fields first
 */
 struct kaapi_io_cbk {
   kaapi_io_cbk_fnc_t           fnc;
   void*                        arg[3];
 };
+
+/*
+*/
+typedef enum kaapi_io_copy_priority {
+  KAAPI_IO_COPY_PRIORITY_LOW    = 0,
+  KAAPI_IO_COPY_PRIORITY_NORMAL = 1,
+  KAAPI_IO_COPY_PRIORITY_HIGH   = 2
+} kaapi_io_copy_priority_t;
 
 /* io instruction to write/read data from the corresponding device
    src == host emitting the request
@@ -77,6 +85,7 @@ struct kaapi_io_cbk {
 struct kaapi_io_copy {
   kaapi_io_cbk_fnc_t           fnc;
   void*                        arg[3];
+  kaapi_io_copy_priority_t     prio;
   const void*                  src;
   const kaapi_memory_view_t*   view_src;
   kaapi_memory_device_t*       dev_src;
@@ -157,7 +166,8 @@ typedef enum kaapi_io_stream_type {
   KAAPI_IO_STREAM_H2D  = 0, /* from CPU to GPU */
   KAAPI_IO_STREAM_KERN = 1,
   KAAPI_IO_STREAM_D2H  = 2, /* from GPU to CPU */
-  KAAPI_IO_STREAM_ALL         /* internal purpose */
+  KAAPI_IO_STREAM_D2D  = 3, /* from GPU to GPU */
+  KAAPI_IO_STREAM_ALL       /* internal purpose */
 } kaapi_io_stream_type_t;
 
 
@@ -178,6 +188,7 @@ typedef enum kaapi_io_stream_type {
 */
 typedef struct kaapi_io_stream {
   kaapi_io_stream_type_t       type;
+  kaapi_lock_t                 mutex;     /*  lock */
   uint64_t                     count;     /* the size of array instr and pending */
   uint64_t                     pos_r;	  /* first instruction to process */
   uint64_t                     pos_w;	  /* next position for writing instructions */
@@ -187,13 +198,13 @@ typedef struct kaapi_io_stream {
   kaapi_io_instruction_t*      pending;   /* pending instructions, not yet completed */
   struct kaapi_offload_stream* stream;
   volatile uint64_t            ok_p __attribute__((aligned(KAAPI_CACHE_LINE)));
-                                          /* past the last ready position of pending instr in [pos_rp,pos_wp] */
+                                          /* past the last position of pending notified instr in [pos_rp,pos_wp] */
 } kaapi_io_stream_t;
 
 
-/* Kaapi offload stream is a set of multiple stream dedicated to manage a device.
-   Streams are decoupled from input/output/kernel executions.
-   The number of stream per type is subject to change at start times
+/* Kaapi offload stream is virtual interface to be implemented by a device.
+   Streams are decoupled from H2D/D2H/D2D/kernel executions.
+   The number of stream per type is subject to change at start time
    by reading environement variables. See kaapi_usage.
 
    ios[0] is the pointer of all the iostream_t*.
@@ -201,9 +212,9 @@ typedef struct kaapi_io_stream {
 */
 typedef struct kaapi_offload_stream {
   struct kaapi_device*   device;
-  int                    count[3];    /* number of iostream per type */
-  int                    next[3];     /* next  stream fifo */
-  kaapi_io_stream_t**    ios[3];      /* relatively to the host that emits request */
+  int                    count[KAAPI_IO_STREAM_ALL];    /* number of iostream per type */
+  kaapi_atomic_t         next[KAAPI_IO_STREAM_ALL];     /* next  stream fifo */
+  kaapi_io_stream_t**    ios[KAAPI_IO_STREAM_ALL];      /* relatively to the host that emits request */
 
   /* virtualisation */
   struct kaapi_io_stream* (*f_stream_alloc)(
@@ -283,10 +294,11 @@ static inline int kaapi_io_stream_sizepending( const kaapi_io_stream_t* ios )
 
 /* Push a new asynchronous event into the kaapi_offload_stream.
    Depending of the kind of operation, the event is recorded
-   into one of the different underlaying cuda stream.
+   into one of the different underlaying ios_stream.
+   The ios_stream is returned through formal parameter ios.
    
    On the completion of the event, the runtime calls the call back
-   function cbk(cu_stream, arg_action) and stores the return value 
+   function cbk(ios_stream, arg_action) and stores the return value
    into the status of the request.
    The return value of the callback function is avaible in the
    request status, once the user has tested or wait for the handle.
@@ -299,21 +311,18 @@ static inline int kaapi_io_stream_sizepending( const kaapi_io_stream_t* ios )
 */
 extern kaapi_io_instruction_t* kaapi_offload_stream_push(
     kaapi_offload_stream_t* const stream,
-    kaapi_io_stream_type_t stype
+    kaapi_io_stream_type_t stype,
+    kaapi_io_stream_t** ios
 );
 
 /* Make last instruction returned by push visible
+   The caller must pass stream, stype and ios returned by previous call to
+   kaapi_offload_stream_push.
 */
 extern kaapi_io_instruction_t* kaapi_offload_stream_commit(
     kaapi_offload_stream_t* const stream,
-    kaapi_io_stream_type_t stype
-);
-
-/*
-*/
-extern kaapi_io_stream_t* kaapi_offload_select_io_stream(
-    kaapi_offload_stream_t* const stream,
-    kaapi_io_stream_type_t stype
+    kaapi_io_stream_type_t stype,
+    kaapi_io_stream_t* ios
 );
 
 /**
@@ -372,12 +381,13 @@ static inline void kaapi_stream_insert_io_begin_inst(
 )
 {
   KAAPI_OFFLOAD_TRACE_IN
+  kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst
-    = kaapi_offload_stream_push( stream, stype );
+    = kaapi_offload_stream_push( stream, stype, &ios );
   inst->type = KAAPI_IO_BEGIN;
   inst->inst.f_io.fnc   = 0;
   inst->inst.f_io.first = inst;
-  kaapi_offload_stream_commit( stream, stype );
+  kaapi_offload_stream_commit( stream, stype, ios );
   KAAPI_OFFLOAD_TRACE_OUT
 }
 
@@ -393,15 +403,16 @@ static inline void kaapi_stream_insert_io_end_inst(
 )
 {
   KAAPI_OFFLOAD_TRACE_IN
+  kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst
-    = kaapi_offload_stream_push( stream, stype );
+    = kaapi_offload_stream_push( stream, stype, &ios );
   inst->type = KAAPI_IO_END;
   inst->inst.l_io.last  = inst;
   inst->inst.l_io.fnc   = fnc;
   inst->inst.l_io.arg[0]= arg0;
   inst->inst.l_io.arg[1]= arg1;
   inst->inst.l_io.arg[2]= arg2;
-  kaapi_offload_stream_commit( stream, stype );
+  kaapi_offload_stream_commit( stream, stype, ios );
   KAAPI_OFFLOAD_TRACE_OUT
 }
 
@@ -419,8 +430,17 @@ static inline void kaapi_stream_insert_io_task_inst(
 )
 {
   KAAPI_OFFLOAD_TRACE_IN
+
+  kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst
-    = kaapi_offload_stream_push( stream, stype );
+    = kaapi_offload_stream_push( stream, stype, &ios );
+
+#if KAAPI_DEBUG
+  kaapi_assert_debug( ios != 0 );
+  kaapi_assert_debug( inst ==  &ios->instr[ios->pos_w % ios->count] );
+  kaapi_assert_debug( ios->mutex._owner == pthread_self());
+#endif
+
   inst->type = KAAPI_IO_KERN;
   inst->inst.k_io.fnc   = fnc;
   inst->inst.l_io.arg[0]= arg0;
@@ -428,7 +448,10 @@ static inline void kaapi_stream_insert_io_task_inst(
   inst->inst.l_io.arg[2]= arg2;
   inst->inst.k_io.task  = task;
   inst->inst.k_io.frame = frame;
-  kaapi_offload_stream_commit( stream, stype );
+  kaapi_offload_stream_commit( stream, stype, ios );
+#if KAAPI_DEBUG
+  kaapi_assert_debug( ios->mutex._owner != pthread_self() );
+#endif
   KAAPI_OFFLOAD_TRACE_OUT
 }
 
@@ -438,6 +461,7 @@ static inline void kaapi_stream_insert_io_copy_inst(
     kaapi_offload_stream_t*    stream,
     kaapi_io_stream_type_t     stype,
     kaapi_io_type_t            io_type,
+    kaapi_io_copy_priority_t   prio,
     const void*                src,
     const kaapi_memory_view_t* view_src,
     kaapi_memory_device_t*     dev_src,
@@ -453,21 +477,32 @@ static inline void kaapi_stream_insert_io_copy_inst(
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_assert_debug( (io_type >=KAAPI_IO_COPY_H2H) && (io_type <= KAAPI_IO_COPY_D2D));
   kaapi_assert( kaapi_memory_view_size(view_src) == kaapi_memory_view_size(view_dest));
+
+  kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst
-    = kaapi_offload_stream_push( stream, stype );
+    = kaapi_offload_stream_push( stream, stype, &ios );
+
+#if KAAPI_DEBUG
+  kaapi_assert_debug( ios != 0 );
+  kaapi_assert_debug( ios->mutex._owner == pthread_self());
+#endif
 
   inst->type = io_type;
   inst->inst.c_io.fnc   = fnc;
   inst->inst.l_io.arg[0]= arg0;
   inst->inst.l_io.arg[1]= arg1;
   inst->inst.l_io.arg[2]= arg2;
+  inst->inst.c_io.prio  = prio;
   inst->inst.c_io.src   = src;
   inst->inst.c_io.view_src  = view_src;
   inst->inst.c_io.dev_src  = dev_src;
   inst->inst.c_io.dest  = dest;
   inst->inst.c_io.view_dest = view_dest;
   inst->inst.c_io.dev_dest  = dev_dest;
-  kaapi_offload_stream_commit( stream, stype );
+  kaapi_offload_stream_commit( stream, stype, ios );
+#if KAAPI_DEBUG
+  kaapi_assert_debug( ios->mutex._owner != pthread_self() );
+#endif
   KAAPI_OFFLOAD_TRACE_OUT
 }
 

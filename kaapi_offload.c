@@ -281,10 +281,12 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     device->memdev.device = device;
     device->stream.device = device;
 
+#if KAAPI_DEBUG
     device->memdev.size_alloc = 0;
     device->memdev.size_free = 0;
     device->memdev.size_dev_alloc = 0;
     device->memdev.size_dev_free = 0;
+#endif
 
     /* not yet fully initialize */
     device->is_initialized = false;
@@ -495,8 +497,17 @@ unsigned int kaapi_offload_get_num_devices(void)
 {
   int err =0;
   kaapi_assert_debug( device->is_initialized );
+  kaapi_assert_debug( kaapi_offload_self_device() == device );
 
 #if KAAPI_HAVE_IO_THREADS
+#if KAAPI_USE_STREAM_D2D
+  err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
+  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+
+  err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_D2D);
+  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+#endif
+
   err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_H2D);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 
@@ -509,6 +520,14 @@ unsigned int kaapi_offload_get_num_devices(void)
   err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 #else
+#if KAAPI_USE_STREAM_D2D
+  err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
+  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+
+  err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_D2D);
+  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+#endif
+
   err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_H2D);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 

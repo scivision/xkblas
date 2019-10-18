@@ -146,7 +146,7 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_nb(KERN_HEMM,M,N,Am);
+    size_t NB = xkblas_auto_tilesize(KERN_HEMM,M,N,Am);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
@@ -382,7 +382,7 @@ extern void xkblas_zhemm_native_(
   const Complex64_t* beta,  Complex64_t* C, const int *ldc
 )
 {
-  if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zsymm));
+  if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zhemm));
   dl_zhemm( side, uplo,
             m, n,
             alpha, A, lda,

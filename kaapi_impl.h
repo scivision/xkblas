@@ -48,9 +48,14 @@
 #define KAAPI_USE_CUDA_PLUGIN 1
 
 /* do not use prefetch for successor task */
-#define KAAPI_USE_PREFETCH 1
+#define KAAPI_USE_PREFETCH 0
 #define KAAPI_MAX_PREFETCH_WINDOW 2
 
+/* to allow transfert between GPUi to GPUj if data is under xfer data to GPUi*/
+#define KAAPI_USE_FAVOR_D2D_1 1
+
+/* to use specific stream for D2D operation */
+#define KAAPI_USE_STREAM_D2D 1
 
 /* Mark that we compile source of the library.
    Only used to avoid to include public definitition of some types.
@@ -133,10 +138,11 @@ typedef struct kaapi_rtparam_t {
   uint32_t              gpu_set;            /* GPU to use */
   double                cuda_cache_factor;  /* percent of total free memory used by cache */
   uint16_t              cuda_stream_capacity;  /* capacity of input stream */
-  uint8_t               cuda_conc_strem_kernel;/* number of concurrent cuda kernel stream per device*/
+  uint8_t               cuda_conc_stream_kernel;/* number of concurrent cuda kernel stream per device*/
   uint8_t               cuda_conc_kernel;  /* number of pending kernel per kernel stream */
-  uint8_t               cuda_conc_input;   /* number of concurrent cuda input stream per device*/
-  uint8_t               cuda_conc_output;  /* number of concurrent cuda output stream per device*/
+  uint8_t               cuda_conc_h2d;     /* number of concurrent cuda h2d stream per device*/
+  uint8_t               cuda_conc_d2h;     /* number of concurrent cuda d2h stream per device*/
+  uint8_t               cuda_conc_d2d;     /* number of concurrent cuda d2d stream per device*/
   float                 cuda_cache_limit;  /* percent reserved for cache */
 } kaapi_rtparam_t;
 
@@ -381,6 +387,12 @@ struct kaapi_queue {
   kaapi_task_t**   data0[KAAPI_TASK_MAX_PRIORITY+1];        /* initial task queue task */
   kaapi_queue_t*   next; /* link of suspended queue */
   int32_t volatile H[KAAPI_TASK_MAX_PRIORITY+1] __attribute__((aligned(KAAPI_CACHE_LINE)));
+#if KAAPI_DEBUG_LOW
+  pthread_t  owner;
+  kaapi_atomic_t  cnt_push;
+  kaapi_atomic_t  cnt_pop;
+  kaapi_atomic_t  cnt_steal;
+#endif
 };
 
 /* fifo queue: based on pthread implementation
@@ -393,6 +405,7 @@ struct kaapi_fifo_queue {
   int32_t         H;        /* pos where to pop */
   int32_t         size;     /* size of queue */
   int32_t         push_count;
+  int32_t         pop_count;
   kaapi_task_t**  data;     /* queue of task */
   kaapi_frame_t** frame;    /* task' frame context where to signal */
   pthread_cond_t  cond_push;

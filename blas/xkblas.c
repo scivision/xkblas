@@ -55,21 +55,66 @@
 /* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map */
 #define KAAPI_SIZE_DSM_MAP 20
 
-/* hash map: matrix -> xkblas_matrix_descr_t */
-static kaapi_hashmap_t _kblas_ptr2handle;
+/*
+*/
+struct xkblas_context {
+  /* hash map: matrix -> xkblas_matrix_descr_t */
+  kaapi_hashmap_t xkblas_ptr2handle;
+  kaapi_hashentries_t* xkblas_mapentries[1ULL<<KAAPI_SIZE_DSM_MAP];
 
-/* use ->pos as index of the next handle to allocated in ->data */
-static kaapi_stack_bloc_t* curr_blochandle = 0;
-static kaapi_stack_bloc_t* freelist_blochandle = 0;
-static kaapi_hashentries_t* _kblas_mapentries[1ULL<<KAAPI_SIZE_DSM_MAP];
+  kaapi_handle_t* xkblas_list_sync0; /* re-used unused sync0->sync field as ptr to handle */
+  uint64_t xkblas_generation_cache;
+  xkblas_matrix_descr_t* xkblas_matrix_descr_list;
+  xkblas_mode_math_t  xkblas_modemath;
+};
+
+
 static kaapi_team_t* _xkblas_team = 0;
 kaapi_thread_t* _xkblas_thread =0;
 
 __thread kaapi_thread_t* _xkblas_self_thread = 0;
+__thread xkblas_context_t _xkblas_self_context = 0;
 
-kaapi_handle_t* _xkblas_list_sync0 = 0; /* re-used unused sync0->sync field as ptr to handle */
-static xkblas_matrix_descr_t* _xkblas_matrix_descr_list = 0;
-static uint64_t _xkblas_generation_cache = 0;
+
+/* Return the current xkblas_context (
+*/
+static xkblas_context_t xkblas_context_get()
+{
+  if (_xkblas_self_context ==0)
+  {
+    xkblas_context_t ctxt = (struct xkblas_context*)malloc(sizeof(struct xkblas_context));
+    int err = kaapi_hashmap_init(&ctxt->xkblas_ptr2handle, ctxt->xkblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
+    kaapi_assert(err ==0);
+    ctxt->xkblas_list_sync0 = 0;
+    ctxt->xkblas_generation_cache = 0;
+    ctxt->xkblas_matrix_descr_list = 0;
+    ctxt->xkblas_modemath = XKBLAS_DEFAULT_MATH;
+
+    _xkblas_self_context = ctxt;
+  }
+  return _xkblas_self_context;
+}
+
+/*
+*/
+void xkblas_set_modemath( xkblas_mode_math_t m)
+{
+  xkblas_context_get()->xkblas_modemath = m;
+}
+
+/*
+*/
+xkblas_mode_math_t xkblas_get_modemath(void)
+{
+  return xkblas_context_get()->xkblas_modemath;
+}
+
+/*
+*/
+extern kaapi_handle_t* xkblas_context_get_list_sync0(void)
+{
+  return xkblas_context_get()->xkblas_list_sync0;
+}
 
 /*
 */
@@ -116,7 +161,7 @@ int xkblas_matrix_descr_isinit(
   xkblas_matrix_descr_t* Ah
 )
 {
-  return (Ah->addr != 0) && (Ah->gen == _xkblas_generation_cache);
+  return (Ah->addr != 0) && (Ah->gen == xkblas_context_get()->xkblas_generation_cache);
 }
 
 
@@ -126,8 +171,10 @@ xkblas_matrix_descr_t* xkblas_find( const void* A )
 {
   xkblas_matrix_descr_t** me;
   kaapi_hashentries_t* entry;
+  xkblas_context_t ctxt = xkblas_context_get();
+
   //printf("xkblas_find:%i\n", ++cnt_xkblas_find);
-  entry = kaapi_hashmap_findinsert( &_kblas_ptr2handle, A );
+  entry = kaapi_hashmap_findinsert( &ctxt->xkblas_ptr2handle, A );
   me = KAAPI_HASHENTRIES_GETREF(entry, xkblas_matrix_descr_t*);
   if (*me == 0)
   {
@@ -136,8 +183,8 @@ xkblas_matrix_descr_t* xkblas_find( const void* A )
     Ah->handle = 0;
     Ah->addr = 0;
     Ah->capacity = 0;
-    Ah->next = _xkblas_matrix_descr_list;
-    _xkblas_matrix_descr_list = Ah;
+    Ah->next = ctxt->xkblas_matrix_descr_list;
+    ctxt->xkblas_matrix_descr_list = Ah;
     *me = Ah;
   }
   return *me;
@@ -149,6 +196,7 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
 )
 {
   size_t default_tilesize = xkblas_get_param();
+  xkblas_context_t ctxt = xkblas_context_get();
 
   Ah->addr = A;
   Ah->eltsize = eltsize;
@@ -180,12 +228,12 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
 char* name =kaapi_dbg_get_name(Ah);
 printf("New handle (%i,%i) / %s\n",m,n, name == 0 ? "" : name );
 #endif
-      handle->sync0.sync = (kaapi_access_t*)_xkblas_list_sync0;
-      _xkblas_list_sync0 = handle;
+      handle->sync0.sync = (kaapi_access_t*)ctxt->xkblas_list_sync0;
+      ctxt->xkblas_list_sync0 = handle;
       Ah->ldid[m*Ah->nt+n] = 0;
     }
 
-  Ah->gen = _xkblas_generation_cache;
+  Ah->gen = ctxt->xkblas_generation_cache;
 }
 
 
@@ -225,7 +273,7 @@ uint16_t xkblas_get_ld(
     goto retval;
   }
   else {
-    lid = _kaapi_get_valid_lid( mdi, 0, 0 );
+    lid = _kaapi_get_source_lid( &kaapi_the_dsm, mdi, 0, 0 );
     if ((lid ==lid0) && (count >0))
       lid = kaapi_localitydomain_get_num(KAAPI_LD_GPU, rand()%count);
   }
@@ -240,11 +288,11 @@ retval:
 static size_t NB = 0;
 void xkblas_set_param(size_t nb, size_t p)
 {
-  printf("In %s: nb:%li, p: %li\n", __func__, nb, p );
+  printf("In %s: nb:%li, p: %li\n", __func__, nb, p);
   NB=nb;
-  if (p>= sizeof(double)) /* max precision */
+  if (p > sizeof(double)) /* max precision */
     p = 16;
-  kaapi_memory_set_info( KAAPI_MEMORY_EXPECTED_BLOCK, nb*nb* p );
+  kaapi_memory_set_info( KAAPI_MEMORY_EXPECTED_BLOCK, nb*nb*p );
 }
 
 
@@ -379,6 +427,7 @@ int xkblas_unregister_memory( void* ptr, size_t sz )
 
 /*
 */
+#if 00
 static void xkblas_free_curr_blochandle(void)
 {
   while (curr_blochandle !=0)
@@ -389,7 +438,7 @@ static void xkblas_free_curr_blochandle(void)
     freelist_blochandle = bloc;
   }
 }
-
+#endif
 
 /* Do not implement type== ALL
    store bloc (i,j) on a grid of ressource GpxGq (i/Bp)%Gp,(j/Bq)%Gq
@@ -543,6 +592,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 */
 #if KAAPI_USE_CUDA
 #if KAAPI_DEBUG
+kaapi_atomic_t spawn_writeback={0};
 kaapi_atomic_t pending_writeback={0};
 kaapi_atomic_t received_writeback={0};
 #endif
@@ -565,6 +615,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   /* Make execution as if task_body_gpu spawn continuation (reception of communication)
      in order to detect that end of tasks execution
   */
+//printf("----------- Writeback task\n");
   NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
 #if KAAPI_DEBUG
   KAAPI_ATOMIC_INCR(&pending_writeback);
@@ -605,10 +656,14 @@ static void xkblas_create_taskwriteback(
   taskarg->frame = ctxt->unlink;
   kaapi_update_dependencies(thread, &taskarg->a, task,
       KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah,m,n));
+  kaapi_assert_debug( taskarg->a.mdi==0 );
   kaapi_ldid_t ldid = xkblas_get_ld(Ah, m, n);
   kaapi_taskflag_set(task, KAAPI_TASK_FLAG_INCOM);
   kaapi_task_set_ld(task, 0, ldid);
   /* incr the fact that spawned task should be considered completed when epilogue is called */
+#if KAAPI_DEBUG
+  KAAPI_ATOMIC_INCR(&spawn_writeback);
+#endif
   KAAPI_ATOMIC_INCR(&taskarg->frame->spawn_count);
   kaapi_task_commit( thread, task );
 }
@@ -781,10 +836,7 @@ printf("Xblas_init\n");
 
 printf("Xblas_init: do it\n");
 
-  int err = kaapi_hashmap_init(&_kblas_ptr2handle, _kblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
-  kaapi_assert(err ==0);
-
-  if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_PRECISION"))
+  if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
     size_t tile_size = 0;
     if (getenv("XKBLAS_TILE_SIZE") ==0)
@@ -825,19 +877,21 @@ printf("Xblas_init: do it\n");
 
   if (getenv("XKBLAS_NCUDA_STREAMS"))
   {
-    printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS', use 'XKBLAS_NSTREAMS'\n");
+    if (!getenv("XKBLAS_NSTREAMS"))
+      printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS' use 'XKBLAS_NSTREAMS'\n");
     setenv("KAAPI_CUDA_KERNEL_STREAM_NUMS",getenv("XKBLAS_NCUDA_STREAMS"),1);
   } 
   if (getenv("XKBLAS_NSTREAMS"))
   {
     if (getenv("XKBLAS_NCUDA_STREAMS"))
-      printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS' also defined use 'XKBLAS_NSTREAMS'\n");
+      printf("[XKBlas] deprecated 'XKBLAS_NCUDA_STREAMS' also defined, use 'XKBLAS_NSTREAMS'\n");
     setenv("KAAPI_CUDA_KERNEL_STREAM_NUMS",getenv("XKBLAS_NSTREAMS"),1);
   }
 
   if (getenv("XKBLAS_NKERNELS_PER_STREAM"))
   {
-    printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM', use 'XKBLAS_NKERNELS'\n");
+    if (!getenv("XKBLAS_NKERNELS"))
+      printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM' use 'XKBLAS_NKERNELS'\n");
     setenv("KAAPI_CUDA_KERNEL_PER_STREAM",getenv("XKBLAS_NKERNELS_PER_STREAM"),1);
   }
   if (getenv("XKBLAS_NKERNELS"))
@@ -906,6 +960,7 @@ int xkblas_finalize(void)
   kaapi_team_deattach(_xkblas_team, _xkblas_thread);
 
   kaapi_context_t* ctxt = kaapi_thread2context(_xkblas_thread);
+#if 00
   xkblas_free_curr_blochandle();
   while (freelist_blochandle !=0)
   {
@@ -913,14 +968,16 @@ int xkblas_finalize(void)
     freelist_blochandle = freelist_blochandle->next;
     kaapi_stackallocator_dealloc(&ctxt->st_allocator, bloc );
   }
+#endif
 
   kaapi_thread_unbind(_xkblas_thread);
   _xkblas_self_thread = _xkblas_thread = 0;
   kaapi_team_dealloc(_xkblas_team);
 
-  err = kaapi_hashmap_clear(&_kblas_ptr2handle);
+  xkblas_context_t xkblas_ctxt = xkblas_context_get();
+  err = kaapi_hashmap_clear(&xkblas_ctxt->xkblas_ptr2handle);
   kaapi_assert(err ==0);
-  err = kaapi_hashmap_destroy(&_kblas_ptr2handle);
+  err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
   kaapi_assert(err ==0);
 
   if (handle_cpublas != 0) 
@@ -933,17 +990,16 @@ int xkblas_finalize(void)
 
 /*
 */
+#if KAAPI_DEBUG
+size_t cnt_activated_handle = 0;
+size_t count = 0;
+#endif
 int xkblas_sync(void)
 {
-//printf("------------ xkblas_sync: %i\n",_xkblas_generation_cache);
-//#undef KAAPI_DEBUG
-//#define KAAPI_DEBUG 1
-#if KAAPI_DEBUG
-  size_t cnt_activated_handle = 0;
-  size_t count = 0;
-#endif
+  xkblas_context_t ctxt = xkblas_context_get();
+
   /* activate first synchronisation access */
-  kaapi_handle_t* curr = _xkblas_list_sync0;
+  kaapi_handle_t* curr = ctxt->xkblas_list_sync0;
   while (curr != 0)
   {
     kaapi_handle_t* next = (kaapi_handle_t*)curr->sync0.sync;
@@ -962,26 +1018,27 @@ int xkblas_sync(void)
 
 //#undef KAAPI_DEBUG
 //#define KAAPI_DEBUG 0
-//printf("------------ xkblas_sync: %i -> #handle: %i, #count activated: %i\n",_xkblas_generation_cache, cnt_activated_handle, count);
+//printf("------------ xkblas_sync: %i -> #handle: %i, #count activated: %i\n",xkblas_generation_cache, cnt_activated_handle, count);
 
-  kaapi_sched_sync(_xkblas_thread);
-
+  /* also do sync */
   kaapi_end_dfg( _xkblas_thread );
+  kaapi_assert( ctxt == xkblas_context_get() );
+
 #define OLD_FLUSH 0
 #if OLD_FLUSH // see xkblas_memory_invalidate_caches below
   xkblas_free_curr_blochandle();
-  kaapi_hashmap_clear(&_kblas_ptr2handle);
-  _xkblas_list_sync0 = 0;
+  kaapi_hashmap_clear(&ctxt->xkblas_ptr2handle);
+  ctxt->xkblas_list_sync0 = 0;
 #else
-  /* reset all entries in _xkblas_list_sync0 */
-  curr = _xkblas_list_sync0;
-  _xkblas_list_sync0 = 0;
+  /* reset all entries in ctxt->xkblas_list_sync0 */
+  curr = ctxt->xkblas_list_sync0;
+  ctxt->xkblas_list_sync0 = 0;
   while (curr != 0)
   {
     kaapi_handle_t* next = (kaapi_handle_t*)curr->sync0.sync;
     kaapi_handle_init(_xkblas_thread, curr, curr->sync0.data);
-    curr->sync0.sync = (kaapi_access_t*)_xkblas_list_sync0;
-    _xkblas_list_sync0 = curr;
+    curr->sync0.sync = (kaapi_access_t*)ctxt->xkblas_list_sync0;
+    ctxt->xkblas_list_sync0 = curr;
     curr = next;
   }
 #endif
@@ -1002,13 +1059,14 @@ int xkblas_memory_invalidate(const void* A)
 int xkblas_memory_invalidate_caches(void)
 {
   kaapi_memory_invalidate_caches();
+  xkblas_context_t ctxt = xkblas_context_get();
 #if OLD_FLUSH //see just above
   xkblas_free_curr_blochandle();
   kaapi_hashmap_clear(&_kblas_ptr2handle);
-  _xkblas_list_sync0 = 0;
+  ctxt->xkblas_list_sync0 = 0;
 #else
-  ++_xkblas_generation_cache;
-  _xkblas_list_sync0 = 0;
+  ++ctxt->xkblas_generation_cache;
+  ctxt->xkblas_list_sync0 = 0;
 #endif
 }
 
@@ -1018,22 +1076,23 @@ int xkblas_memory_invalidate_caches(void)
 int xkblas_memory_free(void)
 {
   kaapi_memory_invalidate_caches();
+  xkblas_context_t ctxt = xkblas_context_get();
   /* free matrix handle list */
-  while (_xkblas_matrix_descr_list !=0)
+  while (ctxt->xkblas_matrix_descr_list !=0)
   {
-    xkblas_matrix_descr_t* next = _xkblas_matrix_descr_list->next;
-    free(_xkblas_matrix_descr_list->handle);
-    free(_xkblas_matrix_descr_list);
-    _xkblas_matrix_descr_list = next;
+    xkblas_matrix_descr_t* next = ctxt->xkblas_matrix_descr_list->next;
+    free(ctxt->xkblas_matrix_descr_list->handle);
+    free(ctxt->xkblas_matrix_descr_list);
+    ctxt->xkblas_matrix_descr_list = next;
   }
   /* kaapi_handle_t are store in matrix descriptor */
-  _xkblas_list_sync0 = 0;
-  kaapi_hashmap_clear(&_kblas_ptr2handle);
+  ctxt->xkblas_list_sync0 = 0;
+  kaapi_hashmap_clear(&ctxt->xkblas_ptr2handle);
 
 #if OLD_FLUSH //see just above
   xkblas_free_curr_blochandle();
-  kaapi_hashmap_clear(&_kblas_ptr2handle);
-  _xkblas_list_sync0 = 0;
+  kaapi_hashmap_clear(&ctxt->xkblas_ptr2handle);
+  ctxt->xkblas_list_sync0 = 0;
 #endif
 }
 
@@ -1060,6 +1119,7 @@ int xkblas_memory_coherent_async(
 )
 {
 #if 0
+  xkblas_sync();
   printf("-----------------------------\n");
   for (size_t i=0; i<kaapi_localitydomain_count(KAAPI_LD_GPU); ++i)
   {
@@ -1237,7 +1297,7 @@ int xkblas_distribute_1Dblock_cyclic_async(
    - M,N should be the dimension of the result. K depends of the Kernel.
    Return NB such that (M,N) is computed in FACTOR*NGPU blocs
 */
-size_t xkblas_auto_nb(
+size_t xkblas_auto_tilesize(
   xkblas_kernel_t kernel, size_t M, size_t N, size_t K
 )
 {
@@ -1258,7 +1318,8 @@ size_t xkblas_auto_nb(
       size_t NB = xkblas_get_param();
       if (NB!=0) return NB;
 
-    #define FACTOR 2
+    #define FACTOR 4
+#if 0
       size_t ngpu = xkblas_get_ngpus();
       double tNB = ((double)M*(double)N) / (double)(ngpu * FACTOR);
       tNB =  sqrt(tNB);
@@ -1271,6 +1332,32 @@ size_t xkblas_auto_nb(
       //TG: TEST BEFORE making it permanent
       if (NB <128) NB = 128;
       return NB;
+#elif 0 // heuristic 4,2 or 4,3,2,1
+      size_t ngpu = xkblas_get_ngpus();
+      if (M<N) N =M;
+      for (int fact = FACTOR; fact>0; fact-=2)
+      {     
+        double tNB = ((double)N) / (double)(ngpu * fact);
+        NB = ceil(tNB);
+        if (NB >=1024) break;
+      }
+printf("TileSize:%i\n", NB);
+      //TG: TEST BEFORE making it permanent
+      if (NB <1024) NB = 1024;
+      return NB;
+#else
+      size_t ngpu = xkblas_get_ngpus();
+      if (M<N) N =M;
+      for (int fact = FACTOR; fact>0; --fact)
+      {
+        double tNB = ((double)N) / (double)(ngpu * fact);
+        NB = ceil(tNB);
+        if (NB >=1024) break;
+      }
+printf("TileSize:%i\n", NB);
+      if (NB <1024) NB = 1024;
+      return NB;
+#endif
     };
 
     case KERN_VOID:
@@ -1318,10 +1405,10 @@ int xkblas_auto_map(
         /* find the most square decomposition of ngpu in Gm x Gn */
         size_t g;
         for (g = Gm+1; g>0; --g)
-        {
-           if (ngpu / g * g == ngpu) break;
-        }
-        if ((g==0) || (g*g != ngpu)) { Gm = ngpu; Gn = 1; }
+           if (ngpu % g == 0) break;
+        if (g==0) { Gm = ngpu; Gn = 1; }
+        //if (g==0) { Gm = 1; Gn = ngpu; }
+        else { Gm = g; Gn = ngpu/g; }
       }
       //printf("Block2D cyclic: Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", Blkm, Blkn, Gm, Gn);
       xkblas_map_2Dblock_cyclic(

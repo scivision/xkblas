@@ -93,7 +93,7 @@ extern void BLAS_NAME(zgemmt)(
     ((*alpha == 0.0 || *k == 0) && *beta == 1.0))
     return;
 
-  if (FLOPS_ZGEMMT(*n,*n,*k)/DATA_ZGEMMT(*n,*n,*k) < threshold_kern[ZGEMMT])
+  if (FLOPS_ZGEMMT(*n,*k)/DATA_ZGEMMT(*n,*k) < threshold_kern[ZGEMMT])
   {
     xkblas_zgemmt_native_( uplo, transa, transb,
                        n, k,
@@ -387,5 +387,4 @@ extern void BLAS_NAME(zher2k)(
     xkblas_memory_invalidate_caches();
  }
 }
-
 #endif

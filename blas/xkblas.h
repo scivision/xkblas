@@ -58,7 +58,21 @@ typedef double complex Complex64_t;
 typedef double CFloat64_t;
 #endif
 
+/* xkblas context
+*/
+typedef struct xkblas_context* xkblas_context_t;
 
+
+/* Xblas mode math
+*/
+typedef enum {
+  XKBLAS_DEFAULT_MATH,
+  XKBLAS_TENSOR_OP_MATH
+} xkblas_mode_math_t;
+
+/* Set the mode math for the next kernels.
+*/
+extern void xkblas_set_modemath( xkblas_mode_math_t );
 
 /* Here we include the header for the underlayer BLAS library.
    Should really be ?
@@ -304,7 +318,7 @@ extern int xkblas_set_ngpus(int ngpus);
 
 /* Set the tile size and the element
  */
-extern void xkblas_set_param(size_t nb, size_t p);
+extern void xkblas_set_param(size_t nb, size_t p );
 
 /** kaapi_get_elapsedtime
     The function kaapi_get_elapsedtime() will return the elapsed time in second

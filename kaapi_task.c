@@ -127,6 +127,13 @@ int kaapi_queue_init( kaapi_queue_t* rd, kaapi_task_t** bloc0, int32_t size )
     rd->data[i] = rd->data0[i] = 0;
     rd->size[i] = 0;
   }
+#if KAAPI_DEBUG_LOW
+  rd->owner = pthread_self();
+  KAAPI_ATOMIC_WRITE(&rd->cnt_push, 0);
+  KAAPI_ATOMIC_WRITE(&rd->cnt_pop, 0);
+  KAAPI_ATOMIC_WRITE(&rd->cnt_steal, 0);
+#endif
+
   if (rd->data[0] ==0) return ENOMEM;
   return 0;
 }
@@ -179,17 +186,35 @@ printf("Realloc queue: size=%i\n", newsize);
 }
 
 /* */
+#if KAAPI_DEBUG_LOW
+kaapi_atomic_t count_queue_push = {0};
+kaapi_atomic_t count_queue_all_push = {0};
+kaapi_atomic_t count_queue_fifo_push = {0};
+#endif
 int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_task_t* task)
 {
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
-
+#if KAAPI_DEBUG_LOW
+  kaapi_assert( pthread_equal( pthread_self(), ctxt->queue->owner ) );
+  KAAPI_ATOMIC_INCR(&count_queue_all_push);
+#endif
   /* explicit queue defined in LD attribut */
   kaapi_ldid_t ldid = kaapi_task_get_ld(task);
   if ((ldid != (kaapi_ldid_t)-1) && ((ctxt->ld ==0) || ((ctxt->ld !=0) && (ldid != ctxt->ld->ldid))))
   {
     kaapi_localitydomain_t* ld = kaapi_localitydomain_get(ldid);
-    if (ld ==0) return -1;
+    if (ld ==0) 
+    {
+#if KAAPI_DEBUG
+      printf("Error in %s\n", __func__); fflush(stdout);
+      kaapi_assert_debug( ld != 0);
+#endif
+      return -1;
+    }
     if (frame ==0) frame = ctxt->unlink;
+#if KAAPI_DEBUG_LOW
+    KAAPI_ATOMIC_INCR(&count_queue_fifo_push);
+#endif
     return kaapi_fifo_queue_push(
         ld->queue,
         frame,
@@ -199,6 +224,12 @@ int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_ta
 
   /* else push in the local queue */
   kaapi_queue_t* rd = ctxt->queue;
+  kaapi_assert_debug( ldid == ctxt->ld->ldid);
+#if KAAPI_DEBUG_LOW
+  KAAPI_ATOMIC_INCR(&count_queue_push);
+  KAAPI_ATOMIC_INCR(&rd->cnt_push);
+#endif
+
   unsigned int p = kaapi_task_get_priority(task);
   kaapi_assert_debug(p<= KAAPI_TASK_MAX_PRIORITY);
   int32_t T = rd->T[p];
@@ -227,19 +258,34 @@ int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_ta
    Else return 0;
    Never pop
 */
+#if KAAPI_DEBUG_LOW
+kaapi_atomic_t count_queue_pop = {0};
+#endif
 extern kaapi_task_t* kaapi_queue_pop(
     kaapi_context_t* owner,
     kaapi_queue_t* rd,
     int32_t* T0
 )
 {
+#if KAAPI_DEBUG_LOW
+  kaapi_assert( pthread_equal( pthread_self(), rd->owner ) );
+#endif
   uint32_t bitmap;
   int32_t p;
   int32_t T;
   kaapi_task_t* task;
 redo:
   bitmap = rd->bitmap;
-  if (bitmap ==0) return 0;
+  if (bitmap ==0)
+  {
+#if KAAPI_DEBUG_LOW
+    for (int i=0; i<KAAPI_TASK_MAX_PRIORITY+1; ++i)
+    {
+      kaapi_assert(rd->T[i] == rd->H[i]);
+    }
+#endif
+    return 0;
+  }
   p = sizeof(int)*8 - __builtin_clz( bitmap )-1;
   kaapi_assert_debug(p<= KAAPI_TASK_MAX_PRIORITY);
   T = rd->T[p];
@@ -290,6 +336,10 @@ out:
     rd->bitmap &= ~(1U<<p);
     goto redo;
   }
+#if KAAPI_DEBUG_LOW
+  KAAPI_ATOMIC_INCR(&count_queue_pop);
+  KAAPI_ATOMIC_INCR(&rd->cnt_pop);
+#endif
   return task;
 }
 
@@ -298,6 +348,9 @@ out:
    Assume that mutex on queue is locked.
    Return 0 in case of failure, else return the task stolen
 */
+#if KAAPI_DEBUG_LOW
+kaapi_atomic_t count_queue_steal = {0};
+#endif
 static inline __attribute__((__always_inline__))
 kaapi_task_t* kaapi_queue_steal(
   kaapi_context_t* victim,
@@ -352,6 +405,10 @@ out:
   }
   *idx = H0;
   *prio = p;
+#if KAAPI_DEBUG_LOW
+  KAAPI_ATOMIC_INCR(&count_queue_steal);
+  KAAPI_ATOMIC_INCR(&rd->cnt_steal);
+#endif
   return task;
 }
 
@@ -1145,7 +1202,6 @@ int kaapi_sched_sync( kaapi_thread_t* thread )
   do
   {
     {
-#if 1
       kaapi_pop_request_t request;
       /* pop in my list */
       request.op      = KAAPI_REQUEST_OP_POP;
@@ -1156,11 +1212,7 @@ int kaapi_sched_sync( kaapi_thread_t* thread )
       if (KAAPI_REQUEST_S_OK !=
           kaapi_sched_process_request(ctxt->team, ctxt,
                                       (kaapi_request_t*) &request ))
-       break;
-#else
-      task = kaapi_queue_pop(ctxt->queue, unlink->save_T);
-      if (task == 0) break;
-#endif
+        break;
     }
 exec_start:
     {
@@ -1227,8 +1279,6 @@ exec_start:
           printf("%i:: Return from suspend work on queue:%p [T:%i, H:%i]\n",
           (int)ctxt->kid, (void*)ctxt->queue, ctxt->queue->T, ctxt->queue->H);
         )
-//printf("Add: #task=%i\n",qf.H-qf.T);
-        //KAAPI_ATOMIC_ADD( unlink->exec_count, qf.H-qf.T );
       }
       kaapi_atomic_lock(&ctxt->lock);
       for (int p=0; p<=KAAPI_TASK_MAX_PRIORITY; ++p)
@@ -1243,7 +1293,8 @@ exec_start:
     kaapi_assert_debug( kaapi_sched_idle == ctxt->sched_idle );
     kaapi_sched_idle( thread, _kaapi_frame_completed, unlink );
   }
-
+  //printf("[sched_sync] spawn: %i / exec: %i\n", 
+  //      KAAPI_ATOMIC_READ(&unlink->spawn_count), KAAPI_ATOMIC_READ(&unlink->exec_count));
   kaapi_frame_pop( ctxt );
 
   return 0;

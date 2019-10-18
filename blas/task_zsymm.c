@@ -60,6 +60,7 @@
   Complex64_t beta;
   kaapi_access_t C;
   size_t ldc;
+  xkblas_mode_math_t mm;
 } NAME(Arg);
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
@@ -93,6 +94,7 @@ void INSERT_TASK_zsymm(
         KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
     taskarg->beta = beta;
     taskarg->ldc = ldc;
+    taskarg->mm = xkblas_get_modemath();
     kaapi_ldid_t ldid = xkblas_get_ld(Ch, Cm, Cn );
     kaapi_task_set_ld(task, 0, ldid);
     kaapi_task_commit( thread, task );

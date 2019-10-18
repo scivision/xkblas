@@ -90,10 +90,11 @@ kaapi_rtparam_t kaapi_default_param = {
   .ngpus                 = (uint8_t)-1,
   .gpu_set               = ~0,
   .cuda_stream_capacity  = 64,
-  .cuda_conc_input       = 1,   /* output: D2H */
-  .cuda_conc_strem_kernel = 2,
+  .cuda_conc_d2h         = 1,   /* output: D2H */
+  .cuda_conc_stream_kernel = 2,
   .cuda_conc_kernel      = 1,
-  .cuda_conc_output      = 1,   /* output: H2D */
+  .cuda_conc_h2d         = 1,   /* output: H2D */
+  .cuda_conc_d2d         = 1,   /* output: D2D */
   .cuda_cache_limit      = 1.00
 };
 
@@ -158,9 +159,9 @@ int kaapi_setup_param(void)
 
   if (getenv("KAAPI_CUDA_KERNEL_STREAM_NUMS"))
   {
-    uint8_t cuda_conc_strem_kernel = (uint8_t )atoi(getenv("KAAPI_CUDA_KERNEL_STREAM_NUMS"));
-    if (cuda_conc_strem_kernel  < 1) cuda_conc_strem_kernel = 1;
-    kaapi_default_param.cuda_conc_strem_kernel = cuda_conc_strem_kernel;
+    uint8_t cuda_conc_stream_kernel = (uint8_t )atoi(getenv("KAAPI_CUDA_KERNEL_STREAM_NUMS"));
+    if (cuda_conc_stream_kernel  < 1) cuda_conc_stream_kernel = 1;
+    kaapi_default_param.cuda_conc_stream_kernel = cuda_conc_stream_kernel;
   }
 
   if (getenv("KAAPI_CUDA_KERNEL_PER_STREAM"))
@@ -239,6 +240,10 @@ int kaapi_init(void)
   kaapi_assert(0 == kaapi_offload_init(0));
   kaapi_assert(0 == kaapi_offload_start());
 #endif
+
+  /* here all locality domain have been initialized */
+  kaapi_assert( 0 == kaapi_dsm_commit() );
+
   return 0;
 }
 
@@ -268,10 +273,11 @@ int kaapi_finalize(void)
   kaapi_default_param.ngpus                 = (uint8_t)-1;
   kaapi_default_param.gpu_set               = ~0;
   kaapi_default_param.cuda_stream_capacity  = 64;
-  kaapi_default_param.cuda_conc_input       = 1;
-  kaapi_default_param.cuda_conc_strem_kernel= 2;
+  kaapi_default_param.cuda_conc_d2h         = 1;
+  kaapi_default_param.cuda_conc_stream_kernel= 2;
   kaapi_default_param.cuda_conc_kernel      = 1;
-  kaapi_default_param.cuda_conc_output      = 1;
+  kaapi_default_param.cuda_conc_h2d         = 1;
+  kaapi_default_param.cuda_conc_d2d         = 1;
   kaapi_default_param.cuda_cache_limit      = 1.00;
 
   return 0;

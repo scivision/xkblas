@@ -2,11 +2,18 @@
 
 
 # Global variables
+#run test for each precision
+LISTKERN_Z="GEMM TRMM TRSM SYMM SYRK SYR2K HEMM HERK HER2K"
+LISTKERN_D="GEMM TRMM TRSM SYMM SYRK SYR2K"
+
 PRECISION="z c d s"
 BS="128"
 N="1024"
-NGPU=1
 KILLDELAY=10m
+GPUCOUNT=`nvidia-smi --query-gpu=gpu_name --format=csv| grep -v name | wc -l`
+GSET="8" 
+#`seq -s ' ' $GPUCOUNT -1 1`
+
 
 #run each kernel
 run_GEMM()
@@ -91,13 +98,6 @@ run_HER2K()
 }
 
 
-
-
-
-#run test for each precision
-LISTKERN_Z="GEMM TRMM TRSM SYMM SYRK SYR2K HEMM HERK HER2K"
-LISTKERN_D="GEMM TRMM TRSM SYMM SYRK SYR2K"
-
 #
 runtest_z()
 {
@@ -158,26 +158,29 @@ dotest()
 }
 
 
-GPUCOUNT=`nvidia-smi --query-gpu=gpu_name --format=csv| grep -v name | wc -l`
-GSET=`seq -s ' ' $GPUCOUNT -1 1`
-
 for NGPU in $GSET;
 do
 
-  N=1024
-  BS=128
-  KILLDELAY=5m
-  echo "--- Run test with N="$N", BS="$BS
-  dotest;
+  #N=1024
+  #BS=128
+  #KILLDELAY=5m
+  #echo "--- Run test with N="$N", BS="$BS
+  #dotest;
 
-  N=2048
-  BS=512
-  KILLDELAY=20m
-  echo "--- Run test with N="$N", BS="$BS
-  dotest;
+  #N=2048
+  #BS=512
+  #KILLDELAY=20m
+  #echo "--- Run test with N="$N", BS="$BS
+  #dotest;
 
-  N=8192
-  BS=1024
+  #N=8192
+  #BS=1024
+  #KILLDELAY=35m
+  #echo "--- Run test with N="$N", BS="$BS
+  #dotest;
+
+  N=16384
+  BS=2048
   KILLDELAY=35m
   echo "--- Run test with N="$N", BS="$BS
   dotest;

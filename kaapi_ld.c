@@ -95,6 +95,7 @@ int kaapi_localitydomain_init( kaapi_localitydomain_t* ld, kaapi_device_t* devic
   rd->frame = 0;
   rd->size = 0;
   rd->push_count = 0;
+  rd->pop_count = 0;
   rd->waiter_push = 0;
   rd->waiter_pop  = 0;
   err = pthread_mutex_init(&rd->lock, 0);
@@ -380,6 +381,7 @@ kaapi_task_t* kaapi_fifo_queue_pop(
     *frame = rd->frame[idx];
     rd->data[idx] = 0;
     rd->frame[idx] = 0;
+    ++rd->pop_count;
     ++rd->H;
     if (rd->waiter_push)
       pthread_cond_signal(&rd->cond_push);

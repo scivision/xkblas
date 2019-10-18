@@ -470,7 +470,7 @@ install:
 		  echo "XKBlas - Static library libxklas.a installed in ${PREFIX}/lib"; \
         	fi;\
 	        if test -e libxkblas.so -a -e libkaapi.so ; then \
-	  	  cp -f ${TARGET_PLUGIN} a libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib; \
+	  	  cp -f ${TARGET_PLUGIN} libkaapi.so libxkblas.so libxkblas_blaswrapper.so ${PREFIX}/lib; \
 		  echo "XKBlas - Dynamic libraries libkaapi.so libxklas.so libxkblas_blaswrapper.so installed in ${PREFIX}/lib"; \
  		fi;\
  		if test -e testing_z; then \
@@ -532,28 +532,28 @@ libxkblas_blaswrapper.so: libxkblas.so ${XKBLAS_WRAPPER_SRC:.c=.o} ${XKBLAS_WRAP
 
 
 testing_z: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
-	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_z_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) .generated_testing
-	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_z -UPRECISION_s -UPRECISION_d -UPRECISION_c -o testing_z  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_z})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_c: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
-	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_c_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) .generated_testing 
-	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_c -UPRECISION_s -UPRECISION_d -UPRECISION_z -o testing_c  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_c})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_d: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
-	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_d_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) .generated_testing 
-	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c -o testing_d  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_d})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_s: $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
-	$(CC) -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 testing_s_wrapper: $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) .generated_testing 
-	$(CC) -DTESTING_API_XKBLAS_WRAPPER  -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lm
+	$(CC) -DTESTING_API_XKBLAS_WRAPPER  -DPRECISION_s -UPRECISION_z -UPRECISION_d -UPRECISION_c -o testing_s  -o $@ $(patsubst %.c,%_wrap.o, $(filter %.c, ${XKBLAS_TESTING_PRECISION_s})) ${XKBLAS_LDFLAGS} -L${KAAPI_HOME} -lxkblas -lkaapi -lm
 
 $(filter %.c,${XKBLAS_TESTING}): testing/testing_zauxiliary.h
 

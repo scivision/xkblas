@@ -49,7 +49,7 @@
 
 /* Debug flag */
 //#define _OFFLOAD_DEBUG  1
-//#define _OFFLOAD_DEBUG  0
+#define _OFFLOAD_DEBUG  0
 
 #if _OFFLOAD_DEBUG
 #include <stdio.h>

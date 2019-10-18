@@ -66,6 +66,7 @@ int xkblas_dbg_setname(
 */
 void xkblas_dbg_dump_graph( const char* name )
 {
+  extern kaapi_handle_t* xkblas_context_get_list_sync0(void);
   static int cnt = 0;
   char buffer[128];
   if (name ==0)
@@ -73,6 +74,6 @@ void xkblas_dbg_dump_graph( const char* name )
   else
     snprintf(buffer,128,"%s.dot", name);
   printf("<<<< Dump graph in file '%s\n", buffer);
-  kaapi_dump_dot_list_handle(xkblas_self_thread(), _xkblas_list_sync0, buffer);
+  kaapi_dump_dot_list_handle(xkblas_self_thread(), xkblas_context_get_list_sync0(), buffer);
   printf("<<<< End dump graph in file '%s\n", buffer);
 }

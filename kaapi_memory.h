@@ -104,46 +104,65 @@ static inline uint16_t kaapi_memory_asid_get_lid( kaapi_address_space_id_t kasid
 /* static limitation of the current implementation */
 #define KAAPI_MEMORY_MAX_NODES 16
 
-/* callback on replica */
+/* callback for replica
+   By default one callback is stored in the replica data structure. Further callbacks may
+   have to be dynamically allocated and link together.
+*/
 typedef struct kaapi_data_replica_cbk {
     struct kaapi_io_cbk            iocbk;      /* called on completion of async comm */
+#if KAAPI_DEBUG
+    int                            idx;
+#endif
     struct kaapi_data_replica_cbk* next;       /* chained if required */
 } kaapi_data_replica_cbk_t;
 
-/* one replica */
+/* one replica
+   - pinned is a counter that allows 255 reservations of the data before allowing it
+   to be evicted from the device memory.
+   Each replicat is part of LRU cache with respect to the device.
+   - lock procted update between different driver threads of different GPUs.
+*/
 typedef struct kaapi_data_replica {
-    kaapi_atomic8_t          pinned;  /* counter: cannot be evicted if>0 */
+    kaapi_lock_t             lock;
+    kaapi_atomic8_t          pinned;       /* counter: cannot be evicted if>0 */
     kaapi_pointer_t          ptr;
     kaapi_memory_view_t      view;
+    int                      count;        /* debug, length of cbk */
     kaapi_data_replica_cbk_t cbk;
     void*                    cachelist;
     void*                    cacheentry;
 } kaapi_data_replica_t;
     
 /* Metadata information for each address
-   - replicas[lid] == information about replica of data on address space lid
+   - replicas[lid] == information about replica of data on address space lid (locality domain id)
    - alloc[lid bit] == 1 iff data allocated (and replica[lid].ptr != 0)
    - valid[lid bit] == 1 iff data in replica[lid] is the last recent write data
    - xfer[lid bit] == 1 iff data in replica[lid] is going to be transfered to lid.
                       upon reception the state will be updated to valid and xfer unset.
-   Each update to bit are non conflictual by thread managing devices.
-   The only exception is :
-    - read valid data in cache associated to lid_i
-    - cache storing valid data is going to evict it.
-    We use Disjktra like protocol to make coherent.
+   - xferb[lid bit] == 1 iff data in replica[lid] is going to be send to other lid.
+                      upon termination the state will be updated to valid and xferb unset.
+                      Used to mark data under write-back operation before possible eviction.
+                      Could be read but not write.
 */
 typedef struct kaapi_metadata_info {
     kaapi_data_replica_t*   replicas[KAAPI_MEMORY_MAX_NODES];
-    kaapi_atomic64_t        alloc;   /* bit i == 1 iff in data allocated in memory */
-    kaapi_atomic64_t        valid;   /* bit i == 1 iff in data valid in memory */
-    kaapi_atomic64_t        xfer;    /* bit i == 1 iff in data in transit to lid i */
+    kaapi_atomic64_t        alloc;
+    kaapi_atomic64_t        valid;
+    kaapi_atomic64_t        xfer;
+    kaapi_atomic64_t        xferb;
+#if defined(KAAPI_DEBUG)
     const char*             debug_info;
+#endif
 } kaapi_metadata_info_t;
 
 
 /* ============================ Memory Node device ================================= */
 struct kaapi_alloc_data;
 typedef struct kaapi_alloc_data kaapi_alloc_data_t;
+
+#define KAAPI_MEMORY_DEVICE_FLAG_NONE         0
+#define KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL  0x1
+#define KAAPI_MEMORY_DEVICE_FLAG_FULL         0x2
 
 struct kaapi_memory_device {
     kaapi_address_space_id_t asid;
@@ -152,7 +171,7 @@ struct kaapi_memory_device {
     kaapi_alloc_data_t* freelist_metabloc;
 
     /* Virtualization of alloc/free on the offload memory device */
-    uintptr_t (*f_alloc)(struct kaapi_memory_device*,  size_t);
+    uintptr_t (*f_alloc)(struct kaapi_memory_device*,  size_t, int* );
     void  (*f_free)(struct kaapi_memory_device*, uintptr_t, size_t);
 
     /* returns:
@@ -165,19 +184,22 @@ struct kaapi_memory_device {
                     const kaapi_memory_view_t* /*view_dest*/,
                     kaapi_pointer_t /*src*/,
                     const kaapi_memory_view_t* /*view_src*/,
+                    int flags, /* 0, 1, 2 */
                     kaapi_io_cbk_fnc_t cbk,
                     void* arg0, void* arg1, void* arg2
     );
     int  (*f_memsync)(struct kaapi_memory_device*, int begend);
 
     /* to help to manage cache */
-    size_t (*f_get_total_mem)(struct kaapi_memory_device*);
+    size_t (*f_get_mem_info)(struct kaapi_memory_device*, size_t*, size_t*);
     size_t (*f_get_free_mem)(struct kaapi_memory_device*);
 
-    size_t size_alloc;     /* size alloc / free by the memory device */
-    size_t size_free;
-    size_t size_dev_alloc; /* size alloc / free to low level device */
+#if KAAPI_DEBUG
+    size_t size_alloc;     /* size alloc by the memory device */
+    size_t size_free;      /* size free */
+    size_t size_dev_alloc; /* size alloc / free to low level device driver */
     size_t size_dev_free;
+#endif
 };
 
 
@@ -211,9 +233,14 @@ typedef struct kaapi_dsm {
 
 extern kaapi_dsm_t kaapi_the_dsm;
 
-/*
+/* Called before any method on dsm
 */
 extern int kaapi_dsm_init( void );
+
+
+/* Called after initialization of localitydomain attached to the dsm
+*/
+extern int kaapi_dsm_commit( void );
 
 /*
 */
@@ -369,8 +396,10 @@ extern int kaapi_memory_cache_invalidate_bloc(
 /* High level memory copy
 */
 extern int kaapi_memory_copy_async(
+    kaapi_memory_device_t* dev,
     kaapi_pointer_t dest, const kaapi_memory_view_t* view_dest,
     kaapi_pointer_t src, const kaapi_memory_view_t* view_src,
+    int flags,
     kaapi_io_cbk_fnc_t cbk,
     void* arg0, void* arg1, void* arg2
 );
@@ -378,7 +407,8 @@ extern int kaapi_memory_copy_async(
 /* Take the first. But always the same.
    If several capacity => take one of the less loaded or random
 */
-extern uint16_t _kaapi_get_valid_lid(
+extern uint16_t _kaapi_get_source_lid(
+  kaapi_dsm_t* dsm,
   kaapi_metadata_info_t* mdi,
   kaapi_address_space_id_t dest_asid,
   int mark );
@@ -402,6 +432,16 @@ static inline bool kaapi_memory_replica_is_xfer(
   kaapi_assert_debug(mdi != 0);
   kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
   return  ((KAAPI_ATOMIC_READ(&mdi->xfer) & (1UL<<lid)) !=0);
+}
+
+static inline bool kaapi_memory_replica_is_xferb(
+    kaapi_metadata_info_t*   mdi,
+    uint16_t lid
+)
+{
+  kaapi_assert_debug(mdi != 0);
+  kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
+  return  ((KAAPI_ATOMIC_READ(&mdi->xferb) & (1UL<<lid)) !=0);
 }
 
 #endif

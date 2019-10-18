@@ -183,7 +183,7 @@ int xkblas_zgemm_async(
     size_t Bnb = 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_nb(KERN_GEMM,M,N,K);
+    size_t NB = xkblas_auto_tilesize(KERN_GEMM,M,N,K);
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
     xkblas_matrix_descr_t* Ch = xkblas_find(C);
@@ -251,8 +251,8 @@ int xkblas_zgemm_async(
                             transA, transB,
                             tempmm, tempnn, tempkn, 
                             *alpha, A(m, k), ldam,  /* lda * Z */
-                                   B(k, n), ldbk,  /* ldb * Y */
-                            zbeta, C(m, n), ldcm); /* ldc * Y */
+                                   B(k, n), ldbk,   /* ldb * Y */
+                            zbeta, C(m, n), ldcm);  /* ldc * Y */
                     }
                 }
                 /*

@@ -71,6 +71,10 @@ typedef double CFloat64_t;
 #include "kaapi.h"
 
 
+/* Get the mode math for the next kernel.
+*/
+extern xkblas_mode_math_t xkblas_get_modemath(void);
+
 /* Common Macro... be carrefull, name not so clear */
 #define _XKBLAS_STR_EXPAND2(tok) #tok
 #define _XKBLAS_STR_EXPAND(tok) _XKBLAS_STR_EXPAND2(tok)
@@ -94,13 +98,6 @@ typedef enum {
   KERN_HER2K
 } xkblas_kernel_t;
 
-/* The blas thread
-*/
-extern kaapi_thread_t* _kaapi_blas_thread;
-
-/* Initial data list
-*/
-extern kaapi_handle_t* _xkblas_list_sync0;
 
 /* Internal matrix data structure
    From application pointer to a matrix, xkblas keep track of the internal matrix descriptor.
@@ -155,7 +152,7 @@ extern int xkblas_auto_map(
    M,N,K are the input problem sizes.
    Some kernel does not required 3 sizes and K is ignored
 */
-extern size_t xkblas_auto_nb(
+extern size_t xkblas_auto_tilesize(
   xkblas_kernel_t kernel, size_t M, size_t N, size_t K
 );
 
@@ -269,7 +266,7 @@ static void kaapi_error( const char* s1, const char* s2)
 /*
 */
 extern __thread kaapi_thread_t* _xkblas_self_thread;
-static inline kaapi_thread_t* xkblas_self_thread(void)
+static inline kaapi_thread_t* xkblas_self_thread()
 { return _xkblas_self_thread; }
 
 

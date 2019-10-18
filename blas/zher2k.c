@@ -152,7 +152,7 @@ int xkblas_zher2k_async( int uplo, int trans, int N, int K,
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_nb(KERN_HER2K,N,K,Am);
+    size_t NB = xkblas_auto_tilesize(KERN_HER2K,N,K,Am);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

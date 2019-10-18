@@ -8,7 +8,7 @@ KAAPI_HOME=$(PWD)
 #CUDA_HOME=/usr/local/cuda-9.0/
 
 # To use hwloc: uncomment following line with correct location
-#HWLOC_HOME=/usr
+HWLOC_HOME=/usr
 
 # For MKL
 #EXTRA=-DKAAPI_BLAS_USE_MKL

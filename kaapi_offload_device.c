@@ -61,19 +61,6 @@ static void callback_epilogue_perparam(
 {
   kaapi_device_t* device = (kaapi_device_t*)arg;
   kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
-#if 0
-  if (KAAPI_ACCESS_IS_WRITE(a->mode) && (a->sync->next ==0))
-  { // anticipate copy to host
-//printf("[%s] make copy to 0\n", __FUNCTION__ );
-    int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid, a->mdi, 0, 0, 0, 0 );
-    kaapi_assert((err ==0) || (err ==EINPROGRESS));
-#if 0
-    if (err == EINPROGRESS)
-      err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
-    kaapi_assert_debug((err == 0) || (err == EINPROGRESS));
-#endif
-  }
-#endif
 }
 
 
@@ -90,9 +77,10 @@ static void callback_epilogue(
   fprintf(stdout, "%s\n", __FUNCTION__);
   fflush(stdout);
 #endif
-  kaapi_device_t* device = ios->stream->device;
-  kaapi_frame_t* frame = (kaapi_frame_t*)arg0;
-  kaapi_task_t* task = (kaapi_task_t*)arg1;
+  kaapi_device_t* device     = (kaapi_device_t*)arg0;
+  kaapi_task_t* task         = (kaapi_task_t*)arg1;
+  kaapi_frame_t* frame       = (kaapi_frame_t*)arg2;
+//printf("callback_epilogue:: task: %p, device: %p\n", task, device);
 
   /* activate successors : reverse the natural order of ready successor
      - it could be best to keep this order by 1/ pushing into local list
@@ -107,8 +95,15 @@ static void callback_epilogue(
   );
 //printf("%f: %i activate: #task=%i\n", kaapi_get_elapsedtime(), device->ctxt->kid, cnt );
 
+  ++device->cnt_exec;
+  ++device->exec_count;
   if (frame)
+  {
     KAAPI_ATOMIC_INCR(&frame->exec_count);
+  }
+  else {
+    printf("Warning, exec task without frame....\n");
+  }
   task->flags |= KAAPI_TASK_FLAG_EXEC;
 
   KAAPI_OFFLOAD_TRACE_OUT
@@ -125,24 +120,26 @@ static void callback_set_valid(
 )
 {
   KAAPI_OFFLOAD_TRACE_IN
-  kaapi_metadata_info_t* mdi __attribute__((unused)) = (kaapi_metadata_info_t*)arg0;
+  kaapi_device_t* device     = (kaapi_device_t*)arg0;
   kaapi_task_t* task         = (kaapi_task_t*)arg1;
   kaapi_frame_t* frame       = (kaapi_frame_t*)arg2;
 
   if (task !=0)
   {
     int wc = KAAPI_ATOMIC_DECR(&task->wc);
-//printf("%li: %s task: %p, ws: %i\n", kaapi_get_elapsedns(), __func__, task, wc );
     if (wc ==0)
     {
-      /* launch task */
       ++ios->stream->device->cnt_ready;
+      /* launch task : be carrefull ios->stream may differs from &device->stream
+         due to forward of callback 
+      */
+      kaapi_assert_debug( device->ld->ldid == kaapi_task_get_ld(task) );
       kaapi_stream_insert_io_task_inst(
-        ios->stream,
+        &device->stream,
         KAAPI_IO_STREAM_KERN,
         task, frame,
         callback_epilogue,
-        frame, task, 0
+        device, task, frame
       );
       kaapi_offload_stream_process_instruction( ios->stream, KAAPI_IO_STREAM_KERN );
     }
@@ -152,7 +149,7 @@ static void callback_set_valid(
 
 
 /* Call the device' task entry point
-   - task cannot create new tasks
+   - task cannot create new tasks on the device
    - the context must has been attached to the device before calling the
    function
 */
@@ -168,18 +165,19 @@ int kaapi_offload_device_execute_task(
   kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
   ++thread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_EXEC];
   ctxt->pc = task;
-  ++device->cnt_exec;
   //printf("%li: %s execute task: %p  %s\n", kaapi_get_elapsedns(), __func__, task, fmt->name );
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(
       task, kaapi_context2thread(ctxt), handle
   );
 #if KAAPI_HAVE_IO_THREADS==0
+#if KAAPI_USE_STREAM_D2D
+  kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
+#endif
   if (kaapi_taskflag_get(task, KAAPI_TASK_FLAG_INCOM))
     kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
   if (kaapi_taskflag_get(task, KAAPI_TASK_FLAG_OUTCOM))
     kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_H2D );
 #endif
-  ++device->exec_count;
   KAAPI_OFFLOAD_TRACE_OUT
 
   return 0;
@@ -248,10 +246,9 @@ static void kaapi_do_prefetch_data(
       );
       /* seems to be considered by dsm_prefetch also, isn't it ? */
       if (kaapi_memory_replica_is_valid(mdi, lid)
-       || kaapi_memory_replica_is_xfer(mdi, lid))
+        || kaapi_memory_replica_is_xfer(mdi, lid))
         continue;
 
-//printf("%f: prefetch/%p\n", kaapi_get_elapsedtime(), access->data ); 
       /* else : send prefetch request */
       int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, device->memdev.asid, mdi, 
 #if KAAPI_DEBUG
@@ -350,8 +347,10 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
             mp,
             mdi,
             callback_set_valid,
-            (void*)mdi, (void*)task, (void*)frame
+            (void*)device, (void*)task, (void*)frame
         );
+//printf("acquire_data:: task: %p, device: %p\n", task, device);
+        kaapi_assert((err ==0)||(err == ENOMEM)||(err ==EINPROGRESS));
         if (err == ENOMEM)
           kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
       } while (err == ENOMEM);
@@ -366,8 +365,24 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
         {
           kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
           if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW)) 
+{
+//printf("Next in on same device\n");
             prefetch_tasklist[prefetch_taskcnt++] = an->task;
+}
+          if (an->sync) an = (kaapi_access_t*)an->sync->next;
+          else an = an->next;
         }
+#if 0 //NEXTNEXT
+        if ((an !=0) && KAAPI_ACCESS_IS_READ(an->mode))
+        {
+          kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
+          if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW)) 
+{
+//printf("Next of next in on same device\n");
+            prefetch_tasklist[prefetch_taskcnt++] = an->task;
+}
+        }
+#endif
       }
 #endif
 
@@ -392,6 +407,11 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
     kaapi_do_prefetch_data( device, prefetch_taskcnt, prefetch_tasklist );
 #endif
 
+#if KAAPI_USE_STREAM_D2D
+  kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
+#endif
+  kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_H2D );
+
 
   /* if nothing remote or all remote finished, then insert
      task for execution in the device stream
@@ -400,12 +420,13 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
   {
     /* could be blocking call if windows is fill */
     ++device->cnt_ready;
+    kaapi_assert_debug( device->ld->ldid == kaapi_task_get_ld(task) );
     kaapi_stream_insert_io_task_inst(
       &device->stream,
       KAAPI_IO_STREAM_KERN,
       task, frame,
       callback_epilogue,
-      frame, task, 0
+      device, task, frame
     );
     kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
   }
@@ -415,7 +436,7 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
 
 /* Sync call by non pure CPU thread
    Close to default kaapi_sched_sync, but task execution and activation to successors is deported
-   to the callback_epilogue which is called when the cuda kernel ends.
+   to the callback_callback_epilogue which is called when the cuda kernel ends.
 */
 int kaapi_sched_sync_offload( kaapi_thread_t* thread )
 {
@@ -515,26 +536,23 @@ redo:
     if (task ==0)
       task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
     else
+      /* spawn_count counts the number of task locally created, not from the mailbox */
       ++device->spawn_count;
 
     if (task ==0)
     {
-      kaapi_assert(kaapi_queue_empty( device->ctxt->queue ) );
       int err;
-      /* process memsync request here when list of task is empty */
-      if (device->request.op != KAAPI_DEVICEOP_NOP)
+      /* wait no more local task */
+      while ((device->request.op == KAAPI_DEVICEOP_NOP) 
+          && (device->cnt_exec < device->spawn_count + device->ld->queue->push_count))
       {
-        /* wait no more task */
-        while (device->exec_count < device->spawn_count + device->ld->queue->push_count)
-        {
-          task = kaapi_queue_pop(device->ctxt, device->ctxt->queue, 0);
-          if (task ==0)
-            task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
-          else 
-            ++device->spawn_count;
-          if (task !=0) goto prepare_execute;
-          kaapi_offload_poll_device( device );
-        } 
+        task = kaapi_queue_pop(device->ctxt, device->ctxt->queue, 0);
+        if (task ==0)
+          task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
+        else 
+          ++device->spawn_count;
+        if (task !=0) goto prepare_execute;
+        kaapi_offload_poll_device( device );
       }
 
       /* may be request */
@@ -542,11 +560,13 @@ redo:
       {
         case KAAPI_DEVICEOP_NOP:
         {
+          //printf("DEVICEOP_NOP\n");
           kaapi_slowdown_cpu();
         } break;
 
         case KAAPI_DEVICEOP_WRITEBACK:
         {
+          LOGDEBUG(printf("DEVICEOP_WRITEBACK\n"));
 do_writeback:
           /* writeback policy: if counter ==0, asynchronous call without any mean to view completion */
           if (device->request.counter ==0)
@@ -568,10 +588,18 @@ printf("WriteBack device:%i counter: %lu, send msg: %lu\n", kaapi_memory_asid_ge
             }
 #endif
             /* make progress of requests */
-            err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
+
+#if KAAPI_USE_STREAM_D2D
+            /* test completion of input back data */
+            err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
             if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
+            err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2D);
+            if (err) goto out_device_writeback;
+#endif
 
             /* test completion of input back data */
+            err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
+            if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
             err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H);
             if (err) goto out_device_writeback;
 
@@ -590,6 +618,14 @@ out_device_writeback:
 
         case KAAPI_DEVICEOP_WRITEBACK_WAIT:
         {
+          LOGDEBUG(printf("DEVICEOP_WRITEBACK_WAIT\n"));
+
+#if KAAPI_USE_STREAM_D2D
+          err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
+          if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
+          err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2D);
+          if (err) goto out_device_writeback;
+#endif
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
@@ -605,6 +641,7 @@ out_device_writeback:
 
         case KAAPI_DEVICEOP_MEMSYNC:
         {
+          LOGDEBUG(printf("DEVICEOP_MEMSYNC\n"));
 #if 0
 printf("Recv memsync device:%i counter: %lu\n", kaapi_memory_asid_get_lid(device->memdev.asid), KAAPI_ATOMIC_READ(device->request.counter));
 #endif
@@ -618,6 +655,13 @@ printf("Recv memsync device:%i counter: %lu\n", kaapi_memory_asid_get_lid(device
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_KERN);
           if (err) goto out_device_memsync;
+
+#if KAAPI_USE_STREAM_D2D
+          err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
+          if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
+          err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2D);
+          if (err) goto out_device_memsync;
+#endif
 
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
@@ -633,7 +677,7 @@ printf("Recv memsync device:%i counter: %lu\n", kaapi_memory_asid_get_lid(device
           if (task !=0) goto prepare_execute;
 
           /* wait more task */
-          if (device->exec_count < device->spawn_count + device->ld->queue->push_count)
+          if (device->cnt_exec < device->spawn_count + device->ld->queue->push_count)
             break;
 
           /* non empty stream */
@@ -649,12 +693,13 @@ out_device_memsync:
           kaapi_assert(err== 0);
         } break;
 
-
         case KAAPI_DEVICEOP_INVALIDATE_CACHES:
         {
+          LOGDEBUG(printf("DEVICEOP_INVALIDATE_CACHES\n"));
           err = kaapi_offload_poll_device( device );
-          if ((err != 0) && (err != EINPROGRESS)) goto out_ic;
+          if (err != 0) goto out_ic;
           kaapi_memory_invalidate_cache( device->memdev.asid );
+device->exec_count = device->spawn_count = device->ld->queue->push_count = device->ld->queue->pop_count = 0;
 out_ic:
           kaapi_offload_requestreply( device, err );
           kaapi_assert(err== 0);
@@ -680,7 +725,7 @@ prepare_execute:
       do {
         kaapi_offload_poll_device( device );
       } while ( /*kaapi_offload_stream_size(&device->stream, KAAPI_IO_STREAM_KERN)*/
-                kaapi_offload_stream_sizepending(&device->stream, KAAPI_IO_STREAM_KERN) >= kaapi_default_param.cuda_conc_strem_kernel*kaapi_default_param.cuda_conc_kernel);
+                kaapi_offload_stream_sizepending(&device->stream, KAAPI_IO_STREAM_KERN) >= kaapi_default_param.cuda_conc_stream_kernel*kaapi_default_param.cuda_conc_kernel);
     }
     kaapi_offload_poll_device( device );
 
@@ -946,16 +991,19 @@ out:
 
 /*
 */
-size_t kaapi_offload_node_get_total_mem(
-  kaapi_device_t* device
+size_t kaapi_offload_get_mem_info(
+  kaapi_device_t* device,
+  size_t* mem_total, size_t* mem_limit
 )
 {
   KAAPI_OFFLOAD_TRACE_IN
   size_t retval = (size_t)-1UL;
-  if (device->is_initialized)
+  if (mem_total) *mem_total = (size_t)-1UL;
+  if (mem_limit) *mem_limit = (size_t)-1UL;
+  if (device->is_initialized) 
   {
     kaapi_device_t* save_device __attribute__((unused))= kaapi_offload_device_push( device );
-    retval = device->memdev.f_get_total_mem( &device->memdev );
+    retval = device->memdev.f_get_mem_info( &device->memdev, mem_total, mem_limit );
     kaapi_offload_device_pop( device );
   }
   KAAPI_OFFLOAD_TRACE_OUT

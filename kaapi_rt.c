@@ -75,18 +75,30 @@ const char* get_kaapi_info(void)
             "  NSTREAMS: %i\n"
             "  NKERNELS: %i\n" 
             "  PREFETCH: %i\n" 
+            "  STREAMD2D: %s\n" 
+            "  D2D OPT1: %s\n" 
             "  IO/THR  : %i\n", 
          STR_EXP(GIT_HASH),
          STR_EXP(XKBLAS_BLASLIB),
          STR_EXP(XKBLAS_CFLAGS),
          kaapi_default_param.gpu_set,
          (int)kaapi_default_param.ngpus,
-         kaapi_default_param.cuda_conc_strem_kernel,
+         kaapi_default_param.cuda_conc_stream_kernel,
          kaapi_default_param.cuda_conc_kernel,
 #if KAAPI_USE_PREFETCH
          KAAPI_MAX_PREFETCH_WINDOW,
 #else
          0,
+#endif 
+#if KAAPI_USE_STREAM_D2D
+         "yes",
+#else
+         "no",
+#endif 
+#if KAAPI_USE_FAVOR_D2D_1
+         "yes",
+#else
+         "no",
 #endif 
          KAAPI_HAVE_IO_THREADS
     );

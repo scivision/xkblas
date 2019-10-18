@@ -152,7 +152,7 @@ static inline int __kaapi_isaligned(const volatile void* a, size_t byte)
 
 /* linux functions which return old value */
 #  define KAAPI_ATOMIC_INCR_ORIG(a) \
-    __KAAPI_ISALIGNED_ATOMIC(a, __sync_fetch_and_add( &(((kaapi_atomic16_t*)a)->_counter), 1 ))
+    __KAAPI_ISALIGNED_ATOMIC(a, __sync_fetch_and_add( &(((kaapi_atomic_t*)a)->_counter), 1 ))
 
 #  define KAAPI_ATOMIC_DECR_ORIG(a) \
     __KAAPI_ISALIGNED_ATOMIC(a, __sync_fetch_and_sub( &((a)->_counter), 1 ))
@@ -369,12 +369,24 @@ extern unsigned int kaapi_self_kid(void);
 #include <pthread.h>
 typedef struct kaapi_lock_t {
   pthread_mutex_t _mutex;
+#if KAAPI_DEBUG
+  volatile pthread_t _owner;
+  volatile pthread_t _unlocker;
+  volatile uint32_t  _magic;
+  volatile uint32_t _line;
+  volatile const char* _file;
+#endif
 } kaapi_lock_t;
 
 #  define KAAPI_LOCK_INITIALIZER {PTHREAD_MUTEX_INITIALIZER}
 
 static inline int kaapi_atomic_initlock( kaapi_lock_t* lock )
 {
+  KAAPI_DEBUG_INST(lock->_magic = 123123123U;)
+  KAAPI_DEBUG_INST(lock->_owner = -1U;)
+  KAAPI_DEBUG_INST(lock->_unlocker = -1U;)
+  KAAPI_DEBUG_INST(lock->_line = -1;)
+  KAAPI_DEBUG_INST(lock->_file = 0;)
   return pthread_mutex_init(&lock->_mutex,0);
 }
 
@@ -390,11 +402,19 @@ static inline int kaapi_atomic_trylock( kaapi_lock_t* lock )
 
 static inline int kaapi_atomic_lock( kaapi_lock_t* lock )
 {
-  return pthread_mutex_lock(&lock->_mutex);
+  int err = pthread_mutex_lock(&lock->_mutex);
+  if (err ==0)
+  {
+    KAAPI_DEBUG_INST(lock->_owner = pthread_self();)
+    KAAPI_DEBUG_INST(lock->_unlocker = -1U;)
+  }
+  return err;
 }
 
 static inline int kaapi_atomic_unlock( kaapi_lock_t* lock )
 {
+  KAAPI_DEBUG_INST(lock->_unlocker = lock->_owner;)
+  KAAPI_DEBUG_INST(lock->_owner = -1U;)
   return pthread_mutex_unlock(&lock->_mutex);
 }
 
@@ -420,6 +440,8 @@ typedef struct kaapi_lock_t {
   volatile uint32_t _owner;
   volatile uint32_t _unlocker;
   volatile uint32_t _magic;
+  volatile uint32_t _line;
+  volatile const char* _file;
 #endif
 } kaapi_lock_t;
 
@@ -436,6 +458,8 @@ static inline int kaapi_atomic_initlock( kaapi_lock_t* lock )
   KAAPI_DEBUG_INST(lock->_owner = -1U;)
   KAAPI_DEBUG_INST(lock->_unlocker = -1U;)
   KAAPI_DEBUG_INST(lock->_sync = 0;)
+  KAAPI_DEBUG_INST(lock->_line = -1;)
+  KAAPI_DEBUG_INST(lock->_file = 0;)
   KAAPI_ATOMIC_WRITE_BARRIER(lock,0);
   return 0;
 }
@@ -456,7 +480,7 @@ static inline int kaapi_atomic_trylock( kaapi_lock_t* lock )
   /* implicit barrier in KAAPI_ATOMIC_CAS if lock is taken */
   if ((KAAPI_ATOMIC_READ(lock) ==0) && KAAPI_ATOMIC_CAS(lock, 0, 1))
   {
-    KAAPI_DEBUG_INST(lock->_owner = kaapi_self_kid();)
+    KAAPI_DEBUG_INST(lock->_owner = pthread_self();)
     KAAPI_DEBUG_INST(lock->_unlocker = -1U;)
     return 1;  
   }
@@ -524,7 +548,7 @@ static inline int kaapi_atomic_assertlocked( kaapi_lock_t* lock)
 */
 typedef struct kaapi_lock_t {
   volatile int32_t  _counter;
-  volatile int32_t  _sync;     /* used for fastes waitlock synchronization */
+  volatile int32_t  _sync;     /* used for fast waitlock synchronization */
 #if KAAPI_DEBUG
   volatile uint32_t _owner;
   volatile uint32_t _unlocker;

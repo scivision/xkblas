@@ -62,7 +62,7 @@ typedef struct kaapi_device_host {
 
 
 /* memdev functions */
-static uintptr_t host_alloc(kaapi_memory_device_t* dev, size_t size)
+static uintptr_t host_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
   kaapi_device_host_t* device = (kaapi_device_host_t*)dev->device;
   void* p = malloc(size);
@@ -70,6 +70,7 @@ static uintptr_t host_alloc(kaapi_memory_device_t* dev, size_t size)
 #if defined(_PLUGIN_DEBUG)
   fprintf(stdout, "host:%s: alloc ptr=%p size=%ld\n", __FUNCTION__, p, size);
 #endif
+  if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_NONE;
   return (uintptr_t)p;
 }
 
@@ -92,6 +93,7 @@ static int host_copy(
     kaapi_memory_device_t* dev,
     kaapi_pointer_t dest, const kaapi_memory_view_t* view_dest,
     kaapi_pointer_t src, const kaapi_memory_view_t* view_src,
+    int flags, 
     kaapi_io_cbk_fnc_t cbk,
     void* arg0, void* arg1, void* arg2
 )
@@ -187,12 +189,14 @@ static int host_memsync(kaapi_memory_device_t* dev, int begend)
 
 /*
 */
-static size_t host_get_total_mem(kaapi_memory_device_t* dev)
+static size_t host_get_mem_info(kaapi_memory_device_t* dev, size_t* mem_total, size_t* mem_limit)
 {
   kaapi_device_host_t* device = (kaapi_device_host_t*)dev->device;
 #if defined(_PLUGIN_DEBUG)
   fprintf(stdout, "host:%s: device %d init\n", __FUNCTION__, device->inherited.device_id);
 #endif
+  if (mem_total) *mem_total = device->total_mem;
+  if (mem_limit) *mem_limit = device->total_mem;
   return device->total_mem;
 }
 
@@ -290,6 +294,7 @@ static char* name_io[] = {
       err = host_copy(&device->memdev,
         kaapi_make_pointer((void*)op->dest,asid), op->view_dest,
         kaapi_make_pointer((void*)op->src,asid), op->view_src,
+        0,
         0, 0, 0, 0
       );
     } break;
@@ -471,7 +476,7 @@ KAAPI_CLASS_ENTRYPOINT kaapi_device_t* KAAPI_PLUGIN_ENTRYPOINT(device_create)(in
   hostdevice->inherited.memdev.f_free = 0;
   hostdevice->inherited.memdev.f_copy = 0;
   hostdevice->inherited.memdev.f_memsync = 0;
-  hostdevice->inherited.memdev.f_get_total_mem = 0;
+  hostdevice->inherited.memdev.f_get_mem_info = 0;
   hostdevice->inherited.memdev.f_get_free_mem = 0;
   hostdevice->inherited.stream.f_stream_free = 0;
   hostdevice->inherited.stream.f_stream_alloc = 0;
@@ -519,7 +524,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* 
   dev->memdev.f_free = host_free;
   dev->memdev.f_copy = host_copy;
   dev->memdev.f_memsync = host_memsync;
-  dev->memdev.f_get_total_mem = host_get_total_mem;
+  dev->memdev.f_get_mem_info = host_get_mem_info;
   dev->memdev.f_get_free_mem = host_get_free_mem;
 
   /* stream device */

@@ -61,6 +61,7 @@
   size_t n;
   kaapi_access_t A;
   size_t lda;
+  xkblas_mode_math_t mm;
  } NAME(Arg);
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
@@ -82,6 +83,7 @@ void INSERT_TASK_zpotrf(
     kaapi_update_dependencies(thread, &taskarg->A, task,
         KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
     taskarg->lda = lda;
+    taskarg->mm = xkblas_get_modemath();
     kaapi_task_set_ld(task, 0, xkblas_get_ld(Ah, Am, An ));
     kaapi_task_commit( thread, task );
 }

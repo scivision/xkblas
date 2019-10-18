@@ -313,9 +313,9 @@ extern int kaapi_offload_synchronize(void);
 extern int kaapi_offload_synchronize_device(kaapi_device_t* device);
 
 /** \ingroup Offload
- * Return memory size
+ * Return total memory size (physical memory).
  */
-extern size_t  kaapi_offload_get_total_mem( kaapi_device_t* device);
+extern size_t  kaapi_offload_get_mem_info( kaapi_device_t* device, size_t* mem_total, size_t* mem_limit);
 
 
 /** \ingroup Offload

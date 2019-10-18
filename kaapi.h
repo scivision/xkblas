@@ -295,6 +295,9 @@ enum  {
   KAAPI_TASK_FLAG_OUTCOM        = KAAPI_TASK_FLAG(9), /* task that may generates outcom */
   KAAPI_TASK_FLAG_INCOM         = KAAPI_TASK_FLAG(10),/* task that may generates incom */
   KAAPI_TASK_FLAG_EXEC          = KAAPI_TASK_FLAG(11),/* mark task executed */
+#if KAAPI_DEBUG
+  KAAPI_TASK_FLAG_PREPARE       = KAAPI_TASK_FLAG(12),/* mark task to be prepared for offloading */
+#endif
 };
 
 #define KAAPI_TASK_FLAG_AFF_MASK \
@@ -1040,7 +1043,7 @@ kaapi_task_t* kaapi_task_init(
 {
   task->body      = body;
   task->flags     = KAAPI_TASK_FLAG_DEFAULT;
-  KAAPI_ATOMIC_WRITE(&task->wc, (int16_t)((1U<<16)-1U));
+  KAAPI_ATOMIC_WRITE(&task->wc, 65535); // (1U<<16)-1U;
   return task;
 }
 
@@ -1059,11 +1062,10 @@ extern int32_t kaapi_queue_push(
 */
 static inline int32_t kaapi_task_commit(kaapi_thread_t* thread, kaapi_task_t* task)
 {
-  int wc = KAAPI_ATOMIC_SUB(&task->wc,(1U<<16)-1U);
+  int wc = KAAPI_ATOMIC_SUB(&task->wc,65535); // (1U<<16)-1U;
   /* KAAPI_TASK_FLAG_NOLINK: used to no push task in ready list */
   if (task->flags & KAAPI_TASK_FLAG_NOLINK)
     return -1;
-  /* no required : */
   ++thread->cnt;
   if (kaapi_taskflag_get(task, KAAPI_TASK_FLAG_INDEPENDENT) || (wc==0))
     return kaapi_queue_push(thread, 0, task);

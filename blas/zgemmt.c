@@ -170,7 +170,7 @@ int xkblas_zgemmt_async(
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_nb(KERN_GEMMT,N,N,K);
+    size_t NB = xkblas_auto_tilesize(KERN_GEMMT,N,N,K);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

@@ -73,6 +73,7 @@
   Complex64_t beta;
   kaapi_access_t C;
   size_t ldc;
+  xkblas_mode_math_t mm;
 } NAME(Arg);
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
@@ -106,6 +107,7 @@ void INSERT_TASK_zgemmt(
         KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
     taskarg->beta = beta;
     taskarg->ldc = ldc;
+    taskarg->mm = xkblas_get_modemath();
     kaapi_ldid_t ldid = xkblas_get_ld(Ch, Cm, Cn );
     kaapi_task_set_ld(task, 0, ldid);
     kaapi_task_commit( thread, task );
@@ -167,6 +169,28 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       arg->C.data, kaapi_dbg_get_name(arg->C.data), arg->n, arg->n, arg->ldc
   );
 #endif
+  cublasStatus_t res;
+  if (arg->mm == XKBLAS_TENSOR_OP_MATH)
+  {
+    res = cublasSetMathMode((cublasHandle_t)handle, CUBLAS_TENSOR_OP_MATH);
+#if KAAPI_DEBUG
+    /* emit warning if constraints defined in CUDA-10.1 are not satisfied */
+    kaapi_assert(arg->n % 4 == 0);
+    kaapi_assert(arg->k % 8 == 0)
+    kaapi_assert(((intptr_t)arg->A.data) % 16 == 0);
+    kaapi_assert(((intptr_t)arg->B.data) % 16 == 0);
+    kaapi_assert(((intptr_t)arg->C.data) % 16 == 0);
+    kaapi_assert(arg->lda % 4 == 0);
+    kaapi_assert(arg->ldb % 4 == 0);
+    kaapi_assert(arg->ldc % 4 == 0);
+#endif
+  }
+  else
+  {
+    res = cublasSetMathMode((cublasHandle_t)handle, CUBLAS_DEFAULT_MATH);
+  } 
+  kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
+
   /* no equivalent cublasZgemmt */
   cublasZgemm((cublasHandle_t)handle,
       cblas2cublas_op(arg->transA), cblas2cublas_op(arg->transB),
