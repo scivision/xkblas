@@ -75,6 +75,8 @@ kaapi_thread_t* _xkblas_thread =0;
 __thread kaapi_thread_t* _xkblas_self_thread = 0;
 __thread xkblas_context_t _xkblas_self_context = 0;
 
+static xkblas_mode_math_t xkblas_default_math = XKBLAS_DEFAULT_MATH;
+
 
 /* Return the current xkblas_context (
 */
@@ -88,7 +90,7 @@ static xkblas_context_t xkblas_context_get()
     ctxt->xkblas_list_sync0 = 0;
     ctxt->xkblas_generation_cache = 0;
     ctxt->xkblas_matrix_descr_list = 0;
-    ctxt->xkblas_modemath = XKBLAS_DEFAULT_MATH;
+    ctxt->xkblas_modemath = xkblas_default_math;
 
     _xkblas_self_context = ctxt;
   }
@@ -903,6 +905,15 @@ printf("Xblas_init: do it\n");
 
   if (getenv("XKBLAS_CACHE_LIMIT"))
     setenv("KAAPI_CUDA_CACHE_LIMIT",getenv("XKBLAS_CACHE_LIMIT"),1);
+
+  const char* m;
+  if (m = getenv("XKBLAS_DEFAULT_MATH"))
+  {
+    if ((strcasecmp(m,"TC") ==0)||(strcasecmp(m,"tensorcore") ==0)||(strcasecmp(m,"mix1632") ==0))
+      xkblas_default_math = XKBLAS_TENSOR_OP_MATH;
+    else
+      printf("[XKBlas] unkown math mode '%s', use default\n", m);
+  }
 
   xkblas_register_task_format();
   kaapi_register_format_writeback();
