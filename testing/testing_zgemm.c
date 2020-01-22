@@ -132,7 +132,7 @@ int testing_zgemm(int argc, char **argv)
         for (tb=1; tb<2; tb++) {
 #endif
 
-#define ITER 6
+#define ITER 5
 	    double time[ITER];
 	    double flops[ITER];
 
@@ -273,7 +273,6 @@ static int check_solution(
     Bnorm      = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,     LDB, work);
     Cinitnorm  = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,  N,  Cref,  LDC, work);
     Cchamnorm  = LAPACKE_zlange_work(LAPACK_COL_MAJOR, 'I', M,  N,  Ccham, LDC, work);
-
 
     /* call to original BLAS version */
     xkblas_zgemm_native(transA, transB, M, N, K,

@@ -166,7 +166,9 @@ typedef enum kaapi_io_stream_type {
   KAAPI_IO_STREAM_H2D  = 0, /* from CPU to GPU */
   KAAPI_IO_STREAM_KERN = 1,
   KAAPI_IO_STREAM_D2H  = 2, /* from GPU to CPU */
+#if KAAPI_USE_STREAM_D2D
   KAAPI_IO_STREAM_D2D  = 3, /* from GPU to GPU */
+#endif
   KAAPI_IO_STREAM_ALL       /* internal purpose */
 } kaapi_io_stream_type_t;
 
@@ -477,6 +479,10 @@ static inline void kaapi_stream_insert_io_copy_inst(
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_assert_debug( (io_type >=KAAPI_IO_COPY_H2H) && (io_type <= KAAPI_IO_COPY_D2D));
   kaapi_assert( kaapi_memory_view_size(view_src) == kaapi_memory_view_size(view_dest));
+  kaapi_assert_debug( (io_type !=KAAPI_IO_COPY_D2D)|| (kaapi_memory_view_iscontiguous(view_src) &&  kaapi_memory_view_iscontiguous(view_src)) );
+  kaapi_assert_debug( (io_type !=KAAPI_IO_COPY_H2D)|| kaapi_memory_view_iscontiguous(view_dest) );
+  kaapi_assert_debug( (io_type !=KAAPI_IO_COPY_D2H)|| kaapi_memory_view_iscontiguous(view_src) );
+  kaapi_assert_debug( (io_type !=KAAPI_IO_COPY_D2H)|| kaapi_memory_view_iscontiguous(view_src) );
 
   kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst

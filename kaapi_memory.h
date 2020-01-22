@@ -127,10 +127,14 @@ typedef struct kaapi_data_replica {
     kaapi_atomic8_t          pinned;       /* counter: cannot be evicted if>0 */
     kaapi_pointer_t          ptr;
     kaapi_memory_view_t      view;
+    uint32_t                 gen;
     int                      count;        /* debug, length of cbk */
     kaapi_data_replica_cbk_t cbk;
     void*                    cachelist;
     void*                    cacheentry;
+#if KAAPI_DEBUG
+    kaapi_thread_t*          thread;       /* thread putting replica */
+#endif
 } kaapi_data_replica_t;
     
 /* Metadata information for each address
@@ -144,16 +148,19 @@ typedef struct kaapi_data_replica {
                       Used to mark data under write-back operation before possible eviction.
                       Could be read but not write.
 */
-typedef struct kaapi_metadata_info {
+struct kaapi_metadata_info {
     kaapi_data_replica_t*   replicas[KAAPI_MEMORY_MAX_NODES];
     kaapi_atomic64_t        alloc;
     kaapi_atomic64_t        valid;
     kaapi_atomic64_t        xfer;
-    kaapi_atomic64_t        xferb;
+    kaapi_atomic64_t        xferb; /* used ??? */
 #if defined(KAAPI_DEBUG)
     const char*             debug_info;
+    pthread_t               owner;      /* current xkblas model => the user thread that call
+                                           xkblas have its own context and data */
 #endif
-} kaapi_metadata_info_t;
+};
+
 
 
 /* ============================ Memory Node device ================================= */
@@ -167,6 +174,7 @@ typedef struct kaapi_alloc_data kaapi_alloc_data_t;
 struct kaapi_memory_device {
     kaapi_address_space_id_t asid;
     kaapi_device_t* device;
+    kaapi_lock_t mem_lock;
     kaapi_alloc_data_t* freelist_bloc;
     kaapi_alloc_data_t* freelist_metabloc;
 
@@ -193,6 +201,9 @@ struct kaapi_memory_device {
     /* to help to manage cache */
     size_t (*f_get_mem_info)(struct kaapi_memory_device*, size_t*, size_t*);
     size_t (*f_get_free_mem)(struct kaapi_memory_device*);
+
+    /* return source lid to reach lid_dest knowing valid_bit and xfer_bit for the data */
+    uint16_t (*f_get_source)( struct kaapi_memory_device*, uint16_t, uint64_t, uint64_t );
 
 #if KAAPI_DEBUG
     size_t size_alloc;     /* size alloc by the memory device */
@@ -228,6 +239,8 @@ struct kaapi_dsm_node;
 typedef struct kaapi_dsm_node kaapi_dsm_node_t;
 
 typedef struct kaapi_dsm {
+  int               mask_level;  // topology level: size of mask_nodes[]
+  uint64_t          *mask_nodes;
   kaapi_dsm_node_t* nodes[KAAPI_MEMORY_MAX_NODES];
 } kaapi_dsm_t;
 
@@ -323,6 +336,7 @@ extern int kaapi_dsm_acquire_data(
       kaapi_task_t* task,
       kaapi_access_mode_t mp,
       kaapi_metadata_info_t* mdi,
+      uint32_t gen,
       kaapi_io_cbk_fnc_t cbk,
       void* arg0, void* arg1, void* arg2
 );
@@ -343,6 +357,7 @@ extern int kaapi_dsm_prefetch_on(
       kaapi_dsm_t* dsm,
       kaapi_address_space_id_t asid,
       kaapi_metadata_info_t* mdi,
+      uint32_t gen,
       kaapi_io_cbk_fnc_t cbk,
       void* arg0, void* arg1, void* arg2
 );
@@ -373,6 +388,10 @@ extern void kaapi_memory_free(kaapi_pointer_t ptr, size_t size );
 
 /*
 */
+extern int kaapi_memory_freelist_destroy(kaapi_memory_device_t* device);
+
+/*
+*/
 enum {
     KAAPI_MEMORY_VOID =0,
     KAAPI_MEMORY_EXPECTED_BLOCK =1 
@@ -384,6 +403,12 @@ extern int kaapi_memory_set_info( int kind, size_t value );
 /*
 */
 extern int kaapi_memory_invalidate_cache(kaapi_address_space_id_t asid);
+
+/*
+*/
+int kaapi_memory_cache_invalidate_data(
+  kaapi_metadata_info_t* mdi
+);
 
 /*
 */
@@ -410,6 +435,7 @@ extern int kaapi_memory_copy_async(
 extern uint16_t _kaapi_get_source_lid(
   kaapi_dsm_t* dsm,
   kaapi_metadata_info_t* mdi,
+  uint32_t gen,
   kaapi_address_space_id_t dest_asid,
   int mark );
 
@@ -443,5 +469,9 @@ static inline bool kaapi_memory_replica_is_xferb(
   kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
   return  ((KAAPI_ATOMIC_READ(&mdi->xferb) & (1UL<<lid)) !=0);
 }
+
+#if KAAPI_DEBUG
+extern void kaapi_memory_cache_print_all(void);
+#endif
 
 #endif

@@ -494,18 +494,23 @@ static int _kaapi_offload_onestream_process_instruction(
   kaapi_assert_debug( ios->pos_r <= ios->pos_wp );
   while (!kaapi_io_stream_emptyinstr(ios))
   {
-    int p  = ios->pos_r  % ios->count;
-    err = stream->f_stream_decode_ioinstruction(stream->device, ios, &ios->instr[p]);
-    kaapi_assert_debug(err ==0 || err == EINPROGRESS);
-    if (err == EINPROGRESS)
+    kaapi_atomic_lock(&ios->mutex);
+    if (!kaapi_io_stream_emptyinstr(ios))
     {
-      /* recopy op in pending op */
-      int wp = ios->pos_wp  % ios->count;
-      ios->pending[wp] = ios->instr[p];
-      ++ios->pos_wp;
+      int p  = ios->pos_r  % ios->count;
+      err = stream->f_stream_decode_ioinstruction(stream->device, ios, &ios->instr[p]);
+      kaapi_assert_debug(err ==0 || err == EINPROGRESS);
+      if (err == EINPROGRESS)
+      {
+        /* recopy op in pending op */
+        int wp = ios->pos_wp  % ios->count;
+        ios->pending[wp] = ios->instr[p];
+        ++ios->pos_wp;
+      }
+      else kaapi_assert(err==0);
+      ++ios->pos_r;
     }
-    else kaapi_assert(err==0);
-    ++ios->pos_r;
+    kaapi_atomic_unlock(&ios->mutex);
   }
   KAAPI_OFFLOAD_TRACE_OUT
   return err;

@@ -57,8 +57,19 @@ int kaapi_stat_get_counter( int num, uint64_t* counter )
   uint64_t retval = 0;
   if ((num <0) || (num >= KAAPI_CNT_MAX))
     return EINVAL;
-  for (int i=0; i<sizeof(thread_stat)/sizeof(kaapi_stat_internal_t); ++i)
-    retval += thread_stat[i].counter[num];
+  for (int i=0; i<sizeof(kaapi_perthread_stat)/sizeof(kaapi_stat_internal_t); ++i)
+    retval += kaapi_perthread_stat[i].counter[num];
+  *counter = retval;
+  return 0;
+}
+
+int kaapi_stat_get_dcounter( int num, double* counter )
+{
+  double retval = 0;
+  if ((num <0) || (num >= KAAPI_CNT_MAX))
+    return EINVAL;
+  for (int i=0; i<KAAPI_MAX_THREAD_COUNT; ++i)
+    retval += kaapi_perthread_stat[i].dcounter[num];
   *counter = retval;
   return 0;
 }
@@ -75,7 +86,7 @@ int kaapi_stat_getdiff_counter( int num, uint64_t* counter )
 */
 extern int kaapi_stat_reset_counters(void)
 {
-  memset( thread_stat, 0, sizeof(thread_stat));
+  memset( kaapi_perthread_stat, 0, sizeof(kaapi_perthread_stat));
   return 0;
 }
 
@@ -194,6 +205,7 @@ kaapi_atomic_t count_queue_fifo_push = {0};
 int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_task_t* task)
 {
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
+
 #if KAAPI_DEBUG_LOW
   kaapi_assert( pthread_equal( pthread_self(), ctxt->queue->owner ) );
   KAAPI_ATOMIC_INCR(&count_queue_all_push);
@@ -211,7 +223,8 @@ int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_ta
 #endif
       return -1;
     }
-    if (frame ==0) frame = ctxt->unlink;
+    kaapi_assert_debug(frame !=0);
+    //if (frame ==0) frame = ctxt->unlink;
 #if KAAPI_DEBUG_LOW
     KAAPI_ATOMIC_INCR(&count_queue_fifo_push);
 #endif
@@ -222,7 +235,6 @@ int32_t kaapi_queue_push( kaapi_thread_t* thread, kaapi_frame_t* frame, kaapi_ta
     );
   }
 
-  /* else push in the local queue */
   kaapi_queue_t* rd = ctxt->queue;
   kaapi_assert_debug( ldid == ctxt->ld->ldid);
 #if KAAPI_DEBUG_LOW
@@ -652,9 +664,9 @@ static kaapi_atomic_t _kaapi_thread_tid = {0};
 
 /*
 */
-kaapi_thread_t* kaapi_thread_bind(int proctype)
+kaapi_thread_t* kaapi_thread_bind(int proctype, size_t user_size)
 {
-  kaapi_context_t* ctxt = (kaapi_context_t*)malloc(sizeof(kaapi_context_t));
+  kaapi_context_t* ctxt = (kaapi_context_t*)malloc(sizeof(kaapi_context_t)+user_size);
   /* */
   ctxt->proctype = proctype;
   if (proctype == KAAPI_PROC_TYPE_HOST)
@@ -674,28 +686,30 @@ kaapi_thread_t* kaapi_thread_bind(int proctype)
     kaapi_assert_debug( errno == 0);
     return 0;
   }
-  ctxt->st_allocator.head = 0; // = &global_stack_allocator;
-  ctxt->team = 0;
 
   /* */
+  ctxt->st_allocator.head = 0; // = &global_stack_allocator;
   ctxt->thread.sp  = (kaapi_task_t*)kaapi_stack_init( &ctxt->st_allocator, &ctxt->st_data);
   ctxt->thread.cnt = 0;
   ctxt->pc = (kaapi_task_t*)ctxt->thread.sp;
+  ctxt->device = 0;
+  ctxt->ld     = 0;
+  ctxt->seed   = rand();
+  ctxt->tid    = KAAPI_ATOMIC_INCR(&_kaapi_thread_tid);
+  ctxt->kid    = 0;
+  ctxt->team   = 0;
   kaapi_atomic_initlock(&ctxt->lock);
-  ctxt->queue = kaapi_data_push(&ctxt->thread, sizeof(kaapi_queue_t));
+  ctxt->queue  = kaapi_data_push(&ctxt->thread, sizeof(kaapi_queue_t));
   kaapi_task_t** bloc0= malloc(sizeof(kaapi_task_t*)*QUEUE_DEFAULT_SIZE);
   //kaapi_task_t** bloc0= kaapi_data_push(&ctxt->thread, sizeof(kaapi_task_t*)*QUEUE_DEFAULT_SIZE);
-  ctxt->seed  = rand();
 
-  /* name for the thread */
-  ctxt->tid = KAAPI_ATOMIC_INCR(&_kaapi_thread_tid);
   if (ctxt->tid >= KAAPI_MAX_THREAD_COUNT)
   {
     free(bloc0);
     free(ctxt);
     return 0;
   }
-  memset(&thread_stat[ctxt->tid], 0, sizeof(thread_stat[ctxt->tid]));
+  memset(&kaapi_perthread_stat[ctxt->tid], 0, sizeof(kaapi_perthread_stat[ctxt->tid]));
 
   if (0 != kaapi_queue_init(ctxt->queue, bloc0, QUEUE_DEFAULT_SIZE))
   {
@@ -703,6 +717,7 @@ kaapi_thread_t* kaapi_thread_bind(int proctype)
     free(ctxt);
     return 0;
   }
+  ctxt->free_wqueue = 0;
   ctxt->suspended_queues = 0;
 
   /* this frame should never be deleted */
@@ -719,6 +734,7 @@ kaapi_thread_t* kaapi_thread_bind(int proctype)
   /* dummy running internal kaapi task */
   kaapi_taskmain_t* tmain = (kaapi_taskmain_t*)kaapi_task_alloc(
      &ctxt->thread,
+     topframe,
      kaapi_taskmain_body,
      sizeof(kaapi_taskmain_t));
   tmain->arg = 0;
@@ -966,7 +982,7 @@ int kaapi_thread_set_current_task(kaapi_thread_t* thread, kaapi_task_t* task )
 
 /*
 */
-int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data)
+int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data, kaapi_metadata_info_t* mdi)
 {
   kaapi_assert_debug( KAAPI_ACCESS_ALL < (1<<8) );
   kaapi_access_sync_init(&h->sync0, data);
@@ -977,6 +993,7 @@ int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data)
   KAAPI_ATOMIC_WRITE(&h->sync0.wc, 1);
   h->last    = &h->sync0;
   h->sync    = 0;
+  h->mdi     = mdi;
   return 0;
 }
 
@@ -987,16 +1004,21 @@ int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data)
 int kaapi_update_dependencies(
   kaapi_thread_t* thread,
   kaapi_access_t* a,
-  kaapi_task_t* task,
+  kaapi_task_t*   task,
   kaapi_access_mode_t mode,
+  uint32_t gen,
   kaapi_handle_t* h
 )
 {
   a->data    = h->sync0.data;
+  a->gen     = gen;
   a->next    = 0;
   a->task    = task;
   a->mode    = mode;
   a->mdi     = 0;
+#if KAAPI_DEBUG
+  a->creator = pthread_self();
+#endif
 
   if ( (h->last->mode != KAAPI_ACCESS_MODE_VOID)
     && !KAAPI_ACCESS_IS_CONCURRENT(mode, h->last->mode))
@@ -1187,6 +1209,10 @@ int kaapi_sched_sync( kaapi_thread_t* thread )
      (e.g. writeback task) have incremented spawn_count or exec_count before sync...
   */
   KAAPI_ATOMIC_ADD(&unlink->spawn_count, (uint32_t)thread->cnt);
+
+  /* stat */
+  kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_SPAWN] += thread->cnt;
+
   thread->cnt = 0;
 
   /* save thread state and push frame (automatic variable) */
@@ -1217,14 +1243,21 @@ int kaapi_sched_sync( kaapi_thread_t* thread )
 exec_start:
     {
       const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
-      ++thread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_EXEC];
       ctxt->pc = task;
       for (int p=0; p<=KAAPI_TASK_MAX_PRIORITY; ++p)
         frame.save_T[p] = ctxt->queue->T[p];
+      if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
+      {
+        kaapi_task_withperfcnt_t* stask = (kaapi_task_withperfcnt_t*)task;
+        stask->s_time = kaapi_get_elapsedtime();
+      }
       fmt->entrypoint[KAAPI_PROC_TYPE_CPU](
           task, kaapi_context2thread(ctxt)
       );
+#if KAAPI_DEBUG
       task->flags |= KAAPI_TASK_FLAG_EXEC;
+#endif
+      ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_EXEC];
       ++exec_cnt;
 
       /* new task(s) ? */
@@ -1266,7 +1299,7 @@ exec_start:
       qf.T[p] = unlink->save_T[p];
     if (1) //qf.H > qf.T)
     {
-      ++thread_stat[ctxt->tid].counter[KAAPI_CNT_SUSPEND];
+      ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_SUSPEND];
       if (!_kaapi_queue_frame_ready(&qf))
       {
         LOGDEBUG(
@@ -1364,7 +1397,7 @@ int kaapi_sched_idle( kaapi_thread_t* thread, int (*f_fini)(void*), void* arg )
         {
           case KAAPI_REQUEST_S_OK:
           {
-            ++thread_stat[ctxt->tid].counter[KAAPI_CNT_STEAL_OK];
+            ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_STEAL_OK];
             if (ctxt->queue ==0) {
               kaapi_queue_t* queue = kaapi_data_push(thread, sizeof(kaapi_queue_t));
               kaapi_task_t** bloc0= kaapi_data_push(&ctxt->thread, sizeof(kaapi_task_t*)*QUEUE_DEFAULT_SIZE);
@@ -1399,7 +1432,7 @@ int kaapi_sched_idle( kaapi_thread_t* thread, int (*f_fini)(void*), void* arg )
 
           case KAAPI_REQUEST_S_NOK:
           {
-            ++thread_stat[ctxt->tid].counter[KAAPI_CNT_STEAL_NOK];
+            ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_STEAL_NOK];
             LOGDEBUG(printf("%i:: Steal fail on %s queue:%p (T:%i, H:%i)\n", (int)ctxt->kid,
               (queue == victim->queue ? "default" : "suspended"),
               (void*)queue, queue->T, queue->H);)

@@ -62,6 +62,42 @@ typedef struct timeval struct_time;
 #  define get_sub_second_ns(t) (1000*(uint64_t)t.tv_usec)
 #endif
 
+/* */
+typedef struct kaapi_counter_info {
+  uint8_t     mask;
+  const char* name;
+  const char* unit;
+  uint8_t     type; /* 0: field counter, 1: field dcounter */
+} kaapi_counter_info_t;
+
+/* */
+static kaapi_counter_info_t kaapi_name_counter[] = {
+  {0, "#task spawn", 0, 0},
+  {0, "#task launch", 0, 0},
+  {1, "#task exec", 0, 0},
+  {1, "GPU Work", "s", 1},
+  {1, "#Gemm on TC", 0, 0},
+  {1, "#Gemm not on TC", 0, 0},
+  {1, "Gemm flops on TC", 0, 1},
+  {1, "Gemm flops not on TC", 0, 1},
+  {0, "#ctxt suspended", 0, 0},
+  {0, "#steal ok", 0, 0},
+  {0, "#steal nok", 0, 0},
+  {1, "GPU alloc", "Bytes", 0},
+  {1, "GPU free", "Bytes", 0},
+  {1, "#H2D", 0, 0},
+  {1, "#D2H", 0, 0},
+  {1, "#D2D", 0, 0},
+  {1, "H2D size", "Bytes", 0},
+  {1, "D2H size", "Bytes", 0},
+  {1, "D2D size", "Bytes", 0},
+  {0, "#HIT", 0, 0},
+  {0, "#MISS", 0, 0},
+  {0, "Hit bytes", "Bytes", 0},
+  {0, "Miss bytes", "Bytes", 0},
+  {0, "", "", 0}
+};
+
 
 void* __kaapi_start_blocaddr(void* addr)
 {
@@ -103,7 +139,7 @@ kaapi_address_space_id_t kaapi_local_asid = 0;
 
 /*
 */
-kaapi_stat_internal_t thread_stat[KAAPI_MAX_THREAD_COUNT];
+kaapi_stat_internal_t kaapi_perthread_stat[KAAPI_MAX_THREAD_COUNT];
 
 /*
 */
@@ -113,6 +149,37 @@ static void kaapi_usage(void)
   printf("KAAPI_NUM_GPUS:\n");
   printf("KAAPI_CUDA_STREAM_CAPACITY:\n");
   printf("KAAPI_CUDA_KERNEL_STREAM_NUMS:\n");
+}
+
+
+/*
+*/
+void kaapi_print_counter(void)
+{
+  FILE* file = stdout;
+  for (int i=0; i<KAAPI_CNT_MAX; ++i)
+  {
+     if (kaapi_name_counter[i].type ==0)
+     {
+       uint64_t sum = 0;
+       kaapi_stat_get_counter(i, &sum);
+       if (kaapi_name_counter[i].mask)
+         if (kaapi_name_counter[i].unit)
+           fprintf(file, "\t%16s: %13lu (%s)\n", kaapi_name_counter[i].name, (unsigned long)sum, kaapi_name_counter[i].unit);
+         else 
+           fprintf(file, "\t%16s: %13lu\n", kaapi_name_counter[i].name, (unsigned long)sum);
+     }
+     else // if (kaapi_name_counter[i].type ==1)
+     {
+       double sum = 0;
+       kaapi_stat_get_dcounter(i, &sum);
+       if (kaapi_name_counter[i].mask)
+         if (kaapi_name_counter[i].unit)
+           fprintf(file, "\t%16s: %13f (%s)\n", kaapi_name_counter[i].name, sum, kaapi_name_counter[i].unit);
+         else
+           fprintf(file, "\t%16s: %13f\n", kaapi_name_counter[i].name, sum);
+     }
+  }
 }
 
 /*
@@ -230,9 +297,7 @@ int kaapi_init(void)
 
   /* set up runtime parameters */
   kaapi_assert( 0 == kaapi_format_init() );
-
-  memset(thread_stat, 0, sizeof(thread_stat));
-
+  memset(kaapi_perthread_stat, 0, sizeof(kaapi_perthread_stat));
   kaapi_assert( 0 == kaapi_dsm_init() );
 
 #if KAAPI_USE_OFFLOAD
@@ -253,6 +318,7 @@ int kaapi_init(void)
 int kaapi_finalize(void)
 {
   int err;
+
   kaapi_format_finalize();
 
   err = kaapi_dsm_finalize();

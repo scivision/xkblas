@@ -184,6 +184,17 @@ int xkblas_zgemm_async(
 
     /* get default tile size and initialize internal descriptor if not yet */
     size_t NB = xkblas_auto_tilesize(KERN_GEMM,M,N,K);
+
+#if 00// TO force synchronous call: may be this should be provided as runtime option
+printf("Gemm: M=%i, N=%i, K=%i, NB=%i\n", M,N,K,NB);
+return xkblas_zgemm_native(
+    transA, transB, M, N, K,
+    alpha, A, LDA,
+           B, LDB,
+    beta,  C, LDC 
+);
+#endif
+
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
     xkblas_matrix_descr_t* Ch = xkblas_find(C);
@@ -323,19 +334,19 @@ int xkblas_zgemm_async(
 /* gemm native pointer */
 static void (*dl_zgemm)(
     const char * transa, const char * transb,
-    const int * m, const int * n, const int * k,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              const Complex64_t * B, const int * ldb,
-    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+    const KBLAS_INT * m, const KBLAS_INT * n, const KBLAS_INT * k,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              const Complex64_t * B, const KBLAS_INT * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const KBLAS_INT * ldc) = 0;
 
 
 /* CPU driver */
 extern void xkblas_zgemm_native_(
     const char * transa, const char * transb,
-    const int * m, const int * n, const int * k,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              const Complex64_t * B, const int * ldb,
-    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+    const KBLAS_INT * m, const KBLAS_INT * n, const KBLAS_INT * k,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              const Complex64_t * B, const KBLAS_INT * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const KBLAS_INT * ldc)
 {
   if (dl_zgemm ==0) xkblas_load_sym((void**)&dl_zgemm,SYMBLAS_NAME(zgemm));
   dl_zgemm( transa, transb,
@@ -353,6 +364,12 @@ extern int xkblas_zgemm_native(
 {
   char trA = cblas2blas_op(transA);
   char trB = cblas2blas_op(transB);
-  xkblas_zgemm_native_( &trA, &trB, &M, &N, &K, alpha, A, &LDA, B, &LDB, beta, C, &LDC );
+  const KBLAS_INT iM = M;
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iK = K;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDB = LDB;
+  const KBLAS_INT iLDC = LDC;
+  xkblas_zgemm_native_( &trA, &trB, &iM, &iN, &iK, alpha, A, &iLDA, B, &iLDB, beta, C, &iLDC );
   return 0;
 }

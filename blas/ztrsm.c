@@ -154,6 +154,15 @@ int xkblas_ztrsm_async(
     /* get default tile size and initialize internal descriptor if not yet */
     size_t NB = xkblas_auto_tilesize(KERN_TRSM,N,NRHS,NA);
 
+#if 00// TO force synchronous call: may be this should be provided as runtime option
+printf("Trsm: N=%i, NRHS=%i, NB=%i\n", N,NRHS,NB);
+return  xkblas_ztrsm_native(
+  side, uplo, transA, diag, 
+  N, NRHS,
+  alpha, A, LDA, 
+         B, LDB );
+#endif
+
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
     if (!xkblas_matrix_descr_isinit(Ah))
@@ -459,19 +468,20 @@ int xkblas_ztrsm_async(
     }
   }
 
+
 /* trsm */
 static void (*dl_ztrsm)(
     const char * side, const char *uplo, const char* transa, const char* diag,
-    const int* m, const int* n,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              Complex64_t* B, const int * ldb ) = 0;
+    const KBLAS_INT* m, const KBLAS_INT* n,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              Complex64_t* B, const KBLAS_INT * ldb ) = 0;
 
 /* CPU driver */
 extern void xkblas_ztrsm_native_(
     const char * side, const char *uplo, const char* transa, const char* diag,
-    const int* m, const int* n,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              Complex64_t* B, const int * ldb )
+    const KBLAS_INT* m, const KBLAS_INT* n,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              Complex64_t* B, const KBLAS_INT * ldb )
 {
   if (dl_ztrsm ==0) xkblas_load_sym((void**)&dl_ztrsm,SYMBLAS_NAME(ztrsm));
   dl_ztrsm( side, uplo, transa, diag,
@@ -489,6 +499,10 @@ extern int xkblas_ztrsm_native(
   char u = cblas2blas_fill(uplo);
   char trA = cblas2blas_op(transA);
   char d = cblas2blas_diag(diag);
-  xkblas_ztrsm_native_( &s, &u, &trA, &d, &N, &NRHS, alpha, A, &LDA, B, &LDB );
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iNRHS = NRHS;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDB = LDB;
+  xkblas_ztrsm_native_( &s, &u, &trA, &d, &iN, &iNRHS, alpha, A, &iLDA, B, &iLDB );
   return 0;
 }

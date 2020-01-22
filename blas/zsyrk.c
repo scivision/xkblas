@@ -302,16 +302,16 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
 /* syrk */
 static void (*dl_zsyrk)(
   const char * uplo, const char * transa,
-  const int *n, const int *k,
-  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
-  const Complex64_t *beta,  Complex64_t *C, const int* ldc) = 0;
+  const KBLAS_INT *n, const KBLAS_INT *k,
+  const Complex64_t *alpha, const Complex64_t *A, const KBLAS_INT* lda,
+  const Complex64_t *beta,  Complex64_t *C, const KBLAS_INT* ldc) = 0;
 
 /* CPU driver */
 extern void xkblas_zsyrk_native_(
   const char * uplo, const char * transa,
-  const int *n, const int *k,
-  const Complex64_t *alpha, const Complex64_t *A, const int* lda,
-  const Complex64_t *beta,  Complex64_t *C, const int* ldc)
+  const KBLAS_INT *n, const KBLAS_INT *k,
+  const Complex64_t *alpha, const Complex64_t *A, const KBLAS_INT* lda,
+  const Complex64_t *beta,  Complex64_t *C, const KBLAS_INT* ldc)
 {
   if (dl_zsyrk ==0) xkblas_load_sym((void**)&dl_zsyrk,SYMBLAS_NAME(zsyrk));
   dl_zsyrk( uplo, transa,
@@ -328,6 +328,10 @@ extern int xkblas_zsyrk_native(
 {
   char u = cblas2blas_fill(uplo);
   char trA = cblas2blas_op(trans);
-  xkblas_zsyrk_native_( &u, &trA, &N, &K, alpha, A, &LDA, beta, C, &LDC );
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iK = K;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDC = LDC;
+  xkblas_zsyrk_native_( &u, &trA, &iN, &iK, alpha, A, &iLDA, beta, C, &iLDC );
   return 0;
 }

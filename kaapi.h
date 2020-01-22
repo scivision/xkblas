@@ -268,8 +268,12 @@ struct kaapi_task {
   unsigned int                 prio: 3; // iff flag KAAPI_TASK_FLAG_PRIORITY is set, else ignored
   unsigned int                 ld: 13;  // iff flag KAAPI_TASK_FLAG_LD_BOUND is set, else ignored
   kaapi_atomic16_t             wc;
+  kaapi_frame_t*               frame;   // TODO TODO TODO: hack to pass frame on stolen task....
+  double                       s_time;  // startup time
+  uint64_t                     pad;
 };
 
+typedef kaapi_task_t kaapi_task_withperfcnt_t;
 
 /** Flag for task.
     Note that this is only for user level construction.
@@ -294,10 +298,10 @@ enum  {
   KAAPI_TASK_FLAG_NOLINK        = KAAPI_TASK_FLAG(8), /* do not link task in readylist */
   KAAPI_TASK_FLAG_OUTCOM        = KAAPI_TASK_FLAG(9), /* task that may generates outcom */
   KAAPI_TASK_FLAG_INCOM         = KAAPI_TASK_FLAG(10),/* task that may generates incom */
-  KAAPI_TASK_FLAG_EXEC          = KAAPI_TASK_FLAG(11),/* mark task executed */
 #if KAAPI_DEBUG
-  KAAPI_TASK_FLAG_PREPARE       = KAAPI_TASK_FLAG(12),/* mark task to be prepared for offloading */
+  KAAPI_TASK_FLAG_EXEC          = KAAPI_TASK_FLAG(11),/* mark task executed */
 #endif
+  KAAPI_TASK_PERFCNT            = KAAPI_TASK_FLAG(12),/* task will register perfcounter */
 };
 
 #define KAAPI_TASK_FLAG_AFF_MASK \
@@ -322,7 +326,6 @@ static inline uint32_t kaapi_taskflag_get( kaapi_task_t* t, uint32_t flag )
 /* ========================================================================= */
 /* Context                                                                   */
 /* ========================================================================= */
-
 #define kaapi_thread2context(th) ((kaapi_context_t*)(th))
 #define kaapi_context2thread(ctxt) ((kaapi_thread_t*)(ctxt))
 
@@ -370,15 +373,19 @@ typedef struct kaapi_access {
   kaapi_access_mode_t  mode:  8;  /* access mode */
   unsigned int         kind:  1;  /* set iff sync access */
   unsigned int         ready: 1;  /* set access is ready */
-  unsigned int         reserv:22; /*  */
+  unsigned int         reserv:22; /* */
+  uint32_t             gen;       /* */
   void*                data;      /* the data */
   struct kaapi_access* next;      /* next conc. access if normal access or accesses to activate */
   struct kaapi_access* sync;      /* sync access. iff kind=1 -> link main syncpoints together */
   kaapi_task_t*        task;      /* the task making this access */
   union {
-    void*                mdi;       /* optim: store pointer to metadata if multi-devices is on */
-    kaapi_atomic_t       wc;        /* iff synchronisation access */
+    void*              mdi;       /* optim: store pointer to metadata if multi-devices is on */
+    kaapi_atomic_t     wc;        /* iff synchronisation access */
   };
+#if KAAPI_DEBUG
+  pthread_t            creator;   /* the thread that create the access */
+#endif
 } kaapi_access_t;
 
 /*
@@ -543,7 +550,6 @@ static inline int kaapi_memory_view_iscontiguous( const kaapi_memory_view_t* con
   }
   return 0;
 }
-
 
 /*
 */
@@ -775,6 +781,10 @@ extern kaapi_format_id_t kaapi_format_structregister(
         void               (*assign)( void*, const kaapi_memory_view_t*, const void*, const kaapi_memory_view_t*)
 );
 
+/** Resolve a format data structure from the body of a task
+*/
+extern kaapi_format_t* kaapi_format_resolve_byfmid( kaapi_format_id_t fmtid );
+
 /** Resolve a format data structure from the key of its format
 */
 extern kaapi_format_t* kaapi_format_resolve_bykey(void* key);
@@ -812,7 +822,6 @@ extern int kaapi_team_dealloc(kaapi_team_t*);
 */
 extern int kaapi_team_size(kaapi_team_t*);
 
-
 /** Attach new thread with given id in the team
     Depending of the type of the thread as given in kaapi_thread_bind,
     the thread may also attached to a device (CPU, GPU, ...). In that
@@ -831,10 +840,18 @@ extern int kaapi_team_deattach(kaapi_team_t*, kaapi_thread_t*);
 */
 enum kaapi_counter_name {
   KAAPI_CNT_TASK_SPAWN= 0,
+  KAAPI_CNT_TASK_ASYNC_EXEC,
   KAAPI_CNT_TASK_EXEC,
+  KAAPI_CNT_TASK_DURATION,
+  KAAPI_CNT_GEMM_ONTC,
+  KAAPI_CNT_GEMM_NOTONTC,
+  KAAPI_FLOPS_GEMM_ONTC,
+  KAAPI_FLOPS_GEMM_NOTONTC,
   KAAPI_CNT_SUSPEND,
   KAAPI_CNT_STEAL_OK,
   KAAPI_CNT_STEAL_NOK,
+  KAAPI_CNT_ALLOC,
+  KAAPI_CNT_FREE,
   KAAPI_CNT_CPYH2D,
   KAAPI_CNT_CPYD2H,
   KAAPI_CNT_CPYD2D,
@@ -852,16 +869,22 @@ enum kaapi_counter_name {
 /* return the counter value
 */
 extern int kaapi_stat_get_counter( int num, uint64_t* counter );
+extern int kaapi_stat_get_dcounter( int num, double* counter );
 
 /* return the counter value counter = get_counter(num) - counter
 */
 extern int kaapi_stat_getdiff_counter( int num, uint64_t* counter );
 extern int kaapi_stat_reset_counters(void);
 
+/*
+*/
+extern void kaapi_print_counter(void);
+
+
 /** Bind a Kaapi thread to the current running thread
     Allocate and return semi-opaque pointer to internal data structure
 */
-extern kaapi_thread_t* kaapi_thread_bind(int proctype);
+extern kaapi_thread_t* kaapi_thread_bind(int proctype, size_t user_size);
 
 /** Unbind a Kaapi thread from the current running thread
     Free internal data structure
@@ -917,6 +940,7 @@ extern int __kaapi_has_enough_dataspace( kaapi_thread_t* thread, size_t size);
 static inline void kaapi_access_init(kaapi_access_t* a, void* ptr )
 {
   a->mode = KAAPI_ACCESS_MODE_VOID;
+  a->gen  = 0;
   a->kind = 0;
   a->ready= 0;
   a->data = ptr;
@@ -935,6 +959,7 @@ static inline void kaapi_access_init(kaapi_access_t* a, void* ptr )
 static inline void kaapi_access_sync_init(kaapi_access_t* a, void* ptr )
 {
   a->mode = KAAPI_ACCESS_SYNC;
+  a->gen  = 0;
   a->kind = 1;
   a->ready= 0;
   a->data = ptr;
@@ -946,13 +971,17 @@ static inline void kaapi_access_sync_init(kaapi_access_t* a, void* ptr )
 }
 
 
-extern int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data);
+/**/
+struct kaapi_metadata_info;
+typedef struct kaapi_metadata_info kaapi_metadata_info_t;
+extern int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data, kaapi_metadata_info_t* mdi);
 
 extern int kaapi_update_dependencies(
   kaapi_thread_t* thread,
   kaapi_access_t* a,
   kaapi_task_t* task,
   kaapi_access_mode_t mode,
+  uint32_t gen,
   kaapi_handle_t* h
 );
 
@@ -1038,12 +1067,14 @@ void* kaapi_stack_restore(
 static inline __attribute__((__always_inline__))
 kaapi_task_t* kaapi_task_init(
     kaapi_task_t* task,
+    kaapi_frame_t* frame,
     kaapi_task_body_t body
 )
 {
   task->body      = body;
   task->flags     = KAAPI_TASK_FLAG_DEFAULT;
   KAAPI_ATOMIC_WRITE(&task->wc, 65535); // (1U<<16)-1U;
+  task->frame     = frame;
   return task;
 }
 
@@ -1077,6 +1108,7 @@ static inline int32_t kaapi_task_commit(kaapi_thread_t* thread, kaapi_task_t* ta
 static inline __attribute__((__always_inline__))
 kaapi_task_t* kaapi_task_alloc(
      kaapi_thread_t* thread,
+     kaapi_frame_t* frame,
      kaapi_task_body_t body,
      uint32_t size
 )
@@ -1084,24 +1116,10 @@ kaapi_task_t* kaapi_task_alloc(
   kaapi_task_t* task = (kaapi_task_t*)thread->sp;
   if (!_kaapi_has_enough_dataspace(thread, size))
     task = (kaapi_task_t*)kaapi_thread_slow_push_data(thread, size);
-  kaapi_task_init(task, body);
+  kaapi_task_init(task, frame, body);
   thread->sp = size + (char*)thread->sp;
   return task;
 }
-
-/** Shortcut for alloc + commit
-*/
-static inline __attribute__((__always_inline__))
-int kaapi_task_push(
-     kaapi_thread_t* thread,
-     kaapi_task_body_t body,
-     uint32_t size
-)
-{
-  kaapi_task_commit( thread, kaapi_task_alloc( thread, body, size ));
-  return 0;
-}
-
 
 /*  The function kaapi_task_set_ld() set the task attribut to
     indicate to the runtime that the task has interest to be pushed to

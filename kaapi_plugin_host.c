@@ -328,6 +328,27 @@ static char* name_io[] = {
 }
 
 
+
+/* */
+static uint16_t host_get_source(
+  kaapi_memory_device_t* dev,
+  uint16_t lid0,
+  uint64_t valid_bit, uint64_t xfer_bit
+)
+{
+  uint16_t lid_src;
+  kaapi_assert_debug((valid_bit !=0) || (xfer_bit !=0));
+
+  if (valid_bit !=0)
+    lid_src = __builtin_ffsll( valid_bit );
+  else
+    lid_src = __builtin_ffsll( xfer_bit );
+  --lid_src;
+  kaapi_assert_debug(lid_src < KAAPI_MEMORY_MAX_NODES);
+  return lid_src;
+}
+
+
 /*
  */
 static int host_stream_process_pending(
@@ -468,20 +489,8 @@ KAAPI_CLASS_ENTRYPOINT kaapi_device_t* KAAPI_PLUGIN_ENTRYPOINT(device_create)(in
 #if _PLUGIN_DEBUG
   fprintf(stdout, "host:%s: deriver create device: %d/%p\n", __FUNCTION__, dev, hostdevice);
 #endif
+  memset(hostdevice, 0, sizeof(kaapi_device_host_t) );
   hostdevice->inherited.device_id = dev;
-  hostdevice->total_mem = 0;
-  hostdevice->free_mem = 0;
-  hostdevice->used_mem = 0;
-  hostdevice->inherited.memdev.f_alloc = 0;
-  hostdevice->inherited.memdev.f_free = 0;
-  hostdevice->inherited.memdev.f_copy = 0;
-  hostdevice->inherited.memdev.f_memsync = 0;
-  hostdevice->inherited.memdev.f_get_mem_info = 0;
-  hostdevice->inherited.memdev.f_get_free_mem = 0;
-  hostdevice->inherited.stream.f_stream_free = 0;
-  hostdevice->inherited.stream.f_stream_alloc = 0;
-  hostdevice->inherited.stream.f_stream_process_pending = 0;
-  hostdevice->inherited.stream.f_stream_decode_ioinstruction = 0;
   KAAPI_OFFLOAD_TRACE_OUT
 
   return &hostdevice->inherited;
@@ -526,6 +535,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* 
   dev->memdev.f_memsync = host_memsync;
   dev->memdev.f_get_mem_info = host_get_mem_info;
   dev->memdev.f_get_free_mem = host_get_free_mem;
+  dev->memdev.f_get_source = host_get_source;
 
   /* stream device */
   dev->stream.f_stream_free = host_stream_free;

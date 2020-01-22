@@ -172,6 +172,16 @@ int xkblas_zgemmt_async(
     /* get default tile size and initialize internal descriptor if not yet */
     size_t NB = xkblas_auto_tilesize(KERN_GEMMT,N,N,K);
 
+#if 00// TO force synchronous call: may be this should be provided as runtime option
+printf("Gemmt: N=%i, K=%i, NB=%i\n", N,K,NB);
+return xkblas_zgemmt_native(
+    uplo, transA, transB, N, K,
+    alpha, A, LDA,
+           B, LDB,
+    beta,  C, LDC
+);
+#endif
+
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
     xkblas_matrix_descr_t* Ch = xkblas_find(C);
@@ -368,19 +378,19 @@ int xkblas_zgemmt_async(
 /* gemmt */
 static void (*dl_zgemmt)(
     const char* uplo, const char * transa, const char * transb,
-    const int * n, const int * k,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              const Complex64_t * B, const int * ldb,
-    const Complex64_t* beta,  Complex64_t * C, const int * ldc) = 0;
+    const KBLAS_INT * n, const KBLAS_INT * k,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              const Complex64_t * B, const KBLAS_INT * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const KBLAS_INT * ldc) = 0;
 
 
 /* CPU driver */
 extern void xkblas_zgemmt_native_(
     const char* uplo, const char * transa, const char * transb,
-    const int * n, const int * k,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              const Complex64_t * B, const int * ldb,
-    const Complex64_t* beta,  Complex64_t * C, const int * ldc)
+    const KBLAS_INT * n, const KBLAS_INT * k,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              const Complex64_t * B, const KBLAS_INT * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const KBLAS_INT * ldc)
 {
 #if defined(KAAPI_BLAS_USE_MKL)
   if (dl_zgemmt ==0) xkblas_load_sym((void**)&dl_zgemmt,SYMBLAS_NAME(zgemmt));
@@ -388,14 +398,14 @@ extern void xkblas_zgemmt_native_(
              n, k,
              alpha, A, lda,
                     B, ldb,
-             sbeta, C, ldc);
+             beta, C, ldc);
 #else
   extern void xkblas_zgemm_native_(
     const char * transa, const char * transb,
-    const int * m, const int * n, const int * k,
-    const Complex64_t* alpha, const Complex64_t* A, const int * lda,
-                              const Complex64_t * B, const int * ldb,
-    const Complex64_t* beta,  Complex64_t * C, const int * ldc);
+    const KBLAS_INT * m, const KBLAS_INT * n, const KBLAS_INT * k,
+    const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT * lda,
+                              const Complex64_t * B, const KBLAS_INT * ldb,
+    const Complex64_t* beta,  Complex64_t * C, const KBLAS_INT * ldc);
 
   xkblas_zgemm_native_( transa, transb,
             n, n, k,
@@ -414,6 +424,11 @@ extern int xkblas_zgemmt_native(
   char u = cblas2blas_fill(uplo);
   char trA = cblas2blas_op(transA);
   char trB = cblas2blas_op(transB);
-  xkblas_zgemmt_native_( &u, &trA, &trB, &N, &K, alpha, A, &LDA, B, &LDB, beta, C, &LDC );
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iK = K;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDB = LDB;
+  const KBLAS_INT iLDC = LDC;
+  xkblas_zgemmt_native_( &u, &trA, &trB, &iN, &iK, alpha, A, &iLDA, B, &iLDB, beta, C, &iLDC );
   return 0;
 }

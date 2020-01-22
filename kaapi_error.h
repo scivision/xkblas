@@ -45,10 +45,15 @@ extern "C" {
 #include <errno.h>
 
 extern void kaapi_abort(unsigned long int line, const char* file, const char* msg);
+extern void kaapi_warning(unsigned long int line, const char* file, const char* msg);
+
+#define _KE_STR_EXP2(tok) #tok
+#define _KE_STR_EXP(tok) ""_KE_STR_EXP2(tok)""
 
 #if defined(NDEBUG)
 #  define kaapi_assert( cond ) if (!(cond)) kaapi_abort(__LINE__, __FILE__, 0)
 #  define kaapi_assert_m( cond, msg ) if (!(cond)) kaapi_abort(__LINE__, __FILE__, msg)
+#  define kaapi_assert_warning(cond)  (!(cond) ? kaapi_warning( __LINE__, __FILE__, _KE_STR_EXP(cond)), 1: 0)
 #  define kaapi_assert_debug( cond )
 #  define kaapi_assert_debug_m( cond, msg )
 #  define KAAPI_DEBUG_INST( inst ) 
@@ -59,6 +64,8 @@ extern void kaapi_abort(unsigned long int line, const char* file, const char* ms
      if (!(cond)) kaapi_abort(__LINE__, __FILE__, "Bad assertion")
 #  define kaapi_assert_m( cond, msg ) \
      if (!(cond)) kaapi_abort(__LINE__, __FILE__, msg)
+///#  define kaapi_assert_warning(cond) if (!(cond)) kaapi_warning( __LINE__, __FILE__, _KE_STR_EXP(cond))
+#  define kaapi_assert_warning(cond)  (!(cond) ? kaapi_warning( __LINE__, __FILE__, _KE_STR_EXP(cond)), 1: 0)
 
 /* force value for KAAPI_DEBUG */
 #if KAAPI_DEBUG==0

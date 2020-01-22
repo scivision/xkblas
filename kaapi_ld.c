@@ -331,6 +331,7 @@ int32_t kaapi_fifo_queue_push(
 {
   unsigned int p = kaapi_task_get_priority(task);
   kaapi_assert_debug(p<= KAAPI_TASK_MAX_PRIORITY);
+  kaapi_assert_debug(frame != 0);
 
   pthread_mutex_lock(&rd->lock);
 
@@ -387,6 +388,7 @@ kaapi_task_t* kaapi_fifo_queue_pop(
       pthread_cond_signal(&rd->cond_push);
   }
   pthread_mutex_unlock(&rd->lock);
+  kaapi_assert_debug((task ==0) || (*frame != 0));
   return task;
 }
 

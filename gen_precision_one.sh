@@ -162,8 +162,6 @@ echo "File '$f' do not exit"
         -e "s+zher2k+${p}her2k+g" \
         -e "s+Zher2k+${pm}her2k+g" \
         -e "s+ZPOTRF+${pm}POTRF+g" \
-        -e "s+zpotrf+${p}potrf+g" \
-        -e "s+Zpotrf+${pm}potrf+g" \
         -e "s+cuDoubleComplex+${cutype}+g" \
         -e "s+kaapi_dcplx_format+${ctype_format}+g" .tmp > .tmp2
     mv .tmp2 .tmp

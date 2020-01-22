@@ -60,7 +60,8 @@ typedef double CFloat64_t;
 
 /* xkblas context
 */
-typedef struct xkblas_context* xkblas_context_t;
+struct xkblas_context;
+typedef struct xkblas_context xkblas_context_t;
 
 
 /* Xblas mode math
@@ -178,35 +179,47 @@ extern int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB
 );
 
-/*
+/* Allocate a Host registered bloc of sz byte if CUDA is configured on.
+   Else return a bloc as if returned by malloc.
  */
 extern void* xkblas_malloc( size_t sz );
 
-/*
+/* Free a Host registered bloc allocated by xkblas_malloc.
  */
 extern void xkblas_free( void* ptr, size_t sz );
 
-/*
+/* Non blocking host registration of the memory block (ptr, sz).
+   Returns an handle that could be employed for wait or testing
+   the completion of the request.
  */
 extern uint64_t xkblas_register_memory_async( void* ptr, size_t sz );
 
-/*
+/* Test completion of the asynchronous host registration operation with
+   given handle. Handle should has been returned by previous call to
+   xkblas_register_memory_async.
+   Returns 0 if operation is not completed, else returns !=0 value.
+   If the test is true, then the memory block specified in the host registration
+   operation has been 'host registered'.
  */
 extern int xkblas_register_memory_test( uint64_t );
 
-/*
+/* Wait completion of the host registration operation with handle
+   returned by previous call to xkblas_register_memory_async.
+   On return the memory block has been 'host registered'.
  */
 extern int xkblas_register_memory_wait( uint64_t );
 
-/*
+/* Wait all previously non blocking host registration operations.
  */
 extern int xkblas_register_memory_waitall( );
 
-/*
+/* Blocking version of xkblas_register_memory_async.
+   Equivalent to xkblas_register_memory_async followed by call to
+   xkblas_register_memory_wait.
  */
 extern int xkblas_register_memory( void* ptr, size_t sz );
 
-/*
+/* Unregister previously host registrered memory block (ptr, sz).
  */
 extern int xkblas_unregister_memory( void* ptr, size_t sz );
 
@@ -295,14 +308,13 @@ extern int xkblas_memory_syncall(void);
 */
 extern int xkblas_memory_invalidate(const void* A);
 
-/* Invalidate all data in cache
+/* Invalidate all data in cache previously used by the current thread.
 */
 extern int xkblas_memory_invalidate_caches(void);
 
 /* Free all internal data structure related to memory management
 */
 extern int xkblas_memory_free(void);
-
 
 /* Get the tile size
 */

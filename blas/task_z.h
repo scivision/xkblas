@@ -125,12 +125,5 @@ void INSERT_TASK_zhemm(
 );
 void register_format_zhemm(void);
 
-void INSERT_TASK_zpotrf(
-    int uplo,
-    size_t n,
-    xkblas_matrix_descr_t *A, size_t Am, size_t An, size_t lda
-);
-void register_format_zpotrf(void);
-
 #endif
 

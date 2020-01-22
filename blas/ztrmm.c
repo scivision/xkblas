@@ -445,16 +445,16 @@ int xkblas_ztrmm_async( int side, int uplo,
 /* trmm */
 static void (*dl_ztrmm)(
   const char* side, const char* uplo, const char* transa, const char* diag,
-  const int* m, const int* n,
-  const Complex64_t*alpha, const Complex64_t *A, const int *lda,
-                           Complex64_t *B, const int* ldb ) = 0;
+  const KBLAS_INT* m, const KBLAS_INT* n,
+  const Complex64_t*alpha, const Complex64_t *A, const KBLAS_INT *lda,
+                           Complex64_t *B, const KBLAS_INT* ldb ) = 0;
 
 /* CPU driver */
 extern void xkblas_ztrmm_native_(
   const char * side, const char *uplo, const char *transa, const char * diag,
-  const int *m, const int * n,
-  const Complex64_t* alpha,  const Complex64_t *A, const int *lda,
-                            Complex64_t *B, const int *ldb
+  const KBLAS_INT *m, const KBLAS_INT * n,
+  const Complex64_t* alpha,  const Complex64_t *A, const KBLAS_INT *lda,
+                            Complex64_t *B, const KBLAS_INT *ldb
 )
 {
   if (dl_ztrmm ==0) xkblas_load_sym((void**)&dl_ztrmm,SYMBLAS_NAME(ztrmm));
@@ -473,6 +473,10 @@ extern int xkblas_ztrmm_native(
   char u = cblas2blas_fill(uplo);
   char trA = cblas2blas_op(transA);
   char d = cblas2blas_diag(diag);
-  xkblas_ztrmm_native_( &s, &u, &trA, &d, &N, &NRHS, alpha, A, &LDA, B, &LDB );
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iNRHS = NRHS;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDB = LDB;
+  xkblas_ztrmm_native_( &s, &u, &trA, &d, &iN, &iNRHS, alpha, A, &iLDA, B, &iLDB );
   return 0;
 }

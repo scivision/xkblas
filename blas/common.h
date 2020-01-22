@@ -52,6 +52,8 @@ typedef double CFloat64_t;
 #  include <cblas.h>
 #  include <lapacke.h>
 #elif defined(KAAPI_BLAS_USE_MKL)
+#  undef lapack_complex_float
+#  undef lapack_complex_double
 #  define lapack_complex_float Complex32_t
 #  define lapack_complex_double Complex64_t
 #  include <mkl.h>
@@ -65,15 +67,63 @@ typedef double CFloat64_t;
 #endif
 
 #include "xkblas.h"
+#include "flops.h"
 #if KAAPI_USE_CUDA
 #include <cublas_v2.h>
 #endif
-#include "kaapi.h"
+#include "kaapi_impl.h"
+#include "kaapi_offload.h"
 
+/* use full to have the interger required by MKL */
+#if KAAPI_BLAS_USE_MKL
+#define KBLAS_INT MKL_INT
+#else
+#define KBLAS_INT int
+#endif
 
 /* Get the mode math for the next kernel.
 */
 extern xkblas_mode_math_t xkblas_get_modemath(void);
+
+/* perfcounter per thread of tasks performed by thread
+   Note that all fields are not available for all context.
+   E
+*/
+typedef struct  {
+  uint64_t          spawn;
+  uint64_t          cpu_exec;
+  uint64_t          gpu_exec;
+  double            flops;    /* sum of flops */
+  double            ai;       /* sum of arithmetic intensity */
+} xkblas_task_perfcounter_t;
+
+/* per thread counter
+*/
+typedef struct {
+  size_t sz_alloc;
+  size_t sz_free;
+  size_t max_size;
+  /* kaapi_format_id_t is uint8_t */
+  xkblas_task_perfcounter_t task[KAAPI_FORMAT_MAX];
+} xkblas_perfcounter_t;
+
+/*
+*/
+struct xkblas_context {
+  /* hash map: matrix -> xkblas_matrix_descr_t */
+  kaapi_thread_t*         kthread;
+  kaapi_hashmap_t         xkblas_ptr2handle;
+  kaapi_hashentries_t*    xkblas_mapentries[1ULL<<KAAPI_SIZE_DSM_MAP];
+
+  kaapi_handle_t*         xkblas_list_sync0; /* re-used unused sync0->sync field as ptr to handle */
+  uint32_t                xkblas_generation_cache;
+  xkblas_matrix_descr_t*  xkblas_matrix_descr_list;
+  xkblas_mode_math_t      xkblas_modemath;
+  xkblas_perfcounter_t*   perfcnt;
+  struct xkblas_context** self; /* point to its own _xkblas_self_context */
+  struct xkblas_context*  next;
+};
+
 
 /* Common Macro... be carrefull, name not so clear */
 #define _XKBLAS_STR_EXPAND2(tok) #tok
@@ -118,7 +168,11 @@ struct xkblas_matrix_descr {
   uint16_t*        ldid;   // array (rowmajor) of mapping attribute or 0
   kaapi_handle_t*  handle; // array (rowmajor) of size MBxNB of handle
   size_t           capacity;// mt*nt size for handle allocation
-  uint64_t         gen;    // generation number of the entry
+  uint32_t         gen;    // generation number of the entry
+  void*            entry;   // entry in hashtable for find
+#if KAAPI_DEBUG
+  pthread_t        owner;
+#endif
   struct xkblas_matrix_descr* next; // to free
 };
 typedef struct xkblas_matrix_descr xkblas_matrix_descr_t;
@@ -262,12 +316,28 @@ static void kaapi_error( const char* s1, const char* s2)
   abort();
 }
 
+/*
+*/
+extern uint32_t xkblas_context_get_generation(void);
+
 
 /*
 */
-extern __thread kaapi_thread_t* _xkblas_self_thread;
+extern __thread xkblas_context_t* _xkblas_self_context;
+extern xkblas_context_t* xkblas_context_alloc(void);
+static inline xkblas_context_t* xkblas_context_get(void)
+{
+  if (_xkblas_self_context ==0)
+    xkblas_context_alloc();
+  return _xkblas_self_context;
+}
+
+/*
+*/
 static inline kaapi_thread_t* xkblas_self_thread()
-{ return _xkblas_self_thread; }
+{
+  return xkblas_context_get()->kthread;
+}
 
 
 static inline void print_dmatrix(int M, int N, double*  A, int ldA)

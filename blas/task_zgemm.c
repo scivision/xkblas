@@ -86,10 +86,12 @@ void INSERT_TASK_zgemm(
     Complex64_t beta,  xkblas_matrix_descr_t *Ch, size_t Cm, size_t Cn, size_t ldc)
 {
     kaapi_task_t* task;
-    kaapi_thread_t* thread = xkblas_self_thread();
-    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_t);
-    task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
-    NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
+    xkblas_context_t* ctxt = xkblas_context_get();
+    kaapi_thread_t* thread = ctxt->kthread;
+    kaapi_context_t* kctxt = kaapi_thread2context(thread);
+    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
+    task = kaapi_task_alloc( thread, kctxt->unlink, NAME(task_fmtid), tasksize );
+    NAME(Arg)* taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
     taskarg->transA = transA;
     taskarg->transB = transB;
@@ -98,18 +100,19 @@ void INSERT_TASK_zgemm(
     taskarg->k = k;
     taskarg->alpha = alpha;
     kaapi_update_dependencies(thread, &taskarg->A, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
+        KAAPI_ACCESS_MODE_R, xkblas_context_get_generation(),  xkblas_get_handle(Ah, Am, An));
     taskarg->lda = lda;
     kaapi_update_dependencies(thread, &taskarg->B, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
+        KAAPI_ACCESS_MODE_R, xkblas_context_get_generation(),  xkblas_get_handle(Bh, Bm, Bn));
     taskarg->ldb = ldb;
     kaapi_update_dependencies(thread, &taskarg->C, task,
-        KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
+        KAAPI_ACCESS_MODE_RW, xkblas_context_get_generation(),  xkblas_get_handle(Ch, Cm, Cn));
     taskarg->beta = beta;
     taskarg->ldc = ldc;
     taskarg->mm = xkblas_get_modemath();
     kaapi_ldid_t ldid = xkblas_get_ld(Ch, Cm, Cn );
     kaapi_task_set_ld(task, 0, ldid);
+    kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
     kaapi_task_commit( thread, task );
 
 #if KAAPI_DEBUG
@@ -132,6 +135,16 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
       arg->C.data, kaapi_dbg_get_name(arg->C.data), arg->m, arg->n, arg->ldc
   );
 #endif
+  xkblas_zgemm_native(
+      arg->transA, arg->transB,
+      arg->m, arg->n, arg->k,
+      &arg->alpha,
+      (Complex64_t*)arg->A.data, arg->lda,
+      (Complex64_t*)arg->B.data, arg->ldb,
+      &arg->beta,
+      (Complex64_t*)arg->C.data, arg->ldc
+  );
+#if 0
   cblas_zgemm(
       CblasColMajor,
       arg->transA, arg->transB,
@@ -142,6 +155,8 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
       CBLAS_SADDR(arg->beta),
       (Complex64_t*)arg->C.data, arg->ldc
   );
+#endif
+
 }
 
 #if KAAPI_USE_CUDA
@@ -156,23 +171,67 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   );
 #endif
   cublasStatus_t res;
+  double flops = FLOPS_ZGEMM(arg->m,arg->n,arg->k);
+#if defined(PRECISION_s)
   if (arg->mm == XKBLAS_TENSOR_OP_MATH)
   {
     res = cublasSetMathMode((cublasHandle_t)handle, CUBLAS_TENSOR_OP_MATH);
-#if KAAPI_DEBUG
+    if (
+        (arg->m % 4 == 0)
+     && (arg->k % 8 == 0)
+     && (((intptr_t)arg->A.data) % 16 == 0)
+     && (((intptr_t)arg->B.data) % 16 == 0)
+     && (((intptr_t)arg->C.data) % 16 == 0)
+     && (arg->lda % 4 == 0)
+     && (arg->ldb % 4 == 0)
+     && (arg->ldc % 4 == 0)
+    )
+    {
+      ++kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].counter[KAAPI_CNT_GEMM_ONTC];
+      kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].dcounter[KAAPI_FLOPS_GEMM_ONTC] += flops;
+    }
+    else
+    {
+      ++kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].counter[KAAPI_CNT_GEMM_NOTONTC];
+      kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].dcounter[KAAPI_FLOPS_GEMM_NOTONTC] += flops;
+    }
+
+#if 0//KAAPI_DEBUG
+  #if 1
+    int warn = 0;
     /* emit warning if constraints defined in CUDA-10.1 are not satisfied */
+    warn |= kaapi_assert_warning(arg->m % 4 == 0);
+    warn |= kaapi_assert_warning(arg->k % 8 == 0);
+    warn |= kaapi_assert_warning(((intptr_t)arg->A.data) % 16 == 0);
+    warn |= kaapi_assert_warning(((intptr_t)arg->B.data) % 16 == 0);
+    warn |= kaapi_assert_warning(((intptr_t)arg->C.data) % 16 == 0);
+    warn |= kaapi_assert_warning(arg->lda % 4 == 0);
+    warn |= kaapi_assert_warning(arg->ldb % 4 == 0);
+    warn |= kaapi_assert_warning(arg->ldc % 4 == 0);
+    if (warn) {
+      printf("*** warning: %s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__,
+        arg->A.data, kaapi_dbg_get_name(arg->A.data), arg->m, arg->k, arg->lda, (cblas2cublas_op(arg->transA)==CUBLAS_OP_N ? "":"^t"),
+        arg->B.data, kaapi_dbg_get_name(arg->B.data), arg->k, arg->n, arg->ldb, (cblas2cublas_op(arg->transB)==CUBLAS_OP_N ? "":"^t"),
+        arg->C.data, kaapi_dbg_get_name(arg->C.data), arg->m, arg->n, arg->ldc
+      );
+    }
+  #else
     kaapi_assert(arg->m % 4 == 0);
-    kaapi_assert(arg->k % 8 == 0)
+    kaapi_assert(arg->k % 8 == 0);
     kaapi_assert(((intptr_t)arg->A.data) % 16 == 0);
     kaapi_assert(((intptr_t)arg->B.data) % 16 == 0);
     kaapi_assert(((intptr_t)arg->C.data) % 16 == 0);
     kaapi_assert(arg->lda % 4 == 0);
     kaapi_assert(arg->ldb % 4 == 0);
     kaapi_assert(arg->ldc % 4 == 0);
-#endif
+  #endif
+#endif // KAAPI_DEBUG
   }
   else
+#endif // defined(PRECISION_s)
   {
+    ++kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].counter[KAAPI_CNT_GEMM_NOTONTC];
+    kaapi_perthread_stat[kaapi_offload_self_device()->ctxt->tid].dcounter[KAAPI_FLOPS_GEMM_NOTONTC]+= flops;
     res = cublasSetMathMode((cublasHandle_t)handle, CUBLAS_DEFAULT_MATH);
   }
   kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
@@ -186,8 +245,11 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       (const cuDoubleComplex*)&arg->beta,
       (cuDoubleComplex*)arg->C.data, arg->ldc
   );
+  kaapi_offloadtask_perfcounter_t* perf = &kaapi_offload_self_device()->perfcnt.task[NAME(task_fmtid)];
+  perf->flops += flops;
+  perf->ai += flops/DATA_ZGEMM(arg->m,arg->n,arg->k);
 }
-#endif
+#endif //USE CUDA
 
 
 #include "task_format.h"

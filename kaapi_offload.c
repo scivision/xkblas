@@ -629,6 +629,23 @@ int kaapi_offload_start(void)
 
 /*
 */
+int kaapi_offload_free_memory(void)
+{
+  KAAPI_OFFLOAD_TRACE_IN
+
+  if (kaapi_offload_num_devices > 0)
+  {
+    int i;
+    for(i = 0; i < kaapi_offload_num_devices; i++)
+      kaapi_offload_device_free_memory(kaapi_offload_devices[i]);
+  }
+  KAAPI_OFFLOAD_TRACE_OUT
+  return 0;
+}
+
+
+/*
+*/
 int kaapi_offload_finalize(void)
 {
   KAAPI_OFFLOAD_TRACE_IN

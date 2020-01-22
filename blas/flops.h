@@ -355,4 +355,74 @@
 #define FMULS_LANGE(__m, __n) ((double)(__m) * (double)(__n))
 #define FADDS_LANGE(__m, __n) ((double)(__m) * (double)(__n))
 
+/*
+ * Data volume
+ */
+#define DATA_MAT(m,n) ((double)(m)*(double)(n))
+
+#define DATA__GEMM(m,n,k) ((DATA_MAT((m),(n))+DATA_MAT((m),(k))+DATA_MAT((k),(n))))
+#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_CGEMM(m,n,k) (1.0*sizeof(float complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_DGEMM(m,n,k) (1.0*sizeof(double)*DATA__GEMM((m),(n),(k)))
+#define DATA_SGEMM(m,n,k) (1.0*sizeof(float)*DATA__GEMM((m),(n),(k)))
+
+#define DATA__GEMM(m,n,k) ((DATA_MAT((m),(n))+DATA_MAT((m),(k))+DATA_MAT((k),(n))))
+#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_CGEMM(m,n,k) (1.0*sizeof(float complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_DGEMM(m,n,k) (1.0*sizeof(double)*DATA__GEMM((m),(n),(k)))
+#define DATA_SGEMM(m,n,k) (1.0*sizeof(float)*DATA__GEMM((m),(n),(k)))
+
+#define FLOPS_ZGEMMT(n,k) (0.5 * FLOPS_ZGEMM((n), (n), (k)))
+#define FLOPS_CGEMMT(n,k) (0.5 * FLOPS_CGEMM((n), (n), (k)))
+#define FLOPS_DGEMMT(n,k) (0.5 * FLOPS_DGEMM((n), (n), (k)))
+#define FLOPS_SGEMMT(n,k) (0.5 * FLOPS_SGEMM((n), (n), (k)))
+
+#define DATA__GEMMT(n,k) ((0.5*DATA_MAT((n),(n))+DATA_MAT((n),(k))+DATA_MAT((k),(n))))
+#define DATA_ZGEMMT(n,k) (1.0*sizeof(double complex)*DATA__GEMMT((n),(k)))
+#define DATA_CGEMMT(n,k) (1.0*sizeof(float complex)*DATA__GEMMT((n),(k)))
+#define DATA_DGEMMT(n,k) (1.0*sizeof(double)*DATA__GEMMT((n),(k)))
+#define DATA_SGEMMT(n,k) (1.0*sizeof(float)*DATA__GEMMT((n),(k)))
+
+#define DATA__TRSM(s,m,n) ((s) == CblasLeft ? (0.5*DATA_MAT((m),(m))+2*DATA_MAT((m),(n))) : (0.5*DATA_MAT((n),(n))+2*DATA_MAT((n),(m))))
+#define DATA_ZTRSM(s,m,n) (1.0*sizeof(double complex)*DATA__TRSM((s),(m),(n)))
+#define DATA_CTRSM(s,m,n) (1.0*sizeof(float complex)*DATA__TRSM((s),(m),(n)))
+#define DATA_DTRSM(s,m,n) (1.0*sizeof(double)*DATA__TRSM((s),(m),(n)))
+#define DATA_STRSM(s,m,n) (1.0*sizeof(float)*DATA__TRSM((s),(m),(n)))
+
+#define DATA_ZTRMM DATA_ZTRSM
+#define DATA_CTRMM DATA_CTRSM
+#define DATA_DTRMM DATA_DTRSM
+#define DATA_STRMM DATA_STRSM
+
+
+#define DATA_ZSYMM(s,m,n) ((s) == CblasLeft ? DATA_ZGEMM(m,m,n) : DATA_ZGEMM(m,n,n))
+#define DATA_CSYMM(s,m,n) ((s) == CblasLeft ? DATA_CGEMM(m,m,n) : DATA_CGEMM(m,n,n))
+#define DATA_DSYMM(s,m,n) ((s) == CblasLeft ? DATA_DGEMM(m,m,n) : DATA_DGEMM(m,n,n))
+#define DATA_SSYMM(s,m,n) ((s) == CblasLeft ? DATA_SGEMM(m,m,n) : DATA_SGEMM(m,n,n))
+
+
+#define DATA__SYRK(n,k) (0.5*DATA_MAT((n),(n))+DATA_MAT((n),(k)))
+#define DATA_ZSYRK(n,k) (1.0*sizeof(double complex)*DATA__SYRK((n),(k)))
+#define DATA_CSYRK(n,k) (1.0*sizeof(float complex)*DATA__SYRK((n),(k)))
+#define DATA_DSYRK(n,k) (1.0*sizeof(double)*DATA__SYRK((n),(k)))
+#define DATA_SSYRK(n,k) (1.0*sizeof(float)*DATA__SYRK((n),(k)))
+
+#define DATA__SYR2K(n,k) (0.5*DATA_MAT((n),(n))+2*DATA_MAT((n),(k)))
+#define DATA_ZSYR2K(n,k) (1.0*sizeof(double complex)*DATA__SYR2K((n),(k)))
+#define DATA_CSYR2K(n,k) (1.0*sizeof(float complex)*DATA__SYR2K((n),(k)))
+#define DATA_DSYR2K(n,k) (1.0*sizeof(double)*DATA__SYR2K((n),(k)))
+#define DATA_SSYR2K(n,k) (1.0*sizeof(float)*DATA__SYR2K((n),(k)))
+
+
+#define DATA_ZHEMM(s,m,n) ((s) == CblasLeft ? DATA_ZGEMM(m,m,n) : DATA_ZGEMM(m,n,n))
+#define DATA_CHEMM(s,m,n) ((s) == CblasLeft ? DATA_CGEMM(m,m,n) : DATA_CGEMM(m,n,n))
+#define DATA_DHEMM(s,m,n) ((s) == CblasLeft ? DATA_DGEMM(m,m,n) : DATA_DGEMM(m,n,n))
+#define DATA_SHEMM(s,m,n) ((s) == CblasLeft ? DATA_SGEMM(m,m,n) : DATA_SGEMM(m,n,n))
+
+#define DATA_ZHERK(n,k) DATA_ZSYRK(n,k)
+#define DATA_CHERK(n,k) DATA_CSYRK(n,k)
+
+#define DATA_ZHER2K(n,k) DATA_ZSYR2K(n,k)
+#define DATA_CHER2K(n,k) DATA_CSYR2K(n,k)
+
 #endif /* _flops_h_ */

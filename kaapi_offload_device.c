@@ -78,6 +78,7 @@ static void callback_epilogue(
   fflush(stdout);
 #endif
   kaapi_device_t* device     = (kaapi_device_t*)arg0;
+  kaapi_context_t* ctxt      = device->ctxt;
   kaapi_task_t* task         = (kaapi_task_t*)arg1;
   kaapi_frame_t* frame       = (kaapi_frame_t*)arg2;
 //printf("callback_epilogue:: task: %p, device: %p\n", task, device);
@@ -95,17 +96,23 @@ static void callback_epilogue(
   );
 //printf("%f: %i activate: #task=%i\n", kaapi_get_elapsedtime(), device->ctxt->kid, cnt );
 
+  /* menage à faire */
+  ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_EXEC];
+  if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
+  {
+    kaapi_task_withperfcnt_t* stask = (kaapi_task_withperfcnt_t*)task;
+    double delta = kaapi_get_elapsedtime()-stask->s_time;
+    kaapi_perthread_stat[ctxt->tid].dcounter[KAAPI_CNT_TASK_DURATION] += delta;
+    const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
+    device->perfcnt.task[fmt->fmtid].time += delta;
+  }
   ++device->cnt_exec;
   ++device->exec_count;
   if (frame)
-  {
     KAAPI_ATOMIC_INCR(&frame->exec_count);
-  }
-  else {
-    printf("Warning, exec task without frame....\n");
-  }
+#if KAAPI_DEBUG
   task->flags |= KAAPI_TASK_FLAG_EXEC;
-
+#endif
   KAAPI_OFFLOAD_TRACE_OUT
 }
 
@@ -141,7 +148,9 @@ static void callback_set_valid(
         callback_epilogue,
         device, task, frame
       );
+#if 0// else possible deadlock on locking replicas
       kaapi_offload_stream_process_instruction( ios->stream, KAAPI_IO_STREAM_KERN );
+#endif
     }
   }
   KAAPI_OFFLOAD_TRACE_OUT
@@ -163,12 +172,17 @@ int kaapi_offload_device_execute_task(
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_context_t* ctxt = device->ctxt;
   kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
-  ++thread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_EXEC];
+  ++kaapi_perthread_stat[ctxt->tid].counter[KAAPI_CNT_TASK_ASYNC_EXEC];
+  if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
+  {
+    kaapi_task_withperfcnt_t* stask = (kaapi_task_withperfcnt_t*)task;
+    stask->s_time = kaapi_get_elapsedtime();
+  }
   ctxt->pc = task;
-  //printf("%li: %s execute task: %p  %s\n", kaapi_get_elapsedns(), __func__, task, fmt->name );
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(
       task, kaapi_context2thread(ctxt), handle
   );
+
 #if KAAPI_HAVE_IO_THREADS==0
 #if KAAPI_USE_STREAM_D2D
   kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
@@ -250,7 +264,7 @@ static void kaapi_do_prefetch_data(
         continue;
 
       /* else : send prefetch request */
-      int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, device->memdev.asid, mdi, 
+      int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, device->memdev.asid, mdi, access->gen,
 #if KAAPI_DEBUG
               callback_epilogue_prefetch_data, access->data, 0, 0 
 #else
@@ -268,14 +282,17 @@ static void kaapi_do_prefetch_data(
 */
 static int kaapi_offload_device_prepare_execute_task(
      kaapi_device_t* const device,
-     kaapi_frame_t* frame, /* to signal */
-     kaapi_task_t* task    /* task was pushed in the context of 'frame' */
+     kaapi_frame_t* frame,            /* to signal */
+     kaapi_task_t* task               /* task was pushed in the context of 'frame' */
  )
 {
   KAAPI_OFFLOAD_TRACE_IN
   int err;
   uint16_t lid = kaapi_memory_asid_get_lid( device->memdev.asid );
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
+  ++device->perfcnt.task[fmt->fmtid].spawn;
+
+  kaapi_assert_debug(frame !=0);
 
   kaapi_assert_debug(device == kaapi_offload_get_current_device());
   kaapi_assert_debug(KAAPI_ATOMIC_READ(&task->wc) ==0);
@@ -299,6 +316,10 @@ static int kaapi_offload_device_prepare_execute_task(
     kaapi_metadata_info_t* mdi;
     unsigned int count_params = kaapi_format_get_count_params(fmt, kaapi_task_getargs(task));
 
+#if 0
+    char all_modes[2*count_params];
+#endif
+
     /* use task->wc as counter for asynchronous callback to detect
        completion of them
        - each callback decr counter
@@ -310,6 +331,13 @@ static int kaapi_offload_device_prepare_execute_task(
     {
       kaapi_access_mode_t m = kaapi_format_get_mode_param(fmt, ith, kaapi_task_getargs(task));
       kaapi_access_mode_t mp = KAAPI_ACCESS_GET_MODE(m);
+#if 0
+    extern char kaapi_getmodename( kaapi_access_mode_t m ) ;
+    all_modes[2*ith] = kaapi_getmodename( mp );
+    if (ith == count_params-1) all_modes[2*ith+1] = 0;
+    else all_modes[2*ith+1] = ',';
+#endif
+
       if (mp & KAAPI_ACCESS_MODE_V)
         continue;
 
@@ -319,19 +347,20 @@ static int kaapi_offload_device_prepare_execute_task(
       access = kaapi_format_get_access_param(fmt, (unsigned int)ith, kaapi_task_getargs(task));
       kaapi_format_get_view_param(fmt, (unsigned int)ith, kaapi_task_getargs(task), &view);
 
-      /* Return the meta data information.
-         If data is not already in the DSM, then add it is local to the host.
-         The memory block is allocated and replica information is
-         set (with address on the device as well as the memory view).
-         Replica information is stored in mdi.
-         If replica for device lid is not allocated then allocate it.
-         access->data is the host pointer then change from above in the function.
-      */
 #if 0
-printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n", 
+printf("[%p]:: Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
+    (void*)pthread_self(),
     task, fmt->name, ith, access->data, 
     view.size[0], view.size[1], view.ld );
 #endif
+      /* Return the meta data information about the data (ptr, view).
+         If data is not registered to the DSM, then the call adds it as new data with
+         valid copy only on the host.
+         The memory block is allocated and replica information is
+         set (with address on the device as well as its memory view).
+         Replica information is stored in mdi.
+         If replica for device lid is not allocated then on return, it is allocated.
+      */
       mdi = kaapi_dsm_findaccess_on_node(
           &kaapi_the_dsm, 
           device->memdev.asid,
@@ -341,11 +370,13 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
       );
 
       do {
-        /* findaccess has already allocated the replica for asid with the right view */
+        /* findaccess has already allocated the replica for asid with the right view
+        */
         err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
             task,
             mp,
             mdi,
+            access->gen,
             callback_set_valid,
             (void*)device, (void*)task, (void*)frame
         );
@@ -399,6 +430,11 @@ printf("Task: %p %s param[%i] @:%p view[%lu, %lu, ld:%lu]\n",
         &mdi->replicas[lid]->view
       );
     }
+#if 0
+printf("[%p]:: Task: %p %s, #params=%i, modes=%s, #wc=%i\n",
+    (void*)pthread_self(),
+    task, fmt->name, count_params, all_modes, KAAPI_ATOMIC_READ(&task->wc) );
+#endif
   }
 
 #if KAAPI_USE_PREFETCH
@@ -530,11 +566,15 @@ int kaapi_sched_idle_offload(
 
     /* */
 redo:
+    frame = 0;
     /* pop on local queue */
     task = kaapi_queue_pop(device->ctxt, device->ctxt->queue, 0);
     /* else pop on device specific queue (~ mailbox) */
     if (task ==0)
+    {
       task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
+      kaapi_assert_debug((task ==0)||(frame != 0));
+    }
     else
       /* spawn_count counts the number of task locally created, not from the mailbox */
       ++device->spawn_count;
@@ -546,10 +586,14 @@ redo:
       while ((device->request.op == KAAPI_DEVICEOP_NOP) 
           && (device->cnt_exec < device->spawn_count + device->ld->queue->push_count))
       {
+        frame = device->ctxt->unlink;
         task = kaapi_queue_pop(device->ctxt, device->ctxt->queue, 0);
         if (task ==0)
+        {
           task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
-        else 
+          kaapi_assert_debug((task ==0)||(frame != 0));
+        }
+        else
           ++device->spawn_count;
         if (task !=0) goto prepare_execute;
         kaapi_offload_poll_device( device );
@@ -669,10 +713,14 @@ printf("Recv memsync device:%i counter: %lu\n", kaapi_memory_asid_get_lid(device
           if (err) goto out_device_memsync;
 
           /* initiate write back only if streams are empty and there are no more tasks to execute */
+          frame = device->ctxt->unlink;
           task = kaapi_queue_pop(device->ctxt, device->ctxt->queue, 0);
           if (task ==0)
+          {
             task = kaapi_fifo_queue_pop(device->ld->queue, &frame);
-          else 
+            kaapi_assert_debug((task ==0)||(frame != 0));
+          }
+          else
             ++device->spawn_count;
           if (task !=0) goto prepare_execute;
 
@@ -715,11 +763,17 @@ out_ic:
     else
     {
 prepare_execute:
-      LOGDEBUG(printf("%i:: device pop task:%p %s prio:%i frame:%p runing queue:%p\n",
-        (int)ctxt->kid, (void*)task,
-        kaapi_task_get_priority(task),
-        frame, ctxt->queue);)
+      LOGDEBUG(
+        printf("%i:: device pop task:%p %s prio:%i frame:%p runing queue:%p\n",
+          (int)ctxt->kid, (void*)task,
+          kaapi_task_get_priority(task),
+          frame, ctxt->queue);
+      )
 
+      //kaapi_assert_debug( (frame ==0) || (frame == task->frame) );
+      // Currently, each task commited to stack store its allocation frame used to signal it.
+      // This extra field may be deleted if when stolen the frame is store on the thief task as in Kaapi
+      frame = task->frame;
       kaapi_offload_device_prepare_execute_task(device, frame, task );
 
       do {
@@ -752,7 +806,7 @@ void* kaapi_offload_device_thread( void* arg )
   kaapi_device_t* device = (kaapi_device_t*)arg;
 
   KAAPI_DEBUG_INST(printf("Device thread for device:%i started\n",device->device_id ));
-  kaapi_thread_t* thread = kaapi_thread_bind(device->driver->f_get_type());
+  kaapi_thread_t* thread = kaapi_thread_bind(device->driver->f_get_type(),0);
   if (thread ==0) return 0;
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
   device->ctxt = ctxt;
@@ -910,6 +964,16 @@ void kaapi_offload_device_stop(kaapi_device_t* const device)
   {
     device->driver->f_device_stop(device);
   }
+  KAAPI_OFFLOAD_TRACE_OUT
+}
+
+
+/*
+*/
+void kaapi_offload_device_free_memory(kaapi_device_t* const device)
+{
+  KAAPI_OFFLOAD_TRACE_IN
+  kaapi_memory_freelist_destroy( &device->memdev );
   KAAPI_OFFLOAD_TRACE_OUT
 }
 

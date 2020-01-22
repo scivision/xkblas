@@ -29,12 +29,20 @@
 #include <sys/resource.h>
 #endif
 
+#if defined(__STDC_NO_COMPLEX__)
+# error "Compiler support for complex number is required."
+#else
+# include <complex.h>
+typedef float complex ct32_helper;
+typedef double complex ct64_helper;
+#endif
+
 #if defined(KAAPI_BLAS_USE_OPENBLAS)
 #  include <cblas.h>
 #  include <lapacke.h>
 #elif defined(KAAPI_BLAS_USE_MKL)
-#  define lapack_complex_float Complex32_t
-#  define lapack_complex_double Complex64_t
+#  define lapack_complex_float ct32_helper
+#  define lapack_complex_double ct64_helper
 #  include <mkl.h>
 #  include <mkl_types.h>
 #  include <mkl_cblas.h>

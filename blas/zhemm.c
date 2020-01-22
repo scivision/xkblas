@@ -368,18 +368,18 @@ int xkblas_zhemm_async( int side, int uplo, int M, int N,
 /* hemm */
 static void (*dl_zhemm)(
   const char* side, const char* uplo,
-  const int* m, const int* n,
-  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
-                            const Complex64_t* B, const int *ldb,
-  const Complex64_t* beta,  Complex64_t* C, const int *ldc ) = 0;
+  const KBLAS_INT* m, const KBLAS_INT* n,
+  const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT *lda,
+                            const Complex64_t* B, const KBLAS_INT *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const KBLAS_INT *ldc ) = 0;
 
 /* CPU driver */
 extern void xkblas_zhemm_native_(
   const char * side, const char * uplo,
-  const int * m, const int * n,
-  const Complex64_t* alpha, const Complex64_t* A, const int *lda,
-                            const Complex64_t* B, const int *ldb,
-  const Complex64_t* beta,  Complex64_t* C, const int *ldc
+  const KBLAS_INT * m, const KBLAS_INT * n,
+  const Complex64_t* alpha, const Complex64_t* A, const KBLAS_INT *lda,
+                            const Complex64_t* B, const KBLAS_INT *ldb,
+  const Complex64_t* beta,  Complex64_t* C, const KBLAS_INT *ldc
 )
 {
   if (dl_zhemm ==0) xkblas_load_sym((void**)&dl_zhemm,SYMBLAS_NAME(zhemm));
@@ -399,7 +399,12 @@ extern int xkblas_zhemm_native(
 {
   char s = cblas2blas_side(side);
   char u = cblas2blas_fill(uplo);
-  xkblas_zhemm_native_( &s, &u, &M, &N, alpha, A, &LDA, B, &LDB, beta, C, &LDC);
+  const KBLAS_INT iM = M;
+  const KBLAS_INT iN = N;
+  const KBLAS_INT iLDA = LDA;
+  const KBLAS_INT iLDB = LDB;
+  const KBLAS_INT iLDC = LDC;
+  xkblas_zhemm_native_( &s, &u, &iM, &iN, alpha, A, &iLDA, B, &iLDB, beta, C, &iLDC);
   return 0;
 }
 

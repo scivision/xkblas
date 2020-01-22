@@ -74,10 +74,12 @@ void INSERT_TASK_zhemm(
 )
 {
     kaapi_task_t* task;
-    kaapi_thread_t* thread = xkblas_self_thread();
-    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_t);
-    task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
-    NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
+    xkblas_context_t* ctxt = xkblas_context_get();
+    kaapi_thread_t* thread = ctxt->kthread;
+    kaapi_context_t* kctxt = kaapi_thread2context(thread);
+    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
+    task = kaapi_task_alloc( thread, kctxt->unlink, NAME(task_fmtid), tasksize );
+    NAME(Arg)* taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
     taskarg->side = side;
     taskarg->uplo = uplo;
@@ -85,24 +87,35 @@ void INSERT_TASK_zhemm(
     taskarg->n = n;
     taskarg->alpha = alpha;
     kaapi_update_dependencies(thread, &taskarg->A, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
+        KAAPI_ACCESS_MODE_R, xkblas_context_get_generation(),  xkblas_get_handle(Ah, Am, An));
     taskarg->lda = lda;
     kaapi_update_dependencies(thread, &taskarg->B, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
+        KAAPI_ACCESS_MODE_R, xkblas_context_get_generation(),  xkblas_get_handle(Bh, Bm, Bn));
     taskarg->ldb = ldb;
     kaapi_update_dependencies(thread, &taskarg->C, task,
-        KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
+        KAAPI_ACCESS_MODE_RW, xkblas_context_get_generation(),  xkblas_get_handle(Ch, Cm, Cn));
     taskarg->beta = beta;
     taskarg->ldc = ldc;
     taskarg->mm = xkblas_get_modemath();
     kaapi_ldid_t ldid = xkblas_get_ld(Ch, Cm, Cn );
     kaapi_task_set_ld(task, 0, ldid);
+    kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
     kaapi_task_commit( thread, task );
 }
 
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
+  xkblas_zhemm_native(
+      arg->side, arg->uplo,
+      arg->m, arg->n,
+      &arg->alpha,
+      (Complex64_t*)arg->A.data, arg->lda,
+      (Complex64_t*)arg->B.data, arg->ldb,
+      &arg->beta,
+      (Complex64_t*)arg->C.data, arg->ldc
+  );
+#if 0
   cblas_zhemm(
       CblasColMajor,
       arg->side, arg->uplo,
@@ -113,6 +126,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
       CBLAS_SADDR(arg->beta),
       (Complex64_t*)arg->C.data, arg->ldc
   );
+#endif
 }
 
 #if KAAPI_USE_CUDA
@@ -128,6 +142,9 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       (const cuDoubleComplex*)&arg->beta,
       (cuDoubleComplex*)arg->C.data, arg->ldc
   );
+  kaapi_offloadtask_perfcounter_t* perf = &kaapi_offload_self_device()->perfcnt.task[NAME(task_fmtid)];
+  perf->flops += FLOPS_ZHEMM(arg->side,arg->m,arg->n);
+  perf->ai += FLOPS_ZHEMM(arg->side,arg->m,arg->n)/DATA_ZHEMM(arg->side,arg->m,arg->n);
 }
 #endif
 

@@ -109,12 +109,12 @@ static __thread int thread_type = 0;
 #  define CONFIG_SYNCHRONOUS_KERNEL 0
 #endif
 
-// force redefinition
-#  undef CONFIG_SYNCHRONOUS_COPY 
-#  define CONFIG_SYNCHRONOUS_COPY 0
+// Debug: force redefinition
+#  undef CONFIG_SYNCHRONOUS_COPY
+#  define CONFIG_SYNCHRONOUS_COPY 1
 
-#  undef CONFIG_SYNCHRONOUS_KERNEL 
-#  define CONFIG_SYNCHRONOUS_KERNEL 0
+//#  undef CONFIG_SYNCHRONOUS_KERNEL 
+//#  define CONFIG_SYNCHRONOUS_KERNEL 0
 
 /* counters */
 enum {
@@ -154,6 +154,7 @@ typedef struct {
   kaapi_device_t inherited;
   CUdevice       cu_device;
   CUcontext      ctx;
+  uint64_t*      affinity; /* of size cuda_count_perfrank -1 */
   size_t         free_mem;
   size_t         size_alloc;
   size_t         size_free;
@@ -223,35 +224,24 @@ static hwloc_topology_t topology;
 #endif
 
 
-
-#if KAAPI_DEBUG
-#define CUDA_ERROR_CHECK 1
-#endif
+/*
+*/
 static void __cudaCheckError( CUresult err,  char *file, const int line )
 {
+    static char msg[256];
     const char* tmp ="";
     if ( CUDA_SUCCESS != err )
     {
       kaapi_assert_debug( CUDA_SUCCESS == cuGetErrorName( err, &tmp ));
-      fprintf( stderr, "cuCheckError() error:%i, failed at %s:%i : %s\n",
+      snprintf( msg, 256, "cuCheckError() error:%i, failed at %s:%i : %s\n",
                  err, file, line, tmp );
-      exit( -1 );
+      kaapi_memory_cache_print_all();
+      kaapi_abort( line, file, msg );
     }
-
-#if 0// CUDA_ERROR_CHECK
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = cuCtxSynchronize();
-    if( CUDA_SUCCESS != err )
-    {
-        fprintf( stderr, "cuCheckError() with sync failed at %s:%i : %s\n",
-                 file, line, tmp );
-        exit( -1 );
-    }
-#endif
     return;
 }
 #define CudaCheckError(cerr)    __cudaCheckError( cerr, __FILE__, __LINE__ )
+#define CudaCheckErrorWithDump(cerr,instr)  if ((cerr) != CUDA_SUCCESS) { instr; __cudaCheckError( cerr, __FILE__, __LINE__ ); }
 
 
 
@@ -261,22 +251,23 @@ static void __cudaCheckError( CUresult err,  char *file, const int line )
    cuda_perf_device[d][i] for i=0,..,cuda_count_perfrank-1 is the mask of device
    for which the device d has link with performance i.
 */
+static int cuda_device_count = 0;    
 static int* cuda_perf_topo = 0;    
 static int cuda_count_perfrank = 0;
 static uint64_t* cuda_perf_device = 0;
 static int* cuda_routing_table = 0;
 
-/* */
-static void _print_mask( uint64_t v )
+/* buffer must be at least device_count */
+static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
 {
   int device_count;
-  CudaCheckError(cuDeviceGetCount(&device_count));
-  for (int i=device_count-1; i>=0; --i)
+  for (int i=0; i<sz; ++i)
   {
-     if ( v & (1<<i)) printf("1");
-     else printf("0");
+     if ( v & (1ULL<<i)) buffer[sz-1-i]='1';
+     else buffer[sz-1-i]='0';
   }
 }
+
 
 /* */
 static void _kaapi_get_gpu_topo(void)
@@ -289,6 +280,7 @@ static void _kaapi_get_gpu_topo(void)
   CudaCheckError(cuDeviceGetCount(&device_count));
 
   if (device_count ==0) return;
+  cuda_device_count = device_count;
   cuda_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
 
   // Enumerates Device <-> Device links and store perfRank
@@ -333,6 +325,7 @@ static void _kaapi_get_gpu_topo(void)
   min_perf++;
   cuda_count_perfrank= min_perf-max_perf+2;
   int perfrank_nolink= min_perf-max_perf+1;
+  int rank;
   for (int device = 0; device < device_count*device_count; device++)
     if (cuda_perf_topo[device] == -1) cuda_perf_topo[device] = min_perf+1;
   cuda_perf_device = malloc( sizeof(uint64_t)*device_count*cuda_count_perfrank);
@@ -341,15 +334,20 @@ static void _kaapi_get_gpu_topo(void)
   {
     for (int device2 = 0; device2 < device_count; device2++)
     {
-      int rank = cuda_perf_topo[device1*device_count+device2]; 
+      rank = cuda_perf_topo[device1*device_count+device2]; 
       kaapi_assert( 0<= device1*device_count+ rank );
       kaapi_assert( device1*cuda_count_perfrank+ rank <= device_count*cuda_count_perfrank);
-      cuda_perf_device[device1*cuda_count_perfrank+ rank] |= (1<<device2);
+      cuda_perf_device[device1*cuda_count_perfrank+ rank] |= (1UL<<device2);
+//char buffer[device_count+1]; buffer[device_count] = 0;
+//_print_mask( buffer, device_count, cuda_perf_device[device1*cuda_count_perfrank+ rank] );
+//printf("Mask(%i, rank=%i) |= (1UL << %i) == %s\n", device1, rank, device2,buffer);
     }
   }
 
   if (getenv("KAAPI_VERBOSE"))
   {
+    char buffer[device_count+1];
+    buffer[device_count] = 0;
     printf("Connection between GPU, #perf rank: %i.\nLowest values means best performance interconnection.\n", cuda_count_perfrank );
     printf("Local performance rank:0, Link perf. perf rank from %i (max perf) to %i (perf)\n", max_perf+1, min_perf+1);
     printf("%10s:", "src\\dest");
@@ -373,7 +371,8 @@ static void _kaapi_get_gpu_topo(void)
       printf("GPU%i: ", device1);
       for (int rank = 0; rank < cuda_count_perfrank; ++rank)
       {
-        _print_mask( cuda_perf_device[device1*cuda_count_perfrank+ rank] );
+        _print_mask( buffer, device_count, cuda_perf_device[device1*cuda_count_perfrank+ rank] );
+        printf(buffer);
         if (rank != cuda_count_perfrank-1) printf(", ");
       }
       printf("\n");
@@ -545,12 +544,11 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
     if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
     return 0;
   }
-
   CudaCheckError(res);
 
   kaapi_assert(ptr != 0);
 #if _PLUGIN_DEBUG
-  fprintf(stdout, "cuda:%s: alloc ptr=%p size=%ld\n", __FUNCTION__, (void*)ptr, size);
+  fprintf(stdout, "cuda:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
   device->size_alloc += size;
 
@@ -588,6 +586,10 @@ static void cuda_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t size)
   res = cuMemFree((CUdeviceptr)ptr);
   CudaCheckError(res);
   device->size_free += size;
+
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "cuda:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
+#endif
 }
 
 
@@ -607,6 +609,7 @@ static int cuda_copy(
   fprintf(stdout, "cuda:%s: device %d init\n", __FUNCTION__, device->inherited.device_id);
 #endif
 
+
 #if _PLUGIN_DEBUG
   CUcontext ctx;
   CUresult res = cuCtxGetCurrent( &ctx );
@@ -620,9 +623,10 @@ static int cuda_copy(
   kaapi_assert( (dest.ptr != 0)
             &&  (src.ptr != 0) );
 
-  kaapi_io_type_t tcopy = 0;
+  kaapi_io_type_t io_type = 0;
   kaapi_io_stream_type_t tstream = 0;
   kaapi_io_copy_priority_t priority = KAAPI_IO_COPY_PRIORITY_NORMAL;
+
   if (flags == 0) /* low */
     priority = KAAPI_IO_COPY_PRIORITY_LOW;
   else if (flags == 2)
@@ -635,10 +639,10 @@ static int cuda_copy(
 #if _PLUGIN_DEBUG
     kaapi_assert(kaapi_cuda_check_address(dest.ptr));
 #endif
-    tcopy = KAAPI_IO_COPY_H2D;
+    io_type = KAAPI_IO_COPY_H2D;
     tstream = KAAPI_IO_STREAM_H2D;
-    ++thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYH2D];
-    thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYH2D_BYTES] +=
+    ++kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYH2D];
+    kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYH2D_BYTES] +=
       kaapi_memory_view_size( view_dest );
   }
   else if ( (kaapi_memory_asid_get_arch(src.asid) != KAAPI_PROC_TYPE_HOST)
@@ -647,10 +651,10 @@ static int cuda_copy(
 #if _PLUGIN_DEBUG
     kaapi_assert(kaapi_cuda_check_address(src.ptr));
 #endif
-    tcopy = KAAPI_IO_COPY_D2H;
+    io_type = KAAPI_IO_COPY_D2H;
     tstream = KAAPI_IO_STREAM_D2H;
-    ++thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2H];
-    thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2H_BYTES] +=
+    ++kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2H];
+    kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2H_BYTES] +=
       kaapi_memory_view_size( view_dest );
   }
   else if ( (kaapi_memory_asid_get_arch(src.asid) != KAAPI_PROC_TYPE_HOST)
@@ -660,14 +664,14 @@ static int cuda_copy(
     kaapi_assert(kaapi_cuda_check_address(src.ptr));
     kaapi_assert(kaapi_cuda_check_address(dest.ptr));
 #endif 
-    tcopy = KAAPI_IO_COPY_D2D;
+    io_type = KAAPI_IO_COPY_D2D;
 #if KAAPI_USE_STREAM_D2D
     tstream = KAAPI_IO_STREAM_D2D;
 #else
     tstream = KAAPI_IO_STREAM_H2D;
 #endif
-    ++thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2D];
-    thread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2D_BYTES] +=
+    ++kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2D];
+    kaapi_perthread_stat[device->inherited.ctxt->tid].counter[KAAPI_CNT_CPYD2D_BYTES] +=
       kaapi_memory_view_size( view_dest );
   }
 
@@ -675,7 +679,7 @@ static int cuda_copy(
   kaapi_stream_insert_io_copy_inst(
       &device->inherited.stream,
       tstream,
-      tcopy,
+      io_type,
       priority,
       kaapi_pointer2void(src), view_src, kaapi_memory_device_get(src.asid),
       kaapi_pointer2void(dest), view_dest, kaapi_memory_device_get(dest.asid),
@@ -697,7 +701,7 @@ static int cuda_memsync(kaapi_memory_device_t* dev, int begend)
   CUresult res;
 
 #if _PLUGIN_DEBUG
-  fprintf(stdout, "cuda:%s: device %d init\n", __FUNCTION__, device->inherited.device_id);
+process  fprintf(stdout, "cuda:%s: device %d init\n", __FUNCTION__, device->inherited.device_id);
 #endif
 
 #if _PLUGIN_DEBUG
@@ -808,9 +812,10 @@ static void kaapi_cuda_init_cuda_stream(
 #if KAAPI_USE_TC
     /*
     */
-#warning "Compile with support for tensor core"
-    res = cublasSetMathMode(cios->handle, CUBLAS_TENSOR_OP_MATH);
-    kaapi_assert(cres == CUBLAS_STATUS_SUCCESS);
+// Not the default
+//#warning "Compile with support for tensor core"
+//    res = cublasSetMathMode(cios->handle, CUBLAS_TENSOR_OP_MATH);
+//    kaapi_assert(cres == CUBLAS_STATUS_SUCCESS);
 #endif
   }
   else
@@ -1028,8 +1033,13 @@ static int cuda_stream_decode_ioinstruction(
 #if KAAPI_HAVE_IO_THREADS
       kaapi_assert_debug( (thread_type == 1) || (thread_type == 2) );
 #endif
+#if 1
       //stream = (instr->inst.c_io.prio == 0 ? &cios->stream_low : &cios->stream);
-      stream = &cios->stream;
+      if (instr->type == KAAPI_IO_COPY_D2D)
+        stream = &cios->stream_low;
+      else
+#endif
+        stream = &cios->stream;
 
       /* wait end of pining operation if any */
       while (reg_prod != reg_sig)
@@ -1037,23 +1047,24 @@ static int cuda_stream_decode_ioinstruction(
 
       kaapi_assert_debug(*stream !=0);
       struct kaapi_io_copy* op = &instr->inst.c_io;
-      CUDA_MEMCPY2D pcopy;
 
-      /* switch among view_src type (1D, 2D or 3D). May be some redistribution may be
-       implemented here ?
+      /* switch among view_src type (1D, 2D or 3D).
+         May be some redistribution may be implemented here ?
        */
       size_t size = kaapi_memory_view_size(op->view_src);
+      kaapi_assert( size == kaapi_memory_view_size(op->view_dest));
       kaapi_assert_debug( size == kaapi_memory_view_size(op->view_dest));
       uint8_t type = op->view_src->type;
       kaapi_assert_debug( type == op->view_dest->type);
       uint8_t storage = op->view_src->storage;
       kaapi_assert_debug( storage == op->view_dest->storage);
-      if (kaapi_memory_view_iscontiguous(op->view_src) &&
-          kaapi_memory_view_iscontiguous(op->view_dest)
-      )
+      int test = kaapi_memory_view_iscontiguous(op->view_src) && kaapi_memory_view_iscontiguous(op->view_dest);
+
+      if (test)
       {
         type = KAAPI_MEMORY_VIEW_1D;
       }
+      kaapi_assert( test||(instr->type!=KAAPI_IO_COPY_D2D) );
 
       void* src  = kaapi_memory_view2pointer((void*)op->src, op->view_src);
       void* dest = kaapi_memory_view2pointer((void*)op->dest, op->view_dest);
@@ -1106,6 +1117,7 @@ static int cuda_stream_decode_ioinstruction(
 
         case KAAPI_MEMORY_VIEW_2D:
         {
+          CUDA_MEMCPY2D pcopy;
           pcopy.dstXInBytes = 0; /* no offset */
           pcopy.dstY        = 0;
           pcopy.dstPitch    = op->view_dest->ld * op->view_dest->wordsize;
@@ -1120,6 +1132,9 @@ static int cuda_stream_decode_ioinstruction(
               pcopy.srcHost       = src;
               pcopy.dstMemoryType = CU_MEMORYTYPE_HOST;
               pcopy.dstHost       = dest;
+#if LOG_DBG
+              printf("%s: pos: %i, instr '%s' 2D data: src:%p, dest:%p, size:%i\n", __FUNCTION__, ios->pos_r, name_io[instr->type], (void*)src, (void*)dest, (int)size);
+#endif
             break;
             case KAAPI_IO_COPY_H2D:
               pcopy.srcMemoryType = CU_MEMORYTYPE_HOST;
@@ -1128,6 +1143,9 @@ static int cuda_stream_decode_ioinstruction(
               pcopy.dstDevice     = (CUdeviceptr)dest;
               COUNTER_CNT_H2D++;
               COUNTER_SIZE_H2D+= size;
+#if LOG_DBG
+              printf("%s: pos: %i, instr '%s' 2D data: src:%p, dest:%p, size:%i\n", __FUNCTION__, ios->pos_r, name_io[instr->type], (void*)src, (void*)dest, (int)size);
+#endif
             break;
             case KAAPI_IO_COPY_D2H:
               pcopy.srcMemoryType = CU_MEMORYTYPE_DEVICE;
@@ -1136,6 +1154,9 @@ static int cuda_stream_decode_ioinstruction(
               pcopy.dstHost       = dest;
               COUNTER_CNT_D2H++;
               COUNTER_SIZE_D2H+= size;
+#if LOG_DBG
+              printf("%s: pos: %i, instr '%s' 2D data: src:%p, dest:%p, size:%i\n", __FUNCTION__, ios->pos_r, name_io[instr->type], (void*)src, (void*)dest, (int)size);
+#endif
             break;
             case KAAPI_IO_COPY_D2D:
               pcopy.srcMemoryType = CU_MEMORYTYPE_DEVICE;
@@ -1144,6 +1165,9 @@ static int cuda_stream_decode_ioinstruction(
               pcopy.dstDevice     = (CUdeviceptr)dest;
               COUNTER_CNT_D2D++;
               COUNTER_SIZE_D2D+= size;
+#if LOG_DBG
+              printf("%s: pos: %i, instr '%s' 2D data: src:%p, dest:%p, size:%i\n", __FUNCTION__, ios->pos_r, name_io[instr->type], (void*)src, (void*)dest, (int)size);
+#endif
             break;
             default:
               kaapi_assert(0);
@@ -1153,15 +1177,21 @@ static int cuda_stream_decode_ioinstruction(
             pcopy.WidthInBytes = op->view_dest->size[1] * op->view_dest->wordsize;
             pcopy.Height       = op->view_dest->size[0];
           }
-          else
+          else if (storage == KAAPI_MEMORY_STORAGE_COLMAJOR)
           {
             pcopy.WidthInBytes = op->view_dest->size[0] * op->view_dest->wordsize;
             pcopy.Height       = op->view_dest->size[1];
+          } else {
+            kaapi_abort( __LINE__, __FILE__, "Invalid storage");
           }
 
           res = cuMemcpy2DAsync( &pcopy, *stream );
-          CudaCheckError(res);
-          //kaapi_assert(res == CUDA_SUCCESS);
+          CudaCheckErrorWithDump(res, 
+            printf("%p:: tid: %i,  type: %s, %p -> %p, size:%i\n", 
+               pthread_self(), device->inherited.ctxt->tid, name_io[instr->type], 
+               src, dest, (int)size
+            )
+          );
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -1172,12 +1202,10 @@ static int cuda_stream_decode_ioinstruction(
 #if CONFIG_SYNCHRONOUS_COPY
       res = cuStreamSynchronize( *stream );
       CudaCheckError(res);
-      //kaapi_assert(res == CUDA_SUCCESS);
       ++ios->ok_p;
 #elif CONFIG_USE_EVENT 
       res = cuEventRecord( cios->end_events[ ios->pos_wp % ios->count ], *stream );
       CudaCheckError(res);
-      //kaapi_assert(res == CUDA_SUCCESS);
 #else // no use event, no synchronous == synchronous
       #error "Unsupported configuration"
 #endif
@@ -1280,6 +1308,9 @@ static int cuda_stream_advance_pending(
         kaapi_assert((res == CUDA_ERROR_NOT_READY)  || (res == CUDA_SUCCESS));
         if (res == CUDA_ERROR_NOT_READY)
           return EINPROGRESS;
+#if LOG_DBG
+        printf("%s:: instruction pos:%i, instr '%s' ok\n", __func__, ios->ok_p,  name_io[op.type]);
+#endif
 
       case KAAPI_IO_END:
       case KAAPI_IO_BARRIER:
@@ -1436,7 +1467,12 @@ static int cuda_stream_process_pending(
       case KAAPI_IO_BARRIER:
         ios->pending[ios->pos_rp % ios->count].type = KAAPI_IO_NOP;
         if (op.inst.cbk.fnc)
+{
+#if LOG_DBG
+          printf("Cbk on : %i  ->%s\n", pos, name_io[op.type] );
+#endif
           op.inst.cbk.fnc(status, ios, op.inst.cbk.arg[0], op.inst.cbk.arg[1], op.inst.cbk.arg[2]);
+}
 
 
       case KAAPI_IO_NOP:
@@ -1452,6 +1488,36 @@ static int cuda_stream_process_pending(
   }
   KAAPI_PLUGIN_TRACE_OUT
   return 0;
+}
+
+
+/* */
+static uint16_t cuda_get_source(
+  kaapi_memory_device_t* dev,
+  uint16_t lid0,
+  uint64_t valid_bit, uint64_t xfer_bit
+)
+{
+  kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
+  int device_id_dest = kaapi_device_ids[dev->device->device_id];
+  uint16_t lid_dest = kaapi_memory_asid_get_lid(dev->asid);
+  uint16_t lid_src;
+  kaapi_assert_debug((valid_bit !=0) || (xfer_bit !=0));
+
+  for (int rank = 0; rank < cuda_count_perfrank-1; ++rank)
+  {
+    if (valid_bit !=0)
+      lid_src = __builtin_ffsll( valid_bit & device->affinity[rank] );
+    else /* xfer !=0: pre-cond of the function */
+      lid_src = __builtin_ffsll( xfer_bit & device->affinity[rank]);
+    if (lid_src !=0)
+    {
+      --lid_src;
+      kaapi_assert_debug(lid_src < KAAPI_MEMORY_MAX_NODES);
+      return lid_src;
+    }
+  }
+  return (uint16_t)-1;
 }
 
 
@@ -1761,25 +1827,10 @@ KAAPI_PLUGIN_ENTRYPOINT(device_create)(int dev)
 #if _PLUGIN_DEBUG
   fprintf(stdout, "cuda:%s: device %d init\n", __FUNCTION__, dev);
 #endif
-  kaapi_device_cuda_t* cudadevice = (kaapi_device_cuda_t*)calloc(1,sizeof(kaapi_device_cuda_t));
+  kaapi_device_cuda_t* cudadevice = (kaapi_device_cuda_t*)malloc(sizeof(kaapi_device_cuda_t));
+  memset(cudadevice, 0, sizeof(kaapi_device_cuda_t) );
   cudadevice->inherited.device_id = dev;
-  cudadevice->prop.mem_total = 0;
-  cudadevice->size_alloc = 0;
-  cudadevice->size_free = 0;
-  cudadevice->free_mem = 0;
-  cudadevice->mem_limit = 0;
-  cudadevice->inherited.handle = 0;
-  cudadevice->inherited.memdev.f_alloc = 0;
-  cudadevice->inherited.memdev.f_free = 0;
-  cudadevice->inherited.memdev.f_copy = 0;
-  cudadevice->inherited.memdev.f_memsync = 0;
-  cudadevice->inherited.memdev.f_get_mem_info = 0;
-  cudadevice->inherited.stream.f_stream_free = 0;
-  cudadevice->inherited.stream.f_stream_alloc = 0;
-  cudadevice->inherited.stream.f_stream_process_pending = 0;
-  cudadevice->inherited.stream.f_stream_decode_ioinstruction = 0;
-
-  return &cudadevice->inherited;
+  return (kaapi_device_t*)cudadevice;
 }
 
 
@@ -1906,6 +1957,8 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
 
     device->free_mem = (size_t)free;
   }
+  dev->memdev.f_get_source = cuda_get_source;
+
 #if KAAPI_CUDA_CACHE
   if (!getenv("KAAPI_NO_GPUALLOCATOR"))
     cuda_mem_cache_init(device);
@@ -1957,6 +2010,11 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
   res = cuCtxPushCurrent(device->ctx);
   kaapi_assert(res == CUDA_SUCCESS);
 
+  /* similar to cuda_perf_device but with ldid index in place of cuda device number */
+  device->affinity = (uint64_t*)malloc( sizeof(uint64_t)* cuda_count_perfrank-1);
+  for (int i=0; i<cuda_count_perfrank-1; ++i)
+    device->affinity[i] = 0;
+
   for (int j=0; j<kaapi_device_count; j++)
   {
     if ( device != kaapi_device_list[j] )
@@ -1970,6 +2028,12 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
         kaapi_assert( res == CUDA_SUCCESS );
         verboseok = 1;
       }
+      int device1 = kaapi_device_ids[device->inherited.device_id];
+      int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
+      int rank = cuda_perf_topo[device1*cuda_device_count+device2];
+      kaapi_assert_debug(rank !=0);
+      if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
+        device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
     }
   }
   CUcontext ctx;
@@ -1988,11 +2052,21 @@ KAAPI_CLASS_ENTRYPOINT const char* KAAPI_PLUGIN_ENTRYPOINT(device_info)(kaapi_de
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
   static char buffer[256];
-  snprintf(buffer, 256, "%s, %i async engine(s), %.2f (GB), cache limit %.2f (GB)",
+  static char buf1[16];
+  static char buf2[16];
+  static char buf3[16];
+  buf1[10] = 0;
+  buf2[10] = 0;
+  buf3[10] = 0;
+  _print_mask(buf1, 10, device->affinity[0]);
+  _print_mask(buf2, 10, device->affinity[1]);
+  _print_mask(buf3, 10, device->affinity[2]);
+  snprintf(buffer, 256, "%s, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
     device->prop.name,
     device->prop.async_engines,
     ((double)device->prop.mem_total)/1024.0/1024.0/1024.0,
-    ((double)device->mem_limit)/1024.0/1024.0/1024.0
+    ((double)device->mem_limit)/1024.0/1024.0/1024.0,
+    buf1, buf2, buf3
   );
   return buffer;
 }
@@ -2037,26 +2111,27 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_start)(kaapi_device_t*
       err = hwloc_cpuset_to_glibc_sched_affinity (topology, cpuset, &schedset, sizeof(cpu_set_t));
       kaapi_assert(err == 0);
       CPU_ZERO(&schedset_map);
-      int cnt=0;
-#if 1//KAAPI_DEBUG
+#if KAAPI_DEBUG
       char buffer[512];
       ssize_t sb = 0;
+#endif
       for (int i=0; i<128; ++i)
       {
         if (CPU_ISSET(i, &schedset))
         {
+#if KAAPI_DEBUG
           sb += snprintf(buffer+sb, 256, "%i ", (int)i);
+#endif
           CPU_SET(i, &schedset_map);
-          ++cnt;
-          //if (cnt >2) break;
         }
       }
+#if KAAPI_DEBUG
       printf("**** Mapping CUDA thread for device %i on core: %s\n", device->cu_device, buffer);
+#endif
 
       pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
       pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset_map);
       for (int i=0; i<10; ++i) sched_yield();
-#endif
       err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset_map);
       kaapi_assert(err == 0);
     }

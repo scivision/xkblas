@@ -179,7 +179,7 @@ kaapi_task_body_t kaapi_format_taskregister_body(
 /**
 */
 kaapi_format_id_t kaapi_format_taskregister_func(
-    kaapi_format_t*         fmt,
+    kaapi_format_t*                fmt,
     void*                          key,
     kaapi_task_bodyfnc_t           body_cpu,
     kaapi_task_bodyfnc_gpu_t       body_gpu,
@@ -255,6 +255,14 @@ kaapi_format_id_t kaapi_format_structregister(
   return fmt->fmtid;
 }
 
+
+/**
+*/
+kaapi_format_t* kaapi_format_resolve_byfmid( kaapi_format_id_t fmtid )
+{
+  if (fmtid >= KAAPI_FORMAT_MAX) return 0;
+  return kaapi_all_formats[fmtid];
+}
 
 /**
 */
@@ -440,8 +448,11 @@ static void voidp_type_assign
 
 /*
 */
+static int called = 0;
 int kaapi_format_init(void)
 {
+  if (++called >1) return 0;
+
   KAAPI_REGISTER_BASICTYPEFORMAT(kaapi_schar_format, signed char, "%hhi")
   KAAPI_REGISTER_BASICTYPEFORMAT(kaapi_char_format, char, "%hhi")
   KAAPI_REGISTER_BASICTYPEFORMAT(kaapi_shrt_format, short, "%hi")
@@ -487,7 +498,9 @@ int kaapi_format_init(void)
 
 void kaapi_format_finalize(void)
 {
+  if (--called >0) return;
   size_t i;
+
   size_t nfmt = sizeof(kaapi_all_formats_bybody)/sizeof(kaapi_format_t*);
   for (i=0; i<nfmt; ++i)
   {
@@ -507,6 +520,7 @@ void kaapi_format_finalize(void)
   }
   kaapi_taskformat_finalize();
 
+  // reset format in the same state for the next kaapi_init()...
   memset( kaapi_all_formats_fnc, 0, sizeof(kaapi_all_formats_fnc) );
   kaapi_all_formats_count = 0;
   memset( kaapi_all_formats, 0, sizeof(kaapi_all_formats) );

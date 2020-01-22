@@ -46,7 +46,7 @@ done
 echo "void xkblas_register_task_format(void) {" >> internal_register.h
 
 # For all kernels generate the format registration function
-for t in gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm potrf;
+for t in gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm ;
 do
   for p in z c d s;
   do
@@ -77,7 +77,6 @@ do
            zhemm.c task_zhemm.c \
            zherk.c task_zherk.c\
            zher2k.c task_zher2k.c\
-           zpotrf.c task_zpotrf.c\
            testing_zauxiliary.c testing_zauxiliary.h\
            testing_zgemm.c\
            testing_ztrsm.c\
@@ -181,36 +180,34 @@ echo "generate $f for precision $p"
         -e "s+task_z+task_${p}+g" \
         -e "s+CBLAS_SADDR\((.*)\)+$ADDR\1+g" \
         -e "s+zauxiliary+${p}auxiliary+g" \
-        -e "s+ZGEMM+${p}GEMM+g" \
+        -e "s+ZGEMM+${pm}GEMM+g" \
         -e "s+zgemm+${p}gemm+g" \
         -e "s+Zgemm+${pm}gemm+g" \
-        -e "s+ZTRSM+${p}TRSM+g" \
+        -e "s+ZTRSM+${pm}TRSM+g" \
         -e "s+ztrsm+${p}trsm+g" \
         -e "s+Ztrsm+${pm}trsm+g" \
-        -e "s+ZTRMM+${p}TRMM+g" \
+        -e "s+ZTRMM+${pm}TRMM+g" \
         -e "s+ztrmm+${p}trmm+g" \
         -e "s+Ztrmm+${pm}trmm+g" \
-        -e "s+ZSYRK+${p}SYRK+g" \
+        -e "s+ZSYRK+${pm}SYRK+g" \
         -e "s+zsyrk+${p}syrk+g" \
         -e "s+Zsyrk+${pm}syrk+g" \
-        -e "s+ZSYR2K+${p}SYR2K+g" \
+        -e "s+ZSYR2K+${pm}SYR2K+g" \
         -e "s+zsyr2k+${p}syr2k+g" \
         -e "s+Zsyr2k+${pm}syr2k+g" \
-        -e "s+ZSYMM+${p}SYMM+g" \
+        -e "s+ZSYMM+${pm}SYMM+g" \
         -e "s+zsymm+${p}symm+g" \
         -e "s+Zsymm+${pm}symm+g" \
-        -e "s+ZHEMM+${p}HEMM+g" \
+        -e "s+ZHEMM+${pm}HEMM+g" \
         -e "s+zhemm+${p}hemm+g" \
         -e "s+Zhemm+${pm}hemm+g" \
-        -e "s+ZHERK+${p}HERK+g" \
+        -e "s+ZHERK+${pm}HERK+g" \
         -e "s+zherk+${p}herk+g" \
         -e "s+Zherk+${pm}herk+g" \
-        -e "s+ZHER2K+${p}HER2K+g" \
+        -e "s+ZHER2K+${pm}HER2K+g" \
         -e "s+zher2k+${p}her2k+g" \
         -e "s+Zher2k+${pm}her2k+g" \
-        -e "s+ZPOTRF+${p}POTRF+g" \
-        -e "s+zpotrf+${p}potrf+g" \
-        -e "s+Zpotrf+${pm}potrf+g" \
+        -e "s+ZPOTRF+${pm}POTRF+g" \
         -e "s+cuDoubleComplex+${cutype}+g" \
         -e "s+kaapi_dcplx_format+${ctype_format}+g" .tmp > .tmp2
     mv .tmp2 .tmp

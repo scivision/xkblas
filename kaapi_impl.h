@@ -47,6 +47,10 @@
 #define KAAPI_USE_HOST_PLUGIN 1
 #define KAAPI_USE_CUDA_PLUGIN 1
 
+/* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map
+*/
+#define KAAPI_SIZE_DSM_MAP 20
+
 /* do not use prefetch for successor task */
 #define KAAPI_USE_PREFETCH 0
 #define KAAPI_MAX_PREFETCH_WINDOW 2
@@ -122,9 +126,13 @@ struct kaapi_queue;
 */
 #define KAAPI_MAX_THREAD_COUNT 256
 typedef struct stat_internal  {
-  uint64_t counter[KAAPI_CNT_MAX];
+  union {
+    uint64_t counter[KAAPI_CNT_MAX];
+    double   dcounter[KAAPI_CNT_MAX];
+  };
 } __attribute__((aligned(KAAPI_CACHE_LINE))) kaapi_stat_internal_t;
-kaapi_stat_internal_t thread_stat[KAAPI_MAX_THREAD_COUNT];
+
+kaapi_stat_internal_t kaapi_perthread_stat[KAAPI_MAX_THREAD_COUNT];
 
 /* steal request header */
 struct kaapi_header_request_t;
@@ -404,8 +412,8 @@ struct kaapi_fifo_queue {
   int32_t         T;        /* pos where to push */
   int32_t         H;        /* pos where to pop */
   int32_t         size;     /* size of queue */
-  int32_t         push_count;
-  int32_t         pop_count;
+  uint64_t        push_count;
+  uint64_t        pop_count;
   kaapi_task_t**  data;     /* queue of task */
   kaapi_frame_t** frame;    /* task' frame context where to signal */
   pthread_cond_t  cond_push;
@@ -598,6 +606,7 @@ struct kaapi_handle {
   kaapi_access_t      sync0;  /* first synchronization */
   kaapi_access_t*     last;   /* last concurrent access */
   kaapi_access_t*     sync;   /* new synchronisation access */
+  kaapi_metadata_info_t* mdi; /* cache metadata */
 };
 
 /* Returns the number of activated successors

@@ -72,6 +72,21 @@ typedef enum {
   KAAPI_DEVICEOP_INVALIDATE_CACHES
 } kaapi_device_op_t;
 
+
+/* perfcounter of task performed by device
+*/
+typedef struct  {
+  uint64_t        spawn;          /*  */
+  double          time;           /*  */
+  double          flops;          /*  */
+  double          ai;             /*  */
+} kaapi_offloadtask_perfcounter_t;
+
+typedef struct  {
+  kaapi_offloadtask_perfcounter_t task[KAAPI_FORMAT_MAX];
+} kaapi_offload_perfcounter_t;
+
+
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource
 */
@@ -79,15 +94,16 @@ struct kaapi_device {
     kaapi_memory_device_t    memdev;     /* casted to kaapi_device */
     kaapi_offload_stream_t   stream;     /* communication streams host<->device */
     kaapi_localitydomain_t*  ld;         /* the device locality domain */
-    kaapi_context_t*         ctxt;
+    kaapi_context_t*         ctxt;       /* running thread */
     kaapi_atomic_t           cnt_push;   /* number of times the ressource is pushed */
     unsigned int             device_id;  /* Internal id for a specific device type (ordering) */
     pthread_t                tid;
     struct kaapi_driver*     driver;
-    uint32_t                 spawn_count;   /* number of tasks */
-    uint32_t                 exec_count;    /* number of tasks completed */
+    uint64_t                 spawn_count;   /* number of tasks */
+    uint64_t                 exec_count;    /* number of tasks completed */
     int volatile             finalize;      /* true iff driver stop device */
     int                      is_initialized;/* True if driver is initialized */
+    kaapi_offload_perfcounter_t perfcnt; /* */
     const char*              name;          /* Device name */
     void*                    handle;        /* device handle, e.g. cublas handle for GPU*/
 
@@ -202,6 +218,11 @@ extern int kaapi_offload_init(int flag);
 extern int kaapi_offload_start(void);
 
 /** \ingroup Offload
+ Free allocated memory on each device
+ */
+extern int kaapi_offload_free_memory(void);
+
+/** \ingroup Offload
  Finalize all devices from plugins
  */
 extern int kaapi_offload_finalize(void);
@@ -249,7 +270,12 @@ extern int kaapi_offload_device_start(kaapi_device_t* const device);
   It stop the device thread (if any) and allows caller to push/pop
   device in its own context.
  */
-void kaapi_offload_device_stop(kaapi_device_t* const device);
+extern void kaapi_offload_device_stop(kaapi_device_t* const device);
+
+/** \ingroup Offload
+  Free allocated memory on the device
+ */
+extern void kaapi_offload_device_free_memory(kaapi_device_t* const device);
 
 
 /** \ingroup Offload

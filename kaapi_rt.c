@@ -60,6 +60,14 @@ void kaapi_abort(unsigned long int line, const char* file, const char* msg)
   abort();
 }
 
+void kaapi_warning(unsigned long int line, const char* file, const char* msg)
+{
+  if (msg)
+    printf("**** warning: Line: %li, File: '%s', msg: '%s'\n", line, file, msg);
+  else
+    printf("**** warning: Line: %li, File: '%s'\n", line, file);
+}
+
 /* How it was compiled */
 const char* get_kaapi_info(void)
 { 
