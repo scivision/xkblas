@@ -1624,15 +1624,14 @@ int xkblas_auto_map(
   {
     case KERN_TRMM:
     case KERN_TRSM:
-#if 1
+#if 0
       xkblas_map_ij_cyclic(
         1, CblasColMajor,
         Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
         0
       );
       break;
-#endif
-#if 0// origin: best 2D on 8 GPUs
+#elif 0// original version 1D. But seems to be best 2D on 8 GPUs
       xkblas_map_1Dblock_cyclic(
         1, CblasColMajor, 0,
         Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
