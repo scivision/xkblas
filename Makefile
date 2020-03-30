@@ -431,7 +431,8 @@ gitlastcommit:
 endif
 kaapi_version.h:  gitlastcommit
 
-DISTTAG=`git describe --tags  --abbrev=0`
+#DISTTAG=`git describe --tags  --abbrev=0`-${GIT_HASH}
+DISTTAG=${GIT_HASH}
 dist:  .generated .generated_testing
 	mkdir -p xkblas/blas xkblas/testing
 	cp ${UKAAPI_FILE_LIB} ${UKAAPI_FILE_PLUGIN} AUTHORS COPYING LICENCE README.md make.inc Makefile xkblas/
