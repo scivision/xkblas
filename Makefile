@@ -61,8 +61,6 @@ ifdef CUDA_HOME
   CUDA_LIBS=-Wl,-rpath=${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64 -lcublas -lcuda -lcudart
   CUDA_KAAPI_PLUGIN=libkaapi_plugin_cuda.so.1
   CUDA_KAAPI_PLUGIN_C=./kaapi_plugin_cuda.c
-  CUDA_KAAPI_PLUGIN=libkaapi_plugin_cuda.so.1
-  CUDA_KAAPI_PLUGIN_C=./kaapi_plugin_cuda.c
   $(info CUDA defined and used)
 else
   CUDA_FLAGS=-DKAAPI_USE_CUDA=0
@@ -436,7 +434,7 @@ DISTTAG=${GIT_HASH}
 dist:  .generated .generated_testing
 	mkdir -p xkblas/blas xkblas/testing
 	cp ${UKAAPI_FILE_LIB} ${UKAAPI_FILE_PLUGIN} AUTHORS COPYING LICENCE README.md make.inc Makefile xkblas/
-	cp blas/flops.h blas/task_format.h blas/xkblas_z.h blas/xkblas_f77_z.h blas/task_z.h blas/task_z_internal.h ${XKBLAS_FILES} ${XKBLAS_WRAPPER_SRC} xkblas/blas
+	cp blas/libxkblas_wrapper.h blas/flops.h blas/xkblas_f77.h blas/task_format.h blas/xkblas_z.h blas/xkblas_f77_z.h blas/task_z.h blas/task_z_internal.h ${XKBLAS_FILES} ${XKBLAS_WRAPPER_SRC}${XKBLAS_WRAPPER_PRECISION} xkblas/blas
 	cp ${XKBLAS_TESTING} xkblas/testing
 	echo ${GIT_HASH} > xkblas/version
 	#update Makefile:
