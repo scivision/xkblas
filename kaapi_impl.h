@@ -43,6 +43,8 @@
 
 #define KAAPI_HAVE_IO_THREADS 0    /* do not use IO threads [Experimental feature!!!!] */
 
+#define KAAPI_SLEEP_DEVICETHREAD 0 /* activate a sleeping state for device thread [Yet experimental feature] */
+
 #ifndef KAAPI_USE_DYNLOADER
 #define KAAPI_USE_DYNLOADER   0    /* do not use dynamically loaded plugin */
 #endif
@@ -436,8 +438,10 @@ struct kaapi_fifo_queue {
   kaapi_frame_t** frame;    /* task' frame context where to signal */
   pthread_cond_t  cond_push;
   int             waiter_push;
-  pthread_cond_t  cond_pop;
-  int             waiter_pop;
+  //pthread_cond_t* cond_pop;
+  //int             waiter_pop;
+  void          (*cbk_fnc)(void*);
+  void*           cbk_arg;
 };
 
 /*
@@ -529,13 +533,12 @@ extern kaapi_task_t* kaapi_fifo_queue_pop(
     kaapi_frame_t** frame
 );
 
-extern int kaapi_fifo_wait_if_empty_queue(
-    kaapi_fifo_queue_t* rd
+extern int kaapi_fifo_register_waiter(
+    kaapi_fifo_queue_t* rd,
+    void (*callback)(void*),
+    void* arg
 );
 
-extern int kaapi_fifo_signal_waiter(
-    kaapi_fifo_queue_t* rd
-);
 
 /*
 */
