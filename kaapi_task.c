@@ -453,9 +453,9 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
 
   if (ld == ctxt->ld)
     return
-      kaapi_queue_push(ctxt, task );
+      kaapi_fifo_queue_owner_push(ld->queue, task );
   else
-    return 
+    return
       kaapi_fifo_queue_push(
           ld->queue,
           task
@@ -1421,11 +1421,6 @@ uint32_t kaapi_sched_activate_syncpoint(
       if (KAAPI_ATOMIC_DECR(&a->task->wc)==0)
       {
         kaapi_thread_push(thread, a->task);
-#if 0
-    const kaapi_format_t* fmt = kaapi_task_getformat_ref(a->task);
-    printf("  activate %p: %s\n", a->task, fmt->name );
-#endif
-
         ++activated;
       }
       a = a->next;
