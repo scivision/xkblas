@@ -345,7 +345,7 @@ static inline bool kaapi_memory_replica_has_whish(
   return  (KAAPI_ATOMIC_READ(&mdi->valid) & (1UL<<lid))!=0;
 }
 
-static inline void kaapi_memory_replica_set_which(
+static inline void kaapi_memory_replica_set_whish(
     kaapi_metadata_info_t*   mdi,
     uint16_t lid
 )
@@ -2214,19 +2214,16 @@ kaapi_metadata_info_t* kaapi_dsm_findaccess_on_node(
 
   /* if only mdi creation returns */
   if ((createflag & KAAPI_DSM_CREATE_DATA) ==0)
-  {
-printf("Return: only MDI creation\n");
     goto return_value;
-  }
     
-  //if (createflag && (mdi->replicas[0]->ptr.ptr !=0) && ((uintptr_t)a->data != (uintptr_t)mdi->replicas[0]->ptr.ptr))
-  kaapi_assert( ((uintptr_t)mdi->replicas[0]->ptr.ptr ==0)
+  kaapi_assert( (mdi->replicas[0] ==0)
+             || ((uintptr_t)mdi->replicas[0]->ptr.ptr ==0)
              || ((uintptr_t)a->data == (uintptr_t)mdi->replicas[0]->ptr.ptr) );
 
-  if ((uintptr_t)a->data != (uintptr_t)mdi->replicas[0]->ptr.ptr)
+  if ((mdi->replicas[0] ==0)||(uintptr_t)a->data != (uintptr_t)mdi->replicas[0]->ptr.ptr)
   {
     /* reference point on the host differs and entry should be created */
-    kaapi_assert_debug( !kaapi_memory_replica_is_valid(mdi,0));
+    kaapi_assert_debug( (mdi->replicas[0] ==0) || !kaapi_memory_replica_is_valid(mdi,0));
     mdi = _kaapi_new_mdi( mdi, a->data, view );
 #if KAAPI_DEBUG
     mdi->owner = a->creator;
@@ -2258,10 +2255,13 @@ return_value:
   kaapi_atomic_unlock( &dsm->nodes[lid0]->lock );
 
   /* */
-  a->mdi = mdi;
-  /* allocate replica but not the memory block */
-  if (((createflag & KAAPI_DSM_CREATE_DATA) !=0) && !kaapi_memory_replica_is_allocated(mdi,lid))
-    mdi->replicas[lid] = _kaapi_new_replica( mdi, mdi->replicas[lid], asid, view);
+  if ((createflag & KAAPI_DSM_CREATE_DATA) !=0) 
+  {
+    a->mdi = mdi;
+    /* allocate replica but not the memory block */
+    if (!kaapi_memory_replica_is_allocated(mdi,lid))
+      mdi->replicas[lid] = _kaapi_new_replica( mdi, mdi->replicas[lid], asid, view);
+  }
 
   return mdi;
 }
@@ -2288,7 +2288,7 @@ int kaapi_dsm_whish_distribution(
     0
   );
   if (mdi ==0) return EINVAL;
-  kaapi_memory_replica_set_which(mdi, lid);
+  kaapi_memory_replica_set_whish(mdi, lid);
   return 0;
 }
 

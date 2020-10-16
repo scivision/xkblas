@@ -66,6 +66,10 @@
 #  define KAAPI_HEAP_STRATEGY KAAPI_HEAP_BEST_FIT
 #endif
 
+/* To activate use of OCR data management. Should be the default when ok.
+*/
+#define KAAPI_USE_OCR 1
+
 /* To activate or not the loadbalancing between GPUs
 */
 #define KAAPI_WS_GPUTASK 1
@@ -73,13 +77,12 @@
 /* use pipeline to order task insertions, communications and kernel launchs
    else the only the number of inserted task + pending task in the stream is limited
 */
-#define KAAPI_PIPELINE_GPUTASK 0
+#define KAAPI_PIPELINE_GPUTASK 1
 
 #if KAAPI_PIPELINE_GPUTASK
 /* reorder stream execution on GPU */
 #define KAAPI_REORDER_TASK_EXEC 1
 #endif
-
 
 /* do not use prefetch for successor task */
 #define KAAPI_USE_PREFETCH 0
@@ -93,6 +96,9 @@
 
 /* to use specific stream for D2D operation. */
 #define KAAPI_USE_STREAM_D2D 1
+
+/* to use D2D topology and performance group */
+#define KAAPI_USE_TOPO_D2D 1
 
 /* Mark that we compile source of the library.
    Only used to avoid to include public definitition of some types.

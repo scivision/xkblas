@@ -221,7 +221,7 @@ int32_t _kaapi_task_commit(kaapi_thread_t* thread, kaapi_task_t* task)
 #define LOG_AFF 0
 
 #define KAAPI_USE_AFFINITY     1
-#define KAAPI_USE_OCR_AFFINITY 1
+#define KAAPI_USE_OCR_AFFINITY 0
 /* Affinity: compute the score of executing the task on the ressource ldid
   The algorithm returns a score for 4 criteria:
   0: size of data store in the ressource ldid
@@ -423,7 +423,7 @@ static kaapi_ldid_t kaapi_compute_best_ld( kaapi_task_t* task)
   else if (affinity_r[lidmax_r] !=0)
     ldid = lidmax_r+1;
   if (ldid != (kaapi_ldid_t)-1)
-    kaapi_task_set_ld(task, 0, ldid );
+    kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid );
 #if LOG_AFF
   printf(buff);
 #endif
@@ -432,7 +432,7 @@ static kaapi_ldid_t kaapi_compute_best_ld( kaapi_task_t* task)
 }
 
 
-/* 
+/* Entry point to push a ready task and dispatch it to queue
 */
 int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
 {
@@ -444,15 +444,15 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
   kaapi_ldid_t ldid = kaapi_task_get_ld(task);
   if (ldid != (kaapi_ldid_t)-1) 
   {
+    /* Is an OCR parameter? Locality is given by the locality of the i-th effective parameter */
     if ((KAAPI_TASK_LD_MASK_PARAM & ldid) !=0)
     {
-      /* bound to a parameter */
-      ldid &= ~KAAPI_TASK_LD_MASK_PARAM;
+      int ith = (int)(ldid & ~KAAPI_TASK_LD_MASK_PARAM);
       const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
       unsigned int count_params = kaapi_format_get_count_params(fmt, kaapi_task_getargs(task));
-      if (ldid < count_params) 
+      if (ith < count_params)
       {
-        kaapi_access_t* access = kaapi_format_get_access_param(fmt, (unsigned int)ldid, kaapi_task_getargs(task));
+        kaapi_access_t* access = kaapi_format_get_access_param(fmt, (unsigned int)ith, kaapi_task_getargs(task));
         kaapi_metadata_info_t* mdi = access->mdi;
         if (mdi ==0)
         {
@@ -464,12 +464,30 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
             0
           );
         }
-        kaapi_assert(mdi != 0);
-        KAAPI_MEMORY_VALUE_TYPE valid_bit = KAAPI_ATOMIC_READ(&mdi->valid);
-        valid_bit &= ~(1<< kaapi_memory_asid_get_lid(kaapi_local_asid));
-        ldid = KAAPI_MEMORY_FFS( valid_bit );
-        --ldid;
-        ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ldid-1);
+        /* if unable to detect meta data information (absence of dsm_whish distribute or absence of previous task running
+           with the parameter */
+        if (mdi != 0) 
+        {
+          KAAPI_MEMORY_VALUE_TYPE valid_bit = KAAPI_ATOMIC_READ(&mdi->valid);
+          valid_bit &= ~(1<< kaapi_memory_asid_get_lid(kaapi_local_asid));
+          /* is valid bit previously defined ? */
+          if (valid_bit !=0) 
+          {  
+            ldid = KAAPI_MEMORY_FFS( valid_bit );
+            --ldid;
+            ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ldid-1);
+          }
+          /* else use the whish */
+          else {
+            KAAPI_MEMORY_VALUE_TYPE whish_bit = KAAPI_ATOMIC_READ(&mdi->whish);
+            if (whish_bit !=0) 
+            {  
+              ldid = KAAPI_MEMORY_FFS( whish_bit );
+              --ldid;
+              ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ldid-1);
+            }  
+          } /* in any previous case, leave ld ==0  */
+        } // mdi !=0
       } 
     }
     else 
@@ -524,7 +542,6 @@ int32_t kaapi_queue_push(
   rd->T[p] = T;
   return T-1 /* [debug] */;
 }
-
 
 /* pop from T: THE
    Return the task popped if popped has index bigger than T0
