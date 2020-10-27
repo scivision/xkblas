@@ -757,7 +757,11 @@ int kaapi_sched_idle_offload(
          - new task to wait =iff= (device->exec_count < device->spawn_count + device->ld->queue->push_count)
     */
     task = 0;
-    if ((task ==0) && kaapi_offload_device_accept_new_task(device))
+    if (
+      //  (device->p_ready - device->p_finish <1) 
+      //    (device->p_write - device->p_ready <1) 
+         kaapi_offload_device_accept_new_task(device)
+    )
     {
       /* pop on local queue */
       if (task ==0)
@@ -779,9 +783,37 @@ int kaapi_sched_idle_offload(
       {
         /* How to choice this delay ? */
         if (tidle_start ==0) tidle_start = kaapi_get_elapsedns();
-        else if (1e-9*(kaapi_get_elapsedns() - tidle_start) > 0.0001)
+        else if (1e-9*(kaapi_get_elapsedns() - tidle_start) > 0.001)
+#if 0//KAAPI_USE_PERFCOUNTER
+        else if ((device->cnt_task!=0) 
+              && (1e-9*(kaapi_get_elapsedns() - tidle_start) > global_max_cpudelay/kaapi_default_param.cuda_conc_kernel) ///kaapi_default_param.cuda_conc_stream_kernel)) 
+        ) 
+#endif
         {
-          if (task ==0)
+          /* Affinity: compute the best (=ldid with at least a write of the task, see IPDPS2013.
+             It remains to transfer the affinity during the steal operations where device
+             may has the capacity to select the best task or at least:
+  	       0- a task with most of its input on the device.
+  	       1- a task with inputs on the device close to the target device.
+  	       2- a task with inputs on the device. 
+  	       3- a task with inputs on the machine. 
+          */
+          kaapi_localitydomain_t* ld;
+#if 1
+          int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
+          int load[ngpu]; 
+          int imax[KAAPI_IMAX]; 
+          int max;
+          int min; 
+          float avrg;
+          float delta;
+          int iimax = _kaapi_compute_load_device(ctxt, &min, &max, &avrg, &delta, imax, load);
+          float minmax = max-min;
+
+          //if ((avrg > 2.0/ngpu) && (delta > 0)) 
+          //if ((avrg >= 1.0) && (delta >= 1.0*kaapi_default_param.cuda_conc_kernel))
+          if ((avrg >= kaapi_default_param.cuda_conc_kernel/2.0) && (delta > 1.0*kaapi_default_param.cuda_conc_kernel))
+>>>>>>> fc37d03 (Before merge?)
           {
            /* Affinity: compute the best (=ldid with at least a write of the task, see IPDPS2013.
               It remains to transfer the affinity during the steal operations where device
