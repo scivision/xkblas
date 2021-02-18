@@ -512,6 +512,11 @@ kaapi_io_instruction_t* kaapi_offload_stream_commit(
   kaapi_writemem_barrier();
   ++ios->pos_w;
 
+#if KAAPI_SLEEP_DEVICETHREAD
+  /* wakupe the sleeping thread: an (other) thread has register a request to process */
+  kaapi_offload_device_wakeup( stream->device );
+#endif
+
   /* unlock mutex locked in stream_push */
   kaapi_assert_debug( ios->mutex._owner == pthread_self());
   kaapi_atomic_unlock(&ios->mutex);
