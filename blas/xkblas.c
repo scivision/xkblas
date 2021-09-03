@@ -45,7 +45,8 @@
 #include "kaapi_impl.h"
 #include "kaapi_offload.h"
 
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
+#    include <cublas_v2.h>
 //#include <cuda.h>
 #include <cuda_runtime_api.h>
 #endif
@@ -89,9 +90,9 @@ xkblas_context_t* xkblas_context_alloc(void)
 
       Todo that-> use user_size extra context in thread_bind.
     */
-    kaapi_thread_t* kthread = kaapi_thread_bind(KAAPI_PROC_TYPE_HOST,0);
+    kaapi_context_t* kctxt = kaapi_self_context();
+    kaapi_thread_t* kthread = kaapi_context2thread(kctxt);
     kaapi_assert( kthread != 0);
-    kaapi_context_t* kctxt = kaapi_thread2context(kthread);
     _xkblas_self_thread = kthread;
     xkblas_context_t* ctxt = (xkblas_context_t*)malloc(sizeof(xkblas_context_t));
     int err = kaapi_hashmap_init(&ctxt->xkblas_ptr2handle, ctxt->xkblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
@@ -394,7 +395,11 @@ int xkblas_set_ngpus(int ngpus)
  */
 void* xkblas_malloc( size_t size )
 {
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_HIP
+  void* ptr = 0;
+  kaapi_assert_m(hipSuccess== hipHostMalloc(&ptr, size, hipHostMallocPortable),"hipHostAlloc failed");
+  return ptr;
+#elif KAAPI_USE_CUDA  
   void* ptr = 0;
   //CUresult err = cuMemHostAlloc(&ptr, size, CU_MEMHOSTALLOC_PORTABLE);
   //kaapi_assert_m(CUDA_SUCCESS== err, "cuMemHostAlloc failed");
@@ -409,7 +414,7 @@ void* xkblas_malloc( size_t size )
  */
 void xkblas_free( void* ptr, size_t sz )
 {
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   //kaapi_assert_m(CUDA_SUCCESS==  cuMemFreeHost(ptr),"cuMemFreeHost failed");
   kaapi_assert_m(cudaSuccess== cudaFreeHost(ptr),"cudaFreeHost failed");
 #else
@@ -423,7 +428,7 @@ void xkblas_free( void* ptr, size_t sz )
 uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 {
 
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
   if (driver ==0) return 0;
   return driver->f_host_register( ptr, sz, 0, 0, 0, 0);
@@ -437,7 +442,7 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 uint64_t xkblas_unregister_memory_async( void* ptr, size_t sz )
 {
 
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
   if (driver ==0) return 0;
   return driver->f_host_unregister( ptr, sz, 0, 0, 0, 0);
@@ -450,7 +455,7 @@ uint64_t xkblas_unregister_memory_async( void* ptr, size_t sz )
 */
 int xkblas_register_memory_test( uint64_t handle )
 {
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( handle, 0 );
@@ -463,7 +468,7 @@ int xkblas_register_memory_test( uint64_t handle )
 */
 int xkblas_register_memory_wait( uint64_t handle )
 {
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( handle, 1 );
@@ -476,7 +481,7 @@ int xkblas_register_memory_wait( uint64_t handle )
 */
 int xkblas_register_memory_waitall( )
 {
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( (uint64_t)-1, 2 );
@@ -795,7 +800,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 
 /*
 */
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
 #if KAAPI_DEBUG
 kaapi_atomic_t spawn_writeback={0};
 kaapi_atomic_t pending_writeback={0};
@@ -929,7 +934,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 
 /*
 */
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
@@ -1015,7 +1020,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 
 /*
 */
-#if KAAPI_USE_CUDA
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
 }
@@ -1149,11 +1154,6 @@ int xkblas_init(void)
     else
       printf("[XKBlas] unkown math mode '%s', use default\n", m);
   }
-  kaapi_counter_set_condition( KAAPI_CNT_GEMM_ONTC, xkblas_ismode_math_tc );
-  kaapi_counter_set_condition( KAAPI_CNT_GEMM_NOTONTC, xkblas_ismode_math_tc );
-  kaapi_counter_set_condition( KAAPI_FLOPS_GEMM_ONTC, xkblas_ismode_math_tc );
-  kaapi_counter_set_condition( KAAPI_FLOPS_GEMM_NOTONTC, xkblas_ismode_math_tc );
-
   xkblas_register_task_format();
   kaapi_register_format_writeback();
   kaapi_register_format_invalidate();
@@ -1321,46 +1321,6 @@ int xkblas_finalize(void)
   handle_cpublas = 0;
 
   kaapi_finalize();
-
-#if KAAPI_USE_PERFCOUNTER
-  if (verbose)
-  {
-    /* move final display of counter after terminaison of kaapi and full memory reclamation */
-    if (disphead && getenv("KAAPI_VERBOSE"))
-    {
-      printf("\t total\n");
-      uint64_t spawn_count = 0;
-      double time_count = 0, flops_count = 0;
-      for (kaapi_format_id_t i=0; i<KAAPI_FORMAT_MAX; ++i)
-      {
-        if (cumul.task[i].spawn>0)
-        {
-          printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
-            task_names[i],
-            cumul.task[i].spawn,
-            cumul.task[i].time,
-            cumul.task[i].flops,
-            cumul.task[i].ai,
-            cumul.task[i].ai/cumul.task[i].spawn
-          );
-          spawn_count+= cumul.task[i].spawn;
-          time_count+= cumul.task[i].time;
-          flops_count+= cumul.task[i].flops;
-          free(task_names[i]); task_names[i] = 0;
-        } 
-      }
-      printf("\t[%12s]: count=%12li, time=%8e, flops=%10e\n",
-          "sum -->",
-          spawn_count,
-          time_count,
-          flops_count
-      );
-      printf("\t Global counters on GPU(s):\n");
-      kaapi_print_counter();
-      printf("[XKBlas stats]\n");
-    }
-  }
-#endif
 }
 
 
@@ -1531,17 +1491,6 @@ int xkblas_memory_coherent_async(
   void* A, size_t LD, size_t eltsize
 )
 {
-#if 0
-  xkblas_sync();
-  printf("-----------------------------\n");
-  for (size_t i=0; i<kaapi_localitydomain_count(KAAPI_LD_GPU); ++i)
-  {
-    printf("  lid[%i]=%i,  %s\n", (int)i, (int)kaapi_localitydomain_get_num(KAAPI_LD_GPU, i), kaapi_localitydomain_info(KAAPI_LD_GPU, i) );
-    kaapi_localitydomain_t* ld = kaapi_localitydomain_get( kaapi_localitydomain_get_num(KAAPI_LD_GPU, i) );
-    kaapi_memory_cache_print( kaapi_memory_device_get( ld->device->memdev.asid ) );
-  }
-#endif
-
   xkblas_matrix_descr_t* Ah = xkblas_find(A);
   if (!xkblas_matrix_descr_isinit(Ah)) /* unknown matrix, return except if debug mode because it is strange to call this
   function with unknown matrix */
@@ -1556,6 +1505,29 @@ int xkblas_memory_coherent_async(
   size_t LDA = LD;
   size_t Amt = Ah->mt;
   size_t Ant = Ah->nt;
+
+#if KAAPI_USE_TRACELIB==1
+    kaapi_context_t* ctxt =kaapi_self_context();
+    kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 /*begin*/ );
+    if (evt)
+    {
+      strncpy(evt->u.s.d0.c8,"coherent",8);
+      evt->u.s.d1.u = Ah->M;
+      evt->u.s.d2.u = Ah->N;
+      evt->u.s.d3.u = A_MB;
+      KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
+    }
+    evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 2 /*info*/ );
+    if (evt)
+    {
+      evt->u.s.d0.u = A_NB;
+      evt->u.s.d1.u = uplo;
+      evt->u.s.d2.u = memflag;
+      evt->u.s.d3.u = 0;
+      KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
+    }
+#endif
+
 
   /* tile iteration */
   if (uplo ==0)
@@ -1603,17 +1575,6 @@ int xkblas_memory_coherent_async(
     printf("[%s]: invalid argument uplo\n", __func__);
     abort();
   }
-
-#if 0
-  xkblas_sync();
-  printf("-----------------------------\n");
-  for (size_t i=0; i<kaapi_localitydomain_count(KAAPI_LD_GPU); ++i)
-  {
-    printf("  lid[%i]=%i,  %s\n", (int)i, (int)kaapi_localitydomain_get_num(KAAPI_LD_GPU, i), kaapi_localitydomain_info(KAAPI_LD_GPU, i) );
-    kaapi_localitydomain_t* ld = kaapi_localitydomain_get( kaapi_localitydomain_get_num(KAAPI_LD_GPU, i) );
-    kaapi_memory_cache_print( kaapi_memory_device_get( ld->device->memdev.asid ) );
-  }
-#endif
 
   return 0;
 }
@@ -1729,6 +1690,33 @@ size_t xkblas_auto_tilesize(
   xkblas_kernel_t kernel, size_t M, size_t N, size_t K
 )
 {
+
+#if 0
+{
+xkblas_context_t* ctxt = xkblas_context_get();
+int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
+float load[ngpu];
+int lmin, lmax;
+float avrg;
+float delta;
+int imax_gpu[ngpu];
+int imax_count;
+imax_count = _kaapi_compute_load_device(
+    &lmin,
+    &lmax,
+    &avrg,
+    &delta,
+    imax_gpu,
+    load);
+char tmp[256];
+ssize_t ssize = snprintf(tmp,256,"--- ctxt:%p #Lmax: %i Load: ", ctxt,imax_count);
+for (int i=0; i<ngpu; ++i)
+  ssize += snprintf(tmp+ssize, 256-ssize, "%f ", load[i]);
+ssize += snprintf(tmp+ssize, 256-ssize,"\n");
+printf(tmp);
+}
+#endif
+
   /* get default tile size and initialize internal descriptor if not yet */
   size_t NB = xkblas_get_param();
   if (NB !=0) return NB;
@@ -1828,19 +1816,20 @@ int xkblas_auto_map(
 {
   switch (kernel)
   {
+    case KERN_SYRK:
 #if 0
+    {
       xkblas_map_ij_cyclic(
         1, CblasColMajor,
         Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
         0
       );
-      break;
+    } break;
 #endif
 
     case KERN_SYR2K:
     case KERN_SYMM:
     case KERN_GEMM:
-    case KERN_SYRK:
     case KERN_TRMM:
     case KERN_GEMMT:
     case KERN_TRSM:
@@ -1906,14 +1895,12 @@ extern void xkblas_load_sym(void** ptr, const char* name)
       abort();
     }
   }
-  //printf("[xkblas]: load symbol %s.\n",name);
   *ptr = dlsym( handle_cpublas, name );
   if (*ptr ==0)
   {
     fprintf(stderr,"*** Error: [xkblas] cannot load symbol '%s' from '%s'\n", name, XKBLAS_BLASLIB);
     abort();
   }
-  //printf("[xkblas]: end load symbol %s.\n",name);
 }
 
 

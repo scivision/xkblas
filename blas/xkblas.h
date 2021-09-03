@@ -63,6 +63,17 @@ typedef double CFloat64_t;
 struct xkblas_context;
 typedef struct xkblas_context xkblas_context_t;
 
+/*
+*/
+extern __thread xkblas_context_t* _xkblas_self_context;
+extern xkblas_context_t* xkblas_context_alloc(void);
+static inline xkblas_context_t* xkblas_context_get(void)
+{
+  if (_xkblas_self_context ==0)
+    xkblas_context_alloc();
+  return _xkblas_self_context;
+}
+
 
 /* Xblas mode math
 */
@@ -80,11 +91,11 @@ extern void xkblas_set_modemath( xkblas_mode_math_t );
 */
 #ifndef KAAPI_NO_DEFAULT_BLAS_ENUM
 /* traditional definitions: before xkblas.h */
-typedef enum CBLAS_ORDER     {CblasRowMajor=101, CblasColMajor=102} CBLAS_ORDER;
-typedef enum CBLAS_TRANSPOSE {CblasNoTrans=111, CblasTrans=112, CblasConjTrans=113, CblasConjNoTrans=114} CBLAS_TRANSPOSE;
-typedef enum CBLAS_UPLO      {CblasUpper=121, CblasLower=122} CBLAS_UPLO;
-typedef enum CBLAS_DIAG      {CblasNonUnit=131, CblasUnit=132} CBLAS_DIAG;
-typedef enum CBLAS_SIDE      {CblasLeft=141, CblasRight=142} CBLAS_SIDE;
+typedef enum {CblasRowMajor=101, CblasColMajor=102} CBLAS_ORDER;
+typedef enum {CblasNoTrans=111, CblasTrans=112, CblasConjTrans=113, CblasConjNoTrans=114} CBLAS_TRANSPOSE;
+typedef enum {CblasUpper=121, CblasLower=122} CBLAS_UPLO;
+typedef enum {CblasNonUnit=131, CblasUnit=132} CBLAS_DIAG;
+typedef enum {CblasLeft=141, CblasRight=142} CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 #endif
 
@@ -101,7 +112,9 @@ typedef enum {
   KERN_SYR2K,
   KERN_HEMM,
   KERN_HERK,
-  KERN_HER2K
+  KERN_HER2K,
+  KERN_SWAP
+
 } xkblas_kernel_t;
 
 /*
@@ -386,9 +399,9 @@ extern uint64_t xkblas_elapsedns(void);
 extern double xkblas_elapsedtime(void);
 
 
-#include "xkblas_z.h"
-#include "xkblas_c.h"
-#include "xkblas_d.h"
-#include "xkblas_s.h"
+#include "zxkblas.h"
+#include "cxkblas.h"
+#include "dxkblas.h"
+#include "sxkblas.h"
 
 #endif /* _xkblas_h_ */
