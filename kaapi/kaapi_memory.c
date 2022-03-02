@@ -450,7 +450,7 @@ kaapi_pointer_t kaapi_memory_alloc(kaapi_address_space_id_t asid, size_t size)
     kaapi_offload_get_mem_info(device->device, 0, &size_chunk0 );
     //size_chunk0 = 1024*1024*8*128;
     size_chunk0 &= ~ 7UL; // round down to align to 8
-    printf("%p:: DO main chunk alloc on device: %p size: %lu\n",pthread_self(), device->device, size_chunk0);
+    //printf("%p:: DO main chunk alloc on device: %p size: %lu\n",pthread_self(), device->device, size_chunk0);
     kaapi_alloc_chunk_t* chunk0 = malloc(sizeof(kaapi_alloc_chunk_t));
     chunk0->device_ptr = device->f_alloc(device,size_chunk0, &flag);
     kaapi_assert (chunk0->device_ptr !=0);
