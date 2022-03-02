@@ -369,6 +369,11 @@ size_t xkblas_get_param(void)
 }
 
 
+int xkblas_get_devicecount(void)
+{
+}
+
+
 /*
 */
 int xkblas_get_ngpus(void)
@@ -427,9 +432,14 @@ void xkblas_free( void* ptr, size_t sz )
  */
 uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 {
-
-#if KAAPI_USE_CUDA || KAAPI_USE_HIP
+#if KAAPI_USE_CUDA||KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
   if (driver ==0) return 0;
   return driver->f_host_register( ptr, sz, 0, 0, 0, 0);
 #endif
@@ -441,9 +451,14 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 */
 uint64_t xkblas_unregister_memory_async( void* ptr, size_t sz )
 {
-
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
   if (driver ==0) return 0;
   return driver->f_host_unregister( ptr, sz, 0, 0, 0, 0);
 #endif
@@ -456,7 +471,13 @@ uint64_t xkblas_unregister_memory_async( void* ptr, size_t sz )
 int xkblas_register_memory_test( uint64_t handle )
 {
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( handle, 0 );
 #endif
@@ -469,7 +490,13 @@ int xkblas_register_memory_test( uint64_t handle )
 int xkblas_register_memory_wait( uint64_t handle )
 {
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( handle, 1 );
 #endif
@@ -482,7 +509,13 @@ int xkblas_register_memory_wait( uint64_t handle )
 int xkblas_register_memory_waitall( )
 {
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
   kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
   if (driver ==0) return 1; /* always completed */
   return driver->f_host_register_testwait( (uint64_t)-1, 2 );
 #endif
@@ -1067,6 +1100,17 @@ static int xkblas_ismode_math_tc(void)
   return xkblas_default_math == XKBLAS_TENSOR_OP_MATH;
 }
 
+
+/*
+*/
+int xkblas_get_device_count(int* count)
+{ 
+  if (count ==0) return EINVAL;
+  *count = kaapi_offload_ndevices(); 
+  return 0;
+}
+
+
 /*
 */
 static int init_count = 0;
@@ -1168,7 +1212,6 @@ int xkblas_init(void)
   {
     extern const char* get_kaapi_version(void);
     extern const char* get_kaapi_info(void);
-    printf("[XKBlas init] %s\n", get_kaapi_version() );
     printf("[XKBlas info]\n%s%s[XKBlas info]\n", get_kaapi_info(), get_xkblas_info() );
 
     /* Some information about hierarchy
@@ -1293,7 +1336,8 @@ int xkblas_finalize(void)
     err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
     kaapi_assert(err ==0);
 
-    *xkblas_ctxt->self = 0;
+//TG: thread may leave and its __thread data specific deallocated?
+//     *xkblas_ctxt->self = 0;
     _xkblas_list_context = xkblas_ctxt->next;
     free(xkblas_ctxt);
   }

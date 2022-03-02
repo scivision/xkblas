@@ -50,10 +50,10 @@ if (KAAPI_USE_CUDA_DRIVER OR KAAPI_USE_CUDA_RT)
   if (NOT ${CUBLAS_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA API but CUBLAS is not found for XKblas !")
   endif()
-  find_path(BLAS_INCLUDE_DIRS cblas.h
-    /usr/include
-    /usr/local/include
-    $ENV{BLAS_HOME}/include)
+#  find_path(BLAS_INCLUDE_DIRS cblas.h
+#    /usr/include
+#    /usr/local/include
+#    $ENV{BLAS_HOME}/include)
 endif()
 
 #Hip
@@ -65,6 +65,10 @@ if (KAAPI_USE_HIP)
     message(FATAL_ERROR "Kaapi is configured with HIP, but hip installation could not be found!")
   endif()
 
+  find_package(ROCBLAS)
+  if (NOT ${ROCBLAS_FOUND})
+    message(FATAL_ERROR "Kaapi is configured with HIP, but rocblas could not be found!")
+  endif()
   find_package(HIPBLAS)
   if (NOT ${HIPBLAS_FOUND})
     message(FATAL_ERROR "Kaapi is configured with HIP, but hipblas could not be found!")
@@ -76,6 +80,8 @@ if (KAAPI_USE_HIP)
   message(STATUS "Found HIPBLAS_LIBRARIES: ${HIPBLAS_LIBRARIES}")
   message(STATUS "Found ROCBLAS_INCLUDE_DIRS: ${ROCBLAS_INCLUDE_DIRS}")
   message(STATUS "Found ROCBLAS_LIBRARIES: ${ROCBLAS_LIBRARIES}")
+else()
+  set(HIP_FOUND FALSE)
 endif()
 
 #--- PAPI
@@ -85,13 +91,25 @@ endif()
 
 #--- HWLOC
 find_package(HWLOC)
+if (${HIP_FOUND} AND ${HWLOC_FOUND})
+  find_path(ROCSMI_INCLUDE_DIRS
+    NAMES rocm_smi/rocm_smi.h
+    HINTS ${ROCSMI_PREFIX}/include 
+  )
+  find_library(ROCSMI_LIBRARIES
+    # Pick the static library first for easier run-time linking.
+    NAMES librocm_smi64.so 
+    HINTS ${ROCSMI_PREFIX}/lib 
+  )
 
+endif()
 
 #--- BLAS
 if (KAAPI_USE_MKL)
   set(BLA_VENDOR Intel10_64lp_seq)
 endif()
 if (KAAPI_USE_OPENBLAS)
+  set(BLA_VENDOR OpenBLAS)
 endif()
 if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS)
   message(FATAL_ERROR "XKblas requires you specify the BLAS Vendor library.")
@@ -101,6 +119,18 @@ find_package(BLAS REQUIRED)
 if (NOT ${BLAS_FOUND})
   message(FATAL_ERROR "XKblas requires a BLAS library.")
 endif()
+if (KAAPI_USE_MKL)
+  find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h
+    $ENV{MKLROOT}/include
+  )
+endif()
+if (KAAPI_USE_OPENBLAS)
+  find_path(BLAS_INCLUDE_DIRS lapacke.h
+    /usr/include
+    /usr/local/include
+  )
+endif()
+add_compile_options(${BLAS_LINKER_FLAGS})
 
 #--- Add common command line options for all subdirectories
 if (KAAPI_USE_CUDA_DRIVER)
@@ -155,6 +185,8 @@ endif()
 
 if (KAAPI_USE_MKL)
   add_compile_options("-DKAAPI_BLAS_USE_MKL=1")
+  add_compile_options("-DMKL_ILP64")
+  add_compile_options("-m64")
   add_compile_options("-DXKBLAS_BLASLIB=\"libmkl_intel_ilp64.so\"")
 endif()
 if (KAAPI_USE_OPENBLAS)

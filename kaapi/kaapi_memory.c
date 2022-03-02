@@ -116,6 +116,8 @@ static int _kaapi_dsm_deallocate_replica(
     kaapi_metadata_info_t* mdi
 );
 
+/*
+*/
 static int kaapi_memory_cache_evict(
   kaapi_memory_device_t* device,
   kaapi_memory_cache_t* cache,
@@ -441,7 +443,6 @@ kaapi_pointer_t kaapi_memory_alloc(kaapi_address_space_id_t asid, size_t size)
   kaapi_atomic_lock(&device->mem_lock);
   if ((device->free_chunk_list ==0) && (device->main_chunk ==0))
   {
-//printf("%p do main chunk alloc on device: %p\n",pthread_self(), device);
     kaapi_assert( device->main_chunk == 0);
     /* first : get limit cache_size and reserve it */
     int flag = KAAPI_MEMORY_DEVICE_FLAG_NONE;
@@ -449,6 +450,7 @@ kaapi_pointer_t kaapi_memory_alloc(kaapi_address_space_id_t asid, size_t size)
     kaapi_offload_get_mem_info(device->device, 0, &size_chunk0 );
     //size_chunk0 = 1024*1024*8*128;
     size_chunk0 &= ~ 7UL; // round down to align to 8
+    printf("%p:: DO main chunk alloc on device: %p size: %lu\n",pthread_self(), device->device, size_chunk0);
     kaapi_alloc_chunk_t* chunk0 = malloc(sizeof(kaapi_alloc_chunk_t));
     chunk0->device_ptr = device->f_alloc(device,size_chunk0, &flag);
     kaapi_assert (chunk0->device_ptr !=0);
@@ -710,8 +712,6 @@ int kaapi_memory_freelist_destroy(kaapi_memory_device_t* device )
 
 int kaapi_memory_set_info( int kind, size_t value )
 {
-  if (getenv("KAAPI_VERBOSE"))
-    printf("[xkaapi] preferred block size to %zu\n", value );
   return 0;
 }
 
@@ -749,8 +749,6 @@ int kaapi_memory_set_info( int kind, size_t value )
       }
     }
     TILE_SIZE = value;
-    if (getenv("KAAPI_VERBOSE")) 
-      printf("[xkaapi] preferred block size to %zu\n", value );
   }
 #endif
   else
@@ -843,12 +841,16 @@ retval:
     {
       double p = 0.01; 
       //printf("Mostly full cache, try to evict: %.2f of %zu = %zu\n",p*100, cache->size_limit, (size_t)(cache->size_limit*p));
-      err = kaapi_memory_cache_evict(device, cache, cache->size_limit*p, 1 );
+      /* flag=0, evicts RO first */
+//TG: before: flag=1
+      err = kaapi_memory_cache_evict(device, cache, cache->size_limit*p, 0 );
     }
     if (flag & KAAPI_MEMORY_DEVICE_FLAG_FULL)
     {
       //printf("Full cache, try to evict: 10%% of %zu = %zu\n",cache->size_limit, (size_t)(cache->size_limit*0.1));
-      err = kaapi_memory_cache_evict(device, cache, cache->size_limit*0.1, 1 );
+      /* flag=0, evicts RO first */
+//TG: before: flag=1
+      err = kaapi_memory_cache_evict(device, cache, cache->size_limit*0.1, 0 );
     }
     kaapi_offload_poll_device( device->device );
   }
@@ -1293,14 +1295,15 @@ void _kaapi_memory_cache_verify_notself(void)
 
 
 
-/* evict at least size bytes of object in the cache
+/* Try to evicts at least 2*size bytes of object in the cache
+   Returns the remainder number of bytes to evict.
 */
 static size_t kaapi_memory_cache_evict_fromlist(
   kaapi_memory_device_t* device,
   kaapi_memory_cache_t* cache,
   size_t size,
   kaapi_cache_list_t* list,
-  int flag
+  int flag /* 1: may do copy, else only suppress copy if valid replica on other node */
 )
 {
   /* */
@@ -1309,9 +1312,11 @@ static size_t kaapi_memory_cache_evict_fromlist(
   kaapi_cache_entry_t* curr = list->end;
   kaapi_cache_entry_t* pcurr;
 
+  size_t size_view = 0;
   size_t size2 = 2*size;
   kaapi_assert( &kaapi_offload_self_device()->memdev == device );
 
+  /* first : evict data if it exist replica on other address space */
   while ((curr != 0) && (size2 >0))
   {
     pcurr = curr->prev;
@@ -1319,59 +1324,75 @@ static size_t kaapi_memory_cache_evict_fromlist(
      && kaapi_memory_replica_is_valid_excepton(curr->mdi, lid)
     )
     {
-      kaapi_assert_debug( kaapi_memory_replica_is_allocated(curr->mdi, lid) );
+      size_view = (size_t)-1;
 
-      kaapi_memory_replica_unset_valid(curr->mdi, lid);
-      kaapi_assert_debug( kaapi_memory_replica_is_valid_somewhere(curr->mdi) );
+      /* lock memory if... */
+      kaapi_atomic_lock(&curr->mdi->replicas[lid]->lock);
+      if (kaapi_memory_replica_is_notpinned(curr->mdi, lid)
+       && kaapi_memory_replica_is_valid_excepton(curr->mdi, lid))
+      {
+//        printf("Make copy data: mdi:%p, lid: %lu\n", curr->mdi,lid);
+  
+        kaapi_assert_debug( kaapi_memory_replica_is_allocated(curr->mdi, lid) );
+  
+        kaapi_memory_replica_unset_valid(curr->mdi, lid);
+  
+        kaapi_assert_debug( kaapi_memory_replica_is_valid_somewhere(curr->mdi) );
+        kaapi_assert_debug( list == curr->mdi->replicas[lid]->cachelist );
+  
+        kaapi_memory_replica_unset_allocated(curr->mdi, lid);
+        kaapi_assert( !kaapi_memory_replica_is_xfer(curr->mdi, lid) );
+  
+        size_view = kaapi_memory_view_size( &curr->mdi->replicas[lid]->view );
+        kaapi_assert_debug( curr->mdi->replicas[lid]->ptr.asid == device->asid );
+        kaapi_memory_free(curr->mdi->replicas[lid]->ptr, size_view );
+        curr->mdi->replicas[lid]->ptr = kaapi_make_nullpointer(cache->asid);
+        curr->mdi->replicas[lid]->cachelist = 0;
+        curr->mdi->replicas[lid]->cacheentry = 0;
+      }  
+      /* unlock memory if... */
+      kaapi_atomic_unlock(&curr->mdi->replicas[lid]->lock);
 
-/* Remainder part of the protocol should be
-      kaapi_mem_barrier();
-      if (kaapi_memory_replica_under_xfer(curr->mdi)) abort eviction
-  On the concurrent threads:
-      kaapi_memory_replica_set_xfer(mdi, lidj); // lidj: lid that want to read value
-      kaapi_mem_barrier();
-      if (!kaapi_memory_replica_is_valid(curr->mdi,lid))
-        redo transfer with new valid replica
-*/
-      kaapi_assert_debug( list == curr->mdi->replicas[lid]->cachelist );
+      if (size_view != (size_t)-1)
+      {
+        if (size2 < size_view) size2 = 0;
+        else size2 -= size_view;
 
-      kaapi_memory_replica_unset_allocated(curr->mdi, lid);
-      kaapi_assert( !kaapi_memory_replica_is_xfer(curr->mdi, lid) );
+        /* erase entry from cache list */
+        if (curr->next !=0) curr->next->prev = pcurr;
+        else list->end = pcurr;
+        if (curr->prev !=0) curr->prev->next = curr->next;
+        else list->beg = curr->next;
+        curr->prev = 0;
 
-      size_t size_view = kaapi_memory_view_size( &curr->mdi->replicas[lid]->view );
-      kaapi_assert_debug( curr->mdi->replicas[lid]->ptr.asid == device->asid );
-      kaapi_memory_free(curr->mdi->replicas[lid]->ptr, size_view );
-//printf("* evict data in list '%s' @:%p size:%lu\n", list == &cache->ro ? "ro" : "rw", curr->mdi->replicas[lid]->ptr.ptr, size_view );
-      curr->mdi->replicas[lid]->ptr = kaapi_make_nullpointer(cache->asid);
-      curr->mdi->replicas[lid]->cachelist = 0;
-      curr->mdi->replicas[lid]->cacheentry = 0;
-      if (size2 < size_view) size2 = 0;
-      else size2 -= size_view;
-
-      /* erase entry from cache list */
-      if (curr->next !=0) curr->next->prev = pcurr;
-      else list->end = pcurr;
-      if (curr->prev !=0) curr->prev->next = curr->next;
-      else list->beg = curr->next;
-      curr->prev = 0;
-      kaapi_atomic_lock(&cache->lock);
-      curr->next = cache->freelist;
-      cache->freelist = curr;
-      kaapi_atomic_unlock(&cache->lock);
-    }
-    else if (0)//((flag ==1) && !kaapi_memory_replica_is_valid_excepton(curr->mdi, lid) && !kaapi_memory_replica_is_xfer(curr->mdi, kaapi_local_asid))
-    //else if (!kaapi_memory_replica_is_valid_excepton(curr->mdi, lid))
-    {
-      printf("Evict data\n");
-      int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
-        curr->mdi,
-        0, 0, 0, 0
-      );
-      if (err == EINPROGRESS)
-        kaapi_offload_poll_device(device->device);
-    }
-
+        kaapi_atomic_lock(&cache->lock);
+        curr->next = cache->freelist;
+        cache->freelist = curr;
+        kaapi_atomic_unlock(&cache->lock);
+      }}
     curr = pcurr;
+  }
+
+  /* Else, if not enough space was evicted, then initiate copy to the host computer: 
+     next time the function is called with transfert ended, data on lid may be evicted !
+  */
+  if (flag && (size2 >0))
+  {
+    curr = list->end;
+    while ((curr != 0) && (size2 >0))
+    {
+      if (!kaapi_memory_replica_is_valid_excepton(curr->mdi, lid) && !kaapi_memory_replica_is_xfer(curr->mdi, kaapi_local_asid))
+      {
+//        printf("Make copy to host before evict data\n");
+        int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
+          curr->mdi,
+          0, 0, 0, 0
+        );
+        if (err == EINPROGRESS)
+          kaapi_offload_poll_device(device->device);
+      }
+      curr = pcurr;
+    }
   }
   if (size2 <= size) return 0;
   return size2-size;
@@ -1417,7 +1438,7 @@ static void kaapi_memory_print_cache_stats(
 
     curr = curr->prev;
   }
-  printf("Eviction from device: %li\n", lid );
+//  printf("Eviction from device: %li\n", lid );
 #if KAAPI_DEBUG
   printf("  -- size_alloc: %li, size_dev_alloc: %li, size_free: %li\n", lid, device->size_alloc, device->size_dev_alloc, device->size_free);
 #endif
@@ -1493,20 +1514,24 @@ if (prt)
 }
 #endif
   
-  kaapi_cache_list_t* list_order[2];
-  int flags[2];
+  kaapi_cache_list_t* list_order[4];
+  int flags[4];
   if (flag ==1)
-  {
-    list_order[0] =  &cache->rw; flags[0] = 1;
+  { /* RW first */
+    list_order[0] =  &cache->rw; flags[0] = 0;
     list_order[1] =  &cache->ro; flags[1] = 0;
+    list_order[2] =  &cache->rw; flags[2] = 1;
+    list_order[3] =  &cache->ro; flags[3] = 1;
   }
   else 
-  {
+  { /* RO first */
     list_order[0] =  &cache->ro; flags[0] = 0;
     list_order[1] =  &cache->rw; flags[1] = 0;
+    list_order[2] =  &cache->ro; flags[2] = 1;
+    list_order[3] =  &cache->rw; flags[3] = 1;
   }
 
-  for (int l=0; l<2; ++l)
+  for (int l=0; l<4; ++l)
   {
     if (size >0)
     {
@@ -2371,6 +2396,7 @@ static int _kaapi_dsm_allocate_replica(
   kdr->ptr = kaapi_memory_alloc( asid, size );
   while (kaapi_pointer_isnull( kdr->ptr ))// && (++retry_cnt <32))
   {
+    /* flag=0, evicts RO first */
     int err = kaapi_memory_cache_evict(dsm->nodes[lid]->device, cache, size, 0);
     if (err == 0)
       kdr->ptr = kaapi_memory_alloc( asid, size );
@@ -3137,7 +3163,7 @@ int kaapi_dsm_register_device(
   else
     device->asid = kaapi_memory_create_asid(
       0, /* global id */
-      ldid, /* before: KAAPI_ATOMIC_INCR(&kaapi_dsm_asid_lid), lid */
+      ldid, 
       arch
     );
 
@@ -3231,7 +3257,10 @@ int kaapi_dsm_unregister_device(
   kaapi_the_dsm.nodes[lid] = 0;
 
 #if KAAPI_DEBUG
-  printf("%i::Memory Device unregister, memory alloc:%li, free:%li\n", lid, device->size_alloc, device->size_free);
+  if (getenv("KAAPI_VERBOSE"))
+  {
+    printf("%i::Memory Device unregister, memory alloc:%li, free:%li\n", lid, device->size_alloc, device->size_free);
+  }
   device_size_alloc += device->size_alloc;
   device_size_free += device->size_free;
 #endif
@@ -3291,7 +3320,8 @@ int kaapi_dsm_finalize( void )
 
 #if KAAPI_DEBUG
   /* print device->size_alloc for each device */
-  printf("KAAPI DSM Finalize: memory alloc: %li, free: %li\n", device_size_alloc, device_size_free );
+  if (getenv("KAAPI_VERBOSE"))
+    printf("KAAPI DSM Finalize: memory alloc: %li, free: %li\n", device_size_alloc, device_size_free );
 #endif
 
   kaapi_memory_freehashmap( &kaapi_the_dsm.nodes[0]->ht, kaapi_local_asid );

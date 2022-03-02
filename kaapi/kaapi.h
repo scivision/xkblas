@@ -107,14 +107,14 @@ typedef uint64_t kaapi_perf_idset_t;
 
 
 /* K-thread processor type for format */
-#define KAAPI_PROC_TYPE_DEFAULT  0x0
-#define KAAPI_PROC_TYPE_HOST     0x0
-#define KAAPI_PROC_TYPE_CUDA     0x1
-#define KAAPI_PROC_TYPE_HIP      0x2
+#define KAAPI_PROC_TYPE_DEFAULT  0
+#define KAAPI_PROC_TYPE_HOST     0
+#define KAAPI_PROC_TYPE_CUDA     1
+#define KAAPI_PROC_TYPE_HIP      2
+#define KAAPI_PROC_TYPE_INTERNAL 3
+#define KAAPI_PROC_TYPE_MAX      4
 #define KAAPI_PROC_TYPE_CPU      KAAPI_PROC_TYPE_HOST
 #define KAAPI_PROC_TYPE_GPU      KAAPI_PROC_TYPE_CUDA
-#define KAAPI_PROC_TYPE_INTERNAL 0x3
-#define KAAPI_PROC_TYPE_MAX 4
 
 
 /* Fwd decl
@@ -215,6 +215,11 @@ extern unsigned int kaapi_thread_kid( kaapi_thread_t* );
     \retval the number of active threads to steal tasks
  */
 extern int kaapi_get_concurrency (void);
+
+/** Returns the total number of devices that can be used by Kaapi to offload
+    task computation
+*/
+extern unsigned int kaapi_offload_ndevices(void);
 
 
 
@@ -782,6 +787,7 @@ extern kaapi_format_id_t kaapi_format_taskregister_func(
   kaapi_format_t*                fmt,
   void*                          key,
   kaapi_task_bodyfnc_t           body,
+  int                            arch,
   kaapi_task_bodyfnc_gpu_t       body_gpu,
   const char*                    name,
   kaapi_fmt_fnc_get_name         get_name,
