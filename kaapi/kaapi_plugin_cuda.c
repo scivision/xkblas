@@ -1943,7 +1943,7 @@ static int cuda_stream_process_pending(
             op->inst.cbk.fnc(status, ios, op->inst.cbk.arg[0], op->inst.cbk.arg[1], op->inst.cbk.arg[2]);
   
 #if KAAPI_USE_PERFCOUNTER
-#warning "Model to compute work ?"
+//TG: #warning "Model to compute work ?"
           if (op->inst.cbk.fnc) op->t3 = kaapi_get_elapsedtime();
           else op->t3 = op->t2;
           if (op->type == KAAPI_IO_KERN)
