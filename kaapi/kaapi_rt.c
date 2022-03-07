@@ -81,8 +81,10 @@ const char* get_kaapi_info(void)
     static char buffer_perfctr[1024];
     err = kaapi_perfctr_get_name_mask( kaapi_tracelib_param.perfctr_idset, 1024, buffer_perfctr);
 #endif
+#if KAAPI_USE_TRACELIB
     static char buffer_eventmask[1024];
     err = kaapi_event_get_name_mask( kaapi_tracelib_param.eventmask, 1024, buffer_eventmask);
+#endif
  
     snprintf( buffer, 8192, 
             "  Git last commit: %s\n"
