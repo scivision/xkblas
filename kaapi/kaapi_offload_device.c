@@ -764,15 +764,18 @@ int _kaapi_compute_load_device(
   for (int i=0; i<ngpu; ++i)
   {
     kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU,i);
-    load[i] = ld->device->pendingtasks;
-    //load[i] = ld->device->flops_tasks;
-    sum += (float)load[i];
-    int l = load[i];
-    if (l> max) {
-      max = l;
+    if (ld !=0)
+    {
+      load[i] = ld->device->pendingtasks;
+      //load[i] = ld->device->flops_tasks;
+      sum += (float)load[i];
+      int l = load[i];
+      if (l> max) {
+        max = l;
+      }
+      if (l < min) 
+        min = l;
     }
-    if (l < min) 
-      min = l;
   }
   float minmax = max-min;
   float avrg = sum/ngpu;
@@ -1212,10 +1215,9 @@ void* kaapi_offload_device_thread( void* arg )
     kaapi_assert(0 == pthread_cond_wait(&device->cond_sleep, &device->lock));
   } while (device->state != KAAPI_DEVICE_STATE_DESTROY);  
 
-  kaapi_localitydomain_destroy(device->ld);
-
   kaapi_offload_device_pop( device );
   _kaapi_offload_device_finalize(device);
+  kaapi_localitydomain_destroy(device->ld);
   device->state = KAAPI_DEVICE_STATE_FINALIZED;
 
 #if KAAPI_DEBUG
