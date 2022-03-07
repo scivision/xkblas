@@ -46,7 +46,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define KAAPI_USE_PERSTREAM_BLASHANDLE  0
+#define KAAPI_USE_PERSTREAM_BLASHANDLE  1
 
 /* There is 2 ways to compile kaapi_pluging_cuda.c:
   - the historical implementation based on the driver API
@@ -2116,8 +2116,11 @@ static int kaapi_plugin_create_thread_CUDA(kaapi_device_t* dev)
 
   CPU_ZERO(&schedset);
   cpuset = hwloc_bitmap_alloc();
+#if KAAPI_USE_CUDA_DRIVER_API || KAAPI_USE_CUDA_RUNTIME_API
   err = hwloc_cudart_get_device_cpuset( topology, kaapi_device_ids[dev->device_id], cpuset );
-  //err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[dev->device_id], cpuset );
+#elif KAAPI_USE_HIP
+  err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[dev->device_id], cpuset );
+#endif
   if (err == 0)
   {
 #if 0
@@ -2134,7 +2137,7 @@ static int kaapi_plugin_create_thread_CUDA(kaapi_device_t* dev)
       err = hwloc_cpuset_to_glibc_sched_affinity (topology, cpuset, &schedset, sizeof(cpu_set_t));
       kaapi_assert(err == 0);
       CPU_ZERO(&schedset_map);
-#if KAAPI_DEBUG
+#if 0//KAAPI_DEBUG
       char buffer[512];
       ssize_t sb = 0;
 #endif
@@ -2142,7 +2145,7 @@ static int kaapi_plugin_create_thread_CUDA(kaapi_device_t* dev)
       {
         if (CPU_ISSET(i, &schedset))
         {
-#if KAAPI_DEBUG
+#if 0//KAAPI_DEBUG
           sb += snprintf(buffer+sb, 256, "%i ", (int)i);
 #endif
           CPU_SET(i, &schedset_map);
@@ -2153,6 +2156,9 @@ static int kaapi_plugin_create_thread_CUDA(kaapi_device_t* dev)
       for (int i=0; i<10; ++i) sched_yield();
       err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset_map);
       kaapi_assert(err == 0);
+#if 0//KAAPI_DEBUG
+    printf(" Debug: device %i with mask: %s\n", dev->device_id, buffer);
+#endif
     }
   }
 #else
@@ -2169,7 +2175,7 @@ static int kaapi_plugin_create_thread_CUDA(kaapi_device_t* dev)
   err = pthread_create(&dev->tid, &attr, kaapi_offload_device_thread, dev);
   kaapi_assert(err ==0);
 #if KAAPI_HAVE_IO_THREADS
-  printf("[kaapi]: plug hip create helper threads H2D and D2H\n");
+  printf("[kaapi]: plug cuda create helper threads H2D and D2H\n");
   err = pthread_create(&device->tidio[0], &attr, kaapi_cuda_H2D_io_thread, dev);
   kaapi_assert(err ==0);
   err = pthread_create(&device->tidio[1], &attr, kaapi_cuda_D2H_io_thread, dev);
