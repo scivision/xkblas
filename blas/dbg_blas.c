@@ -38,6 +38,10 @@
 #include <assert.h>
 #include "common.h"
 
+/* Fwd decl, fncs defined in kaapi_dbg.c */
+extern void kaapi_dbg_register_name( const void* ptr, const char* name );
+extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* first, const char* filename );
+
 /* Give name of tile for various output (graph, debug).
    Each tile will be display as name(i,j) where i,j is the position in A.
 */
