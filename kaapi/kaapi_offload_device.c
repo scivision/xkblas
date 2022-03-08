@@ -1181,7 +1181,6 @@ void* kaapi_offload_device_thread( void* arg )
   ctxt->ld = device->ld;
   _kaapi_self_context = ctxt;
 
-  /* infinite loop with the device context */
   kaapi_offload_device_push( device );
 
   /* */
@@ -1200,7 +1199,7 @@ void* kaapi_offload_device_thread( void* arg )
   kaapi_assert(0 == pthread_mutex_unlock(&device->lock));
   
 
-  /* infinite loop */
+  /* infinite loop with the device context */
   int err = kaapi_sched_idle_offload(thread, _kaapi_device_finalize, device);
   kaapi_assert((err==0)||(err==EINTR));
 
