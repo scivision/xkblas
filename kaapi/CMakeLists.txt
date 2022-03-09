@@ -71,6 +71,7 @@ target_link_libraries(kaapi PRIVATE Threads::Threads)
 
 if (${HWLOC_FOUND})
   include_directories(${HWLOC_INCLUDE_DIRS})
+  message(STATUS "Found HWLOC_INCLUDE_DIRS: ${HWLOC_INCLUDE_DIRS}")
   target_link_libraries(kaapi PRIVATE ${HWLOC_LIBRARIES})
 endif()
 
