@@ -170,6 +170,8 @@ struct kaapi_device {
 typedef struct kaapi_driver {
     const char*              name;          /* name of the drvier */
     unsigned int             flags;	    /* Device flags */
+    kaapi_atomic_t           ndevices;      /* number of devices managed by this driver */
+    kaapi_atomic_t           ndevices_commit;/* number of devices committed (ready to run)*/
 
     void*                    handle;        /* plugin handle */
 
@@ -217,6 +219,8 @@ typedef struct kaapi_driver {
         void* arg0, void* arg1, void* arg2
     );
 
+    /* Set the cpuset of the attr for creating the thread that will manage the device dev */
+    int (*f_device_set_cpuset)(cpu_set_t*, int);
     /* create device object and initialize device_id field with argument */
     kaapi_device_t* (*f_device_create)(struct kaapi_driver*, int);
     int (*f_device_destroy)(kaapi_device_t*);
@@ -224,8 +228,6 @@ typedef struct kaapi_driver {
     const char* (*f_device_info)(kaapi_device_t*);
     int (*f_device_init)(kaapi_device_t*);
     int (*f_device_commit)(kaapi_device_t*);
-    int (*f_device_start)(kaapi_device_t*);
-    int (*f_device_stop)(kaapi_device_t*);
     void (*f_device_finalize)(kaapi_device_t*);
     /* consider device as the current device */
     int (*f_device_attach)(kaapi_device_t*);
@@ -307,13 +309,8 @@ extern int kaapi_offload_device_commit(kaapi_device_t* const device);
 extern const char* kaapi_offload_device_info(kaapi_device_t* const device);
 
 /** \ingroup Offload
-  It inits a device and attaches to the current thread.
-*/
-extern int kaapi_offload_device_start(kaapi_device_t* const device);
-
-/** \ingroup Offload
-  It stop the device thread (if any) and allows caller to push/pop
-  device in its own context.
+  Stop the device thread (if any) before calling the finalize function to destroy
+  allocated ressources.
  */
 extern void kaapi_offload_device_stop(kaapi_device_t* const device);
 
@@ -340,6 +337,12 @@ extern void kaapi_offload_device_finalize(kaapi_device_t* const device);
 
 /** \ingroup Offload
  */
+typedef struct {
+  kaapi_driver_t* driver;
+  int device_id;
+  int global_device_id;
+  pthread_t tid;
+} kaapi_driver_thread_arg_t;
 extern void* kaapi_offload_device_thread( void* arg );
 
 

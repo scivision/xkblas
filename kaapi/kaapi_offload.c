@@ -36,6 +36,8 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+#define _GNU_SOURCE
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
@@ -56,26 +58,16 @@
 static unsigned int kaapi_offload_num_devices = 0;
 
 /* kaapi device pointers indexed by Id */
-static kaapi_device_t** kaapi_offload_devices = NULL;
+kaapi_device_t** kaapi_offload_devices = NULL;
 
 /* current device Id (internal) */
 static __thread kaapi_device_t* kaapi_offload_current_device = 0;
-
-/* need a host device to execute task following constraints on the data flow graph */
-static int _kaapi_host_device = -1;
 
 /* head of the list of all the configured drivers */
 static kaapi_driver_t* kaapi_list_drivers = 0;
 
 /* driver by type table */
 static kaapi_driver_t* kaapi_drivers_bytype[KAAPI_PROC_TYPE_MAX];
-
-/*
-*/
-kaapi_device_t* kaapi_offload_get_host_device(void)
-{
-  return (_kaapi_host_device == -1 ? 0 : kaapi_offload_devices[_kaapi_host_device]);
-}
 
 
 /*
@@ -85,7 +77,7 @@ kaapi_device_t* kaapi_offload_device(int devid)
   if ((devid<0) && (devid >=kaapi_offload_num_devices))
      return 0;
   kaapi_device_t* device = kaapi_offload_devices[devid];
-  kaapi_assert(device->state == KAAPI_DEVICE_STATE_START);
+  kaapi_assert(device->state >= KAAPI_DEVICE_STATE_START);
   return device;
 }
 
@@ -167,13 +159,12 @@ static bool kaapi_offload_load_plugin(
   DLSYM (host_register);
   DLSYM (host_register_testwait);
   DLSYM (host_unregister);
+  DLSYM (device_set_cpuset);
   DLSYM (device_create);
   DLSYM (device_destroy);
   DLSYM (device_info);
   DLSYM (device_init);
   DLSYM (device_commit);
-  DLSYM (device_start);
-  DLSYM (device_stop);
   DLSYM (device_finalize);
   DLSYM (device_attach);
   DLSYM (device_detach);
@@ -233,8 +224,10 @@ void _kaapi_offload_config_data_field_device(kaapi_driver_t* driver, kaapi_devic
 #endif
 }
 
+
+
 /* Configure Kaapi based on the loaded driver plugin.
-   All devices from its plugin are not initialized here.
+   All devices managed by the driver are intialized.
 */
 static void
 kaapi_offload_config_devices(kaapi_driver_t* driver)
@@ -244,20 +237,10 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
   int i;
 
   if (driver->f_init() != 0)
-  {
-#if _OFFLOAD_DEBUG
-    fprintf(stdout, "%s: driver %s not initialized !\n", __FUNCTION__, driver->f_get_name() == 0 ? "<no name>" : driver->f_get_name() );
-    fflush(stdout);
-#endif
     goto out;
-  }
 
   n_devices = driver->f_get_number();
-#if _OFFLOAD_DEBUG
-  fprintf(stdout, "%s: driver %s export #device(s)=%i\n", __FUNCTION__, driver->f_get_name() == 0 ? "<no name>" : driver->f_get_name(), n_devices );
-  fflush(stdout);
-#endif
-  if( n_devices < 1 )
+  if (n_devices < 1)
     goto out;
 
   /*
@@ -269,19 +252,31 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     return;
   memset(kaapi_offload_devices+kaapi_offload_num_devices, 0, n_devices*sizeof(kaapi_device_t*));
 
+  cpu_set_t save_schedset;
+  pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
+
   for (i= 0; i < n_devices; i++)
   {
-    /* assume that device_create set at least the internal device_id */
-    kaapi_device_t* device = driver->f_device_create(driver, i);
-    kaapi_assert(device->device_id == i);
+    /* */
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    cpu_set_t schedset;
+    int err = driver->f_device_set_cpuset(&schedset, i);
+    if (err ==0)
+    {
+      err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
+      kaapi_assert(err == 0);
+    }
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
+    for (int i=0; i<10; ++i) sched_yield();
 
-    /* register the host device (should always be loaded) and initialize it */
-    if ((_kaapi_host_device == -1) &&
-        (strcasecmp("host", device->name)==0)
-      )
-      _kaapi_host_device = kaapi_offload_num_devices;
-
-    kaapi_offload_devices[kaapi_offload_num_devices] = device;
+    kaapi_driver_thread_arg_t* arg = (kaapi_driver_thread_arg_t*)malloc(sizeof(kaapi_driver_thread_arg_t));
+    arg->driver= driver;
+    arg->device_id = i;
+    arg->global_device_id = kaapi_offload_num_devices;
+    arg->tid = 0;
+    err = pthread_create(&arg->tid, &attr, kaapi_offload_device_thread, arg);
+    kaapi_assert(err ==0);
     kaapi_offload_num_devices++;
   }
 out:
@@ -293,7 +288,7 @@ out:
 #if KAAPI_USE_DYNLOADER
 /*
 */
-static bool
+static int
 kaapi_offload_plugin_filter(kaapi_driver_t* driver, char *const plugin_filter)
 {
   char* filter;
@@ -435,6 +430,8 @@ kaapi_offload_find_plugins(void)
   KAAPI_PLUGIN_ENTRYPOINT(get_host_driver)(current);
   current->name = "HOST";
   current->handle = 0;
+  KAAPI_ATOMIC_WRITE(&current->ndevices, 0);
+  KAAPI_ATOMIC_WRITE(&current->ndevices_commit, 0);
   current->next = kaapi_list_drivers;
   kaapi_list_drivers = current;
   unsigned int type = current->f_get_type();
@@ -451,6 +448,8 @@ kaapi_offload_find_plugins(void)
   KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(current);
   current->name = "CUDA";
   current->handle = 0;
+  KAAPI_ATOMIC_WRITE(&current->ndevices, 0);
+  KAAPI_ATOMIC_WRITE(&current->ndevices_commit, 0);
   current->next = kaapi_list_drivers;
   kaapi_list_drivers = current;
   unsigned int type = current->f_get_type();
@@ -467,6 +466,8 @@ kaapi_offload_find_plugins(void)
   KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(current);
   current->name = "HIP";
   current->handle = 0;
+  KAAPI_ATOMIC_WRITE(&current->ndevices, 0);
+  KAAPI_ATOMIC_WRITE(&current->ndevices_commit, 0);
   current->next = kaapi_list_drivers;
   kaapi_list_drivers = current;
   unsigned int type = current->f_get_type();
@@ -607,21 +608,20 @@ int kaapi_offload_start(void)
   kaapi_offload_config_devices(kaapi_drivers_bytype[KAAPI_PROC_TYPE_HIP]);
 #endif
 
-#if 0 /* does not impose order... see juste above */
-  kaapi_driver_t* current = kaapi_list_drivers;
-  while (current !=0)
-  {
-    kaapi_offload_config_devices(current);
-    current = current->next;
-  }
-#endif
 
-  /* initialize the host device */
-  if (kaapi_offload_num_devices >0)
-  {
-    for (int i=0; i<kaapi_offload_num_devices; ++i)
-      kaapi_offload_device_start(kaapi_offload_devices[i]);
-  }
+  /* wait all threads per driver */
+  kaapi_driver_t* driver;
+
+#if KAAPI_USE_CUDA
+  driver = kaapi_drivers_bytype[KAAPI_PROC_TYPE_CUDA];
+#endif
+#if KAAPI_USE_HIP
+  driver = kaapi_drivers_bytype[KAAPI_PROC_TYPE_HIP];
+#endif
+  int ndevices = driver->f_get_number();
+  while (KAAPI_ATOMIC_READ(&driver->ndevices_commit) < ndevices)
+    kaapi_slowdown_cpu();
+
   KAAPI_OFFLOAD_TRACE_OUT
   return 0;
 }

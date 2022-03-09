@@ -136,6 +136,11 @@ KAAPI_PLUGIN_ENTRYPOINT(host_unregister)(
 
 /*
  */
+KAAPI_CLASS_ENTRYPOINT int
+KAAPI_PLUGIN_ENTRYPOINT(device_set_cpuset)(cpu_set_t* attr, int dev);
+
+/*
+ */
 KAAPI_CLASS_ENTRYPOINT struct kaapi_device*
 KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev);
 
@@ -153,17 +158,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_info)(struct kaapi_device*);
  */
 KAAPI_CLASS_ENTRYPOINT int
 KAAPI_PLUGIN_ENTRYPOINT(device_init)(struct kaapi_device*);
-
-/*
- */
-KAAPI_CLASS_ENTRYPOINT int
-KAAPI_PLUGIN_ENTRYPOINT(device_start)(struct kaapi_device*);
-
-/*
- */
-KAAPI_CLASS_ENTRYPOINT int
-KAAPI_PLUGIN_ENTRYPOINT(device_stop)(struct kaapi_device*);
-
 
 /*
  */
