@@ -475,11 +475,6 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
     if (ctxt->last_ldid >= count) ctxt->last_ldid = 0;
   }
 
-#if 0
-const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
-printf("Push task: %p, name:%s on ldid: %i\n", task, fmt->name, ld->ldid );
-#endif
-
   if (ld == ctxt->ld)
     return
       kaapi_fifo_queue_owner_push(ld->queue, task );
@@ -1412,9 +1407,6 @@ uint32_t kaapi_sched_activate_successors (
   {
     const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
     unsigned int count_params = kaapi_format_get_count_params(fmt, kaapi_task_getargs(task));
-#if 0
-printf(">>>>>>>>end task %p: %s\n", task, fmt->name );
-#endif
     for (unsigned int i=0; i<count_params; ++i)
     {
       kaapi_access_mode_t mode = kaapi_format_get_mode_param(fmt, i, kaapi_task_getargs(task));
@@ -1426,9 +1418,6 @@ printf(">>>>>>>>end task %p: %s\n", task, fmt->name );
 
       activated += kaapi_sched_activate_syncpoint( thread, a->sync );
     }
-#if 0
-printf("<<<<<<<<end task %p: %s\n", task, fmt->name );
-#endif
   }
   
   return activated;
