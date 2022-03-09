@@ -1190,6 +1190,7 @@ void* kaapi_offload_device_thread( void* a )
   /* release the thread argument */
   free(a);
 
+  device->state = KAAPI_DEVICE_STATE_INIT;
   kaapi_offload_device_push( device );
 
   kaapi_thread_t* thread = kaapi_thread_bind(device->driver->f_get_type(),0);
@@ -1201,21 +1202,21 @@ void* kaapi_offload_device_thread( void* a )
   _kaapi_self_context = ctxt;
 
   KAAPI_ATOMIC_INCR(&driver->ndevices);
+  kaapi_mem_barrier();
 
   /* we need to wait all threads of the driver before doing commit */
   int ndevices = driver->f_get_number();
   while (KAAPI_ATOMIC_READ(&driver->ndevices) < ndevices)
     kaapi_slowdown_cpu();
   
-  kaapi_mem_barrier();
-  
   kaapi_offload_device_commit(device);
-  kaapi_assert( (device->state == KAAPI_DEVICE_STATE_COMMIT)||(device->state == KAAPI_DEVICE_STATE_DOSTART));
-
+  kaapi_assert( device->state == KAAPI_DEVICE_STATE_COMMIT);
 
   /* thread ready for execution */
   device->state = KAAPI_DEVICE_STATE_START;
   KAAPI_ATOMIC_INCR(&driver->ndevices_commit);
+
+  kaapi_mem_barrier();
 
   /* */
 #if KAAPI_SLEEP_DEVICETHREAD

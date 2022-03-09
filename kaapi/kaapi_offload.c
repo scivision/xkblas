@@ -77,7 +77,7 @@ kaapi_device_t* kaapi_offload_device(int devid)
   if ((devid<0) && (devid >=kaapi_offload_num_devices))
      return 0;
   kaapi_device_t* device = kaapi_offload_devices[devid];
-  kaapi_assert(device->state >= KAAPI_DEVICE_STATE_START);
+  kaapi_assert(device->state >= KAAPI_DEVICE_STATE_INIT);
   return device;
 }
 
