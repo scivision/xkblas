@@ -82,7 +82,7 @@ endif()
 
 if (${CUDA_DRIVER_FOUND})
   include_directories(${CUDA_DRIVER_INCLUDE_DIRS})
-  target_link_libraries(kaapi PRIVATE ${CUDA_DRIVER_LIBRARIES} ${CUBLAS_LIBRARIES})
+  target_link_libraries(kaapi PRIVATE ${CUDA_DRIVER_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
 endif()
 
 if (${CUDA_RT_FOUND})
