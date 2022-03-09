@@ -275,6 +275,21 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     arg->device_id = i;
     arg->global_device_id = kaapi_offload_num_devices;
     arg->tid = 0;
+
+    int type = driver->f_get_type();
+    switch (type) {
+      case KAAPI_PROC_TYPE_HOST:
+        break;
+      case KAAPI_PROC_TYPE_CUDA:
+      case KAAPI_PROC_TYPE_HIP :
+        arg->ld = malloc(sizeof(kaapi_localitydomain_t));
+        kaapi_localitydomain_init(arg->ld, 0);
+        kaapi_localitydomain_attach( KAAPI_LD_GPU, 0, arg->ld );
+        break;
+    default:
+      abort();
+    };
+
     err = pthread_create(&arg->tid, &attr, kaapi_offload_device_thread, arg);
     kaapi_assert(err ==0);
     kaapi_offload_num_devices++;
@@ -656,7 +671,11 @@ int kaapi_offload_finalize(void)
     for(i = 0; i < kaapi_offload_num_devices; i++)
       kaapi_offload_device_stop(kaapi_offload_devices[i]);
     for(i = 0; i < kaapi_offload_num_devices; i++)
+    {
+      int err = pthread_join(kaapi_offload_devices[i]->tid, 0);
+      kaapi_assert(err ==0);
       kaapi_offload_device_finalize(kaapi_offload_devices[i]);
+    }
     free(kaapi_offload_devices);
     kaapi_offload_devices = 0;
     kaapi_offload_num_devices = 0;

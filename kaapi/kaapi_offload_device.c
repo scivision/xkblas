@@ -1175,6 +1175,7 @@ void* kaapi_offload_device_thread( void* a )
 
   kaapi_driver_t* driver = arg->driver;
   kaapi_device_t* device = driver->f_device_create(driver, arg->device_id);
+  _kaapi_offload_config_data_field_device(driver, device);
   kaapi_assert(device->device_id == arg->device_id);
 
   /* register the new device in global table */
@@ -1183,11 +1184,11 @@ void* kaapi_offload_device_thread( void* a )
   /* recopy thread id */
   device->tid = arg->tid;
 
+  /* basic initialisation */
+  kaapi_offload_device_init(device, arg->ld);
+
   /* release the thread argument */
   free(a);
-
-  /* basic initialisation */
-  kaapi_offload_device_init(device);
 
   kaapi_offload_device_push( device );
 
@@ -1257,7 +1258,7 @@ void* kaapi_offload_device_thread( void* a )
 
 /*
 */
-int kaapi_offload_device_init(kaapi_device_t* const device)
+int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain_t* ld)
 {
   KAAPI_OFFLOAD_TRACE_IN
   KAAPI_DEBUG_INST( KAAPI_ATOMIC_WRITE(&count_valid,0);
@@ -1278,6 +1279,15 @@ int kaapi_offload_device_init(kaapi_device_t* const device)
 #endif
     goto return_value;
   }
+
+  /* initialize the locality domain */
+  if (ld != 0)
+  {
+    ld->device = device;
+    device->ld = ld;
+    kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
+  }
+
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */
@@ -1427,9 +1437,13 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_STOPPED);
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
-  kaapi_localitydomain_deattach( KAAPI_LD_GPU, device->ld );
   device->driver->f_device_finalize(device);
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_FINALIZED);
+  if (device->ld !=0)
+  {
+    kaapi_localitydomain_deattach( KAAPI_LD_GPU, device->ld );
+    free(device->ld);
+  }
 
   KAAPI_OFFLOAD_TRACE_OUT
 }
@@ -1440,6 +1454,7 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
 void kaapi_offload_device_finalize(kaapi_device_t* const device)
 {
   KAAPI_OFFLOAD_TRACE_IN
+
   device->driver->f_device_destroy(device);
   KAAPI_OFFLOAD_TRACE_OUT
 }

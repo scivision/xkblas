@@ -293,7 +293,7 @@ static inline kaapi_address_space_id_t kaapi_offload_self_device_get_asid(void)
   It inits a device and attaches to the current thread.
   Called by the thread that manages the device.
 */
-extern int kaapi_offload_device_init(kaapi_device_t* const device);
+extern int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain_t* ld);
 
 /** \ingroup Offload
   It commits a device.
@@ -341,6 +341,7 @@ typedef struct {
   kaapi_driver_t* driver;
   int device_id;
   int global_device_id;
+  kaapi_localitydomain_t* ld;
   pthread_t tid;
 } kaapi_driver_thread_arg_t;
 extern void* kaapi_offload_device_thread( void* arg );

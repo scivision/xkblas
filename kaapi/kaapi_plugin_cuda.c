@@ -239,7 +239,7 @@ typedef struct kaapi_cuda_io_stream_t {
 #    endif
 #  endif
 #endif
-#if KAAPI_USE_PERSTREAM_BLASHANDLE==1
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
   cublasHandle_t    handle;
 #endif
 } kaapi_cuda_io_stream_t;
@@ -978,10 +978,13 @@ static void kaapi_cuda_init_cuda_stream(
   res = cudaStreamCreateWithPriority (&cios->stream_low, cudaStreamNonBlocking, leastPriority);
   CudaCheckError(res);
 #endif
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+  cios->handle = 0;
+#endif
   if (type == KAAPI_IO_STREAM_KERN)
   {
     kaapi_assert_debug( thread_type == 0 );
-#if KAAPI_USE_PERSTREAM_BLASHANDLE==1
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
     /*
      */
     cublasStatus_t cres = cublasCreate(&cios->handle);
@@ -995,9 +998,6 @@ static void kaapi_cuda_init_cuda_stream(
 #if KAAPI_HAVE_IO_THREADS
     kaapi_assert_debug( ((type == KAAPI_IO_STREAM_H2D) && (thread_type == 1)) 
                      || ((type == KAAPI_IO_STREAM_D2H) && (thread_type == 2)) );
-#endif
-#if KAAPI_USE_PERSTREAM_BLASHANDLE
-    cios->handle = 0;
 #endif
   }
 }
@@ -2505,7 +2505,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev)
 #if KAAPI_USE_CUDA_RUNTIME_API
   cudadevice->save_device_id = -1;
 #endif
-  _kaapi_offload_config_data_field_device(driver, &cudadevice->inherited);
   return &cudadevice->inherited;
 }
 
@@ -2518,11 +2517,8 @@ KAAPI_PLUGIN_ENTRYPOINT(device_destroy)(kaapi_device_t* dev)
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
   KAAPI_OFFLOAD_TRACE_IN
 
-  int err = pthread_join(dev->tid, 0);
-  kaapi_assert(err ==0);
   dev->state = KAAPI_DEVICE_STATE_DESTROY;
 
-  free(device->inherited.ld);
   free(device);
 
   KAAPI_OFFLOAD_TRACE_OUT
@@ -2666,22 +2662,12 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   dev->stream.f_stream_process_pending = cuda_stream_process_pending;
   dev->stream.f_stream_decode_ioinstruction = cuda_stream_decode_ioinstruction;
 
-  kaapi_localitydomain_t* ld = malloc(sizeof(kaapi_localitydomain_t));
-  kaapi_localitydomain_init(ld, &device->inherited);
-  device->inherited.ld = ld;
-  kaapi_localitydomain_attach( KAAPI_LD_GPU, 0, ld );
-  kaapi_dsm_register_device(&kaapi_the_dsm, &dev->memdev, dev->driver->f_get_type(), ld->ldid );
+  /* register the device as a driver' device */
   kaapi_device_list[ dev->device_id ] = device;
 
 #if KAAPI_USE_CUDA_DRIVER_API
   res = cuCtxPopCurrent(&device->ctx);
   CudaCheckError(res);
-#endif
-
-#if 0//KAAPI_DEBUG
-  int devid;
-  cudaGetDevice(&devid);
-  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
 #endif
 
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
@@ -2798,8 +2784,9 @@ KAAPI_CLASS_ENTRYPOINT const char* KAAPI_PLUGIN_ENTRYPOINT(device_info)(kaapi_de
   _print_mask(buf1, 10, device->affinity[0]);
   _print_mask(buf2, 10, device->affinity[1]);
   _print_mask(buf3, 10, device->affinity[2]);
-  snprintf(buffer, 256, "%s, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
+  snprintf(buffer, 256, "%s, cuda device: %i, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
     device->prop.name,
+    device->inherited.device_id,
     device->prop.async_engines,
     ((double)dev->mem_total)/1024.0/1024.0/1024.0,
     ((double)dev->mem_limit)/1024.0/1024.0/1024.0,
