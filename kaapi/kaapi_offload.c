@@ -275,6 +275,7 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     arg->device_id = i;
     arg->global_device_id = kaapi_offload_num_devices;
     arg->tid = 0;
+    arg->ld  = 0;
 
     int type = driver->f_get_type();
     switch (type) {
