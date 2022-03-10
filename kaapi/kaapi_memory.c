@@ -935,6 +935,18 @@ int kaapi_memory_freelist_destroy(kaapi_memory_device_t* device )
 #endif // KAAPI_USE_OWN_HEAP_ALLOCATOR
 
 
+/*
+*/
+static void callback_nop(
+    kaapi_io_status_t status,
+    kaapi_io_stream_t* ios,
+    void* _drc, void* _asid, void* _mdi
+)
+{
+  //printf("*** CBK nop\n"); fflush(stdout);
+}
+
+
 
 /** Allocates an empty software cache for the device.
  * All blocks are in a FIFO double-ended queue, LRU policy.
@@ -1312,6 +1324,8 @@ static size_t kaapi_memory_cache_evict_fromlist(
   kaapi_cache_entry_t* curr = list->end;
   kaapi_cache_entry_t* pcurr;
 
+//printf("lid:%i try to evict data size: %li\n", lid, size);
+
   size_t size_view = 0;
   size_t size2 = 2*size;
   kaapi_assert( &kaapi_offload_self_device()->memdev == device );
@@ -1331,8 +1345,6 @@ static size_t kaapi_memory_cache_evict_fromlist(
       if (kaapi_memory_replica_is_notpinned(curr->mdi, lid)
        && kaapi_memory_replica_is_valid_excepton(curr->mdi, lid))
       {
-//        printf("Make copy data: mdi:%p, lid: %lu\n", curr->mdi,lid);
-  
         kaapi_assert_debug( kaapi_memory_replica_is_allocated(curr->mdi, lid) );
   
         kaapi_memory_replica_unset_valid(curr->mdi, lid);
@@ -1349,7 +1361,8 @@ static size_t kaapi_memory_cache_evict_fromlist(
         curr->mdi->replicas[lid]->ptr = kaapi_make_nullpointer(cache->asid);
         curr->mdi->replicas[lid]->cachelist = 0;
         curr->mdi->replicas[lid]->cacheentry = 0;
-      }  
+
+      }
       /* unlock memory if... */
       kaapi_atomic_unlock(&curr->mdi->replicas[lid]->lock);
 
@@ -1357,6 +1370,13 @@ static size_t kaapi_memory_cache_evict_fromlist(
       {
         if (size2 < size_view) size2 = 0;
         else size2 -= size_view;
+
+#if 0
+kaapi_memory_view_t* view = &curr->mdi->replicas[lid]->view;
+printf("==========================\nlid:%i erase replica: size: %llu (requested size: %llu),  mdi:%p, view %li x %li w: %li)\n", lid, size_view, size, curr->mdi, view->size[0], view->size[1], view->wordsize);
+//kaapi_memory_cache_print( device );
+printf("\n");
+#endif
 
         /* erase entry from cache list */
         if (curr->next !=0) curr->next->prev = pcurr;
@@ -1369,31 +1389,39 @@ static size_t kaapi_memory_cache_evict_fromlist(
         curr->next = cache->freelist;
         cache->freelist = curr;
         kaapi_atomic_unlock(&cache->lock);
-      }}
+      }
+    }
     curr = pcurr;
   }
 
+#if 0 // TODO: take into account intransit request before emit new request !
   /* Else, if not enough space was evicted, then initiate copy to the host computer: 
-     next time the function is called with transfert ended, data on lid may be evicted !
+     next time the function is called will end of transfer report on mdi state,
+     data on lid may be evicted !
   */
   if (flag && (size2 >0))
   {
     curr = list->end;
     while ((curr != 0) && (size2 >0))
     {
-      if (!kaapi_memory_replica_is_valid_excepton(curr->mdi, lid) && !kaapi_memory_replica_is_xfer(curr->mdi, kaapi_local_asid))
+      if (kaapi_memory_replica_is_valid_on(curr->mdi, lid) && !kaapi_memory_replica_is_xfer(curr->mdi, kaapi_local_asid))
       {
-//        printf("Make copy to host before evict data\n");
+        printf("Make copy to host before evict data\n");
+        size_view = kaapi_memory_view_size( &curr->mdi->replicas[lid]->view );
         int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
           curr->mdi,
-          0, 0, 0, 0
+          callback_nop, 0, 0, 0
         );
+
         if (err == EINPROGRESS)
           kaapi_offload_poll_device(device->device);
+        if (size2 < size_view) size2 = 0;
+        else size2 -= size_view;
       }
       curr = pcurr;
     }
   }
+#endif
   if (size2 <= size) return 0;
   return size2-size;
 }
@@ -1504,9 +1532,9 @@ static int kaapi_memory_cache_evict(
 )
 {
   kaapi_assert( &kaapi_offload_self_device()->memdev == device );
-#if 1
-static volatile int volatile prt = 0;
-if (prt)
+#if KAAPI_DEBUG
+static volatile int volatile prt_cache = 0;
+if (prt_cache)
 {
   kaapi_memory_cache_print( device );
   kaapi_memory_print_cache_stats( device, cache, "RO", &cache->ro);
@@ -1550,11 +1578,6 @@ if (prt)
   /* here if size >0 then it could be necessary to write back valid bloc on the cache
      but not pinned.
   */
-#if 0//KAAPI_DEBUG
-  if (size !=0)
-   _kaapi_memory_cache_print(cache);
-#endif
-
   return size ==0 ? 0 : ENOMEM;
 }
 
@@ -1931,7 +1954,6 @@ static inline kaapi_data_replica_t* _kaapi_new_replica(
     printf("Reset cbk list: cbk: %p\n", &kdr->cbk);
   }
 #endif
-  kdr->count         = 0;
   if (!kaapi_pointer_isnull( kdr->ptr ))
   {
     size_t size = kaapi_memory_view_size(&kdr->view);
@@ -2636,18 +2658,6 @@ static void callback_activate_replica_on_receive_cbk(
 
 /*
 */
-static void callback_nop(
-    kaapi_io_status_t status,
-    kaapi_io_stream_t* ios,
-    void* _drc, void* _asid, void* _mdi
-)
-{
-  //printf("*** CBK nop\n"); fflush(stdout);
-}
-
-
-/*
-*/
 static void callback_resend_replica_on_callback_cbk(
     kaapi_io_status_t status,
     kaapi_io_stream_t* ios,
@@ -2791,7 +2801,7 @@ static int kaapi_dsm_fetch_on(
   /* replica where to add callback */
   kaapi_data_replica_t* r = mdi->replicas[lid_dest];
 
-  kaapi_assert_debug( cbk !=0 );
+  //Before: kaapi_assert_debug( cbk !=0 ); but some prefetch instructions are not with callback
   cbk = cbk == 0 ? callback_nop : cbk;
 
   /* If selected source lid_src is xfer, then attach a callback to transfer back data to lid_dest

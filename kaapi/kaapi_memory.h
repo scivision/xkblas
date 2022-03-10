@@ -114,18 +114,17 @@ typedef struct kaapi_data_replica_cbk {
 } kaapi_data_replica_cbk_t;
 
 /* one replica
-   - pinned is a counter that allows 255 reservations of the data before allowing it
+   - pinned is a counter that allows reservations of the data before allowing it
    to be evicted from the device memory.
    Each replicat is part of LRU cache with respect to the device.
    - lock procted update between different driver threads of different GPUs.
 */
 typedef struct kaapi_data_replica {
     kaapi_lock_t             lock;
-    kaapi_atomic8_t          pinned;       /* counter: cannot be evicted if>0 */
     kaapi_pointer_t          ptr;
     kaapi_memory_view_t      view;
-    int                      count;        /* debug, length of cbk */
-    kaapi_data_replica_cbk_t cbk;
+    kaapi_atomic32_t         pinned;       /* counter: cannot be evicted if>0 */
+    kaapi_data_replica_cbk_t cbk;          /* list of cbk */
     void*                    cachelist;
     void*                    cacheentry;
 #if KAAPI_DEBUG
