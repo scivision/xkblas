@@ -834,7 +834,8 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 /*
 */
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
-#if KAAPI_DEBUG
+#define KAAPI_DEBUG_CTR 1
+#if KAAPI_DEBUG_CTR
 kaapi_atomic_t spawn_writeback={0};
 kaapi_atomic_t pending_writeback={0};
 kaapi_atomic_t received_writeback={0};
@@ -847,7 +848,7 @@ static void callback_epilogue_writeback(
 {
   kaapi_metadata_info_t* mdi __attribute__((unused)) = (kaapi_metadata_info_t*)arg0;
   kaapi_frame_t* frame = (kaapi_frame_t*)arg1;
-#if KAAPI_DEBUG
+#if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&received_writeback);
 #endif
   KAAPI_ATOMIC_INCR(&frame->exec_count);
@@ -861,7 +862,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   */
 //printf("----------- Writeback task\n");
   NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
-#if KAAPI_DEBUG
+#if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&pending_writeback);
 #endif
   int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
@@ -921,7 +922,7 @@ static void xkblas_create_taskwriteback(
 #endif
 
 
-#if KAAPI_DEBUG
+#if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&spawn_writeback);
 #endif
   /* incr spawn_count: spawned task should be considered completed when epilogue is called */
@@ -1844,8 +1845,6 @@ redo_syr2k:
       }
       break;
   }
-
-//printf("Mat size: %i tilesize: %i\n",(int)M, NB);
   return NB;
 }
 
