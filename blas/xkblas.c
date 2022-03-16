@@ -89,8 +89,11 @@ xkblas_context_t* xkblas_context_alloc(void)
          |------------------|
 
       Todo that-> use user_size extra context in thread_bind.
+
+      Use low level kaapi thread routines and do explicit register to be able
+      to free/unbind data on finalize
     */
-    kaapi_context_t* kctxt = kaapi_self_context();
+    kaapi_context_t* kctxt = _kaapi_self_context = kaapi_init_get_context();
     kaapi_thread_t* kthread = kaapi_context2thread(kctxt);
     kaapi_assert( kthread != 0);
     _xkblas_self_thread = kthread;
@@ -1230,7 +1233,8 @@ int xkblas_init(void)
      && (kaapi_localitydomain_count(KAAPI_LD_GPU) >0))
     {
     for (size_t i=0; i<kaapi_localitydomain_count(KAAPI_LD_GPU); ++i)
-      printf("  lid[%i]=%i,  %s\n", (int)i, (int)kaapi_localitydomain_get_num(KAAPI_LD_GPU, i), kaapi_localitydomain_info(KAAPI_LD_GPU, i) );
+      printf("  lid[%i]=%i, @ld:%p,  %s\n", 
+          (int)i, (int)kaapi_localitydomain_get_num(KAAPI_LD_GPU, i), kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, i), kaapi_localitydomain_info(KAAPI_LD_GPU, i) );
     }
   }
 
@@ -1337,8 +1341,7 @@ int xkblas_finalize(void)
     err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
     kaapi_assert(err ==0);
 
-//TG: thread may leave and its __thread data specific deallocated?
-//     *xkblas_ctxt->self = 0;
+    *xkblas_ctxt->self = 0;
     _xkblas_list_context = xkblas_ctxt->next;
     free(xkblas_ctxt);
   }
@@ -1552,7 +1555,7 @@ int xkblas_memory_coherent_async(
   size_t Ant = Ah->nt;
 
 #if KAAPI_USE_TRACELIB==1
-    kaapi_context_t* ctxt =kaapi_self_context();
+    kaapi_context_t* ctxt = kaapi_self_context();
     kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 /*begin*/ );
     if (evt)
     {
