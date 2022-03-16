@@ -966,10 +966,8 @@ void* kaapi_cuda_register_thread(void* dummy )
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
           err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
-          //printf("%p:: hipHostRegister ptr: %p, size: %lu\n", pthread_self(), req.ptr, req.size);
+          //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
           if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
-          //hipError_t err = hipHostRegister( ptr, size, hipHostRegisterPortable );
-          //if ((err != hipSuccess) && (err != hipErrorHostMemoryAlreadyRegistered))
           {
             printf("***[%s]: hipHostRegister error: %i\n", __func__, err);
             req.err = EALREADY;
@@ -1045,6 +1043,14 @@ static char* name_io[] = {
   "IO_KERN"
 };
 
+#define NOT_REENTRANT
+#ifdef NOT_REENTRANT
+/* 2022-03-10: I assume hip functions for malink async copy are not reentrant 
+   with global serialization I do not have any deadlock inside internal rocm-4.5 functions.
+*/
+#warning "To solve !"
+static pthread_mutex_t access_lock= PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 /*
  */
@@ -1062,6 +1068,11 @@ static int cuda_stream_decode_ioinstruction(
   kaapi_cuda_io_stream_t* cios = (kaapi_cuda_io_stream_t*)ios;
   hipError_t res = hipSuccess;
   hipStream_t* stream = 0;
+#if 1//KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#endif
   //hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
   uint8_t type; /* 1D, 2D */
 
@@ -1131,6 +1142,11 @@ static int cuda_stream_decode_ioinstruction(
         {
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
+#ifdef NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+{
+pthread_mutex_lock(&access_lock);
+#endif
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1171,6 +1187,10 @@ static int cuda_stream_decode_ioinstruction(
             default:
               kaapi_assert_debug(0);
           };
+#ifdef NOT_REENTRANT
+pthread_mutex_unlock(&access_lock);
+}
+#endif
           CudaCheckError(res);
         } break;
 
@@ -1192,6 +1212,11 @@ static int cuda_stream_decode_ioinstruction(
           dpitch = op->view_dest->ld * op->view_dest->wordsize;
           spitch = op->view_src->ld * op->view_src->wordsize;
 
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+#ifdef NOT_REENTRANT
+{
+pthread_mutex_lock(&access_lock);
+#endif
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1215,6 +1240,10 @@ static int cuda_stream_decode_ioinstruction(
             default:
               kaapi_assert(0);
           };
+#ifdef NOT_REENTRANT
+pthread_mutex_unlock(&access_lock);
+}
+#endif
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -1279,7 +1308,7 @@ static int cuda_stream_decode_ioinstruction(
 #endif
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
       /* the call + execute_task should be atomic */
-      hipblasStatus_t cres = hipblasSetStream(device->handle, *stream);
+      hipblasStatus_t cres = hipblasSetStream(device->handle, cios->stream);
       kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
 #endif
       kaapi_offload_device_execute_task(
@@ -1380,7 +1409,7 @@ static int cuda_stream_advance_pending(
           res = hipEventQuery( cios->end_events[idx] );
           kaapi_assert_debug((res == hipErrorNotReady)  || (res == hipSuccess));
           if (res == hipErrorNotReady)
-            pthread_yield();
+            goto break_label;
           else {
 #if KAAPI_USE_TRACELIB==1
             if (op->type != KAAPI_IO_KERN)
@@ -1395,6 +1424,7 @@ static int cuda_stream_advance_pending(
             }
 #endif
             if (prev_iosokp+1 == ios_okp) ++prev_iosokp;
+            break;
           }
         }
   
@@ -1419,6 +1449,7 @@ static int cuda_stream_advance_pending(
         break;
     }
   }
+break_label:
   /* all events have been tested, test the prev_iosokp has been incremented */
   ios_okp = ios->ok_p;
   if (prev_iosokp != ios_okp-1) 
@@ -1746,7 +1777,7 @@ KAAPI_PLUGIN_ENTRYPOINT(get_number)(void)
 
 /*
 */
-KAAPI_CLASS_ENTRYPOINT unsigned int 
+KAAPI_CLASS_ENTRYPOINT unsigned int
 KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
 {
   int device_count;
@@ -1762,7 +1793,7 @@ KAAPI_PLUGIN_ENTRYPOINT(init)(void)
 {
   hipError_t res;
   kaapi_cuda_plugin_lock();
-  if(plugin_initialized == true){
+  if (plugin_initialized == true){
       kaapi_cuda_plugin_unlock();
       return 0;
   }
@@ -2310,6 +2341,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
   assert(plugin_initialized == true);
 
+#if 0//TOPUT
   if (device->save_device_id >=0)
   {
     hipError_t res;
@@ -2317,6 +2349,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
     CudaCheckError(res);
     device->save_device_id =-1;
   }
+#endif
 
   return 0;
 }

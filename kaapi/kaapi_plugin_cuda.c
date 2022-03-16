@@ -1376,6 +1376,7 @@ static int cuda_stream_advance_pending(
           res = cudaEventQuery( cios->end_events[idx] );
           kaapi_assert_debug((res == cudaErrorNotReady)  || (res == cudaSuccess));
           if (res == cudaErrorNotReady)
+            //goto break_label;
             pthread_yield();
           else {
 #if KAAPI_USE_TRACELIB==1
@@ -1415,6 +1416,7 @@ static int cuda_stream_advance_pending(
         break;
     }
   }
+break_label:
   /* all events have been tested, test the prev_iosokp has been incremented */
   ios_okp = ios->ok_p;
   if (prev_iosokp != ios_okp-1) 
