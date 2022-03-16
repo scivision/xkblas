@@ -207,6 +207,7 @@ static void callback_epilogue(
 #endif
   ++device->exec_count;
   KAAPI_ATOMIC_INCR(&task->frame->exec_count);
+//printf("incr: @p\n",task->frame);
   task->flags |= KAAPI_TASK_FLAG_EXEC;
   KAAPI_OFFLOAD_TRACE_OUT
 }

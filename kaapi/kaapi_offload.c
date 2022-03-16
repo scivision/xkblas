@@ -695,6 +695,8 @@ int kaapi_offload_finalize(void)
     free(kaapi_list_drivers);
     kaapi_list_drivers = next_driver;
   }
+  memset(kaapi_drivers_bytype, 0, sizeof(kaapi_drivers_bytype));
+  kaapi_offload_init_called = 0;
   KAAPI_OFFLOAD_TRACE_OUT
   return 0;
 }
