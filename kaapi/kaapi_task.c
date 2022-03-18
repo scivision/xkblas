@@ -168,6 +168,9 @@ int32_t kaapi_task_commit(kaapi_thread_t* thread, kaapi_task_t* task)
   int wc = KAAPI_ATOMIC_DECR(&task->wc); //
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
   task->frame = ctxt->unlink;
+#if BUG_2022_03_18
+printf("%p:: %30.30s, thread: %p, frame: %p, task: %p, #task: %lu\n",pthread_self(), __FUNCTION__, thread, ctxt->unlink, task, thread->cnt);
+#endif
   if (kaapi_taskflag_get(task, KAAPI_TASK_FLAG_INDEPENDENT) || (wc==0))
     return kaapi_thread_push(thread, task);
   return -1;
@@ -1311,6 +1314,9 @@ WARNING: END NO
   kaapi_stack_bloc_t* sp_bloc = ctxt->st_data.bloc;
 
   kaapi_frame_t* frame      = (kaapi_frame_t*)kaapi_data_push(thread, sizeof(kaapi_frame_t));
+#if BUG_2022_03_18
+printf("%p:: %30.30s, thread: %p, frame: %p\n",pthread_self(), __FUNCTION__, thread, frame);
+#endif
   kaapi_frame_push(frame, ctxt, flag, sp_bloc);
   return 0;
 }
@@ -1321,6 +1327,9 @@ WARNING: END NO
 int kaapi_end_dfg( kaapi_thread_t* thread )
 {
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
+#if BUG_2022_03_18
+printf("%p:: %30.30s, thread: %p, frame: %p\n",pthread_self(), __FUNCTION__, thread, ctxt->unlink);
+#endif
   kaapi_sched_sync(thread);
   kaapi_frame_pop(ctxt);
   return 0;
@@ -1438,6 +1447,9 @@ int kaapi_sched_sync( kaapi_thread_t* thread )
   )
     return 0;
 
+#if BUG_2022_03_18
+printf("%p:: %30.30s, thread: %p, frame: %p, #task: %lu\n",pthread_self(), __FUNCTION__, thread, unlink, thread->cnt);
+#endif
   KAAPI_EVENT_PUSH0( &ctxt->kproc, KAAPI_EVT_TASKSYNC, 0 /* start */ );
 
   uint32_t exec_cnt = 0;

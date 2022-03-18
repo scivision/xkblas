@@ -405,6 +405,7 @@ int32_t kaapi_fifo_queue_push(
     rd->cbk_fnc(rd->cbk_arg);
   }
 
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
 
   return T; /* [debug] */;
@@ -446,6 +447,7 @@ int32_t kaapi_fifo_queue_owner_push(
     rd->cbk_fnc(rd->cbk_arg);
   }
 
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
 
   return H; /* [debug] */;
@@ -477,6 +479,7 @@ kaapi_task_t* kaapi_fifo_queue_pop(
     if (rd->waiter_push)
       pthread_cond_signal(&rd->cond_push);
   }
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
   return task;
 }
@@ -538,6 +541,7 @@ kaapi_task_t* kaapi_fifo_queue_steal(
     }
     break;
   }
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
   return task;
 }
@@ -635,6 +639,7 @@ kaapi_task_t* kaapi_fifo_queue_pop_with_affinity(
     printf("%p: task %p stolen to %i queue size:%i, score=[%lu, %lu, %lu, %lu]\n", pthread_self(), task, ldid_target, kaapi_fifo_queue_size(rd), score[nsbest][0], score[nsbest][1], score[nsbest][2], score[nsbest][3]);
 #endif
     
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
   return task;
 }
@@ -707,6 +712,7 @@ kaapi_task_t* kaapi_fifo_queue_steal_with_affinity(
 #endif
   }
     
+  //if (task) printf("%p:: %30.30s, queue: %p, task: %p, frame: %p\n", pthread_self(), __FUNCTION__, rd, task, task->frame);
   pthread_mutex_unlock(&rd->lock);
   return task;
 }

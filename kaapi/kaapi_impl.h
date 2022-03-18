@@ -83,7 +83,7 @@ BUG: if set to 0 / PIPELINE set to 0 => deadlock
 
 #if KAAPI_PIPELINE_GPUTASK
 /* reorder stream execution on GPU */
-#define KAAPI_REORDER_TASK_EXEC 0
+#define KAAPI_REORDER_TASK_EXEC 1
 #endif
 
 /* do not use prefetch for successor task */

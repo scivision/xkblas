@@ -195,6 +195,12 @@ return xkblas_zgemm_native(
     beta,  C, LDC 
 );
 #endif
+#if BUG_2022_03_18 && defined(PRECISION_d)
+printf("%p:: %30.30s: READ(%p), READ(%p), %s(%p)\n", 
+   pthread_self(), __FUNCTION__, 
+   A, B, (*beta ==0.0? "WRITE":"READWRITE"), C
+); 
+#endif
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

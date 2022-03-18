@@ -96,6 +96,17 @@ void INSERT_TASK_zgemm(
     task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
     NAME(Arg)* taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
+#if BUG_2022_03_18 && defined(PRECISION_d)
+{
+  double* A = Ah->addr;
+  double* B = Bh->addr;
+  double* C = Ch->addr;
+printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i), READ(%p,%i,%i), %s(%p,%i,%i)\n", 
+   pthread_self(), __FUNCTION__, thread, task, 
+   A, Am, An, B, Bm, Bn, (beta ==0.0? "WRITE":"READWRITE"), C, Cm, Cn
+); 
+}
+#endif
     taskarg->transA = transA;
     taskarg->transB = transB;
     taskarg->m = m;

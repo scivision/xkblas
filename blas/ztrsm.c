@@ -163,6 +163,11 @@ return  xkblas_ztrsm_native(
   alpha, A, LDA, 
          B, LDB );
 #endif
+#if BUG_2022_03_18 && defined(PRECISION_d)
+{
+  printf("%p:: %30.30s: N: %li, NRHS: %li, READ(%p), READWRITE(%p)\n", pthread_self(), __FUNCTION__, N, NRHS, A, B ); 
+}
+#endif
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

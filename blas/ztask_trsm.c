@@ -111,6 +111,16 @@ void INSERT_TASK_ztrsm(
     taskarg->Bm = Bm;
     taskarg->Bn = Bn;
 #endif
+#if BUG_2022_03_18 && defined(PRECISION_d)
+{
+  double* A = Ah->addr;
+  double* B = Bh->addr;
+printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i)/handle: %p, READWRITE(%p,%i,%i)/handle: %p\n", 
+   pthread_self(), __FUNCTION__, thread, task, 
+   A, Am, An, xkblas_get_handle(Ah, Am, An),
+   B, Bm, Bn, xkblas_get_handle(Bh, Bm, Bn)); 
+}
+#endif
     taskarg->alpha = alpha;
     kaapi_update_dependencies(thread, &taskarg->A, task,
         KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
