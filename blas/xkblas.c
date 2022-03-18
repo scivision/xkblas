@@ -209,7 +209,6 @@ xkblas_matrix_descr_t* xkblas_find( const void* A )
   kaapi_hashentries_t* entry;
   xkblas_context_t* ctxt = xkblas_context_get();
 
-  //printf("xkblas_find:%i\n", ++cnt_xkblas_find);
   entry = kaapi_hashmap_findinsert( &ctxt->xkblas_ptr2handle, A );
   me = KAAPI_HASHENTRIES_GETREF(entry, xkblas_matrix_descr_t*);
   if (*me == 0)
@@ -272,11 +271,8 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
 #define ADDR_(A, m, n) ((char*)(A)+ ((m) * MB + (n) * NB * LD)*eltsize)
       kaapi_handle_t*  handle = &Ah->handle[m*Ah->nt+n];
       kaapi_handle_init(ctxt->kthread, handle, ADDR_(A,m,n), 0);
-#if 0//DEBUG
-char* name =kaapi_dbg_get_name(Ah);
-printf("New handle (%i,%i) / %s\n",m,n, name == 0 ? "" : name );
-#endif
-#if 1
+#if BUG_2022_03_18
+printf("%p:: %30.30s matrix: %p %lix%li (dim), %lix%li (tile), tile: (%lix%li), new handle: %p\n",pthread_self(), __FUNCTION__, A, M, N, mt, nt, MB, NB, handle);
       handle->sync0.sync = 0;
       if (ctxt->xkblas_list_sync0_tail !=0)
         ctxt->xkblas_list_sync0_tail->sync0.sync = (kaapi_access_t*)handle;
@@ -356,7 +352,6 @@ retval:
 static size_t NB = 0;
 void xkblas_set_param(size_t nb, size_t p)
 {
-  //printf("In %s: nb:%li, p: %li\n", __func__, nb, p);
   NB=nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
@@ -830,8 +825,6 @@ static kaapi_format_id_t NAME(task_fmtid) = 0;
 */
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
-  //printf("[%s] should never be call on CPU !!!\n", __func__);
-  //abort();
 }
 
 /*
@@ -855,7 +848,6 @@ static void callback_epilogue_writeback(
   KAAPI_ATOMIC_INCR(&received_writeback);
 #endif
   KAAPI_ATOMIC_INCR(&frame->exec_count);
-  //printf("Receive callback coherent: %p, count:%li\n", frame, KAAPI_ATOMIC_INCR(&frame->exec_count));
 }
 
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
@@ -863,7 +855,6 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   /* Make execution as if task_body_gpu spawn continuation (reception of communication)
      in order to detect that end of tasks execution
   */
-//printf("----------- Writeback task\n");
   NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
 #if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&pending_writeback);
@@ -1374,20 +1365,27 @@ int xkblas_finalize(void)
 
 /*
 */
-#if KAAPI_DEBUG
+#if 1//KAAPI_DEBUG
 size_t cnt_activated_handle = 0;
 size_t count = 0;
+size_t id_sync = 0;
 #endif
 int xkblas_sync(void)
 {
   xkblas_context_t* xk_ctxt = xkblas_context_get();
   kaapi_context_t* ctxt = kaapi_thread2context(xk_ctxt->kthread);
+#if BUG_2022_03_18
+printf("%p:: %30.30s , begin sync id: %lu, #handle: %i, #count activated: %i\n", pthread_self(), __FUNCTION__, id_sync, cnt_activated_handle, count);
+#endif
 
   /* activate first synchronisation access */
   kaapi_handle_t* curr = xk_ctxt->xkblas_list_sync0;
   while (curr != 0)
   {
     kaapi_handle_t* next = (kaapi_handle_t*)curr->sync0.sync;
+#if BUG_2022_03_18
+printf("%p:: handle: %p, sync: %p\n", pthread_self(), curr, curr->sync);
+#endif
     if (curr->sync != 0)
     {
 #if KAAPI_DEBUG
@@ -1403,10 +1401,8 @@ int xkblas_sync(void)
 
 //#undef KAAPI_DEBUG
 //#define KAAPI_DEBUG 0
-//printf("------------ xkblas_sync: %i -> #handle: %i, #count activated: %i\n",xkblas_generation_cache, cnt_activated_handle, count);
 
   /* also do sync */
-  //printf("--- [thread: %i] xkblas_sync: #spawn task: %li\n", kaapi_thread_kid(xk_ctxt->kthread), xk_ctxt->kthread->cnt);
   kaapi_end_dfg( xk_ctxt->kthread );
   kaapi_assert( xk_ctxt == xkblas_context_get() );
 
@@ -1428,10 +1424,20 @@ int xkblas_sync(void)
     if (mdi == 0)
       mdi = (curr->last->mode == KAAPI_ACCESS_SYNC ? 0: curr->last->mdi);
     kaapi_handle_init(xk_ctxt->kthread, curr, curr->sync0.data, mdi);
+
     curr->sync0.sync = (kaapi_access_t*)xk_ctxt->xkblas_list_sync0;
+#if BUG_2022_03_18
+printf("%p:: remain handle: %p, sync: %p\n", pthread_self(), curr, curr->sync);
+#endif
     xk_ctxt->xkblas_list_sync0 = curr;
+    if (xk_ctxt->xkblas_list_sync0_tail ==0)
+      xk_ctxt->xkblas_list_sync0_tail = curr;
     curr = next;
   }
+#endif
+
+#if BUG_2022_03_18
+printf("%p:: %30.30s , end sync id: %lu, #handle: %i, #count activated: %i\n\n\n", pthread_self(), __FUNCTION__, id_sync++, cnt_activated_handle, count);
 #endif
 
   kaapi_begin_dfg( xk_ctxt->kthread, KAAPI_FRAME_FLAG_DFG_OK );
@@ -1442,6 +1448,9 @@ int xkblas_sync(void)
  */
 int xkblas_memory_invalidate_caches(void)
 {
+#if BUG_2022_03_18
+  printf("%p:: %30.30s\n", pthread_self(), __FUNCTION__);
+#endif
   //kaapi_memory_invalidate_caches();
   xkblas_context_t* ctxt = xkblas_context_get();
 #if OLD_FLUSH //see just above
@@ -1486,6 +1495,8 @@ int xkblas_memory_invalidate_caches(void)
   _kaapi_memory_cache_verify_notself();
 #endif
   ctxt->xkblas_matrix_descr_list = 0;
+  ctxt->xkblas_list_sync0 = 0;
+  ctxt->xkblas_list_sync0_tail = 0;
 #endif
 }
 
@@ -1553,6 +1564,14 @@ int xkblas_memory_coherent_async(
   size_t LDA = LD;
   size_t Amt = Ah->mt;
   size_t Ant = Ah->nt;
+
+{
+  xkblas_context_t* ctxt = xkblas_context_get();
+  kaapi_thread_t* thread = ctxt->kthread;
+#if BUG_2022_03_18
+printf("%p:: %30.30s: memflag: %i, thread: %p, A: %p\n", pthread_self(), __FUNCTION__, memflag, thread, A );
+#endif
+}
 
 #if KAAPI_USE_TRACELIB==1
     kaapi_context_t* ctxt = kaapi_self_context();
@@ -1674,24 +1693,15 @@ int xkblas_distribute_2Dblock_cyclic_async(
   char* ptr = (char*)A;
   void* addr;
 
-#if 0
-  printf("Distribute on grid: %i x %i\n", Gp, Gq);
-#endif
   for (size_t i=0; i<Amt; ++i)
   {
     for (size_t j=0; j<Ant; ++j)
     {
       int r = ( ((i/Bp)%Gp)*Gq + (j/Bq)%Gq ) %count;
-#if 0
-printf("%i ", r );
-#endif
       kaapi_ldid_t ldid = kaapi_localitydomain_get_num(type, r);
       xkblas_create_distribute( Ah, i, j, lda, eltsize, ldid );
       xkblas_set_ldid(Ah, i, j, ldid );
     }
-#if 0
-printf("\n");
-#endif
   }
   return 0;
 }
