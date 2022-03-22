@@ -2306,7 +2306,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
   if (device->save_device_id >=0)
   {
     cudaError_t res;
-    res = cudaSetDevice( kaapi_device_ids[device->save_device_id] );
+    res = cudaSetDevice( device->save_device_id );
     CudaCheckError(res);
     device->save_device_id =-1;
   }
