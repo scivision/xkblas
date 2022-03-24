@@ -2151,7 +2151,6 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
 
   /* all other devices 'peer' context have been initialized, enable peer */
 #if CONFIG_USE_P2P
-  int verboseok = 0;
   cudaError_t res;
 #if KAAPI_DEBUG
   int devid;
@@ -2183,19 +2182,18 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
       if (access)
       {
         res = cudaDeviceEnablePeerAccess(kaapi_device_ids[kaapi_device_list[j]->inherited.device_id], 0 );
-        CudaCheckError(res);
-//#warning
-//printf("Device %i enable Peer Access with device %i\n", device->inherited.device_id, kaapi_device_list[j]->inherited.device_id);
-        verboseok = 1;
-      }
-      int device1 = kaapi_device_ids[device->inherited.device_id];
-      int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
-      int rank = cuda_perf_topo[device1*cuda_device_count+device2];
-      kaapi_assert_debug(rank !=0);
-      if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
-      {
-        device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
-        ld->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+        if ((res == cudaSuccess)||(res ==cudaErrorPeerAccessAlreadyEnabled))
+        {
+          int device1 = kaapi_device_ids[device->inherited.device_id];
+          int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
+          int rank = cuda_perf_topo[device1*cuda_device_count+device2];
+          kaapi_assert_debug(rank !=0);
+          if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
+          {
+            device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+            ld->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+          }
+        }
       }
     }
     else
