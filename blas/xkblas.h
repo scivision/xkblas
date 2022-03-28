@@ -49,7 +49,10 @@
 #include <stdint.h>
 
 /* VERION */
-#define XKBLAS_VERSION 0040
+#define __XKBLAS__ 0
+#define __XKBLAS_MINOR__ 4
+#define __XKBLAS_PATCHLEVEL__ 0
+
 
 /* */
 #if defined(__STDC_NO_COMPLEX__)
