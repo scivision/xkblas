@@ -46,7 +46,6 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#undef KAAPI_USE_CUDA_DRIVER_API
 #undef KAAPI_USE_CUDA_RUNTIME_API
 #define KAAPI_USE_CUDA_RUNTIME_API 1
 
@@ -1409,7 +1408,8 @@ static int cuda_stream_advance_pending(
           res = hipEventQuery( cios->end_events[idx] );
           kaapi_assert_debug((res == hipErrorNotReady)  || (res == hipSuccess));
           if (res == hipErrorNotReady)
-            goto break_label;
+            //goto break_label;
+            pthread_yield();
           else {
 #if KAAPI_USE_TRACELIB==1
             if (op->type != KAAPI_IO_KERN)
@@ -2341,7 +2341,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
   assert(plugin_initialized == true);
 
-#if 0//TOPUT
   if (device->save_device_id >=0)
   {
     hipError_t res;
@@ -2349,7 +2348,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
     CudaCheckError(res);
     device->save_device_id =-1;
   }
-#endif
 
   return 0;
 }
