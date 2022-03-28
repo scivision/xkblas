@@ -57,11 +57,8 @@
 #if (KAAPI_USE_CUDA_DRIVER_API!=0)
 #  error "KAAPI_USE_CUDA_DRIVER_API is no more supported, please use the CUDA_RUNTIME_API"
 #endif
-#if (KAAPI_USE_CUDA_DRIVER_API!=0)&&(KAAPI_USE_CUDA_RUNTIME_API!=0)
-#  error "KAAPI_USE_CUDA_DRIVER_API and KAAPI_USE_CUDA_RUNTIME_API are defined. Please defined only ONE of the macro to use either the CUDA Driver xor the CUDA Runtime API."
-#endif
-#if (KAAPI_USE_CUDA_DRIVER_API==0)&&(KAAPI_USE_CUDA_RUNTIME_API==0)
-#  error "KAAPI_USE_CUDA_DRIVER_API and KAAPI_USE_CUDA_RUNTIME_API are NOT defined. Please defined only ONE of the macro to use either the CUDA Driver xor the CUDA Runtime API."
+#if (KAAPI_USE_CUDA_RUNTIME_API ==0)
+#  error "KAAPI_USE_CUDA_RUNTIME_API is not defined. Please defined CUDA Runtime API on the command line for cmake."
 #endif
 
 #include <cuda_runtime.h>

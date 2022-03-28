@@ -11,7 +11,6 @@ project (XKblas)
 
 
 # Global options
-option(KAAPI_USE_CUDA_DRIVER "To set if Kaapi should be compiled with support for NVIDIA GPU using Driver API." OFF)
 option(KAAPI_USE_CUDA_RT "To set if Kaapi should be compiled with support for NVIDIA GPU using Runtime API." OFF)
 option(KAAPI_USE_HIP "To set if Kaapi should be compiled with support for AMD GPU using HIP API." OFF)
 
@@ -24,28 +23,18 @@ option(KAAPI_USE_OPENBLAS "Use MKL" OFF)
 option(KAAPI_USE_SLEEP "Sleep thread is nothing to do" ON)
 
 #--
-if (KAAPI_USE_CUDA_DRIVER AND KAAPI_USE_CUDA_RT)
-  message(FATAL_ERROR "Use either KAAPI_USE_CUDA_DRIVER or KAAPI_USE_CUDA_RT but not the both at the same time.")
-endif()
-
-if (KAAPI_USE_HIP AND (KAAPI_USE_CUDA_DRIVER OR KAAPI_USE_CUDA_RT))
+if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
 endif()
 
 #--- CUDA
-find_package(CUDA_DRIVER)
 find_package(CUDA_RT)
-if (KAAPI_USE_CUDA_DRIVER)
-  if (NOT ${CUDA_DRIVER_FOUND})
-    message(FATAL_ERROR "Kaapi is configured with CUDA Driver API but library could not be found.")
-  endif()
-endif()
 if (KAAPI_USE_CUDA_RT)
   if (NOT ${CUDA_RT_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA Runtime API but library could not be found.")
   endif()
 endif()
-if (KAAPI_USE_CUDA_DRIVER OR KAAPI_USE_CUDA_RT)
+if (KAAPI_USE_CUDA_RT)
   find_package(CUBLAS)
   if (NOT ${CUBLAS_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA API but CUBLAS is not found for XKblas !")
@@ -133,11 +122,6 @@ endif()
 add_compile_options(${BLAS_LINKER_FLAGS})
 
 #--- Add common command line options for all subdirectories
-if (KAAPI_USE_CUDA_DRIVER)
-  add_compile_options("-DKAAPI_USE_CUDA=1")
-  add_compile_options("-DKAAPI_USE_CUDA_DRIVER_API=1")
-  message(STATUS "Configuring Kaapi with CUDA driver plugin")
-endif()
 if (KAAPI_USE_CUDA_RT)
   add_compile_options("-DKAAPI_USE_CUDA=1")
   add_compile_options("-DKAAPI_USE_CUDA_RUNTIME_API=1")
