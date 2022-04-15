@@ -112,12 +112,14 @@ static void callback_epilogue(
   kaapi_task_t*    task         = (kaapi_task_t*)arg1;
   uint64_t         index        = (uint64_t)(uintptr_t)arg2;
 
-  kaapi_assert_debug( task->device ==device );
+  kaapi_assert_debug( task->device == device );
+
+//printf("Epilogue: GPUdelay: %f / %lu\n", status.gpu_delay, (uint64_t)(1000000000.0*status.gpu_delay));
 
   KAAPI_ATOMIC_INCR(&device->cnt_exec);
   KAAPI_ATOMIC_DECR(&device->cnt_ready);
-  KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
-       3 /* end */, task, kaapi_task_getformat_ref(task)->fmtid, kaapi_task_getargs(task) );
+  KAAPI_EVENT_PUSH4( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
+       3 /* end */, task, kaapi_task_getformat_ref(task)->fmtid, kaapi_task_getargs(task), (uint64_t)(1000000000.0*status.gpu_delay) );
   
   /* update the finish index for the current tasks and all next task that may have finish earlier */
 #if KAAPI_LOG_PIPE
@@ -158,8 +160,8 @@ static void callback_epilogue(
     callback_epilogue_perparam, (uint64_t)device
   );
 
-  /* */
-  double flops = 0, dflops= 0, data = 0;
+  /* if task does not define cost, assume == 1 */
+  double flops = 1.0, dflops= 0, data = 0;
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
   --device->pendingtasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
@@ -460,9 +462,10 @@ static int kaapi_offload_device_prepare_execute_task(
   task->device = device;
 #endif
 
-  /* Register counters for performance analysis
+  /* Register counters for performance analysis.
+     If task does not define cost function, assume it is 1.
   */
-  double flops = 0, dflops =0, data = 0;
+  double flops = 1, dflops =0, data = 0;
   ++device->pendingtasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
   {
@@ -1126,8 +1129,10 @@ prepare_execute:
       )
       
 #if 1
+#if KAAPI_USE_STREAM_D2D
       err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+#endif
       err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
       err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_H2D );

@@ -105,6 +105,7 @@ xkblas_context_t* xkblas_context_alloc(void)
     ctxt->xkblas_generation_cache = 0;
     ctxt->xkblas_matrix_descr_list = 0;
     ctxt->xkblas_modemath = xkblas_default_math;
+    ctxt->kctxt = kctxt;
     ctxt->kthread = kthread;
 
     /* create default kaapi context & thread */
@@ -288,6 +289,7 @@ printf("%p:: %30.30s matrix: %p %lix%li (dim), %lix%li (tile), tile: (%lix%li), 
 
   /* to debug... */
   Ah->gen = ctxt->xkblas_generation_cache;
+  return 0;
 }
 
 
@@ -369,6 +371,7 @@ size_t xkblas_get_param(void)
 
 int xkblas_get_devicecount(void)
 {
+  return 0;
 }
 
 
@@ -533,7 +536,7 @@ int xkblas_register_memory( void* ptr, size_t sz )
 int xkblas_unregister_memory( void* ptr, size_t sz )
 {
   uint64_t handle = xkblas_unregister_memory_async(ptr, sz); 
-  xkblas_register_memory_waitall();
+  return xkblas_register_memory_waitall();
 }
 
 /*
@@ -550,6 +553,60 @@ static void xkblas_free_curr_blochandle(void)
   }
 }
 #endif
+
+/* Map all block to 1 GPU
+*/
+int xkblas_map_all(
+  int hlevel, int storage, size_t m, size_t n,
+  const void* A, size_t lda, size_t eltsize,
+  int gpu, int force
+)
+{
+  xkblas_matrix_descr_t* Ah = xkblas_find(A);
+  if (!xkblas_matrix_descr_isinit(Ah)) return EINVAL;
+
+  kaapi_ld_type_t type;
+  switch (hlevel) {
+    case 0: type = KAAPI_LD_BOARD; break;
+    case 1: type = KAAPI_LD_GPU; break;
+    case 2: type = KAAPI_LD_CORE; break;
+    default:
+      printf("[%s] unknown type, returns immediatly\n", __func__);
+#if KAAPI_DEBUG
+      abort();
+#endif
+      return EINVAL;
+  };
+
+  unsigned int count = kaapi_localitydomain_count(type);
+  if (count ==0) return EINVAL;
+
+  size_t Amt = Ah->mt;
+  size_t Ant = Ah->nt;
+
+  kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(type, gpu);
+
+  for (size_t i=0; i<Amt; ++i)
+  {
+    for (size_t j=0; j<Ant; ++j)
+    {
+      uint16_t ldid = xkblas_get_ldid(Ah, i, j );
+      if ((ldid ==(uint16_t)-1) || force)
+      {
+        xkblas_set_ldid(Ah, i, j, ldid = ld->ldid);
+#if KAAPI_USE_OCR
+        kaapi_assert( ldid == kaapi_memory_asid_get_lid(ld->device->memdev.asid) );
+        kaapi_assert(0 == kaapi_dsm_wish_distribution(
+              &kaapi_the_dsm,
+              ld->device->memdev.asid,
+              xkblas_get_handle(Ah, i, j)
+        ));
+#endif
+      }
+    }
+  }
+  return 0;
+}
 
 /* Do not implement type== ALL
    store bloc (i,j) on a grid of ressource GpxGq (i/Bp)%Gp,(j/Bq)%Gq
@@ -901,15 +958,6 @@ static void xkblas_create_taskwriteback(
 #if KAAPI_USE_OCR
   /* OCR on the first parameter */
   kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 0);
-
-#if KAAPI_DEBUG
-  kaapi_ldid_t ldid0 = kaapi_dsm_get_wish_distribution(
-      &kaapi_the_dsm,
-      xkblas_get_handle(Ah,m,n));
-  uint16_t ldid1 = xkblas_get_ld(Ah,m,n);
-  kaapi_assert( ldid0 == ldid1 );
-#endif
-
 #else
   uint16_t ldid = xkblas_get_ld(Ah,m,n);
   kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
@@ -1183,8 +1231,8 @@ int xkblas_init(void)
   if (getenv("XKBLAS_CACHE_LIMIT"))
     setenv("KAAPI_CUDA_CACHE_LIMIT",getenv("XKBLAS_CACHE_LIMIT"),1);
 
-  const char* m;
-  if (m = getenv("XKBLAS_DEFAULT_MATH"))
+  const char* m = getenv("XKBLAS_DEFAULT_MATH");
+  if (m !=0)
   {
     if ((strcasecmp(m,"TC") ==0)||(strcasecmp(m,"tensorcore") ==0)||(strcasecmp(m,"mix1632") ==0))
       xkblas_default_math = XKBLAS_TENSOR_OP_MATH;
@@ -1232,6 +1280,8 @@ int xkblas_init(void)
   /* */
   kaapi_thread_t* thread = xkblas_self_thread();
   kaapi_begin_dfg( thread, KAAPI_FRAME_FLAG_DFG_OK );
+
+  return 0;
 }
 
 
@@ -1360,12 +1410,13 @@ int xkblas_finalize(void)
   handle_cpublas = 0;
 
   kaapi_finalize();
+  return 0;
 }
 
 
 /*
 */
-#if 1//KAAPI_DEBUG
+#if KAAPI_DEBUG
 size_t cnt_activated_handle = 0;
 size_t count = 0;
 size_t id_sync = 0;
@@ -1441,6 +1492,7 @@ printf("%p:: %30.30s , end sync id: %lu, #handle: %i, #count activated: %i\n\n\n
 #endif
 
   kaapi_begin_dfg( xk_ctxt->kthread, KAAPI_FRAME_FLAG_DFG_OK );
+  return 0;
 }
 
 
@@ -1498,6 +1550,7 @@ int xkblas_memory_invalidate_caches(void)
   ctxt->xkblas_list_sync0 = 0;
   ctxt->xkblas_list_sync0_tail = 0;
 #endif
+  return 0;
 }
 
 
@@ -1526,6 +1579,7 @@ int xkblas_memory_free(void)
   ctxt->xkblas_list_sync0 = 0;
   ctxt->xkblas_list_sync0_tail = 0;
 #endif
+  return 0;
 }
 
 
@@ -1539,6 +1593,7 @@ int xkblas_memory_syncall(void)
   kaapi_memory_synchronize();
   //double t1 = kaapi_get_elapsedtime();
   //printf("Time(s) sync + memory synchronise:%f\n",t1-t0);
+  return 0;
 }
 
 /*
@@ -1848,6 +1903,7 @@ redo_syr2k:
       }
       break;
 
+    case KERN_SWAP:
     default:
       { 
         fact = 1;
@@ -1865,11 +1921,16 @@ redo_syr2k:
 /* Map tile of matrix descriptor.
    Hardcoded selection between 1D or 2D mapping depending of the type of kernel
 */
+kaapi_atomic_t count_call ={0};
 int xkblas_auto_map(
+  xkblas_context_t* ctxt,
   xkblas_kernel_t kernel,
   xkblas_matrix_descr_t* Ah
 )
 {
+  size_t ngpu = xkblas_get_ngpus();
+  if (ngpu ==0) return EBUSY;
+
   switch (kernel)
   {
     case KERN_SYRK:
@@ -1892,33 +1953,92 @@ int xkblas_auto_map(
     case KERN_HEMM:
     case KERN_HERK:
     case KERN_HER2K:
-    { /* 2D Bloc cyclic */
-      size_t Blkm = 1;
-      size_t Blkn = 1;
-      size_t ngpu = xkblas_get_ngpus();
-      size_t Gm = sqrt(ngpu);
-      size_t Gn = Gm;
-      if (Gm ==0) { Gn = ngpu; Gm = 1; }
-      else {
-        /* find the most square decomposition of ngpu in Gm x Gn */
-        size_t g;
-        for (g = Gm+1; g>0; --g)
-           if (ngpu % g == 0) break;
-        if (g==0) { Gm = ngpu; Gn = 1; }
-        //if (g==0) { Gm = 1; Gn = ngpu; }
-        else { Gm = g; Gn = ngpu/g; }
+    { 
+#define EXP_LO 0
+#if EXP_L0 // experimental
+      int underloaded = 0;
+      int iimin = 0;
+      int GPU=0;
+      float sum = 0.0;
+      { /* compute #ngpu underloaded and the index of gpu that has minimal load */
+        int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
+        float load[ngpu];
+        int min = INT_MAX;
+        int iimin = 0;
+        for (int i=0; i<ngpu; ++i)
+        {
+          kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU,i);
+          if (ld !=0)
+          {
+            load[i] = ld->device->pendingtasks;
+            //load[i] = ld->device->flops_tasks;
+            sum += (float)load[i];
+            int l = load[i];
+            if (l < min)
+            {
+              min = l;
+              iimin = i;
+            }
+          }
+        }
+        sum /= (float)ngpu;
+        for (int i=0; i<ngpu; ++i)
+        {
+           if (load[i] <= 0.5*sum) ++underloaded;
+        }
       }
-      //printf("Block2D cyclic: Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", Blkm, Blkn, Gm, Gn);
-      xkblas_map_2Dblock_cyclic(
-        1, CblasColMajor,
-        Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
-        Blkm, Blkn, Gm, Gn, 0
-      );
+      int dispatch = (underloaded >= 0.5*ngpu); //dispatch =0; (Ah->mt*Ah->nt > 32* ngpu); 
+      if (dispatch ==0) GPU = iimin; //GPU= KAAPI_ATOMIC_INCR(&count_call);
+ printf("%i:: [dispatch] kernel: %i, avrg load: %f, dispatch: %i, iff==0, GPU= %i\n", ctxt->kctxt->kid, kernel, sum, dispatch, GPU);
+      //printf("%s:: tid: %i, kid: %lu => dispatch: %i\n", __FUNCTION__, ctxt->kctxt->tid, ctxt->kctxt->kid, dispatch);
+      if (dispatch)
+#endif
+      {
+        /* 2D Bloc cyclic */
+        size_t Blkm = 1;
+        size_t Blkn = 1;
+        size_t Gm = sqrt(ngpu);
+        size_t Gn = Gm;
+        if (Gm ==0) { Gn = ngpu; Gm = 1; }
+        else {
+          /* find the most square decomposition of ngpu in Gm x Gn */
+          size_t g;
+          for (g = Gm+1; g>0; --g)
+             if (ngpu % g == 0) break;
+          if (g==0) { Gm = ngpu; Gn = 1; }
+          //if (g==0) { Gm = 1; Gn = ngpu; }
+          else { Gm = g; Gn = ngpu/g; }
+        }
+        //printf("Block2D cyclic: Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", Blkm, Blkn, Gm, Gn);
+        xkblas_map_2Dblock_cyclic(
+          1, CblasColMajor,
+          Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
+          Blkm, Blkn, Gm, Gn, 0
+        );
+      }
+#if EXP_LO
+      else 
+      {
+        //xkblas_map_2Dblock_cyclic(
+        //  1, CblasColMajor,
+        //  Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
+        //  Blkm, Blkn, Gm, Gn, 0
+        //);
+        xkblas_map_all(
+          1, CblasColMajor,
+          Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
+          GPU % ngpu, 0
+        );
+       }
+#endif
     } break;
 
+    case KERN_SWAP:
+      break;
     case KERN_VOID:
       break;
   }
+  return 0;
 }
 
 
@@ -1967,7 +2087,7 @@ const char* get_xkblas_info(void)
   static int isinit = 0;
   if (isinit ==0)
     snprintf( buffer, 8192, 
-            "  TILE_SIZE: %i\n"
+            "  TILE_SIZE: %lu\n"
             "  MODE_MATH: %s\n",
          xkblas_get_param(),
          (xkblas_default_math == XKBLAS_TENSOR_OP_MATH ? "TensorCore" : "Default")

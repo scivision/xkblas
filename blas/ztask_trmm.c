@@ -119,7 +119,7 @@ void INSERT_TASK_ztrmm(
         KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Bh, Bm, Bn));
     taskarg->ldb = ldb;
     taskarg->mm = xkblas_get_modemath();
-#if 0//KAAPI_USE_OCR 
+#if KAAPI_USE_OCR 
     /* OCR on the second parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 1);
 #else
@@ -157,7 +157,8 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       arg->Am, arg->An, arg->Bm, arg->Bn
   );
 #endif
-  cublasZtrmm((cublasHandle_t)handle,
+  cublasStatus_t res;
+  res = cublasZtrmm((cublasHandle_t)handle,
         cblas2cublas_side(arg->side), cblas2cublas_uplo(arg->uplo),
         cblas2cublas_op(arg->transA), cblas2cublas_diag(arg->diag),
         arg->m, arg->n,
@@ -167,6 +168,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
         arg->B.data, arg->ldb,
 #endif
         arg->B.data, arg->ldb);
+  kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
 }
 #endif
 

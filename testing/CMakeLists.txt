@@ -39,7 +39,7 @@ set(SOURCES_TESTING_Z
   )
 
 add_executable(ztesting ${SOURCES_TESTING_Z})
-#target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z -UPRECISION_c) 
+target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z=1 -UPRECISION_c) 
 target_link_libraries(ztesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
 install(TARGETS ztesting DESTINATION testing)
 
@@ -60,7 +60,7 @@ set(SOURCES_TESTING_C
   )
 
 add_executable(ctesting ${SOURCES_TESTING_C})
-#target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c) 
+target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c=1) 
 target_link_libraries(ctesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
 install(TARGETS ctesting DESTINATION testing)
 
@@ -77,7 +77,7 @@ set(SOURCES_TESTING_D
   )
 
 add_executable(dtesting ${SOURCES_TESTING_D})
-#target_compile_options(dtesting PUBLIC -DPRECISION_d -UPRECISION_s -UPRECISION_z -UPRECISION_c) 
+target_compile_options(dtesting PUBLIC -DPRECISION_d=1 -UPRECISION_s -UPRECISION_z -UPRECISION_c) 
 target_link_libraries(dtesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} ${HIP_LIBRARIES} m)
 install(TARGETS dtesting DESTINATION testing)
 
@@ -95,6 +95,6 @@ set(SOURCES_TESTING_S
   )
 
 add_executable(stesting ${SOURCES_TESTING_S})
-#target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s -UPRECISION_z -UPRECISION_c) 
+target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION_z -UPRECISION_c) 
 target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
 install(TARGETS stesting DESTINATION testing)

@@ -45,7 +45,7 @@
 #ifndef KAAPI_USE_SLEEP
 #define KAAPI_SLEEP_DEVICETHREAD 1 /* default: activate a sleeping state for device thread [Yet experimental feature] */
 #else
-#define KAAPI_SLEEP_DEVICETHREAD KAAPI_USE_SLEEP /* else take the value of KAAPI_USE_SLEEP
+#define KAAPI_SLEEP_DEVICETHREAD KAAPI_USE_SLEEP /* else take the value of KAAPI_USE_SLEEP */
 #endif
 
 #ifndef KAAPI_USE_DYNLOADER
@@ -83,7 +83,7 @@ BUG: if set to 0 / PIPELINE set to 0 => deadlock
 
 #if KAAPI_PIPELINE_GPUTASK
 /* reorder stream execution on GPU */
-#define KAAPI_REORDER_TASK_EXEC 1
+#define KAAPI_REORDER_TASK_EXEC 0
 #endif
 
 /* do not use prefetch for successor task */
@@ -92,20 +92,13 @@ BUG: if set to 0 / PIPELINE set to 0 => deadlock
 
 
 /* to allow transfert between GPUi to GPUj if data is under xfer data to GPUi*/
-#if KAAPI_USE_HIP
-#  define KAAPI_USE_FAVOR_D2D_1 0 /* HIP with MI50onPCIE */
-#else
-#  define KAAPI_USE_FAVOR_D2D_1 1
-#endif
+#define KAAPI_USE_FAVOR_D2D_1 1 
+#define KAAPI_USE_STREAM_D2D  1
+#define KAAPI_USE_TOPO_D2D    1
 
 /* to allow to route data through NVlink if 2 GPUs is not interconnected */
 #define KAAPI_USE_D2D_ROUTE 0
 
-/* to use specific stream for D2D operation. */
-#define KAAPI_USE_STREAM_D2D 1
-
-/* to use D2D topology and performance group */
-#define KAAPI_USE_TOPO_D2D 1
 
 /* Mark that we compile source of the library.
    Only used to avoid to include public definitition of some types.
@@ -217,7 +210,7 @@ struct kaapi_queue;
 
 
 /* ========================================================================= */
-/* Data type
+/* Data type                                                                 */
 /* ========================================================================= */
 
 /* steal request header */
@@ -311,7 +304,6 @@ struct kaapi_team {
   kaapi_barrier_t            barrier; // barrier need if use Kaapi standalone
 };
 
-
 /*
 */
 typedef struct kaapi_stack_bloc {
@@ -342,7 +334,7 @@ typedef struct kaapi_stack_allocator {
 
 
 /* ========================================================================= */
-/* Thread representation in Kaapi
+/* Thread representation in Kaapi                                            */
 /* ========================================================================= */
 
 /* Thread context = private part of kaapi_thread_t
@@ -529,7 +521,8 @@ int kaapi_queue_empty( kaapi_queue_t* rd)
   return rd->bitmap == 0;
 }
 
-/* return 1 iff it exist i such that rd->H[i] > T[i] */
+/* return 1 iff it exist i such that rd->H[i] > T[i]
+*/
 static inline
 int kaapi_queue_headgreather( kaapi_queue_t* rd, int32_t* T)
 {
@@ -538,7 +531,8 @@ int kaapi_queue_headgreather( kaapi_queue_t* rd, int32_t* T)
   return 0;
 }
 
-/* return 1 iff rd->T == T */
+/* return 1 iff rd->T == T
+*/
 static inline
 int kaapi_queue_topequal( kaapi_queue_t* rd, int32_t* T)
 {
@@ -547,7 +541,7 @@ int kaapi_queue_topequal( kaapi_queue_t* rd, int32_t* T)
   return 1;
 }
 
-/* Approximate size (+-2) if concurrent accesses
+/* Approximate size (+/-) May be not correct in case of concurrent accesses
 */
 static inline __attribute__((__always_inline__))
 int32_t kaapi_queue_size( kaapi_queue_t* rd)
@@ -606,7 +600,6 @@ extern int32_t kaapi_fifo_queue_push(
     kaapi_fifo_queue_t* ld,
     kaapi_task_t* task
 );
-
 
 /*  owner_push/pop: LIFO order
 */

@@ -128,7 +128,8 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-  cublasZhemm((cublasHandle_t)handle,
+  cublasStatus_t res;
+  res = cublasZhemm((cublasHandle_t)handle,
       cblas2cublas_side(arg->side), cblas2cublas_uplo(arg->uplo),
       arg->m, arg->n,
       (const cuDoubleComplex*)&arg->alpha,
@@ -137,6 +138,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       (const cuDoubleComplex*)&arg->beta,
       (cuDoubleComplex*)arg->C.data, arg->ldc
   );
+  kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
 }
 #endif
 

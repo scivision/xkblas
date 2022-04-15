@@ -1,3 +1,4 @@
+
 /**
  *
  * @file ztesting_auxiliary.c
@@ -37,7 +38,7 @@ typedef float complex ct32_helper;
 typedef double complex ct64_helper;
 #endif
 
-#if defined(KAAPI_BLAS_USE_OPENBLAS)
+#if defined(KAAPI_BLAS_USE_OPENBLAS)||defined(KAAPI_BLAS_USE_CRAYBLAS)
 #  include <cblas.h>
 #  include <lapacke.h>
 #elif defined(KAAPI_BLAS_USE_MKL)
@@ -77,7 +78,7 @@ typedef struct timeval struct_time;
 
 int   IONE  = 1;
 int   PAD[2048] = {0,0,0,0,0,0,0}; /* pad */
-lapack_int ISEED[5] = {0,0,0,1,1};   /* initial seed for zlarnv() */
+lapack_int ISEED[5] = {7,1,2,1,1};   /* initial seed for zlarnv() */
 int   PAD2[2048] = {0,0,0,0,0,0,0}; /* pad */
 
 int     side[2]   = { CblasLeft,    CblasRight };
@@ -175,7 +176,14 @@ int main (int argc, char **argv)
     }
 #endif
     else
+    {
+#if (PRECISION_z==1) || (PRECISION_c==1)
+     fprintf(stderr,"*** Unknown function Z,C: '%s'\n",func);
+#else
+     fprintf(stderr,"*** Unknown function D,S: '%s'\n",func);
+#endif
       abort();
+    }
 
     if ( info == -1 ) {
         printf( "TESTING %s FAILED : incorrect number of arguments\n", func);

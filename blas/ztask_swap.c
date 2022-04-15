@@ -116,9 +116,10 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
+  cublasStatus_t res;
   if (arg->issame)
   {
-    cublasZswap((cublasHandle_t)handle,
+    res = cublasZswap((cublasHandle_t)handle,
       arg->M,
       arg->i*arg->LDA+(cuDoubleComplex*)arg->A.data, 1,
       arg->j*arg->LDA+(cuDoubleComplex*)arg->A.data, 1
@@ -126,12 +127,13 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   }
   else 
   {
-    cublasZswap((cublasHandle_t)handle,
+    res = cublasZswap((cublasHandle_t)handle,
       arg->M,
       arg->i*arg->LDA+(cuDoubleComplex*)arg->A.data, 1,
       arg->j*arg->LDB+(cuDoubleComplex*)arg->B.data, 1
     );
   }
+  kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
 }
 #endif
 

@@ -159,7 +159,7 @@ typedef struct kaapi_io_instruction {
     struct kaapi_io_kernel  k_io;
     struct kaapi_io_barrier b_io;
   } inst;
-#if KAAPI_USE_PERFCOUNTER==1
+#if (KAAPI_USE_PERFCOUNTER==1) || (KAAPI_USE_TRACELIB==1)
   double                    t0; /* insert time in the stream */
   double                    t1; /* start time of execution */
   double                    t2; /* time where detected completed */

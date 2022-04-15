@@ -179,6 +179,8 @@ typedef struct {
 
   /* device properties (from NVIDIA website) */
   struct {
+    int pciBusID;
+    int pciDeviceID;
     bool overlap;      /* if the device can concurrently copy memory between host and device while executing a kernel */
     bool integrated;   /* if the device is integrated with the memory subsystem */
     bool map;          /* if the device can map host memory into the CUDA address space */
@@ -213,7 +215,7 @@ typedef struct kaapi_cuda_io_stream_t {
   cudaStream_t      stream_low;
 #if CONFIG_USE_EVENT
   cudaEvent_t*      end_events;               /* size: capacity */
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   cudaEvent_t*      start_events;             /* size: capacity */
 #  endif
 #endif
@@ -392,7 +394,7 @@ static void _kaapi_get_gpu_topo(void)
       for (int rank = 0; rank < cuda_count_perfrank; ++rank)
       {
         _print_mask( buffer, device_count, cuda_perf_device[device1*cuda_count_perfrank+ rank] );
-        printf(buffer);
+        printf("%s",buffer);
         if (rank != cuda_count_perfrank-1) printf(", ");
       }
       printf("\n");
@@ -702,7 +704,7 @@ static size_t cuda_get_free_mem(kaapi_memory_device_t* dev)
 static void _kaapi_cuda_create_event( kaapi_cuda_io_stream_t* cios, int k )
 {
   cudaError_t res;
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   res = cudaEventCreateWithFlags(&cios->end_events[k], cudaEventDefault);
   CudaCheckError(res);
   res = cudaEventCreateWithFlags(&cios->start_events[k], cudaEventDefault);
@@ -716,7 +718,7 @@ static void _kaapi_cuda_create_event( kaapi_cuda_io_stream_t* cios, int k )
 static void _kaapi_cuda_destroy_event( kaapi_cuda_io_stream_t* cios, int k )
 {
   cudaError_t res;
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   res = cudaEventDestroy(cios->end_events[k]);
   CudaCheckError(res);
   res = cudaEventDestroy(cios->start_events[k]);
@@ -797,7 +799,7 @@ static kaapi_io_stream_t* cuda_stream_alloc(
 
 #if CONFIG_USE_EVENT
   cios->end_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   cios->start_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
 #  endif
   if (cios->end_events ==0)
@@ -805,7 +807,7 @@ static kaapi_io_stream_t* cuda_stream_alloc(
     free(cios);
     return 0;
   }
-# if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   if (cios->start_events ==0)
   {
     free(cios->end_events);
@@ -840,7 +842,7 @@ static void cuda_stream_free(
 
 #if CONFIG_USE_EVENT
   free(cios->end_events);
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   free(cios->start_events);
 #  endif
 #endif
@@ -1087,7 +1089,7 @@ static int cuda_stream_decode_ioinstruction(
         kaapi_slowdown_cpu();
 #endif
 
-#if CONFIG_USE_EVENT && KAAPI_USE_PERFCOUNTER
+#if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1))
       instr->t1 = kaapi_get_elapsedtime();
       res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == cudaSuccess);
@@ -1118,6 +1120,7 @@ static int cuda_stream_decode_ioinstruction(
       
       KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
          1 /* begin */, op->reserved );
+      uint64_t delay = kaapi_get_elapsedns();
       switch (type)
       {
         case KAAPI_MEMORY_VIEW_1D:
@@ -1128,8 +1131,9 @@ static int cuda_stream_decode_ioinstruction(
           {
             case KAAPI_IO_COPY_H2H:
               memcpy( dest, src, size );
-              KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->reserved );
+              delay = kaapi_get_elapsedns()-delay;
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+                 2 /* end */, op->reserved, delay );
               res = 0;
             break;
             case KAAPI_IO_COPY_H2D:
@@ -1220,9 +1224,10 @@ static int cuda_stream_decode_ioinstruction(
       res = cudaStreamSynchronize( *stream );
       CudaCheckError(res);
 #if KAAPI_USE_TRACELIB==1
+      delay = kaapi_get_elapsedns()-delay;
       if ((type != KAAPI_MEMORY_VIEW_1D) && (instr->type != KAAPI_IO_COPY_H2H)
-        KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-         2 /* end */, op->reserved );
+        KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+         2 /* end */, op->reserved, delay );
 #endif
       ++ios->ok_p;
 #elif CONFIG_USE_EVENT 
@@ -1263,13 +1268,14 @@ static int cuda_stream_decode_ioinstruction(
       );
       KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          1 /* begin */, op->reserved );
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER|| (KAAPI_USE_TRACELIB==1)
       instr->t1 = kaapi_get_elapsedtime();
 #  if CONFIG_USE_EVENT
       res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == cudaSuccess);
 #  endif
 #endif
+      uint64_t delay = kaapi_get_elapsedns();
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
       /* the call + execute_task should be atomic */
       cublasStatus_t cres = cublasSetStream(device->handle, *stream);
@@ -1284,11 +1290,13 @@ static int cuda_stream_decode_ioinstruction(
         device->handle
 #endif
       );
+
 #if CONFIG_SYNCHRONOUS_KERNEL
+      delay = kaapi_get_elapsedns() -delay;
       res = cudaStreamSynchronize( *stream );
       kaapi_assert(res == CUDA_SUCCESS);
-      KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-         2 /* end */, op->reserved );
+      KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
+         2 /* end */, op->reserved, delay );
       ++ios->ok_p;
 #elif CONFIG_USE_EVENT 
       res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
@@ -1338,17 +1346,15 @@ static int cuda_stream_advance_pending(
 
 #if 0 // best
   int queue_max[4];
-  queue_max[KAAPI_IO_STREAM_H2D]  = 9; 
-  queue_max[KAAPI_IO_STREAM_KERN] = 2; //kaapi_default_param.cuda_conc_kernel; 
-  queue_max[KAAPI_IO_STREAM_D2H]  = 6; 
-#if KAAPI_USE_STREAM_D2D
-  queue_max[KAAPI_IO_STREAM_D2D]  = 4; 
-#endif
-  if ((len_p >1) && (len_p> queue_max[ios->type]))
+  queue_max[KAAPI_IO_STREAM_H2D]  = kaapi_default_param.cuda_conc_kernel;
+  queue_max[KAAPI_IO_STREAM_KERN] = kaapi_default_param.cuda_conc_kernel;
+  queue_max[KAAPI_IO_STREAM_D2H]  = kaapi_default_param.cuda_conc_kernel;
+  queue_max[KAAPI_IO_STREAM_D2D]  = kaapi_default_param.cuda_conc_kernel;
+  if ((len_p >1) && (len_p>= queue_max[ios->type]))
   {
     int shift = 0; //(ios->type == KAAPI_IO_STREAM_KERN ? 0: len_p/2-1);
     int idx = (ios->ok_p + shift)% ios->count;
-    res = cudaEventSynchronize(cios->end_events[idx]);
+    res = hipEventSynchronize(cios->end_events[idx]);
   }
 #endif//if 0
 
@@ -1377,15 +1383,24 @@ static int cuda_stream_advance_pending(
             pthread_yield();
           else {
 #if KAAPI_USE_TRACELIB==1
+            float delay; /* ms */
+            res = cudaEventElapsedTime ( &delay, cios->start_events[idx], cios->end_events[idx] );
+            if (res != cudaSuccess) {
+              printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+              delay = 0;
+              kaapi_assert(0);
+            }
             if (op->type != KAAPI_IO_KERN)
             {
-              KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->inst.c_io.reserved );
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
+//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*delay));
             }
             else
             {
-              KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-                 2 /* end */, op->inst.k_io.reserved );
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
+                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*delay));
+//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*delay));
             }
 #endif
             if (prev_iosokp+1 == ios_okp) ++prev_iosokp;
@@ -1494,20 +1509,21 @@ static int cuda_stream_process_pending(
         case KAAPI_IO_END:
         case KAAPI_IO_BARRIER:
         {
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER|| (KAAPI_USE_TRACELIB==1)
           cudaError_t res;
 #  if KAAPI_DEBUG
           res = cudaEventQuery( cios->start_events[idx] );
           if (res != cudaSuccess)
-            printf("   invalid start_event state at: %lu \n", idx );
+            printf("   invalid start_event state at: %d \n", idx );
 #  endif
           res = cudaEventElapsedTime ( &status.gpu_delay, cios->start_events[idx], cios->end_events[idx] );
           if (res != cudaSuccess) {
-            printf("   invalid Cuda event state at: %lu non fifo order ?\n", idx );
+            printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
             status.gpu_delay = 0;
             kaapi_assert(0);
           }
 
+          /* second*/
           status.gpu_delay *= 1e-3;
           status.cpu_delay = op->t2 - op->t1; 
 #endif
@@ -2065,6 +2081,8 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   res = cudaGetDeviceProperties(&prop, kaapi_device_ids[dev->device_id]);
   CudaCheckError(res);
   
+  device->prop.pciBusID = prop.pciBusID;
+  device->prop.pciDeviceID = prop.pciDeviceID;
 #ifndef __HIP_PLATFORM_AMD__
   device->prop.overlap = prop.deviceOverlap;
   device->prop.async_engines = prop.asyncEngineCount;
@@ -2219,9 +2237,11 @@ KAAPI_CLASS_ENTRYPOINT const char* KAAPI_PLUGIN_ENTRYPOINT(device_info)(kaapi_de
   _print_mask(buf1, 10, device->affinity[0]);
   _print_mask(buf2, 10, device->affinity[1]);
   _print_mask(buf3, 10, device->affinity[2]);
-  snprintf(buffer, 256, "%s, cuda device: %i, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
+  snprintf(buffer, 256, "%s, cuda device: %i, pci: %02x:%02x, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
     device->prop.name,
     device->inherited.device_id,
+    device->prop.pciBusID,
+    device->prop.pciDeviceID,
     device->prop.async_engines,
     ((double)dev->mem_total)/1024.0/1024.0/1024.0,
     ((double)dev->mem_limit)/1024.0/1024.0/1024.0,

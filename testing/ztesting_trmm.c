@@ -108,8 +108,6 @@ int testing_ztrmm(int argc, char **argv)
         fp_per_add = 2;
     }
 
-    for(i=0;i<max(M,N);i++)
-      A[LDA*i+i] = A[LDA*i+i] + 2.0;
 
     for (s=0; s<2; s++) {
         for (u=0; u<2; u++) {
@@ -128,8 +126,11 @@ int testing_ztrmm(int argc, char **argv)
                     for (k=0; k<ITER; ++k)
                     {
                       /* Initialize A, B, C */
-                      LAPACKE_zlarnv_work(IONE, ISEED, LDAxM, A);
-                      LAPACKE_zlarnv_work(IONE, ISEED, LDBxN, B);
+                      LAPACKE_zlarnv_work(1, ISEED, LDAxM, A);
+                      LAPACKE_zlarnv_work(1, ISEED, LDBxN, B);
+
+                      for(i=0;i<max(M,N);i++)
+                        A[LDA*i+i] = A[LDA*i+i] + 2.0;
 
                       memcpy(Binit,  B, LDBxN*sizeof(Complex64_t));
                       memcpy(Bfinal, B, LDBxN*sizeof(Complex64_t));
