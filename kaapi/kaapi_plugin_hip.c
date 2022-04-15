@@ -771,6 +771,8 @@ static void kaapi_cuda_init_cuda_stream(
      */
     hipblasStatus_t cres = hipblasCreate(&cios->handle);
     kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
+    cres = rocblas_set_pointer_mode( cios->handle, rocblas_pointer_mode_host);
+    kaapi_assert(cres == rocblas_status_success);
     cres = hipblasSetStream( cios->handle, cios->stream);
     kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
 #endif
@@ -1298,6 +1300,11 @@ pthread_mutex_unlock(&access_lock);
       );
       KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          1 /* begin */, op->reserved );
+#if 0 // def NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+{
+pthread_mutex_lock(&access_lock);
+#endif
 #if KAAPI_USE_PERFCOUNTER
       instr->t1 = kaapi_get_elapsedtime();
 #  if CONFIG_USE_EVENT
@@ -1319,6 +1326,11 @@ pthread_mutex_unlock(&access_lock);
         device->handle
 #endif
       );
+#if 0 // def NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+pthread_mutex_unlock(&access_lock);
+}
+#endif
 #if CONFIG_SYNCHRONOUS_KERNEL
       res = hipStreamSynchronize( *stream );
       kaapi_assert(res == hipSuccess);
@@ -2097,6 +2109,8 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   hipError_t res;
   res = hipSetDevice(kaapi_device_ids[dev->device_id]);
   CudaCheckError(res);
+
+  rocblas_initialize();
 
   res = hipGetDeviceProperties(&prop, kaapi_device_ids[dev->device_id]);
   CudaCheckError(res);
