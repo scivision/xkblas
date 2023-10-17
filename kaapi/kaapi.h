@@ -46,6 +46,7 @@
     @abstract This is the public header for uKaapi
 */
 #define KAAPI_H _KAAPI_H
+#define KAAPI_H _KAAPI_H
 
 /* .0: initial release
    .1: with merge of static part and new libkomp for supporting libgomp and libiomp5
@@ -142,18 +143,6 @@ struct kaapi_localitydomain;
 typedef struct kaapi_localitydomain kaapi_localitydomain_t;
 
 typedef struct kaapi_listrequest_iterator kaapi_listrequest_iterator_t;
-
-/* counter type
-*/
-typedef int64_t kaapi_perf_counter_t;
-
-/* identifier of a perf event
-*/
-typedef uint32_t kaapi_perf_id_t;
-
-/* type of a set of events
-*/
-typedef uint64_t kaapi_perf_idset_t;
 
 
 /** \ingroup Kaapi
