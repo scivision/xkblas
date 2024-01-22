@@ -40,17 +40,28 @@
 #undef KAAPI_DEBUG
 #endif
 
+#define STR_EXPAND(tok) #tok
+
+
 #define ROWDIM(v,m,n) ((v) == CblasNoTrans ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasNoTrans ? n : m)
 
-#define STR_EXPAND(tok) #tok
+/* Here is assumed the pointer to the struct argument is 'arg'.
+   Must be passed as a macro parameter.
+ */
+ 
+/* Macros to defined the task format data structure for GEMM computation.
+   GEMM == C <- alpha*A*B + beta C.
+   A, B are read access data. C is either write accessed if beta==0 or read-write access data.
+   A, B and C are 2D matrices with given view.
+*/
 #define TASK_NAME zgemm
 #define STRNAME  "zgemm"
 #define NAME(x) x##_##zgemm
 #define PNAME(x) zgemm##_##x
 #define SIZE_NPARAM 3
 #define NPARAM 3
-#define MODE_PARAM {KAAPI_ACCESS_MODE_R,KAAPI_ACCESS_MODE_R,arg->beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW}
+#define MODE_PARAM {KAAPI_ACCESS_MODE_R, KAAPI_ACCESS_MODE_R, arg->beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW}
 #define ADDR_PARAM {&arg->A, &arg->B, &arg->C}
 #define VIEW_PARAM {\
     { ROWDIM(arg->transA, &arg->m, &arg->k), COLDIM(arg->transA, &arg->m, &arg->k), &arg->lda},\
@@ -64,8 +75,7 @@
 
 
 /**
- *
- * @ingroup CORE_Complex64_t
+ * The task' data structure of arguments.
  *
  */
  typedef struct {
@@ -101,17 +111,6 @@ void INSERT_TASK_zgemm(
     task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
     NAME(Arg)* taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
-#if BUG_2022_03_18 && defined(PRECISION_d)
-{
-  double* A = Ah->addr;
-  double* B = Bh->addr;
-  double* C = Ch->addr;
-printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i), READ(%p,%i,%i), %s(%p,%i,%i)\n", 
-   pthread_self(), __FUNCTION__, thread, task, 
-   A, Am, An, B, Bm, Bn, (beta ==0.0? "WRITE":"READWRITE"), C, Cm, Cn
-); 
-}
-#endif
     taskarg->transA = transA;
     taskarg->transB = transB;
     taskarg->m = m;
@@ -132,41 +131,18 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i), READ(%p,%i,%i), %s(%
 #if KAAPI_USE_OCR
     /* OCR on the third parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
-#if KAAPI_DEBUG
-    kaapi_ldid_t ldid0 = kaapi_dsm_get_wish_distribution(
-      &kaapi_the_dsm,
-      xkblas_get_handle(Ch, Cm, Cn));
-    uint16_t ldid1 = xkblas_get_ld(Ch, Cm, Cn);
-    kaapi_assert( ldid0 == ldid1 );
-#endif
-
 #else
     uint16_t ldid = xkblas_get_ld(Ch, Cm, Cn);
     kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
 #endif
     kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
     kaapi_task_commit( thread, task );
-
-#if KAAPI_DEBUG
-  printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
-      A, kaapi_dbg_get_name(A), m, k, lda, (transA==CblasNoTrans ? "":"^t"),
-      B, kaapi_dbg_get_name(B), k, n, ldb, (transB==CblasNoTrans ? "":"^t"),
-      C, kaapi_dbg_get_name(C), m, n, ldc
-  );
-#endif
 }
 
 
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if KAAPI_DEBUG
-  printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
-      arg->A.data, kaapi_dbg_get_name(arg->A.data), arg->m, arg->k, arg->lda, (arg->transA==CblasNoTrans ? "":"^t"),
-      arg->B.data, kaapi_dbg_get_name(arg->B.data), arg->k, arg->n, arg->ldb, (arg->transB==CblasNoTrans ? "":"^t"),
-      arg->C.data, kaapi_dbg_get_name(arg->C.data), arg->m, arg->n, arg->ldc
-  );
-#endif
   xkblas_zgemm_native(
       arg->transA, arg->transB,
       arg->m, arg->n, arg->k,
@@ -182,15 +158,9 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if KAAPI_DEBUG
-  printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
-      arg->A.data, kaapi_dbg_get_name(arg->A.data), arg->m, arg->k, arg->lda, (cblas2cublas_op(arg->transA)==CUBLAS_OP_N ? "":"^t"),
-      arg->B.data, kaapi_dbg_get_name(arg->B.data), arg->k, arg->n, arg->ldb, (cblas2cublas_op(arg->transB)==CUBLAS_OP_N ? "":"^t"),
-      arg->C.data, kaapi_dbg_get_name(arg->C.data), arg->m, arg->n, arg->ldc
-  );
-#endif
   double flops = FLOPS_ZGEMM(arg->m,arg->n,arg->k);
   cublasStatus_t res;
+
 #if (PRECISION_s||(CUDART_VERSION>=1100)) && (__HIP_PLATFORM_AMD__==0)
   if (arg->mm == XKBLAS_TENSOR_OP_MATH)
   {
@@ -207,11 +177,6 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 #endif
   }
 
-#if HEAVY_DEBUG && PRECISION_d
-  cuDoubleComplex* bufferC = malloc( sizeof(cuDoubleComplex)*arg->m * arg->n );
-  cudaMemcpy( bufferC, arg->C.data, arg->m*arg->n *sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost );
-#endif
-
   res = cublasZgemm((cublasHandle_t)handle,
       cblas2cublas_op(arg->transA), cblas2cublas_op(arg->transB),
       arg->m, arg->n, arg->k,
@@ -222,41 +187,6 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
       (cuDoubleComplex*)arg->C.data, arg->ldc
   );
   kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
-
-#if HEAVY_DEBUG && PRECISION_d
-  /* copy data back on buffer, do computation and check result */
-  cuDoubleComplex* bufferA = malloc( sizeof(cuDoubleComplex)*arg->m * arg->k );
-  cuDoubleComplex* bufferB = malloc( sizeof(cuDoubleComplex)*arg->k * arg->n );
-  cudaMemcpy( bufferA, arg->A.data, arg->m * arg->k *sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost );
-  cudaMemcpy( bufferB, arg->B.data, arg->k * arg->n *sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost );
-  xkblas_zgemm_native(
-      arg->transA, arg->transB,
-      arg->m, arg->n, arg->k,
-      &arg->alpha,
-      (Complex64_t*)bufferA, arg->lda,
-      (Complex64_t*)bufferB, arg->ldb,
-      &arg->beta,
-      (Complex64_t*)bufferC, arg->ldc
-  );
-  /* wait kernel */
-  cudaDeviceSynchronize();
-  cuDoubleComplex* bufferC2 = malloc( sizeof(cuDoubleComplex)*arg->m * arg->n );
-  cudaMemcpy( bufferC2, arg->C.data, arg->m*arg->n *sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost );
-
-  double norm_inf = 0;
-  double norm_C = 0;
-  for (long i=0; i< (long)arg->m*(long)arg->n; ++i)
-    {
-       norm_inf = fmax( norm_inf, fabs(bufferC[i]- bufferC2[i]) ); 
-       norm_C = fmax( norm_C, fabs(bufferC[i]) ); 
-    }
-  if (norm_inf/norm_C >= 1e-10) { printf("Error\n"); exit(1); }
-  else printf(".");
-  free(bufferC);
-  free(bufferA);
-  free(bufferB);
-  free(bufferC2);
-#endif
 }
 
 #endif //USE CUDA

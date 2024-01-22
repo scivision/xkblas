@@ -29,10 +29,6 @@
 #include <math.h>
 #include <string.h>
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-//#define KAAPI_DEBUG 1
 
 /**
  ********************************************************************************
@@ -185,22 +181,6 @@ int xkblas_zgemm_async(
 
     /* get default tile size and initialize internal descriptor if not yet */
     size_t NB = xkblas_auto_tilesize(KERN_GEMM,M,N,K);
-
-#if 00// TO force synchronous call: may be this should be provided as runtime option
-printf("Gemm: M=%i, N=%i, K=%i, NB=%i\n", M,N,K,NB);
-return xkblas_zgemm_native(
-    transA, transB, M, N, K,
-    alpha, A, LDA,
-           B, LDB,
-    beta,  C, LDC 
-);
-#endif
-#if BUG_2022_03_18 && defined(PRECISION_d)
-printf("%p:: %30.30s: READ(%p), READ(%p), %s(%p)\n", 
-   pthread_self(), __FUNCTION__, 
-   A, B, (*beta ==0.0? "WRITE":"READWRITE"), C
-); 
-#endif
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

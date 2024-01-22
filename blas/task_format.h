@@ -37,7 +37,7 @@
 
 #include "kaapi_format.h"
 
-/* This file define format for task. THIS FILE SHOULD INCLUDED BY TASK FILE IMPLEMENTION
+/* This file defines format for task. THIS FILE SHOULD BE INCLUDED BY TASK FILE IMPLEMENTION
 */
 static void PNAME(format_get_name)(
   const kaapi_format_t* fmt, const void* sp, char* buffer, int size
