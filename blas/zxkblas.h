@@ -35,6 +35,8 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+#include <stdbool.h> // TODO find where to place this
+
 /* Naming convention:
    * XX_async -> multiGPU asynchronous version
    * XX_native -> call to the native blas CPU variant
@@ -152,3 +154,17 @@ extern int xkblas_zswap_native(
   int M, int Ni, int Nj, int i, int j,
   Complex64_t *A, int LDA,
   Complex64_t *B, int LDB);
+
+extern int xkblas_zscaling_async(
+	size_t m, size_t n, bool should_copy,
+	//int* IW,
+	Complex64_t* D, size_t ldd,
+	Complex64_t* L, size_t ldl,
+	Complex64_t* U, size_t ldu);
+
+extern int xkblas_zscaling_native(
+	size_t m, size_t n, bool should_copy,
+	//int* IW,
+	Complex64_t* D, size_t ldd,
+	Complex64_t* L, size_t ldl,
+	Complex64_t* U, size_t ldu);

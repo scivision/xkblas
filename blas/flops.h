@@ -383,6 +383,18 @@
 #define DATA_DGEMMT(n,k) (1.0*sizeof(double)*DATA__GEMMT((n),(k)))
 #define DATA_SGEMMT(n,k) (1.0*sizeof(float)*DATA__GEMMT((n),(k)))
 
+// TODO update with correct data ?
+#define FLOPS_ZSCALING(m,n) (4.0*m*n)
+#define FLOPS_CSCALING(m,n) (4.0*m*n)
+#define FLOPS_DSCALING(m,n) (1.0*m*n)
+#define FLOPS_SSCALING(m,n) (1.0*m*n)
+
+#define DATA__SCALING(m,n) ((DATA_MAT((n),(n))+DATA_MAT((n),(m))+DATA_MAT((m),(n))))
+#define DATA_ZSCALING(m,n) (1.0*sizeof(double complex)*DATA__SCALING((n),(m)))
+#define DATA_CSCALING(m,n) (1.0*sizeof(float complex)*DATA__SCALING((n),(m)))
+#define DATA_DSCALING(m,n) (1.0*sizeof(double)*DATA__SCALING((n),(m)))
+#define DATA_SSCALING(m,n) (1.0*sizeof(float)*DATA__SCALING((n),(m)))
+
 #define DATA__TRSM(s,m,n) ((s) == CblasLeft ? (0.5*DATA_MAT((m),(m))+2*DATA_MAT((m),(n))) : (0.5*DATA_MAT((n),(n))+2*DATA_MAT((n),(m))))
 #define DATA_ZTRSM(s,m,n) (1.0*sizeof(double complex)*DATA__TRSM((s),(m),(n)))
 #define DATA_CTRSM(s,m,n) (1.0*sizeof(float complex)*DATA__TRSM((s),(m),(n)))

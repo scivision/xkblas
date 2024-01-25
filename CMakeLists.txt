@@ -30,6 +30,7 @@ if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
 endif()
 
 #--- CUDA
+find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
 find_package(CUDA_RT)
 if (KAAPI_USE_CUDA_RT)
   if (NOT ${CUDA_RT_FOUND})

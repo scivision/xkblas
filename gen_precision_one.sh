@@ -170,6 +170,7 @@ echo "generate $f for precision $p on directory $dir"
         -e "s+zher2k+${p}her2k+g" \
         -e "s+Zher2k+${pm}her2k+g" \
         -e "s+ZPOTRF+${pm}POTRF+g" \
+	-e "s+zscaling+${p}scaling+g" \
         -e "s+cuDoubleComplex+${cutype}+g" \
         -e "s+kaapi_dcplx_format+${ctype_format}+g" $temp/.tmp > $temp/.tmp2
     mv $temp/.tmp2 $temp/.tmp
@@ -203,4 +204,3 @@ echo "generate $f for precision $p on directory $dir"
     mv $temp/.tmp2 $dir/$filename
 
     \rm -r $temp
-
