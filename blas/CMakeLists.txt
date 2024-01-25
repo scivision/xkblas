@@ -138,7 +138,6 @@ if (${HIP_FOUND})
   endforeach()
   add_library(xkblas SHARED internal_register.h common.h xkblas.h ztask_internal.h ctask_internal.h dtask_internal.h stask_internal.h ${HEADER_FILE} ${HIPYFIED_FILE}) 
 else()
-	# TODO cuda compile, make generic
 	add_custom_target(task_internal_headers DEPENDS
 		${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
 		${CMAKE_CURRENT_BINARY_DIR}/dtask_internal.h
@@ -146,19 +145,22 @@ else()
 		${CMAKE_CURRENT_BINARY_DIR}/ztask_internal.h
 	)
 
+	# TODO cuda compile, make generic
 	set(CUDA_SOURCES
 		${CMAKE_CURRENT_SOURCE_DIR}/zscaling.cu
 		${CMAKE_CURRENT_BINARY_DIR}/sscaling.cu
 		${CMAKE_CURRENT_BINARY_DIR}/dscaling.cu
 		${CMAKE_CURRENT_BINARY_DIR}/cscaling.cu
 	)
-	cuda_compile( cuda_objects ${CUDA_SOURCES} )
-
-	add_library(xkblas SHARED internal_register.h common.h xkblas.h xkblas.c dbg_blas.c
+	set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
+	cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
+	
+	add_library(xkblas SHARED internal_register.h common.h xkblas.h xkblas.c dbg_blas.c 
 		${SOURCES_Z}
 		${GENERATED_SOURCES}
 		${cuda_objects}
 	)
+	set_source_files_properties(${SOURCES_Z} ${GENERATED_SOURCES} PROPERTIES COMPILE_FLAGS "-fPIC" )
 	add_dependencies(xkblas task_internal_headers)
 endif()
 
