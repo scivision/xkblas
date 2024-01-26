@@ -68,11 +68,20 @@ Then one could enter:
 
 # Testing the installation
 XKBlas has testing programs ported from PLASMA/Chameleon.
-To compile them and run all tests for all precisions, enter
+
+To compile them and run all tests for all precisions, you should define ```-DKAAPI_BUILD_TESTING```:
+
+```
+cmake -DKAAPI_BUILD_TESTING=1
+```
+
+and enter:
+
 ```
 > make -j testing
 > ./testing/run_test
 ```
+
 All BLAS routines, for each precision and all possible values of trans/side/uplo/diag parameters,
 are tested against 3 matrix sizes (1024, 2048, 8192) using all the numbers of GPUs
 the host have.

@@ -26,11 +26,13 @@ find_library(CUBLAS_LIBRARIES
     # Pick the static library first for easier run-time linking.
     NAMES cublas 
     HINTS ${CUBLAS_PREFIX}/lib64 ${CUBLAS_PREFIX}/lib ${HILTIDEPS}/lib
+    HINTS /usr/local/cuda/lib64
 )
 
 find_path(CUBLAS_INCLUDE_DIRS
     NAMES cublas_v2.h 
     HINTS ${CUBLAS_PREFIX}/include ${HILTIDEPS}/include
+    HINTS /usr/local/cuda/include
 )
 
 include(FindPackageHandleStandardArgs)

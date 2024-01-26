@@ -26,11 +26,13 @@ find_library(CUDA_RT_LIBRARIES
     # Pick the static library first for easier run-time linking.
     NAMES cudart 
     HINTS ${CUDA_RT_PREFIX}/lib64 ${CUDA_RT_PREFIX}/lib ${HILTIDEPS}/lib
+    HINTS /usr/local/cuda/lib64
 )
 
 find_path(CUDA_RT_INCLUDE_DIRS
     NAMES cuda_runtime.h 
     HINTS ${CUDA_RT_PREFIX}/include ${HILTIDEPS}/include
+    HINTS /usr/local/cuda/include
 )
 
 include(FindPackageHandleStandardArgs)
