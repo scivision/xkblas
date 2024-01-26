@@ -177,7 +177,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set_target_properties(xkblas PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE) 
 
 target_link_libraries(xkblas PUBLIC kaapi)
-target_link_libraries(xkblas PRIVATE ${CUBLAS_LIBRARIES} ${HIPBLAS_LIBRARIES} ${ROCBLAS_LIBRARIES})
+target_link_libraries(xkblas PRIVATE ${CUBLAS_LIBRARIES} ${HIPBLAS_LIBRARIES} ${ROCBLAS_LIBRARIES} stdc++)
 set_target_properties(xkblas PROPERTIES LINKER_LANGUAGE C)
 
 install(TARGETS xkblas DESTINATION lib)
