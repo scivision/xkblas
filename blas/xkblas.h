@@ -120,7 +120,7 @@ typedef enum {
   KERN_HERK,
   KERN_HER2K,
   KERN_SWAP,
-  KERN_SCALING
+  KERN_COPYSCALE
 
 } xkblas_kernel_t;
 

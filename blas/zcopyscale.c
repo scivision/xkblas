@@ -120,7 +120,7 @@
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
-int xkblas_zscaling_async(
+int xkblas_zcopyscale_async(
 	/*
 	
 	int i_rowmax, int i_rowmin, int sizecopy, 
@@ -149,24 +149,24 @@ int xkblas_zscaling_async(
 	// TODO Check input args
 	if( ldd < N )
 	{
-		kaapi_error("zscaling", "Invalid value for ldd\n");
+		kaapi_error("zcopyscale", "Invalid value for ldd\n");
 		return -5;
 	}
 	if( ldl < N )
 	{
-		kaapi_error("zscaling", "Invalid value for ldl\n");
+		kaapi_error("zcopyscale", "Invalid value for ldl\n");
 		return -7;
 	}
 	if( ldu < M )
 	{
-		kaapi_error("zscaling", "Invalid value for ldu\n");
+		kaapi_error("zcopyscale", "Invalid value for ldu\n");
 		return -9;
 	}
 	
 	// TODO check if something to do ... n_cols > 0 
 		
 	// get default tile size and initialize internal descriptor if not yet
-	size_t NB = xkblas_auto_tilesize(KERN_SCALING,M,N,N); // TODO define the case for KERN_SCALING
+	size_t NB = xkblas_auto_tilesize(KERN_COPYSCALE,M,N,N); // TODO define the case for KERN_COPYSCALE
 
        	// TODO add something to force synchronous call ?
 	
@@ -194,7 +194,7 @@ int xkblas_zscaling_async(
 #endif
 	/* map output of A on ressources */
 	xkblas_context_t* xkctxt = xkblas_context_get();
-	xkblas_auto_map( xkctxt, KERN_SCALING, Lh );
+	xkblas_auto_map( xkctxt, KERN_COPYSCALE, Lh );
 
 	// TODO implement trace search KAAPI_USE_TRACELIB==1
 
@@ -205,7 +205,7 @@ int xkblas_zscaling_async(
 		{
 			int n = MIN(N - blockIdx_n * Lh->nb, Lh->nb);
 
-			INSERT_TASK_zscaling(m,n,should_copy,
+			INSERT_TASK_zcopyscale(m,n,should_copy,
 			//	NULL, 0, 0,
 				D(n,n), ldd, 
 				L(m,n), ldl, 
@@ -217,7 +217,7 @@ int xkblas_zscaling_async(
 }
 
 /* CPU driver */
-extern int xkblas_zscaling_native(
+extern int xkblas_zcopyscale_native(
 	size_t m, size_t n, bool should_copy,
 	//int* IW,
 	Complex64_t* D, size_t ldd,

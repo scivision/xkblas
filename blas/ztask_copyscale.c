@@ -39,10 +39,10 @@
 #define COLDIM(v,m,n) ((v) == CblasNoTrans ? n : m)
 
 #define STR_EXPAND(tok) #tok
-#define TASK_NAME zscaling
-#define STRNAME  "zscaling"
-#define NAME(x) x##_##zscaling
-#define PNAME(x) zscaling##_##x
+#define TASK_NAME zcopyscale
+#define STRNAME  "zcopyscale"
+#define NAME(x) x##_##zcopyscale
+#define PNAME(x) zcopyscale##_##x
 //#define SIZE_NPARAM 4
 //#define NPARAM 4
 //#define MODE_PARAM {KAAPI_ACCESS_MODE_R,KAAPI_ACCESS_MODE_R,KAAPI_ACCESS_MODE_RW,KAAPI_ACCESS_MODE_W}
@@ -59,8 +59,8 @@
 #define FORMAT_TYPE kaapi_dcplx_format
 #define SIZEOF_TYPE sizeof(Complex64_t)
 #define DOT_COLOR "peachpuff2"
-#define TASK_FLOPS FLOPS_ZSCALING(arg->n,arg->m)
-#define TASK_DATA  DATA_ZSCALING(arg->n,arg->m)
+#define TASK_FLOPS FLOPS_ZCOPYSCALE(arg->n,arg->m)
+#define TASK_DATA  DATA_ZCOPYSCALE(arg->n,arg->m)
 // TODO redefine task FLOP and TASK DATA
 
 /**
@@ -83,7 +83,7 @@
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
 
-void INSERT_TASK_zscaling(
+void INSERT_TASK_zcopyscale(
 	size_t m, size_t n, bool should_copy,
 //	xkblas_matrix_descr_t *IWh, size_t IWm, size_t IWn,
 	xkblas_matrix_descr_t *Dh, size_t Dm, size_t Dn, size_t ldd,
@@ -142,7 +142,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
   
-  xkblas_zscaling_native(
+  xkblas_zcopyscale_native(
       arg->m, arg->n, arg->should_copy,
 //    arg->IW.data, 
       arg->D.data, arg->ldd,
@@ -152,7 +152,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 }
 
 #if KAAPI_USE_CUDA||KAAPI_USE_HIP
-extern void cuda_zscaling( 
+extern void cuda_zcopyscale( 
 	cudaStream_t cuda_stream, size_t m, size_t n, bool should_copy,
         int* IW,
 	const cuDoubleComplex* D, size_t ldd,
@@ -165,7 +165,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 	
 	cudaStream_t cuda_stream;
         cublasGetStream( (cublasHandle_t) handle, &cuda_stream ); // TODO check error
-	cuda_zscaling( cuda_stream, arg->m, arg->n, arg->should_copy, 
+	cuda_zcopyscale( cuda_stream, arg->m, arg->n, arg->should_copy, 
 			NULL, //(int*) arg->IW.data, 
 			(const cuDoubleComplex*) arg->D.data, arg->ldd, 
 			(cuDoubleComplex*) arg->L.data, arg->ldl, 

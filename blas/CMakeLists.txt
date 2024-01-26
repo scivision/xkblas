@@ -21,7 +21,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BL
 # Current implementation generates explicit call to register function for each known task.
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/internal_register.h
-    COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/gen_internal_register.sh gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm scaling
+    COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/gen_internal_register.sh gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm copyscale
     DEPENDS ${CMAKE_SOURCE_DIR}/gen_internal_register.sh ${CMAKE_CURRENT_SOURCE_DIR}/task_format.h
 )
 
@@ -50,25 +50,25 @@ add_custom_command(
 list(APPEND SOURCES_S
   sgemm.c sgemmt.c strsm.c strmm.c ssymm.c ssyrk.c ssyr2k.c sxkblas.h sxkblas_f77.h
   stask_gemm.c stask_symm.c stask_gemmt.c stask_trsm.c stask_trmm.c stask_syrk.c stask_syr2k.c stask.h 
-  sscaling.c stask_scaling.c sscaling.cu
+  scopyscale.c stask_copyscale.c scopyscale.cu
 )
 
 list(APPEND SOURCES_D
   dgemm.c dgemmt.c dtrsm.c dtrmm.c dsymm.c dsyrk.c dsyr2k.c dxkblas.h dxkblas_f77.h 
   dtask_gemm.c dtask_symm.c dtask_gemmt.c dtask_trsm.c dtask_trmm.c dtask_syrk.c dtask_syr2k.c dtask.h 
-  dscaling.c dtask_scaling.c dscaling.cu
+  dcopyscale.c dtask_copyscale.c dcopyscale.cu
 )
 
 list(APPEND SOURCES_C
   cgemm.c cgemmt.c ctrsm.c ctrmm.c csymm.c csyrk.c csyr2k.c chemm.c cherk.c cher2k.c cxkblas.h cxkblas_f77.h 
   ctask_gemm.c ctask_symm.c ctask_gemmt.c ctask_trsm.c ctask_trmm.c ctask_syrk.c ctask_syr2k.c ctask_hemm.c ctask_herk.c ctask_her2k.c ctask.h 
-  cscaling.c ctask_scaling.c cscaling.cu
+  ccopyscale.c ctask_copyscale.c ccopyscale.cu
 )
 
 list(APPEND SOURCES_Z
   zgemm.c zgemmt.c ztrsm.c ztrmm.c zsymm.c zsyrk.c zsyr2k.c zhemm.c zherk.c zher2k.c zswap.c zxkblas.h 
   ztask_gemm.c ztask_symm.c ztask_gemmt.c ztask_trsm.c ztask_trmm.c ztask_syrk.c ztask_syr2k.c ztask_hemm.c ztask_herk.c ztask_her2k.c ztask_swap.c ztask.h zxkblas_f77.h 
-  zscaling.c ztask_scaling.c zscaling.cu
+  zcopyscale.c ztask_copyscale.c zcopyscale.cu
 )
 
 list(APPEND GENERATED_SOURCES ${SOURCES_S} ${SOURCES_D} ${SOURCES_C})
@@ -147,10 +147,10 @@ else()
 
 	# TODO cuda compile, make generic
 	set(CUDA_SOURCES
-		${CMAKE_CURRENT_SOURCE_DIR}/zscaling.cu
-		${CMAKE_CURRENT_BINARY_DIR}/sscaling.cu
-		${CMAKE_CURRENT_BINARY_DIR}/dscaling.cu
-		${CMAKE_CURRENT_BINARY_DIR}/cscaling.cu
+		${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
+		${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
+		${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
+		${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
 	)
 	set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
 	cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )

@@ -1,12 +1,12 @@
 /**
  *
- * @file zscaling.cu
+ * @file zcopyscale.cu
  *
  * @copyright ???
  *
  ***
  *
- * @brief zscaling cuda kernels and wrappers
+ * @brief zcopyscale cuda kernels and wrappers
  *
  * @version 1.0.0
  * @comment ...
@@ -22,10 +22,10 @@
 
 // Define fuctions as extern C so they can be linked with a C linker
 extern "C" {
-void cuda_zscaling( cudaStream_t, size_t, size_t, bool, int*, const cuDoubleComplex*, size_t, cuDoubleComplex*, size_t, cuDoubleComplex*, size_t );
+void cuda_zcopyscale( cudaStream_t, size_t, size_t, bool, int*, const cuDoubleComplex*, size_t, cuDoubleComplex*, size_t, cuDoubleComplex*, size_t );
 }
 
-__global__ void kernel_zscaling_1x1( 
+__global__ void kernel_zcopyscale_1x1( 
 		int m, int n, bool should_copy, 
 		const cuDoubleComplex* D, size_t ldd, 
 		cuDoubleComplex* L, size_t ldl,
@@ -86,7 +86,7 @@ __global__ void kernel_zscaling_1x1(
 }
 
 
-void cuda_zscaling( 
+void cuda_zcopyscale( 
 	cudaStream_t cuda_stream, size_t m, size_t n, bool should_copy,
         int* IW,
 	const cuDoubleComplex* D, size_t ldd,
@@ -108,5 +108,5 @@ void cuda_zscaling(
 	// We will store L and D-1 (as a vector)
 	int element_in_shared = B.x*B.y + 1*B.x;
 	size_t shared_size = sizeof(cuDoubleComplex) * element_in_shared; // ~16ko, all cuda GPU have 48ko available
-	kernel_zscaling_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
+	kernel_zcopyscale_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
 }

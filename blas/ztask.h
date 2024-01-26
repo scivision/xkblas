@@ -132,13 +132,13 @@ void INSERT_TASK_zswap(
 );
 void register_format_zswap(void);
 
-void INSERT_TASK_zscaling(
+void INSERT_TASK_zcopyscale(
 	size_t m, size_t n, bool should_copy,
 	xkblas_matrix_descr_t *D, size_t Dm, size_t Dn, size_t ldd,
 	xkblas_matrix_descr_t *L, size_t Lm, size_t Ln, size_t ldl,
 	xkblas_matrix_descr_t *U, size_t Um, size_t Un, size_t ldu
 );
-void register_format_zscaling(void);
+void register_format_zcopyscale(void);
 
 #endif
 

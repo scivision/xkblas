@@ -1,6 +1,6 @@
 /**
  *
- * @file testing_zscaling.c
+ * @file testing_zcopyscale.c
  *
  * @copyright 2009-2014 The University of Tennessee and The University of
  *                      Tennessee Research Foundation. All rights reserved.
@@ -9,7 +9,7 @@
  *
  ***
  *
- * @brief zscaling testing
+ * @brief zcopyscale testing
  *
  * @version 1.0.0
  * @comment 
@@ -34,11 +34,11 @@
 
 #include "flops.h"
 
-int testing_zscaling(int argc, char **argv)
+int testing_zcopyscale(int argc, char **argv)
 {
 	/* Check for number of arguments*/
 	if( argc < 6 ) {
-		USAGE("SCALING", "m n ldd ldl ldu cpy",
+		USAGE("COPYSCALE", "m n ldd ldl ldu cpy",
 			"\t- m   : number of rows of L, number of cols of U\n"
 			"\t- n   : number of cols of L, number of rows and cols of D, number of rows of U\n"
 			"\t- ldd : leading dimension of matrix D\n"
@@ -59,7 +59,7 @@ int testing_zscaling(int argc, char **argv)
 	eps = LAPACKE_dlamch_work('e'); // TODO ???
 
 	printf("\n");
-	printf("------ TESTS FOR XKBLAS ZSCALING ROUTINE -------  \n");
+	printf("------ TESTS FOR XKBLAS ZCOPYSCALE ROUTINE -------  \n");
 	printf("            Size of the Matrix L %d by %d\n", M, N);
 	printf("\n");
 	printf(" The matrices L and D are randomly generated for each test.\n");
@@ -68,7 +68,7 @@ int testing_zscaling(int argc, char **argv)
 	printf(" Computational tests pass if scaled residuals are less than 10.\n");
 
 	/*----------------------------------------------------------
-	 *  TESTING SCALING
+	 *  TESTING COPYSCALE
 	 */
 
 #define ITER 5
@@ -114,9 +114,9 @@ int testing_zscaling(int argc, char **argv)
 			Uinit[i] = Ufinal[i] = U[i];
 		}
 
-		/* Compute zscaling */
+		/* Compute zcopyscale */
 		double t0 = xkblas_elapsedtime();
-		xkblas_zscaling_async( M, N, CPY, D, LDD, L, LDL, U, LDU );
+		xkblas_zcopyscale_async( M, N, CPY, D, LDD, L, LDL, U, LDU );
 		xkblas_memory_coherent_async( 0, 0, M, N, Ufinal, LDU, sizeof(Complex64_t) );
 		xkblas_memory_coherent_async( 0, 0, N, M, Lfinal, LDL, sizeof(Complex64_t) );
 		xkblas_sync();
@@ -146,14 +146,14 @@ int testing_zscaling(int argc, char **argv)
 	printf("***************************************************\n");
 	if (suspicious == 0 )
 	{
-		printf("\t- TESTING ZSCALING ... PASSED !\n");
+		printf("\t- TESTING ZCOPYSCALE ... PASSED !\n");
 		// TODO do correct measure of execution time ?
 		//for( int i = 0; i < ITER; i++ )
 		//	printf("GFlops=%f\n", flops[i]/time[i]);
 	}
 	else
 	{
-		printf("\t- TESTING ZSCALING ... FAILED !\n");
+		printf("\t- TESTING ZCOPYSCALE ... FAILED !\n");
 		return 1;
 	}
 	return 0;
