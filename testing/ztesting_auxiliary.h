@@ -81,6 +81,7 @@ int testing_ztrmm(int argc, char **argv);
 int testing_zsymm(int argc, char **argv);
 int testing_zsyrk(int argc, char **argv);
 int testing_zsyr2k(int argc, char **argv);
+int testing_zscaling(int argc, char **argv);
 #if defined(PRECISION_z) || defined(PRECISION_c)
 int testing_zhemm(int argc, char **argv);
 int testing_zherk(int argc, char **argv);
