@@ -141,7 +141,7 @@ int xkblas_zcopyscale_async(
 	int ldu = lda;
 	*/
 	size_t M, size_t N, bool should_copy,
-	//int* IW,
+	int* IW,
 	Complex64_t* D, size_t ldd,
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)
@@ -219,7 +219,7 @@ int xkblas_zcopyscale_async(
 /* CPU driver */
 extern int xkblas_zcopyscale_native(
 	size_t m, size_t n, bool should_copy,
-	//int* IW,
+	int* IW,
 	Complex64_t* D, size_t ldd,
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)

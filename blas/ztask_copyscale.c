@@ -144,6 +144,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
   
   xkblas_zcopyscale_native(
       arg->m, arg->n, arg->should_copy,
+      NULL,
 //    arg->IW.data, 
       arg->D.data, arg->ldd,
       arg->L.data, arg->ldl,

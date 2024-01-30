@@ -157,14 +157,14 @@ extern int xkblas_zswap_native(
 
 extern int xkblas_zcopyscale_async(
 	size_t m, size_t n, bool should_copy,
-	//int* IW,
+	int* IW,
 	Complex64_t* D, size_t ldd,
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu);
 
 extern int xkblas_zcopyscale_native(
 	size_t m, size_t n, bool should_copy,
-	//int* IW,
+	int* IW,
 	Complex64_t* D, size_t ldd,
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu);

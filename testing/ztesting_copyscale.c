@@ -116,7 +116,7 @@ int testing_zcopyscale(int argc, char **argv)
 
 		/* Compute zcopyscale */
 		double t0 = xkblas_elapsedtime();
-		xkblas_zcopyscale_async( M, N, CPY, D, LDD, L, LDL, U, LDU );
+		xkblas_zcopyscale_async( M, N, CPY, NULL, D, LDD, L, LDL, U, LDU );
 		xkblas_memory_coherent_async( 0, 0, M, N, Ufinal, LDU, sizeof(Complex64_t) );
 		xkblas_memory_coherent_async( 0, 0, N, M, Lfinal, LDL, sizeof(Complex64_t) );
 		xkblas_sync();
