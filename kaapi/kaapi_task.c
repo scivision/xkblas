@@ -454,7 +454,7 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
           }
         } // mdi !=0
         else {
-          printf("Bad MDI index\n");
+          printf("Bad MDI index %p\n", access);
           kaapi_assert(0);
         }
        

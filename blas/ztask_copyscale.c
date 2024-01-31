@@ -102,39 +102,33 @@ void INSERT_TASK_zcopyscale(
 	taskarg->m = m;
 	taskarg->n = n;
 	taskarg->should_copy = should_copy;
-	//kaapi_update_dependencies( thread, &taskarg->IW, task, KAAPI_ACCESS_MODE_R, xkblas_get_handle(IWh, IWm, IWn) );	
+	printf("Dh %p, Dm %d/%d, Dn %d/%d %p\n", Dh, Dm, Dh->mt, Dn, Dh->nt, &taskarg->D);
 	kaapi_update_dependencies( thread, &taskarg->D, task,
 		KAAPI_ACCESS_MODE_R, xkblas_get_handle(Dh, Dm, Dn) );	
 	taskarg->ldd = ldd;
+
+	printf("Lh %p, Lm %d/%d, Ln %d/%d %p\n", Lh, Lm, Lh->mt, Ln, Lh->nt, &taskarg->L);
 	kaapi_update_dependencies( thread, &taskarg->L, task,
 		KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Lh, Lm, Ln) );	
 	taskarg->ldl = ldl;
+	
+	printf("Uh %p, Um %d/%d, Un %d/%d %p\n", Uh, Um, Uh->mt, Un, Uh->nt, &taskarg->U);
 	kaapi_update_dependencies( thread, &taskarg->U, task,
 		KAAPI_ACCESS_MODE_W, xkblas_get_handle(Uh, Um, Un) );	
 	taskarg->ldu = ldu;
+	//kaapi_update_dependencies( thread, &taskarg->IW, task, KAAPI_ACCESS_MODE_R, xkblas_get_handle(IWh, IWm, IWn) );	
 
 	// ????
 #if KAAPI_USE_OCR
     		// OCR on the L (because RW) -> maybe U -> R, L -> W
 	kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
 #else
-    	uint16_t ldid = xkblas_get_ld(Lh, Lm, Ln);
-    	kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
+	uint16_t ldid = xkblas_get_ld(Lh, Lm, Ln);
+	kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
 #endif
     
-    	kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
-    	kaapi_task_commit( thread, task );
-	
-	// TODO add debug infos
-	/*
-#if defined(KAAPI_DEBUG)
-  printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
-      A, kaapi_dbg_get_name(A), n, k, lda, (transA==CblasNoTrans ? "":"^t"),
-      B, kaapi_dbg_get_name(B), k, n, ldb, (transB==CblasNoTrans ? "":"^t"),
-      C, kaapi_dbg_get_name(C), n, n, ldc
-  );
-#endif
-  	*/
+	kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
+	kaapi_task_commit( thread, task );	
 }
 
 

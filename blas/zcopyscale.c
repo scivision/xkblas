@@ -121,25 +121,6 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 int xkblas_zcopyscale_async(
-	/*
-	
-	int i_rowmax, int i_rowmin, int sizecopy, 
-	int lda, int n_cols, 
-	int lIW, int* IW, int offset_IW,
-	int la, Complex64_t* A, 
-	size_t pos_elt, size_t A_Lpos, size_t A_Upos, size_t A_Dpos, bool copy_needed)
-{
-	// unused variables sizecopy, lIW, pos_elt
-	int M = i_rowmax - i_rowmin;
-	int N = n_cols;
-	Complex64_t* D = A + A_Dpos;
-	Complex64_t* L = A + A_Lpos;
-	Complex64_t* U = A + A_Upos;
-	// TODO IW handling apply offset
-	int ldd = lda;
-	int ldl = lda;
-	int ldu = lda;
-	*/
 	size_t M, size_t N, bool should_copy,
 	int* IW,
 	Complex64_t* D, size_t ldd,
@@ -165,25 +146,63 @@ int xkblas_zcopyscale_async(
 	
 	// TODO check if something to do ... n_cols > 0 
 		
-	// get default tile size and initialize internal descriptor if not yet
-	size_t NB = xkblas_auto_tilesize(KERN_COPYSCALE,M,N,N); // TODO define the case for KERN_COPYSCALE
-
-       	// TODO add something to force synchronous call ?
-	
+	// get default tile size and initialize internal descriptor if not yet	
 	xkblas_matrix_descr_t* Dh = xkblas_find(D);	
 	xkblas_matrix_descr_t* Lh = xkblas_find(L);	
 	xkblas_matrix_descr_t* Uh = xkblas_find(U);	
 	// TODO IW handle add desc
-	
-    	if (!xkblas_matrix_descr_isinit(Dh))
-      		xkblas_init_matrix_handle(Dh, (void*)D, N, N, ldd, sizeof(Complex64_t), NB, NB);
-      	kaapi_assert_debug( (Dh->ld == ldd) && (Dh->M == N) && (Dh->N == N) );
-    	if (!xkblas_matrix_descr_isinit(Lh))
-      		xkblas_init_matrix_handle(Lh, (void*)L, M, N, ldl, sizeof(Complex64_t), NB, NB);
-      	kaapi_assert_debug( (Lh->ld == ldl) && (Lh->M == M) && (Lh->N == N) );
-    	if (!xkblas_matrix_descr_isinit(Uh))
-      		xkblas_init_matrix_handle(Uh, (void*)U, N, M, ldu, sizeof(Complex64_t), NB, NB);
-      	kaapi_assert_debug( (Uh->ld == ldu) && (Uh->M == N) && (Uh->N == M) );
+
+	printf("M %d, N %d, ldd %d, ldl %d, ldu %d\n", M, N, ldd, ldl, ldu);
+	int Dstatus = xkblas_matrix_descr_isinit(Dh);
+	int Lstatus = xkblas_matrix_descr_isinit(Lh);
+	int Ustatus = xkblas_matrix_descr_isinit(Uh);
+
+	int n_block = 0;
+	int m_block = 0;
+	{
+		// Try to define common NB and MB size
+		if( Dstatus )
+		{
+			kaapi_assert_debug_m( Dh->nb == Dh->mb, "copyscale error: unsupported D splitting" );
+			n_block = Dh->nb;
+		}
+
+		if( Lstatus )
+		{
+			if( n_block == 0 )
+							n_block = Lh->mb;
+			m_block = Lh->nb;
+			kaapi_assert_debug_m( n_block == Lh->mb, "copyscale error: L and D splitting are incompatible" );
+		}
+
+		if( Ustatus )
+		{
+			if( m_block == 0 )
+				m_block = Uh->mb;
+			if( n_block == 0 )
+				n_block = Uh->nb;
+			kaapi_assert_debug_m( (n_block == Uh->nb) && (m_block == Uh->mb), "copyscale error: U splitting incompatible with L and D"  );
+		}
+
+		size_t NB = xkblas_auto_tilesize(KERN_COPYSCALE,M,N,N); // TODO define the case for KERN_COPYSCALE
+		if( n_block == 0 )
+						n_block = NB;
+		if( m_block == 0 )
+						m_block = NB;
+
+		// init unitialised matrices
+		if( !Dstatus )
+			xkblas_init_matrix_handle(Dh, (void*)D, N, N, ldd, sizeof(Complex64_t), n_block, n_block);
+		if( !Lstatus )
+			xkblas_init_matrix_handle(Lh, (void*)L, N, M, ldl, sizeof(Complex64_t), n_block, m_block);
+		if( !Ustatus )
+			xkblas_init_matrix_handle(Uh, (void*)U, M, N, ldu, sizeof(Complex64_t), m_block, n_block);
+	}
+	kaapi_assert_debug_m( (Dh->ld == ldd) && (Dh->M == N) && (Dh->N == N), "Invalid matrice D" );
+	kaapi_assert_debug_m( (Lh->ld == ldl) && (Lh->M == N) && (Lh->N == M), "Invalid matrice L" );
+	kaapi_assert_debug_m( (Uh->ld == ldu) && (Uh->M == M) && (Uh->N == N), "Invalid matrice U" );
+	Ustatus = xkblas_matrix_descr_isinit(Uh);
+	printf("U status %d\n", Ustatus);
 
 #if defined(KAAPI_DEBUG)
 	{
@@ -192,24 +211,29 @@ int xkblas_zcopyscale_async(
 		assert( 0 == xkblas_dbg_setname( "U", Uh ) );
 	}
 #endif
+
 	/* map output of A on ressources */
 	xkblas_context_t* xkctxt = xkblas_context_get();
 	xkblas_auto_map( xkctxt, KERN_COPYSCALE, Lh );
 
 	// TODO implement trace search KAAPI_USE_TRACELIB==1
-
-	for( int blockIdx_m = 0; blockIdx_m < Lh->mt; blockIdx_m++ )
+	printf("Lhmt %d, Lhnt %d\n", Lh->mt, Lh->nt );
+	for( int blockIdx_m = 0; blockIdx_m < Lh->nt; blockIdx_m++ )
 	{
-		int m = MIN(M - blockIdx_m * Lh->mb, Lh->mb);
-		for( int blockIdx_n = 0; blockIdx_n < Lh->nt; blockIdx_n++ )
+		int m = MIN(M - blockIdx_m * Lh->nb, Lh->nb);
+		for( int blockIdx_n = 0; blockIdx_n < Lh->mt; blockIdx_n++ )
 		{
-			int n = MIN(N - blockIdx_n * Lh->nb, Lh->nb);
+			int n = MIN(N - blockIdx_n * Lh->mb, Lh->mb);
+			printf( "bm %d, bn %d\n", blockIdx_m, blockIdx_n );
 
 			INSERT_TASK_zcopyscale(m,n,should_copy,
 			//	NULL, 0, 0,
-				D(n,n), ldd, 
-				L(m,n), ldl, 
-				U(n,m), ldu );
+				D(blockIdx_n, blockIdx_n), ldd,
+				L(blockIdx_n, blockIdx_m), ldl,
+				U(blockIdx_m, blockIdx_n), ldu );
+			//	D(n,n), ldd, 
+			//	L(m,n), ldl, 
+			//	U(n,m), ldu );
 
 		}
 	}
