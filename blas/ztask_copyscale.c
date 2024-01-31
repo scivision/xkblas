@@ -121,7 +121,7 @@ void INSERT_TASK_zcopyscale(
 	// ????
 #if KAAPI_USE_OCR
     		// OCR on the L (because RW) -> maybe U -> R, L -> W
-	kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
+	kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 1);
 #else
 	uint16_t ldid = xkblas_get_ld(Lh, Lm, Ln);
 	kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);

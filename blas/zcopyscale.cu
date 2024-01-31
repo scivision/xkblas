@@ -17,6 +17,7 @@
 #include <cooperative_groups.h>
 #include <cuComplex.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include<ztask_internal.h>
 
@@ -39,19 +40,26 @@ __global__ void kernel_zcopyscale_1x1(
 	int idx_x = blockDim.x * blockIdx.x + threadIdx.x;
 	int idx_y = blockDim.y * blockIdx.y + threadIdx.y;
 
+	int col_count = min( blockDim.x * (blockIdx.x + 1), n ) - blockDim.x * blockIdx.x;
+	int row_count = min( blockDim.y * (blockIdx.y + 1), m ) - blockDim.y * blockIdx.y;
+
 	// Load L in shared
-	if( idx_x < n && idx_y < m )
+	if( threadIdx.x < col_count && threadIdx.y < row_count )
 	{ // TODO deal with bank conflict (cf nvidia blog)
-		shm_L[ threadIdx.x + threadIdx.y * blockDim.x ] = L[ idx_x + idx_y * ldl ];
+		size_t s_pos = threadIdx.x + threadIdx.y * blockDim.x;
+		size_t l_pos = idx_x + idx_y * ldl;
+		shm_L[ s_pos ] = L[ l_pos ];
 	}
 	block_group.sync(); // Wait L loaded in shared
 
 	// Transpose in U
-	if( should_copy && idx_x < m && idx_y < n )
+	if( should_copy && threadIdx.x < row_count && threadIdx.y < col_count )
 	{
-		size_t pos_block_u = blockDim.x * blockIdx.x + (blockDim.y * blockIdx.y) * ldu;
-		U[ pos_block_u + threadIdx.x + threadIdx.y * ldu ] 
-			= L[ threadIdx.x * blockDim.y + threadIdx.y ];	
+		size_t pos_block_u = (blockDim.x * blockIdx.x) * ldu + (blockDim.y * blockIdx.y);
+		size_t s_pos = threadIdx.x * blockDim.x + threadIdx.y;
+		size_t u_pos = pos_block_u + threadIdx.x + threadIdx.y * ldu;
+
+		U[ u_pos ] = shm_L[ s_pos ];	
 	}
 
 	// Update L
@@ -69,7 +77,7 @@ __global__ void kernel_zcopyscale_1x1(
 	}
 	block_group.sync(); // Wait D loaded in shared
 
-	if( idx_x < n && idx_y < m )
+	if( threadIdx.x < col_count && threadIdx.y < row_count )
 	{
 		cuDoubleComplex V = shm_L[ threadIdx.x + threadIdx.y * blockDim.x ];
 		cuDoubleComplex	X = shm_X[ threadIdx.x ];
@@ -78,8 +86,8 @@ __global__ void kernel_zcopyscale_1x1(
 #if (PRECISION_s == 1) || (PRECISION_d == 1)
 		ret = V * X;
 #else
-		ret.x = V.x * X.x - V.y * V.y;
-		ret.y = V.x * X.y + V.y * V.x;
+		ret.x = V.x * X.x - V.y * X.y;
+		ret.y = V.x * X.y + V.y * X.x;
 #endif
 		L[ idx_x + idx_y * ldl ] = ret;
 	}
@@ -108,5 +116,9 @@ void cuda_zcopyscale(
 	// We will store L and D-1 (as a vector)
 	int element_in_shared = B.x*B.y + 1*B.x;
 	size_t shared_size = sizeof(cuDoubleComplex) * element_in_shared; // ~16ko, all cuda GPU have 48ko available
+	printf("Start copyscale %d %d \n", m, n);
 	kernel_zcopyscale_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
+	cudaStreamSynchronize(cuda_stream);
+	printf("End copyscale\n");
+
 }
