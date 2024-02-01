@@ -116,9 +116,9 @@ void cuda_zcopyscale(
 	// We will store L and D-1 (as a vector)
 	int element_in_shared = B.x*B.y + 1*B.x;
 	size_t shared_size = sizeof(cuDoubleComplex) * element_in_shared; // ~16ko, all cuda GPU have 48ko available
-	printf("Start copyscale %d %d \n", m, n);
+	//printf("Start copyscale %d %d \n", m, n);
 	kernel_zcopyscale_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
 	cudaStreamSynchronize(cuda_stream);
-	printf("End copyscale\n");
+	//printf("End copyscale\n");
 
 }

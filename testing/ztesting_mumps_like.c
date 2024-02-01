@@ -72,7 +72,7 @@ int testing_zmumps_like(int argc, char **argv)
 	 *  TESTING COPYSCALE
 	 */
 
-#define ITER 5
+#define ITER 1
 	for( int i_iter = 0; i_iter < ITER; i_iter++ )
 	{
 		/* Allocate */
@@ -93,40 +93,38 @@ int testing_zmumps_like(int argc, char **argv)
 		LAPACKE_zlarnv_work(IONE, ISEED, LD*LD, A);
 	
 		/* Compute */
-		Complex64_t one;
-#if (PRECISION_s == 1) || (PRECISION_d == 1)
-		one = 1;
-#else
-		one = 1;
-		//one.x = 1;
-		//one.y = 0;
-#endif
+		Complex64_t one = 1;
+		Complex64_t zero = 0;
 		char side = 'L';
 		char uplo = 'U';
 		char transA = 'T';
 		char diag = 'U';
+		
 		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ),
 				xkblas_blas2cblas_fill( &uplo ),
 				xkblas_blas2cblas_trans( &transA ),
 				xkblas_blas2cblas_diag( &diag ),
 				N, M, &one, D, LD, L, LD );	
-				
+		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Comment here to unlock
+		
 		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
+		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // OR comment here to unlock	
+		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t));	
+	
+		char transL = 'T';
+		char transU = 'T';	
+		xkblas_zgemmt_async( 
+				xkblas_blas2cblas_fill(&uplo),
+				xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
+				M, N, &one, L, LD, U, LD, &one, G, LD );
+		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t));	
 		
 		printf("Before sync\n");
 		xkblas_sync();
 		printf("After sync\n");
-		//xkblas_zgemmt_async( 
-
-
-		/*
-		xkblas_zcopyscale_async( M, N, CPY, NULL, D, LDD, L, LDL, U, LDU );
-		xkblas_memory_coherent_async( 0, 0, M, N, Ufinal, LDU, sizeof(Complex64_t) );
-		xkblas_memory_coherent_async( 0, 0, N, M, Lfinal, LDL, sizeof(Complex64_t) );
-		xkblas_sync();
 		xkblas_memory_invalidate_caches();
-		*/
-
+		//xkblas_zgemmt_async( 
+		
 		xkblas_free(A,LD*LD*sizeof(Complex64_t));
 	}
 
