@@ -127,7 +127,6 @@ int xkblas_zcopyscale_async(
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)
 {
-	printf("Call COPYSCALE ASYNC M %d, N %d\n", M, N);
 	// TODO Check input args
 	if( ldd < N )
 	{
@@ -153,7 +152,6 @@ int xkblas_zcopyscale_async(
 	xkblas_matrix_descr_t* Uh = xkblas_find(U);	
 	// TODO IW handle add desc
 
-	printf("M %d, N %d, ldd %d, ldl %d, ldu %d\n", M, N, ldd, ldl, ldu);
 	int Dstatus = xkblas_matrix_descr_isinit(Dh);
 	int Lstatus = xkblas_matrix_descr_isinit(Lh);
 	int Ustatus = xkblas_matrix_descr_isinit(Uh);
@@ -203,7 +201,6 @@ int xkblas_zcopyscale_async(
 	kaapi_assert_debug_m( (Lh->ld == ldl) && (Lh->M == N) && (Lh->N == M), "Invalid matrice L" );
 	kaapi_assert_debug_m( (Uh->ld == ldu) && (Uh->M == M) && (Uh->N == N), "Invalid matrice U" );
 	Ustatus = xkblas_matrix_descr_isinit(Uh);
-	printf("m_block %d, n_block %d\n", m_block, n_block);
 
 #if defined(KAAPI_DEBUG)
 	{

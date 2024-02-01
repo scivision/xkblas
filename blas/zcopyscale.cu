@@ -118,7 +118,6 @@ void cuda_zcopyscale(
 	size_t shared_size = sizeof(cuDoubleComplex) * element_in_shared; // ~16ko, all cuda GPU have 48ko available
 	//printf("Start copyscale %d %d \n", m, n);
 	kernel_zcopyscale_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
-	cudaStreamSynchronize(cuda_stream);
 	//printf("End copyscale\n");
 
 }
