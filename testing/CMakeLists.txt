@@ -7,6 +7,7 @@ list(APPEND GENERATED_SOURCES
   dtesting_gemm.c dtesting_trsm.c dtesting_trmm.c dtesting_symm.c dtesting_syrk.c dtesting_syr2k.c dplgsy.c dtesting_auxiliary.h dtesting_auxiliary.c
   ctesting_gemm.c ctesting_trsm.c ctesting_trmm.c ctesting_hemm.c ctesting_symm.c ctesting_syrk.c ctesting_syr2k.c ctesting_herk.c ctesting_her2k.c cplghe.c cplgsy.c ctesting_auxiliary.h ctesting_auxiliary.c
   stesting_copyscale.c dtesting_copyscale.c ctesting_copyscale.c
+  stesting_mumps_like.c dtesting_mumps_like.c ctesting_mumps_like.c 
 ) 
 
 
@@ -35,6 +36,7 @@ set(SOURCES_TESTING_Z
   ztesting_herk.c
   ztesting_her2k.c
   ztesting_copyscale.c
+  ztesting_mumps_like.c
   zplghe.c
   zplgsy.c
   ztesting_auxiliary.h ztesting_auxiliary.c
@@ -57,6 +59,7 @@ set(SOURCES_TESTING_C
   ctesting_herk.c
   ctesting_her2k.c
   ctesting_copyscale.c
+  ctesting_mumps_like.c
   cplghe.c
   cplgsy.c
   ctesting_auxiliary.h ctesting_auxiliary.c
@@ -76,6 +79,7 @@ set(SOURCES_TESTING_D
   dtesting_syrk.c
   dtesting_syr2k.c
   dtesting_copyscale.c
+  dtesting_mumps_like.c
   dplgsy.c
   dtesting_auxiliary.h dtesting_auxiliary.c
   )
@@ -95,6 +99,7 @@ set(SOURCES_TESTING_S
   stesting_syrk.c
   stesting_syr2k.c
   stesting_copyscale.c
+  stesting_mumps_like.c
   splgsy.c
   stesting_auxiliary.h stesting_auxiliary.c
   )

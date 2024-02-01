@@ -115,7 +115,7 @@ int main (int argc, char **argv)
                "   - nb     : define the tile size\n"
                "   - ib     : define the inner tile size\n"
                "   - FUNC   : name of function to test\n"
-               "              name could be GEMM TRMM TRSM SYMM SYRK SR2K COPYSCALE"
+               "              name could be GEMM TRMM TRSM SYMM SYRK SR2K COPYSCALE MUMPSLIKE"
 #if (PRECISION_z==1) || (PRECISION_c==1)
                " HEMM HERK HER2K\n"
 #else
@@ -166,6 +166,9 @@ int main (int argc, char **argv)
     }
     else if ( strcmp(func, "COPYSCALE") == 0 ) {
     	info += testing_zcopyscale( argc, argv );
+    }
+    else if ( strcmp(func, "MUMPSLIKE") == 0 ) {
+    	info += testing_zmumps_like( argc, argv );
     }
 #if (PRECISION_z==1) || (PRECISION_c==1)
     else if ( strcmp(func, "HEMM") == 0 ) {
