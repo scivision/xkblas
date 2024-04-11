@@ -127,6 +127,8 @@ int xkblas_zcopyscale_async(
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)
 {
+	printf("[XKBLAS] copyscale M %d, N %d, D %p, ldd %d, L %p, ldl %d, U %p, ldu %d\n",
+									M, N, D, ldd, L, ldl, U, ldu );
 	// TODO Check input args
 	if( ldd < N )
 	{
@@ -214,7 +216,19 @@ int xkblas_zcopyscale_async(
 	xkblas_context_t* xkctxt = xkblas_context_get();
 	xkblas_auto_map( xkctxt, KERN_COPYSCALE, Lh );
 
-	// TODO implement trace search KAAPI_USE_TRACELIB==1
+#if KAAPI_USE_TRACELIB==1
+	kaapi_context_t* ctxt = kxctxt->kctxt;
+	kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 /*begin*/);
+	if(evt)
+	{
+		strncpy(evt->u.s.d0.c8,"zcpys",8);
+		evt->u.s.d1.u = M;
+		evt->u.s.d2.u = N;
+		KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
+	}
+	//evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 2 /*info*/
+#endif
+
 	for( int blockIdx_m = 0; blockIdx_m < Lh->nt; blockIdx_m++ )
 	{
 		int m = MIN(M - blockIdx_m * Lh->nb, Lh->nb);
