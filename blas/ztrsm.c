@@ -157,6 +157,7 @@ int xkblas_ztrsm_async(
 
     /* get default tile size and initialize internal descriptor if not yet */
     size_t NB = xkblas_auto_tilesize(KERN_TRSM,N,NRHS,NA);
+		//NB = 64;
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);

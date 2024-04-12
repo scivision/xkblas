@@ -34,6 +34,19 @@
 
 #include "flops.h"
 
+void check_d_matrice( double A, double B, int m, int n, int ld ){
+	int error_count = 0;
+	for( int i = 0; i < m; i++ )
+	{
+		for( int j = 0; j < n; j++ )
+		{
+			if( A[i + j*ld] != B[i + j*ld] )
+				error_count++;
+		}
+	}
+	printf("Error count = %d\n", error_count);
+}
+
 int testing_zmumps_like(int argc, char **argv)
 {
 	// Operations: 
@@ -81,6 +94,12 @@ int testing_zmumps_like(int argc, char **argv)
 		Complex64_t *U = A + N;
 		Complex64_t *L = A + N * LD;
 		Complex64_t *G = A + N * LD + N;
+		
+		Complex64_t *A_ref = (Complex64_t*) xkblas_malloc(LD*LD*sizeof(Complex64_t));
+		Complex64_t *D_ref = A_ref;
+		Complex64_t *U_ref = A_ref + N;
+		Complex64_t *L_ref = A_ref + N * LD;
+		Complex64_t *G_ref = A_ref + N * LD + N;
 	
 		if(!A)
 		{
@@ -91,7 +110,8 @@ int testing_zmumps_like(int argc, char **argv)
 
 		/* Prepare random data */
 		LAPACKE_zlarnv_work(IONE, ISEED, LD*LD, A);
-	
+		memcpy( A_ref, A, LD*LD*sizeof(Complex64_t) );
+
 		/* Compute */
 		Complex64_t one = 1;
 		Complex64_t zero = 0;
@@ -99,33 +119,45 @@ int testing_zmumps_like(int argc, char **argv)
 		char uplo = 'U';
 		char transA = 'T';
 		char diag = 'U';
-		
-		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ),
-				xkblas_blas2cblas_fill( &uplo ),
-				xkblas_blas2cblas_trans( &transA ),
-				xkblas_blas2cblas_diag( &diag ),
-				N, M, &one, D, LD, L, LD );	
-		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Comment here to unlock
-		
-		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
-		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // OR comment here to unlock	
-		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t));	
-	
 		char transL = 'T';
 		char transU = 'T';	
-		xkblas_zgemmt_async( 
-				xkblas_blas2cblas_fill(&uplo),
-				xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
+		
+		// Execute version without sync
+		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
+				N, M, &one, D, LD, L, LD );
+
+		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
+		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Get L back
+		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t)); // Get U back
+
+		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo),	xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
 				M, N, &one, L, LD, U, LD, &one, G, LD );
-		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t));	
-		
-		printf("Before sync\n");
+		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t)); // Get G back
 		xkblas_sync();
-		printf("After sync\n");
 		xkblas_memory_invalidate_caches();
-		//xkblas_zgemmt_async( 
-		
+		print("Without sync execution done\n");
+
+		// Execute version without sync
+		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
+				N, M, &one, D_ref, LD, L_ref, LD );
+
+		xkblas_zcopyscale_async( M, N, true, NULL, D_ref, LD, L_ref, LD, U_ref, LD );
+		xkblas_memory_coherent_async( 0, 0, N, M, L_ref, LD, sizeof(Complex64_t)); // Get L back
+		xkblas_memory_coherent_async( 0, 0, M, N, U_ref, LD, sizeof(Complex64_t)); // Get U back
+
+		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo),	xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
+				M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
+		xkblas_memory_coherent_async( 0, 0, M, M, G_ref, LD, sizeof(Complex64_t)); // Get G back
+		xkblas_sync();
+		xkblas_memory_invalidate_caches();
+		print("With sync execution done\n");
+
+#if (PRECISION_d == 1)
+		check_d_matrice( A, A_ref, M, N, LD );
+#endif
+
 		xkblas_free(A,LD*LD*sizeof(Complex64_t));
+		xkblas_free(A_ref,LD*LD*sizeof(Complex64_t));
 	}
 
 	printf("***************************************************\n");

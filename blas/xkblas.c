@@ -1805,6 +1805,7 @@ size_t xkblas_auto_tilesize(
 {
   /* get default tile size and initialize internal descriptor if not yet */
   size_t NB = xkblas_get_param();
+	NB = 64;
   if (NB !=0) return NB;
   size_t ngpu = xkblas_get_ngpus();
   size_t fact = 1;
