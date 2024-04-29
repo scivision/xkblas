@@ -36,12 +36,7 @@
 #include <math.h>
 #endif
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-
 #define STR_EXPAND(tok) #tok
-
 
 #define ROWDIM(v,m,n) ((v) == CblasNoTrans ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasNoTrans ? n : m)
@@ -92,6 +87,18 @@
   Complex64_t beta;
   kaapi_access_t C;
   size_t ldc;
+#if defined(KAAPI_DEBUG)
+	/* debug */
+	void* A_host_ptr;
+	void* B_host_ptr;
+	void* C_host_ptr;
+	size_t Am;
+	size_t An;
+	size_t Bm;
+	size_t Bn;
+	size_t Cm;
+	size_t Cn;
+#endif
   xkblas_mode_math_t mm;
 } NAME(Arg);
 
@@ -128,6 +135,17 @@ void INSERT_TASK_zgemm(
     taskarg->beta = beta;
     taskarg->ldc = ldc;
     taskarg->mm = xkblas_get_modemath();
+#if defined(KAAPI_DEBUG)
+		taskarg->A_host_ptr = Ah->addr;
+		taskarg->B_host_ptr = Bh->addr;
+		taskarg->C_host_ptr = Ch->addr;
+		taskarg->Am = Am;
+		taskarg->An = An;
+		taskarg->Bm = Bm;
+		taskarg->Bn = Bn;
+		taskarg->Cm = Cm;
+		taskarg->Cn = Cn;
+#endif
 #if KAAPI_USE_OCR
     /* OCR on the third parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
@@ -176,6 +194,14 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
     kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
 #endif
   }
+
+#if defined(KAAPI_DEBUG)
+	printf("%s[%d,%d,%d]: A[%p](%i,%i) B[%p](%i,%i) C[%p](%i,%i)\n", __func__,
+		arg->m, arg->n, arg->k,
+		arg->A_host_ptr, arg->Am, arg->An,
+		arg->B_host_ptr, arg->Bm, arg->Bn,
+		arg->C_host_ptr, arg->Cm, arg->Cn);
+#endif
 
   res = cublasZgemm((cublasHandle_t)handle,
       cblas2cublas_op(arg->transA), cblas2cublas_op(arg->transB),

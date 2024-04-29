@@ -30,10 +30,6 @@
 #include "ztask.h"
 #include "ztask_internal.h"
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-
 // for TRSM
 #define ROWDIM(v,m,n) ((v) == CblasLeft ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasLeft ? m : n)
@@ -76,6 +72,8 @@
   size_t ldb;
 #if defined(KAAPI_DEBUG)
   /* debug */
+	void* A_host_ptr;
+	void* B_host_ptr;
   size_t Am;
   size_t An;
   size_t Bm;
@@ -106,6 +104,8 @@ void INSERT_TASK_ztrsm(
     taskarg->m = m;
     taskarg->n = n;
 #if defined(KAAPI_DEBUG)
+		taskarg->A_host_ptr = Ah->addr;
+		taskarg->B_host_ptr = Bh->addr;
     taskarg->Am = Am;
     taskarg->An = An;
     taskarg->Bm = Bm;
@@ -163,10 +163,11 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
 #if defined(KAAPI_DEBUG)
-  printf("%s: A(%i,%i) X = B(%i,%i)\n",__func__,
-      arg->Am, arg->An, arg->Bm, arg->Bn
+  printf("%s[%d,%d]: A[%p](%i,%i) X = B[%p](%i,%i)\n",__func__,
+      arg->m, arg->n, arg->A_host_ptr, arg->Am, arg->An, arg->B_host_ptr, arg->Bm, arg->Bn
   );
 #endif
+
   cublasStatus_t res;
   res = cublasZtrsm((cublasHandle_t)handle,
         cblas2cublas_side(arg->side), cblas2cublas_uplo(arg->uplo),

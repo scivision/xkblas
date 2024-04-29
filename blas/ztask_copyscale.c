@@ -31,10 +31,6 @@
 #include "ztask.h"
 #include "ztask_internal.h"
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-
 #define ROWDIM(v,m,n) ((v) == CblasNoTrans ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasNoTrans ? n : m)
 
@@ -79,6 +75,17 @@
 	size_t ldl;
 	kaapi_access_t U;
 	size_t ldu;
+#if defined(KAAPI_DEBUG)
+	void* D_host_ptr;
+	void* L_host_ptr;
+	void* U_host_ptr;
+	size_t Dm;
+	size_t Dn;
+	size_t Lm;
+	size_t Ln;
+	size_t Um;
+	size_t Un;
+#endif
 } NAME(Arg);
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
@@ -116,6 +123,19 @@ void INSERT_TASK_zcopyscale(
 	kaapi_update_dependencies( thread, &taskarg->U, task,
 		KAAPI_ACCESS_MODE_W, xkblas_get_handle(Uh, Um, Un) );	
 	taskarg->ldu = ldu;
+
+#if defined(KAAPI_DEBUG)
+	taskarg->D_host_ptr = Dh->addr;
+	taskarg->L_host_ptr = Lh->addr;
+	taskarg->U_host_ptr = Uh->addr;
+	taskarg->Dm = Dm;
+	taskarg->Dn = Dn;
+	taskarg->Lm = Lm;
+	taskarg->Ln = Ln;
+	taskarg->Um = Um;
+	taskarg->Un = Un;
+#endif
+
 	//kaapi_update_dependencies( thread, &taskarg->IW, task, KAAPI_ACCESS_MODE_R, xkblas_get_handle(IWh, IWm, IWn) );	
 
 	// ????
@@ -157,6 +177,12 @@ extern void cuda_zcopyscale(
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
 	NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
+#if defined(KAAPI_DEBUG)
+	printf("%s: D[%p](%i,%i) L[%p](%i,%i) U[%p](%i,%i)\n", __func__,
+		arg->D_host_ptr, arg->Dm, arg->Dn,
+		arg->L_host_ptr, arg->Lm, arg->Ln,
+		arg->U_host_ptr, arg->Um, arg->Un);
+#endif
 	
 	cudaStream_t cuda_stream;
         cublasGetStream( (cublasHandle_t) handle, &cuda_stream ); // TODO check error
