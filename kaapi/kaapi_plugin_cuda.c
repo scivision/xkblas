@@ -1137,6 +1137,7 @@ static int cuda_stream_decode_ioinstruction(
               res = 0;
             break;
             case KAAPI_IO_COPY_H2D:
+						  printf("htd %p %p 0x%x %p\n", dest, src, size, *stream);
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
@@ -1146,6 +1147,7 @@ static int cuda_stream_decode_ioinstruction(
               COUNTER_SIZE_H2D+= size;
             break;
             case KAAPI_IO_COPY_D2H:
+						  printf("dth %p %p 0x%x %p\n", dest, src, size, *stream);
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,

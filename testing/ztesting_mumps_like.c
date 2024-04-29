@@ -34,15 +34,17 @@
 
 #include "flops.h"
 
-void check_d_matrice( double A, double B, int m, int n, int ld ){
+void check_d_matrice( double* A, double* B, int m, int n, int ld ){
 	int error_count = 0;
 	for( int i = 0; i < m; i++ )
 	{
 		for( int j = 0; j < n; j++ )
 		{
+		  //printf("%.2f ", A[i + j*ld]);
 			if( A[i + j*ld] != B[i + j*ld] )
 				error_count++;
 		}
+		//printf("\n");
 	}
 	printf("Error count = %d\n", error_count);
 }
@@ -94,7 +96,8 @@ int testing_zmumps_like(int argc, char **argv)
 		Complex64_t *U = A + N;
 		Complex64_t *L = A + N * LD;
 		Complex64_t *G = A + N * LD + N;
-		
+		printf("Allocated: %p -> +0x%x\n", A, LD*LD*sizeof(Complex64_t));
+
 		Complex64_t *A_ref = (Complex64_t*) xkblas_malloc(LD*LD*sizeof(Complex64_t));
 		Complex64_t *D_ref = A_ref;
 		Complex64_t *U_ref = A_ref + N;
@@ -107,9 +110,16 @@ int testing_zmumps_like(int argc, char **argv)
 			printf("Out of memory\n");
 			return -2;
 		}
+		if(!A_ref)
+		{
+			xkblas_free(A_ref,LD*LD*sizeof(Complex64_t));
+			printf("Out of memory\n");
+			return -2;
+		}
 
 		/* Prepare random data */
-		LAPACKE_zlarnv_work(IONE, ISEED, LD*LD, A);
+		long long int seeds[4] = {1, 2, 3, 4};
+		int info = LAPACKE_zlarnv_work(1, seeds, LD*LD, A);
 		memcpy( A_ref, A, LD*LD*sizeof(Complex64_t) );
 
 		/* Compute */
@@ -125,35 +135,42 @@ int testing_zmumps_like(int argc, char **argv)
 		// Execute version without sync
 		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
 				N, M, &one, D, LD, L, LD );
+		xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
 		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Get L back
 		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t)); // Get U back
+		xkblas_sync();
 
-		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo),	xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
-				M, N, &one, L, LD, U, LD, &one, G, LD );
+		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
+				M, M, N, &one, L, LD, U, LD, &one, G, LD );
+		
+		xkblas_sync();
 		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t)); // Get G back
+
 		xkblas_sync();
 		xkblas_memory_invalidate_caches();
-		print("Without sync execution done\n");
+		printf("Without sync execution done\n");
 
-		// Execute version without sync
+		// Execute version with sync
 		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
 				N, M, &one, D_ref, LD, L_ref, LD );
+		xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D_ref, LD, L_ref, LD, U_ref, LD );
 		xkblas_memory_coherent_async( 0, 0, N, M, L_ref, LD, sizeof(Complex64_t)); // Get L back
 		xkblas_memory_coherent_async( 0, 0, M, N, U_ref, LD, sizeof(Complex64_t)); // Get U back
+		xkblas_sync();
 
-		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo),	xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
-				M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
+		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
+				M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
 		xkblas_memory_coherent_async( 0, 0, M, M, G_ref, LD, sizeof(Complex64_t)); // Get G back
 		xkblas_sync();
 		xkblas_memory_invalidate_caches();
-		print("With sync execution done\n");
+		printf("With sync execution done\n");
 
 #if (PRECISION_d == 1)
-		check_d_matrice( A, A_ref, M, N, LD );
+		check_d_matrice( A, A_ref, LD, LD, LD );
 #endif
 
 		xkblas_free(A,LD*LD*sizeof(Complex64_t));
