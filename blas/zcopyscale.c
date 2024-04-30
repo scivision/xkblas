@@ -203,7 +203,6 @@ int xkblas_zcopyscale_async(
 	kaapi_assert_debug_m( (Dh->ld == ldd) && (Dh->M == N) && (Dh->N == N), "Invalid matrice D" );
 	kaapi_assert_debug_m( (Lh->ld == ldl) && (Lh->M == N) && (Lh->N == M), "Invalid matrice L" );
 	kaapi_assert_debug_m( (Uh->ld == ldu) && (Uh->M == M) && (Uh->N == N), "Invalid matrice U" );
-	Ustatus = xkblas_matrix_descr_isinit(Uh);
 
 #if defined(KAAPI_DEBUG)
 	{

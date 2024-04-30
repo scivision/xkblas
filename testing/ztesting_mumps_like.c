@@ -1,22 +1,10 @@
 /**
  *
  * @file testing_zcopyscale.c
- *
- * @copyright 2009-2014 The University of Tennessee and The University of
- *                      Tennessee Research Foundation. All rights reserved.
- * @copyright 2012-2018 Bordeaux INP, CNRS (LaBRI UMR 5800), Inria,
- *                      Univ. Bordeaux. All rights reserved.
- *
- ***
- *
  * @brief zcopyscale testing
  *
  * @version 1.0.0
  * @comment 
- * @author Mathieu Faverge
- * @author Emmanuel Agullo
- * @author Cedric Castagnede
- * @author Thierry Gautier, xkblas port
  * @author Pierre-Etienne Polet
  * @date 2024-01-26
  * @precisions normal z -> c d s
@@ -34,19 +22,38 @@
 
 #include "flops.h"
 
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+
 void check_d_matrice( double* A, double* B, int m, int n, int ld ){
+	double error_ratio_max = 0;
+	double error_ratio_min = 0;
+	double max_delta = 0;
+	double min_delta = 0;
 	int error_count = 0;
 	for( int i = 0; i < m; i++ )
 	{
 		for( int j = 0; j < n; j++ )
 		{
-		  //printf("%.2f ", A[i + j*ld]);
+		  printf("%.0f ", B[i + j*ld]);
 			if( A[i + j*ld] != B[i + j*ld] )
+			{
 				error_count++;
+				double delta = (A[i + j*ld]-B[i+j*ld]);
+				max_delta = MAX( max_delta, delta );
+				min_delta = MIN( min_delta, delta );
+				if( B[i + j*ld] != 0 )
+				{
+					double ratio = delta/B[i+j*ld];
+					error_ratio_max = MAX(error_ratio_max, ratio);
+					error_ratio_min = MIN(error_ratio_min, ratio);
+				}
+			}
 		}
-		//printf("\n");
+		printf("\n");
 	}
-	printf("Error count = %d\n", error_count);
+	printf( "Error count = %d deltas: [%f,%f], ratios [%f,%f]\n", error_count, min_delta, max_delta,
+									error_ratio_min, error_ratio_max );
 }
 
 int testing_zmumps_like(int argc, char **argv)
@@ -118,8 +125,27 @@ int testing_zmumps_like(int argc, char **argv)
 		}
 
 		/* Prepare random data */
+		/*
 		long long int seeds[4] = {1, 2, 3, 4};
 		int info = LAPACKE_zlarnv_work(1, seeds, LD*LD, A);
+		*/
+		memset( A, 0, LD*LD*sizeof(Complex64_t) );
+#if (PRECISION_d == 1)
+		// D => identity
+		for( int i = 0; i < N; i++ )
+						D[ i * LD + i ] = 2;
+
+		// L:
+		for( int i = 0; i < N; i++ )
+		{
+			for( int j = 0; j < M; j++ )
+			{
+				L[i * LD + j] = 1;
+			}
+		}
+
+#endif
+
 		memcpy( A_ref, A, LD*LD*sizeof(Complex64_t) );
 
 		/* Compute */
@@ -133,16 +159,16 @@ int testing_zmumps_like(int argc, char **argv)
 		char transU = 'T';	
 		
 		// Execute version without sync
-		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
-				N, M, &one, D, LD, L, LD );
+		//xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D, LD, L, LD );
 		//xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
-		//xkblas_sync();
+		printf("zcopyscale end\n");
+		xkblas_sync();
+		printf("sync done\n");
 
-		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
-				M, M, N, &one, L, LD, U, LD, &one, G, LD );
-		//xkblas_sync();
+		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L, LD, U, LD, &one, G, LD );
+		xkblas_sync();
 		
 		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Get L back
 		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t)); // Get U back
@@ -153,16 +179,15 @@ int testing_zmumps_like(int argc, char **argv)
 		printf("Without sync execution done\n");
 
 		// Execute version with sync
-		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ),
-				N, M, &one, D_ref, LD, L_ref, LD );
+		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D_ref, LD, L_ref, LD );
 		xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D_ref, LD, L_ref, LD, U_ref, LD );
 		xkblas_sync();
 
-		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU),
-				M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
-		
+		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
+		xkblas_sync();
+
 		xkblas_memory_coherent_async( 0, 0, N, M, L_ref, LD, sizeof(Complex64_t)); // Get L back
 		xkblas_memory_coherent_async( 0, 0, M, N, U_ref, LD, sizeof(Complex64_t)); // Get U back
 		xkblas_memory_coherent_async( 0, 0, M, M, G_ref, LD, sizeof(Complex64_t)); // Get G back
