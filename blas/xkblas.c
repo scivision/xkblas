@@ -1917,6 +1917,7 @@ int xkblas_auto_map(
     } break;
 #endif
 
+    case KERN_COPYSCALE:
     case KERN_SYR2K:
     case KERN_SYMM:
     case KERN_GEMM:

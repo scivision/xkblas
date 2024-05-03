@@ -163,9 +163,7 @@ int testing_zmumps_like(int argc, char **argv)
 		//xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
-		printf("zcopyscale end\n");
 		xkblas_sync();
-		printf("sync done\n");
 
 		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L, LD, U, LD, &one, G, LD );
 		xkblas_sync();
@@ -179,8 +177,8 @@ int testing_zmumps_like(int argc, char **argv)
 		printf("Without sync execution done\n");
 
 		// Execute version with sync
-		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D_ref, LD, L_ref, LD );
-		xkblas_sync();
+		//xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D_ref, LD, L_ref, LD );
+		//xkblas_sync();
 
 		xkblas_zcopyscale_async( M, N, true, NULL, D_ref, LD, L_ref, LD, U_ref, LD );
 		xkblas_sync();

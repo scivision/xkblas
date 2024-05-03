@@ -191,7 +191,7 @@ int xkblas_zcopyscale_async(
 		if( m_block == 0 )
 						m_block = NB;
 
-		printf("[XKBLAS] cpyscale mb %d, nb %d\n", m_block, n_block);
+		printf("[XKBLAS] cpyscale mb %d, nb %d, M %d, N %d\n", m_block, n_block, M, N);
 		// init unitialised matrices
 		if( !Dstatus )
 			xkblas_init_matrix_handle(Dh, (void*)D, N, N, ldd, sizeof(Complex64_t), n_block, n_block);
@@ -218,7 +218,7 @@ int xkblas_zcopyscale_async(
 
 #if KAAPI_USE_TRACELIB==1
 	kaapi_context_t* ctxt = xkctxt->kctxt;
-	kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 /*begin*/);
+	kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 );
 	if(evt)
 	{
 		strncpy(evt->u.s.d0.c8,"zcpys",8);
@@ -226,7 +226,6 @@ int xkblas_zcopyscale_async(
 		evt->u.s.d2.u = N;
 		KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
 	}
-	//evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 2 /*info*/
 #endif
 
 	for( int blockIdx_m = 0; blockIdx_m < Lh->nt; blockIdx_m++ )

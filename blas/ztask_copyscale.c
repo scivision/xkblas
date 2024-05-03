@@ -109,19 +109,20 @@ void INSERT_TASK_zcopyscale(
 	taskarg->m = m;
 	taskarg->n = n;
 	taskarg->should_copy = should_copy;
-	//printf("Dh %p, Dm %d/%d, Dn %d/%d %p\n", Dh, Dm, Dh->mt, Dn, Dh->nt, &taskarg->D);
 	kaapi_update_dependencies( thread, &taskarg->D, task,
 		KAAPI_ACCESS_MODE_R, xkblas_get_handle(Dh, Dm, Dn) );	
+	printf("Dh %p, Dm %d/%d, Dn %d/%d %p - %p\n", Dh, Dm, Dh->mt, Dn, Dh->nt, &taskarg->D, xkblas_get_handle(Dh, Dm, Dn) );
 	taskarg->ldd = ldd;
 
-	//printf("Lh %p, Lm %d/%d, Ln %d/%d %p\n", Lh, Lm, Lh->mt, Ln, Lh->nt, &taskarg->L);
 	kaapi_update_dependencies( thread, &taskarg->L, task,
 		KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Lh, Lm, Ln) );	
+	printf("Lh %p, Lm %d/%d, Ln %d/%d %p - %p\n", Lh, Lm, Lh->mt, Ln, Lh->nt, &taskarg->L, xkblas_get_handle(Lh, Lm, Ln));
 	taskarg->ldl = ldl;
 	
-	//printf("Uh %p, Um %d/%d, Un %d/%d %p\n", Uh, Um, Uh->mt, Un, Uh->nt, &taskarg->U);
 	kaapi_update_dependencies( thread, &taskarg->U, task,
 		KAAPI_ACCESS_MODE_W, xkblas_get_handle(Uh, Um, Un) );	
+	printf("Uh %p, Um %d/%d, Un %d/%d %p - %p\n", Uh, Um, Uh->mt, Un, Uh->nt, &taskarg->U, xkblas_get_handle(Uh, Um, Un));
+
 	taskarg->ldu = ldu;
 
 #if defined(KAAPI_DEBUG)
