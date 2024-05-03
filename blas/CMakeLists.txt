@@ -113,6 +113,14 @@ set(GENERATED_SOURCES ${AGENERATED_SOURCES})
 
 
 #--- XKBLAS
+
+set(CUDA_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
+	${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
+	${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
+	${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
+)
+
 if (${HIP_FOUND})
   message(STATUS "Compilation with HIBLAS in : ${HIPBLAS_INCLUDE_DIR}")
   list(APPEND HIPIFY_FILE ${CMAKE_CURRENT_SOURCE_DIR}/xkblas.c ${CMAKE_CURRENT_SOURCE_DIR}/dbg_blas.c 
@@ -136,7 +144,45 @@ if (${HIP_FOUND})
      #message(STATUS "Hipyfied: ${file} -> ${CMAKE_CURRENT_BINARY_DIR}/${file_hip}")
      list(APPEND HIPYFIED_FILE ${CMAKE_CURRENT_BINARY_DIR}/${file_hip})
   endforeach()
-  add_library(xkblas SHARED internal_register.h common.h xkblas.h ztask_internal.h ctask_internal.h dtask_internal.h stask_internal.h ${HEADER_FILE} ${HIPYFIED_FILE}) 
+
+	# HIP compilation for copyscale
+	#set(hip_object "${CMAKE_CURRENT_BINARY_DIR}/hip_object.o")
+	set(HIP_OBJECTS)
+	set(HIP_SOURCES)
+	foreach(source_file ${CUDA_SOURCES})
+		get_filename_component(base_name ${source_file} NAME_WE)
+		set(hip_file "${CMAKE_CURRENT_BINARY_DIR}/${base_name}_hip.cpp")
+		set(obj_file "${CMAKE_CURRENT_BINARY_DIR}/${base_name}_hip.o")
+
+		list(APPEND HIP_SOURCES ${hip_file})
+		list(APPEND HIP_OBJECTS ${obj_file})
+		
+		add_custom_command(
+			OUTPUT ${hip_file}
+			COMMAND hipify-perl ${source_file} > ${hip_file}
+			DEPENDS ${source_file}
+			COMMENT "Convertig CUDA sources to HIP sources"
+		)
+
+		add_custom_command(
+			OUTPUT ${obj_file}
+			COMMAND hipcc -c -fPIC ${hip_file} -o ${obj_file} -I ${CMAKE_CURRENT_BINARY_DIR}
+			DEPENDS ${hip_file}
+			COMMENT "Build HIP source"
+		)
+	endforeach()
+
+	#add_custom_command(
+	#		OUTPUT ${hip_object}
+	#		COMMAND	hipcc -c ${HIP_SOURCES} -o ${hip_object}
+	#		DEPENDS ${HIP_SOURCES}
+	#		COMMENT "Build object file from HIP sources"
+	#)
+	
+  add_library(xkblas SHARED internal_register.h common.h xkblas.h ztask_internal.h ctask_internal.h dtask_internal.h stask_internal.h ${HEADER_FILE} ${HIPYFIED_FILE}
+					${HIP_OBJECTS})
+	#				${hip_object}) 
+	#add_dependencies(xkblas task_internal_headers)
 else()
 	add_custom_target(task_internal_headers DEPENDS
 		${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
@@ -146,12 +192,6 @@ else()
 	)
 
 	# TODO cuda compile, make generic
-	set(CUDA_SOURCES
-		${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
-		${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
-		${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
-		${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
-	)
 	set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
 	cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
 	
