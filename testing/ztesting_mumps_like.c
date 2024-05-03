@@ -176,11 +176,23 @@ int testing_zmumps_like(int argc, char **argv)
 		char transL = 'T';
 		char transU = 'T';	
 		
+		// Execute version without sync
 		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D, LD, L, LD );
 		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
 		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Get L back
 		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t)); // Get U back
+		
+//#define USING_GEMMT
+#ifdef USING_GEMMT
+		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo), xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, N, &one, L, LD, U, LD, &one, G, LD );	
+#else
+		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L, LD, U, LD, &one, G, LD );
+#endif
+
+		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t)); // Get G back	
 		xkblas_sync();
+		xkblas_memory_invalidate_caches();
+		printf("Without sync execution done\n");
 
 		xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D_ref, LD, L_ref, LD );
 		xkblas_sync();
@@ -189,42 +201,17 @@ int testing_zmumps_like(int argc, char **argv)
 		xkblas_memory_coherent_async( 0, 0, M, N, U_ref, LD, sizeof(Complex64_t)); // Get U back
 		xkblas_sync();
 
-		/*
-		// Execute version without sync
-		//xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D, LD, L, LD );
-		//xkblas_sync();
-
-		xkblas_zcopyscale_async( M, N, true, NULL, D, LD, L, LD, U, LD );
-		xkblas_sync();
-
-		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L, LD, U, LD, &one, G, LD );
-		xkblas_sync();
-		
-		xkblas_memory_coherent_async( 0, 0, N, M, L, LD, sizeof(Complex64_t)); // Get L back
-		xkblas_memory_coherent_async( 0, 0, M, N, U, LD, sizeof(Complex64_t)); // Get U back
-		xkblas_memory_coherent_async( 0, 0, M, M, G, LD, sizeof(Complex64_t)); // Get G back
-
-		xkblas_sync();
-		xkblas_memory_invalidate_caches();
-		printf("Without sync execution done\n");
-
-		// Execute version with sync
-		//xkblas_ztrsm_async( xkblas_blas2cblas_side( &side ), xkblas_blas2cblas_fill( &uplo ), xkblas_blas2cblas_trans( &transA ), xkblas_blas2cblas_diag( &diag ), N, M, &one, D_ref, LD, L_ref, LD );
-		//xkblas_sync();
-
-		xkblas_zcopyscale_async( M, N, true, NULL, D_ref, LD, L_ref, LD, U_ref, LD );
-		xkblas_sync();
-
+#ifdef USING_GEMMT
+		xkblas_zgemmt_async( xkblas_blas2cblas_fill(&uplo), xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );	
+#else
 		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
-		xkblas_sync();
+#endif
 
-		xkblas_memory_coherent_async( 0, 0, N, M, L_ref, LD, sizeof(Complex64_t)); // Get L back
-		xkblas_memory_coherent_async( 0, 0, M, N, U_ref, LD, sizeof(Complex64_t)); // Get U back
+//		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
 		xkblas_memory_coherent_async( 0, 0, M, M, G_ref, LD, sizeof(Complex64_t)); // Get G back
 		xkblas_sync();
 		xkblas_memory_invalidate_caches();
 		printf("With sync execution done\n");
-		*/
 
 #if (PRECISION_d == 1)
 		check_d_matrice( A, A_ref, LD, LD, LD );
