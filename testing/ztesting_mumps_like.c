@@ -52,6 +52,7 @@ void check_d_matrice( double* A, double* B, int m, int n, int ld ){
 			}
 		}
 	}
+	/*
 	printf("\nA: \n");
 	for( int i = 0; i < m; i++ )
 	{
@@ -70,6 +71,7 @@ void check_d_matrice( double* A, double* B, int m, int n, int ld ){
 		}
 		printf("\n");
 	}
+	*/
 	printf( "Error count = %d deltas: [%f,%f], ratios [%f,%f]\n", error_count, min_delta, max_delta,
 									error_ratio_min, error_ratio_max );
 }
@@ -143,10 +145,11 @@ int testing_zmumps_like(int argc, char **argv)
 		}
 
 		/* Prepare random data */
-		/*
+		
 		long long int seeds[4] = {1, 2, 3, 4};
 		int info = LAPACKE_zlarnv_work(1, seeds, LD*LD, A);
-		*/
+		
+		/*
 		memset( A, 0, LD*LD*sizeof(Complex64_t) );
 #if (PRECISION_d == 1)
 		// D => identity
@@ -161,8 +164,8 @@ int testing_zmumps_like(int argc, char **argv)
 				L[i * LD + j] = 2;
 			}
 		}
-
 #endif
+	*/
 
 		memcpy( A_ref, A, LD*LD*sizeof(Complex64_t) );
 
