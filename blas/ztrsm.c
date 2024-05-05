@@ -203,7 +203,7 @@ int xkblas_ztrsm_async(
   }
 #endif
 
-    xkblas_context_t* xkctxt =xkblas_context_get();
+    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_TRSM, Bh );
 
 #if KAAPI_USE_TRACELIB==1
