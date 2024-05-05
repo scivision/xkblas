@@ -886,13 +886,13 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 
 /*
 */
-#if KAAPI_USE_CUDA || KAAPI_USE_HIP
-#define KAAPI_DEBUG_CTR 1
-#if KAAPI_DEBUG_CTR
+#if defined(KAAPI_DEBUG) && (KAAPI_USE_CUDA || KAAPI_USE_HIP)
+#  define KAAPI_DEBUG_CTR 1
+#  if KAAPI_DEBUG_CTR
 kaapi_atomic_t spawn_writeback={0};
 kaapi_atomic_t pending_writeback={0};
 kaapi_atomic_t received_writeback={0};
-#endif
+#  endif
 static void callback_epilogue_writeback(
     kaapi_io_status_t status,
     kaapi_io_stream_t* ios,
@@ -901,9 +901,9 @@ static void callback_epilogue_writeback(
 {
   kaapi_metadata_info_t* mdi __attribute__((unused)) = (kaapi_metadata_info_t*)arg0;
   kaapi_frame_t* frame = (kaapi_frame_t*)arg1;
-#if KAAPI_DEBUG_CTR
+#  if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&received_writeback);
-#endif
+#  endif
   KAAPI_ATOMIC_INCR(&frame->exec_count);
 }
 
@@ -913,14 +913,16 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
      in order to detect that end of tasks execution
   */
   NAME(Arg)* taskarg = kaapi_task_getargst(task,NAME(Arg));
-#if KAAPI_DEBUG_CTR
+#  if KAAPI_DEBUG_CTR
   KAAPI_ATOMIC_INCR(&pending_writeback);
-#endif
+#  endif
   int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
     taskarg->a.mdi, 
     callback_epilogue_writeback, taskarg->a.mdi, taskarg->frame, taskarg
   );
   kaapi_assert((err==0) || (err== EINPROGRESS));
+  if (err ==0) /* no call back called in that case, unroll callback_epilogue_writeback */
+    KAAPI_ATOMIC_INCR(&taskarg->frame->exec_count);
 }
 #endif
 
@@ -928,6 +930,15 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 
 
 /* Create write back task for the tile A(m,n) of size compute in the function
+  TODO
+   - there is may be two problems here:
+     * the task makes its action (recopy data from GPU) in a split-phase actions
+     - 1/ the task post request to kaapi to fetch data on the local host CPU
+     - 2/ upon completion the callback is called to signal the end of the transfert
+  1/ followed by 2/ is not atomic. It is possible to schedule a task that update the
+  data between 1/ and 2/. So what would be the transfered data ?
+  If the data is already local, kaapi_dsm_prefetch_on never calls the callback function.
+  It should be.
 */
 static void xkblas_create_taskwriteback(
   xkblas_matrix_descr_t* Ah,
@@ -1598,7 +1609,6 @@ int xkblas_memory_syncall(void)
 
 /*
 */
-
 int xkblas_memory_coherent_async(
   int uplo, int memflag,
   size_t M, size_t N,

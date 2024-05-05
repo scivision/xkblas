@@ -6,7 +6,7 @@ set(CMAKE_CXX_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1")
 set(CMAKE_CC_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1")
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1")
 
-
+#
 project (XKblas)
 
 
@@ -30,14 +30,12 @@ if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
 endif()
 
 #--- CUDA
-find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
-find_package(CUDA_RT)
 if (KAAPI_USE_CUDA_RT)
+  find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
+  find_package(CUDA_RT)
   if (NOT ${CUDA_RT_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA Runtime API but library could not be found.")
   endif()
-endif()
-if (KAAPI_USE_CUDA_RT)
   find_package(CUBLAS)
   if (NOT ${CUBLAS_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA API but CUBLAS is not found for XKblas !")
@@ -93,7 +91,6 @@ if (${HIP_FOUND} AND ${HWLOC_FOUND})
     NAMES librocm_smi64.so 
     HINTS ${ROCSMI_PREFIX}/lib 
   )
-
 endif()
 
 #--- BLAS

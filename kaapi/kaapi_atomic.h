@@ -36,6 +36,13 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+
+/* ======================================================================
+   TODO:
+    - remove atomic to base it on C atomic function.
+   
+   ====================================================================== */
+
 #ifndef _KAAPI_ATOMIC_H
 #define _KAAPI_ATOMIC_H 1
 

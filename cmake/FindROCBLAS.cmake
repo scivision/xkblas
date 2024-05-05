@@ -18,7 +18,7 @@
 #  ROCBLAS_INCLUDE_DIRS       The location of ROCBLAS headers
 
 find_path(ROCBLAS_PREFIX_DIRS
-    NAMES include/internal/rocblas-functions.h include/internal/rocblas-auxiliary.h
+    NAMES include/rocblas/internal/rocblas-functions.h include/rocblas/internal/rocblas-auxiliary.h
     HINTS $ENV{ROCBLAS_PATH} $ENV{ROCM_PATH}/rocblas
 )
 
@@ -28,7 +28,7 @@ find_library(ROCBLAS_LIBRARIES
     HINTS ${ROCBLAS_PREFIX_DIRS}/lib ${HILTIDEPS}/lib 
 )
 find_path(ROCBLAS_INCLUDE_DIRS
-    NAMES internal/rocblas-functions.h internal/rocblas-auxiliary.h
+    NAMES rocblas/internal/rocblas-functions.h rocblas/internal/rocblas-auxiliary.h
     HINTS ${ROCBLAS_PREFIX_DIRS}/include ${HILTIDEPS}/include 
 )
 

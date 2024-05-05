@@ -191,11 +191,19 @@ else()
 		${CMAKE_CURRENT_BINARY_DIR}/ztask_internal.h
 	)
 
-	# TODO cuda compile, make generic
-	set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
-	cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
-	
-	add_library(xkblas SHARED internal_register.h common.h xkblas.h xkblas.c dbg_blas.c 
+        if (${CUDA_RT_FOUND})
+          # TODO cuda compile, make generic
+          set(CUDA_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
+            ${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
+            ${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
+            ${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
+          )
+          set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
+          cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
+        endif()
+           
+	add_library(xkblas SHARED internal_register.h common.h xkblas.h xkblas.c dbg_blas.c
 		${SOURCES_Z}
 		${GENERATED_SOURCES}
 		${cuda_objects}
