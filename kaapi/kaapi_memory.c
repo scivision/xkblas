@@ -2792,6 +2792,7 @@ static int kaapi_dsm_fetch_on(
 
   if (kaapi_memory_replica_is_valid(mdi, lid_dest))
   {
+    /* here call the call back ? */
     if (lock2 != lock1)
       kaapi_atomic_unlock(lock2);
     kaapi_atomic_unlock(lock1);
@@ -2968,6 +2969,7 @@ int kaapi_dsm_release_data(
 /* May returns:
      EINPROGRESS : if data not yet on asid
      ENOMEM : not possible to allocate replica
+     0: nothing to do, data is already on the asid
 */
 int kaapi_dsm_prefetch_on(
       kaapi_dsm_t* dsm,

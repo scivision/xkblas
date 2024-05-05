@@ -265,8 +265,8 @@ typedef struct kaapi_dsm_node kaapi_dsm_node_t;
 
 typedef struct kaapi_dsm {
   int               mask_level;  // topology level: size of mask_nodes[]
-  uint64_t          *mask_nodes;
-  kaapi_dsm_node_t* nodes[KAAPI_MEMORY_MAX_NODES];
+  uint64_t         *mask_nodes;
+  kaapi_dsm_node_t *nodes[KAAPI_MEMORY_MAX_NODES];
 } kaapi_dsm_t;
 
 extern kaapi_dsm_t kaapi_the_dsm;
