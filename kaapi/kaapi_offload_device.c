@@ -36,7 +36,6 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#define _OFFLOAD_DEBUG  0
 #define KAAPI_STREAM_CAPACITY 512
 
 #define _GNU_SOURCE
