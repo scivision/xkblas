@@ -21,6 +21,14 @@ else()
   add_compile_options("-DKAAPI_USE_PAPI=0")
 endif()
 
+
+if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+  add_compile_options("-DKAAPI_USE_ROCSMI=0")
+else()
+  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+endif()
+
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 
@@ -75,7 +83,9 @@ if (${HWLOC_FOUND})
   target_link_libraries(kaapi PRIVATE ${HWLOC_LIBRARIES})
 endif()
 
-if (${HWLOC_FOUND} AND ${HIP_FOUND}) 
+if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+  message(STATUS "Not found ROCSMI_INCLUDE")
+else()
   message(STATUS "Found ROCSMI_INCLUDE: ${ROCSMI_INCLUDE_DIRS}")
   include_directories(${ROCSMI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${ROCSMI_LIBRARIES})

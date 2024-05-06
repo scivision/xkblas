@@ -45,10 +45,15 @@
 #include "kaapi_impl.h"
 #include "kaapi_offload.h"
 
+#if KAAPI_USE_CUDA 
+#  include <cublas_v2.h>
+#elif KAAPI_USE_HIP
+#  include <hipblas/hipblas.h>
+#endif
+
 #if KAAPI_USE_CUDA || KAAPI_USE_HIP
-#    include <cublas_v2.h>
 //#include <cuda.h>
-#include <cuda_runtime_api.h>
+#  include <cuda_runtime_api.h>
 #endif
 
 #include "internal_register.h"

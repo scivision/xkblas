@@ -68,9 +68,10 @@
 #endif
 
 #include <hip/hip_runtime.h>
-#include <hipblas.h>
-#include <internal/rocblas-functions.h>
-#include <internal/rocblas-auxiliary.h>
+#include <hipblas/hipblas.h>
+#include <rocblas/rocblas.h>
+//#include <internal/rocblas-functions.h>
+//#include <internal/rocblas-auxiliary.h>
 
 #if KAAPI_HAVE_IO_THREADS
 #error "Not supported"
@@ -99,7 +100,9 @@ static __thread int thread_type = 0;
 */
 #if KAAPI_USE_HWLOC
 #include "hwloc.h"
-#include "hwloc/rsmi.h"
+#if KAAPI_USE_ROCSMI
+#  include "hwloc/rsmi.h"
+#endif
 #include "hwloc/glibc-sched.h"
 #endif
 
@@ -1744,7 +1747,9 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
 
   cpuset = hwloc_bitmap_alloc();
 #if KAAPI_USE_HIP // first because USE_HIP also define USE_CUDA_RUNTIME
+#  if KAAPI_USE_ROCSMI
   err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
+#  endif
 #elif KAAPI_USE_CUDA_RUNTIME_API
   err = hwloc_cudart_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
 #endif
@@ -1759,10 +1764,9 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
       }
     }
   }
-#else
+#endif
   /* no hwloc: do nothing, op not supported */
   err = ENOTSUP;
-#endif
 
 retval:
 #if KAAPI_USE_HWLOC 
