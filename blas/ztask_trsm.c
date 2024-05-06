@@ -144,7 +144,7 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i)/handle: %p, READWRITE
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if defined(KAAPI_DEBUG)
+#if 0//defined(KAAPI_DEBUG)
   printf("%s: %s x = %s \n",__func__,
       kaapi_dbg_get_name(arg->A.data),
       kaapi_dbg_get_name(arg->B.data)
@@ -162,7 +162,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if defined(KAAPI_DEBUG)
+#if 0//defined(KAAPI_DEBUG)
   printf("%s[%d,%d]: A[%p](%i,%i) X = B[%p](%i,%i)\n",__func__,
       arg->m, arg->n, arg->A_host_ptr, arg->Am, arg->An, arg->B_host_ptr, arg->Bm, arg->Bn
   );

@@ -36,11 +36,6 @@
 #include <math.h>
 #endif
 
-
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-
 #define ROWDIM(v,m,n) ((v) == CblasNoTrans ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasNoTrans ? n : m)
 
@@ -141,7 +136,7 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i), READ(%p,%i,%i), %s(%
     kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
     kaapi_task_commit( thread, task );
 
-#if defined(KAAPI_DEBUG)
+#if 0//defined(KAAPI_DEBUG)
   printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
       A, kaapi_dbg_get_name(A), n, k, lda, (transA==CblasNoTrans ? "":"^t"),
       B, kaapi_dbg_get_name(B), k, n, ldb, (transB==CblasNoTrans ? "":"^t"),
@@ -154,7 +149,7 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i), READ(%p,%i,%i), %s(%
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if defined(KAAPI_DEBUG)
+#if 0//defined(KAAPI_DEBUG)
   printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
       arg->A.data, kaapi_dbg_get_name(arg->A.data), arg->n, arg->k, arg->lda, (arg->transA==CblasNoTrans ? "":"^t"),
       arg->B.data, kaapi_dbg_get_name(arg->B.data), arg->k, arg->n, arg->ldb, (arg->transB==CblasNoTrans ? "":"^t"),
@@ -178,7 +173,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if defined(KAAPI_DEBUG)
+#if 0//defined(KAAPI_DEBUG)
   printf("%s: @:%p %s[%lu,%lu, ld:%lu]%s x @:%p %s[%lu,%lu, ld:%lu]%s -> @:%p %s[%lu,%lu, ld:%lu]\n",__func__, 
       arg->A.data, kaapi_dbg_get_name(arg->A.data), arg->n, arg->k, arg->lda, (cblas2cublas_op(arg->transA)==CUBLAS_OP_N ? "":"^t"),
       arg->B.data, kaapi_dbg_get_name(arg->B.data), arg->k, arg->n, arg->ldb, (cblas2cublas_op(arg->transB)==CUBLAS_OP_N ? "":"^t"),
@@ -193,7 +188,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 #if KAAPI_DEBUG
     /* emit warning if constraints defined in CUDA-10.1 are not satisfied */
     kaapi_assert(arg->n % 4 == 0);
-    kaapi_assert(arg->k % 8 == 0)
+    kaapi_assert(arg->k % 8 == 0);
     kaapi_assert(((intptr_t)arg->A.data) % 16 == 0);
     kaapi_assert(((intptr_t)arg->B.data) % 16 == 0);
     kaapi_assert(((intptr_t)arg->C.data) % 16 == 0);

@@ -195,7 +195,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 #endif
   }
 
-#if defined(KAAPI_DEBUG)
+#if 0 // defined(KAAPI_DEBUG)
 	printf("%s[%d,%d,%d]: A[%p](%i,%i) B[%p](%i,%i) C[%p](%i,%i)\n", __func__,
 		arg->m, arg->n, arg->k,
 		arg->A_host_ptr, arg->Am, arg->An,

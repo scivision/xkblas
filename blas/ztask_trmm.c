@@ -30,11 +30,6 @@
 #include "ztask.h"
 #include "ztask_internal.h"
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-//#define KAAPI_DEBUG 1
-
 #define ROWDIM(v,m,n) ((v) == CblasLeft ? m : n)
 #define COLDIM(v,m,n) ((v) == CblasLeft ? n : m)
 
