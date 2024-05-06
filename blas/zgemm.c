@@ -227,6 +227,14 @@ int xkblas_zgemm_async(
 
     xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
+
+#if defined(KAAPI_DEBUG)
+  {
+    kaapi_assert( 0 == xkblas_dbg_setname( "A", Ah ) );
+    kaapi_assert( 0 == xkblas_dbg_setname( "B", Bh ) );
+    kaapi_assert( 0 == xkblas_dbg_setname( "C", Ch ) );
+  }
+#endif
     
 #if KAAPI_USE_TRACELIB==1
     kaapi_context_t* ctxt = xkctxt->kctxt;

@@ -28,12 +28,6 @@
 #include "ztask_internal.h"
 #include <string.h>
 
-
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-//#define KAAPI_DEBUG 1
-
 /**
  ********************************************************************************
  *
@@ -227,9 +221,9 @@ return xkblas_zgemmt_native(
 
 #if defined(KAAPI_DEBUG)
   {
-    assert( 0 == xkblas_dbg_setname( "A", Ah ) );
-    assert( 0 == xkblas_dbg_setname( "B", Bh ) );
-    assert( 0 == xkblas_dbg_setname( "C", Ch ) );
+    kaapi_assert( 0 == xkblas_dbg_setname( "A", Ah ) );
+    kaapi_assert( 0 == xkblas_dbg_setname( "B", Bh ) );
+    kaapi_assert( 0 == xkblas_dbg_setname( "C", Ch ) );
   }
 #endif
 

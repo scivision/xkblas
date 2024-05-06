@@ -29,11 +29,6 @@
 #include "ztask_internal.h"
 #include <string.h>
 
-#ifdef KAAPI_DEBUG
-#undef KAAPI_DEBUG
-#endif
-//#define KAAPI_DEBUG 1
-
 // TODO redefine this ...
 /**
  ********************************************************************************
@@ -206,9 +201,9 @@ int xkblas_zcopyscale_async(
 
 #if defined(KAAPI_DEBUG)
 	{
-		assert( 0 == xkblas_dbg_setname( "D", Dh ) );
-		assert( 0 == xkblas_dbg_setname( "L", Lh ) );
-		assert( 0 == xkblas_dbg_setname( "U", Uh ) );
+		kaapi_assert( 0 == xkblas_dbg_setname( "D", Dh ) );
+		kaapi_assert( 0 == xkblas_dbg_setname( "L", Lh ) );
+		kaapi_assert( 0 == xkblas_dbg_setname( "U", Uh ) );
 	}
 #endif
 
