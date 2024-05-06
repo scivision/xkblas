@@ -109,4 +109,11 @@ target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION
 target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
 install(TARGETS stesting DESTINATION testing)
 
-add_custom_target( testing DEPENDS stesting dtesting ctesting ztesting )
+# - Do not install run_tests in the installation directory
+add_custom_command(
+  OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/run_tests
+  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/run_tests ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/run_tests
+)
+
+add_custom_target( testing DEPENDS stesting dtesting ctesting ztesting ${CMAKE_CURRENT_BINARY_DIR}/run_tests )

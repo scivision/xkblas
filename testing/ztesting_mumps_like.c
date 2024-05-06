@@ -210,7 +210,6 @@ int testing_zmumps_like(int argc, char **argv)
 		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
 #endif
 
-//		xkblas_zgemm_async( xkblas_blas2cblas_trans(&transL), xkblas_blas2cblas_trans(&transU), M, M, N, &one, L_ref, LD, U_ref, LD, &one, G_ref, LD );
 		xkblas_memory_coherent_async( 0, 0, M, M, G_ref, LD, sizeof(Complex64_t)); // Get G back
 		xkblas_sync();
 		xkblas_memory_invalidate_caches();
