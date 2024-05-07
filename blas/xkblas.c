@@ -412,8 +412,6 @@ void* xkblas_malloc( size_t size )
   return ptr;
 #elif KAAPI_USE_CUDA  
   void* ptr = 0;
-  //CUresult err = cuMemHostAlloc(&ptr, size, CU_MEMHOSTALLOC_PORTABLE);
-  //kaapi_assert_m(CUDA_SUCCESS== err, "cuMemHostAlloc failed");
   kaapi_assert_m(cudaSuccess== cudaHostAlloc(&ptr, size, cudaHostAllocPortable),"cudaHostAlloc failed");
   return ptr;
 #else
@@ -1177,6 +1175,9 @@ int xkblas_init(void)
 {
   if (init_count++ !=0) return 0;
 
+  if (getenv("XKBLAS_VERBOSE"))
+    setenv("KAAPI_VERBOSE",getenv("XKBLAS_VERBOSE"),1);
+
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
     size_t tile_size = 0;
@@ -1203,7 +1204,7 @@ int xkblas_init(void)
         exit(1); 
       }
     }
-    if (getenv("KAAPI_VERBOSE"))
+    if (getenv("XKBLAS_VERBOSE"))
     {
       printf("xe size: %lu, precision: %lu\n",tile_size, precision);
     }
@@ -1267,7 +1268,7 @@ int xkblas_init(void)
   //_xkblas_global_team = kaapi_team_alloc();
 
 
-  if (getenv("KAAPI_VERBOSE")||getenv("XKBLAS_VERBOSE"))
+  if (getenv("XKBLAS_VERBOSE"))
   {
     extern const char* get_kaapi_version(void);
     extern const char* get_kaapi_info(void);
@@ -1319,7 +1320,7 @@ int xkblas_finalize(void)
   kaapi_atomic_lock(&_xkblas_list_lock);
 
   int verbose=0;
-  if (getenv("KAAPI_VERBOSE")||getenv("XKBLAS_VERBOSE"))
+  if (getenv("XKBLAS_VERBOSE"))
     verbose = 1;
  
 #if KAAPI_USE_PERFCOUNTER
