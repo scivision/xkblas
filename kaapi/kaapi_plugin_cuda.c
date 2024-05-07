@@ -133,7 +133,7 @@ static __thread int thread_type = 0;
 //#  define CONFIG_SYNCHRONOUS_COPY 1
 
 //#  undef CONFIG_SYNCHRONOUS_KERNEL 
-//#  define CONFIG_SYNCHRONOUS_KERNEL 0
+//#  define CONFIG_SYNCHRONOUS_KERNEL 1
 
 /* counters */
 enum {
@@ -1137,7 +1137,11 @@ static int cuda_stream_decode_ioinstruction(
               res = 0;
             break;
             case KAAPI_IO_COPY_H2D:
-						  printf("htd %p %p 0x%x %p\n", dest, src, size, *stream);
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
@@ -1147,7 +1151,11 @@ static int cuda_stream_decode_ioinstruction(
               COUNTER_SIZE_H2D+= size;
             break;
             case KAAPI_IO_COPY_D2H:
-						  printf("dth %p %p 0x%x %p\n", dest, src, size, *stream);
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
@@ -1158,6 +1166,11 @@ static int cuda_stream_decode_ioinstruction(
             break;
 
             case KAAPI_IO_COPY_D2D:
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpyPeerAsync( dest,
                                          kaapi_device_ids[op->dev_dest->device->device_id],
                                          src,
@@ -1194,19 +1207,39 @@ static int cuda_stream_decode_ioinstruction(
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
             break;
             case KAAPI_IO_COPY_H2D:
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
               COUNTER_CNT_H2D++;
               COUNTER_SIZE_H2D   += size;
             break;
             case KAAPI_IO_COPY_D2H:
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
               COUNTER_CNT_D2H++;
               COUNTER_SIZE_D2H   += size;
             break;
             case KAAPI_IO_COPY_D2D:
+#if KAAPI_DEBUG
+_kaapi_lock_print();
+	      printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
+_kaapi_unlock_print();
+#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, *stream );
               COUNTER_CNT_D2D++;
               COUNTER_SIZE_D2D   += size;
@@ -1226,8 +1259,9 @@ static int cuda_stream_decode_ioinstruction(
       res = cudaStreamSynchronize( *stream );
       CudaCheckError(res);
 #if KAAPI_USE_TRACELIB==1
+      /* TODO: add end event before synchronize and report the elpased time between start/end events */
       delay = kaapi_get_elapsedns()-delay;
-      if ((type != KAAPI_MEMORY_VIEW_1D) && (instr->type != KAAPI_IO_COPY_H2H)
+      if ((type != KAAPI_MEMORY_VIEW_1D) && (instr->type != KAAPI_IO_COPY_H2H))
         KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
          2 /* end */, op->reserved, delay );
 #endif
@@ -1277,7 +1311,6 @@ static int cuda_stream_decode_ioinstruction(
       kaapi_assert(res == cudaSuccess);
 #  endif
 #endif
-      uint64_t delay = kaapi_get_elapsedns();
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
       /* the call + execute_task should be atomic */
       cublasStatus_t cres = cublasSetStream(device->handle, *stream);
@@ -1294,9 +1327,20 @@ static int cuda_stream_decode_ioinstruction(
       );
 
 #if CONFIG_SYNCHRONOUS_KERNEL
-      delay = kaapi_get_elapsedns() -delay;
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+      res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
+      kaapi_assert(res == cudaSuccess);
+#endif
       res = cudaStreamSynchronize( *stream );
       kaapi_assert(res == CUDA_SUCCESS);
+
+      float gpu_delay;
+      res = cudaEventElapsedTime ( &gpu_delay, cios->start_events[ios->pos_wp % ios->count], cios->end_events[ios->pos_wp % ios->count] );
+      if (res != cudaSuccess) {
+         CudaCheckError(res);
+         kaapi_assert(0);
+      }
+      uint64_t delay = gpu_delay*1000.0; // convert to ns
       KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          2 /* end */, op->reserved, delay );
       ++ios->ok_p;
@@ -1520,8 +1564,9 @@ static int cuda_stream_process_pending(
 #  endif
           res = cudaEventElapsedTime ( &status.gpu_delay, cios->start_events[idx], cios->end_events[idx] );
           if (res != cudaSuccess) {
-            printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+            printf("   invalid Cuda event state at: %d, type:%i. non fifo order ?\n", idx, op->type );
             status.gpu_delay = 0;
+            CudaCheckError(res);
             kaapi_assert(0);
           }
 
