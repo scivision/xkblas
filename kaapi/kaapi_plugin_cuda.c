@@ -1642,7 +1642,8 @@ static uint16_t cuda_get_source(
       return lid_src;
     }
   }
-#else /* first return a random valid data, else an xfer data */
+#endif
+  /* first return a random valid data, else an xfer data */
   if (valid_bit !=0)
   {
     uint16_t retval = _kaapi_get_random_bit1(valid_bit, &device->inherited.ctxt->seed)-1; 
@@ -1655,7 +1656,6 @@ static uint16_t cuda_get_source(
     //printf("RndBiti(%i).2=%i\n", xfer_bit, retval );
     return retval;
   }
-#endif
   return (uint16_t)-1;
 }
 
