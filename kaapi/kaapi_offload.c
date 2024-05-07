@@ -50,7 +50,6 @@
 
 #define KAAPI_PREFIX "."
 
-#define _OFFLOAD_DEBUG 0
 #include "kaapi_impl.h"
 #include "kaapi_offload.h"
 
@@ -168,7 +167,7 @@ static bool kaapi_offload_load_plugin(
   DLSYM (device_finalize);
   DLSYM (device_attach);
   DLSYM (device_detach);
-  DLSYM (get_cublas_handle);
+  DLSYM (get_gpublas_handle);
 
 out:
   if(err != NULL){

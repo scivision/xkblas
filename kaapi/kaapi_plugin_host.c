@@ -643,7 +643,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t
 
 /*
 */
-KAAPI_CLASS_ENTRYPOINT void* KAAPI_PLUGIN_ENTRYPOINT(get_cublas_handle)(kaapi_device_t* dev)
+KAAPI_CLASS_ENTRYPOINT void* KAAPI_PLUGIN_ENTRYPOINT(get_gpublas_handle)(kaapi_device_t* dev)
 {
   KAAPI_OFFLOAD_TRACE_IN
 #if _PLUGIN_DEBUG
@@ -682,6 +682,6 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_host_driver)(kaapi_driver_t* driver)
   EP (device_finalize);
   EP (device_attach);
   EP (device_detach);
-  EP (get_cublas_handle);
+  EP (get_gpublas_handle);
 }
 #endif

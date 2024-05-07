@@ -2335,7 +2335,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
 /*
 */
 KAAPI_CLASS_ENTRYPOINT void* 
-KAAPI_PLUGIN_ENTRYPOINT(get_cublas_handle)(kaapi_device_t* dev)
+KAAPI_PLUGIN_ENTRYPOINT(get_gpublas_handle)(kaapi_device_t* dev)
 {
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
@@ -2374,6 +2374,6 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (device_finalize);
   EP (device_attach);
   EP (device_detach);
-  EP (get_cublas_handle);
+  EP (get_gpublas_handle);
 }
 #endif

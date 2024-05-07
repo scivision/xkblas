@@ -50,6 +50,8 @@
 #define KAAPI_PLUGIN_ENTRYPOINT_NAME( func_name ) KAAPI_PLUGIN_PREFIX_NAME #func_name
 #define KAAPI_PLUGIN_ENTRYPOINT( func_name ) KAAPI_PLUGIN_ ## func_name
 
+#include "kaapi_offload_dbg.h" 
+
 #if !defined(KAAPI_USE_OFFLOAD)
 /* exported function even if OFFLOAD is disable */
 static inline unsigned int kaapi_offload_get_num_devices(void)
@@ -234,8 +236,8 @@ typedef struct kaapi_driver {
     /* consider device as the current device */
     int (*f_device_detach)(kaapi_device_t*);
 
-    /* cublas support */
-    void* (*f_get_cublas_handle)(kaapi_device_t*);
+    /* GPU blas support */
+    void* (*f_get_gpublas_handle)(kaapi_device_t*);
 
     /* linked list of all drivers */
     struct kaapi_driver* next;

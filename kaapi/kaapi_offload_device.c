@@ -344,7 +344,7 @@ int kaapi_offload_device_execute_task(
   KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
      2 /* begin */, task, kaapi_task_getformat_ref(task)->fmtid, kaapi_task_getargs(task) );
   
-  /* handle comes form portability layer: for cuda its the cublas hande */
+  /* handle comes form portability layer: for cuda its the gpublas hande */
   ctxt->pc = task;
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(
       task, kaapi_context2thread(ctxt), handle
@@ -1657,9 +1657,9 @@ int kaapi_offload_invalidate_caches(void)
 
 /*
 */
-extern void* kaapi_get_cublas_handle(void);
-void* kaapi_get_cublas_handle(void)
+extern void* kaapi_get_gpublas_handle(void);
+void* kaapi_get_gpublas_handle(void)
 {
   kaapi_device_t* device = kaapi_offload_self_device();
-  return device->driver->f_get_cublas_handle( device );
+  return device->driver->f_get_gpublas_handle( device );
 }

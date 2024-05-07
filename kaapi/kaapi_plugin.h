@@ -177,5 +177,5 @@ KAAPI_PLUGIN_ENTRYPOINT(device_detach)(struct kaapi_device*);
 /*
 */
 KAAPI_CLASS_ENTRYPOINT void*
-KAAPI_PLUGIN_ENTRYPOINT(get_cublas_handle)(kaapi_device_t* dev);
+KAAPI_PLUGIN_ENTRYPOINT(get_gpublas_handle)(kaapi_device_t* dev);
 #endif
