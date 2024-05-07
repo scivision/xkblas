@@ -245,12 +245,12 @@ void kaapi_offload_print_stream_info(kaapi_offload_stream_t* stream)
       ios, 
       (kaapi_io_stream_emptyinstr(ios) ? "EMPTY" : "READY"),
       name_type[ios->type],
-      ios->pos_r,
-      ios->pos_rp,
-      ios->pos_w,
-      ios->pos_wp,
-      ios->ok_p,
-      ios->count
+      (int)ios->pos_r,
+      (int)ios->pos_rp,
+      (int)ios->pos_w,
+      (int)ios->pos_wp,
+      (int)ios->ok_p,
+      (int)ios->count
     );
   }
 }
