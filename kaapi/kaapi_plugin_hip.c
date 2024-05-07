@@ -1955,9 +1955,9 @@ int KAAPI_PLUGIN_ENTRYPOINT(host_register_testwait)(
 KAAPI_CLASS_ENTRYPOINT int
 KAAPI_PLUGIN_ENTRYPOINT(device_set_cpuset)(cpu_set_t* schedset, int dev)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   int err = kaapi_set_cpuset(schedset, dev);
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return err;
 }
 
@@ -1967,12 +1967,13 @@ KAAPI_PLUGIN_ENTRYPOINT(device_set_cpuset)(cpu_set_t* schedset, int dev)
 KAAPI_CLASS_ENTRYPOINT kaapi_device_t* 
 KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)malloc(sizeof(kaapi_device_hip_t));
   memset(device, 0, sizeof(kaapi_device_hip_t) );
   device->inherited.device_id = dev;
   device->save_device_id = -1;
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_create device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return &device->inherited;
 }
 
@@ -1983,13 +1984,13 @@ KAAPI_CLASS_ENTRYPOINT int
 KAAPI_PLUGIN_ENTRYPOINT(device_destroy)(kaapi_device_t* dev)
 {
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
-  KAAPI_OFFLOAD_TRACE_IN
-
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_destroy device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
   dev->state = KAAPI_DEVICE_STATE_DESTROY;
 
   free(device);
 
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 
@@ -2000,7 +2001,8 @@ KAAPI_CLASS_ENTRYPOINT int
 KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
 {
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
 
   int err = 0;
   int pi;
@@ -2015,8 +2017,12 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   hipError_t res;
   res = hipSetDevice(kaapi_device_ids[dev->device_id]);
   kaapi_hip_CheckError(res);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). Set \n",
+     dev->device_id, dev, device->driver->name);
 
   rocblas_initialize();
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). RocBLAS initialized\n",
+     dev->device_id, dev, device->driver->name);
 
   res = hipGetDeviceProperties(&prop, kaapi_device_ids[dev->device_id]);
   kaapi_hip_CheckError(res);
@@ -2078,7 +2084,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
 #endif
 out:
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return err;
 }
 
@@ -2091,7 +2097,7 @@ out:
 static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
 KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t* dev)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
 
   pthread_mutex_lock(&global_lock);
@@ -2152,6 +2158,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
   }
   pthread_mutex_unlock(&global_lock);
 #endif // CONFIG_USE_P2P
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 

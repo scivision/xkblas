@@ -1176,6 +1176,7 @@ int _kaapi_device_finalize(  void* arg )
 */
 void* kaapi_offload_device_thread( void* a )
 {
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   kaapi_driver_thread_arg_t* arg = (kaapi_driver_thread_arg_t*)a;
 
   kaapi_driver_t* driver = arg->driver;
@@ -1191,6 +1192,8 @@ void* kaapi_offload_device_thread( void* a )
 
   /* basic initialisation */
   kaapi_offload_device_init(device, arg->ld);
+  
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id:%i, thread:%i, initialized @:%X\n",device->device_id, device->tid, device);
 
   /* release the thread argument */
   free(a);
@@ -1222,6 +1225,7 @@ void* kaapi_offload_device_thread( void* a )
   KAAPI_ATOMIC_INCR(&driver->ndevices_commit);
 
   kaapi_mem_barrier();
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id:%i, thread:%i, commited @:%X\n",device->device_id, device->tid, device);
 
   /* */
 #if KAAPI_SLEEP_DEVICETHREAD
@@ -1258,6 +1262,8 @@ void* kaapi_offload_device_thread( void* a )
   kaapi_thread_unbind(thread);
   _kaapi_self_context = 0;
   device->state = KAAPI_DEVICE_STATE_DESTROYED;
+
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 
@@ -1266,23 +1272,20 @@ void* kaapi_offload_device_thread( void* a )
 */
 int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain_t* ld)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   KAAPI_DEBUG_INST( KAAPI_ATOMIC_WRITE(&count_valid,0);
                     KAAPI_ATOMIC_WRITE(&call_valid,0);)
-#if _OFFLOAD_DEBUG
-  fprintf(stdout, "%s: device %d/%p under initialization\n", __FUNCTION__, device->device_id, (void*) device );
-  fflush(stdout);
-#endif
+
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id:%i, thread:%i, device@:%X\n",device->device_id, device->tid, device);
   int err = 0;
 
   kaapi_driver_t* driver = device->driver;
   err = driver->f_device_init(device);
   if (err != 0)
   {
-#if _OFFLOAD_DEBUG
-    fprintf(stdout, "%s: device '%s' failed during initialization\n", __FUNCTION__, device->name ==0 ? "<no name>": device->name );
-    fflush(stdout);
-#endif
+    KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id:%i, thread:%i, device@:%X (%s) failed to initialized\n",
+      device->device_id, device->tid, device->driver->name,device);
     goto return_value;
   }
 
@@ -1293,7 +1296,6 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
     device->ld = ld;
     kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
   }
-
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */
@@ -1347,7 +1349,7 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   kaapi_assert(0 == pthread_mutex_unlock(&device->lock));
 
 return_value:
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return err;
 }
 

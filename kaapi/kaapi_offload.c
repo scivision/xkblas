@@ -231,7 +231,7 @@ void _kaapi_offload_config_data_field_device(kaapi_driver_t* driver, kaapi_devic
 static void
 kaapi_offload_config_devices(kaapi_driver_t* driver)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   int n_devices;
   int i;
 
@@ -241,6 +241,8 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
   n_devices = driver->f_get_number();
   if (n_devices < 1)
     goto out;
+    
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("driver @:%x name:%s == %i device(s)\n", driver, driver->name, n_devices);
 
   /*
   */
@@ -293,12 +295,14 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
       abort();
     };
 
+    KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id: %i / global_id: %i of driver name:%s\n", arg->device_id, arg->global_device_id, driver->name);
     err = pthread_create(&arg->tid, &attr, kaapi_offload_device_thread, arg);
     kaapi_assert(err ==0);
     kaapi_offload_num_devices++;
   }
+
 out:
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return;
 }
 
@@ -346,7 +350,7 @@ kaapi_offload_plugin_filter(kaapi_driver_t* driver, char *const plugin_filter)
 static void
 kaapi_offload_find_plugins(void)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   char* plugin_path = getenv("KAAPI_PLUGIN_PATH"); // Path to compiled plugins
   char* env_plugin_filter = getenv("KAAPI_DEVICE_TYPE"); // device type: cuda, host, etc
   char plugin_filter[128];
@@ -430,15 +434,16 @@ kaapi_offload_find_plugins(void)
 
   closedir(dir);
 return_label:
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return;
 }
+
 #else // no KAAPI_USE_DYNLOADER
 
 static void
 kaapi_offload_find_plugins(void)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   kaapi_driver_t* current;
 
 #if KAAPI_USE_HOST_PLUGIN
@@ -455,6 +460,7 @@ kaapi_offload_find_plugins(void)
   unsigned int type = current->f_get_type();
   kaapi_assert( type < KAAPI_PROC_TYPE_MAX );
   kaapi_drivers_bytype[type] = current;
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("Driver 'host' loaded @:%x\n",current);
   //kaapi_offload_config_devices(current);
 }
 #endif
@@ -474,6 +480,7 @@ kaapi_offload_find_plugins(void)
   kaapi_assert( type < KAAPI_PROC_TYPE_MAX );
   kaapi_drivers_bytype[type] = current;
   //kaapi_offload_config_devices(current);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("Driver 'CUDA' loaded @:%x\n",current);
 }
 #elif KAAPI_USE_HIP
 {
@@ -490,10 +497,11 @@ kaapi_offload_find_plugins(void)
   kaapi_assert( type < KAAPI_PROC_TYPE_MAX );
   kaapi_drivers_bytype[type] = current;
   //kaapi_offload_config_devices(current);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("Driver 'HIP' loaded @:%x\n",current);
 }
 #endif
 
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return;
 }
 
@@ -587,7 +595,7 @@ static int kaapi_offload_init_called = 0;
 int kaapi_offload_init(int flag)
 {
   
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
   if (kaapi_offload_init_called ==0)
   {
     kaapi_offload_init_called = 1;
@@ -600,7 +608,7 @@ int kaapi_offload_init(int flag)
     */
     kaapi_offload_find_plugins();
   }
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 
@@ -609,7 +617,7 @@ int kaapi_offload_init(int flag)
 */
 int kaapi_offload_start(void)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
 #if _OFFLOAD_DEBUG
   fprintf(stdout, "%s: #devices = %i\n", __FUNCTION__, kaapi_offload_num_devices );
   fflush(stdout);
@@ -628,15 +636,22 @@ int kaapi_offload_start(void)
   kaapi_driver_t* driver;
 
 #if KAAPI_USE_CUDA
+{
   driver = kaapi_drivers_bytype[KAAPI_PROC_TYPE_CUDA];
-#elif KAAPI_USE_HIP
-  driver = kaapi_drivers_bytype[KAAPI_PROC_TYPE_HIP];
-#endif
   int ndevices = driver->f_get_number();
   while (KAAPI_ATOMIC_READ(&driver->ndevices_commit) < ndevices)
     kaapi_slowdown_cpu();
+}
+#elif KAAPI_USE_HIP
+{
+  driver = kaapi_drivers_bytype[KAAPI_PROC_TYPE_HIP];
+  int ndevices = driver->f_get_number();
+  while (KAAPI_ATOMIC_READ(&driver->ndevices_commit) < ndevices)
+    kaapi_slowdown_cpu();
+}
+#endif
 
-  KAAPI_OFFLOAD_TRACE_OUT
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 
@@ -662,7 +677,7 @@ int kaapi_offload_free_memory(void)
 */
 int kaapi_offload_finalize(void)
 {
-  KAAPI_OFFLOAD_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_IN
 
   if (kaapi_offload_num_devices > 0)
   {
@@ -680,7 +695,6 @@ int kaapi_offload_finalize(void)
     kaapi_offload_num_devices = 0;
   }
 
-
   /* */
   while (kaapi_list_drivers !=0)
   {
@@ -695,7 +709,8 @@ int kaapi_offload_finalize(void)
   }
   memset(kaapi_drivers_bytype, 0, sizeof(kaapi_drivers_bytype));
   kaapi_offload_init_called = 0;
-  KAAPI_OFFLOAD_TRACE_OUT
+
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
   return 0;
 }
 

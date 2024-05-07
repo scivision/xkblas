@@ -47,7 +47,12 @@
 #define _KAAPI_OFFLOAD_DBG_H_
 
 
-/* Debug flag */
+/* Debug flags:
+   some macros are defined to control debuging output of various part.
+   This file defines macros for controlling offloading part of the code:
+   _OFFLOAD_DEBUG: general debuging info for all the parts
+   _OFFLOAD_INIT_DEBUG: initialisation of the devices as viewed by kaapi.
+ */
 //#define _OFFLOAD_DEBUG  1
 #ifndef _OFFLOAD_DEBUG  
 #define _OFFLOAD_DEBUG  0
@@ -68,6 +73,24 @@
 #  define KAAPI_OFFLOAD_TRACE_IN
 #  define KAAPI_OFFLOAD_TRACE_OUT
 #  define KAAPI_OFFLOAD_TRACE_MSG(...)
+#endif
+
+
+#if _OFFLOAD_INIT_DEBUG
+#include <stdio.h>
+#  define KAAPI_OFFLOAD_INIT_TRACE_IN \
+    fprintf(stdout, "%p::IN %s\n", (void*)pthread_self(), __FUNCTION__);\
+    fflush(stdout);
+#  define KAAPI_OFFLOAD_INIT_TRACE_OUT \
+    fprintf(stdout, "%p::OUT %s\n", (void*)pthread_self(), __FUNCTION__);\
+    fflush(stdout);
+#  define KAAPI_OFFLOAD_INIT_TRACE_MSG(...) \
+    fprintf(stdout, "%p::%s :", (void*)pthread_self(), __FUNCTION__ ); fprintf(stdout, __VA_ARGS__);\
+    fflush(stdout);
+#else
+#  define KAAPI_OFFLOAD_INIT_TRACE_IN
+#  define KAAPI_OFFLOAD_INIT_TRACE_OUT
+#  define KAAPI_OFFLOAD_INIT_TRACE_MSG(...)
 #endif
 
 #endif /* _KAAPI_OFFLOAD_DBG_H_ */
