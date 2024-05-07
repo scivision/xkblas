@@ -67,16 +67,6 @@ extern void kaapi_warning(unsigned long int line, const char* file, const char* 
 ///#  define kaapi_assert_warning(cond) if (!(cond)) kaapi_warning( __LINE__, __FILE__, _KE_STR_EXP(cond))
 #  define kaapi_assert_warning(cond)  (!(cond) ? kaapi_warning( __LINE__, __FILE__, _KE_STR_EXP(cond)), 1: 0)
 
-/* force value for KAAPI_DEBUG */
-#if KAAPI_DEBUG==0
-#elif KAAPI_DEBUG ==1
-#elif defined(KAAPI_DEBUG)
-#undef KAAPI_DEBUG
-#define KAAPI_DEBUG 1
-#else
-#define KAAPI_DEBUG 1
-#endif
-
 #if defined(NDEBUG)
 #undef KAAPI_DEBUG
 #endif

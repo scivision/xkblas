@@ -70,7 +70,7 @@
   size_t lda;
   kaapi_access_t B;
   size_t ldb;
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
   /* debug */
 	void* A_host_ptr;
 	void* B_host_ptr;
@@ -103,14 +103,6 @@ void INSERT_TASK_ztrsm(
     taskarg->diag = diag;
     taskarg->m = m;
     taskarg->n = n;
-#if defined(KAAPI_DEBUG)
-		taskarg->A_host_ptr = Ah->addr;
-		taskarg->B_host_ptr = Bh->addr;
-    taskarg->Am = Am;
-    taskarg->An = An;
-    taskarg->Bm = Bm;
-    taskarg->Bn = Bn;
-#endif
 #if BUG_2022_03_18 && defined(PRECISION_d)
 {
   double* A = Ah->addr;
@@ -129,6 +121,14 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i)/handle: %p, READWRITE
         KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Bh, Bm, Bn));
     taskarg->ldb = ldb;
     taskarg->mm = xkblas_get_modemath();
+#if KAAPI_DEBUG
+		taskarg->A_host_ptr = taskarg->A.data;
+		taskarg->B_host_ptr = taskarg->B.data;
+    taskarg->Am = Am;
+    taskarg->An = An;
+    taskarg->Bm = Bm;
+    taskarg->Bn = Bn;
+#endif
 #if KAAPI_USE_OCR 
     /* OCR on the third parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 1);
@@ -144,7 +144,7 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i)/handle: %p, READWRITE
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if 0//defined(KAAPI_DEBUG)
+#if 0//KAAPI_DEBUG
   printf("%s: %s x = %s \n",__func__,
       kaapi_dbg_get_name(arg->A.data),
       kaapi_dbg_get_name(arg->B.data)
@@ -162,7 +162,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if 0//defined(KAAPI_DEBUG)
+#if 0//KAAPI_DEBUG
   printf("%s[%d,%d]: A[%p](%i,%i) X = B[%p](%i,%i)\n",__func__,
       arg->m, arg->n, arg->A_host_ptr, arg->Am, arg->An, arg->B_host_ptr, arg->Bm, arg->Bn
   );

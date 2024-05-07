@@ -194,13 +194,9 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
     Complex64_t zbeta;
     Complex64_t zone = (Complex64_t)1.0;
 
-#if defined(KAAPI_DEBUG)
-  {
-    kaapi_assert( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert( 0 == xkblas_dbg_setname( "B", Bh ) );
-    kaapi_assert( 0 == xkblas_dbg_setname( "C", Ch ) );
-  }
-#endif
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "B", Bh ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "C", Ch ) );
 
     /* map output of C on ressources */
     xkblas_context_t* xkctxt =xkblas_context_get();

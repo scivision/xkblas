@@ -109,7 +109,7 @@ BUG: if set to 0 / PIPELINE set to 0 => deadlock
 #define KAAPI_CACHE_LINE_SIZE 64
 #endif
 
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
 #define KAAPI_RETURN_ERROR(err,val) \
   {\
     if (err != val) { printf("%s %i: error\n", __FILE__, __LINE__); }\
@@ -167,7 +167,7 @@ extern kaapi_rtparam_t kaapi_default_param;
 #include "kaapi_perfctr.h"
 #include "kaapi_trace.h"
 
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
 #include <signal.h>
 #define KAAPI_ATOMIC_PRINT( inst ) \
 {\
@@ -208,6 +208,13 @@ struct kaapi_queue;
 #  define KAAPI_CTXT_PERFREG_INCR(ctxt,idx)
 #endif
 
+
+/** Debug. To serialize output
+*/
+#if KAAPI_DEBUG
+extern void _kaapi_lock_print(void);
+extern void _kaapi_unlock_print(void);
+#endif
 
 /* ========================================================================= */
 /* Data type                                                                 */
@@ -760,6 +767,7 @@ extern uint32_t kaapi_sched_activate_successors(
 */
 extern uint32_t kaapi_sched_activate_syncpoint(
     kaapi_thread_t* thread,
+    kaapi_task_t* task,
     kaapi_access_t* sync
 );
 
@@ -959,7 +967,7 @@ extern int kaapi_taskmodule_init(void);
 extern int kaapi_taskmodule_finalize(void);
 
 
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
 /* Signal handler to dump the state of the internal kprocessors
    This signal handler is attached to SIGALARM when KAAPI_DUMP_PERIOD env. var. is defined.
 */

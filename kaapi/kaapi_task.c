@@ -450,14 +450,34 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
               uint16_t lid = KAAPI_MEMORY_FFS( bit );
               --lid;
               ld = kaapi_localitydomain_get(lid);
+#if 0
+  _kaapi_lock_print();
+  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, no LD, wish:%i\n",pthread_self(), task,access,lid);
+  _kaapi_unlock_print();
+#endif
             }
+#if 0
+else 
+{
+  _kaapi_lock_print();
+  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, no LD no wish bit:%i\n",pthread_self(), task,access);
+  _kaapi_unlock_print();
+}
+#endif
           }
+#if 0
+else
+{
+  _kaapi_lock_print();
+  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, LD is:%i\n",pthread_self(), task,access,ld->ldid);
+  _kaapi_unlock_print();
+}
+#endif
         } // mdi !=0
         else {
           printf("Bad MDI index %p\n", access);
           kaapi_assert(0);
         }
-       
       } 
       else {
         printf("Bad OCR index\n");
@@ -470,6 +490,11 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
 
   if (ld ==0) 
   {
+#if 0
+_kaapi_lock_print();
+printf("%x:: No locality domain, take the next one:%i \n", pthread_self(), ctxt->last_ldid);
+_kaapi_unlock_print();
+#endif
     ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ctxt->last_ldid++);
     int count = kaapi_localitydomain_count(KAAPI_LD_GPU);
     if (ctxt->last_ldid >= count) ctxt->last_ldid = 0;
@@ -733,7 +758,7 @@ static void* _kaapi_resize_stack( kaapi_stack_t* stack, void* sp, kaapi_stack_al
 {
   if (size >= kaapi_default_param.stackblocsize)
   {
-#if 1//defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
     fprintf(stderr,"*** stack bloc overflow: data too big for one allocation,"
          " please extend your KAAPI_STACKBLOCSIZE and recompile the library."
          " KAAPI_STACKBLOCSIZE is actually set to %li bytes / %.2f MBytes. Data required is %li (bytes)",
@@ -1234,7 +1259,7 @@ int kaapi_handle_init(kaapi_thread_t* thread, kaapi_handle_t* h, void* data, kaa
 {
   kaapi_assert_debug( KAAPI_ACCESS_ALL < (1<<8) );
   kaapi_access_sync_init(&h->sync0, data);
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
   h->sync0.reserv = 1; // DEBUG
 #endif
   /* wc not ready initially */
@@ -1378,6 +1403,7 @@ redo:
 */
 uint32_t kaapi_sched_activate_syncpoint(
     kaapi_thread_t* thread,
+    kaapi_task_t* task, 
     kaapi_access_t* sync
 )
 {
@@ -1391,6 +1417,12 @@ uint32_t kaapi_sched_activate_syncpoint(
       a->ready = 1;
       if (KAAPI_ATOMIC_DECR(&a->task->wc)==0)
       {
+#if 0
+_kaapi_lock_print();
+if (task) printf("%x:: Task: %p, name: %s => activate task: %p, name: %s\n", pthread_self(), task, kaapi_task_getformat_ref(task)->name, a->task, kaapi_task_getformat_ref(a->task)->name );
+else printf("%x:: Activate task: %p, name: %s\n", pthread_self(), a->task, kaapi_task_getformat_ref(a->task)->name );
+_kaapi_unlock_print();
+#endif
         kaapi_thread_push(thread, a->task);
         ++activated;
       }
@@ -1413,6 +1445,9 @@ uint32_t kaapi_sched_activate_successors (
   uint32_t activated = 0;
   if (! (task->flags & KAAPI_TASK_FLAG_INDEPENDENT))
   {
+#if 0
+printf("Successor of task: %p, name: %s\n", task, kaapi_task_getformat_ref(task)->name );
+#endif
     const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
     unsigned int count_params = kaapi_format_get_count_params(fmt, kaapi_task_getargs(task));
     for (unsigned int i=0; i<count_params; ++i)
@@ -1424,7 +1459,7 @@ uint32_t kaapi_sched_activate_successors (
       kaapi_access_t* a  = kaapi_format_get_access_param( fmt, i, kaapi_task_getargs(task));
       if (cbk) cbk(task, i, a, arg);
 
-      activated += kaapi_sched_activate_syncpoint( thread, a->sync );
+      activated += kaapi_sched_activate_syncpoint( thread, task, a->sync );
     }
   }
   

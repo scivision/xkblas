@@ -175,12 +175,8 @@ int xkblas_zsyrk_async( int uplo, int trans, int N, int K,
     Complex64_t zbeta;
     Complex64_t zone = (Complex64_t)1.0;
 
-#if defined(KAAPI_DEBUG)
-  {
-    kaapi_assert( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert( 0 == xkblas_dbg_setname( "C", Ch ) );
-  }
-#endif
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "C", Ch ) );
 
     xkblas_context_t* xkctxt =xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_SYRK, Ch );

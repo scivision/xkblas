@@ -44,6 +44,7 @@
 #include "kaapi_offload.h"
 #include "kaapi_offload_stream.h"
 
+
 /* Priorities for fecthing or copying data
 */
 #define KAAPI_FETCH_PRIORITY_LOW    0
@@ -2006,7 +2007,7 @@ static kaapi_metadata_info_t* _kaapi_new_mdi(
   }
   KAAPI_ATOMIC_WRITE(&mdi->xfer,  0ULL);
   KAAPI_ATOMIC_WRITE(&mdi->xferb, 0ULL);
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
   mdi->debug_info = 0;
   mdi->owner = 0;
 #endif
@@ -2060,7 +2061,7 @@ abort();
   }
   else
     mdi = KAAPI_HASHENTRIES_GET(entry, kaapi_metadata_info_t*);
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
   mdi->debug_info = strdup(name);
 #endif
   return 0;
@@ -2501,6 +2502,16 @@ uint16_t _kaapi_get_source_lid(
   lid0 = kaapi_memory_asid_get_lid(kaapi_local_asid);
   lid_dest = kaapi_memory_asid_get_lid(dest_asid);
   
+#if 0
+_kaapi_lock_print();
+{
+  uint64_t vb = KAAPI_ATOMIC_READ(&mdi->valid);
+  uint64_t ab = KAAPI_ATOMIC_READ(&mdi->alloc);
+  printf("%x:: IN get source mdi @:%p, (dest=%i) lid0:%i, valid_bit:%i/%p  alloc_bit: %i/%p\n", pthread_self(), mdi, lid_dest, lid0, (int)vb, vb, (int)ab, ab);
+}
+_kaapi_unlock_print();
+#endif
+
   /* choose valid copies to move data to device
      - warning: only replica with valid bit, not in transit are
      ensured to be send to the device
@@ -2515,9 +2526,9 @@ reload:
   xfer_bit = KAAPI_ATOMIC_READ(&mdi->xfer);
 #endif
 
-  valid_bit &= ~(1<<lid0);
+  valid_bit &= ~((KAAPI_MEMORY_VALUE_TYPE)1<<lid0);
 #if KAAPI_USE_FAVOR_D2D_1
-  xfer_bit &= ~(1<<lid0);
+  xfer_bit &= ~((KAAPI_MEMORY_VALUE_TYPE)1<<lid0);
 #endif
 
   /* if ==0 => lid0 is the only valid ressource */
@@ -2528,6 +2539,14 @@ reload:
 #endif
   {
     lid_src = lid0;
+#if 0
+_kaapi_lock_print();
+valid_bit= KAAPI_ATOMIC_READ(&mdi->valid);
+KAAPI_MEMORY_VALUE_TYPE res_bit = valid_bit & ~((KAAPI_MEMORY_VALUE_TYPE)1<<lid0);
+printf("%x:: **** Warning no valid bit: %i, res_valid: %i, return ASID=host\n",pthread_self(), valid_bit, res_bit );
+_kaapi_dbg_breakpoint();
+_kaapi_unlock_print();
+#endif
     goto return_value;
   }
 
@@ -2562,6 +2581,12 @@ reload:
         goto return_value;
     }
     lid_src = lid0;
+#if 0
+_kaapi_lock_print();
+printf("%x:: **** Warning no valid bit neither xfer bit, return ASID=host\n",pthread_self());
+_kaapi_dbg_breakpoint();
+_kaapi_unlock_print();
+#endif
     goto return_value;
 #endif
   }
@@ -2597,6 +2622,16 @@ return_value:
   if (sel_dest) *sel_dest = lid_dest;
 #else
   /* lock at affinity between dest/src */
+#error "Code removed"
+#endif
+#if 0
+_kaapi_lock_print();
+{
+  uint64_t vb = KAAPI_ATOMIC_READ(&mdi->valid);
+  uint64_t ab = KAAPI_ATOMIC_READ(&mdi->alloc);
+  printf("%x:: OUT get source mdi @:%p, (dest=%i) returns %i: valid_bit:%i/%p  alloc_bit: %i/%p\n", pthread_self(), mdi, lid_dest, lid_src, (int)vb, vb, (int)ab, ab);
+}
+_kaapi_unlock_print();
 #endif
 
   return lid_src;
@@ -2770,6 +2805,11 @@ static int kaapi_dsm_fetch_on(
   kaapi_data_replica_t* dest_replica = mdi->replicas[lid_dest];
   kaapi_assert_debug( src_replica->ptr.ptr != 0 );
   kaapi_assert_debug( dest_replica->ptr.ptr != 0 );
+#if 0
+_kaapi_lock_print();
+  printf("%x:: transfer data @[%i]=%p -> @[%i]=%p\n", pthread_self(), lid_src, src_replica->ptr.ptr, lid_dest, dest_replica->ptr.ptr );
+_kaapi_unlock_print();
+#endif
 
   /* Lock lid_src & lid metadata state evolution.
      Lock in order < of local id of device to avoid deadlock.
@@ -2811,6 +2851,11 @@ static int kaapi_dsm_fetch_on(
   int d2d_route = kaapi_memory_replica_is_xfer(mdi, lid_src) && !kaapi_memory_replica_is_xfer(mdi, lid_dest);
   if (d2d_route)
   {
+#if 0
+_kaapi_lock_print();
+printf("***** Opportuinist transfer: wait data on %i, before to resendto %i\n", pthread_self(), lid_src, lid_dest );
+_kaapi_unlock_print();
+#endif
     /* add callback on lid_src: atomic with the receiver that will call the callbacks in the list */
     kaapi_data_replica_cbk_t* drc =_allocate_callback(r);
     drc->iocbk.fnc    = cbk;
@@ -2821,7 +2866,7 @@ static int kaapi_dsm_fetch_on(
     /* Mark destination lid as under xfer to avoid multiple transfer */
     kaapi_memory_replica_set_xfer( mdi, lid_dest );
 
-    /* next callback will ocurrs on lid_src to forward data when receive */
+    /* replace the callback that will ocurrs on lid_src to forward data when receive */
     r = mdi->replicas[lid_src];
     cbk = callback_resend_replica_on_callback_cbk;
     arg0 = (void*)(uintptr_t)lid_src;
@@ -2874,6 +2919,7 @@ static int kaapi_dsm_fetch_on(
 }
 
 
+
 /* ~ to pin/unpin memory location
    may return ENOMEM if no more memory on the device
 */
@@ -2921,7 +2967,6 @@ int kaapi_dsm_acquire_data(
         KAAPI_ATOMIC_DECR(&task->wc);
     }
 
-    kaapi_memory_cache_touch( dsm, lid, KAAPI_ACCESS_MODE_R, mdi );
   }
   if (KAAPI_ACCESS_IS_WRITE(mp))
   {
@@ -2933,10 +2978,17 @@ int kaapi_dsm_acquire_data(
        wait until the data on the on the fly data transfers.
     */
     kaapi_memory_replica_set_all_dirty_except( mdi, lid );
-
-    /* touch entry in cache as write access */
-    kaapi_memory_cache_touch( dsm, lid, KAAPI_ACCESS_MODE_W, mdi );
   }
+
+  /* touch entry in cache as write access */
+  if (KAAPI_ACCESS_IS_WRITE(mp)) kaapi_memory_cache_touch( dsm, lid, KAAPI_ACCESS_MODE_W, mdi );
+  else kaapi_memory_cache_touch( dsm, lid, KAAPI_ACCESS_MODE_R, mdi );
+
+#if 0
+_kaapi_lock_print();
+  printf("%x:: Task: %p (%s), mdi @:%p ", pthread_self(), task, kaapi_task_getformat_ref(task)->name, mdi); kaapi_dsm_print_mdi("", mdi );
+_kaapi_unlock_print();
+#endif
 
   return err;
 }

@@ -69,7 +69,7 @@
   size_t lda;
   kaapi_access_t B;
   size_t ldb;
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
   /* debug */
   size_t Am;
   size_t An;
@@ -100,7 +100,7 @@ void INSERT_TASK_ztrmm(
     taskarg->diag = diag;
     taskarg->m = m;
     taskarg->n = n;
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
     taskarg->Am = Am;
     taskarg->An = An;
     taskarg->Bm = Bm;
@@ -129,7 +129,7 @@ void INSERT_TASK_ztrmm(
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if 0 //defined(KAAPI_DEBUG)
+#if 0 //KAAPI_DEBUG
   printf("%s: %s x = %s \n",__func__,
       kaapi_dbg_get_name(arg->A.data),
       kaapi_dbg_get_name(arg->B.data)
@@ -147,7 +147,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
   NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if 0 //defined(KAAPI_DEBUG)
+#if 0 //KAAPI_DEBUG
   printf("%i::%s: A(%i,%i) X = B(%i,%i)\n",kaapi_offload_self_device()->device_id, __func__,
       arg->Am, arg->An, arg->Bm, arg->Bn
   );

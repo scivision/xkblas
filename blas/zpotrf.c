@@ -81,11 +81,7 @@ int xkblas_zpotrf_async(
     size_t Amt = Ah->mt;
     size_t Ant = Ah->nt;
 
-#if defined(KAAPI_DEBUG)
-  {
-    assert( 0 == xkblas_dbg_setname( "A", Ah ) );
-  }
-#endif
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
 
     /*
      *  CblasLower

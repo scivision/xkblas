@@ -199,13 +199,9 @@ int xkblas_zcopyscale_async(
 	kaapi_assert_debug_m( (Lh->ld == ldl) && (Lh->M == N) && (Lh->N == M), "Invalid matrice L" );
 	kaapi_assert_debug_m( (Uh->ld == ldu) && (Uh->M == M) && (Uh->N == N), "Invalid matrice U" );
 
-#if defined(KAAPI_DEBUG)
-	{
-		kaapi_assert( 0 == xkblas_dbg_setname( "D", Dh ) );
-		kaapi_assert( 0 == xkblas_dbg_setname( "L", Lh ) );
-		kaapi_assert( 0 == xkblas_dbg_setname( "U", Uh ) );
-	}
-#endif
+  kaapi_assert_debug( 0 == xkblas_dbg_setname( "D", Dh ) );
+  kaapi_assert_debug( 0 == xkblas_dbg_setname( "L", Lh ) );
+  kaapi_assert_debug( 0 == xkblas_dbg_setname( "U", Uh ) );
 
 	/* map output of A on ressources */
 	xkblas_context_t* xkctxt = xkblas_context_get();

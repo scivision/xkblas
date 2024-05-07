@@ -196,12 +196,8 @@ int xkblas_ztrsm_async(
     Complex64_t minvalpha  = (Complex64_t)-1.0 / *alpha;
     Complex64_t lalpha;
 
-#if defined(KAAPI_DEBUG)
-  {
-    kaapi_assert( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert( 0 == xkblas_dbg_setname( "B", Bh ) );
-  }
-#endif
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname( "B", Bh ) );
 
     xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_TRSM, Bh );

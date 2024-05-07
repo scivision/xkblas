@@ -155,7 +155,7 @@ struct kaapi_metadata_info {
     KAAPI_MEMORY_BITFIELD_TYPE xfer;
     KAAPI_MEMORY_BITFIELD_TYPE wish;
     KAAPI_MEMORY_BITFIELD_TYPE xferb; /* used ??? */
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
     const char*                debug_info;
     pthread_t                  owner;      /* current xkblas model => the user thread that call
                                              xkblas have its own context and data */

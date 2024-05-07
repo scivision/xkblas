@@ -75,7 +75,7 @@
 	size_t ldl;
 	kaapi_access_t U;
 	size_t ldu;
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
 	void* D_host_ptr;
 	void* L_host_ptr;
 	void* U_host_ptr;
@@ -125,10 +125,10 @@ void INSERT_TASK_zcopyscale(
 
 	taskarg->ldu = ldu;
 
-#if defined(KAAPI_DEBUG)
-	taskarg->D_host_ptr = Dh->addr;
-	taskarg->L_host_ptr = Lh->addr;
-	taskarg->U_host_ptr = Uh->addr;
+#if KAAPI_DEBUG
+	taskarg->D_host_ptr = taskarg->D.data;
+	taskarg->L_host_ptr = taskarg->L.data;
+	taskarg->U_host_ptr = taskarg->U.data;
 	taskarg->Dm = Dm;
 	taskarg->Dn = Dn;
 	taskarg->Lm = Lm;
@@ -178,11 +178,11 @@ extern void cuda_zcopyscale(
 static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, void* handle )
 {
 	NAME(Arg)* arg = (NAME(Arg)*)kaapi_task_getargs(task);
-#if defined(KAAPI_DEBUG)
-	printf("%s: D[%p](%i,%i) L[%p](%i,%i) U[%p](%i,%i)\n", __func__,
-		arg->D_host_ptr, arg->Dm, arg->Dn,
-		arg->L_host_ptr, arg->Lm, arg->Ln,
-		arg->U_host_ptr, arg->Um, arg->Un);
+#if 0 // KAAPI_DEBUG
+	printf("%x:: task:%p %s: D[%p/%p](%i,%i) L[%p/%p](%i,%i) U[%p/%p](%i,%i)\n", pthread_self(), task, __func__,
+		arg->D_host_ptr, arg->D.data, arg->Dm, arg->Dn,
+		arg->L_host_ptr, arg->L.data, arg->Lm, arg->Ln,
+		arg->U_host_ptr, arg->U.data, arg->Um, arg->Un);
 #endif
 	
 	cudaStream_t cuda_stream;

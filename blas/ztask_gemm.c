@@ -87,7 +87,7 @@
   Complex64_t beta;
   kaapi_access_t C;
   size_t ldc;
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
 	/* debug */
 	void* A_host_ptr;
 	void* B_host_ptr;
@@ -135,16 +135,16 @@ void INSERT_TASK_zgemm(
     taskarg->beta = beta;
     taskarg->ldc = ldc;
     taskarg->mm = xkblas_get_modemath();
-#if defined(KAAPI_DEBUG)
-		taskarg->A_host_ptr = Ah->addr;
-		taskarg->B_host_ptr = Bh->addr;
-		taskarg->C_host_ptr = Ch->addr;
-		taskarg->Am = Am;
-		taskarg->An = An;
-		taskarg->Bm = Bm;
-		taskarg->Bn = Bn;
-		taskarg->Cm = Cm;
-		taskarg->Cn = Cn;
+#if KAAPI_DEBUG
+    taskarg->A_host_ptr = taskarg->A.data;
+    taskarg->B_host_ptr = taskarg->B.data;
+    taskarg->C_host_ptr = taskarg->C.data;
+    taskarg->Am = Am;
+    taskarg->An = An;
+    taskarg->Bm = Bm;
+    taskarg->Bn = Bn;
+    taskarg->Cm = Cm;
+    taskarg->Cn = Cn;
 #endif
 #if KAAPI_USE_OCR
     /* OCR on the third parameter */
@@ -195,12 +195,12 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
 #endif
   }
 
-#if 0 // defined(KAAPI_DEBUG)
-	printf("%s[%d,%d,%d]: A[%p](%i,%i) B[%p](%i,%i) C[%p](%i,%i)\n", __func__,
+#if 0//KAAPI_DEBUG
+	printf("%x:: task:%p %s[%d,%d,%d]: A[%p/%p](%i,%i) B[%p/%p](%i,%i) C[%p/%p](%i,%i)\n", pthread_self(), task, __func__,
 		arg->m, arg->n, arg->k,
-		arg->A_host_ptr, arg->Am, arg->An,
-		arg->B_host_ptr, arg->Bm, arg->Bn,
-		arg->C_host_ptr, arg->Cm, arg->Cn);
+		arg->A_host_ptr, arg->A.data, arg->Am, arg->An,
+		arg->B_host_ptr, arg->B.data, arg->Bm, arg->Bn,
+		arg->C_host_ptr, arg->C.data, arg->Cm, arg->Cn);
 #endif
 
   res = cublasZgemm((cublasHandle_t)handle,

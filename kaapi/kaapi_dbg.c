@@ -39,6 +39,13 @@
 #include <stdio.h>
 #include "kaapi_impl.h"
 
+
+/* */
+void _kaapi_dbg_breakpoint(void)
+{
+}
+
+
 /* TODO: the noprint_data flag does not work.
    - the idea is to link together tasks without intermediate data node.
    - nothing was done.... if set, a set of independant tasks are outputed, which

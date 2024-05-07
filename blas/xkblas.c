@@ -889,7 +889,7 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 
 /*
 */
-#if defined(KAAPI_DEBUG) && (KAAPI_USE_CUDA || KAAPI_USE_HIP)
+#if KAAPI_DEBUG && (KAAPI_USE_CUDA || KAAPI_USE_HIP)
 #  define KAAPI_DEBUG_CTR 1
 #  if KAAPI_DEBUG_CTR
 kaapi_atomic_t spawn_writeback={0};
@@ -1459,7 +1459,7 @@ printf("%p:: handle: %p, sync: %p\n", pthread_self(), curr, curr->sync);
 #if KAAPI_DEBUG
       count += 
 #endif
-        kaapi_sched_activate_syncpoint(xk_ctxt->kthread, &curr->sync0);
+        kaapi_sched_activate_syncpoint(xk_ctxt->kthread, 0, &curr->sync0);
 #if KAAPI_DEBUG
       ++cnt_activated_handle;
 #endif

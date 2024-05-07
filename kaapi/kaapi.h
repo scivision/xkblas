@@ -1333,8 +1333,8 @@ extern uint64_t kaapi_get_elapsedns(void);
 */
 extern double kaapi_get_elapsedtime(void);
 
-
-#if defined(KAAPI_DEBUG)
+#if KAAPI_DEBUG
+extern void _kaapi_dbg_breakpoint(void);
 extern void kaapi_dump_dot( kaapi_thread_t* thread, const char* filename );
 extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* first, const char* filename );
 extern void kaapi_dump_raw_dot( kaapi_thread_t* thread, const char* filename );
