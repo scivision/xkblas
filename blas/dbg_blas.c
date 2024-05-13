@@ -45,7 +45,7 @@ extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* 
 /* Give name of tile for various output (graph, debug).
    Each tile will be display as name(i,j) where i,j is the position in A.
 */
-int xkblas_dbg_setname_with_flags(
+int xkblas_dbg_setname(
   const char* name,
   xkblas_matrix_descr_t* Ah
 )

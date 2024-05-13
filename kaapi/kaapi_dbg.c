@@ -784,7 +784,7 @@ redo_print:
 */
 void kaapi_dbg_register_name( const void* ptr, const char* name )
 {
-	kaapi_dbg_register_with_flags(ptr, name, 1);
+	kaapi_dbg_register_name_with_flags(ptr, name, 1);
 }
 
 /*
