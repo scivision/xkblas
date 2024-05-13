@@ -61,14 +61,20 @@
 #if _OFFLOAD_DEBUG
 #include <stdio.h>
 #  define KAAPI_OFFLOAD_TRACE_IN \
+    _kaapi_lock_print();\
     fprintf(stdout, "%p::IN %s\n", (void*)pthread_self(), __FUNCTION__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #  define KAAPI_OFFLOAD_TRACE_OUT \
+    _kaapi_lock_print();\
     fprintf(stdout, "%p::OUT %s\n", (void*)pthread_self(), __FUNCTION__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #  define KAAPI_OFFLOAD_TRACE_MSG(...) \
+    _kaapi_lock_print();\
     fprintf(stdout, __VA_ARGS__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #else
 #  define KAAPI_OFFLOAD_TRACE_IN
 #  define KAAPI_OFFLOAD_TRACE_OUT
@@ -79,14 +85,20 @@
 #if _OFFLOAD_INIT_DEBUG
 #include <stdio.h>
 #  define KAAPI_OFFLOAD_INIT_TRACE_IN \
+    _kaapi_lock_print();\
     fprintf(stdout, "%p::IN %s\n", (void*)pthread_self(), __FUNCTION__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #  define KAAPI_OFFLOAD_INIT_TRACE_OUT \
+    _kaapi_lock_print();\
     fprintf(stdout, "%p::OUT %s\n", (void*)pthread_self(), __FUNCTION__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #  define KAAPI_OFFLOAD_INIT_TRACE_MSG(...) \
+    _kaapi_lock_print();\
     fprintf(stdout, "%p::%s :", (void*)pthread_self(), __FUNCTION__ ); fprintf(stdout, __VA_ARGS__);\
-    fflush(stdout);
+    fflush(stdout);\
+    _kaapi_unlock_print();
 #else
 #  define KAAPI_OFFLOAD_INIT_TRACE_IN
 #  define KAAPI_OFFLOAD_INIT_TRACE_OUT
