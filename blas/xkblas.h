@@ -303,6 +303,12 @@ extern int xkblas_dbg_setname(
   xkblas_matrix_descr_t* Mh
 );
 
+extern int xkblas_dbg_setname_with_flags(
+  const char* name,
+  xkblas_matrix_descr_t* Mh,
+  uint32_t flags
+);
+
 /* Dump the DAG corresponding to the current spawned task.
 */
 extern void xkblas_dbg_dump_graph( const char* name );

@@ -202,9 +202,9 @@ int xkblas_zsyr2k_async( int uplo, int trans, int N, int K,
     Complex64_t zone   = (Complex64_t)1.0;
     Complex64_t zbeta;
 
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "B", Bh ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "C", Ch ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
 
     xkblas_context_t* xkctxt =xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_SYR2K, Ch );

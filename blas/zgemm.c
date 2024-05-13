@@ -228,9 +228,9 @@ int xkblas_zgemm_async(
     xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
 
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "B", Bh ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "C", Ch ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
     
 #if KAAPI_USE_TRACELIB==1
     kaapi_context_t* ctxt = xkctxt->kctxt;

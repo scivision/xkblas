@@ -177,8 +177,8 @@ int xkblas_zherk_async( int uplo, int trans, int N, int K,
     Complex64_t zbeta;
     double dbeta;
 
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "C", Ch ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
 
     xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_HERK, Ch );
