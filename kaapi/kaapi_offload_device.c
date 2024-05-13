@@ -1294,6 +1294,7 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   {
     ld->device = device;
     device->ld = ld;
+    KAAPI_OFFLOAD_INIT_TRACE_MSG("kaapi_dsm_register_device:: device_id:%i, device@:%X register to localitydomain ldid: %i\n", device->device_id, device, ld->ldid );
     kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
   }
 

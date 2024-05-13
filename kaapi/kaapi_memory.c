@@ -3250,6 +3250,14 @@ int kaapi_dsm_register_device(
   kaapi_assert_debug(lid < KAAPI_MEMORY_MAX_NODES);
   if (dsm->nodes[lid] !=0)  /* already initialized ? */
   {
+ #if KAAPI_DEBUG
+    if (dsm->nodes[lid] !=0) {
+      _kaapi_lock_print();
+      printf("%x:: In %s: device lid:%i seems to be already initialized to device:%p, try to initialize it againto devie:%p\n", 
+         pthread_self(), lid, dsm->nodes[lid], device );
+      _kaapi_unlock_print();
+    }
+#endif
     kaapi_assert( dsm->nodes[lid]->device == device );
     return 0;
   }
