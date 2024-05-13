@@ -1137,7 +1137,7 @@ static int cuda_stream_decode_ioinstruction(
               res = 0;
             break;
             case KAAPI_IO_COPY_H2D:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1151,7 +1151,7 @@ _kaapi_unlock_print();
               COUNTER_SIZE_H2D+= size;
             break;
             case KAAPI_IO_COPY_D2H:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1166,7 +1166,7 @@ _kaapi_unlock_print();
             break;
 
             case KAAPI_IO_COPY_D2D:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1207,7 +1207,7 @@ _kaapi_unlock_print();
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1215,7 +1215,7 @@ _kaapi_unlock_print();
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
             break;
             case KAAPI_IO_COPY_H2D:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1225,7 +1225,7 @@ _kaapi_unlock_print();
               COUNTER_SIZE_H2D   += size;
             break;
             case KAAPI_IO_COPY_D2H:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
@@ -1235,7 +1235,7 @@ _kaapi_unlock_print();
               COUNTER_SIZE_D2H   += size;
             break;
             case KAAPI_IO_COPY_D2D:
-#if KAAPI_DEBUG
+#if 0// KAAPI_DEBUG
 _kaapi_lock_print();
 	      printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
