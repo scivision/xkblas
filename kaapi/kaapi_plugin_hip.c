@@ -1540,7 +1540,7 @@ static uint16_t kaapi_hip_get_source(
       return lid_src;
     }
   }
-#else /* first return a random valid data, else an xfer data */
+#endif
   if (valid_bit !=0)
   {
     uint16_t retval = _kaapi_get_random_bit1(valid_bit, &device->inherited.ctxt->seed)-1; 
@@ -1553,7 +1553,6 @@ static uint16_t kaapi_hip_get_source(
     //printf("RndBiti(%i).2=%i\n", xfer_bit, retval );
     return retval;
   }
-#endif
   return (uint16_t)-1;
 }
 
@@ -1972,7 +1971,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev)
   memset(device, 0, sizeof(kaapi_device_hip_t) );
   device->inherited.device_id = dev;
   device->save_device_id = -1;
-  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_create device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_create device_id: %i, device @:%X (%s)\n",dev, device, driver->name);
   KAAPI_OFFLOAD_INIT_TRACE_OUT
   return &device->inherited;
 }
@@ -1985,7 +1984,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_destroy)(kaapi_device_t* dev)
 {
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
   KAAPI_OFFLOAD_INIT_TRACE_IN
-  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_destroy device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_destroy device_id: %i, device @:%X (%s)\n",dev->device_id, dev, dev->driver->name);
   dev->state = KAAPI_DEVICE_STATE_DESTROY;
 
   free(device);
@@ -2002,7 +2001,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
 {
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
   KAAPI_OFFLOAD_INIT_TRACE_IN
-  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s)\n",dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s)\n",dev->device_id, dev, dev->driver->name);
 
   int err = 0;
   int pi;
@@ -2017,12 +2016,12 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   hipError_t res;
   res = hipSetDevice(kaapi_device_ids[dev->device_id]);
   kaapi_hip_CheckError(res);
-  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). Set \n",
-     dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). hipSetDevice ok \n",
+     dev->device_id, dev, dev->driver->name);
 
   rocblas_initialize();
-  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). RocBLAS initialized\n",
-     dev->device_id, dev, device->driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). rocblas_initialize\n",
+     dev->device_id, dev, dev->driver->name);
 
   res = hipGetDeviceProperties(&prop, kaapi_device_ids[dev->device_id]);
   kaapi_hip_CheckError(res);
