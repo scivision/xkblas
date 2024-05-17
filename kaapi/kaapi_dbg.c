@@ -781,13 +781,6 @@ redo_print:
 
 
 /*
-*/
-void kaapi_dbg_register_name( const void* ptr, const char* name )
-{
-	kaapi_dbg_register_name_with_flags(ptr, name, 1);
-}
-
-/*
  * flags:
  * 	1 erase previous name
  */
@@ -807,6 +800,12 @@ void kaapi_dbg_register_name_with_flags( const void* ptr, const char* name, uint
   KAAPI_HASHENTRIES_SET(entry, strdup(name), const char*);
 }
 
+/*
+*/
+void kaapi_dbg_register_name( const void* ptr, const char* name )
+{
+	kaapi_dbg_register_name_with_flags(ptr, name, 1);
+}
 
 /*
 */

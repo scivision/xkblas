@@ -39,7 +39,7 @@
 #include "common.h"
 
 /* Fwd decl, fncs defined in kaapi_dbg.c */
-extern void kaapi_dbg_register_name( const void* ptr, const char* name );
+extern void kaapi_dbg_register_name_with_flags( const void* ptr, const char* name, uint32_t flags ); // TODO why not in include ?
 extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* first, const char* filename );
 
 /* Give name of tile for various output (graph, debug).
