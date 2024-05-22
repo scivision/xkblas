@@ -28,6 +28,8 @@ option(KAAPI_USE_CRAYBLAS "Use Cray LIBSCI" OFF)
 option(KAAPI_USE_SLEEP "Sleep thread is nothing to do" ON)
 option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
 
+option(KAAPI_USE_HWLOC "To set if Kaapi should be compiled with support for HWLOC." ON)
+
 #--
 if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
@@ -84,17 +86,19 @@ if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 endif()
 
 #--- HWLOC
-find_package(HWLOC)
-if (${HIP_FOUND} AND ${HWLOC_FOUND})
-  find_path(ROCSMI_INCLUDE_DIRS
-    NAMES rocm_smi/rocm_smi.h
-    HINTS ${ROCSMI_PREFIX}/include 
-  )
-  find_library(ROCSMI_LIBRARIES
-    # Pick the static library first for easier run-time linking.
-    NAMES librocm_smi64.so 
-    HINTS ${ROCSMI_PREFIX}/lib 
-  )
+if (KAAPI_USE_HWLOC)
+  find_package(HWLOC)
+  if (${HIP_FOUND} AND ${HWLOC_FOUND})
+    find_path(ROCSMI_INCLUDE_DIRS
+      NAMES rocm_smi/rocm_smi.h
+      HINTS ${ROCSMI_PREFIX}/include 
+    )
+    find_library(ROCSMI_LIBRARIES
+      # Pick the static library first for easier run-time linking.
+      NAMES librocm_smi64.so 
+      HINTS ${ROCSMI_PREFIX}/lib 
+    )
+  endif()
 endif()
 
 #--- BLAS
@@ -169,8 +173,12 @@ else()
   add_compile_options("-DDKAAPI_USE_SLEEP=0")
 endif()
 
-if (${HWLOC_FOUND})
-  add_compile_options("-DKAAPI_USE_HWLOC=1")
+if (KAAPI_USE_HWLOC)
+  if (${HWLOC_FOUND})
+    add_compile_options("-DKAAPI_USE_HWLOC=1")
+  else()
+    add_compile_options("-DKAAPI_USE_HWLOC=0")
+  endif()
 else()
   add_compile_options("-DKAAPI_USE_HWLOC=0")
 endif()
