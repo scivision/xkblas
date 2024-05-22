@@ -122,8 +122,10 @@ int xkblas_zcopyscale_async(
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)
 {
+#if 0
 	printf("[XKBLAS] copyscale M %d, N %d, D %p, ldd %d, L %p, ldl %d, U %p, ldu %d\n",
 									M, N, D, ldd, L, ldl, U, ldu );
+#endif
 	// TODO Check input args
 	if( ldd < N )
 	{
@@ -186,7 +188,9 @@ int xkblas_zcopyscale_async(
 		if( m_block == 0 )
 						m_block = NB;
 
+#if 0
 		printf("[XKBLAS] cpyscale mb %d, nb %d, M %d, N %d\n", m_block, n_block, M, N);
+#endif
 		// init unitialised matrices
 		if( !Dstatus )
 			xkblas_init_matrix_handle(Dh, (void*)D, N, N, ldd, sizeof(Complex64_t), n_block, n_block);
