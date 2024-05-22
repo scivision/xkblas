@@ -891,6 +891,9 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 */
 #if KAAPI_DEBUG && (KAAPI_USE_CUDA || KAAPI_USE_HIP)
 #  define KAAPI_DEBUG_CTR 1
+#endif
+
+#if (KAAPI_USE_CUDA || KAAPI_USE_HIP)
 #  if KAAPI_DEBUG_CTR
 kaapi_atomic_t spawn_writeback={0};
 kaapi_atomic_t pending_writeback={0};
