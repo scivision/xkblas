@@ -524,6 +524,7 @@ static inline bool kaapi_memory_replica_is_xferb(
 
 #if KAAPI_DEBUG
 extern void kaapi_memory_cache_print_all(void);
+extern void _kaapi_memory_cache_verify_notself();
 #endif
 
 #endif

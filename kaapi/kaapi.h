@@ -1339,6 +1339,7 @@ extern void kaapi_dump_dot( kaapi_thread_t* thread, const char* filename );
 extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* first, const char* filename );
 extern void kaapi_dump_raw_dot( kaapi_thread_t* thread, const char* filename );
 extern void kaapi_dbg_register_name( const void* ptr, const char* name );
+extern void kaapi_dbg_register_name_with_flags( const void* ptr, const char* name, uint32_t flags );
 extern const char* kaapi_dbg_get_name( const void* ptr );
 #endif
 

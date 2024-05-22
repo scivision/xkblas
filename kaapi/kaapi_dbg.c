@@ -781,13 +781,30 @@ redo_print:
 
 
 /*
-*/
-void kaapi_dbg_register_name( const void* ptr, const char* name )
+ * flags:
+ * 	1 erase previous name
+ */
+void kaapi_dbg_register_name_with_flags( const void* ptr, const char* name, uint32_t flags )
 {
   kaapi_hashentries_t* entry = kaapi_hashmap_findinsert(&data_info_khm, ptr);
   char* oldname = KAAPI_HASHENTRIES_GET(entry, char*);
-  if (oldname !=0) free(oldname);
+  if(oldname != 0 && (flags & 1) == 0)
+  {
+	  // TODO: should we free "name" here ??
+	  return; // name already existing, skip
+  }
+  else if(oldname != 0)
+  {
+  	free(oldname);
+  }
   KAAPI_HASHENTRIES_SET(entry, strdup(name), const char*);
+}
+
+/*
+*/
+void kaapi_dbg_register_name( const void* ptr, const char* name )
+{
+	kaapi_dbg_register_name_with_flags(ptr, name, 1);
 }
 
 /*

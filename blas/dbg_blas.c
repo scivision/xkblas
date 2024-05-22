@@ -39,7 +39,7 @@
 #include "common.h"
 
 /* Fwd decl, fncs defined in kaapi_dbg.c */
-extern void kaapi_dbg_register_name( const void* ptr, const char* name );
+extern void kaapi_dbg_register_name_with_flags( const void* ptr, const char* name, uint32_t flags ); // TODO why not in include ?
 extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* first, const char* filename );
 
 /* Give name of tile for various output (graph, debug).
@@ -48,6 +48,15 @@ extern void kaapi_dump_dot_list_handle( kaapi_thread_t* thread, kaapi_handle_t* 
 int xkblas_dbg_setname(
   const char* name,
   xkblas_matrix_descr_t* Ah
+)
+{
+  return xkblas_dbg_setname_with_flags( name, Ah, 1 );
+}
+
+int xkblas_dbg_setname_with_flags(
+  const char* name,
+  xkblas_matrix_descr_t* Ah,
+  uint32_t flags
 )
 {
   if (name ==0) return EINVAL;
@@ -60,7 +69,7 @@ int xkblas_dbg_setname(
     {
       char buffer[64];
       snprintf(buffer,64,"%s(%i,%i)",name, (int)m, (int)n);
-      kaapi_dbg_register_name( (void*)( (uintptr_t)Ah->addr + Ah->eltsize*(m*Ah->mb + n*Ah->nb*Ah->ld)), buffer );
+      kaapi_dbg_register_name_with_flags( (void*)( (uintptr_t)Ah->addr + Ah->eltsize*(m*Ah->mb + n*Ah->nb*Ah->ld)), buffer, flags );
     }
   return 0;
 }

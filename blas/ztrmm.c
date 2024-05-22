@@ -190,8 +190,8 @@ int xkblas_ztrmm_async( int side, int uplo,
 
     Complex64_t zone       = (Complex64_t) 1.0;
 
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "A", Ah ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname( "B", Bh ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
+    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
 
     xkblas_context_t* xkctxt =xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_TRMM, Bh );
