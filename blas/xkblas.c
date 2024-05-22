@@ -1404,7 +1404,10 @@ int xkblas_finalize(void)
     err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
     kaapi_assert(err ==0);
 
+/* TG: comment. PPolet has detected bug because xkblas_ctxt->self may points to pthread' stack
+  address already finalized.
     *xkblas_ctxt->self = 0;
+*/
     _xkblas_list_context = xkblas_ctxt->next;
     free(xkblas_ctxt);
   }
