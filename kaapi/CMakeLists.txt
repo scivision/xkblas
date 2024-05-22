@@ -25,7 +25,15 @@ endif()
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
   add_compile_options("-DKAAPI_USE_ROCSMI=0")
 else()
-  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  find_path(HWLOC_RSMI_INCLUDE_DIRS
+    NAMES hwloc/rsmi.h
+    HINTS ${ROCSMI_PREFIX}/include
+  )
+  if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
+    add_compile_options("-DKAAPI_USE_ROCSMI=0")
+  else()
+    add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  endif()
 endif()
 
 
