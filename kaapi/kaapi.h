@@ -402,7 +402,7 @@ extern char kaapi_getmodename( kaapi_access_mode_t m );
 typedef struct kaapi_access {
   kaapi_access_mode_t  mode:  8;  /* access mode */
   unsigned int         kind:  1;  /* set iff sync access */
-  unsigned int         ready: 1;  /* set access is ready */
+  unsigned int         ready: 1;  /* set access if ready */
   unsigned int         reserv:22; /* */
   uint32_t             gen;       /* */
   void*                data;      /* the data */
