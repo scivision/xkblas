@@ -125,6 +125,7 @@ struct xkblas_context {
   xkblas_mode_math_t      xkblas_modemath;
   xkblas_perfcounter_t*   perfcnt;
   struct xkblas_context** self; /* point to its own _xkblas_self_context */
+  struct xkblas_context*  prev;
   struct xkblas_context*  next;
 };
 

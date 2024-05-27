@@ -64,6 +64,8 @@
 static kaapi_team_t*       _xkblas_global_team = 0;
 static kaapi_atomic_t      _xkblas_thread_idx = {0};
 __thread xkblas_context_t* _xkblas_self_context = 0;
+pthread_key_t _pthread_xkblas_context_key;
+
 /* deprecated variable */
 __thread kaapi_thread_t*   _xkblas_self_thread = 0;
 
@@ -75,6 +77,39 @@ static xkblas_mode_math_t xkblas_default_math = XKBLAS_DEFAULT_MATH;
 
 
 static const char* get_xkblas_info(void);
+
+/* Deallocate the current xkblas_context */
+static void
+xkblas_pthread_context_clean(void* arg)
+{
+    xkblas_context_t* xkblas_ctxt = _xkblas_self_context;
+    kaapi_atomic_lock(&_xkblas_list_lock);
+    if( xkblas_ctxt != NULL )
+    {
+      if( xkblas_ctxt->prev != NULL )
+          xkblas_ctxt->prev->next = xkblas_ctxt->next;
+      if( xkblas_ctxt->next != NULL )
+          xkblas_ctxt->next->prev = xkblas_ctxt->prev;
+      if( _xkblas_list_context == xkblas_ctxt )
+          _xkblas_list_context = xkblas_ctxt->next;
+      xkblas_ctxt->next = NULL;
+      xkblas_ctxt->prev = NULL;
+
+      kaapi_team_deattach(xkblas_ctxt->kteam, xkblas_ctxt->kthread);
+      kaapi_thread_unbind(xkblas_ctxt->kthread);
+      kaapi_team_dealloc(xkblas_ctxt->kteam);
+      xkblas_ctxt->kteam = 0;
+
+      int err = kaapi_hashmap_clear(&xkblas_ctxt->xkblas_ptr2handle);
+      kaapi_assert(err == 0);
+      err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
+      kaapi_assert(err == 0);
+
+      *xkblas_ctxt->self = 0; // equivalent to _xkblas_self_context == NULL
+      free(xkblas_ctxt);
+    }
+    kaapi_atomic_unlock(&_xkblas_list_lock);
+}
 
 /* Return the current xkblas_context (
 */
@@ -121,11 +156,17 @@ xkblas_context_t* xkblas_context_alloc(void)
 
     /* link all context */
     kaapi_atomic_lock(&_xkblas_list_lock);
+    ctxt->prev = NULL;
     ctxt->next = _xkblas_list_context;
+    if(ctxt->next != NULL)
+      ctxt->next->prev = ctxt;
+
     _xkblas_list_context = ctxt;
     ctxt->self = &_xkblas_self_context;
     kaapi_atomic_unlock(&_xkblas_list_lock);
     _xkblas_self_context = ctxt;
+
+    pthread_setspecific( _pthread_xkblas_context_key, _xkblas_self_context);
   }
   return _xkblas_self_context;
 }
@@ -1180,6 +1221,11 @@ int xkblas_init(void)
 {
   if (init_count++ !=0) return 0;
 
+  if( pthread_key_create(&_pthread_xkblas_context_key, xkblas_pthread_context_clean) != 0 ) {
+    // TODO error
+    printf("XKBLAS error, unable to create pthread_key\n");
+  }
+
   if (getenv("XKBLAS_VERBOSE"))
     setenv("KAAPI_VERBOSE",getenv("XKBLAS_VERBOSE"),1);
 
@@ -1435,6 +1481,7 @@ int xkblas_finalize(void)
   handle_cpublas = 0;
 
   kaapi_finalize();
+  pthread_key_delete( _pthread_xkblas_context_key );
   return 0;
 }
 
