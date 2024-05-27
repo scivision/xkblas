@@ -121,6 +121,13 @@ set(CUDA_SOURCES
 	${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
 )
 
+add_custom_target(task_internal_headers DEPENDS
+	${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
+	${CMAKE_CURRENT_BINARY_DIR}/dtask_internal.h
+	${CMAKE_CURRENT_BINARY_DIR}/ctask_internal.h
+	${CMAKE_CURRENT_BINARY_DIR}/ztask_internal.h
+)
+
 if (${HIP_FOUND})
   message(STATUS "Compilation with HIBLAS in : ${HIPBLAS_INCLUDE_DIR}")
   list(APPEND HIPIFY_FILE ${CMAKE_CURRENT_SOURCE_DIR}/xkblas.c ${CMAKE_CURRENT_SOURCE_DIR}/dbg_blas.c 
@@ -179,17 +186,11 @@ if (${HIP_FOUND})
 	#		COMMENT "Build object file from HIP sources"
 	#)
 	
-  add_library(xkblas SHARED internal_register.h common.h xkblas.h ztask_internal.h ctask_internal.h dtask_internal.h stask_internal.h ${HEADER_FILE} ${HIPYFIED_FILE}
+  add_library(xkblas SHARED internal_register.h common.h xkblas.h ${HEADER_FILE} ${HIPYFIED_FILE}
 					${HIP_OBJECTS})
 	#				${hip_object}) 
-	#add_dependencies(xkblas task_internal_headers)
+  add_dependencies(xkblas task_internal_headers)
 else()
-	add_custom_target(task_internal_headers DEPENDS
-		${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
-		${CMAKE_CURRENT_BINARY_DIR}/dtask_internal.h
-		${CMAKE_CURRENT_BINARY_DIR}/ctask_internal.h
-		${CMAKE_CURRENT_BINARY_DIR}/ztask_internal.h
-	)
 
         if (${CUDA_RT_FOUND})
           # TODO cuda compile, make generic
