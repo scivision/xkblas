@@ -109,9 +109,10 @@ int xkblas_ztrsm_async(
     int NA;
     int status;
 
+#if 0
 		printf("[XKBLAS] trsm N %d, A %p, lda %d, B %p, ldb %d\n",
 										N, A, LDA, B, LDB );
-
+#endif
     if (side == CblasLeft) {
         NA = N;
     } else {

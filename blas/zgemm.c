@@ -185,6 +185,10 @@ int xkblas_zgemm_async(
     xkblas_context_t* xkctxt = xkblas_context_get();
     size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM,M,N,K);
 
+#if 0
+    printf("[XKBLAS] NB =: %lu\n", NB);
+#endif
+
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
     xkblas_matrix_descr_t* Ch = xkblas_find(C);
