@@ -58,7 +58,7 @@
 */
 #define KAAPI_SIZE_DSM_MAP 20
 
-/* Define to 1 if xkaapi/xkblas uses its own heap allocator (experimental) else 0
+/* Define to 1 if xkaapi/xkblas uses its own heap allocator else 0
 */
 #define KAAPI_USE_OWN_HEAP_ALLOCATOR 1
 #if KAAPI_USE_OWN_HEAP_ALLOCATOR
