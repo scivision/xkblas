@@ -238,7 +238,7 @@ extern int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
    Some kernel does not required 3 sizes and K is ignored
 */
 extern size_t xkblas_auto_tilesize(
-  xkblas_kernel_t kernel, size_t M, size_t N, size_t K
+  xkblas_context_t* xkctxt, xkblas_kernel_t kernel, size_t M, size_t N, size_t K
 );
 
 
@@ -318,6 +318,7 @@ extern void xkblas_dbg_dump_graph( const char* name );
    If force !=0 then force remapping of the tile even if mapping is already defined.
  */
 extern int xkblas_map_2Dblock_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t ld, size_t eltsize,
   size_t Bp, size_t Bq, /* blocking size */
@@ -331,6 +332,7 @@ extern int xkblas_map_2Dblock_cyclic(
    If force !=0 then force remapping of the tile even if mapping is already defined.
 */
 extern int xkblas_map_1Dblock_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, int colrow, size_t m, size_t n,
   const void* A, size_t ld, size_t eltsize,
   size_t B, size_t G,    /* grid size */
@@ -351,7 +353,7 @@ extern int xkblas_distribute_2Dblock_cyclic_async(
    with blocking factor B.
 */
 extern int xkblas_distribute_1Dblock_cyclic_async(
-  int hlevel, int storage, int uplo, int colrow, 
+  int hlevel, int storage, int uplo, int colrow,
   size_t NB, size_t m, size_t n, const void* A, size_t ld, size_t eltsize,
   size_t B, size_t G    /* grid size */
 );
@@ -407,7 +409,7 @@ extern int xkblas_get_ngpus(void);
 */
 extern int xkblas_set_ngpus(int ngpus);
 
-/* Set the tile size and the element
+/* Set the tile size and the size of element
  */
 extern void xkblas_set_param(size_t nb, size_t p );
 

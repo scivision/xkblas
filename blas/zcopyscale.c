@@ -182,7 +182,8 @@ int xkblas_zcopyscale_async(
 			kaapi_assert_debug_m( (n_block == Uh->nb) && (m_block == Uh->mb), "copyscale error: U splitting incompatible with L and D"  );
 		}
 
-		size_t NB = xkblas_auto_tilesize(KERN_COPYSCALE,M,N,N); // TODO define the case for KERN_COPYSCALE
+	  xkblas_context_t* xkctxt = xkblas_context_get();
+		size_t NB = xkblas_auto_tilesize(xkctxt, KERN_COPYSCALE,M,N,N); // TODO define the case for KERN_COPYSCALE
 		if( n_block == 0 )
 						n_block = NB;
 		if( m_block == 0 )
@@ -208,7 +209,6 @@ int xkblas_zcopyscale_async(
   kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "U", Uh, 0 ) );
 
 	/* map output of A on ressources */
-	xkblas_context_t* xkctxt = xkblas_context_get();
 	xkblas_auto_map( xkctxt, KERN_COPYSCALE, Lh );
 
 #if KAAPI_USE_TRACELIB==1

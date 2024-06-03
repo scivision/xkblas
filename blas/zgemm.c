@@ -182,7 +182,8 @@ int xkblas_zgemm_async(
     size_t Bnb = 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_GEMM,M,N,K);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM,M,N,K);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
@@ -225,7 +226,6 @@ int xkblas_zgemm_async(
 
     Complex64_t zbeta;
 
-    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
 
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
