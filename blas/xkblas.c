@@ -166,9 +166,9 @@ xkblas_context_t* xkblas_context_alloc(void)
       xkctxt->gpuset[i] = i;
 #else /* experimental */
     ctxt->ngpus = -1;    /* each XKBLAS is mapped to 1 GPU */
-    xkctxt->ngpus  = kaapi_default_param.ngpus;
+    ctxt->ngpus  = kaapi_default_param.ngpus;
     for (int i=0; i<XKBLAS_MAX_NGPUS; ++i)
-      xkctxt->gpuset[i] = i;
+      ctxt->gpuset[i] = i;
 #endif
 
     /* create default kaapi context & thread */
@@ -424,8 +424,6 @@ void xkblas_set_param(size_t nb, size_t p)
 {
   xkblas_context_t* xkctxt = xkblas_context_get();
   xkctxt->NB = nb;
-  /* also recopy in global memory ??? */
-  NB=nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
 }
@@ -1962,7 +1960,6 @@ size_t xkblas_auto_tilesize(
 {
   /* get default tile size and initialize internal descriptor if not yet */
   size_t NB = xkctxt->NB;
-  if (NB !=0) return NB;
   size_t ngpu = xkblas_get_ngpus();
   size_t fact = 1;
   
@@ -1970,19 +1967,17 @@ size_t xkblas_auto_tilesize(
 
 #if XKBLAS_PARTITION_THREAD ==0 /* default */
   force_todefault_mapping = 1;
+  if (NB !=0) return NB;
 #else /* use or defined xkctxt->ngpu & xkctxt->gpuset */
-  /* get default tile size and initialize internal descriptor if not yet */
-  size_t NB = xkctxt->NB;
-  
   /* put here if there is concurrency between xkblas thread context (case of MUMPS)
      that use OpenMP
   */
   if (omp_get_num_threads() >1)
   {
-    force_todefault_mapping = 0
+    force_todefault_mapping = 0;
     fact = 2;
     xkctxt->ngpus = 1;
-    xkctxt->gpuset[0] = xkctxt->ctxt->tid % kaapi_default_param.ngpus;
+    xkctxt->gpuset[0] = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
   }
   else {
     force_todefault_mapping = 1;
@@ -1991,6 +1986,7 @@ size_t xkblas_auto_tilesize(
     for (int i=0; i<xkctxt->ngpus; ++i)
       xkctxt->gpuset[i] = i;
   }
+  if (NB !=0) return NB;
 #endif
 
   if (force_todefault_mapping ==0)

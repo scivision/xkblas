@@ -145,6 +145,9 @@ int xkblas_zcopyscale_async(
 	
 	// TODO check if something to do ... n_cols > 0 
 		
+
+  xkblas_context_t* xkctxt = xkblas_context_get();
+
 	// get default tile size and initialize internal descriptor if not yet	
 	xkblas_matrix_descr_t* Dh = xkblas_find(D);	
 	xkblas_matrix_descr_t* Lh = xkblas_find(L);
