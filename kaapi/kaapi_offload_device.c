@@ -755,12 +755,13 @@ static void callback_replyrequest_memsync(
 */
 #define KAAPI_IMAX 4
 int _kaapi_compute_load_device(
-    int* pmin,
-    int* pmax, 
-    float* pavrg, 
-    float* pdelta, 
-    int* imax,  /* of size at least KAAPI_IMAX */
-    float* pload
+    float* pmin,    /* min load */
+    float* pmax,    /* max load */
+    float* pavrg,   /* average load */
+    float* pdelta,  /* *pdelta= sum of diff of load of each device versus average */
+    int*   imax,    /* of size at least KAAPI_IMAX, index of max loaded device */
+    int*   pcntzero,/* number of device with load 0 */
+    float* pload    /* number of pending tasks */
 )
 {
   int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
@@ -769,20 +770,22 @@ int _kaapi_compute_load_device(
   int min = INT_MAX;
   float sum = 0.0;
   int iimax = 0;
+  int cntzero = 0
   for (int i=0; i<ngpu; ++i)
   {
     kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU,i);
     if (ld !=0)
     {
-      load[i] = ld->device->pendingtasks;
+      load[i] = ld->device->flops_pendingtasks;
       //load[i] = ld->device->flops_tasks;
       sum += (float)load[i];
-      int l = load[i];
+      float l = load[i];
       if (l> max) {
         max = l;
       }
       if (l < min) 
         min = l;
+      if (ld->device->pendingtasks ==0) ++cntzero;
     }
   }
   float minmax = max-min;
@@ -795,7 +798,7 @@ int _kaapi_compute_load_device(
     delta += fabs(d);
     if (pload) pload[i] = load[i];
 
-    if (load[i] == max)
+    if ((imax !=0) && (load[i] == max))
     {
       imax[iimax%KAAPI_IMAX]=i;
       ++iimax;
@@ -806,6 +809,7 @@ int _kaapi_compute_load_device(
   *pmax = max;
   *pavrg = avrg;
   *pdelta = delta;
+  *pcntzero = cntzero;
   return iimax;
 }
 
@@ -884,10 +888,11 @@ int kaapi_sched_idle_offload(
           float load[ngpu]; 
           int imax[KAAPI_IMAX]; 
           int max;
-          int min; 
+          int min;
+          int cntzero;
           float avrg;
           float delta;
-          int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, load);
+          int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, load);
           float minmax = max-min;
 
           if ((avrg > 2.0/ngpu) && (delta > 0)) 
