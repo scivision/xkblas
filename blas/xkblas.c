@@ -1998,6 +1998,7 @@ size_t xkblas_auto_tilesize(
     float delta;
     int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, load);
     float minmax = max-min;
+    printf("%s:: Under L0:: LoadAvrg=%f LoadMax=%f CntZero=%i\n", __func__, max, avrg, cntzero );
     
   }
   else {
