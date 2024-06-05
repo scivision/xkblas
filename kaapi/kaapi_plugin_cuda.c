@@ -136,22 +136,6 @@ static __thread int thread_type = 0;
 //#  define CONFIG_SYNCHRONOUS_KERNEL 1
 
 /* counters */
-enum {
-  CUDA_CNT_H2D =0,
-  CUDA_SIZE_H2D,
-  CUDA_CNT_D2H,
-  CUDA_SIZE_D2H,
-  CUDA_CNT_D2D,
-  CUDA_SIZE_D2D,
-  CUDA_MAX_COUNTERS
-};
-#define COUNTER_CNT_H2D   device->counter[CUDA_CNT_H2D]
-#define COUNTER_SIZE_H2D  device->counter[CUDA_SIZE_H2D]
-#define COUNTER_CNT_D2H   device->counter[CUDA_CNT_D2H]
-#define COUNTER_SIZE_D2H  device->counter[CUDA_SIZE_D2H]
-#define COUNTER_CNT_D2D   device->counter[CUDA_CNT_D2D]
-#define COUNTER_SIZE_D2D  device->counter[CUDA_SIZE_D2D]
-
 
 #if KAAPI_CUDA_CACHE
 typedef struct cuda_cache_blk cuda_cache_blk_t;
@@ -194,7 +178,6 @@ typedef struct {
 #if KAAPI_CUDA_CACHE
   cuda_cache_t* cache;
 #endif
-  size_t counter[CUDA_MAX_COUNTERS];
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
   cublasHandle_t    handle;
 #endif
@@ -1147,8 +1130,8 @@ _kaapi_unlock_print();
                                      size,
                                      cudaMemcpyHostToDevice,
                                      *stream);
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D+= size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev) += size;
             break;
             case KAAPI_IO_COPY_D2H:
 #if 0// KAAPI_DEBUG
@@ -1161,8 +1144,8 @@ _kaapi_unlock_print();
                                      size,
                                      cudaMemcpyDeviceToHost,
                                      *stream);
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H+= size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)+= size;
             break;
 
             case KAAPI_IO_COPY_D2D:
@@ -1177,8 +1160,8 @@ _kaapi_unlock_print();
                                          kaapi_device_ids[op->dev_src->device->device_id],
                                          size,
                                          *stream);
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D+= size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)+= size;
             break;
             default:
               kaapi_assert_debug(0);
@@ -1221,8 +1204,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D   += size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2H:
 #if 0// KAAPI_DEBUG
@@ -1231,8 +1214,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H   += size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2D:
 #if 0// KAAPI_DEBUG
@@ -1241,8 +1224,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, *stream );
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D   += size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev) += size;
             break;
             default:
               kaapi_assert(0);
@@ -2323,16 +2306,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_finalize)(kaapi_device_t* dev)
     cublasDestroy(device->handle);
 #endif
 
-  if (getenv("KAAPI_VERBOSE"))
-  {
-# if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %li\n", device->inherited.device_id, dev->cnt_task);
-# endif
-    printf("%i, MEM : %li, %li\n", device->inherited.device_id, device->size_alloc, device->size_free);
-    printf("%i, H2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_H2D, COUNTER_SIZE_H2D);
-    printf("%i, D2H : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2H, COUNTER_SIZE_D2H);
-    printf("%i, D2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2D, COUNTER_SIZE_D2D);
-  }
   dev->state = KAAPI_DEVICE_STATE_FINALIZED;
   KAAPI_OFFLOAD_TRACE_OUT
 }

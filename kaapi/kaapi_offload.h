@@ -98,6 +98,24 @@ typedef struct  {
   kaapi_offloadtask_perfcounter_t task[KAAPI_FORMAT_MAX];
 } kaapi_offload_perfcounter_t;
 
+/* Online perf counter */
+enum {
+  COM_COUNTER_CNT_H2D =0,
+  COM_COUNTER_SIZE_H2D,
+  COM_COUNTER_CNT_D2H,
+  COM_COUNTER_SIZE_D2H,
+  COM_COUNTER_CNT_D2D,
+  COM_COUNTER_SIZE_D2D,
+  COM_COUNTER_MAX
+};
+#define COUNTER_CNT_H2D(device)   ((device)->counter[COM_COUNTER_CNT_H2D])
+#define COUNTER_SIZE_H2D(device)  ((device)->counter[COM_COUNTER_SIZE_H2D])
+#define COUNTER_CNT_D2H(device)   ((device)->counter[COM_COUNTER_CNT_D2H])
+#define COUNTER_SIZE_D2H(device)  ((device)->counter[COM_COUNTER_SIZE_D2H])
+#define COUNTER_CNT_D2D(device)   ((device)->counter[COM_COUNTER_CNT_D2D])
+#define COUNTER_SIZE_D2D(device)  ((device)->counter[COM_COUNTER_SIZE_D2D])
+
+
 
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource
@@ -122,7 +140,6 @@ struct kaapi_device {
     uint64_t                    pendingtasks;      /* #tasks (between prepare data and end of execution) */
     double                      flops_pendingtasks;/* idem for pending tasks (between prepare data and end of execution) */
     double                      data_pendingtasks; /* idem for pending tasks */
-    kaapi_offload_perfcounter_t perfcnt;           /* per task */
     const char*                 name;              /* Device name */
 
     size_t                      mem_limit;
@@ -149,10 +166,13 @@ struct kaapi_device {
     uint64_t                    p_finish;          /* position in the stream of the next task to finish */
 #endif
 #if KAAPI_USE_PERFCOUNTER
+    kaapi_offload_perfcounter_t perfcnt;           /* per task */
     uint32_t                    cnt_task;
     float                       sum_cpudelay;
+    float                       sum_gpudelay;
     float                       max_cpudelay;
     float                       min_cpudelay;
+    size_t                      com_counter[COM_COUNTER_MAX];
 #define KAAPI_LOG_DELAY 0 // to debug perf
 #if KAAPI_LOG_DELAY
     FILE*                       flog_delay;

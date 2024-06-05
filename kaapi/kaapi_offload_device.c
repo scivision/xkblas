@@ -172,6 +172,7 @@ static void callback_epilogue(
   
 #if KAAPI_USE_PERFCOUNTER
   device->sum_cpudelay += status.cpu_delay;
+  device->sum_gpudelay += status.gpu_delay;
   ++device->cnt_task;
   if (status.cpu_delay > device->max_cpudelay)
   {
@@ -1322,6 +1323,7 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
 #if KAAPI_USE_PERFCOUNTER
   device->cnt_task     = 0.0;
   device->sum_cpudelay = 0.0;
+  device->sum_gpudelay = 0.0;
   device->max_cpudelay = 0.0;
   device->min_cpudelay = FLT_MAX;
 #if KAAPI_LOG_DELAY
@@ -1446,7 +1448,20 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_STOPPED);
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
+
+  if (getenv("KAAPI_VERBOSE"))
+  {
+# if KAAPI_USE_PERFCOUNTER
+    printf("%i, TASK: %li\n", device->device_id, dev->cnt_task);
+# endif
+    printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
+    printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
+    printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
+    printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
+  }
   device->driver->f_device_finalize(device);
+
+  
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_FINALIZED);
   if (device->ld !=0)
   {

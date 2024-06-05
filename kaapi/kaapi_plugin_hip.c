@@ -126,24 +126,6 @@ static __thread int thread_type = 0;
 //#  undef CONFIG_SYNCHRONOUS_KERNEL 
 //#  define CONFIG_SYNCHRONOUS_KERNEL 0
 
-/* counters */
-enum {
-  HIP_CNT_H2D =0,
-  HIP_SIZE_H2D,
-  HIP_CNT_D2H,
-  HIP_SIZE_D2H,
-  HIP_CNT_D2D,
-  HIP_SIZE_D2D,
-  HIP_MAX_COUNTERS
-};
-#define COUNTER_CNT_H2D   device->counter[HIP_CNT_H2D]
-#define COUNTER_SIZE_H2D  device->counter[HIP_SIZE_H2D]
-#define COUNTER_CNT_D2H   device->counter[HIP_CNT_D2H]
-#define COUNTER_SIZE_D2H  device->counter[HIP_SIZE_D2H]
-#define COUNTER_CNT_D2D   device->counter[HIP_CNT_D2D]
-#define COUNTER_SIZE_D2D  device->counter[HIP_SIZE_D2D]
-
-
 typedef struct {
   kaapi_device_t inherited;
   int            save_device_id;
@@ -1059,8 +1041,8 @@ pthread_mutex_lock(&access_lock);
                                      size,
                                      hipMemcpyHostToDevice,
                                      *stream);
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D+= size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)+= size;
             break;
             case KAAPI_IO_COPY_D2H:
               res = hipMemcpyAsync( dest,
@@ -1068,8 +1050,8 @@ pthread_mutex_lock(&access_lock);
                                      size,
                                      hipMemcpyDeviceToHost,
                                      *stream);
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H+= size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)+= size;
             break;
 
             case KAAPI_IO_COPY_D2D:
@@ -1079,8 +1061,8 @@ pthread_mutex_lock(&access_lock);
                                          kaapi_device_ids[op->dev_src->device->device_id],
                                          size,
                                          *stream);
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D+= size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)+= size;
             break;
             default:
               kaapi_assert_debug(0);
@@ -1122,18 +1104,18 @@ pthread_mutex_lock(&access_lock);
             break;
             case KAAPI_IO_COPY_H2D:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyHostToDevice, *stream );
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D   += size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2H:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToHost, *stream );
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H   += size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2D:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice, *stream );
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D   += size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)   += size;
             break;
             default:
               kaapi_assert(0);
@@ -2212,16 +2194,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_finalize)(kaapi_device_t* dev)
     hipblasDestroy(device->handle);
 #endif
 
-  if (getenv("KAAPI_VERBOSE"))
-  {
-# if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %u\n", device->inherited.device_id, dev->cnt_task);
-# endif
-    printf("%i, MEM : %li, %li\n", device->inherited.device_id, device->size_alloc, device->size_free);
-    printf("%i, H2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_H2D, COUNTER_SIZE_H2D);
-    printf("%i, D2H : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2H, COUNTER_SIZE_D2H);
-    printf("%i, D2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2D, COUNTER_SIZE_D2D);
-  }
   dev->state = KAAPI_DEVICE_STATE_FINALIZED;
   KAAPI_OFFLOAD_TRACE_OUT
 }
