@@ -84,8 +84,12 @@ static xkblas_context_t*   _xkblas_list_context = 0;
 
 static xkblas_mode_math_t xkblas_default_math = XKBLAS_DEFAULT_MATH;
 
-
+/* */
 static const char* get_xkblas_info(void);
+
+
+/* default tile size */
+static size_t NB = 0;
 
 /* Deallocate the current xkblas_context */
 static void
@@ -157,13 +161,13 @@ xkblas_context_t* xkblas_context_alloc(void)
     ctxt->xkblas_modemath = xkblas_default_math;
     ctxt->kctxt = kctxt;
     ctxt->kthread = kthread;
-    ctxt->NB = 1024; /* arbitrary value */
+    ctxt->NB = NB; /* copie defaut value */
 #if XKBLAS_PARTITION_THREAD ==0 /* default */
     ctxt->ngpus = -1;    /* no gpu defined, take all of them */
-    xkctxt->ngpus  = kaapi_default_param.ngpus;
-    kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
-    for (int i=0; i<xkctxt->ngpus; ++i)
-      xkctxt->gpuset[i] = i;
+    ctxt->ngpus  = kaapi_default_param.ngpus;
+    kaapi_assert( ctxt->ngpus < XKBLAS_MAX_NGPUS);
+    for (int i=0; i<ctxt->ngpus; ++i)
+      ctxt->gpuset[i] = i;
 #else /* experimental */
     ctxt->ngpus = -1;    /* each XKBLAS is mapped to 1 GPU */
     ctxt->ngpus  = kaapi_default_param.ngpus;
@@ -309,7 +313,6 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB
 )
 {
-  size_t default_tilesize = xkblas_get_param();
   xkblas_context_t* ctxt = xkblas_context_get();
 
   Ah->addr = A;
@@ -422,8 +425,7 @@ retval:
 */
 void xkblas_set_param(size_t nb, size_t p)
 {
-  xkblas_context_t* xkctxt = xkblas_context_get();
-  xkctxt->NB = nb;
+  NB = nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
 }
@@ -1290,6 +1292,9 @@ int xkblas_init(void)
 {
   if (init_count++ !=0) return 0;
 
+  size_t tile_size = NB;
+  size_t precision = sizeof(double);
+
   if( pthread_key_create(&_pthread_xkblas_context_key, xkblas_pthread_context_clean) != 0 ) {
     // TODO error
     printf("XKBLAS error, unable to create pthread_key\n");
@@ -1300,13 +1305,11 @@ int xkblas_init(void)
 
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
-    size_t tile_size = 0;
     if (getenv("XKBLAS_TILE_SIZE") ==0)
       tile_size = xkblas_get_param();
     else
       tile_size = atoi(getenv("XKBLAS_TILE_SIZE"));
 
-    size_t precision = sizeof(double);
     if (getenv("XKBLAS_PRECISION") ==0)
       precision = sizeof(double);
     else {
@@ -1328,7 +1331,6 @@ int xkblas_init(void)
     {
       printf("xe size: %lu, precision: %lu\n",tile_size, precision);
     }
-    xkblas_set_param( tile_size, precision );
   }
 
   if (getenv("XKBLAS_NGPUS"))
@@ -1387,6 +1389,7 @@ int xkblas_init(void)
 
   //_xkblas_global_team = kaapi_team_alloc();
 
+  xkblas_set_param( tile_size, precision );
 
   if (getenv("XKBLAS_VERBOSE"))
   {
@@ -1427,7 +1430,8 @@ int xkblas_init(void)
 int xkblas_finalize(void)
 {
   if (--init_count !=0) return 0;
-
+  /* reset some global variable(s) to default value(s) */
+  NB = 0;
   int err;
 
   /* TG: with several thread calling xkblas it is not possible to form the correct team
@@ -1967,15 +1971,20 @@ size_t xkblas_auto_tilesize(
 
 #if XKBLAS_PARTITION_THREAD ==0 /* default */
   force_todefault_mapping = 1;
-  if (NB !=0) return NB;
 #else /* use or defined xkctxt->ngpu & xkctxt->gpuset */
   /* put here if there is concurrency between xkblas thread context (case of MUMPS)
      that use OpenMP
   */
+  /* TODO: better choice: use load estimate to select a set of GPU.
+     For instance, depending of the load balancing under the L0 thread with MUMPS
+     may be one threads will finish the update while all others do not emit calls
+	   to blas 
+  */
+
   if (omp_get_num_threads() >1)
   {
     force_todefault_mapping = 0;
-    fact = 2;
+    fact = 2; /* split tow to fullfill streams */
     xkctxt->ngpus = 1;
     xkctxt->gpuset[0] = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
 
@@ -1997,12 +2006,17 @@ size_t xkblas_auto_tilesize(
     kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
     for (int i=0; i<xkctxt->ngpus; ++i)
       xkctxt->gpuset[i] = i;
+    if (NB !=0) 
+    {
+      printf("%s:: Above L0:: #GPUS=%i M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, M,N,K,NB);
+      return NB;
+    }
   }
-  if (NB !=0) return NB;
 #endif
 
   if (force_todefault_mapping ==0)
   {
+    if (N>M) M =N;
     switch (kernel)
     {
       case KERN_HERK:
@@ -2019,7 +2033,7 @@ size_t xkblas_auto_tilesize(
       case KERN_COPYSCALE:
       default:
         {
-          if (N>M) M =N;
+          /* take max */
           NB = M / (fact*ngpu);
           NB = (NB + 63) & ~63UL;
           if (NB <1024) NB = 1024;
@@ -2029,6 +2043,7 @@ size_t xkblas_auto_tilesize(
   }
   else /* force_todefault_mapping == 1 */
   {
+    if (N>M) M =N;
     switch (kernel)
     {
       case KERN_HERK:
@@ -2109,6 +2124,11 @@ size_t xkblas_auto_tilesize(
         break;
     }
   }
+
+  if (force_todefault_mapping==0)
+    printf("%s:: Under L0: #GPUS=%i, GPU[0]:%i, M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, xkctxt->gpuset[0], M,N,K,NB);
+  else
+    printf("%s:: #GPUS=%i, M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, M,N,K,NB);
   return NB;
 }
 
