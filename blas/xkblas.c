@@ -1978,6 +1978,18 @@ size_t xkblas_auto_tilesize(
     fact = 2;
     xkctxt->ngpus = 1;
     xkctxt->gpuset[0] = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
+
+    int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
+    float load[ngpu];
+    int imax[KAAPI_IMAX];
+    int max;
+    int min;
+    int cntzero;
+    float avrg;
+    float delta;
+    int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, load);
+    float minmax = max-min;
+    
   }
   else {
     force_todefault_mapping = 1;
