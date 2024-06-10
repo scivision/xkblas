@@ -201,9 +201,11 @@ struct kaapi_queue;
 /* Macro to access to counter or not
 */
 #if KAAPI_USE_PERFCOUNTER==1
+#  define KAAPI_CTXT_PERFREG_COUNTER(ctxt,idx) ((ctxt)->perf_regs[idx])
 #  define KAAPI_CTXT_PERFREG_ADD(ctxt,idx,value) (ctxt)->perf_regs[idx] += value;
 #  define KAAPI_CTXT_PERFREG_INCR(ctxt,idx) ++(ctxt)->perf_regs[idx];
 #else
+#  define KAAPI_CTXT_PERFREG_COUNTER(ctxt,idx)  
 #  define KAAPI_CTXT_PERFREG_ADD(ctxt,idx,value)
 #  define KAAPI_CTXT_PERFREG_INCR(ctxt,idx)
 #endif

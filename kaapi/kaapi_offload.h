@@ -106,14 +106,18 @@ enum {
   COM_COUNTER_SIZE_D2H,
   COM_COUNTER_CNT_D2D,
   COM_COUNTER_SIZE_D2D,
+  COM_COUNTER_TASK,
+  COM_COUNTER_TIME_TASK,
   COM_COUNTER_MAX
 };
-#define COUNTER_CNT_H2D(device)   ((device)->com_counter[COM_COUNTER_CNT_H2D])
-#define COUNTER_SIZE_H2D(device)  ((device)->com_counter[COM_COUNTER_SIZE_H2D])
-#define COUNTER_CNT_D2H(device)   ((device)->com_counter[COM_COUNTER_CNT_D2H])
-#define COUNTER_SIZE_D2H(device)  ((device)->com_counter[COM_COUNTER_SIZE_D2H])
-#define COUNTER_CNT_D2D(device)   ((device)->com_counter[COM_COUNTER_CNT_D2D])
-#define COUNTER_SIZE_D2D(device)  ((device)->com_counter[COM_COUNTER_SIZE_D2D])
+#define COUNTER_CNT_H2D(device)   ((device)->perf_counter[COM_COUNTER_CNT_H2D])
+#define COUNTER_SIZE_H2D(device)  ((device)->perf_counter[COM_COUNTER_SIZE_H2D])
+#define COUNTER_CNT_D2H(device)   ((device)->perf_counter[COM_COUNTER_CNT_D2H])
+#define COUNTER_SIZE_D2H(device)  ((device)->perf_counter[COM_COUNTER_SIZE_D2H])
+#define COUNTER_CNT_D2D(device)   ((device)->perf_counter[COM_COUNTER_CNT_D2D])
+#define COUNTER_SIZE_D2D(device)  ((device)->perf_counter[COM_COUNTER_SIZE_D2D])
+#define COUNTER_TASK(device)      ((device)->perf_counter[COM_COUNTER_TASK])
+#define COUNTER_TIME_TASK(device) ((device)->perf_counter[COM_COUNTER_TIME_TASK])
 
 
 
@@ -169,7 +173,7 @@ struct kaapi_device {
     size_t                      free_mem;
     size_t                      size_alloc;
     size_t                      size_free;
-    size_t                      com_counter[COM_COUNTER_MAX];
+    size_t                      perf_counter[COM_COUNTER_MAX];
 #if KAAPI_USE_PERFCOUNTER
     uint32_t                    cnt_task;
     float                       sum_cpudelay;
@@ -265,6 +269,20 @@ typedef struct kaapi_driver {
 
     /* linked list of all drivers */
     struct kaapi_driver* next;
+
+    /* global static for all devices managed by the driver */
+#if KAAPI_USE_PERFCOUNTER
+    size_t                      size_alloc;
+    size_t                      size_free;
+    uint32_t                    cnt_task;
+    float                       sum_cpudelay;
+    float                       sum_gpudelay;
+    float                       max_cpudelay;
+    float                       min_cpudelay;
+    size_t                      perf_counter[COM_COUNTER_MAX];
+    kaapi_offload_perfcounter_t perfcnt;           /* per task */
+#endif
+
 } kaapi_driver_t;
 
 

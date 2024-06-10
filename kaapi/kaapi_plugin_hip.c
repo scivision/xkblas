@@ -1305,25 +1305,25 @@ static int kaapi_hip_stream_advance_pending(
             //goto break_label;
             pthread_yield();
           else {
-#if KAAPI_USE_TRACELIB==1
-            float delay; /* ms */
-            res = hipEventElapsedTime ( &delay, cios->start_events[idx], cios->end_events[idx] );
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+            float gpu_delay; /* ms */
+            res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
             if (res != hipSuccess) {
               printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
-              delay = 0;
+              gpu_delay = 0;
               kaapi_assert(0);
             }
             if (op->type != KAAPI_IO_KERN)
             {
               KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*delay));
+                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*gpu_delay));
+//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*gpu_delay));
             }
             else
             {
               KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*delay) );
-//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*delay));
+                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*gpu_delay) );
+//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*gpu_delay));
             }
 #endif
             if (prev_iosokp+1 == ios_okp) ++prev_iosokp;

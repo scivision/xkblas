@@ -1314,6 +1314,7 @@ _kaapi_unlock_print();
       res = cudaStreamSynchronize( *stream );
       kaapi_assert(res == CUDA_SUCCESS);
 
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
       float gpu_delay;
       res = cudaEventElapsedTime ( &gpu_delay, cios->start_events[ios->pos_wp % ios->count], cios->end_events[ios->pos_wp % ios->count] );
       if (res != cudaSuccess) {
@@ -1323,6 +1324,7 @@ _kaapi_unlock_print();
       uint64_t delay = gpu_delay*1000.0; // convert to ns
       KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          2 /* end */, op->reserved, delay );
+#endif
       ++ios->ok_p;
 #elif CONFIG_USE_EVENT 
       res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );

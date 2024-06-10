@@ -48,8 +48,8 @@ struct kaapi_memory_device;
 */
 typedef struct {
   int   error;
-  float cpu_delay; /* time on CPU between launch and completion */
-  float gpu_delay; /* time of CPU between launch and completion */
+  float cpu_delay; /* time on CPU between launch and completion (s)*/
+  float gpu_delay; /* time of CPU between launch and completion (s)*/
 } kaapi_io_status_t;
 
 typedef void (*kaapi_io_cbk_fnc_t)(
