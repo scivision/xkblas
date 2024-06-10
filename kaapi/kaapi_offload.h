@@ -180,6 +180,10 @@ struct kaapi_device {
     float                       sum_gpudelay;
     float                       max_cpudelay;
     float                       min_cpudelay;
+    float                       sum_comdelay;
+    float                       sum_bwd;
+    size_t                      size_com;
+    size_t                      cnt_com;
     kaapi_offload_perfcounter_t perfcnt;           /* per task */
 #define KAAPI_LOG_DELAY 0 // to debug perf
 #if KAAPI_LOG_DELAY
@@ -279,6 +283,10 @@ typedef struct kaapi_driver {
     float                       sum_gpudelay;
     float                       max_cpudelay;
     float                       min_cpudelay;
+    float                       sum_comdelay;
+    float                       sum_bwd;
+    size_t                      size_com;
+    size_t                      cnt_com;
     size_t                      perf_counter[COM_COUNTER_MAX];
     kaapi_offload_perfcounter_t perfcnt;           /* per task */
 #endif

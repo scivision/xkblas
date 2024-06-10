@@ -113,7 +113,7 @@ static void callback_epilogue(
 
   kaapi_assert_debug( task->device == device );
 
-//printf("Epilogue: GPUdelay: %f / %lu\n", status.gpu_delay, (uint64_t)(1000000000.0*status.gpu_delay));
+//printf("Epilogue: GPUdelay: %f \n", status.gpu_delay );
 
   KAAPI_ATOMIC_INCR(&device->cnt_exec);
   KAAPI_ATOMIC_DECR(&device->cnt_ready);
@@ -358,15 +358,16 @@ int kaapi_offload_device_execute_task(
 
 
 #if KAAPI_USE_PREFETCH
-#if KAAPI_DEBUG
 static void callback_epilogue_prefetch_data(
     kaapi_io_status_t status,
     kaapi_io_stream_t* ios,
     void* arg0, void* arg1, void* arg2
 )
 {
+  kaapi_device_t*          device = (kaapi_device_t*)arg0; 
+  kaapi_metadata_info_t*   mdi = (kaapi_metadata_info_t*)arg1;
+  void*                    data = arg2;
 }
-#endif
 
 
 /* Send prefetch for next tasks.
@@ -426,11 +427,7 @@ static void kaapi_do_prefetch_data(
 
       /* else : send prefetch request */
       int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, device->memdev.asid, mdi, 
-#if KAAPI_DEBUG
-              callback_epilogue_prefetch_data, access->data, 0, 0 
-#else
-              0, 0, 0, 0 
-#endif
+              callback_epilogue_prefetch_data, device, mdi, access->data  
       );
       kaapi_assert((err ==0) || (err ==EINPROGRESS));
     }
@@ -1345,6 +1342,9 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   device->sum_gpudelay = 0.0;
   device->max_cpudelay = 0.0;
   device->min_cpudelay = FLT_MAX;
+  device->sum_comdelay = 0;
+  device->sum_bwd = 0;
+  device->size_com = 0;
 #if KAAPI_LOG_DELAY
   char filename[128];
   sprintf(filename,"log_delay.%i",device->device_id);
@@ -1468,7 +1468,7 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
 
-  if (getenv("KAAPI_VERBOSE") && (device->driver->f_get_type() == KAAPI_PROC_TYPE_GPU))
+  if (getenv("KAAPI_VERBOSE") && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
   {
 # if KAAPI_USE_PERFCOUNTER
     printf("%i, TASK: %li, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
@@ -1479,12 +1479,19 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
     printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
     printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
     printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
+    printf("%i, COM : %g MB, %g s\n", device->device_id, device->size_com*1.0 /(1024.0*1024.0), device->sum_comdelay);
+    printf("%i, ABWD: %g MB/s\n", device->device_id, device->sum_bwd/device->cnt_com /(1024.0*1024.0));
 
     device->driver->size_alloc += device->size_alloc;
     device->driver->size_free += device->size_free;
     device->driver->cnt_task += device->cnt_task;
     device->driver->sum_cpudelay += device->sum_cpudelay;
     device->driver->sum_gpudelay += device->sum_gpudelay;
+    device->driver->sum_comdelay += device->sum_comdelay;
+    device->driver->sum_bwd += device->sum_bwd;
+    device->driver->sum_comdelay += device->sum_comdelay;
+    device->driver->size_com += device->size_com;
+    device->driver->cnt_com += device->cnt_com;
     COUNTER_CNT_H2D(device->driver)  += COUNTER_CNT_H2D(device);
     COUNTER_SIZE_H2D(device->driver) += COUNTER_SIZE_H2D(device);
     COUNTER_CNT_D2H(device->driver)  += COUNTER_CNT_D2H(device);

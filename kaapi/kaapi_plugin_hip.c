@@ -1450,6 +1450,18 @@ static int kaapi_hip_stream_process_pending(
           status.gpu_delay *= 1e-3;
           status.cpu_delay = op->t2 - op->t1; 
 #endif
+          if ((op->type >= KAAPI_IO_COPY_H2H) && (op->type <= KAAPI_IO_COPY_D2D))
+          {
+            status.bytes = kaapi_memory_view_size(op->inst.c_io.view_src);
+#if KAAPI_USE_PERFCOUNTER
+            device->sum_comdelay += status.gpu_delay;
+            device->sum_bwd += status.bytes / status.gpu_delay;
+            device->size_com += status.bytes;
+//            printf("(*)%g MB, %g s, bwd: %g\n", status.bytes*1.0/(1024*1024.0), status.gpu_delay, status.bytes / (1024.0*1024.0*status.gpu_delay) );
+            ++device->cnt_com;
+#endif
+          }
+
           if (op->inst.cbk.fnc)
             op->inst.cbk.fnc(status, ios, op->inst.cbk.arg[0], op->inst.cbk.arg[1], op->inst.cbk.arg[2]);
   

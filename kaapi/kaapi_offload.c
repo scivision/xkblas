@@ -712,6 +712,8 @@ int kaapi_offload_finalize(void)
       printf("\tH2D : %li, %li\n", COUNTER_CNT_H2D(kaapi_list_drivers), COUNTER_SIZE_H2D(kaapi_list_drivers));
       printf("\tD2H : %li, %li\n", COUNTER_CNT_D2H(kaapi_list_drivers), COUNTER_SIZE_D2H(kaapi_list_drivers));
       printf("\tD2D : %li, %li\n", COUNTER_CNT_D2D(kaapi_list_drivers), COUNTER_SIZE_D2D(kaapi_list_drivers));
+      printf("\tCOM : %g MB, %g s\n", kaapi_list_drivers->size_com*1.0/(1024.0*1024.0), kaapi_list_drivers->sum_comdelay);
+      printf("\tABWD: %g MB/s\n", kaapi_list_drivers->sum_bwd/kaapi_list_drivers->cnt_com /(1024.0*1024.0));
     }
 #endif
 
