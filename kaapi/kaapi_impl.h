@@ -209,12 +209,10 @@ struct kaapi_queue;
 #endif
 
 
-/** Debug. To serialize output
+/** To serialize output
 */
-#if KAAPI_DEBUG
 extern void _kaapi_lock_print(void);
 extern void _kaapi_unlock_print(void);
-#endif
 
 /* ========================================================================= */
 /* Data type                                                                 */

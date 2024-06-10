@@ -159,7 +159,6 @@ int __kaapi_has_enough_dataspace( kaapi_thread_t* thread, size_t size)
   return _kaapi_has_enough_dataspace(thread, size);
 }
 
-#if KAAPI_DEBUG
 /**
 */
 static kaapi_lock_t lock_print = KAAPI_LOCK_INITIALIZER;
@@ -172,7 +171,7 @@ void _kaapi_unlock_print(void)
 {
   kaapi_atomic_unlock(&lock_print);
 }
-#endif
+
 
 /* Default value reset in kaapi_init.
    Warning to keep them coherent.
