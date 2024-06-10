@@ -130,9 +130,6 @@ typedef struct {
   kaapi_device_t inherited;
   int            save_device_id;
   uint64_t*      affinity; /* of size hip_count_perfrank -1 */
-  size_t         free_mem;
-  size_t         size_alloc;
-  size_t         size_free;
 
   /* device properties (from NVIDIA website) */
   struct {
@@ -148,7 +145,6 @@ typedef struct {
 #if KAAPI_HAVE_IO_THREADS
   pthread_t tidio[2];
 #endif
-  size_t counter[HIP_MAX_COUNTERS];
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
   hipblasHandle_t    handle;
 #endif
@@ -383,7 +379,7 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
 
   /* here we limit the size of allocated memory for the cache system */
-  if (((device->size_alloc - device->size_free) + size) > device->inherited.mem_limit)
+  if (((device->inherited.size_alloc - device->inherited.size_free) + size) > device->inherited.mem_limit)
   {
     if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
     return 0;
@@ -405,11 +401,11 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
 #if _PLUGIN_DEBUG
   fprintf(stdout, "hip:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
-  device->size_alloc += size;
+  device->inherited.size_alloc += size;
 
   if (flag)
   {
-    if ( 1.0*(device->size_alloc - device->size_free) / device->inherited.mem_limit >= 0.9)
+    if ( 1.0*(device->inherited.size_alloc - device->inherited.size_free) / device->inherited.mem_limit >= 0.9)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
@@ -427,7 +423,7 @@ static void kaapi_hip_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t siz
 
   res = hipFree((void*)ptr);
   kaapi_hip_CheckError(res);
-  device->size_free += size;
+  device->inherited.size_free += size;
 
 #if _PLUGIN_DEBUG
   fprintf(stdout, "hip:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
@@ -564,9 +560,9 @@ static size_t kaapi_hip_get_free_mem(kaapi_memory_device_t* dev)
   res = hipMemGetInfo(&free, &total);
   kaapi_hip_CheckError(res);
 
-  device->free_mem = (size_t)free;
+  device->inherited.free_mem = (size_t)free;
 
-  return device->free_mem;
+  return device->inherited.free_mem;
 }
 
 
@@ -2024,9 +2020,9 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   strncpy(device->prop.name, prop.name, 64);
 
   /* memory device */
-  device->size_alloc = 0;
-  device->size_free = 0;
-  device->free_mem = 0;
+  device->inherited.size_alloc = 0;
+  device->inherited.size_free = 0;
+  device->inherited.free_mem = 0;
   if (getenv("KAAPI_NO_GPUALLOCATOR"))
   {
     printf("[XKAAPI] KAAPI_NO_GPUALLOCATOR but Hip driver do not support it. Ignored.\n");
@@ -2044,11 +2040,11 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
     res = hipMemGetInfo(&free, &total);
     kaapi_hip_CheckError(res);
 
-    device->free_mem = (size_t)free;
+    device->inherited.free_mem = (size_t)free;
   }
   /* limit the memory allocation: reserve about 180MB for runing something */
   dev->mem_limit = (size_t)((double)kaapi_default_param.cuda_cache_limit
-          * (double)(device->free_mem-180UL*1024UL*1024UL));
+          * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
   dev->memdev.f_get_source = kaapi_hip_get_source;
 
   /* stream device */

@@ -157,9 +157,6 @@ typedef struct {
   kaapi_device_t inherited;
   int            save_device_id;
   uint64_t*      affinity; /* of size cuda_count_perfrank -1 */
-  size_t         free_mem;
-  size_t         size_alloc;
-  size_t         size_free;
 
   /* device properties (from NVIDIA website) */
   struct {
@@ -414,7 +411,7 @@ static void cuda_mem_cache_init(kaapi_device_cuda_t* dev)
   cudaError_t res;
   size_t size;
   
-  size = (size_t)(dev->free_mem * PERCENTAGE);
+  size = (size_t)(dev->inherited.free_mem * PERCENTAGE);
   res = cudaMalloc( &ptr, size );
   kaapi_assert(res !=  cudaErrorMemoryAllocation );
   CudaCheckError(res);
@@ -500,7 +497,7 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
 
   /* here we limit the size of allocated memory for the cache system */
-  if (((device->size_alloc - device->size_free) + size) > device->inherited.mem_limit)
+  if (((device->inherited.size_alloc - device->inherited.size_free) + size) > device->inherited.mem_limit)
   {
     if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
     return 0;
@@ -522,11 +519,11 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 #if _PLUGIN_DEBUG
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
-  device->size_alloc += size;
+  device->inherited.size_alloc += size;
 
   if (flag)
   {
-    if ( 1.0*(device->size_alloc - device->size_free) / device->inherited.mem_limit >= 0.9)
+    if ( 1.0*(device->inherited.size_alloc - device->inherited.size_free) / device->inherited.mem_limit >= 0.9)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
@@ -544,7 +541,7 @@ static void cuda_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t size)
 
   res = cudaFree((void*)ptr);
   CudaCheckError(res);
-  device->size_free += size;
+  device->inherited.size_free += size;
 
 #if _PLUGIN_DEBUG
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
@@ -673,9 +670,9 @@ static size_t cuda_get_free_mem(kaapi_memory_device_t* dev)
   res = cudaMemGetInfo(&free, &total);
   CudaCheckError(res);
 
-  device->free_mem = (size_t)free;
+  device->inherited.free_mem = (size_t)free;
 
-  return device->free_mem;
+  return device->inherited.free_mem;
 }
 
 
@@ -2125,9 +2122,9 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   strncpy(device->prop.name, prop.name, 64);
 
   /* memory device */
-  device->size_alloc = 0;
-  device->size_free = 0;
-  device->free_mem = 0;
+  device->inherited.size_alloc = 0;
+  device->inherited.size_free = 0;
+  device->inherited.free_mem = 0;
 #if KAAPI_CUDA_CACHE
   dev->memdev.f_alloc = cuda_mem_alloc_cache;
   dev->memdev.f_free = cuda_mem_free_cache;
@@ -2155,11 +2152,11 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
     res = cudaMemGetInfo(&free, &total);
     CudaCheckError(res);
 
-    device->free_mem = (size_t)free;
+    device->inherited.free_mem = (size_t)free;
   }
   /* limit the memory allocation: reserve about 180MB for runing something */
   dev->mem_limit = (size_t)((double)kaapi_default_param.cuda_cache_limit
-          * (double)(device->free_mem-180UL*1024UL*1024UL));
+          * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
   dev->memdev.f_get_source = cuda_get_source;
 
 #if KAAPI_CUDA_CACHE

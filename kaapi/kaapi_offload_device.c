@@ -162,13 +162,13 @@ static void callback_epilogue(
   /* if task does not define cost, assume == 1 */
   double flops = 1.0, dflops= 0, data = 0;
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
-  --device->pendingtasks;
+  ++device->exectasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
+  {
     kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
-  device->flops_tasks += flops+dflops;
-  device->data_tasks += data;
-  device->flops_pendingtasks -= flops+dflops;
-  device->data_pendingtasks -= data;
+    device->flops_exectasks += flops+dflops;
+    device->data_exectasks += data;
+  }
   
 #if KAAPI_USE_PERFCOUNTER
   device->sum_cpudelay += status.cpu_delay;
@@ -466,12 +466,12 @@ static int kaapi_offload_device_prepare_execute_task(
      If task does not define cost function, assume it is 1.
   */
   double flops = 1, dflops =0, data = 0;
-  ++device->pendingtasks;
+  ++device->submittasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
   {
     kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
-    device->flops_pendingtasks += (flops+dflops);
-    device->data_pendingtasks += data;
+    device->flops_submittasks += (flops+dflops);
+    device->data_submittasks += data;
   }
 
   KAAPI_CTXT_PERFREG_INCR(kaapi_self_context(),KAAPI_PERF_ID_TASKSTARTEXEC);
@@ -753,7 +753,6 @@ static void callback_replyrequest_memsync(
 
 /* Compute load of device. Return the number of GPUs having the maximal load
 */
-#define KAAPI_IMAX 4
 int _kaapi_compute_load_device(
     float* pmin,    /* min load */
     float* pmax,    /* max load */
@@ -761,6 +760,7 @@ int _kaapi_compute_load_device(
     float* pdelta,  /* *pdelta= sum of diff of load of each device versus average */
     int*   imax,    /* of size at least KAAPI_IMAX, index of max loaded device */
     int*   pcntzero,/* number of device with load 0 */
+    int*   izero,   /* index of 0 loaded GPU */
     float* pload    /* number of pending tasks */
 )
 {
@@ -770,24 +770,37 @@ int _kaapi_compute_load_device(
   int min = INT_MAX;
   float sum = 0.0;
   int iimax = 0;
-  int cntzero = 0
+  int cntzero = 0;
+  int iizero = 0;
+
+
   for (int i=0; i<ngpu; ++i)
   {
+    load[i] = 0;
     kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU,i);
     if (ld !=0)
     {
-      load[i] = ld->device->flops_pendingtasks;
-      //load[i] = ld->device->flops_tasks;
-      sum += (float)load[i];
-      float l = load[i];
-      if (l> max) {
-        max = l;
-      }
-      if (l < min) 
-        min = l;
-      if (ld->device->pendingtasks ==0) ++cntzero;
+      uint64_t pt = ld->device->submittasks - ld->device->exectasks;
+      load[i] = pt; //ld->device->flops_submittasks - ld->device->flops_exectasks;
     }
   }
+
+  for (int i=0; i<ngpu; ++i)
+  {
+    sum += (float)load[i];
+    float l = load[i];
+    if (l> max) {
+      max = l;
+    }
+    if (l < min) 
+      min = l;
+    if (load[i] ==0)
+    {
+         ++cntzero;
+         izero[iizero++] = i;
+    }
+  }
+
   float minmax = max-min;
   float avrg = sum/ngpu;
   float delta = 0.0;
@@ -1319,11 +1332,12 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
 
   /* */
   device->time_tasks = 0.0;
-  device->flops_tasks = 0.0;
-  device->data_tasks = 0.0;
-  device->pendingtasks = 0;
-  device->flops_pendingtasks= 0.0;
-  device->data_pendingtasks = 0.0;
+  device->exectasks  = 0;
+  device->flops_exectasks = 0.0;
+  device->data_exectasks = 0.0;
+  device->submittasks = 0;
+  device->flops_submittasks= 0.0;
+  device->data_submittasks = 0.0;
 
 #if KAAPI_USE_PERFCOUNTER
   device->cnt_task     = 0.0;
@@ -1457,7 +1471,7 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
   if (getenv("KAAPI_VERBOSE"))
   {
 # if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %li\n", device->device_id, dev->cnt_task);
+    printf("%i, TASK: %li\n", device->device_id, device->cnt_task);
 # endif
     printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
     printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
