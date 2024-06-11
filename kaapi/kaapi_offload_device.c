@@ -168,6 +168,11 @@ static void callback_epilogue(
     kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
     device->flops_exectasks += flops+dflops;
     device->data_exectasks += data;
+#if KAAPI_USE_PERFCOUNTER
+    device->perfcnt.task[i].time += status.gpu_delay;
+    device->perfcnt.task[i].flops += flops+dflops;
+    device->perfcnt.task[i].ai += data/(flops+dflops);
+#endif
   }
   
 #if KAAPI_USE_PERFCOUNTER
@@ -342,14 +347,19 @@ int kaapi_offload_device_execute_task(
 #if KAAPI_DEBUG
   kaapi_assert( task->device ==device );
 #endif
+  kaapi_format_id_t fmtid = kaapi_task_getformat_ref(task)->fmtid;
   KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
-     2 /* begin */, task, kaapi_task_getformat_ref(task)->fmtid, kaapi_task_getargs(task) );
+     2 /* begin */, task, fmtid, kaapi_task_getargs(task) );
   
   /* handle comes form portability layer: for cuda its the gpublas hande */
   ctxt->pc = task;
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(
       task, kaapi_context2thread(ctxt), handle
   );
+
+#if KAAPI_USE_PERFCOUNTER
+  device->perfcnt.task[i].spawn++;
+#endif
 
   KAAPI_OFFLOAD_TRACE_OUT
 
