@@ -1,6 +1,10 @@
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../blas ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/kaapi ${CMAKE_SOURCE_DIR}/blas ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
+if (OPENMP_FOUND)
+  add_compile_options("${OpenMP_C_FLAGS}")
+  add_link_options("${OpenMP_C_FLAGS}")
+endif()
 
 list(APPEND GENERATED_SOURCES 
   stesting_gemm.c stesting_trsm.c stesting_trmm.c stesting_symm.c stesting_syrk.c stesting_syr2k.c splgsy.c stesting_auxiliary.h stesting_auxiliary.c

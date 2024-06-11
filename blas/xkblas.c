@@ -68,6 +68,8 @@
 */
 static int use_partition_thread_strategy = 0;
 
+#define XKBLAS_PARTITION_THREAD 1
+
 #if XKBLAS_PARTITION_THREAD==1
 #include <omp.h>
 #endif
@@ -1449,7 +1451,10 @@ int xkblas_finalize(void)
 
   int verbose=0;
   if (getenv("XKBLAS_VERBOSE"))
-    verbose = 1;
+  {
+    verbose = atoi(getenv("XKBLAS_VERBOSE"));
+    if (verbose <0) verbose = 0;
+  }
  
 #if KAAPI_USE_PERFCOUNTER
   int disphead = 0;
@@ -1475,7 +1480,7 @@ int xkblas_finalize(void)
             printf("[XKBlas stats]\n");
             disphead = 1;
           }
-          if (dispdevice ==0)
+          if ((dispdevice ==0) && (verbose>=2))
           {
             printf("\t*device: %i\n", d);
             dispdevice =1;
@@ -1483,14 +1488,17 @@ int xkblas_finalize(void)
           kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
           kaapi_format_get_name(fmt, 0, tmp, sizeof(tmp));
           task_names[i] = strdup(tmp);
-          printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
-            tmp,
-            device->perfcnt.task[i].spawn,
-            device->perfcnt.task[i].time,
-            device->perfcnt.task[i].flops,
-            device->perfcnt.task[i].ai,
-            device->perfcnt.task[i].ai/device->perfcnt.task[i].spawn
-          );
+          if (verbose >=2)
+          {
+            printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
+              tmp,
+              device->perfcnt.task[i].spawn,
+              device->perfcnt.task[i].time,
+              device->perfcnt.task[i].flops,
+              device->perfcnt.task[i].ai,
+              device->perfcnt.task[i].ai/device->perfcnt.task[i].spawn
+            );
+          }
           spawn_count+= device->perfcnt.task[i].spawn;
           time_count+= device->perfcnt.task[i].time;
           flops_count+= device->perfcnt.task[i].flops;
@@ -2077,6 +2085,7 @@ size_t xkblas_auto_tilesize(
       }
     }
 #endif
+  }
 
   if (force_todefault_mapping ==0)
   {
@@ -2331,7 +2340,6 @@ int xkblas_auto_map(
 
 
 
-
 /* kaapi_get_elapsedtime
 */
 uint64_t xkblas_elapsedns(void)
@@ -2378,7 +2386,7 @@ const char* get_xkblas_info(void)
             "  GPU PART.: %s\n"
             "  TILE_SIZE: %lu\n"
             "  MODE_MATH: %s\n",
-         (use_partition_thread_strategy ==0 ? "NONE" : "THREAD",
+         (use_partition_thread_strategy ==0 ? "NONE" : "THREAD"),
          xkblas_get_param(),
          (xkblas_default_math == XKBLAS_TENSOR_OP_MATH ? "TensorCore" : "Default")
     );

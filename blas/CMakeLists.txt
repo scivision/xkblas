@@ -13,6 +13,11 @@ else()
   )
 endif()
 
+if (OPENMP_FOUND)
+  add_compile_options("${OpenMP_C_FLAGS}")
+endif()
+
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 # Bootstrap 
@@ -224,6 +229,10 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 # which point to directories outside the build tree to the install RPATH
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set_target_properties(xkblas PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE) 
+
+if (OPENMP_FOUND)
+    target_link_libraries(xkblas PRIVATE ${OPENMP_LIBRARIES})
+endif()
 
 target_link_libraries(xkblas PUBLIC kaapi)
 target_link_libraries(xkblas PRIVATE ${CUBLAS_LIBRARIES} ${HIPBLAS_LIBRARIES} ${ROCBLAS_LIBRARIES} stdc++)

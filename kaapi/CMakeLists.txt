@@ -22,6 +22,7 @@ else()
 endif()
 
 
+
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
   add_compile_options("-DKAAPI_USE_ROCSMI=0")
 else()
@@ -95,6 +96,7 @@ if (KAAPI_USE_HWLOC)
 else()
   message(STATUS "XKblas is configured without support for HWLOC")
 endif()
+
 
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
   message(STATUS "Not found ROCSMI_INCLUDE")

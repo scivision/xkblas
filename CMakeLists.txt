@@ -35,6 +35,13 @@ if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
 endif()
 
+#--- OpenMP
+find_package(OpenMP)
+if (OPENMP_FOUND)
+  #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
 #--- CUDA
 if (KAAPI_USE_CUDA_RT)
   find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
