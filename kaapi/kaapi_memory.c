@@ -3032,7 +3032,7 @@ int kaapi_dsm_register_device(
  #if KAAPI_DEBUG
     if (dsm->nodes[lid] !=0) {
       _kaapi_lock_print();
-      printf("%x:: In %s: device lid:%i seems to be already initialized to device:%p, try to initialize it againto devie:%p\n", 
+      printf("%x:: In %s: device lid:%i seems to be already initialized to device:%p, try to initialize it againto device:%p\n", 
          pthread_self(), lid, dsm->nodes[lid], device );
       _kaapi_unlock_print();
     }
