@@ -1478,19 +1478,25 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
 
-  if (getenv("KAAPI_VERBOSE") && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
+  int verbose = 0;
+  if (getenv("KAAPI_VERBOSE"))
+    verbose = atoi(getenv("KAAPI_VERBOSE"));
+  if (verbose && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
   {
+    if (verbose >=2)
+    {
 # if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %li, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
-    printf("%i, WORK: %g (cpu s), %g (gpu s)\n", device->device_id, device->sum_cpudelay, device->sum_gpudelay ); 
+      printf("%i, TASK: %li, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
+      printf("%i, WORK: %g (cpu s), %g (gpu s)\n", device->device_id, device->sum_cpudelay, device->sum_gpudelay ); 
 //KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_CPU), KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_GPU));
 # endif
-    printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
-    printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
-    printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
-    printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
-    printf("%i, COM : %g MB, %g s\n", device->device_id, device->size_com*1.0 /(1024.0*1024.0), device->sum_comdelay);
-    printf("%i, ABWD: %g MB/s\n", device->device_id, device->sum_bwd/device->cnt_com /(1024.0*1024.0));
+      printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
+      printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
+      printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
+      printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
+      printf("%i, COM : %g MB, %g s\n", device->device_id, device->size_com*1.0 /(1024.0*1024.0), device->sum_comdelay);
+      printf("%i, ABWD: %g MB/s\n", device->device_id, device->sum_bwd/device->cnt_com /(1024.0*1024.0));
+    }
 
     device->driver->size_alloc += device->size_alloc;
     device->driver->size_free += device->size_free;
