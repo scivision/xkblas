@@ -128,7 +128,7 @@ static void callback_epilogue(
 #if KAAPI_PIPELINE_GPUTASK
   /* must by try lock to avoid supspending the callback execution thread */
   pthread_mutex_lock(&device->pipe_lock);
-  device->pipeline[index % device->pipe_size] = 0; /* free the slot in the pipeline */
+  device->pipeline[index % device->pipe_size] = 0; /* free the slot in the pipeline */ 
 #if KAAPI_LOG_PIPE
   printf("Task[%i]=%p mark finished\n", index, task );
 #endif
@@ -169,9 +169,9 @@ static void callback_epilogue(
     device->flops_exectasks += flops+dflops;
     device->data_exectasks += data;
 #if KAAPI_USE_PERFCOUNTER
-    device->perfcnt.task[i].time += status.gpu_delay;
-    device->perfcnt.task[i].flops += flops+dflops;
-    device->perfcnt.task[i].ai += data/(flops+dflops);
+    device->perfcnt.task[fmt->fmtid].time += status.gpu_delay;
+    device->perfcnt.task[fmt->fmtid].flops += flops+dflops;
+    device->perfcnt.task[fmt->fmtid].ai += data/(flops+dflops);
 #endif
   }
   
@@ -358,7 +358,7 @@ int kaapi_offload_device_execute_task(
   );
 
 #if KAAPI_USE_PERFCOUNTER
-  device->perfcnt.task[i].spawn++;
+  device->perfcnt.task[fmtid].spawn++;
 #endif
 
   KAAPI_OFFLOAD_TRACE_OUT

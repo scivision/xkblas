@@ -1509,6 +1509,26 @@ int xkblas_finalize(void)
         );
       }
     }
+    if (disphead)
+    {
+      printf("Resume for all devices\n");
+      for (kaapi_format_id_t i=0; i<KAAPI_FORMAT_MAX; ++i)
+      { 
+        if (cumul.task[i].spawn >0)
+        { 
+          kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
+          printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
+            task_names[i],
+            cumul.task[i].spawn,
+            cumul.task[i].time,
+            cumul.task[i].flops,
+            cumul.task[i].ai,
+            cumul.task[i].ai/cumul.task[i].spawn
+          );
+        }
+      } 
+      printf("[XKBlas stats]\n");
+    }
   }
 #endif
 
