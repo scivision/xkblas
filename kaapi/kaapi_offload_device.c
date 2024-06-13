@@ -169,9 +169,10 @@ static void callback_epilogue(
     device->flops_exectasks += flops+dflops;
     device->data_exectasks += data;
 #if KAAPI_USE_PERFCOUNTER
-    device->perfcnt.task[fmt->fmtid].time += status.gpu_delay;
-    device->perfcnt.task[fmt->fmtid].flops += flops+dflops;
-    device->perfcnt.task[fmt->fmtid].ai += data/(flops+dflops);
+    kaapi_offloadtask_perfcounter_t* perf = &device->perfcnt.task[fmt->fmtid];
+    perf->time  += status.gpu_delay;
+    perf->flops += flops+dflops;
+    perf->ai += (flops+dflops)/data;
 #endif
   }
   
@@ -203,15 +204,8 @@ static void callback_epilogue(
   KAAPI_CTXT_PERFREG_INCR(ctxt,KAAPI_PERF_ID_TASKEXEC);
   KAAPI_CTXT_PERFREG_ADD (ctxt,KAAPI_PERF_ID_WORK_CPU, status.cpu_delay);
   KAAPI_CTXT_PERFREG_ADD (ctxt,KAAPI_PERF_ID_WORK_GPU, status.gpu_delay);
-
-  if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
-  {
-    kaapi_offloadtask_perfcounter_t* perf = &device->perfcnt.task[fmt->fmtid];
-    perf->time  += status.gpu_delay;
-    perf->flops += flops;
-    perf->ai += flops/data;
-  }
 #endif
+
   ++device->exec_count;
   KAAPI_ATOMIC_INCR(&task->frame->exec_count);
 //printf("incr: @p\n",task->frame);
