@@ -432,6 +432,7 @@ retval:
 */
 void xkblas_set_param(size_t nb, size_t p)
 {
+  printf( "%s::Set tile size to: %i\n", __func__, nb );
   NB = nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
@@ -1304,7 +1305,7 @@ int xkblas_init(void)
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
     if (getenv("XKBLAS_TILE_SIZE") ==0)
-      tile_size = xkblas_get_param();
+      tile_size = NB;
     else
       tile_size = atoi(getenv("XKBLAS_TILE_SIZE"));
 
@@ -1324,8 +1325,9 @@ int xkblas_init(void)
         fprintf(stderr,"[XKBlas] XKBLAS_PRECISION must be = float|real*4|double|read*8|complex|complex32|complex*4|complex64|complex*8.\n");
         exit(1); 
       }
-      xkblas_set_param( tile_size, precision );
     }
+    printf( "%s::Set tile size to: %i\n", __func__, tile_size );
+    xkblas_set_param( tile_size, precision );
 
     if (getenv("XKBLAS_VERBOSE"))
     {
@@ -1992,8 +1994,8 @@ size_t xkblas_auto_tilesize(
   size_t NB = xkctxt->NB;
   size_t ngpu = xkblas_get_ngpus();
   size_t fact = 2;
-  size_t minNB = 1024; 
-  int force_todefault_mapping;
+  size_t minNB = 2048; 
+  int force_todefault_mapping = 1;
 
   if (use_partition_thread_strategy ==0)
   {
@@ -2019,7 +2021,7 @@ size_t xkblas_auto_tilesize(
     if (omp_get_num_threads() >1)
     {
       force_todefault_mapping = 0;
-      fact = 2; /* split tow to fullfill streams */
+      fact = 2; /* split to to fullfill streams */
       ngpu = xkctxt->ngpus = 1;
       int self = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
       xkctxt->gpuset[0] = self;
@@ -2035,19 +2037,18 @@ size_t xkblas_auto_tilesize(
       float delta;
       int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, izero, load);
       float minmax = max-min;
-  #if 0
+#if 0
       _kaapi_lock_print();
-      printf("%s:: Below L0:: LoadAvrg=%g LoadMax=%g CntZero=%i, Load=", __func__, avrg, max, cntzero );
+      printf("%s:: Below L0:: M=%i, N=%i, K=%i LoadAvrg=%g LoadMax=%g CntZero=%i, Load=", __func__, M, N, K, avrg, max, cntzero );
       for (int i=0; i<ngpu; ++i)
         printf("%g ", load[i]);
       printf("\n");
       _kaapi_unlock_print();
-  #endif
+#endif
       if (cntzero >0)
       {
          force_todefault_mapping = 1;
          fact = 1;
-         minNB /= 2;
          ngpu = xkctxt->ngpus = cntzero;
          int j = 1;
          for (int i=0; i<xkctxt->ngpus; ++i) {
@@ -2056,25 +2057,26 @@ size_t xkblas_auto_tilesize(
              xkctxt->gpuset[j++] = izero[i];
            }
          }
-        minNB *= 2;
+        minNB *= 1;
         if (NB !=0)
         {
-          return 4*NB;
+          return 2*NB;
         }
       }
       else /* favor coarse grain local submission */
       {
+        force_todefault_mapping = 0;
         minNB *=2;
         if (NB !=0)
         {
-          return NB*4;
+          return NB*2;
         }
       }
     }
     else {
       force_todefault_mapping = 1;
       fact = 1;
-      minNB *=2;
+      //minNB *=2;
       ngpu = xkctxt->ngpus  = kaapi_default_param.ngpus;
       kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
       for (int i=0; i<xkctxt->ngpus; ++i)
