@@ -316,7 +316,7 @@ static void _kaapi_get_gpu_topo(void)
   }
 
 #if KAAPI_DEBUG
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
   {
     char buffer[device_count+1];
     buffer[device_count] = 0;

@@ -3108,7 +3108,7 @@ int kaapi_dsm_unregister_device(
   kaapi_the_dsm.nodes[lid] = 0;
 
 #if KAAPI_DEBUG
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
   {
     printf("%i::Memory Device unregister, memory alloc:%li, free:%li\n", lid, device->size_alloc, device->size_free);
   }
@@ -3132,7 +3132,7 @@ int kaapi_dsm_init( void )
   kaapi_hashmap_init(&free_ptr_ht, free_mapentries, KAAPI_SIZE_DBG_MAP_ALLOC, 0);
 #endif
 #if MEM_ALLOC_FREELIST
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
     printf("[xkaapi] use free list allocator\n" );
 #endif
 #if KAAPI_DEBUG_LOW
@@ -3171,7 +3171,7 @@ int kaapi_dsm_finalize( void )
 
 #if KAAPI_DEBUG
   /* print device->size_alloc for each device */
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
     printf("KAAPI DSM Finalize: memory alloc: %li, free: %li\n", device_size_alloc, device_size_free );
 #endif
 

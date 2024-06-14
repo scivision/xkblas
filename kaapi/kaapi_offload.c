@@ -703,7 +703,7 @@ int kaapi_offload_finalize(void)
   {
 #if KAAPI_USE_PERFCOUNTER
     /* do not print stats for virtual device cpu */
-    if (kaapi_list_drivers->f_get_type() != KAAPI_PROC_TYPE_CPU)
+    if ((kaapi_default_param.verbose>0) && (kaapi_list_drivers->f_get_type() != KAAPI_PROC_TYPE_CPU))
     {
       printf("Resume for driver: %s\n", kaapi_list_drivers->name );
       printf("\tTASK: %li\n", kaapi_list_drivers->cnt_task );

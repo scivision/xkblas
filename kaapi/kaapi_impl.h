@@ -142,6 +142,7 @@ typedef struct kaapi_rtparam_t {
   uint8_t               sys_ngpus;          /* number of GPU plugged to this node */
   uint8_t               ngpus;              /* number of GPU for this node */
   uint32_t              gpu_set;            /* GPU to use */
+  uint8_t               verbose;            /* verbose level. 0 : no verbose */
   double                cuda_cache_factor;  /* percent of total free memory used by cache */
   uint16_t              cuda_stream_capacity;  /* capacity of input stream */
   uint8_t               cuda_conc_stream_kernel;/* number of concurrent cuda kernel stream per device*/

@@ -1301,7 +1301,6 @@ int xkblas_init(void)
   if (getenv("XKBLAS_VERBOSE"))
     setenv("KAAPI_VERBOSE",getenv("XKBLAS_VERBOSE"),1);
 
-
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
     if (getenv("XKBLAS_TILE_SIZE") ==0)
@@ -1326,13 +1325,7 @@ int xkblas_init(void)
         exit(1); 
       }
     }
-    printf( "%s::Set tile size to: %i\n", __func__, tile_size );
     xkblas_set_param( tile_size, precision );
-
-    if (getenv("XKBLAS_VERBOSE"))
-    {
-      printf("xe size: %lu, precision: %lu\n",tile_size, precision);
-    }
   }
 
   if (getenv("XKBLAS_NGPUS"))
@@ -1398,7 +1391,7 @@ int xkblas_init(void)
     printf("***warning: XKBLAS_PARTITION is defined by library not configured to support it\n");
 #endif
 
-  if (getenv("XKBLAS_VERBOSE"))
+  if (kaapi_default_param.verbose>0) 
   {
     extern const char* get_kaapi_version(void);
     extern const char* get_kaapi_info(void);
@@ -1451,18 +1444,11 @@ int xkblas_finalize(void)
   /* */
   kaapi_atomic_lock(&_xkblas_list_lock);
 
-  int verbose=0;
-  if (getenv("XKBLAS_VERBOSE"))
-  {
-    verbose = atoi(getenv("XKBLAS_VERBOSE"));
-    if (verbose <0) verbose = 0;
-  }
- 
 #if KAAPI_USE_PERFCOUNTER
   int disphead = 0;
   kaapi_offload_perfcounter_t cumul;
   char* task_names[KAAPI_FORMAT_MAX];
-  if (verbose)
+  if (kaapi_default_param.verbose)
   {
     memset(&cumul, 0, sizeof(cumul));
     memset(&task_names, 0, sizeof(task_names));
@@ -1482,7 +1468,7 @@ int xkblas_finalize(void)
             printf("[XKBlas stats]\n");
             disphead = 1;
           }
-          if ((dispdevice ==0) && (verbose>=2))
+          if ((dispdevice ==0) && (kaapi_default_param.verbose>=2))
           {
             printf("\t*device: %i\n", d);
             dispdevice =1;
@@ -1490,7 +1476,7 @@ int xkblas_finalize(void)
           kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
           kaapi_format_get_name(fmt, 0, tmp, sizeof(tmp));
           task_names[i] = strdup(tmp);
-          if (verbose >=2)
+          if (kaapi_default_param.verbose >=2)
           {
             printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
               tmp,

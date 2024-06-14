@@ -295,6 +295,13 @@ int kaapi_setup_param(void)
     kaapi_default_param.cuda_cache_limit = cuda_cache_limit;
   }
 
+  kaapi_default_param.verbose=0;
+  if (getenv("KAAPI_VERBOSE"))
+  {
+    kaapi_default_param.verbose = atoi(getenv("KAAPI_VERBOSE"));
+    if (kaapi_default_param.verbose <0) kaapi_default_param.verbose = 0;
+  }
+
   return 0;
 }
 

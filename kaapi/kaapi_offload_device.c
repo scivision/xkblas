@@ -1472,12 +1472,9 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
 
-  int verbose = 0;
-  if (getenv("KAAPI_VERBOSE"))
-    verbose = atoi(getenv("KAAPI_VERBOSE"));
-  if (verbose && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
+  if (kaapi_default_param.verbose && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
   {
-    if (verbose >=2)
+    if (kaapi_default_param.verbose >=2)
     {
 # if KAAPI_USE_PERFCOUNTER
       printf("%i, TASK: %li, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
