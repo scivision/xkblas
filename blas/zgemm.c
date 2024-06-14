@@ -121,8 +121,10 @@ int xkblas_zgemm_async(
                               const Complex64_t *B, int LDB,
     const Complex64_t* beta,        Complex64_t *C, int LDC )
 {
+#if 0
 		printf("[XKBLAS] gemm M %d, N %d, K %d, A %p, LDA %d, B %p, LDB %d, C %p, LDC %d\n",
 										M, N, K, A, LDA, B, LDB, C, LDC );
+#endif
     size_t Am, An, Bm, Bn;
 
     /* Check input arguments */
