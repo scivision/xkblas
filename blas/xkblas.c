@@ -1301,6 +1301,7 @@ int xkblas_init(void)
   if (getenv("XKBLAS_VERBOSE"))
     setenv("KAAPI_VERBOSE",getenv("XKBLAS_VERBOSE"),1);
 
+
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
     if (getenv("XKBLAS_TILE_SIZE") ==0)
@@ -1325,7 +1326,13 @@ int xkblas_init(void)
         exit(1); 
       }
     }
+    printf( "%s::Set tile size to: %i\n", __func__, tile_size );
     xkblas_set_param( tile_size, precision );
+
+    if (getenv("XKBLAS_VERBOSE"))
+    {
+      printf("xe size: %lu, precision: %lu\n",tile_size, precision);
+    }
   }
 
   if (getenv("XKBLAS_NGPUS"))
@@ -1391,7 +1398,7 @@ int xkblas_init(void)
     printf("***warning: XKBLAS_PARTITION is defined by library not configured to support it\n");
 #endif
 
-  if (kaapi_default_param.verbose>0) 
+  if (getenv("XKBLAS_VERBOSE"))
   {
     extern const char* get_kaapi_version(void);
     extern const char* get_kaapi_info(void);
@@ -1444,11 +1451,18 @@ int xkblas_finalize(void)
   /* */
   kaapi_atomic_lock(&_xkblas_list_lock);
 
+  int verbose=0;
+  if (getenv("XKBLAS_VERBOSE"))
+  {
+    verbose = atoi(getenv("XKBLAS_VERBOSE"));
+    if (verbose <0) verbose = 0;
+  }
+ 
 #if KAAPI_USE_PERFCOUNTER
   int disphead = 0;
   kaapi_offload_perfcounter_t cumul;
   char* task_names[KAAPI_FORMAT_MAX];
-  if (kaapi_default_param.verbose)
+  if (verbose)
   {
     memset(&cumul, 0, sizeof(cumul));
     memset(&task_names, 0, sizeof(task_names));
@@ -1468,7 +1482,7 @@ int xkblas_finalize(void)
             printf("[XKBlas stats]\n");
             disphead = 1;
           }
-          if ((dispdevice ==0) && (kaapi_default_param.verbose>=2))
+          if ((dispdevice ==0) && (verbose>=2))
           {
             printf("\t*device: %i\n", d);
             dispdevice =1;
@@ -1476,7 +1490,7 @@ int xkblas_finalize(void)
           kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
           kaapi_format_get_name(fmt, 0, tmp, sizeof(tmp));
           task_names[i] = strdup(tmp);
-          if (kaapi_default_param.verbose >=2)
+          if (verbose >=2)
           {
             printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
               tmp,
@@ -1978,7 +1992,8 @@ size_t xkblas_auto_tilesize(
 {
   /* get default tile size and initialize internal descriptor if not yet */
   size_t NB = xkctxt->NB;
-  size_t ngpu = xkblas_get_ngpus();
+  int SW_ngpus= kaapi_localitydomain_count(KAAPI_LD_GPU); /* system wide number of GPUs (on the current node)*/
+  size_t ngpus = xkblas_get_ngpus(); 
   size_t fact = 2;
   size_t minNB = 2048; 
   int force_todefault_mapping = 1;
@@ -1997,7 +2012,7 @@ size_t xkblas_auto_tilesize(
     }
   }
   else
-  { /* use or defined xkctxt->ngpu & xkctxt->gpuset
+  { /* use or defined xkctxt->ngpus & xkctxt->gpuset
        Current prototype only detec concurrent BLAS call if xkblas thread are in a parallel OpenMP region
     */
 #if XKBLAS_PARTITION_THREAD==0
@@ -2007,16 +2022,16 @@ size_t xkblas_auto_tilesize(
     if (omp_get_num_threads() >1)
     {
       force_todefault_mapping = 0;
-      fact = 2; /* split to to fullfill streams */
-      ngpu = xkctxt->ngpus = 1;
+      fact = 1;
+
       int self = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
+      xkctxt->ngpus = 1;
       xkctxt->gpuset[0] = self;
 
-      int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
-      float load[ngpu];
+      float load[SW_ngpus];
+      int izero[SW_ngpus];
       int imax[KAAPI_IMAX];
       int cntzero;
-      int izero[ngpu];
       float max;
       float min;
       float avrg;
@@ -2026,51 +2041,56 @@ size_t xkblas_auto_tilesize(
 #if 0
       _kaapi_lock_print();
       printf("%s:: Below L0:: M=%i, N=%i, K=%i LoadAvrg=%g LoadMax=%g CntZero=%i, Load=", __func__, M, N, K, avrg, max, cntzero );
-      for (int i=0; i<ngpu; ++i)
+      for (int i=0; i<SW_ngpus; ++i)
         printf("%g ", load[i]);
       printf("\n");
       _kaapi_unlock_print();
 #endif
-      if (cntzero >0)
+      /* number of worker is :omp_get_num_threads() */
+      if (cntzero > SW_ngpus/2)
       {
-         force_todefault_mapping = 1;
-         fact = 1;
-         ngpu = xkctxt->ngpus = cntzero;
-         int j = 1;
-         for (int i=0; i<xkctxt->ngpus; ++i) {
-           if (izero[i] != self)
-           {
-             xkctxt->gpuset[j++] = izero[i];
-           }
-         }
-        minNB *= 1;
+        force_todefault_mapping = 1;
+        xkctxt->ngpus = (cntzero > SW_ngpus*2/3 ? SW_ngpus : cntzero/2);
+	if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
+        int j = 1; /* self is already at position 0 */
+        for (int i=0; i<xkctxt->ngpus; ++i) {
+          if (izero[i] != self)
+          {
+            xkctxt->gpuset[j++] = izero[i];
+          }
+        }
+	minNB *=1;
+#if 1
         if (NB !=0)
         {
           return 2*NB;
         }
+#endif
       }
-      else /* favor coarse grain local submission */
+      else /* favor coarse grain local submission with pipelining comm */
       {
-        force_todefault_mapping = 0;
-        minNB *=2;
+	minNB *=2;
+#if 1
         if (NB !=0)
         {
           return NB*2;
         }
+#endif
       }
     }
     else {
       force_todefault_mapping = 1;
-      fact = 1;
-      //minNB *=2;
-      ngpu = xkctxt->ngpus  = kaapi_default_param.ngpus;
+      fact = 2;
+      xkctxt->ngpus  = SW_ngpus;
       kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
       for (int i=0; i<xkctxt->ngpus; ++i)
         xkctxt->gpuset[i] = i;
+#if 1
       if (NB !=0)
       {
         return NB;
       }
+#endif
     }
 #endif
   }
@@ -2095,7 +2115,7 @@ size_t xkblas_auto_tilesize(
       default:
         {
           /* take max */
-          NB = M / (fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
           NB = (NB + 63) & ~63UL;
           if (NB <minNB) NB = minNB;
         }
@@ -2112,12 +2132,12 @@ size_t xkblas_auto_tilesize(
         {
           fact = 2;
   redo_syrk:
-          NB = M / (fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
           if (NB >= 2048)
             NB= NB & ~2047UL;
           if ((NB <= 1024) && (fact==2))
           { fact=1; goto redo_syrk;}
-          if (NB >4096) NB = M / (2*fact*ngpu);
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <512) NB = 512;
         }
         break;
@@ -2127,11 +2147,11 @@ size_t xkblas_auto_tilesize(
         {
           fact = 4;
   redo_syr2k:
-          NB = M / (fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
           NB= (NB +63UL)& ~63UL;
           if ((NB <= 2048) && (fact>2))
           { --fact; goto redo_syr2k;}
-          if (NB >4096) NB = M / (2*fact*ngpu);
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <512) NB = 512;
         }
         break;
@@ -2140,9 +2160,9 @@ size_t xkblas_auto_tilesize(
       case KERN_SYMM:
         {
           fact = 4;
-          NB = M / (fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
           NB= NB & ~1023UL;
-          if (NB >4096) NB = M / (2*fact*ngpu);
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <1024) NB = 1024;
         }
         break;
@@ -2153,7 +2173,7 @@ size_t xkblas_auto_tilesize(
       case KERN_GEMM:
         {
   //        fact = 2;
-          NB = M / (fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
           NB = (NB + 63) & ~63UL;
           if (NB <minNB) NB = minNB;
         }
@@ -2164,12 +2184,12 @@ size_t xkblas_auto_tilesize(
       case KERN_GEMM:
         {
           fact = 1;
-          NB = M / (fact*ngpu);
-          if (M >ngpu)
+          NB = M / (fact*xkctxt->ngpus);
+          if (M >xkctxt->ngpus)
           {
             if ((M> 16384)&&(NB<2048)) NB=2048;
           }
-          if (NB >4096) NB = M / (2*fact*ngpu);
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <512) NB = 512;
           NB = (NB + 63) & ~63UL;
         }
@@ -2181,8 +2201,8 @@ size_t xkblas_auto_tilesize(
       default:
         {
           fact = 1;
-          NB = M / (fact*ngpu);
-          if (NB >=4096) NB = M / (2*fact*ngpu);
+          NB = M / (fact*xkctxt->ngpus);
+          if (NB >=4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <1024) NB = 1024;
           NB = (NB + 63) & ~63UL;
         }
