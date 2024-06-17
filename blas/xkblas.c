@@ -61,16 +61,16 @@
 /* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map */
 #define KAAPI_SIZE_DSM_MAP 20
 
-/* XKBLAS_PARTITION_THREAD : if defined to 1 then map thread to one GPU.
+/* XKBLAS_ADAPTATIVE : if defined to 1 then map thread to fewer GPU and control task granularity
    To be extended to a set of GPUs.
    Dependency: require omp.h in order to detect if thread is in parallel region.
    Next implementation will only be based on internal counter such as GPU activites.
 */
 static int use_partition_thread_strategy = 0;
 
-#define XKBLAS_PARTITION_THREAD 1
+#define XKBLAS_ADAPTATIVE 1
 
-#if XKBLAS_PARTITION_THREAD==1
+#if XKBLAS_ADAPTATIVE==1
 #include <omp.h>
 #endif
 
@@ -1390,12 +1390,17 @@ int xkblas_init(void)
   kaapi_init();
 
   //_xkblas_global_team = kaapi_team_alloc();
-#if XKBLAS_PARTITION_THREAD
-  if (getenv("XKBLAS_PARTITION"))
-    use_partition_thread_strategy = 1;
+#if XKBLAS_ADAPTATIVE
+  if (getenv("XKBLAS_ADAPTIVE"))
+  {
+    if (atoi(getenv("XKBLAS_ADAPTIVE")) != 0)
+      use_partition_thread_strategy = 1;
+    else
+      use_partition_thread_strategy = 0;
+  }
 #else
-  if (getenv("XKBLAS_PARTITION"))
-    printf("***warning: XKBLAS_PARTITION is defined by library not configured to support it\n");
+  if (getenv("XKBLAS_ADAPTIVE"))
+    printf("***warning: XKBLAS_ADAPTIVE is defined by library not configured to support it\n");
 #endif
 
   if (getenv("XKBLAS_VERBOSE"))
@@ -1982,6 +1987,79 @@ int xkblas_distribute_1Dblock_cyclic_async(
 }
 
 
+/* FLOPS per kernel. TODO: add side
+*/
+double _xkblas_get_cost( double* data, xkblas_kernel_t kernel, size_t M, size_t N, size_t K )
+{ 
+  double flops = 0.0;
+
+  switch (kernel) {
+    case KERN_HERK:
+      *data = DATA_ZHERK(M,N);
+      flops = FLOPS_ZHERK(M, N);
+//printf("%s:: K=%i, N=%i, Flops HERK=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYRK:
+      *data = DATA_ZSYRK(M, N);
+      flops = FLOPS_ZSYRK(M, N);
+//printf("%s:: K=%i, N=%i, Flops SYRK=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_HER2K:
+      *data = DATA_ZHER2K(M, N);
+      flops = FLOPS_ZHER2K(M, N);
+//printf("%s:: K=%i, N=%i, Flops HER2K=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYR2K:
+      *data = DATA_ZSYR2K(M, N);
+      flops = FLOPS_ZSYR2K(M, N);
+//printf("%s:: K=%i, N=%i, Flops SYR2K=%g\n", __func__, M, M, flops);
+    break;
+    case KERN_HEMM:
+      *data = DATA_ZHEMM(CblasLeft, M, N);
+      flops = FLOPS_ZHEMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops HEMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYMM:
+      *data = DATA_ZSYMM(CblasLeft, M, N);
+      flops = FLOPS_ZSYMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops SYMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_TRMM:
+      *data = DATA_ZTRMM(CblasLeft, M, N);
+      flops = FLOPS_ZTRMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops TRMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_TRSM:
+      *data = DATA_ZTRSM(CblasLeft, M, N);
+      flops = FLOPS_ZTRSM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops TRSM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_GEMMT:
+      *data = DATA_ZGEMMT(N,K);
+      flops = FLOPS_ZGEMMT(N,K);
+//printf("%s:: M=%i, N=%i, K=%i, Flops GEMMT=%g\n", __func__, M, N, K, flops);
+    break;
+    case KERN_GEMM:
+      *data = DATA_ZGEMM(M, N,K);
+      flops = FLOPS_ZGEMM(M, N,K);
+//printf("%s:: M=%i, N=%i, K=%i, Flops GEMM=%g\n", __func__, M, N, K, flops);
+    break;
+    case KERN_SWAP:
+    case KERN_COPYSCALE:
+      *data = DATA_MAT(M,N);
+      flops = 3*(double)M*(double)N;
+    break;
+    default: 
+      return 0;
+    break;
+  }
+  return flops;
+}
+
+
+
+static inline int min(int a, int b) { return a<b ? a:b; }
+
 /* Return the bloc size:
    - M,N should be the dimension of the result. K depends of the Kernel.
    Return NB such that (M,N) is computed in FACTOR*NGPU blocs
@@ -1997,6 +2075,14 @@ size_t xkblas_auto_tilesize(
   size_t fact = 2;
   size_t minNB = 2048; 
   int force_todefault_mapping = 1;
+
+#if XKBLAS_ADAPTATIVE==1
+  double data;
+  double W = _xkblas_get_cost(&data, kernel, M, N, K);
+  double Wt = 0.5*(double)min(NB,M)*(double)min(NB,N)*(double)min(NB,K);
+  double D = fact*(double)NB*(double)NB;
+  int cntzero; /* number of inactive GPUs */
+#endif
 
   if (use_partition_thread_strategy ==0)
   {
@@ -2015,7 +2101,7 @@ size_t xkblas_auto_tilesize(
   { /* use or defined xkctxt->ngpus & xkctxt->gpuset
        Current prototype only detec concurrent BLAS call if xkblas thread are in a parallel OpenMP region
     */
-#if XKBLAS_PARTITION_THREAD==0
+#if XKBLAS_ADAPTATIVE==0
     /* not configure, so this case could never occurs */
     kaapi_assert(use_partition_thread_strategy ==0);
 #else
@@ -2024,14 +2110,13 @@ size_t xkblas_auto_tilesize(
       force_todefault_mapping = 0;
       fact = 1;
 
-      int self = xkctxt->kctxt->tid % kaapi_default_param.ngpus;
+      int self = xkctxt->kctxt->tid % SW_ngpus;
       xkctxt->ngpus = 1;
       xkctxt->gpuset[0] = self;
 
       float load[SW_ngpus];
       int izero[SW_ngpus];
       int imax[KAAPI_IMAX];
-      int cntzero;
       float max;
       float min;
       float avrg;
@@ -2046,20 +2131,45 @@ size_t xkblas_auto_tilesize(
       printf("\n");
       _kaapi_unlock_print();
 #endif
+#if 1
+      size_t minNB = 2048; 
+      force_todefault_mapping = 0;
+      if (NB==0) NB = minNB;
+      fact =1;
+
+      //double Pavrg = W/D; /* 1GPU max */
+      xkctxt->ngpus = cntzero; // (Pavrg < cntzero ? (int)Pavrg : cntzero);
+      if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
+      if (cntzero >0)
+      {
+        int j = 1; /* self is already at position 0 */
+        for (int i=0; i<xkctxt->ngpus; ++i) 
+        {
+          if (izero[i] != self)
+          {
+            kaapi_assert_debug( izero[i] < SW_ngpus );
+            xkctxt->gpuset[j++] = izero[i];
+          }
+        }
+      }
+#else
       /* number of worker is :omp_get_num_threads() */
       if (cntzero > SW_ngpus/2)
       {
         force_todefault_mapping = 1;
-        xkctxt->ngpus = (cntzero > SW_ngpus*2/3 ? SW_ngpus : cntzero/2);
+        xkctxt->ngpus = (cntzero > SW_ngpus*2/3 ? (cntzero < SW_ngpus ? cntzero : SW_ngpus) : cntzero/2);
 	if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
         int j = 1; /* self is already at position 0 */
-        for (int i=0; i<xkctxt->ngpus; ++i) {
+        for (int i=0; i<xkctxt->ngpus; ++i) 
+        {
           if (izero[i] != self)
           {
+            kaapi_assert_debug( izero[i] < SW_ngpus );
             xkctxt->gpuset[j++] = izero[i];
           }
         }
 	minNB *=1;
+
 #if 1
         if (NB !=0)
         {
@@ -2070,22 +2180,30 @@ size_t xkblas_auto_tilesize(
       else /* favor coarse grain local submission with pipelining comm */
       {
 	minNB *=2;
-#if 1
         if (NB !=0)
-        {
           return NB*2;
-        }
-#endif
       }
+#endif // end if 1
     }
     else {
+      // In // OpenMP region 
+#if 1// 
+      force_todefault_mapping = 0;
+      size_t minNB = 2048; //xkctxt->NB; //1024; 
+      if (NB==0) NB = minNB;
+      fact =2;
+      double Pavrg = W/D; /* 1GPU max */
+      xkctxt->ngpus = (Pavrg < SW_ngpus ? (int)Pavrg : SW_ngpus);
+      kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
+      for (int i=0; i<xkctxt->ngpus; ++i)
+        xkctxt->gpuset[i] = i;
+#else
       force_todefault_mapping = 1;
       fact = 2;
       xkctxt->ngpus  = SW_ngpus;
       kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
       for (int i=0; i<xkctxt->ngpus; ++i)
         xkctxt->gpuset[i] = i;
-#if 1
       if (NB !=0)
       {
         return NB;
@@ -2115,9 +2233,38 @@ size_t xkblas_auto_tilesize(
       default:
         {
           /* take max */
+#if 1
+          if (omp_get_num_threads() >1)
+          {
+            double ffact = 4; // fact
+            double k =  W/(ffact * (double)xkctxt->ngpus);
+            double fNB = pow(k,1.0/3.0);
+	    size_t cntb  = ceil(M/fNB);
+            NB = M/cntb;
+            //if ((omp_get_num_threads() >1) && (NB > minNB)) NB = minNB;
+            if (NB > 8192) NB = 8192; /* on MI50, TRSM has an error due to insufficient memory allocation */
+          }
+          else {
+#  if 0
+            NB = M / (fact*xkctxt->ngpus);
+            NB = (NB + 63) & ~63UL;
+            if (NB <minNB) NB = minNB;
+#  else
+            double ffact = 2;
+            double fNB = sqrt( (double)M*(double)N / (ffact * (double)(xkctxt->ngpus * kaapi_default_param.cuda_conc_stream_kernel)) );
+            NB = ceil(fNB);
+#  endif
+         }
+#else
           NB = M / (fact*xkctxt->ngpus);
           NB = (NB + 63) & ~63UL;
+#endif
           if (NB <minNB) NB = minNB;
+#if 0
+printf("%s::%s L0: (M,N,K)=(%llu, %llu, %llu), (W,Wt,D,Pavrg)=(%g,%g,%g,%g) => NB =%llu / NGPU=%i (%i,...)\n", 
+    __func__,  (omp_get_num_threads() >1 ? "Under" : "Above"),
+    M,N,K, W,Wt,D,W/D, NB, xkctxt->ngpus, xkctxt->gpuset[0]);
+#endif
         }
         break;
     }
