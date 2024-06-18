@@ -432,7 +432,7 @@ retval:
 */
 void xkblas_set_param(size_t nb, size_t p)
 {
-  printf( "%s::Set tile size to: %i\n", __func__, nb );
+  //printf( "%s::Set tile size to: %lu\n", __func__, nb );
   NB = nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
@@ -1326,7 +1326,7 @@ int xkblas_init(void)
         exit(1); 
       }
     }
-    printf( "%s::Set tile size to: %i\n", __func__, tile_size );
+    //printf( "%s::Set tile size to: %lu\n", __func__, tile_size );
     xkblas_set_param( tile_size, precision );
 
     if (getenv("XKBLAS_VERBOSE"))
