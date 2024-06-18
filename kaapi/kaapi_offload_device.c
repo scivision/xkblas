@@ -1477,7 +1477,7 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
     if (kaapi_default_param.verbose >=2)
     {
 # if KAAPI_USE_PERFCOUNTER
-      printf("%i, TASK: %li, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
+      printf("%i, TASK: %u, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
       printf("%i, WORK: %g (cpu s), %g (gpu s)\n", device->device_id, device->sum_cpudelay, device->sum_gpudelay ); 
 //KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_CPU), KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_GPU));
 # endif

@@ -706,9 +706,9 @@ int kaapi_offload_finalize(void)
     if ((kaapi_default_param.verbose>0) && (kaapi_list_drivers->f_get_type() != KAAPI_PROC_TYPE_CPU))
     {
       printf("Resume for driver: %s\n", kaapi_list_drivers->name );
-      printf("\tTASK: %li\n", kaapi_list_drivers->cnt_task );
+      printf("\tTASK: %u\n", kaapi_list_drivers->cnt_task );
       printf("\tWORK: %g (cpu s), %g (gpu s)\n", kaapi_list_drivers->sum_cpudelay, kaapi_list_drivers->sum_gpudelay );
-      printf("\tMEM : %li, %li\n", kaapi_list_drivers->size_alloc, kaapi_list_drivers->size_free);
+      printf("\tMEM : %lu, %lu\n", kaapi_list_drivers->size_alloc, kaapi_list_drivers->size_free);
       printf("\tH2D : %li, %li\n", COUNTER_CNT_H2D(kaapi_list_drivers), COUNTER_SIZE_H2D(kaapi_list_drivers));
       printf("\tD2H : %li, %li\n", COUNTER_CNT_D2H(kaapi_list_drivers), COUNTER_SIZE_D2H(kaapi_list_drivers));
       printf("\tD2D : %li, %li\n", COUNTER_CNT_D2D(kaapi_list_drivers), COUNTER_SIZE_D2D(kaapi_list_drivers));
