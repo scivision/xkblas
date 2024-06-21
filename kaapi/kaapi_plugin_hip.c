@@ -55,8 +55,9 @@
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
 #include <rocblas/rocblas.h>
-//#include <internal/rocblas-functions.h>
-//#include <internal/rocblas-auxiliary.h>
+#if KAAPI_USE_ROCSMI
+#  include "<rocm_smi/rocm_smi.h>"
+#endif
 
 #if KAAPI_HAVE_IO_THREADS
 #error "Not supported"
@@ -247,14 +248,18 @@ static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
 static void _kaapi_get_gpu_topo(void)
 {
   hipError_t res;
-  int min_perf= 0; /* min_perf >= max_perf */
+  int min_perf= INT_MAX; /* min_perf <= max_perf */
   int max_perf= 0;
-  int device_count;
-  kaapi_hip_CheckError(hipGetDeviceCount(&device_count));
+  int device_count = 0;
+  rsmi_status_t err;
+
+  err = rsmi_init(0);
+  err = rsmi_num_monitor_devices(&device_count);
 
   if (device_count ==0) return;
   hip_device_count = device_count;
   hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
+
 
   // Enumerates Device <-> Device links and store perfRank
   for (int device1 = 0; device1 < device_count; device1++)
@@ -267,23 +272,24 @@ static void _kaapi_get_gpu_topo(void)
       {
         int perfRank = 0;
         int accessSupported = 0;
-
-        kaapi_hip_CheckError(
-          hipDeviceGetP2PAttribute(&accessSupported, hipDevP2PAttrAccessSupported,
-            device1, device2));
-        if (accessSupported)
+        uint64_t hops;
+        RSMI_IO_LINK_TYPE type;
+        err = rsmi_topo_get_link_type(device1, device2, &hops, &type);
+        if (hops>0)
         {
-          kaapi_hip_CheckError(
-            hipDeviceGetP2PAttribute(&perfRank, hipDevP2PAttrPerformanceRank,
-              device1, device2));
-          if (perfRank < max_perf)
+          uint64_t min_bandwidth, max_bandwidth;
+          uint64_t weight;
+          err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
+          err = rsmi_topo_get_link_weight(device1, device2,&weight);
+          perfRank = max_bandwidth;
+          if (perfRank > max_perf)
             max_perf= perfRank;
-          if (perfRank > min_perf)
+          if (perfRank < min_perf)
             min_perf= perfRank;
-          hip_perf_topo[device1*device_count+device2] = 1+perfRank;
+          hip_perf_topo[device1*device_count+device2] = perfRank;
         }
         else
-          hip_perf_topo[device1*device_count+device2] = -1; /* should be higher than previous value: computed after */
+          hip_perf_topo[device1*device_count+device2] = INT_MAX; /* should be higher than previous value: computed after */
       }
     }
   }
@@ -351,6 +357,7 @@ static void _kaapi_get_gpu_topo(void)
     } 
   } 
 #endif
+  err = rsmi_shut_down();
 }
 #endif
 
