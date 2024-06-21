@@ -259,6 +259,14 @@ static uint64_t insert_perfrank( uint64_t* allrank, uint64_t new_rank)
   return new_rank;
 }
 
+static int comp_perfRank(const void* a, const void* b)
+{
+  uint64_t i1 = *(uint64_t*)a;
+  uint64_t i2 = *(uint64_t*)b;
+  if (i1 ==i2) return 0;
+  if (i1 < i2) return 1;
+  return -1;
+}
 
 /* */
 static void _kaapi_get_gpu_topo(void)
@@ -343,6 +351,7 @@ static void _kaapi_get_gpu_topo(void)
   }
   printf("Topo: max perf = %lu\n", max_perf);
   printf("Topo: min perf = %lu\n", min_perf);
+  qsort(all_perfrank, MAX_PERFF_RANK, sizeof(uint64_t), comp_perfRank );
   for (int i=0; i<MAX_PERFF_RANK; ++i)
   {
     if (all_perfrank[i] ==0) break;
