@@ -1,0 +1,2354 @@
+/*
+** Copyright 2009-2013,2018,2019 INRIA
+**
+** Contributors :
+**
+** thierry.gautier@inrialpes.fr
+** joao.lima@inf.ufsm.br
+**
+** This software is a computer program whose purpose is to execute
+** blas subroutines on multi-GPUs system.
+**
+** This software is governed by the CeCILL-C license under French law and
+** abiding by the rules of distribution of free software.  You can  use,
+** modify and/ or redistribute the software under the terms of the CeCILL-C
+** license as circulated by CEA, CNRS and INRIA at the following URL
+** "http://www.cecill.info".
+
+** As a counterpart to the access to the source code and  rights to copy,
+** modify and redistribute granted by the license, users are provided only
+** with a limited warranty  and the software's author,  the holder of the
+** economic rights,  and the successive licensors  have only  limited
+** liability.
+
+** In this respect, the user's attention is drawn to the risks associated
+** with loading,  using,  modifying and/or developing or reproducing the
+** software by the user in light of its specific status of free software,
+** that may mean  that it is complicated to manipulate,  and  that  also
+** therefore means  that it is reserved for developers  and  experienced
+** professionals having in-depth computer knowledge. Users are therefore
+** encouraged to load and test the software's suitability as regards their
+** requirements in conditions enabling the security of their systems and/or
+** data to be ensured and,  more generally, to use and operate it in the
+** same conditions as regards security.
+
+** The fact that you are presently reading this means that you have had
+** knowledge of the CeCILL-C license and that you accept its terms.
+**/
+
+#define _GNU_SOURCE
+#include <pthread.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <assert.h>
+#include <stdarg.h>
+
+#define KAAPI_USE_PERSTREAM_BLASHANDLE  1
+
+#if (KAAPI_USE_HIP==0)
+#  error "KAAPI_USE_HIP is NOT defined but plugin hip file is compiled"
+#endif
+
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <rocblas/rocblas.h>
+#if KAAPI_USE_ROCSMI
+#  include <rocm_smi/rocm_smi.h>
+#endif
+
+#if KAAPI_HAVE_IO_THREADS
+#error "Not supported"
+#endif
+
+/* Set to 1 for using tensor core */
+#define KAAPI_USE_TC 0
+
+/* use peer communication */
+#define CONFIG_USE_P2P  1
+
+/* use nvlink related function to get topology */
+#define KAAPI_HIP_USE_TOPO 1
+
+/* for debuging: 0 device thread, 1 IO helper thread */
+static __thread int thread_type = 0;
+
+
+/* HWLOC (tested with 2.x) is used to get the cpuset where to bind
+   device thread with high affinity (the cpuset of the package hwloc object)
+   that contains the card.
+   It does not seems to introduce or not gain on grunch machine (two fat memory hierarchy ?)
+*/
+#if KAAPI_USE_HWLOC
+#include "hwloc.h"
+#if KAAPI_USE_HWLOCROCSMI
+#  include "hwloc/rsmi.h"
+#endif
+#include "hwloc/glibc-sched.h"
+#endif
+
+#include "kaapi_impl.h"
+#include "kaapi_trace.h"
+#include "kaapi_offload.h"
+
+/*
+*/
+#define _PLUGIN_NAME   "hip"
+#define _PLUGIN_DEBUG   0
+
+#if KAAPI_USE_DYNLOADER
+#  define KAAPI_CLASS_ENTRYPOINT
+#else
+#  define KAAPI_CLASS_ENTRYPOINT static
+#endif
+
+#include "kaapi_plugin.h"
+
+/* to use event for synchronisation */
+#define CONFIG_USE_EVENT 1
+
+/* make all call synchronous -debug- */
+#define CONFIG_SYNCHRONOUS 0
+
+#if CONFIG_SYNCHRONOUS
+#  define CONFIG_SYNCHRONOUS_COPY 1
+#  define CONFIG_SYNCHRONOUS_KERNEL 1
+#else 
+#  define CONFIG_SYNCHRONOUS_COPY 0
+#  define CONFIG_SYNCHRONOUS_KERNEL 0
+#endif
+
+// Debug: force redefinition
+//#  undef CONFIG_SYNCHRONOUS_COPY
+//#  define CONFIG_SYNCHRONOUS_COPY 1
+
+//#  undef CONFIG_SYNCHRONOUS_KERNEL 
+//#  define CONFIG_SYNCHRONOUS_KERNEL 0
+
+typedef struct {
+  kaapi_device_t inherited;
+  int            save_device_id;
+  uint64_t*      affinity; /* of size hip_count_perfrank -1 */
+
+  /* device properties (from NVIDIA website) */
+  struct {
+    int pciBusID;
+    int pciDeviceID;
+    bool overlap;      /* if the device can concurrently copy memory between host and device while executing a kernel */
+    bool integrated;   /* if the device is integrated with the memory subsystem */
+    bool map;          /* if the device can map host memory into the HIP address space */
+    bool concurrent;   /* if the device supports executing multiple kernels within the same context simultaneously */
+    int async_engines; /* Number of asynchronous engines */
+    char name[64];     /* GPU name */
+  } prop;
+#if KAAPI_HAVE_IO_THREADS
+  pthread_t tidio[2];
+#endif
+#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
+  hipblasHandle_t    handle;
+#endif
+} kaapi_device_hip_t;
+
+/* IO stream with specific field for HIP
+   If event is configured on, then one event is insert just after each asynchronous
+   operations (memcpy, kernel launch). Then the runtime can wait or test specific event.
+   Each Kaapi IOstream represents count HIP stream. Currently only kernel stream may
+   represents multiple HIP streams. And because IOstream does not preserve order, the
+   kernels are dispatch to a different stream at each time.
+
+   Synchronizations between Kaapi IOstream uses Event.
+ */
+typedef struct kaapi_hip_io_stream_t {
+  kaapi_io_stream_t inherited;
+  int              capacity;
+  hipStream_t      stream;
+  hipStream_t      stream_low;
+#if CONFIG_USE_EVENT
+  hipEvent_t*      end_events;               /* size: capacity */
+#  if KAAPI_USE_PERFCOUNTER
+  hipEvent_t*      start_events;             /* size: capacity */
+#  endif
+#endif
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+  hipblasHandle_t    handle;
+#endif
+} kaapi_hip_io_stream_t;
+
+/* number of used device for this run */
+static int kaapi_device_count = 0;
+
+/* list of devices */
+static kaapi_device_hip_t** kaapi_device_list = 0;
+
+/* array of the device id to used */
+static int* kaapi_device_ids = 0;
+
+static bool plugin_initialized = false;
+static pthread_mutex_t kaapi_hip_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static size_t kaapi_hip_get_free_mem(kaapi_memory_device_t* dev);
+
+/* Thread for registering array
+*/
+static void* kaapi_hip_register_thread(void*);
+
+#if KAAPI_USE_HWLOC
+static hwloc_topology_t topology;
+#endif
+
+
+/*
+*/
+static void __kaapi_hip_CheckError( hipError_t err,  char *file, const int line )
+{
+    extern void kaapi_memory_cache_print_all(void);
+    static char msg[256];
+    const char* tmp ="";
+    if ( hipSuccess != err )
+    {
+      tmp = hipGetErrorName( err );
+      snprintf( msg, 256, "cuCheckError() error:%i, failed at %s:%i : %s\n",
+                 err, file, line, tmp );
+      kaapi_memory_cache_print_all();
+      kaapi_abort( line, file, msg );
+    }
+    return;
+}
+#define kaapi_hip_CheckError(cerr)    __kaapi_hip_CheckError( cerr, __FILE__, __LINE__ )
+#define kaapi_hip_CheckErrorWithDump(cerr,instr)  if ((cerr) != hipSuccess) { instr; __kaapi_hip_CheckError( cerr, __FILE__, __LINE__ ); }
+
+
+#if KAAPI_HIP_USE_TOPO
+/* hip_perf_topo[device1,device2] returns the perfRank of the communication link between
+   device.
+   hip_perf_device[d][i] for i=0,..,hip_count_perfrank-1 is the mask of device
+   for which the device d has link with performance i.
+*/
+static int hip_device_count = 0;    
+static int* hip_perf_topo = 0;    
+static int hip_count_perfrank = 0;
+static uint64_t* hip_perf_device = 0;
+static int* hip_routing_table = 0;
+
+/* buffer must be at least device_count */
+static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
+{
+  int device_count;
+  for (int i=0; i<sz; ++i)
+  {
+     if ( v & (1ULL<<i)) buffer[sz-1-i]='1';
+     else buffer[sz-1-i]='0';
+  }
+}
+
+
+/* */
+#define MAX_PERFF_RANK 64
+static uint64_t insert_perfrank( uint64_t* allrank, uint64_t new_rank)
+{
+  int i;
+  for (i=0; i<MAX_PERFF_RANK; ++i)
+  {
+    if (allrank[i] == 0) break;
+    if (allrank[i] == new_rank) return new_rank;
+  }
+  kaapi_assert( i < MAX_PERFF_RANK );
+  allrank[i] = new_rank;
+  return new_rank;
+}
+
+
+/* */
+static void _kaapi_get_gpu_topo(void)
+{
+  hipError_t res;
+  uint64_t min_perf= UINT_MAX; /* min_perf <= max_perf */
+  uint64_t max_perf= 0;
+  int device_count = 0;
+  rsmi_status_t err;
+
+  err = rsmi_init(0);
+  err = rsmi_num_monitor_devices(&device_count);
+
+  /* assume that device_count not to high */
+  kaapi_assert( device_count <= MAX_PERFF_RANK );
+  uint64_t perfRank = 0;
+  uint64_t all_perfrank[MAX_PERFF_RANK];
+  uint64_t hops;
+  uint64_t min_bandwidth, max_bandwidth;
+  uint64_t weight;
+  for (int i=0; i<MAX_PERFF_RANK; ++i) all_perfrank[i] = 0;
+
+  if (device_count ==0) return;
+  hip_device_count = device_count;
+  hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
+
+  RSMI_IO_LINK_TYPE type;
+  printf("#devices =%i\n", device_count );
+  // Enumerates Device <-> Device links and store perfRank
+  for (int device1 = 0; device1 < device_count; device1++)
+  {
+    for (int device2 = 0; device2 < device_count; device2++)
+    {
+      if (device1 == device2) 
+      {
+        perfRank = insert_perfrank(all_perfrank,UINT_MAX);
+        if (perfRank > max_perf)
+          max_perf= perfRank;
+        hip_perf_topo[device1*device_count+device2] = perfRank;
+        hops =0;
+        weight = 0;
+        type = RSMI_IOLINK_TYPE_SIZE;
+      }
+      else 
+      {
+        int accessSupported = 0;
+        uint16_t dev_id1, dev_id2;
+        err = rsmi_dev_id_get(device1, &dev_id1);
+        err = rsmi_dev_id_get(device2, &dev_id2);
+
+        err = rsmi_topo_get_link_type(device1, device2, &hops, &type);
+        if (hops>0)
+        {
+          err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
+          err = rsmi_topo_get_link_weight(device1, device2,&weight);
+          if (max_bandwidth ==0) max_bandwidth = 1;
+          perfRank = insert_perfrank(all_perfrank,max_bandwidth);
+          if (perfRank > max_perf)
+            max_perf= perfRank;
+          if (perfRank < min_perf)
+            min_perf= perfRank;
+          hip_perf_topo[device1*device_count+device2] = perfRank;
+        }
+        else
+        {
+          perfRank = 1;
+          if (perfRank < min_perf)
+            min_perf= perfRank;
+          hip_perf_topo[device1*device_count+device2] = insert_perfrank(all_perfrank, 1); /* should be higher than previous value: computed after */
+        }
+      }
+      char* stype = "undefined type";
+      if (type == RSMI_IOLINK_TYPE_PCIEXPRESS) stype = "PCIe";
+      else if (type == RSMI_IOLINK_TYPE_XGMI) stype = "XGMI";
+      else if (type == RSMI_IOLINK_TYPE_UNDEFINED) stype = "undefined";
+
+      printf("weight:(%i,%i)=%lu\n", device1, device2, weight );
+      printf("type:(%i,%i)=%s\n", device1, device2, stype );
+      printf("hop:(%i,%i)=%lu\n", device1, device2, hops );
+      printf("perfRank: (%i,%i)=%lu\n", device1, device2, perfRank );
+    }
+  }
+  printf("Topo: max perf = %lu\n", max_perf);
+  printf("Topo: min perf = %lu\n", min_perf);
+  for (int i=0; i<MAX_PERFF_RANK; ++i)
+  {
+    if (all_perfrank[i] ==0) break;
+    printf("PerRank[%i]=%lu\n", i, all_perfrank[i] );
+  }
+  
+  /* number of performance links: max_perf-min_perf+3  
+     - max_perf-min_perf+1 if GPUs peer access is enable between GPU
+     - +1 if GPU peer access is not enable
+     - -1 for local inter access
+  */
+  hip_count_perfrank= min_perf-max_perf+2;
+  int perfrank_nolink= min_perf-max_perf+1;
+  int rank;
+  for (int device = 0; device < device_count*device_count; device++)
+    if (hip_perf_topo[device] == -1) hip_perf_topo[device] = min_perf+1;
+  size_t size = device_count*hip_count_perfrank*sizeof(uint64_t);
+  hip_perf_device = malloc( size );
+  for (int i=0; i<device_count*hip_count_perfrank; ++i)
+    hip_perf_device[i] = 0;
+  /* GCC bug in warning about memset: memset(hip_perf_device, 0, size ); */
+  for (int device1 = 0; device1 < device_count; device1++)
+  {
+    for (int device2 = 0; device2 < device_count; device2++)
+    {
+      rank = hip_perf_topo[device1*device_count+device2]; 
+      //kaapi_assert( 0<= device1*device_count+ rank );
+      //kaapi_assert( device1*hip_count_perfrank+ rank <= device_count*hip_count_perfrank);
+      hip_perf_device[device1*hip_count_perfrank+ rank] |= (1UL<<device2);
+    }
+  }
+
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+  {
+    char buffer[device_count+1];
+    buffer[device_count] = 0;
+    printf("Connection between GPU, #perf rank: %i.\nLowest values means best performance interconnection.\n", hip_count_perfrank );
+    printf("Local performance rank:0, Link perf. perf rank from %i (max perf) to %i (perf)\n", max_perf+1, min_perf+1);
+    printf("%10s:", "src\\dest");
+    for (int device1 = 0; device1 < device_count; device1++)
+      printf("      GPU%i", device1);
+    printf("\n");
+
+    for (int device1 = 0; device1 < device_count; device1++)
+    {
+      printf("      GPU%i:", device1 );
+      for (int device2 = 0; device2 < device_count; device2++)
+         printf("%10i", hip_perf_topo[device1*device_count+device2]);
+      printf("\n");
+    }
+
+    /* mask */
+    printf("\nDevice performance rank mask\n");
+    if (1)
+    for (int device1 = 0; device1 < device_count; device1++)
+    { 
+      printf("GPU%i: ", device1);
+      for (int rank = 0; rank < hip_count_perfrank; ++rank)
+      {
+        _print_mask( buffer, device_count, hip_perf_device[device1*hip_count_perfrank+ rank] );
+        printf("%s",buffer);
+        if (rank != hip_count_perfrank-1) printf(", ");
+      }
+      printf("\n");
+    } 
+  } 
+#endif
+  err = rsmi_shut_down();
+}
+#endif
+
+
+
+/*
+*/
+static inline void kaapi_hip_plugin_lock(void)
+{
+  pthread_mutex_lock(&kaapi_hip_lock);
+}
+
+/*
+*/
+static inline void kaapi_hip_plugin_unlock(void)
+{
+  pthread_mutex_unlock(&kaapi_hip_lock);
+}
+
+/*
+*/
+static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
+{
+  void* ptr;
+  hipError_t res;
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+
+  /* here we limit the size of allocated memory for the cache system */
+  if (((device->inherited.size_alloc - device->inherited.size_free) + size) > device->inherited.mem_limit)
+  {
+    if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
+    return 0;
+  }
+
+  kaapi_assert(plugin_initialized == true);
+
+  res = hipMalloc( &ptr, size );
+  if (res == hipErrorOutOfMemory )
+  {
+    printf(" HIP ERROR:: free %li, request: %li\n", kaapi_hip_get_free_mem(dev), size);
+    if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
+    kaapi_assert(0);
+    return 0;
+  }
+  kaapi_hip_CheckError(res);
+
+  kaapi_assert(ptr != 0);
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "hip:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
+#endif
+  device->inherited.size_alloc += size;
+
+  if (flag)
+  {
+    if ( 1.0*(device->inherited.size_alloc - device->inherited.size_free) / device->inherited.mem_limit >= 0.9)
+      *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
+  }
+  return (uintptr_t)ptr;
+}
+
+
+/*
+*/
+static void kaapi_hip_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t size)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+  hipError_t res;
+
+  kaapi_assert(plugin_initialized == true);
+
+  res = hipFree((void*)ptr);
+  kaapi_hip_CheckError(res);
+  device->inherited.size_free += size;
+
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "hip:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
+#endif
+}
+
+
+/* Implementation of kaapi_memory_copy_async through f_copy interface of memory device.
+*/
+static int kaapi_hip_copy(
+    kaapi_memory_device_t* dev,
+    kaapi_pointer_t dest, const kaapi_memory_view_t* view_dest,
+    kaapi_pointer_t src,  const kaapi_memory_view_t* view_src,
+    int flags,
+    kaapi_io_cbk_fnc_t cbk,
+    void* arg0, void* arg1, void* arg2
+)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+
+  /* enforce method to only process H2D or D2D or D2H copy */
+  kaapi_assert( (kaapi_memory_asid_get_arch(dest.asid) != KAAPI_PROC_TYPE_HOST)
+            ||  (kaapi_memory_asid_get_arch(src.asid) != KAAPI_PROC_TYPE_HOST) );
+  kaapi_assert( (dest.ptr != 0)
+            &&  (src.ptr != 0) );
+
+  kaapi_io_type_t io_type = 0;
+  kaapi_io_stream_type_t tstream = 0;
+  kaapi_io_copy_priority_t priority = KAAPI_IO_COPY_PRIORITY_NORMAL;
+
+  if (flags == 0) /* low */
+    priority = KAAPI_IO_COPY_PRIORITY_LOW;
+  else if (flags == 2)
+    priority = KAAPI_IO_COPY_PRIORITY_HIGH;
+  /* else == normal */
+
+  if ( (kaapi_memory_asid_get_arch(src.asid) == KAAPI_PROC_TYPE_HOST)
+    && (kaapi_memory_asid_get_arch(dest.asid) != KAAPI_PROC_TYPE_HOST) )
+  {
+    io_type = KAAPI_IO_COPY_H2D;
+    tstream = KAAPI_IO_STREAM_H2D;
+    KAAPI_CTXT_PERFREG_ADD(device->inherited.ctxt,KAAPI_PERF_ID_CPYH2D_BYTES, kaapi_memory_view_size( view_dest ));
+  }
+  else if ( (kaapi_memory_asid_get_arch(src.asid) != KAAPI_PROC_TYPE_HOST)
+      && (kaapi_memory_asid_get_arch(dest.asid) == KAAPI_PROC_TYPE_HOST) )
+  {
+    io_type = KAAPI_IO_COPY_D2H;
+    tstream = KAAPI_IO_STREAM_D2H;
+    KAAPI_CTXT_PERFREG_ADD(device->inherited.ctxt,KAAPI_PERF_ID_CPYD2H_BYTES, kaapi_memory_view_size( view_dest ));
+  }
+  else if ( (kaapi_memory_asid_get_arch(src.asid) != KAAPI_PROC_TYPE_HOST)
+      && (kaapi_memory_asid_get_arch(dest.asid) != KAAPI_PROC_TYPE_HOST) )
+  {
+    io_type = KAAPI_IO_COPY_D2D;
+#if KAAPI_USE_STREAM_D2D
+    tstream = KAAPI_IO_STREAM_D2D;
+#else
+    tstream = KAAPI_IO_STREAM_H2D;
+#endif
+    KAAPI_CTXT_PERFREG_ADD(device->inherited.ctxt,KAAPI_PERF_ID_CPYD2D_BYTES, kaapi_memory_view_size( view_dest ));
+  }
+
+  /* verify iff all inputs are in local node */
+  kaapi_assert_debug( device->inherited.stream.device == &device->inherited );
+
+  kaapi_stream_insert_io_copy_inst(
+      &device->inherited.stream,
+      tstream,
+      io_type,
+      priority,
+      kaapi_pointer2void(src), view_src, kaapi_memory_device_get(src.asid),
+      kaapi_pointer2void(dest), view_dest, kaapi_memory_device_get(dest.asid),
+      cbk, arg0, arg1, arg2
+  );
+
+  return EINPROGRESS;
+}
+
+
+
+/*
+*/
+static int kaapi_hip_memsync(kaapi_memory_device_t* dev, int begend)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+  hipError_t res;
+#if KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#endif
+  res = hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
+  kaapi_hip_CheckError(res);
+  res = hipDeviceSynchronize();
+  kaapi_hip_CheckError(res);
+  return 0;
+}
+
+
+
+/*
+*/
+static size_t kaapi_hip_get_mem_info(kaapi_memory_device_t* dev, size_t* mem_total, size_t* mem_limit)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "hip:%s: device %d init\n", __FUNCTION__, device->inherited.device_id);
+#endif
+  if (mem_total) *mem_total = device->inherited.mem_total;
+  if (mem_limit) *mem_limit = device->inherited.mem_limit;
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "hip:%s: device %d init\n", __FUNCTION__, device->inherited.device_id, (mem_total ==0 ? -1 : *mem_total), (mem_limit ==0 ? -1 : *mem_limit));
+#endif
+  return device->inherited.mem_total;
+}
+
+
+
+/*
+*/
+static size_t kaapi_hip_get_free_mem(kaapi_memory_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+  size_t free;
+  size_t total;
+  hipError_t res;
+#if KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#endif
+  res = hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
+  kaapi_hip_CheckError(res);
+  res = hipMemGetInfo(&free, &total);
+  kaapi_hip_CheckError(res);
+
+  device->inherited.free_mem = (size_t)free;
+
+  return device->inherited.free_mem;
+}
+
+
+/* TG NOTE: here if perfcounter is enable, then 2 events per communication may be inserted:
+   the first that inserted just before the communication, the second just after.
+   Using such insertions, it is able to compute (online) the bandwidth of communication.
+   + enable timing
+*/
+static void _kaapi_hip_create_event( kaapi_hip_io_stream_t* cios, int k )
+{
+  hipError_t res;
+#if KAAPI_USE_PERFCOUNTER
+  res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDefault);
+  kaapi_hip_CheckError(res);
+  res = hipEventCreateWithFlags(&cios->start_events[k], hipEventDefault);
+  kaapi_hip_CheckError(res);
+#else
+  res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDisableTiming);
+  kaapi_hip_CheckError(res);
+#endif
+}
+
+static void _kaapi_hip_destroy_event( kaapi_hip_io_stream_t* cios, int k )
+{
+  hipError_t res;
+#if KAAPI_USE_PERFCOUNTER
+  res = hipEventDestroy(cios->end_events[k]);
+  kaapi_hip_CheckError(res);
+  res = hipEventDestroy(cios->start_events[k]);
+  kaapi_hip_CheckError(res);
+#else
+  res = hipEventDestroy(cios->end_events[k]);
+  kaapi_hip_CheckError(res);
+#endif
+}
+
+
+
+/*
+*/
+static void kaapi_hip_init_stream(
+    kaapi_hip_io_stream_t* cios,
+    int type,
+    unsigned int capacity
+)
+{
+  int leastPriority, greatestPriority;
+  
+  cios->capacity = capacity;
+
+#if CONFIG_USE_EVENT
+  /* */
+  for (int k=0; k<capacity; ++k)
+    _kaapi_hip_create_event(cios, k);
+#endif
+  
+  hipError_t res;
+  res = hipDeviceGetStreamPriorityRange ( &leastPriority, &greatestPriority );
+  kaapi_hip_CheckError(res);
+
+  res = hipStreamCreateWithPriority (&cios->stream, hipStreamNonBlocking, greatestPriority);
+  kaapi_hip_CheckError(res);
+  /* used by prefetching operation */
+  res = hipStreamCreateWithPriority (&cios->stream_low, hipStreamNonBlocking, leastPriority);
+  kaapi_hip_CheckError(res);
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+  cios->handle = 0;
+#endif
+  if (type == KAAPI_IO_STREAM_KERN)
+  {
+    kaapi_assert_debug( thread_type == 0 );
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+    /*
+     */
+    hipblasStatus_t cres = hipblasCreate(&cios->handle);
+    kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
+    rocblas_status rres = rocblas_set_pointer_mode( cios->handle, rocblas_pointer_mode_host);
+    kaapi_assert(rres == rocblas_status_success);
+    cres = hipblasSetStream( cios->handle, cios->stream);
+    kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
+#endif
+  }
+  else
+  {
+#if KAAPI_HAVE_IO_THREADS
+    kaapi_assert_debug( ((type == KAAPI_IO_STREAM_H2D) && (thread_type == 1)) 
+                     || ((type == KAAPI_IO_STREAM_D2H) && (thread_type == 2)) );
+#endif
+  }
+}
+
+
+/*
+ */
+static kaapi_io_stream_t* kaapi_hip_stream_alloc(
+    kaapi_device_t* dev,
+    int type,
+    unsigned int capacity
+)
+{
+  hipError_t res;
+  kaapi_assert_debug(plugin_initialized == true);
+  kaapi_assert_debug((dev->device_id >= 0) && (dev->device_id < kaapi_device_count) );
+
+  kaapi_hip_io_stream_t* cios = (kaapi_hip_io_stream_t*)malloc(sizeof(kaapi_hip_io_stream_t));
+  if (cios ==0)
+    return 0;
+
+#if CONFIG_USE_EVENT
+  cios->end_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
+#  if KAAPI_USE_PERFCOUNTER
+  cios->start_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
+#  endif
+  if (cios->end_events ==0)
+  {
+    free(cios);
+    return 0;
+  }
+# if KAAPI_USE_PERFCOUNTER
+  if (cios->start_events ==0)
+  {
+    free(cios->end_events);
+    free(cios);
+    return 0;
+  }
+#  endif
+#endif
+
+  cios->stream = 0;
+  cios->stream_low = 0;
+#if KAAPI_HAVE_IO_THREADS
+  /* do not initialize kernel streams if io threads are spawned */
+  if (type != KAAPI_IO_STREAM_KERN) return &cios->inherited;
+#endif
+  kaapi_hip_init_stream( cios, type, capacity );
+  return &cios->inherited;
+}
+
+/*
+ */
+static void kaapi_hip_stream_free(
+    kaapi_device_t* dev,
+    kaapi_io_stream_t* ios
+)
+{
+  kaapi_hip_io_stream_t* cios = (kaapi_hip_io_stream_t*)ios;
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+  if (cios->handle)
+    hipblasDestroy(cios->handle);
+#endif
+
+#if CONFIG_USE_EVENT
+  /* */
+  for (int k=0; k<cios->capacity; ++k)
+  _kaapi_hip_destroy_event(cios, k);
+
+  free(cios->end_events);
+#  if KAAPI_USE_PERFCOUNTER
+  free(cios->start_events);
+#  endif
+#endif
+  hipStreamDestroy(cios->stream);
+  hipStreamDestroy(cios->stream_low);
+  free(cios);
+}
+
+
+/*
+*/
+typedef enum host_register_request_op {
+  DEVICE_REGISTER_REQUEST,
+  DEVICE_UNREGISTER_REQUEST
+} host_register_request_op_t;
+
+/*
+*/
+typedef enum register_state {
+  REQUEST_INIT,
+  REQUEST_POST,
+  REQUEST_WAIT,
+  REQUEST_DONE
+} request_state_t;
+
+/* Request for asynchronous memory pinning operation.
+   Store request for pinning memory region (ptr,size).
+   Once the operation complets, call the callback
+   cbk(status, arg0, arg1, arg2), if cbk is not null.
+   The caller thread waiting on the request lock the request' mutex
+   and wait on the request condition.
+*/
+typedef struct host_register_request {
+  host_register_request_op_t op;
+  request_state_t            state;
+  int                        err;    /* error code if any */
+  pthread_mutex_t            lock;
+  pthread_cond_t             cond;
+  void*                      ptr;
+  size_t                     size;
+#if KAAPI_USE_PERFCOUNTER
+  double                     t0;    /* time to the post op */
+#endif
+  kaapi_io_cbk_fnc_t cbk;
+  void* arg0; void* arg1; void* arg2;
+} host_register_request_t;
+
+
+typedef struct host_register_queue {
+  #define KAAPI_MAX_REGLIST 256
+  pthread_t         thread;
+  volatile uint64_t posw;  /* index of the next request to store */
+  volatile uint64_t posr;  /* index of the next request to read */
+  pthread_mutex_t   lock;
+  pthread_cond_t    cond;
+  pthread_cond_t    cond_waitall;  /* broadcasted when request is processed */
+  host_register_request_t req[KAAPI_MAX_REGLIST];
+} host_register_queue_t __attribute__ ((aligned (KAAPI_CACHE_LINE_SIZE)));
+
+
+/* array of lists of requests */
+static int all_rrl_size = 0;
+static host_register_queue_t* all_rrl = 0;
+
+static void kaapi_hip_init_reqreg_list( host_register_queue_t* rrl )
+{
+  rrl->posw = 0;
+  rrl->posr = 0;
+  kaapi_assert(0 == pthread_mutex_init(&rrl->lock, 0));
+  kaapi_assert(0 == pthread_cond_init(&rrl->cond, 0));
+  kaapi_assert(0 == pthread_cond_init(&rrl->cond_waitall, 0));
+  memset(rrl->req, 0, sizeof(rrl->req));
+  for (int i=0; i<KAAPI_MAX_REGLIST; ++i)
+  {
+    kaapi_assert(0 == pthread_mutex_init(&rrl->req[i].lock, 0));
+    kaapi_assert(0 == pthread_cond_init(&rrl->req[i].cond, 0));
+    rrl->req[i].state = REQUEST_INIT;
+  }
+};
+
+/* daemon thread, one per queue
+*/
+void* kaapi_hip_register_thread(void* dummy )
+{
+  kaapi_thread_t* kthread = kaapi_thread_bind(KAAPI_PROC_TYPE_INTERNAL,0);
+  kaapi_assert( kthread != 0);
+  kaapi_context_t* kctxt = kaapi_thread2context(kthread);
+  
+  int tid = (int)(uintptr_t)dummy;
+  kaapi_assert( tid < all_rrl_size );
+  host_register_queue_t* rrl = &all_rrl[tid];
+
+  kaapi_assert( 0 == pthread_mutex_lock(&rrl->lock) );
+  while (1)
+  {
+    /* wait for request until plugin is finished */
+    while (plugin_initialized && (rrl->posw == rrl->posr))
+      kaapi_assert(0 == pthread_cond_wait(&rrl->cond, &rrl->lock));
+
+    /* yeh, one request ? */
+    if (rrl->posw > rrl->posr)
+    {
+      uint64_t index = rrl->posr % KAAPI_MAX_REGLIST;
+
+      /* recopy request */
+      host_register_request_t req = rrl->req[index];
+      req.err = 0;
+
+      kaapi_assert(0 == pthread_mutex_unlock(&rrl->lock));
+#if KAAPI_USE_PERFCOUNTER
+      double t0p = kaapi_get_elapsedtime();
+#endif
+      hipError_t err = hipSuccess;
+      if (req.size >0)
+      {
+        if (req.op == DEVICE_REGISTER_REQUEST)
+        {
+          err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
+          //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
+          if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
+          {
+            printf("***[%s]: hipHostRegister error: %i\n", __func__, err);
+            req.err = EALREADY;
+          }
+        }
+        else if (req.op == DEVICE_UNREGISTER_REQUEST)
+        {
+          err = hipHostUnregister(req.ptr);
+          if (!( (hipSuccess == err) || (hipErrorHostMemoryNotRegistered == err)))
+          {
+            printf("***[%s]: hipHostUnregister error: %i\n", __func__, err);
+            req.err = EALREADY;
+          }
+        }
+      }
+#if KAAPI_USE_PERFCOUNTER
+      double t1 = kaapi_get_elapsedtime();
+#endif
+
+      if (req.cbk !=0)
+      {
+        kaapi_io_status_t ios = {0, req.err };
+        req.cbk(ios, 0, req.arg0, req.arg1, req.arg2);
+      }
+#if KAAPI_USE_PERFCOUNTER==1
+      double t1p = kaapi_get_elapsedtime();
+
+/* register thread has a k-thread attached, so perfcounter and event can be generated
+      //TODO: toverhead += (t0p-rrl->req[index].t0) + (t1p-t1);
+      if (req.op == DEVICE_REGISTER_REQUEST)
+        kaapi_perthread_asyncpin[tid].dcounter[KAAPI_TIME_OS_PIN] += t1-t0p;
+      else
+        kaapi_perthread_asyncpin[tid].dcounter[KAAPI_TIME_OS_UNPIN] += t1-t0p;
+      kaapi_perthread_asyncpin[tid].dcounter[KAAPI_TIME_OVERHEAD_PIN]
+          += (t0p-req.t0) + (t1p-t1);
+*/
+#endif
+
+      kaapi_assert(0 == pthread_mutex_lock(&rrl->lock));
+
+      /* request lock */
+      kaapi_assert(0 == pthread_mutex_lock(&rrl->req[index].lock));
+      request_state_t state = rrl->req[index].state;
+      rrl->req[index].err = req.err;
+      rrl->req[index].state = REQUEST_DONE;
+      if (state == REQUEST_WAIT)
+        kaapi_assert(0 == pthread_cond_signal( &rrl->req[index].cond ));
+      kaapi_assert(0 == pthread_mutex_unlock( &rrl->req[index].lock));
+      kaapi_assert_debug( rrl->posr % KAAPI_MAX_REGLIST == index );
+      ++rrl->posr;
+      /* always broadcast to waiters on all requests: may be optimized */
+      kaapi_assert(0 == pthread_cond_broadcast( &rrl->cond_waitall ));
+    }
+    /* if queue empty and plugin dinitialized then exit */
+    else if (!plugin_initialized) break;
+  }
+  kaapi_assert(0 == pthread_mutex_unlock(&rrl->lock));
+  kaapi_assert(0 == kaapi_thread_unbind(kthread));
+  return 0;
+}
+
+
+
+static char* name_io[] = {
+  "IO_NOP",
+  "IO_BEGIN",
+  "IO_END",
+  "IO_COPY_H2H",
+  "IO_COPY_H2D",
+  "IO_COPY_D2H",
+  "IO_COPY_D2D",
+  "IO_BARRIER",
+  "IO_KERN"
+};
+
+#define NOT_REENTRANT
+#ifdef NOT_REENTRANT
+/* 2022-03-10: I assume hip functions for async copy or kernel launch are not reentrant 
+   with global serialization I do not have any deadlock inside internal rocm-4.5 functions.
+*/
+#warning "To solve !"
+static pthread_mutex_t access_lock= PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+/*
+ */
+static int kaapi_hip_stream_decode(
+    kaapi_device_t* dev,
+    kaapi_io_stream_t* ios,
+    kaapi_io_instruction_t* instr
+)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+
+  KAAPI_PLUGIN_TRACE_IN
+  KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s'\n", __FUNCTION__, name_io[instr->type]);
+
+  kaapi_hip_io_stream_t* cios = (kaapi_hip_io_stream_t*)ios;
+  hipError_t res = hipSuccess;
+  hipStream_t* stream = 0;
+#if KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#else
+  hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
+#endif
+  uint8_t type; /* 1D, 2D */
+
+  switch (instr->type)
+  {
+    case KAAPI_IO_NOP:
+    case KAAPI_IO_BEGIN:
+    case KAAPI_IO_END:
+      return 0;
+
+    case KAAPI_IO_COPY_H2H:
+    case KAAPI_IO_COPY_H2D:
+    case KAAPI_IO_COPY_D2H:
+    case KAAPI_IO_COPY_D2D:
+    {
+#if KAAPI_HAVE_IO_THREADS
+      kaapi_assert_debug( (thread_type == 1) || (thread_type == 2) );
+#endif
+
+      if (instr->type == KAAPI_IO_COPY_D2D)
+        stream = &cios->stream_low;
+      else
+        stream = &cios->stream;
+      kaapi_assert_debug(*stream !=0);
+
+#if 0
+      /* todo in an efficient way: implicit synchro between host_register_async and here */
+      /* wait end of pining operation if any */
+      while (rrl->posw != rrl->reg_sig)
+        kaapi_slowdown_cpu();
+#endif
+
+#if CONFIG_USE_EVENT && KAAPI_USE_PERFCOUNTER
+      instr->t1 = kaapi_get_elapsedtime();
+      res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
+      kaapi_assert(res == hipSuccess);
+#endif
+
+      struct kaapi_io_copy* op = &instr->inst.c_io;
+
+      /* switch among view_src type (1D, 2D or 3D).
+         May be some redistribution may be implemented here ?
+       */
+      size_t size = kaapi_memory_view_size(op->view_src);
+      kaapi_assert( size == kaapi_memory_view_size(op->view_dest));
+      kaapi_assert_debug( size == kaapi_memory_view_size(op->view_dest));
+      type = op->view_src->type;
+      kaapi_assert_debug( type == op->view_dest->type);
+      uint8_t storage = op->view_src->storage;
+      kaapi_assert_debug( storage == op->view_dest->storage);
+      int test = kaapi_memory_view_iscontiguous(op->view_src) && kaapi_memory_view_iscontiguous(op->view_dest);
+
+      if (test)
+      {
+        type = KAAPI_MEMORY_VIEW_1D;
+      }
+      kaapi_assert_debug( test || (instr->type != KAAPI_IO_COPY_D2D) );
+
+      void* src  = kaapi_memory_view2pointer((void*)op->src, op->view_src);
+      void* dest = kaapi_memory_view2pointer((void*)op->dest, op->view_dest);
+      
+      KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+         1 /* begin */, op->reserved );
+      uint64_t delay = kaapi_get_elapsedns();
+      switch (type)
+      {
+        case KAAPI_MEMORY_VIEW_1D:
+        {
+          KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
+          //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
+#ifdef NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+{
+pthread_mutex_lock(&access_lock);
+#endif
+          switch (instr->type)
+          {
+            case KAAPI_IO_COPY_H2H:
+              memcpy( dest, src, size );
+              delay = kaapi_get_elapsedns()-delay;
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+                 2 /* end */, op->reserved, delay );
+              res = 0;
+            break;
+            case KAAPI_IO_COPY_H2D:
+              res = hipMemcpyAsync( dest,
+                                     src,
+                                     size,
+                                     hipMemcpyHostToDevice,
+                                     *stream);
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)+= size;
+            break;
+            case KAAPI_IO_COPY_D2H:
+              res = hipMemcpyAsync( dest,
+                                     src,
+                                     size,
+                                     hipMemcpyDeviceToHost,
+                                     *stream);
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)+= size;
+            break;
+
+            case KAAPI_IO_COPY_D2D:
+              res = hipMemcpyPeerAsync( dest,
+                                         kaapi_device_ids[op->dev_dest->device->device_id],
+                                         src,
+                                         kaapi_device_ids[op->dev_src->device->device_id],
+                                         size,
+                                         *stream);
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)+= size;
+            break;
+            default:
+              kaapi_assert_debug(0);
+          };
+#ifdef NOT_REENTRANT
+pthread_mutex_unlock(&access_lock);
+}
+#endif
+          kaapi_hip_CheckError(res);
+        } break;
+
+        case KAAPI_MEMORY_VIEW_2D:
+        {
+          size_t width, height, dpitch, spitch;
+          if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
+          {
+            width  = op->view_dest->size[1] * op->view_dest->wordsize;
+            height = op->view_dest->size[0];
+          }
+          else if (storage == KAAPI_MEMORY_STORAGE_COLMAJOR)
+          {
+            width  = op->view_dest->size[0] * op->view_dest->wordsize;
+            height = op->view_dest->size[1];
+          } else {
+            kaapi_abort( __LINE__, __FILE__, "Invalid storage");
+          }
+          dpitch = op->view_dest->ld * op->view_dest->wordsize;
+          spitch = op->view_src->ld * op->view_src->wordsize;
+
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+#ifdef NOT_REENTRANT
+{
+pthread_mutex_lock(&access_lock);
+#endif
+          switch (instr->type)
+          {
+            case KAAPI_IO_COPY_H2H:
+              res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyHostToHost, *stream );
+            break;
+            case KAAPI_IO_COPY_H2D:
+              res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyHostToDevice, *stream );
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)   += size;
+            break;
+            case KAAPI_IO_COPY_D2H:
+              res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToHost, *stream );
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)   += size;
+            break;
+            case KAAPI_IO_COPY_D2D:
+              res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice, *stream );
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)   += size;
+            break;
+            default:
+              kaapi_assert(0);
+          };
+#ifdef NOT_REENTRANT
+pthread_mutex_unlock(&access_lock);
+}
+#endif
+        } break;
+
+        case KAAPI_MEMORY_VIEW_3D:
+        default:
+          kaapi_assert(false); 
+          break;
+      };
+
+#if CONFIG_SYNCHRONOUS_COPY
+      res = hipStreamSynchronize( *stream );
+      kaapi_hip_CheckError(res);
+#if KAAPI_USE_TRACELIB==1
+      delay = kaapi_get_elapsedns()-delay;
+      if ((type != KAAPI_MEMORY_VIEW_1D) && (instr->type != KAAPI_IO_COPY_H2H)
+        KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+         2 /* end */, op->reserved, delay );
+#endif
+      ++ios->ok_p;
+#elif CONFIG_USE_EVENT 
+      res = hipEventRecord( cios->end_events[ ios->pos_wp % ios->count ], *stream );
+      kaapi_hip_CheckError(res);
+#else // no use event, no synchronous == synchronous
+      #error "Unsupported configuration"
+#endif
+      KAAPI_PLUGIN_TRACE_MSG("%s: stream %p instr '%s' src:%p, dest:%p size:%zu\n", __FUNCTION__,
+          (void*)*stream,
+          name_io[instr->type],
+          (void*)src,
+          (void*)dest,
+          size
+      );
+    } break;
+
+    case KAAPI_IO_BARRIER:
+      res = hipStreamSynchronize( cios->stream );
+      kaapi_assert(res == hipSuccess);
+      res = hipStreamSynchronize( cios->stream_low );
+      kaapi_assert(res == hipSuccess);
+      ++ios->ok_p;
+      break;
+
+    case KAAPI_IO_KERN:
+    {
+#if KAAPI_HAVE_IO_THREADS
+      kaapi_assert_debug( thread_type == 0 );
+#endif
+      /* same as cublas */
+      stream = &cios->stream;
+      struct kaapi_io_kernel* op = &instr->inst.k_io;
+      KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' exec task:%p, stream: %p\n", __FUNCTION__,
+          name_io[instr->type],
+          op->task,
+          (void*)*stream
+      );
+      KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
+         1 /* begin */, op->reserved );
+#ifdef NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+{
+pthread_mutex_lock(&access_lock);
+#endif
+#if KAAPI_USE_PERFCOUNTER
+      instr->t1 = kaapi_get_elapsedtime();
+#  if CONFIG_USE_EVENT
+      res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
+      kaapi_assert(res == hipSuccess);
+#  endif
+#endif
+      uint64_t delay = kaapi_get_elapsedns();
+#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
+      /* the call + execute_task should be atomic */
+      hipblasStatus_t cres = hipblasSetStream(device->handle, cios->stream);
+      kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
+#endif
+      kaapi_offload_device_execute_task(
+        &device->inherited,
+        op->task,
+#if KAAPI_USE_PERSTREAM_BLASHANDLE
+        cios->handle
+#else
+        device->handle
+#endif
+      );
+#ifdef NOT_REENTRANT
+// 10-03: I ASSUME this functions are note totally re-entrant. See above.
+pthread_mutex_unlock(&access_lock);
+}
+#endif
+#if CONFIG_SYNCHRONOUS_KERNEL
+      delay = kaapi_get_elapsedns() -delay;
+      res = hipStreamSynchronize( *stream );
+      kaapi_assert(res == hipSuccess);
+      KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
+         2 /* end */, op->reserved, delay );
+      ++ios->ok_p;
+#elif CONFIG_USE_EVENT 
+      res = hipEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
+      kaapi_assert(res == hipSuccess);
+#else // no use event, no synchronous
+      #error "Unsupported configuration"
+#endif
+    }
+  }
+
+  KAAPI_PLUGIN_TRACE_OUT
+  return EINPROGRESS;
+}
+
+
+/* The purpose of this function is to increase ios->ok_p
+   but whithout calling callback
+ */
+static int kaapi_hip_stream_advance_pending(
+    kaapi_device_t* dev,
+    kaapi_io_stream_t* ios,
+    int blocking
+)
+{
+  KAAPI_PLUGIN_TRACE_IN
+
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  hipError_t res;
+#if KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#else
+  hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
+#endif
+
+  kaapi_hip_io_stream_t* cios = (kaapi_hip_io_stream_t*)ios;
+  if (kaapi_io_stream_emptypending(ios))
+    return 0;
+
+#if CONFIG_USE_EVENT 
+  if (blocking)
+  {
+    res = hipStreamSynchronize( cios->stream );
+    kaapi_hip_CheckError(res);
+    res = hipStreamSynchronize( cios->stream_low );
+    kaapi_hip_CheckError(res);
+    ios->ok_p = ios->pos_wp;
+    return 0;
+  }
+
+  size_t len_p = kaapi_io_stream_sizepending(ios);
+
+#if 0 // 
+  int queue_max[4];
+  queue_max[KAAPI_IO_STREAM_H2D]  = kaapi_default_param.cuda_conc_kernel; 
+  queue_max[KAAPI_IO_STREAM_KERN] = kaapi_default_param.cuda_conc_kernel; 
+  queue_max[KAAPI_IO_STREAM_D2H]  = kaapi_default_param.cuda_conc_kernel; 
+  queue_max[KAAPI_IO_STREAM_D2D]  = kaapi_default_param.cuda_conc_kernel; 
+  if ((len_p >1) && (len_p>= queue_max[ios->type]))
+  {
+    int shift = 0; //(ios->type == KAAPI_IO_STREAM_KERN ? 0: len_p/2-1);
+    int idx = (ios->ok_p + shift)% ios->count;
+    res = hipEventSynchronize(cios->end_events[idx]);
+  }
+#endif//if 0
+
+  /* ios->ok_p is past the last ok pending request: test from ok_p to pos_wp */
+  int cnt;
+  uint64_t ios_okp = ios->ok_p; 
+  int prev_iosokp = ios_okp-1;
+  while (ios_okp < ios->pos_wp)
+  {
+    int idx = ios_okp % ios->count;
+    kaapi_io_instruction_t* op = &ios->pending[idx];
+    res = hipSuccess;
+    switch (op->type)
+    {
+      case KAAPI_IO_KERN:
+      case KAAPI_IO_COPY_H2H:
+      case KAAPI_IO_COPY_H2D:
+      case KAAPI_IO_COPY_D2H:
+      case KAAPI_IO_COPY_D2D:
+        for (int cnt=0; cnt<1; ++cnt)
+        {
+          res = hipEventQuery( cios->end_events[idx] );
+          kaapi_assert_debug((res == hipErrorNotReady)  || (res == hipSuccess));
+          if (res == hipErrorNotReady)
+            //goto break_label;
+            pthread_yield();
+          else {
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+            float gpu_delay; /* ms */
+            res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
+            if (res != hipSuccess) {
+              printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+              gpu_delay = 0;
+              kaapi_assert(0);
+            }
+            if (op->type != KAAPI_IO_KERN)
+            {
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
+                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*gpu_delay));
+//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*gpu_delay));
+            }
+            else
+            {
+              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
+                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*gpu_delay) );
+//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*gpu_delay));
+            }
+#endif
+            if (prev_iosokp+1 == ios_okp) ++prev_iosokp;
+            break;
+          }
+        }
+  
+#if KAAPI_USE_PERFCOUNTER
+        if (res == hipSuccess)
+          op->t2 = kaapi_get_elapsedtime();
+#endif
+
+#if LOG_DBG
+        printf("%s:: instruction pos:%i, instr '%s' ok\n", __func__, ios_okp,  name_io[op->type]);
+#endif
+
+      case KAAPI_IO_END:
+      case KAAPI_IO_BARRIER:
+      case KAAPI_IO_NOP:
+        ++ios_okp;
+        break;
+
+      default:
+        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", dev->ld->idx, ios_okp);
+        kaapi_assert(0);
+        break;
+    }
+  }
+break_label:
+  /* all events have been tested, test the prev_iosokp has been incremented */
+  ios_okp = ios->ok_p;
+  if (prev_iosokp != ios_okp-1) 
+  {
+    ios->ok_p = prev_iosokp+1;
+    return 0;
+  }
+  return EINPROGRESS;
+
+#elif CONFIG_SYNCHRONOUS_COPY && CONFIG_SYNCHRONOUS_KERNEL
+  /* if synchronous call then advance automatically at the end of the operation */ 
+  ;
+#else
+  /* if do not use event */
+  if (blocking)
+  {
+    res = hipStreamSynchronize( cios->stream );
+    kaapi_hip_CheckError(res);
+    res = hipStreamSynchronize( cios->stream_low );
+    kaapi_hip_CheckError(res);
+    ios->ok_p = ios->pos_wp;
+    return 0;
+  }
+  else
+  {
+    res = hipStreamQuery( cios->stream );
+    if (res == hipErrorNotReady)
+    {
+      KAAPI_PLUGIN_TRACE_OUT
+      return EINPROGRESS;
+    }
+    kaapi_hip_CheckError(res);
+    res = hipStreamQuery( cios->stream_low );
+    if (res == hipErrorNotReady)
+    {
+      KAAPI_PLUGIN_TRACE_OUT
+      return EINPROGRESS;
+    }
+    kaapi_hip_CheckError(res);
+
+    ios->ok_p = ios->pos_wp;
+  }
+#endif
+  KAAPI_PLUGIN_TRACE_OUT
+}
+
+
+
+/*
+ */
+static int kaapi_hip_stream_process_pending(
+    kaapi_device_t* device,
+    kaapi_io_stream_t* ios,
+    int blocking
+)
+{
+  kaapi_hip_io_stream_t* cios = (kaapi_hip_io_stream_t*)ios;
+
+  do {
+    kaapi_hip_stream_advance_pending(device, ios, blocking );
+
+    KAAPI_PLUGIN_TRACE_IN
+
+    kaapi_io_status_t status = {0,0};
+
+    /* call callback functions */
+    for (uint64_t pos = ios->pos_rp; pos<ios->ok_p; ++pos)
+    {
+      int idx = pos % ios->count;
+      kaapi_io_instruction_t* op = &ios->pending[idx];
+      switch (op->type)
+      {
+        case KAAPI_IO_KERN:
+        case KAAPI_IO_COPY_H2H:
+        case KAAPI_IO_COPY_H2D:
+        case KAAPI_IO_COPY_D2H:
+        case KAAPI_IO_COPY_D2D:
+        case KAAPI_IO_END:
+        case KAAPI_IO_BARRIER:
+        {
+#if KAAPI_USE_PERFCOUNTER
+          hipError_t res;
+#  if KAAPI_DEBUG
+          res = hipEventQuery( cios->start_events[idx] );
+          if (res != hipSuccess)
+            printf("   invalid start_event state at: %d \n", idx );
+#  endif
+          res = hipEventElapsedTime ( &status.gpu_delay, cios->start_events[idx], cios->end_events[idx] );
+          if (res != hipSuccess) {
+            printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+            status.gpu_delay = 0;
+            kaapi_assert(0);
+          }
+
+          status.gpu_delay *= 1e-3;
+          status.cpu_delay = op->t2 - op->t1; 
+#endif
+          if ((op->type >= KAAPI_IO_COPY_H2H) && (op->type <= KAAPI_IO_COPY_D2D))
+          {
+            status.bytes = kaapi_memory_view_size(op->inst.c_io.view_src);
+#if KAAPI_USE_PERFCOUNTER
+            device->sum_comdelay += status.gpu_delay;
+            device->sum_bwd += status.bytes / status.gpu_delay;
+            device->size_com += status.bytes;
+//            printf("(*)%g MB, %g s, bwd: %g\n", status.bytes*1.0/(1024*1024.0), status.gpu_delay, status.bytes / (1024.0*1024.0*status.gpu_delay) );
+            ++device->cnt_com;
+#endif
+          }
+
+          if (op->inst.cbk.fnc)
+            op->inst.cbk.fnc(status, ios, op->inst.cbk.arg[0], op->inst.cbk.arg[1], op->inst.cbk.arg[2]);
+  
+#if KAAPI_USE_PERFCOUNTER
+//TG: #warning "Model to compute work ?"
+          if (op->inst.cbk.fnc) op->t3 = kaapi_get_elapsedtime();
+          else op->t3 = op->t2;
+          if (op->type == KAAPI_IO_KERN)
+          {
+            kaapi_context_t* ctxt = device->ctxt;
+//            kaapi_perthread_stat[ctxt->tid].dcounter[KAAPI_CNT_TASK_WORK_OVERHEAD_CPU] += (op->t1-op->t0)+(op->t3-op->t2);
+          }
+#endif
+          op->type = KAAPI_IO_NOP;
+        }
+  
+        case KAAPI_IO_NOP:
+          /* commit index for the next event */
+          ++ios->pos_rp;
+          //return 0;
+          break;
+  
+        default:
+          fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, pos);
+          kaapi_assert(0);
+          break;
+      }
+    }
+  } while (0); 
+  KAAPI_PLUGIN_TRACE_OUT
+  return 0;
+}
+
+
+/* Return the source device to send data to device in the destination memory 'dev'.
+ */
+static uint16_t kaapi_hip_get_source(
+    kaapi_memory_device_t* dev,
+    uint16_t lid0,
+    KAAPI_MEMORY_VALUE_TYPE valid_bit,
+    KAAPI_MEMORY_VALUE_TYPE xfer_bit
+)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
+  int device_id_dest = kaapi_device_ids[dev->device->device_id];
+  uint16_t lid_dest = kaapi_memory_asid_get_lid(dev->asid);
+  uint16_t lid_src;
+  kaapi_assert_debug((valid_bit !=0) || (xfer_bit !=0));
+
+  /* return the device with the higher affinity rank with lid_dest
+     - does not consider the last performance rank
+   */
+#if KAAPI_USE_TOPO_D2D
+  for (int rank = 0; rank < hip_count_perfrank-1; ++rank)
+  {
+    if (valid_bit !=0)
+      lid_src = KAAPI_MEMORY_FFS( valid_bit & device->affinity[rank] );
+      //lid_src = _kaapi_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+    else 
+      lid_src = KAAPI_MEMORY_FFS( xfer_bit & device->affinity[rank]);
+      //lid_src = _kaapi_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+    if (lid_src !=0)
+    {
+      --lid_src;
+      kaapi_assert_debug(lid_src < KAAPI_MEMORY_MAX_NODES);
+      return lid_src;
+    }
+  }
+#endif
+  if (valid_bit !=0)
+  {
+    uint16_t retval = _kaapi_get_random_bit1(valid_bit, &device->inherited.ctxt->seed)-1; 
+    //printf("RndBit(%i).1=%i\n", valid_bit, retval );
+    return retval;
+  }
+  if (xfer_bit !=0)
+  {
+    uint16_t retval = _kaapi_get_random_bit1(xfer_bit, &device->inherited.ctxt->seed)-1; 
+    //printf("RndBiti(%i).2=%i\n", xfer_bit, retval );
+    return retval;
+  }
+  return (uint16_t)-1;
+}
+
+
+#if KAAPI_HAVE_IO_THREADS
+static int kaapi_hip_io_thread( kaapi_device_hip_t* device, kaapi_io_stream_type_t type )
+{
+  hipError_t res;
+  res = hipSetDevice(kaapi_device_ids[device->inherited.device_id]);
+  kaapi_assert( res == hipSuccess );
+
+  /* initialize all IO stream within the current context */
+  kaapi_offload_stream_t* const stream = &device->inherited.stream;
+  for (unsigned int i=0; i< stream->count[type]; ++i)
+    kaapi_hip_init_stream( (kaapi_hip_io_stream_t*)stream->ios[type][i], type, stream->ios[type][i]->count );
+
+  /* infinite loop */
+  while (!device->inherited.finalize)
+  {
+    int count = 0;
+    kaapi_offload_stream_process_instruction( stream, type );
+    for (unsigned int i=0; i< stream->count[type]; ++i)
+    {
+      uint64_t old_ok_p = stream->ios[type][i]->ok_p;
+      kaapi_hip_stream_advance_pending( &device->inherited, stream->ios[type][i], 0 );
+      if (old_ok_p != stream->ios[type][i]->ok_p) ++count;
+    }
+    if (count ==0) pthread_yield();
+  }
+}
+
+
+static void* kaapi_cuda_H2D_io_thread( void* arg )
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)arg;
+  /* for debug */
+  thread_type = 1;
+
+  kaapi_hip_io_thread(device, KAAPI_IO_STREAM_H2D);
+  return 0;
+}
+
+static void* kaapi_cuda_D2H_io_thread( void* arg )
+{ 
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)arg;
+  /* for debug */
+  thread_type = 2;
+
+  kaapi_hip_io_thread(device, KAAPI_IO_STREAM_D2H);
+  return 0;
+}
+#endif
+
+
+/* Update pthread_attr_t with the CPUset to start the thread that manages the device
+   Return ENOTSUP is hwloc is not available or some internal error occurs.
+*/
+static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
+{
+  KAAPI_OFFLOAD_TRACE_IN
+
+  if (schedset ==0) return EINVAL;
+
+  int err;
+  CPU_ZERO(schedset);
+
+#if KAAPI_USE_HWLOC
+  hwloc_cpuset_t cpuset;
+  hwloc_obj_t obj;
+
+  cpuset = hwloc_bitmap_alloc();
+#  if KAAPI_USE_HIP 
+#    if KAAPI_USE_HWLOCROCSMI
+  err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
+#    endif
+  if (err == 0)
+  {
+    {
+      err = hwloc_cpuset_to_glibc_sched_affinity (topology, cpuset, schedset, sizeof(cpu_set_t));
+      kaapi_assert(err == 0);
+      if (err !=0) {
+        err = ENOTSUP;
+        goto retval;
+      }
+    }
+  }
+#  endif
+#endif
+  /* no hwloc: do nothing, op not supported */
+  err = ENOTSUP;
+
+retval:
+#if KAAPI_USE_HWLOC 
+  hwloc_bitmap_free(cpuset);
+#endif
+
+  KAAPI_OFFLOAD_TRACE_OUT
+  return err;
+}
+
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT const char *
+KAAPI_PLUGIN_ENTRYPOINT(get_name)(void)
+{
+  KAAPI_PLUGIN_TRACE_IN
+  KAAPI_PLUGIN_TRACE_OUT
+  return "hip";
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT unsigned int 
+KAAPI_PLUGIN_ENTRYPOINT(get_flags)(void)
+{
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT unsigned int 
+KAAPI_PLUGIN_ENTRYPOINT(get_type)(void)
+{
+  return KAAPI_PROC_TYPE_HIP;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT unsigned int 
+KAAPI_PLUGIN_ENTRYPOINT(get_number)(void)
+{
+  assert(plugin_initialized == true);
+  return kaapi_device_count;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT unsigned int
+KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
+{
+  int device_count;
+  kaapi_hip_CheckError(hipGetDeviceCount(&device_count));
+  return (unsigned int)device_count;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int 
+KAAPI_PLUGIN_ENTRYPOINT(init)(void)
+{
+  hipError_t res;
+  kaapi_hip_plugin_lock();
+  if (plugin_initialized == true){
+      kaapi_hip_plugin_unlock();
+      return 0;
+  }
+  
+  int device_count;
+  res = hipGetDeviceCount(&device_count);
+  kaapi_hip_CheckError(res);
+
+  kaapi_device_list = (kaapi_device_hip_t**)calloc( device_count, sizeof(kaapi_device_hip_t) );
+  kaapi_default_param.sys_ngpus = device_count;
+
+  if (kaapi_default_param.ngpus == (uint8_t)-1)
+  {
+    kaapi_default_param.ngpus = device_count;
+    kaapi_default_param.gpu_set = (1<<device_count)-1;
+  }
+
+  /* bad number of GPUS ? */
+  if (kaapi_default_param.ngpus > device_count)
+  {
+    printf("[%s] too many GPUs requested: %i. Use system default count: %i\n",__func__, kaapi_default_param.ngpus, device_count);
+    kaapi_default_param.ngpus = device_count;
+  }
+
+  kaapi_device_count = kaapi_default_param.ngpus;
+  kaapi_device_ids = (int*)malloc( kaapi_default_param.ngpus*sizeof(int) );
+  int gpuset = kaapi_default_param.gpu_set;
+  for (int i=0; i<kaapi_default_param.ngpus; ++i)
+  {
+    int idx = __builtin_ffs((unsigned int)gpuset);
+    kaapi_assert( idx != 0);
+    --idx;
+    gpuset &= ~(1<<idx);
+    kaapi_device_ids[i] = idx;
+    //fprintf(stdout,"[%s] take GPU id:%2i= device_id:%i\n", __FUNCTION__, i, idx);
+  }
+
+  kaapi_device_count = kaapi_default_param.ngpus;
+  plugin_initialized = true;
+  kaapi_hip_plugin_unlock();
+#if _PLUGIN_DEBUG
+  fprintf(stdout, "hip:%s: hip init with %d devices\n", __FUNCTION__, kaapi_device_count);
+#endif
+
+#if KAAPI_USE_HWLOC
+  hwloc_topology_init(&topology);
+  //hwloc_topology_set_io_types_filter(topology, HWLOC_TYPE_FILTER_KEEP_IMPORTANT);
+  hwloc_topology_load(topology);
+#endif
+
+#if KAAPI_HIP_USE_TOPO
+  _kaapi_get_gpu_topo();
+#endif
+
+  int nrrl = getenv("KAAPI_RRL_SIZE") ? atoi(getenv("KAAPI_RRL_SIZE")) : 1;
+  if (nrrl <=0) nrrl = 1;
+  if (nrrl >= kaapi_default_param.ngpus) nrrl = kaapi_default_param.ngpus;
+  //printf("*** NEW: #rrl=%i\n", nrrl);
+  all_rrl_size =nrrl;
+  all_rrl = (host_register_queue_t*)malloc(all_rrl_size* sizeof(host_register_queue_t));
+  for (int i=0; i<nrrl; ++i)
+  {
+    kaapi_hip_init_reqreg_list(&all_rrl[i]);
+    int err = pthread_create(&all_rrl[i].thread, 0, kaapi_hip_register_thread, (void*)(uintptr_t)i );
+    kaapi_assert(err ==0);
+  }
+
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(finalize)(void)
+{
+  kaapi_hip_plugin_lock();
+  if (plugin_initialized == true)
+  {
+    plugin_initialized = false;
+#if _PLUGIN_DEBUG
+    fprintf(stdout, "hip:%s: hip finalize\n", __FUNCTION__);
+#endif
+  }
+  kaapi_hip_plugin_unlock();
+
+  /* */
+  void* tmp;
+  for (int i=0; i<all_rrl_size; ++i)
+  {
+    kaapi_assert(0 == pthread_cond_signal( &all_rrl[i].cond ));
+    kaapi_assert(0 == pthread_join( all_rrl[i].thread, &tmp ));
+  }
+  free( all_rrl );
+  all_rrl_size = 0;
+  all_rrl = 0;
+
+  free(kaapi_device_ids);
+  kaapi_device_ids = 0;
+
+#if KAAPI_USE_HWLOC
+  hwloc_topology_destroy(topology);
+#endif
+
+  free(  kaapi_device_list );
+  kaapi_device_list = 0;
+}
+
+
+static uint64_t post_request(
+    host_register_request_op_t op,
+    void* ptr, size_t size,
+    kaapi_io_cbk_fnc_t cbk,
+    void* arg0, void* arg1, void* arg2
+)
+{
+  if (ptr ==0) return (uint64_t)-1;
+
+  /* Hash function from self_thread to get its request register list */
+  int hash = kaapi_hash_ulong( pthread_self() ) % all_rrl_size;
+  host_register_queue_t* rrl = &all_rrl[hash];
+  kaapi_assert(0 == pthread_mutex_lock( &rrl->lock ));
+  while (rrl->posw - rrl->posr >= KAAPI_MAX_REGLIST)
+    pthread_cond_wait( &rrl->cond_waitall, &rrl->lock );
+  uint64_t index = rrl->posw;
+  ++rrl->posw;
+  int idx = index % KAAPI_MAX_REGLIST;
+  rrl->req[idx].op   = op;
+  rrl->req[idx].state= REQUEST_POST;
+  rrl->req[idx].size = size;
+  rrl->req[idx].cbk  = cbk;
+  rrl->req[idx].arg0 = arg0;
+  rrl->req[idx].arg1 = arg1;
+  rrl->req[idx].arg2 = arg2;
+  rrl->req[idx].ptr  = ptr;
+#if KAAPI_USE_PERFCOUNTER
+  rrl->req[idx].t0   = kaapi_get_elapsedtime();
+#endif
+  /* signal daemon thread */
+  kaapi_assert(0 == pthread_cond_signal( &rrl->cond ));
+  kaapi_assert(0 == pthread_mutex_unlock( &rrl->lock ));
+  return index;
+}
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT
+uint64_t KAAPI_PLUGIN_ENTRYPOINT(host_register)(
+    void* ptr, size_t size,
+    kaapi_io_cbk_fnc_t cbk,
+    void* arg0, void* arg1, void* arg2
+)
+{
+  if (ptr ==0) return (uint64_t)-1;
+  return post_request( DEVICE_REGISTER_REQUEST, ptr, size, cbk, arg0, arg1, arg2 );
+}
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT
+uint64_t KAAPI_PLUGIN_ENTRYPOINT(host_unregister)(
+    void* ptr, size_t size,
+    kaapi_io_cbk_fnc_t cbk,
+    void* arg0, void* arg1, void* arg2
+)
+{
+  if (ptr ==0) return (uint64_t)-1;
+  return post_request( DEVICE_UNREGISTER_REQUEST, ptr, size, cbk, arg0, arg1, arg2 );
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT
+int KAAPI_PLUGIN_ENTRYPOINT(host_register_testwait)(
+    uint64_t index,
+    int flag
+)
+{
+  /* Hash function from the thread id to request register list */
+  int hash = kaapi_hash_ulong( pthread_self() ) % all_rrl_size;
+  host_register_queue_t* rrl = &all_rrl[hash];
+
+  if ((flag != 2) && ((index == (uint64_t)-1) || (index >= rrl->posw)))
+    return EINVAL;
+
+  switch (flag) 
+  {
+    case 0: /* test: do not lock if test is true, else may it is a false negative */
+      if (index <= rrl->posr) return 0;
+      return EINPROGRESS;
+
+    case 1: /* wait */
+      /*TODO: cannot compute the time between T0 of the post_request and now if the index < rrl->posr
+        because it means that requests have been proceed but we lost t0 stored in the request struct.
+        One solution: sum t0, sum twait here and at the end returns sum twait - sum t0 as the sum of the delay.
+        One case should be take into account: is post without corresponding wait=> each wait should account for all request between rrl->posr until the current index !.
+        Other solution: keep the list of waiting requests index increment on wait_request.
+      */
+      kaapi_assert(0 == pthread_mutex_lock( &rrl->lock ));
+      if (index >= rrl->posr)
+      {
+        int idx = index % KAAPI_MAX_REGLIST;
+        kaapi_assert(0 == pthread_mutex_lock( &rrl->req[idx].lock ));
+        kaapi_assert(0 == pthread_mutex_unlock( &rrl->lock ));
+        kaapi_assert_debug((rrl->req[idx].state == REQUEST_POST) || (rrl->req[idx].state == REQUEST_DONE));
+        if (rrl->req[idx].state == REQUEST_POST)
+        {
+          rrl->req[idx].state = REQUEST_WAIT;
+          kaapi_assert(0 == pthread_cond_wait( &rrl->req[idx].cond, &rrl->req[idx].lock ));
+          kaapi_assert_debug( rrl->req[idx].state == REQUEST_DONE );
+          kaapi_assert(0 == pthread_mutex_unlock( &rrl->req[idx].lock ));
+        }
+        return 0;
+      }
+      else {
+        kaapi_assert(0 == pthread_mutex_unlock( &rrl->lock ));
+        return 0;
+      }
+
+    case 2: /* wait all */
+    {
+      kaapi_assert(0 == pthread_mutex_lock( &rrl->lock ));
+      uint64_t pos = rrl->posw;
+      while (pos > rrl->posr)
+        kaapi_assert(0 == pthread_cond_wait( &rrl->cond_waitall, &rrl->lock ));
+      kaapi_assert(0 == pthread_mutex_unlock( &rrl->lock ));
+      return 0;
+    }
+    default: 
+      return EINVAL;
+  } 
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int
+KAAPI_PLUGIN_ENTRYPOINT(device_set_cpuset)(cpu_set_t* schedset, int dev)
+{
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  int err = kaapi_set_cpuset(schedset, dev);
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
+  return err;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT kaapi_device_t* 
+KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev)
+{
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)malloc(sizeof(kaapi_device_hip_t));
+  memset(device, 0, sizeof(kaapi_device_hip_t) );
+  device->inherited.device_id = dev;
+  device->save_device_id = -1;
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_create device_id: %i, device @:%X (%s)\n",dev, device, driver->name);
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
+  return &device->inherited;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int 
+KAAPI_PLUGIN_ENTRYPOINT(device_destroy)(kaapi_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_destroy device_id: %i, device @:%X (%s)\n",dev->device_id, dev, dev->driver->name);
+  dev->state = KAAPI_DEVICE_STATE_DESTROY;
+
+  free(device);
+
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int 
+KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s)\n",dev->device_id, dev, dev->driver->name);
+
+  int err = 0;
+  int pi;
+
+  if ((plugin_initialized != true) || (dev == 0))
+  { 
+    err = EINVAL;
+    goto out;
+  }
+
+  struct hipDeviceProp_t prop;
+  hipError_t res;
+  res = hipSetDevice(kaapi_device_ids[dev->device_id]);
+  kaapi_hip_CheckError(res);
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). hipSetDevice ok \n",
+     dev->device_id, dev, dev->driver->name);
+
+  rocblas_initialize();
+  KAAPI_OFFLOAD_INIT_TRACE_MSG("::device_init device_id: %i, device @:%X (%s). rocblas_initialize\n",
+     dev->device_id, dev, dev->driver->name);
+
+  res = hipGetDeviceProperties(&prop, kaapi_device_ids[dev->device_id]);
+  kaapi_hip_CheckError(res);
+  
+#ifdef __HIP_PLATFORM_AMD__
+  device->prop.pciBusID = prop.pciBusID;
+  device->prop.pciDeviceID = prop.pciDeviceID;
+#endif
+#ifndef __HIP_PLATFORM_AMD__
+  device->prop.overlap = prop.deviceOverlap;
+  device->prop.async_engines = prop.asyncEngineCount;
+  device->prop.map = prop.canMapHostMemory;
+  device->prop.integrated = prop.integrated;
+#endif
+  device->prop.concurrent = prop.concurrentKernels;
+  dev->mem_total = prop.totalGlobalMem;
+  memset(device->prop.name, 0, 64*sizeof(char));
+  strncpy(device->prop.name, prop.name, 64);
+
+  /* memory device */
+  device->inherited.size_alloc = 0;
+  device->inherited.size_free = 0;
+  device->inherited.free_mem = 0;
+  if (getenv("KAAPI_NO_GPUALLOCATOR"))
+  {
+    printf("[XKAAPI] KAAPI_NO_GPUALLOCATOR but Hip driver do not support it. Ignored.\n");
+  } 
+  dev->memdev.f_alloc = kaapi_hip_alloc;
+  dev->memdev.f_free = kaapi_hip_free;
+
+  dev->memdev.f_copy = kaapi_hip_copy;
+  dev->memdev.f_memsync = kaapi_hip_memsync;
+  dev->memdev.f_get_mem_info = kaapi_hip_get_mem_info;
+  dev->memdev.f_get_free_mem = kaapi_hip_get_free_mem;
+  {
+    size_t free;
+    size_t total;
+    res = hipMemGetInfo(&free, &total);
+    kaapi_hip_CheckError(res);
+
+    device->inherited.free_mem = (size_t)free;
+  }
+  /* limit the memory allocation: reserve about 180MB for runing something */
+  dev->mem_limit = (size_t)((double)kaapi_default_param.cuda_cache_limit
+          * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
+  dev->memdev.f_get_source = kaapi_hip_get_source;
+
+  /* stream device */
+  dev->stream.f_stream_free = kaapi_hip_stream_free;
+  dev->stream.f_stream_alloc = kaapi_hip_stream_alloc;
+  dev->stream.f_stream_process_pending = kaapi_hip_stream_process_pending;
+  dev->stream.f_stream_decode_ioinstruction = kaapi_hip_stream_decode;
+
+  /* register the device as a driver' device */
+  kaapi_device_list[ dev->device_id ] = device;
+
+#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
+  hipblasStatus_t cres = hipblasCreate(&device->handle);
+  kaapi_assert(cres == HIPBLAS_STATUS_SUCCESS);
+#endif
+out:
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
+  return err;
+}
+
+
+
+/* Call on all devices of the driver after they have been initialized
+*/
+/* It seems that HIP does not appreciate concurrent execution of hipDeviceEnablePeerAccess
+*/
+static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
+KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t* dev)
+{
+  KAAPI_OFFLOAD_INIT_TRACE_IN
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+
+  pthread_mutex_lock(&global_lock);
+  /* all other devices 'peer' context have been initialized, enable peer */
+#if CONFIG_USE_P2P
+  int verboseok = 0;
+  hipError_t res;
+#if KAAPI_DEBUG
+  int devid;
+  hipGetDevice(&devid);
+  kaapi_assert(devid == kaapi_device_ids[device->inherited.device_id]);
+#endif
+
+  /* similar to hip_perf_device but with ldid index in place of hip device number */
+  kaapi_localitydomain_t* ld = device->inherited.ld;
+  kaapi_assert(ld !=0);
+  ld->perfrank = hip_count_perfrank-1;
+  ld->affinity = (uint64_t*)malloc( sizeof(uint64_t)* ld->perfrank);
+  device->affinity = (uint64_t*)malloc( sizeof(uint64_t)* ld->perfrank );
+  for (int i=0; i<hip_count_perfrank-1; ++i)
+  {
+    ld->affinity[i] = 0;
+    device->affinity[i] = 0;
+  }
+
+  for (int j=0; j<kaapi_device_count; j++)
+  {
+    if ( device != kaapi_device_list[j] )
+    {
+      int access;
+      res = hipDeviceCanAccessPeer(&access,
+        kaapi_device_ids[device->inherited.device_id],
+        kaapi_device_ids[kaapi_device_list[j]->inherited.device_id]);
+      kaapi_hip_CheckError(res);
+      if (access)
+      {
+        res = hipDeviceEnablePeerAccess(kaapi_device_ids[kaapi_device_list[j]->inherited.device_id], 0 );
+        kaapi_hip_CheckError(res);
+//#warning
+//printf("Device %i enable Peer Access with device %i\n", device->inherited.device_id, kaapi_device_list[j]->inherited.device_id);
+        verboseok = 1;
+      }
+      int device1 = kaapi_device_ids[device->inherited.device_id];
+      int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
+      int rank = hip_perf_topo[device1*hip_device_count+device2];
+      kaapi_assert_debug(rank !=0);
+      if (hip_perf_device[ device1*hip_count_perfrank+ rank] & (1<<device2))
+      {
+        device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+        ld->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+      }
+    }
+    else
+    { /* add device with itself */
+      device->affinity[0] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+      ld->affinity[0] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+    }
+  }
+  pthread_mutex_unlock(&global_lock);
+#endif // CONFIG_USE_P2P
+  KAAPI_OFFLOAD_INIT_TRACE_OUT
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT const char* KAAPI_PLUGIN_ENTRYPOINT(device_info)(kaapi_device_t* dev)
+{
+  KAAPI_OFFLOAD_TRACE_IN
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  static char buffer[256];
+  static char buf1[16];
+  static char buf2[16];
+  static char buf3[16];
+  buf1[10] = 0;
+  buf2[10] = 0;
+  buf3[10] = 0;
+  _print_mask(buf1, 10, device->affinity[0]);
+  _print_mask(buf2, 10, device->affinity[1]);
+  _print_mask(buf3, 10, device->affinity[2]);
+  snprintf(buffer, 256, "%s, hip device: %i, pci: %02x:%02x, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
+    device->prop.name,
+    device->inherited.device_id,
+    device->prop.pciBusID,
+    device->prop.pciDeviceID,
+    device->prop.async_engines,
+    ((double)dev->mem_total)/1024.0/1024.0/1024.0,
+    ((double)dev->mem_limit)/1024.0/1024.0/1024.0,
+    buf1, buf2, buf3
+  );
+  return buffer;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(device_finalize)(kaapi_device_t* dev)
+{
+  KAAPI_OFFLOAD_TRACE_IN
+
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  kaapi_assert(plugin_initialized == true);
+
+  kaapi_offload_stream_destroy(&dev->stream);
+#if KAAPI_PIPELINE_GPUTASK
+  kaapi_assert(0== pthread_mutex_destroy(&dev->pipe_lock));
+#endif
+
+#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
+  if (device->handle)
+    hipblasDestroy(device->handle);
+#endif
+
+  dev->state = KAAPI_DEVICE_STATE_FINALIZED;
+  KAAPI_OFFLOAD_TRACE_OUT
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int 
+KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  assert(plugin_initialized == true);
+
+  kaapi_assert(device->save_device_id == -1);
+  hipError_t res;
+  res = hipGetDevice(&device->save_device_id);
+  kaapi_hip_CheckError(res);
+  res = hipSetDevice( kaapi_device_ids[device->inherited.device_id] );
+  kaapi_hip_CheckError(res);
+
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int 
+KAAPI_PLUGIN_ENTRYPOINT(device_detach)(kaapi_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+  assert(plugin_initialized == true);
+
+  if (device->save_device_id >=0)
+  {
+    hipError_t res;
+    res = hipSetDevice( device->save_device_id );
+    kaapi_hip_CheckError(res);
+    device->save_device_id =-1;
+  }
+
+  return 0;
+}
+
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT void* 
+KAAPI_PLUGIN_ENTRYPOINT(get_gpublas_handle)(kaapi_device_t* dev)
+{
+  kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev;
+#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
+  return (void*)(uintptr_t)device->handle;
+#else
+  return 0;
+#endif
+}
+
+
+#if KAAPI_USE_DYNLOADER==0
+  /* */
+#define EP(func)                                                     \
+    driver->f_##func = KAAPI_PLUGIN_ENTRYPOINT(func)
+
+void KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(kaapi_driver_t* driver)
+{
+  /* */
+  EP (get_name);
+  EP (get_flags);
+  EP (get_type);
+  EP (get_number);
+  EP (get_ndevices);
+  EP (init);
+  EP (finalize);
+  EP (host_register);
+  EP (host_register_testwait);
+  EP (host_unregister);
+
+  EP (device_set_cpuset);
+  EP (device_create);
+  EP (device_destroy);
+  EP (device_info);
+  EP (device_init);
+  EP (device_commit);
+  EP (device_finalize);
+  EP (device_attach);
+  EP (device_detach);
+  EP (get_gpublas_handle);
+}
+#endif

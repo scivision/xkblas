@@ -93,19 +93,53 @@ if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 endif()
 
 #--- HWLOC
+if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+else()
+  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  find_path(HWLOC_RSMI_INCLUDE_DIRS
+    NAMES hwloc/rsmi.h
+    HINTS ${ROCSMI_PREFIX}/include
+  )
+  if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
+    add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
+    set(ROCSMI_INCLUDE_DIRS "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+  endif()
+endif()
+
+
 if (KAAPI_USE_HWLOC)
   find_package(HWLOC)
 endif()
 if (${HIP_FOUND})
   find_path(ROCSMI_INCLUDE_DIRS
     NAMES rocm_smi/rocm_smi.h
-    HINTS ${ROCSMI_PREFIX}/include 
+    HINTS ${ROCM_PATH}/include
+    HINTS ${ROCSMI_PREFIX}/include  
   )
   find_library(ROCSMI_LIBRARIES
     # Pick the static library first for easier run-time linking.
     NAMES librocm_smi64.so 
-    HINTS ${ROCSMI_PREFIX}/lib 
+    HINTS ${ROCM_PATH}/lib
+    HINTS ${ROCSMI_PREFIX}/lib  
   )
+  if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+    add_compile_options("-DKAAPI_USE_ROCSMI=0")
+    add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
+    message(STATUS "ROCSMI_INCLUDE_DIRS not defined:" ${ROCSMI_INCLUDE_DIRS})
+  else()
+    message(STATUS "ROCSMI_INCLUDE_DIRS defined:" ${ROCSMI_INCLUDE_DIRS})
+    add_compile_options("-DKAAPI_USE_ROCSMI=1")
+    if (HWLOC_FOUND)
+      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=1")
+    else()
+      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
+    endif()
+  endif()
+  if (ROCSMI_LIBRARIES STREQUAL "ROCSMI_LIBRARIES-NOTFOUND")
+     message(STATUS "ROCSMI_LIBRARIES not defined:" ${ROCSMI_LIBRARIES})
+  else()
+     message(STATUS "ROCSMI_LIBRARIES defined:" ${ROCSMI_LIBRARIES})
+  endif()
 endif()
 
 #--- BLAS
