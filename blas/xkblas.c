@@ -2158,7 +2158,7 @@ size_t xkblas_auto_tilesize(
       {
         force_todefault_mapping = 1;
         xkctxt->ngpus = (cntzero > SW_ngpus*2/3 ? (cntzero < SW_ngpus ? cntzero : SW_ngpus) : cntzero/2);
-	if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
+        if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
         int j = 1; /* self is already at position 0 */
         for (int i=0; i<xkctxt->ngpus; ++i) 
         {
@@ -2168,7 +2168,7 @@ size_t xkblas_auto_tilesize(
             xkctxt->gpuset[j++] = izero[i];
           }
         }
-	minNB *=1;
+        minNB *=1;
 
 #if 1
         if (NB !=0)
@@ -2191,7 +2191,7 @@ size_t xkblas_auto_tilesize(
       force_todefault_mapping = 0;
       size_t minNB = 2048; //xkctxt->NB; //1024; 
       if (NB==0) NB = minNB;
-      fact =2;
+      fact =1;
       double Pavrg = W/D; /* 1GPU max */
       xkctxt->ngpus = (Pavrg < SW_ngpus ? (int)Pavrg : SW_ngpus);
       kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
