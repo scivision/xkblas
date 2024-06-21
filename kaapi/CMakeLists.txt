@@ -25,16 +25,16 @@ endif()
 
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
   add_compile_options("-DKAAPI_USE_ROCSMI=0")
+  add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
 else()
+  add_compile_options("-DKAAPI_USE_ROCSMI=1")
   find_path(HWLOC_RSMI_INCLUDE_DIRS
     NAMES hwloc/rsmi.h
     HINTS ${ROCSMI_PREFIX}/include
   )
   if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
-    add_compile_options("-DKAAPI_USE_ROCSMI=0")
+    add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
     set(ROCSMI_INCLUDE_DIRS "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  else()
-    add_compile_options("-DKAAPI_USE_ROCSMI=1")
   endif()
 endif()
 
@@ -101,9 +101,9 @@ endif()
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
   message(STATUS "Not found ROCSMI_INCLUDE")
 else()
-  message(STATUS "Found ROCSMI_INCLUDE: ${ROCSMI_INCLUDE_DIRS}")
   include_directories(${ROCSMI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${ROCSMI_LIBRARIES})
+  message(STATUS "Found ROCSMI_LIBRARIES: ${ROCSMI_LIBRARIES}")
 endif()
 
 if (${CUDA_DRIVER_FOUND})

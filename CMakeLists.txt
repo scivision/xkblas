@@ -95,17 +95,17 @@ endif()
 #--- HWLOC
 if (KAAPI_USE_HWLOC)
   find_package(HWLOC)
-  if (${HIP_FOUND} AND ${HWLOC_FOUND})
-    find_path(ROCSMI_INCLUDE_DIRS
-      NAMES rocm_smi/rocm_smi.h
-      HINTS ${ROCSMI_PREFIX}/include 
-    )
-    find_library(ROCSMI_LIBRARIES
-      # Pick the static library first for easier run-time linking.
-      NAMES librocm_smi64.so 
-      HINTS ${ROCSMI_PREFIX}/lib 
-    )
-  endif()
+endif()
+if (${HIP_FOUND})
+  find_path(ROCSMI_INCLUDE_DIRS
+    NAMES rocm_smi/rocm_smi.h
+    HINTS ${ROCSMI_PREFIX}/include 
+  )
+  find_library(ROCSMI_LIBRARIES
+    # Pick the static library first for easier run-time linking.
+    NAMES librocm_smi64.so 
+    HINTS ${ROCSMI_PREFIX}/lib 
+  )
 endif()
 
 #--- BLAS

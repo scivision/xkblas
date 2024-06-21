@@ -56,7 +56,7 @@
 #include <hipblas/hipblas.h>
 #include <rocblas/rocblas.h>
 #if KAAPI_USE_ROCSMI
-#  include "<rocm_smi/rocm_smi.h>"
+#  include <rocm_smi/rocm_smi.h>
 #endif
 
 #if KAAPI_HAVE_IO_THREADS
