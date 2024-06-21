@@ -83,7 +83,7 @@ static __thread int thread_type = 0;
 */
 #if KAAPI_USE_HWLOC
 #include "hwloc.h"
-#if KAAPI_USE_ROCSMI
+#if KAAPI_USE_HWLOCROCSMI
 #  include "hwloc/rsmi.h"
 #endif
 #include "hwloc/glibc-sched.h"
@@ -1676,7 +1676,7 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
 
   cpuset = hwloc_bitmap_alloc();
 #  if KAAPI_USE_HIP 
-#    if KAAPI_USE_ROCSMI
+#    if KAAPI_USE_HWLOCROCSMI
   err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
 #    endif
   if (err == 0)
