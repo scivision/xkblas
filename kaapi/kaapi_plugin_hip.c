@@ -246,17 +246,29 @@ static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
 
 /* */
 #define MAX_PERFF_RANK 64
-static uint64_t insert_perfrank( uint64_t* allrank, uint64_t new_rank)
+uint64_t all_perfrank[MAX_PERFF_RANK];
+static uint64_t insert_perfrank( uint64_t new_rank)
 {
   int i;
   for (i=0; i<MAX_PERFF_RANK; ++i)
   {
-    if (allrank[i] == 0) break;
-    if (allrank[i] == new_rank) return new_rank;
+    if (all_perfrank[i] == 0) break;
+    if (all_perfrank[i] == new_rank) return new_rank;
   }
   kaapi_assert( i < MAX_PERFF_RANK );
-  allrank[i] = new_rank;
+  all_perfrank[i] = new_rank;
   return new_rank;
+}
+
+static int find_perfrank( int cnt, uint64_t rank )
+{
+  int i;
+  for (i=0; i<cnt; ++i)
+  {
+    if (all_perfrank[i] == rank) return i;
+  }
+  kaapi_assert( 0 );
+  return -1;
 }
 
 static int comp_perfRank(const void* a, const void* b)
@@ -272,7 +284,7 @@ static int comp_perfRank(const void* a, const void* b)
 static void _kaapi_get_gpu_topo(void)
 {
   hipError_t res;
-  uint64_t min_perf= UINT_MAX; /* min_perf <= max_perf */
+  uint64_t min_perf= UINT64_MAX; /* min_perf <= max_perf */
   uint64_t max_perf= 0;
   int device_count = 0;
   rsmi_status_t err;
@@ -283,7 +295,6 @@ static void _kaapi_get_gpu_topo(void)
   /* assume that device_count not to high */
   kaapi_assert( device_count <= MAX_PERFF_RANK );
   uint64_t perfRank = 0;
-  uint64_t all_perfrank[MAX_PERFF_RANK];
   uint64_t hops;
   uint64_t min_bandwidth, max_bandwidth;
   uint64_t weight;
@@ -294,7 +305,6 @@ static void _kaapi_get_gpu_topo(void)
   hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
 
   RSMI_IO_LINK_TYPE type;
-  printf("#devices =%i\n", device_count );
   // Enumerates Device <-> Device links and store perfRank
   for (int device1 = 0; device1 < device_count; device1++)
   {
@@ -302,7 +312,7 @@ static void _kaapi_get_gpu_topo(void)
     {
       if (device1 == device2) 
       {
-        perfRank = insert_perfrank(all_perfrank,UINT_MAX);
+        perfRank = insert_perfrank(UINT64_MAX);
         if (perfRank > max_perf)
           max_perf= perfRank;
         hip_perf_topo[device1*device_count+device2] = perfRank;
@@ -323,7 +333,7 @@ static void _kaapi_get_gpu_topo(void)
           err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
           err = rsmi_topo_get_link_weight(device1, device2,&weight);
           if (max_bandwidth ==0) max_bandwidth = 1;
-          perfRank = insert_perfrank(all_perfrank,max_bandwidth);
+          perfRank = insert_perfrank(max_bandwidth);
           if (perfRank > max_perf)
             max_perf= perfRank;
           if (perfRank < min_perf)
@@ -335,7 +345,7 @@ static void _kaapi_get_gpu_topo(void)
           perfRank = 1;
           if (perfRank < min_perf)
             min_perf= perfRank;
-          hip_perf_topo[device1*device_count+device2] = insert_perfrank(all_perfrank, 1); /* should be higher than previous value: computed after */
+          hip_perf_topo[device1*device_count+device2] = insert_perfrank(1); /* should be higher than previous value: computed after */
         }
       }
       char* stype = "undefined type";
@@ -343,31 +353,49 @@ static void _kaapi_get_gpu_topo(void)
       else if (type == RSMI_IOLINK_TYPE_XGMI) stype = "XGMI";
       else if (type == RSMI_IOLINK_TYPE_UNDEFINED) stype = "undefined";
 
-      printf("weight:(%i,%i)=%lu\n", device1, device2, weight );
-      printf("type:(%i,%i)=%s\n", device1, device2, stype );
-      printf("hop:(%i,%i)=%lu\n", device1, device2, hops );
-      printf("perfRank: (%i,%i)=%lu\n", device1, device2, perfRank );
+#if KAAPI_DEBUG
+      if (kaapi_default_param.verbose)
+      {
+        printf("weight:(%i,%i)=%lu\n", device1, device2, weight );
+        printf("type:(%i,%i)=%s\n", device1, device2, stype );
+        printf("hop:(%i,%i)=%lu\n", device1, device2, hops );
+        printf("perfRank: (%i,%i)=%lu\n", device1, device2, perfRank );
+      }
+#endif
     }
   }
-  printf("Topo: max perf = %lu\n", max_perf);
-  printf("Topo: min perf = %lu\n", min_perf);
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+  {
+    printf("Topo: max perf = %lu\n", max_perf);
+    printf("Topo: min perf = %lu\n", min_perf);
+  }
+#endif
+
+  /* sort in deacreasing order the performance rank */
   qsort(all_perfrank, MAX_PERFF_RANK, sizeof(uint64_t), comp_perfRank );
-  for (int i=0; i<MAX_PERFF_RANK; ++i)
+  int i;
+  for (i=0; i<MAX_PERFF_RANK; ++i)
   {
     if (all_perfrank[i] ==0) break;
-    printf("PerRank[%i]=%lu\n", i, all_perfrank[i] );
+#if KAAPI_DEBUG
+    if (kaapi_default_param.verbose)
+    {
+      printf("PerRank[%i]=%lu\n", i, all_perfrank[i] );
+    }
+#endif
   }
-  
+  hip_count_perfrank = i;
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+  {
+    printf("Number of performance rank: %lu\n", hip_count_perfrank);
+  }
+#endif
+
   /* number of performance links: max_perf-min_perf+3  
-     - max_perf-min_perf+1 if GPUs peer access is enable between GPU
-     - +1 if GPU peer access is not enable
-     - -1 for local inter access
   */
-  hip_count_perfrank= min_perf-max_perf+2;
-  int perfrank_nolink= min_perf-max_perf+1;
   int rank;
-  for (int device = 0; device < device_count*device_count; device++)
-    if (hip_perf_topo[device] == -1) hip_perf_topo[device] = min_perf+1;
   size_t size = device_count*hip_count_perfrank*sizeof(uint64_t);
   hip_perf_device = malloc( size );
   for (int i=0; i<device_count*hip_count_perfrank; ++i)
@@ -377,10 +405,11 @@ static void _kaapi_get_gpu_topo(void)
   {
     for (int device2 = 0; device2 < device_count; device2++)
     {
-      rank = hip_perf_topo[device1*device_count+device2]; 
+      rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*device_count+device2] );
       //kaapi_assert( 0<= device1*device_count+ rank );
       //kaapi_assert( device1*hip_count_perfrank+ rank <= device_count*hip_count_perfrank);
       hip_perf_device[device1*hip_count_perfrank+ rank] |= (1UL<<device2);
+      //hip_perf_topo[device1*device_count+device2] = rank;
     }
   }
 
@@ -2201,7 +2230,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
       }
       int device1 = kaapi_device_ids[device->inherited.device_id];
       int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
-      int rank = hip_perf_topo[device1*hip_device_count+device2];
+      int rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*hip_device_count+device2]);
       kaapi_assert_debug(rank !=0);
       if (hip_perf_device[ device1*hip_count_perfrank+ rank] & (1<<device2))
       {
