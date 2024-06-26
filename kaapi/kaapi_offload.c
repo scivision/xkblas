@@ -254,7 +254,7 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
   memset(kaapi_offload_devices+kaapi_offload_num_devices, 0, n_devices*sizeof(kaapi_device_t*));
 
   cpu_set_t save_schedset;
-  pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
+  pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset); 
   for (i= 0; i < n_devices; i++)
   {
     /* */
@@ -267,7 +267,7 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
       err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
       kaapi_assert(err == 0);
     }
-    //pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
     for (int i=0; i<10; ++i) sched_yield();
 
     kaapi_driver_thread_arg_t* arg = (kaapi_driver_thread_arg_t*)malloc(sizeof(kaapi_driver_thread_arg_t));
@@ -299,6 +299,8 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     kaapi_assert(err ==0);
     kaapi_offload_num_devices++;
   }
+  
+  pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
 
 out:
   KAAPI_OFFLOAD_INIT_TRACE_OUT
