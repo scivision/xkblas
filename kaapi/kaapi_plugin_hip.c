@@ -393,7 +393,7 @@ static void _kaapi_get_gpu_topo(void)
   }
 #endif
 
-  /* number of performance links: max_perf-min_perf+3  
+  /* TODO. On AMD do not distinguish high speed link with XGMI link. I.e. using Weight of network as metric ?
   */
   int rank;
   size_t size = device_count*hip_count_perfrank*sizeof(uint64_t);
@@ -1617,11 +1617,11 @@ static uint16_t kaapi_hip_get_source(
   for (int rank = 0; rank < hip_count_perfrank-1; ++rank)
   {
     if (valid_bit !=0)
-      lid_src = KAAPI_MEMORY_FFS( valid_bit & device->affinity[rank] );
-      //lid_src = _kaapi_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+      //lid_src = KAAPI_MEMORY_FFS( valid_bit & device->affinity[rank] );
+      lid_src = _kaapi_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
     else 
-      lid_src = KAAPI_MEMORY_FFS( xfer_bit & device->affinity[rank]);
-      //lid_src = _kaapi_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+      //lid_src = KAAPI_MEMORY_FFS( xfer_bit & device->affinity[rank]);
+      lid_src = _kaapi_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
     if (lid_src !=0)
     {
       --lid_src;
