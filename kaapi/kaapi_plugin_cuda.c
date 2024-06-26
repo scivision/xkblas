@@ -306,6 +306,7 @@ static void _kaapi_get_gpu_topo(void)
           CudaCheckError(
             cudaDeviceGetP2PAttribute(&perfRank, cudaDevP2PAttrPerformanceRank,
               device1, device2));
+          /* max perf if 0 with cudaDevP2PAttrPerformanceRank */
           if (perfRank < max_perf)
             max_perf= perfRank;
           if (perfRank > min_perf)
@@ -1724,8 +1725,6 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
   cpuset = hwloc_bitmap_alloc();
 #if KAAPI_USE_CUDA_RUNTIME_API
   err = hwloc_cudart_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
-#elif KAAPI_USE_HIP
-  err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
 #endif
   if (err == 0)
   {
