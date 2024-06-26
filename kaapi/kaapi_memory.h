@@ -443,14 +443,6 @@ extern void kaapi_memory_free(kaapi_pointer_t ptr, size_t size );
 */
 extern int kaapi_memory_freelist_destroy(kaapi_memory_device_t* device);
 
-/*
-*/
-enum {
-    KAAPI_MEMORY_VOID =0,
-    KAAPI_MEMORY_EXPECTED_BLOCK =1 
-};
-extern int kaapi_memory_set_info( int kind, size_t value );
-
 
 /* -------------------------------------------------------------------------- */
 /*

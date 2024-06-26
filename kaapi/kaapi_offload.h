@@ -98,6 +98,28 @@ typedef struct  {
   kaapi_offloadtask_perfcounter_t task[KAAPI_FORMAT_MAX];
 } kaapi_offload_perfcounter_t;
 
+/* Online perf counter */
+enum {
+  COM_COUNTER_CNT_H2D =0,
+  COM_COUNTER_SIZE_H2D,
+  COM_COUNTER_CNT_D2H,
+  COM_COUNTER_SIZE_D2H,
+  COM_COUNTER_CNT_D2D,
+  COM_COUNTER_SIZE_D2D,
+  COM_COUNTER_TASK,
+  COM_COUNTER_TIME_TASK,
+  COM_COUNTER_MAX
+};
+#define COUNTER_CNT_H2D(device)   ((device)->perf_counter[COM_COUNTER_CNT_H2D])
+#define COUNTER_SIZE_H2D(device)  ((device)->perf_counter[COM_COUNTER_SIZE_H2D])
+#define COUNTER_CNT_D2H(device)   ((device)->perf_counter[COM_COUNTER_CNT_D2H])
+#define COUNTER_SIZE_D2H(device)  ((device)->perf_counter[COM_COUNTER_SIZE_D2H])
+#define COUNTER_CNT_D2D(device)   ((device)->perf_counter[COM_COUNTER_CNT_D2D])
+#define COUNTER_SIZE_D2D(device)  ((device)->perf_counter[COM_COUNTER_SIZE_D2D])
+#define COUNTER_TASK(device)      ((device)->perf_counter[COM_COUNTER_TASK])
+#define COUNTER_TIME_TASK(device) ((device)->perf_counter[COM_COUNTER_TIME_TASK])
+
+
 
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource
@@ -117,12 +139,12 @@ struct kaapi_device {
     volatile kaapi_device_state_t state;           /* True if driver is initialized */
   
     double                      time_tasks;        /* cumulative time for all executed tasks */
-    double                      flops_tasks;       /* cumulative flops for all executed tasks */
-    double                      data_tasks;        /* cumulative data for all executed tasks */
-    uint64_t                    pendingtasks;      /* #tasks (between prepare data and end of execution) */
-    double                      flops_pendingtasks;/* idem for pending tasks (between prepare data and end of execution) */
-    double                      data_pendingtasks; /* idem for pending tasks */
-    kaapi_offload_perfcounter_t perfcnt;           /* per task */
+    uint64_t                    exectasks;         /* #tasks executed */
+    double                      flops_exectasks;   /* cumulative flops for all executed tasks */
+    double                      data_exectasks;    /* cumulative data for all executed tasks */
+    uint64_t                    submittasks;       /* #tasks (between prepare data and end of execution) */
+    double                      flops_submittasks; /* idem for pending tasks (between prepare data and end of execution) */
+    double                      data_submittasks;  /* idem for pending tasks */
     const char*                 name;              /* Device name */
 
     size_t                      mem_limit;
@@ -148,11 +170,21 @@ struct kaapi_device {
     uint64_t                    p_ready;           /* position of the first ready task submitted to stream but not yet tested finish */
     uint64_t                    p_finish;          /* position in the stream of the next task to finish */
 #endif
+    size_t                      free_mem;
+    size_t                      size_alloc;
+    size_t                      size_free;
+    size_t                      perf_counter[COM_COUNTER_MAX];
 #if KAAPI_USE_PERFCOUNTER
     uint32_t                    cnt_task;
     float                       sum_cpudelay;
+    float                       sum_gpudelay;
     float                       max_cpudelay;
     float                       min_cpudelay;
+    float                       sum_comdelay;
+    float                       sum_bwd;
+    size_t                      size_com;
+    size_t                      cnt_com;
+    kaapi_offload_perfcounter_t perfcnt;           /* per task */
 #define KAAPI_LOG_DELAY 0 // to debug perf
 #if KAAPI_LOG_DELAY
     FILE*                       flog_delay;
@@ -241,6 +273,24 @@ typedef struct kaapi_driver {
 
     /* linked list of all drivers */
     struct kaapi_driver* next;
+
+    /* global static for all devices managed by the driver */
+#if KAAPI_USE_PERFCOUNTER
+    size_t                      size_alloc;
+    size_t                      size_free;
+    uint32_t                    cnt_task;
+    float                       sum_cpudelay;
+    float                       sum_gpudelay;
+    float                       max_cpudelay;
+    float                       min_cpudelay;
+    float                       sum_comdelay;
+    float                       sum_bwd;
+    size_t                      size_com;
+    size_t                      cnt_com;
+    size_t                      perf_counter[COM_COUNTER_MAX];
+    kaapi_offload_perfcounter_t perfcnt;           /* per task */
+#endif
+
 } kaapi_driver_t;
 
 
@@ -441,12 +491,15 @@ static inline int kaapi_offload_device_accept_new_task( kaapi_device_t* device )
 
 /*
 */
+#define KAAPI_IMAX 4
 extern int _kaapi_compute_load_device(
-    int* pmin,
-    int* pmax,
+    float* pmin,
+    float* pmax,
     float* pavrg,
     float* pdelta,
     int* imax,  /* of size at least KAAPI_IMAX */
+    int*   pcntzero,
+    int*   izero,
     float* pload
 );
 

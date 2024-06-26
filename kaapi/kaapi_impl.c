@@ -159,7 +159,6 @@ int __kaapi_has_enough_dataspace( kaapi_thread_t* thread, size_t size)
   return _kaapi_has_enough_dataspace(thread, size);
 }
 
-#if KAAPI_DEBUG
 /**
 */
 static kaapi_lock_t lock_print = KAAPI_LOCK_INITIALIZER;
@@ -172,7 +171,7 @@ void _kaapi_unlock_print(void)
 {
   kaapi_atomic_unlock(&lock_print);
 }
-#endif
+
 
 /* Default value reset in kaapi_init.
    Warning to keep them coherent.
@@ -294,6 +293,13 @@ int kaapi_setup_param(void)
     if (cuda_cache_limit > 1) cuda_cache_limit = 1.00;
     if (cuda_cache_limit < 0.01) cuda_cache_limit = 0.01;
     kaapi_default_param.cuda_cache_limit = cuda_cache_limit;
+  }
+
+  kaapi_default_param.verbose=0;
+  if (getenv("KAAPI_VERBOSE"))
+  {
+    kaapi_default_param.verbose = atoi(getenv("KAAPI_VERBOSE"));
+    if (kaapi_default_param.verbose <0) kaapi_default_param.verbose = 0;
   }
 
   return 0;

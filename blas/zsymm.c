@@ -148,7 +148,8 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_SYMM,M,N,Am);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_SYMM,M,N,Am);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
@@ -199,7 +200,6 @@ int xkblas_zsymm_async( int side, int uplo, int M, int N,
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
 
     /* map output of C on ressources */
-    xkblas_context_t* xkctxt =xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_SYMM, Ch );
 
 #if KAAPI_USE_TRACELIB==1

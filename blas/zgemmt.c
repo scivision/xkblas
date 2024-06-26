@@ -165,7 +165,8 @@ int xkblas_zgemmt_async(
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_GEMMT,N,N,K);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMMT,N,N,K);
 
 #if 00// TO force synchronous call: may be this should be provided as runtime option
 printf("Gemmt: N=%i, K=%i, NB=%i\n", N,K,NB);
@@ -224,7 +225,6 @@ return xkblas_zgemmt_native(
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
 
     /* map output of C on ressources */
-    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_GEMMT, Ch );
 
 #if KAAPI_USE_TRACELIB==1

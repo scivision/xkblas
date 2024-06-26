@@ -61,6 +61,19 @@
 /* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map */
 #define KAAPI_SIZE_DSM_MAP 20
 
+/* XKBLAS_ADAPTATIVE : if defined to 1 then map thread to fewer GPU and control task granularity
+   To be extended to a set of GPUs.
+   Dependency: require omp.h in order to detect if thread is in parallel region.
+   Next implementation will only be based on internal counter such as GPU activites.
+*/
+static int use_partition_thread_strategy = 0;
+
+#define XKBLAS_ADAPTATIVE 1
+
+#if XKBLAS_ADAPTATIVE==1
+#include <omp.h>
+#endif
+
 static kaapi_team_t*       _xkblas_global_team = 0;
 static kaapi_atomic_t      _xkblas_thread_idx = {0};
 __thread xkblas_context_t* _xkblas_self_context = 0;
@@ -75,8 +88,12 @@ static xkblas_context_t*   _xkblas_list_context = 0;
 
 static xkblas_mode_math_t xkblas_default_math = XKBLAS_DEFAULT_MATH;
 
-
+/* */
 static const char* get_xkblas_info(void);
+
+
+/* default tile size */
+static size_t NB = 0;
 
 /* Deallocate the current xkblas_context */
 static void
@@ -137,6 +154,7 @@ xkblas_context_t* xkblas_context_alloc(void)
     kaapi_thread_t* kthread = kaapi_context2thread(kctxt);
     kaapi_assert( kthread != 0);
     _xkblas_self_thread = kthread;
+
     xkblas_context_t* ctxt = (xkblas_context_t*)malloc(sizeof(xkblas_context_t));
     int err = kaapi_hashmap_init(&ctxt->xkblas_ptr2handle, ctxt->xkblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
     kaapi_assert(err ==0);
@@ -147,6 +165,22 @@ xkblas_context_t* xkblas_context_alloc(void)
     ctxt->xkblas_modemath = xkblas_default_math;
     ctxt->kctxt = kctxt;
     ctxt->kthread = kthread;
+    ctxt->NB = NB; /* copie defaut value */
+    if (use_partition_thread_strategy ==1)
+    {
+      ctxt->ngpus = -1;    /* no gpu defined, take all of them */
+      ctxt->ngpus  = kaapi_default_param.ngpus;
+      kaapi_assert( ctxt->ngpus < XKBLAS_MAX_NGPUS);
+      for (int i=0; i<ctxt->ngpus; ++i)
+        ctxt->gpuset[i] = i;
+    }
+    else
+    {
+      ctxt->ngpus = -1;    /* each XKBLAS is mapped to 1 GPU */
+      ctxt->ngpus  = kaapi_default_param.ngpus;
+      for (int i=0; i<XKBLAS_MAX_NGPUS; ++i)
+        ctxt->gpuset[i] = i;
+    }
 
     /* create default kaapi context & thread */
     int idx = KAAPI_ATOMIC_INCR(&_xkblas_thread_idx);
@@ -286,7 +320,6 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB
 )
 {
-  size_t default_tilesize = xkblas_get_param();
   xkblas_context_t* ctxt = xkblas_context_get();
 
   Ah->addr = A;
@@ -397,13 +430,12 @@ retval:
 
 /* NB = tile size. 0 == value computed at runtime
 */
-static size_t NB = 0;
 void xkblas_set_param(size_t nb, size_t p)
 {
-  NB=nb;
+  //printf( "%s::Set tile size to: %lu\n", __func__, nb );
+  NB = nb;
   if (p > sizeof(double)) /* max precision */
     p = 16;
-  kaapi_memory_set_info( KAAPI_MEMORY_EXPECTED_BLOCK, nb*nb*p );
 }
 
 
@@ -411,7 +443,8 @@ void xkblas_set_param(size_t nb, size_t p)
 */
 size_t xkblas_get_param(void)
 {
-  return NB;
+  xkblas_context_t* xkctxt = xkblas_context_get();
+  return xkctxt->NB;
 }
 
 
@@ -425,7 +458,8 @@ int xkblas_get_devicecount(void)
 */
 int xkblas_get_ngpus(void)
 {
-  return (int)kaapi_default_param.ngpus;
+  xkblas_context_t* xkctxt = xkblas_context_get();
+  return (int)xkctxt->ngpus;
 }
 
 /*
@@ -439,7 +473,8 @@ int xkblas_set_ngpus(int ngpus)
     err = EDOM;
     ngpus = kaapi_default_param.sys_ngpus;
   }
-  kaapi_default_param.ngpus = ngpus;
+  xkblas_context_t* xkctxt = xkblas_context_get();
+  xkctxt->ngpus = ngpus;
   return err;
 }
 
@@ -601,6 +636,7 @@ static void xkblas_free_curr_blochandle(void)
 /* Map all block to 1 GPU
 */
 int xkblas_map_all(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   int gpu, int force
@@ -657,6 +693,7 @@ int xkblas_map_all(
    If matrix is not found return EINVAL
 */
 int xkblas_map_2Dblock_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   size_t Bp, size_t Bq, /* blocking size */
@@ -681,6 +718,9 @@ int xkblas_map_2Dblock_cyclic(
   };
 
   unsigned int count = kaapi_localitydomain_count(type);
+  if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+    count = xkctxt->ngpus;
+
   if (count ==0) return EINVAL;
 
   size_t Amt = Ah->mt;
@@ -694,6 +734,14 @@ int xkblas_map_2Dblock_cyclic(
       if ((ldid ==(uint16_t)-1) || force)
       {
         int r = ( ((i/Bp)%Gp)*Gq + (j/Bq)%Gq ) %count;
+
+        if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+        {
+          int* gpuset = xkctxt->gpuset;
+          kaapi_assert( r<xkctxt->ngpus );
+          r = gpuset[r];
+        }
+
         kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(type, r);
         xkblas_set_ldid(Ah, i, j, ldid = ld->ldid);
 #if KAAPI_USE_OCR
@@ -716,6 +764,7 @@ int xkblas_map_2Dblock_cyclic(
    colrow = 1 -> row mapping
 */
 int xkblas_map_1Dblock_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, int colrow, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   size_t B, size_t G,    /* grid size */
@@ -726,7 +775,7 @@ int xkblas_map_1Dblock_cyclic(
   MB = NB = xkblas_get_param();
   if (colrow == 0)
   {
-    return xkblas_map_2Dblock_cyclic(
+    return xkblas_map_2Dblock_cyclic(xkctxt,
       hlevel, storage, m, n, A, lda, eltsize,
       (m+MB-1)/MB, B,
       1, G,
@@ -735,7 +784,7 @@ int xkblas_map_1Dblock_cyclic(
   }
   else
   {
-    return xkblas_map_2Dblock_cyclic(
+    return xkblas_map_2Dblock_cyclic(xkctxt,
       hlevel, storage, m, n, A, lda, eltsize,
       B, (n+NB-1)/NB,
       G, 1,
@@ -750,6 +799,7 @@ int xkblas_map_1Dblock_cyclic(
 
 
 int xkblas_map_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   int force
@@ -772,6 +822,8 @@ int xkblas_map_cyclic(
   };
 
   unsigned int count = kaapi_localitydomain_count(type);
+  if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+    count = xkctxt->ngpus;
   if (count ==0) return EINVAL;
 
   size_t Amt = Ah->mt;
@@ -787,6 +839,12 @@ int xkblas_map_cyclic(
       if ((ldid ==(uint16_t)-1) || force)
       {
         int r = (i*Ant+j)%count;
+        if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+        {
+          int* gpuset = xkctxt->gpuset;
+          kaapi_assert( r<xkctxt->ngpus );
+          r = gpuset[r];
+        }
         xkblas_set_ldid(Ah, i, j, ldid = kaapi_localitydomain_get_num(type, r));
       }
     }
@@ -796,6 +854,7 @@ int xkblas_map_cyclic(
 
 
 int xkblas_map_ij_cyclic(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   int force
@@ -818,6 +877,8 @@ int xkblas_map_ij_cyclic(
   };
 
   unsigned int count = kaapi_localitydomain_count(type);
+  if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+    count = xkctxt->ngpus;
   if (count ==0) return EINVAL;
 
   size_t Amt = Ah->mt;
@@ -833,6 +894,12 @@ int xkblas_map_ij_cyclic(
       if ((ldid ==(uint16_t)-1) || force)
       {
         int r = (i+j)%count;
+        if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+        {
+          int* gpuset = xkctxt->gpuset;
+          kaapi_assert( r<xkctxt->ngpus );
+          r = gpuset[r];
+        }
         xkblas_set_ldid(Ah, i, j, ldid = kaapi_localitydomain_get_num(type, r));
       }
     }
@@ -840,7 +907,9 @@ int xkblas_map_ij_cyclic(
   return 0;
 }
 
+#if 0
 int xkblas_map_test(
+  xkblas_context_t* xkctxt,
   int hlevel, int storage, size_t m, size_t n,
   const void* A, size_t lda, size_t eltsize,
   int force
@@ -892,7 +961,7 @@ int xkblas_map_test(
   return 0;
 }
 
-
+#endif
 
 /*
 */
@@ -1221,6 +1290,9 @@ int xkblas_init(void)
 {
   if (init_count++ !=0) return 0;
 
+  size_t tile_size = 0;
+  size_t precision = sizeof(double);
+
   if( pthread_key_create(&_pthread_xkblas_context_key, xkblas_pthread_context_clean) != 0 ) {
     // TODO error
     printf("XKBLAS error, unable to create pthread_key\n");
@@ -1229,15 +1301,14 @@ int xkblas_init(void)
   if (getenv("XKBLAS_VERBOSE"))
     setenv("KAAPI_VERBOSE",getenv("XKBLAS_VERBOSE"),1);
 
+
   if (getenv("XKBLAS_TILE_SIZE") || getenv("XKBLAS_BLOC_SIZE") || getenv("XKBLAS_PRECISION"))
   {
-    size_t tile_size = 0;
     if (getenv("XKBLAS_TILE_SIZE") ==0)
-      tile_size = xkblas_get_param();
+      tile_size = NB;
     else
       tile_size = atoi(getenv("XKBLAS_TILE_SIZE"));
 
-    size_t precision = sizeof(double);
     if (getenv("XKBLAS_PRECISION") ==0)
       precision = sizeof(double);
     else {
@@ -1255,11 +1326,13 @@ int xkblas_init(void)
         exit(1); 
       }
     }
+    //printf( "%s::Set tile size to: %lu\n", __func__, tile_size );
+    xkblas_set_param( tile_size, precision );
+
     if (getenv("XKBLAS_VERBOSE"))
     {
       printf("xe size: %lu, precision: %lu\n",tile_size, precision);
     }
-    xkblas_set_param( tile_size, precision );
   }
 
   if (getenv("XKBLAS_NGPUS"))
@@ -1317,7 +1390,18 @@ int xkblas_init(void)
   kaapi_init();
 
   //_xkblas_global_team = kaapi_team_alloc();
-
+#if XKBLAS_ADAPTATIVE
+  if (getenv("XKBLAS_ADAPTIVE"))
+  {
+    if (atoi(getenv("XKBLAS_ADAPTIVE")) != 0)
+      use_partition_thread_strategy = 1;
+    else
+      use_partition_thread_strategy = 0;
+  }
+#else
+  if (getenv("XKBLAS_ADAPTIVE"))
+    printf("***warning: XKBLAS_ADAPTIVE is defined by library not configured to support it\n");
+#endif
 
   if (getenv("XKBLAS_VERBOSE"))
   {
@@ -1358,7 +1442,6 @@ int xkblas_init(void)
 int xkblas_finalize(void)
 {
   if (--init_count !=0) return 0;
-
   int err;
 
   /* TG: with several thread calling xkblas it is not possible to form the correct team
@@ -1367,12 +1450,18 @@ int xkblas_finalize(void)
   kaapi_end_dfg( _xkblas_self_context->kthread );
   kaapi_memory_synchronize();
 
+  /* reset some global variable(s) to default value(s) */
+  NB = 0;
+
   /* */
   kaapi_atomic_lock(&_xkblas_list_lock);
 
   int verbose=0;
   if (getenv("XKBLAS_VERBOSE"))
-    verbose = 1;
+  {
+    verbose = atoi(getenv("XKBLAS_VERBOSE"));
+    if (verbose <0) verbose = 0;
+  }
  
 #if KAAPI_USE_PERFCOUNTER
   int disphead = 0;
@@ -1398,7 +1487,7 @@ int xkblas_finalize(void)
             printf("[XKBlas stats]\n");
             disphead = 1;
           }
-          if (dispdevice ==0)
+          if ((dispdevice ==0) && (verbose>=2))
           {
             printf("\t*device: %i\n", d);
             dispdevice =1;
@@ -1406,14 +1495,17 @@ int xkblas_finalize(void)
           kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
           kaapi_format_get_name(fmt, 0, tmp, sizeof(tmp));
           task_names[i] = strdup(tmp);
-          printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
-            tmp,
-            device->perfcnt.task[i].spawn,
-            device->perfcnt.task[i].time,
-            device->perfcnt.task[i].flops,
-            device->perfcnt.task[i].ai,
-            device->perfcnt.task[i].ai/device->perfcnt.task[i].spawn
-          );
+          if (verbose >=2)
+          {
+            printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
+              tmp,
+              device->perfcnt.task[i].spawn,
+              device->perfcnt.task[i].time,
+              device->perfcnt.task[i].flops,
+              device->perfcnt.task[i].ai,
+              device->perfcnt.task[i].ai/device->perfcnt.task[i].spawn
+            );
+          }
           spawn_count+= device->perfcnt.task[i].spawn;
           time_count+= device->perfcnt.task[i].time;
           flops_count+= device->perfcnt.task[i].flops;
@@ -1433,6 +1525,26 @@ int xkblas_finalize(void)
           flops_count
         );
       }
+    }
+    if (disphead)
+    {
+      printf("Resume for all devices\n");
+      for (kaapi_format_id_t i=0; i<KAAPI_FORMAT_MAX; ++i)
+      { 
+        if (cumul.task[i].spawn >0)
+        { 
+          kaapi_format_t* fmt = kaapi_format_resolve_byfmid(i);
+          printf("\t[%12s]: count=%12li, time=%8e, flops=%10e, ai=%10e bar{ai}=%10e\n",
+            task_names[i],
+            cumul.task[i].spawn,
+            cumul.task[i].time,
+            cumul.task[i].flops,
+            cumul.task[i].ai,
+            cumul.task[i].ai/cumul.task[i].spawn
+          );
+        }
+      } 
+      printf("[XKBlas stats]\n");
     }
   }
 #endif
@@ -1654,8 +1766,6 @@ int xkblas_memory_free(void)
   return 0;
 }
 
-
-
 /*
 */
 int xkblas_memory_syncall(void)
@@ -1792,12 +1902,14 @@ int xkblas_distribute_2Dblock_cyclic_async(
   size_t Gp, size_t Gq  /* grid size */
 )
 {
+  xkblas_context_t* xkctxt = xkblas_context_get();
+  
   xkblas_matrix_descr_t* Ah = xkblas_find(A);
   if (!xkblas_matrix_descr_isinit(Ah)) 
   {
     xkblas_init_matrix_handle(Ah, (void*)A, m, n, lda, eltsize, NB, NB);
   }
-
+  
   kaapi_ld_type_t type;
   switch (hlevel) {
     case 0: type = KAAPI_LD_BOARD; break;
@@ -1810,8 +1922,10 @@ int xkblas_distribute_2Dblock_cyclic_async(
 #endif
       return EINVAL;
   };
-
   unsigned int count = kaapi_localitydomain_count(type);
+  if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+    count = xkctxt->ngpus;
+
   if (count ==0) return EINVAL;
 
   size_t Amt = Ah->mt;
@@ -1824,6 +1938,13 @@ int xkblas_distribute_2Dblock_cyclic_async(
     for (size_t j=0; j<Ant; ++j)
     {
       int r = ( ((i/Bp)%Gp)*Gq + (j/Bq)%Gq ) %count;
+      if ((use_partition_thread_strategy) && (type ==KAAPI_LD_GPU))
+      {
+        int* gpuset = xkctxt->gpuset;
+        kaapi_assert( r<xkctxt->ngpus );
+        r = gpuset[r];
+      }
+
       kaapi_ldid_t ldid = kaapi_localitydomain_get_num(type, r);
       xkblas_create_distribute( Ah, i, j, lda, eltsize, ldid );
       xkblas_set_ldid(Ah, i, j, ldid );
@@ -1866,98 +1987,382 @@ int xkblas_distribute_1Dblock_cyclic_async(
 }
 
 
+/* FLOPS per kernel. TODO: add side
+*/
+double _xkblas_get_cost( double* data, xkblas_kernel_t kernel, size_t M, size_t N, size_t K )
+{ 
+  double flops = 0.0;
+
+  switch (kernel) {
+    case KERN_HERK:
+      *data = DATA_ZHERK(M,N);
+      flops = FLOPS_ZHERK(M, N);
+//printf("%s:: K=%i, N=%i, Flops HERK=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYRK:
+      *data = DATA_ZSYRK(M, N);
+      flops = FLOPS_ZSYRK(M, N);
+//printf("%s:: K=%i, N=%i, Flops SYRK=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_HER2K:
+      *data = DATA_ZHER2K(M, N);
+      flops = FLOPS_ZHER2K(M, N);
+//printf("%s:: K=%i, N=%i, Flops HER2K=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYR2K:
+      *data = DATA_ZSYR2K(M, N);
+      flops = FLOPS_ZSYR2K(M, N);
+//printf("%s:: K=%i, N=%i, Flops SYR2K=%g\n", __func__, M, M, flops);
+    break;
+    case KERN_HEMM:
+      *data = DATA_ZHEMM(CblasLeft, M, N);
+      flops = FLOPS_ZHEMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops HEMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_SYMM:
+      *data = DATA_ZSYMM(CblasLeft, M, N);
+      flops = FLOPS_ZSYMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops SYMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_TRMM:
+      *data = DATA_ZTRMM(CblasLeft, M, N);
+      flops = FLOPS_ZTRMM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops TRMM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_TRSM:
+      *data = DATA_ZTRSM(CblasLeft, M, N);
+      flops = FLOPS_ZTRSM(CblasLeft, M, N);
+//printf("%s:: M=%i, N=%i, Flops TRSM=%g\n", __func__, M, N, flops);
+    break;
+    case KERN_GEMMT:
+      *data = DATA_ZGEMMT(N,K);
+      flops = FLOPS_ZGEMMT(N,K);
+//printf("%s:: M=%i, N=%i, K=%i, Flops GEMMT=%g\n", __func__, M, N, K, flops);
+    break;
+    case KERN_GEMM:
+      *data = DATA_ZGEMM(M, N,K);
+      flops = FLOPS_ZGEMM(M, N,K);
+//printf("%s:: M=%i, N=%i, K=%i, Flops GEMM=%g\n", __func__, M, N, K, flops);
+    break;
+    case KERN_SWAP:
+    case KERN_COPYSCALE:
+      *data = DATA_MAT(M,N);
+      flops = 3*(double)M*(double)N;
+    break;
+    default: 
+      return 0;
+    break;
+  }
+  return flops;
+}
+
+
+
+static inline int min(int a, int b) { return a<b ? a:b; }
+
 /* Return the bloc size:
    - M,N should be the dimension of the result. K depends of the Kernel.
    Return NB such that (M,N) is computed in FACTOR*NGPU blocs
 */
 size_t xkblas_auto_tilesize(
-  xkblas_kernel_t kernel, size_t M, size_t N, size_t K
+  xkblas_context_t* xkctxt, xkblas_kernel_t kernel, size_t M, size_t N, size_t K
 )
 {
   /* get default tile size and initialize internal descriptor if not yet */
-  size_t NB = xkblas_get_param();
-  if (NB !=0) return NB;
-  size_t ngpu = xkblas_get_ngpus();
-  size_t fact = 1;
+  size_t NB = xkctxt->NB;
+  int SW_ngpus= kaapi_localitydomain_count(KAAPI_LD_GPU); /* system wide number of GPUs (on the current node)*/
+  size_t ngpus = xkblas_get_ngpus(); 
+  size_t fact = 2;
+  size_t minNB = 2048; 
+  int force_todefault_mapping = 1;
 
-  switch (kernel)
+#if XKBLAS_ADAPTATIVE==1
+  double data;
+  double W = _xkblas_get_cost(&data, kernel, M, N, K);
+  double Wt = 0.5*(double)min(NB,M)*(double)min(NB,N)*(double)min(NB,K);
+  double D = fact*(double)NB*(double)NB;
+  int cntzero; /* number of inactive GPUs */
+#endif
+
+  if (use_partition_thread_strategy ==0)
   {
-    case KERN_HERK:
-    case KERN_SYRK:
-      {
-        fact = 2;
-redo_syrk:
-        NB = M / (fact*ngpu);
-        if (NB >= 2048)
-          NB= NB & ~2047UL;
-        if ((NB <= 1024) && (fact==2)) 
-        { fact=1; goto redo_syrk;} 
-        if (NB >4096) NB = M / (2*fact*ngpu);
-        if (NB <512) NB = 512;
-      }
-      break;
-
-    case KERN_HER2K:
-    case KERN_SYR2K:
-      {
-        fact = 4;
-redo_syr2k:
-        NB = M / (fact*ngpu);
-        NB= (NB +63UL)& ~63UL;
-        if ((NB <= 2048) && (fact>2))
-        { --fact; goto redo_syr2k;}
-        if (NB >4096) NB = M / (2*fact*ngpu);
-        if (NB <512) NB = 512;
-      }
-      break;
-
-    case KERN_HEMM:
-    case KERN_SYMM:
-      {
-        fact = 4;
-        NB = M / (fact*ngpu);
-        NB= NB & ~1023UL;
-        if (NB >4096) NB = M / (2*fact*ngpu);
-        if (NB <1024) NB = 1024;
-      } 
-      break;
-
-    case KERN_TRMM:
-    case KERN_TRSM:
-      {
-        fact = 2;
-        NB = M / (fact*ngpu);
-        if (NB <1024) NB = 1024;
-        NB = (NB + 63) & ~63UL;
-      }
-      break;
-
-    case KERN_GEMMT:
-    case KERN_GEMM:
-      { 
-        fact = 1;
-        NB = M / (fact*ngpu);
-        if (M >ngpu)
-        {
-          if ((M> 16384)&&(NB<2048)) NB=2048;
-        }
-        if (NB >4096) NB = M / (2*fact*ngpu);
-        if (NB <512) NB = 512;
-        NB = (NB + 63) & ~63UL;
-      }
-      break;
-
-    case KERN_SWAP:
-    default:
-      { 
-        fact = 1;
-        NB = M / (fact*ngpu);
-        if (NB >=4096) NB = M / (2*fact*ngpu);
-        if (NB <1024) NB = 1024;
-        NB = (NB + 63) & ~63UL;
-      }
-      break;
+    force_todefault_mapping = 1;
+    if (NB !=0)
+    {
+#if 0
+      _kaapi_lock_print();
+      printf("%s:: NB fixed to:%i, #GPUS=%i M:%i, N:%i, K:%i\n", __func__, NB, xkctxt->ngpus, M,N,K);
+      _kaapi_unlock_print();
+#endif
+      return NB;
+    }
   }
+  else
+  { /* use or defined xkctxt->ngpus & xkctxt->gpuset
+       Current prototype only detec concurrent BLAS call if xkblas thread are in a parallel OpenMP region
+    */
+#if XKBLAS_ADAPTATIVE==0
+    /* not configure, so this case could never occurs */
+    kaapi_assert(use_partition_thread_strategy ==0);
+#else
+    if (omp_get_num_threads() >1)
+    {
+      force_todefault_mapping = 0;
+      fact = 1;
+
+      int self = xkctxt->kctxt->tid % SW_ngpus;
+      xkctxt->ngpus = 1;
+      xkctxt->gpuset[0] = self;
+
+      float load[SW_ngpus];
+      int izero[SW_ngpus];
+      int imax[KAAPI_IMAX];
+      float max;
+      float min;
+      float avrg;
+      float delta;
+      int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, izero, load);
+      float minmax = max-min;
+#if 0
+      _kaapi_lock_print();
+      printf("%s:: Below L0:: M=%i, N=%i, K=%i LoadAvrg=%g LoadMax=%g CntZero=%i, Load=", __func__, M, N, K, avrg, max, cntzero );
+      for (int i=0; i<SW_ngpus; ++i)
+        printf("%g ", load[i]);
+      printf("\n");
+      _kaapi_unlock_print();
+#endif
+#if 1
+      size_t minNB = 2048; 
+      force_todefault_mapping = 0;
+      if (NB==0) NB = minNB;
+      fact =1;
+
+      //double Pavrg = W/D; /* 1GPU max */
+      xkctxt->ngpus = cntzero; // (Pavrg < cntzero ? (int)Pavrg : cntzero);
+      if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
+      if (cntzero >0)
+      {
+        int j = 1; /* self is already at position 0 */
+        for (int i=0; i<xkctxt->ngpus; ++i) 
+        {
+          if (izero[i] != self)
+          {
+            kaapi_assert_debug( izero[i] < SW_ngpus );
+            xkctxt->gpuset[j++] = izero[i];
+          }
+        }
+      }
+#else
+      /* number of worker is :omp_get_num_threads() */
+      if (cntzero > SW_ngpus/2)
+      {
+        force_todefault_mapping = 1;
+        xkctxt->ngpus = (cntzero > SW_ngpus*2/3 ? (cntzero < SW_ngpus ? cntzero : SW_ngpus) : cntzero/2);
+        if (xkctxt->ngpus==0) { xkctxt->ngpus = 1; }
+        int j = 1; /* self is already at position 0 */
+        for (int i=0; i<xkctxt->ngpus; ++i) 
+        {
+          if (izero[i] != self)
+          {
+            kaapi_assert_debug( izero[i] < SW_ngpus );
+            xkctxt->gpuset[j++] = izero[i];
+          }
+        }
+        minNB *=1;
+
+#if 1
+        if (NB !=0)
+        {
+          return 2*NB;
+        }
+#endif
+      }
+      else /* favor coarse grain local submission with pipelining comm */
+      {
+	minNB *=2;
+        if (NB !=0)
+          return NB*2;
+      }
+#endif // end if 1
+    }
+    else {
+      // In // OpenMP region 
+#if 1// 
+      force_todefault_mapping = 0;
+      size_t minNB = 2048; //xkctxt->NB; //1024; 
+      if (NB==0) NB = minNB;
+      fact =1;
+      double Pavrg = W/D; /* 1GPU max */
+      xkctxt->ngpus = (Pavrg < SW_ngpus ? (int)Pavrg : SW_ngpus);
+      kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
+      for (int i=0; i<xkctxt->ngpus; ++i)
+        xkctxt->gpuset[i] = i;
+#else
+      force_todefault_mapping = 1;
+      fact = 2;
+      xkctxt->ngpus  = SW_ngpus;
+      kaapi_assert( xkctxt->ngpus < XKBLAS_MAX_NGPUS);
+      for (int i=0; i<xkctxt->ngpus; ++i)
+        xkctxt->gpuset[i] = i;
+      if (NB !=0)
+      {
+        return NB;
+      }
+#endif
+    }
+#endif
+  }
+
+  if (force_todefault_mapping ==0)
+  {
+    if (N>M) M =N;
+    switch (kernel)
+    {
+      case KERN_HERK:
+      case KERN_SYRK:
+      case KERN_HER2K:
+      case KERN_SYR2K:
+      case KERN_HEMM:
+      case KERN_SYMM:
+      case KERN_TRMM:
+      case KERN_TRSM:
+      case KERN_GEMMT:
+      case KERN_GEMM:
+      case KERN_SWAP:
+      case KERN_COPYSCALE:
+      default:
+        {
+          /* take max */
+#if 1
+          if (omp_get_num_threads() >1)
+          {
+            double ffact = 4; // fact
+            double k =  W/(ffact * (double)xkctxt->ngpus);
+            double fNB = pow(k,1.0/3.0);
+	    size_t cntb  = ceil(M/fNB);
+            NB = M/cntb;
+            //if ((omp_get_num_threads() >1) && (NB > minNB)) NB = minNB;
+            if (NB > 8192) NB = 8192; /* on MI50, TRSM has an error due to insufficient memory allocation */
+          }
+          else {
+#  if 0
+            NB = M / (fact*xkctxt->ngpus);
+            NB = (NB + 63) & ~63UL;
+            if (NB <minNB) NB = minNB;
+#  else
+            double ffact = 2;
+            double fNB = sqrt( (double)M*(double)N / (ffact * (double)(xkctxt->ngpus * kaapi_default_param.cuda_conc_stream_kernel)) );
+            NB = ceil(fNB);
+#  endif
+         }
+#else
+          NB = M / (fact*xkctxt->ngpus);
+          NB = (NB + 63) & ~63UL;
+#endif
+          if (NB <minNB) NB = minNB;
+#if 0
+printf("%s::%s L0: (M,N,K)=(%llu, %llu, %llu), (W,Wt,D,Pavrg)=(%g,%g,%g,%g) => NB =%llu / NGPU=%i (%i,...)\n", 
+    __func__,  (omp_get_num_threads() >1 ? "Under" : "Above"),
+    M,N,K, W,Wt,D,W/D, NB, xkctxt->ngpus, xkctxt->gpuset[0]);
+#endif
+        }
+        break;
+    }
+  }
+  else /* force_todefault_mapping == 1 */
+  {
+    if (N>M) M =N;
+    switch (kernel)
+    {
+      case KERN_HERK:
+      case KERN_SYRK:
+        {
+          fact = 2;
+  redo_syrk:
+          NB = M / (fact*xkctxt->ngpus);
+          if (NB >= 2048)
+            NB= NB & ~2047UL;
+          if ((NB <= 1024) && (fact==2))
+          { fact=1; goto redo_syrk;}
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
+          if (NB <512) NB = 512;
+        }
+        break;
+
+      case KERN_HER2K:
+      case KERN_SYR2K:
+        {
+          fact = 4;
+  redo_syr2k:
+          NB = M / (fact*xkctxt->ngpus);
+          NB= (NB +63UL)& ~63UL;
+          if ((NB <= 2048) && (fact>2))
+          { --fact; goto redo_syr2k;}
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
+          if (NB <512) NB = 512;
+        }
+        break;
+
+      case KERN_HEMM:
+      case KERN_SYMM:
+        {
+          fact = 4;
+          NB = M / (fact*xkctxt->ngpus);
+          NB= NB & ~1023UL;
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
+          if (NB <1024) NB = 1024;
+        }
+        break;
+
+      case KERN_TRMM:
+      case KERN_TRSM:
+      case KERN_GEMMT:
+      case KERN_GEMM:
+        {
+  //        fact = 2;
+          NB = M / (fact*xkctxt->ngpus);
+          NB = (NB + 63) & ~63UL;
+          if (NB <minNB) NB = minNB;
+        }
+        break;
+
+#if 0
+      case KERN_GEMMT:
+      case KERN_GEMM:
+        {
+          fact = 1;
+          NB = M / (fact*xkctxt->ngpus);
+          if (M >xkctxt->ngpus)
+          {
+            if ((M> 16384)&&(NB<2048)) NB=2048;
+          }
+          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
+          if (NB <512) NB = 512;
+          NB = (NB + 63) & ~63UL;
+        }
+        break;
+#endif
+
+      case KERN_SWAP:
+      case KERN_COPYSCALE: /* TODO ?*/
+      default:
+        {
+          fact = 1;
+          NB = M / (fact*xkctxt->ngpus);
+          if (NB >=4096) NB = M / (2*fact*xkctxt->ngpus);
+          if (NB <1024) NB = 1024;
+          NB = (NB + 63) & ~63UL;
+        }
+        break;
+    }
+  }
+
+#if 0
+  if (force_todefault_mapping==0)
+    printf("%s:: Under L0: #GPUS=%i, GPU[0]:%i, M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, xkctxt->gpuset[0], M,N,K,NB);
+  else
+    printf("%s:: #GPUS=%i, M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, M,N,K,NB);
+#endif
   return NB;
 }
 
@@ -1967,20 +2372,20 @@ redo_syr2k:
 */
 kaapi_atomic_t count_call ={0};
 int xkblas_auto_map(
-  xkblas_context_t* ctxt,
+  xkblas_context_t* xkctxt,
   xkblas_kernel_t kernel,
   xkblas_matrix_descr_t* Ah
 )
 {
-  size_t ngpu = xkblas_get_ngpus();
-  if (ngpu ==0) return EBUSY;
+  size_t ngpus = xkctxt->ngpus;
+  if (ngpus ==0) return EBUSY;
 
   switch (kernel)
   {
     case KERN_SYRK:
 #if 0
     {
-      xkblas_map_ij_cyclic(
+      xkblas_map_ij_cyclic(xkctxt, 
         1, CblasColMajor,
         Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
         0
@@ -2042,20 +2447,21 @@ int xkblas_auto_map(
         /* 2D Bloc cyclic */
         size_t Blkm = 1;
         size_t Blkn = 1;
-        size_t Gm = sqrt(ngpu);
+        size_t Gm = sqrt(ngpus);
         size_t Gn = Gm;
-        if (Gm ==0) { Gn = ngpu; Gm = 1; }
+        if (Gm ==0) { Gn = ngpus; Gm = 1; }
         else {
-          /* find the most square decomposition of ngpu in Gm x Gn */
+          /* find the most square decomposition of ngpus in Gm x Gn */
           size_t g;
           for (g = Gm+1; g>0; --g)
-             if (ngpu % g == 0) break;
-          if (g==0) { Gm = ngpu; Gn = 1; }
-          //if (g==0) { Gm = 1; Gn = ngpu; }
-          else { Gm = g; Gn = ngpu/g; }
+             if (ngpus % g == 0) break;
+          if (g==0) { Gm = ngpus; Gn = 1; }
+          //if (g==0) { Gm = 1; Gn = ngpus; }
+          else { Gm = g; Gn = ngpus/g; }
         }
         //printf("Block2D cyclic: Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", Blkm, Blkn, Gm, Gn);
         xkblas_map_2Dblock_cyclic(
+          xkctxt,
           1, CblasColMajor,
           Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
           Blkm, Blkn, Gm, Gn, 0
@@ -2070,9 +2476,10 @@ int xkblas_auto_map(
         //  Blkm, Blkn, Gm, Gn, 0
         //);
         xkblas_map_all(
+          xkctxt,
           1, CblasColMajor,
           Ah->M, Ah->N, Ah->addr, Ah->ld, Ah->eltsize,
-          GPU % ngpu, 0
+          GPU % ngpus, 0
         );
        }
 #endif
@@ -2085,7 +2492,6 @@ int xkblas_auto_map(
   }
   return 0;
 }
-
 
 
 
@@ -2131,9 +2537,11 @@ const char* get_xkblas_info(void)
   static char buffer[8192];
   static int isinit = 0;
   if (isinit ==0)
-    snprintf( buffer, 8192, 
+    snprintf( buffer, 8192,
+            "  GPU PART.: %s\n"
             "  TILE_SIZE: %lu\n"
             "  MODE_MATH: %s\n",
+         (use_partition_thread_strategy ==0 ? "NONE" : "THREAD"),
          xkblas_get_param(),
          (xkblas_default_math == XKBLAS_TENSOR_OP_MATH ? "TensorCore" : "Default")
     );

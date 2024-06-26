@@ -136,22 +136,6 @@ static __thread int thread_type = 0;
 //#  define CONFIG_SYNCHRONOUS_KERNEL 1
 
 /* counters */
-enum {
-  CUDA_CNT_H2D =0,
-  CUDA_SIZE_H2D,
-  CUDA_CNT_D2H,
-  CUDA_SIZE_D2H,
-  CUDA_CNT_D2D,
-  CUDA_SIZE_D2D,
-  CUDA_MAX_COUNTERS
-};
-#define COUNTER_CNT_H2D   device->counter[CUDA_CNT_H2D]
-#define COUNTER_SIZE_H2D  device->counter[CUDA_SIZE_H2D]
-#define COUNTER_CNT_D2H   device->counter[CUDA_CNT_D2H]
-#define COUNTER_SIZE_D2H  device->counter[CUDA_SIZE_D2H]
-#define COUNTER_CNT_D2D   device->counter[CUDA_CNT_D2D]
-#define COUNTER_SIZE_D2D  device->counter[CUDA_SIZE_D2D]
-
 
 #if KAAPI_CUDA_CACHE
 typedef struct cuda_cache_blk cuda_cache_blk_t;
@@ -173,9 +157,6 @@ typedef struct {
   kaapi_device_t inherited;
   int            save_device_id;
   uint64_t*      affinity; /* of size cuda_count_perfrank -1 */
-  size_t         free_mem;
-  size_t         size_alloc;
-  size_t         size_free;
 
   /* device properties (from NVIDIA website) */
   struct {
@@ -194,7 +175,6 @@ typedef struct {
 #if KAAPI_CUDA_CACHE
   cuda_cache_t* cache;
 #endif
-  size_t counter[CUDA_MAX_COUNTERS];
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
   cublasHandle_t    handle;
 #endif
@@ -366,7 +346,7 @@ static void _kaapi_get_gpu_topo(void)
   }
 
 #if KAAPI_DEBUG
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
   {
     char buffer[device_count+1];
     buffer[device_count] = 0;
@@ -431,7 +411,7 @@ static void cuda_mem_cache_init(kaapi_device_cuda_t* dev)
   cudaError_t res;
   size_t size;
   
-  size = (size_t)(dev->free_mem * PERCENTAGE);
+  size = (size_t)(dev->inherited.free_mem * PERCENTAGE);
   res = cudaMalloc( &ptr, size );
   kaapi_assert(res !=  cudaErrorMemoryAllocation );
   CudaCheckError(res);
@@ -517,7 +497,7 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
 
   /* here we limit the size of allocated memory for the cache system */
-  if (((device->size_alloc - device->size_free) + size) > device->inherited.mem_limit)
+  if (((device->inherited.size_alloc - device->inherited.size_free) + size) > device->inherited.mem_limit)
   {
     if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
     return 0;
@@ -539,11 +519,11 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 #if _PLUGIN_DEBUG
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
-  device->size_alloc += size;
+  device->inherited.size_alloc += size;
 
   if (flag)
   {
-    if ( 1.0*(device->size_alloc - device->size_free) / device->inherited.mem_limit >= 0.9)
+    if ( 1.0*(device->inherited.size_alloc - device->inherited.size_free) / device->inherited.mem_limit >= 0.9)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
@@ -561,7 +541,7 @@ static void cuda_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t size)
 
   res = cudaFree((void*)ptr);
   CudaCheckError(res);
-  device->size_free += size;
+  device->inherited.size_free += size;
 
 #if _PLUGIN_DEBUG
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
@@ -690,9 +670,9 @@ static size_t cuda_get_free_mem(kaapi_memory_device_t* dev)
   res = cudaMemGetInfo(&free, &total);
   CudaCheckError(res);
 
-  device->free_mem = (size_t)free;
+  device->inherited.free_mem = (size_t)free;
 
-  return device->free_mem;
+  return device->inherited.free_mem;
 }
 
 
@@ -1147,8 +1127,8 @@ _kaapi_unlock_print();
                                      size,
                                      cudaMemcpyHostToDevice,
                                      *stream);
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D+= size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev) += size;
             break;
             case KAAPI_IO_COPY_D2H:
 #if 0// KAAPI_DEBUG
@@ -1161,8 +1141,8 @@ _kaapi_unlock_print();
                                      size,
                                      cudaMemcpyDeviceToHost,
                                      *stream);
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H+= size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)+= size;
             break;
 
             case KAAPI_IO_COPY_D2D:
@@ -1177,8 +1157,8 @@ _kaapi_unlock_print();
                                          kaapi_device_ids[op->dev_src->device->device_id],
                                          size,
                                          *stream);
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D+= size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)+= size;
             break;
             default:
               kaapi_assert_debug(0);
@@ -1221,8 +1201,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D   += size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2H:
 #if 0// KAAPI_DEBUG
@@ -1231,8 +1211,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H   += size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2D:
 #if 0// KAAPI_DEBUG
@@ -1241,8 +1221,8 @@ _kaapi_lock_print();
 _kaapi_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, *stream );
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D   += size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev) += size;
             break;
             default:
               kaapi_assert(0);
@@ -1334,6 +1314,7 @@ _kaapi_unlock_print();
       res = cudaStreamSynchronize( *stream );
       kaapi_assert(res == CUDA_SUCCESS);
 
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
       float gpu_delay;
       res = cudaEventElapsedTime ( &gpu_delay, cios->start_events[ios->pos_wp % ios->count], cios->end_events[ios->pos_wp % ios->count] );
       if (res != cudaSuccess) {
@@ -1343,6 +1324,7 @@ _kaapi_unlock_print();
       uint64_t delay = gpu_delay*1000.0; // convert to ns
       KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          2 /* end */, op->reserved, delay );
+#endif
       ++ios->ok_p;
 #elif CONFIG_USE_EVENT 
       res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
@@ -1574,6 +1556,19 @@ static int cuda_stream_process_pending(
           status.gpu_delay *= 1e-3;
           status.cpu_delay = op->t2 - op->t1; 
 #endif
+          if ((op->type >= KAAPI_IO_COPY_H2H) && (op->type <= KAAPI_IO_COPY_D2D))
+          {
+            status.bytes = kaapi_memory_view_size(op->inst.c_io.view_src);
+#if KAAPI_USE_PERFCOUNTER
+            device->sum_comdelay += status.gpu_delay;
+            device->sum_bwd += status.bytes / status.gpu_delay;
+            device->size_com += status.bytes;
+//            printf("(*)%g MB, %g s, bwd: %g\n", status.bytes*1.0/(1024*1024.0), status.gpu_delay, status.bytes / (1024.0*1024.0*status.gpu_delay) );
+            ++device->cnt_com;
+#endif
+          }
+
+
           if (op->inst.cbk.fnc)
             op->inst.cbk.fnc(status, ios, op->inst.cbk.arg[0], op->inst.cbk.arg[1], op->inst.cbk.arg[2]);
   
@@ -2142,9 +2137,9 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   strncpy(device->prop.name, prop.name, 64);
 
   /* memory device */
-  device->size_alloc = 0;
-  device->size_free = 0;
-  device->free_mem = 0;
+  device->inherited.size_alloc = 0;
+  device->inherited.size_free = 0;
+  device->inherited.free_mem = 0;
 #if KAAPI_CUDA_CACHE
   dev->memdev.f_alloc = cuda_mem_alloc_cache;
   dev->memdev.f_free = cuda_mem_free_cache;
@@ -2172,11 +2167,11 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
     res = cudaMemGetInfo(&free, &total);
     CudaCheckError(res);
 
-    device->free_mem = (size_t)free;
+    device->inherited.free_mem = (size_t)free;
   }
   /* limit the memory allocation: reserve about 180MB for runing something */
   dev->mem_limit = (size_t)((double)kaapi_default_param.cuda_cache_limit
-          * (double)(device->free_mem-180UL*1024UL*1024UL));
+          * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
   dev->memdev.f_get_source = cuda_get_source;
 
 #if KAAPI_CUDA_CACHE
@@ -2323,16 +2318,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_finalize)(kaapi_device_t* dev)
     cublasDestroy(device->handle);
 #endif
 
-  if (getenv("KAAPI_VERBOSE"))
-  {
-# if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %li\n", device->inherited.device_id, dev->cnt_task);
-# endif
-    printf("%i, MEM : %li, %li\n", device->inherited.device_id, device->size_alloc, device->size_free);
-    printf("%i, H2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_H2D, COUNTER_SIZE_H2D);
-    printf("%i, D2H : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2H, COUNTER_SIZE_D2H);
-    printf("%i, D2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2D, COUNTER_SIZE_D2D);
-  }
   dev->state = KAAPI_DEVICE_STATE_FINALIZED;
   KAAPI_OFFLOAD_TRACE_OUT
 }

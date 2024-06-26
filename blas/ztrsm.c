@@ -157,7 +157,8 @@ int xkblas_ztrsm_async(
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_TRSM,N,NRHS,NA);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_TRSM,N,NRHS,NA);
 		//NB = 64;
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
@@ -200,7 +201,6 @@ int xkblas_ztrsm_async(
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
 
-    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_TRSM, Bh );
 
 #if KAAPI_USE_TRACELIB==1

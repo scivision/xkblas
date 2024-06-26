@@ -55,8 +55,9 @@
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
 #include <rocblas/rocblas.h>
-//#include <internal/rocblas-functions.h>
-//#include <internal/rocblas-auxiliary.h>
+#if KAAPI_USE_ROCSMI
+#  include <rocm_smi/rocm_smi.h>
+#endif
 
 #if KAAPI_HAVE_IO_THREADS
 #error "Not supported"
@@ -82,7 +83,7 @@ static __thread int thread_type = 0;
 */
 #if KAAPI_USE_HWLOC
 #include "hwloc.h"
-#if KAAPI_USE_ROCSMI
+#if KAAPI_USE_HWLOCROCSMI
 #  include "hwloc/rsmi.h"
 #endif
 #include "hwloc/glibc-sched.h"
@@ -126,31 +127,10 @@ static __thread int thread_type = 0;
 //#  undef CONFIG_SYNCHRONOUS_KERNEL 
 //#  define CONFIG_SYNCHRONOUS_KERNEL 0
 
-/* counters */
-enum {
-  HIP_CNT_H2D =0,
-  HIP_SIZE_H2D,
-  HIP_CNT_D2H,
-  HIP_SIZE_D2H,
-  HIP_CNT_D2D,
-  HIP_SIZE_D2D,
-  HIP_MAX_COUNTERS
-};
-#define COUNTER_CNT_H2D   device->counter[HIP_CNT_H2D]
-#define COUNTER_SIZE_H2D  device->counter[HIP_SIZE_H2D]
-#define COUNTER_CNT_D2H   device->counter[HIP_CNT_D2H]
-#define COUNTER_SIZE_D2H  device->counter[HIP_SIZE_D2H]
-#define COUNTER_CNT_D2D   device->counter[HIP_CNT_D2D]
-#define COUNTER_SIZE_D2D  device->counter[HIP_SIZE_D2D]
-
-
 typedef struct {
   kaapi_device_t inherited;
   int            save_device_id;
   uint64_t*      affinity; /* of size hip_count_perfrank -1 */
-  size_t         free_mem;
-  size_t         size_alloc;
-  size_t         size_free;
 
   /* device properties (from NVIDIA website) */
   struct {
@@ -166,7 +146,6 @@ typedef struct {
 #if KAAPI_HAVE_IO_THREADS
   pthread_t tidio[2];
 #endif
-  size_t counter[HIP_MAX_COUNTERS];
 #if KAAPI_USE_PERSTREAM_BLASHANDLE==0
   hipblasHandle_t    handle;
 #endif
@@ -266,61 +245,157 @@ static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
 
 
 /* */
+#define MAX_PERFF_RANK 64
+uint64_t all_perfrank[MAX_PERFF_RANK];
+static uint64_t insert_perfrank( uint64_t new_rank)
+{
+  int i;
+  for (i=0; i<MAX_PERFF_RANK; ++i)
+  {
+    if (all_perfrank[i] == 0) break;
+    if (all_perfrank[i] == new_rank) return new_rank;
+  }
+  kaapi_assert( i < MAX_PERFF_RANK );
+  all_perfrank[i] = new_rank;
+  return new_rank;
+}
+
+static int find_perfrank( int cnt, uint64_t rank )
+{
+  int i;
+  for (i=0; i<cnt; ++i)
+  {
+    if (all_perfrank[i] == rank) return i;
+  }
+  kaapi_assert( 0 );
+  return -1;
+}
+
+static int comp_perfRank(const void* a, const void* b)
+{
+  uint64_t i1 = *(uint64_t*)a;
+  uint64_t i2 = *(uint64_t*)b;
+  if (i1 ==i2) return 0;
+  if (i1 < i2) return 1;
+  return -1;
+}
+
+/* */
 static void _kaapi_get_gpu_topo(void)
 {
   hipError_t res;
-  int min_perf= 0; /* min_perf >= max_perf */
-  int max_perf= 0;
-  int device_count;
-  kaapi_hip_CheckError(hipGetDeviceCount(&device_count));
+  uint64_t min_perf= UINT64_MAX; /* min_perf <= max_perf */
+  uint64_t max_perf= 0;
+  int device_count = 0;
+  rsmi_status_t err;
+
+  err = rsmi_init(0);
+  err = rsmi_num_monitor_devices(&device_count);
+
+  /* assume that device_count not to high */
+  kaapi_assert( device_count <= MAX_PERFF_RANK );
+  uint64_t perfRank = 0;
+  uint64_t hops;
+  uint64_t min_bandwidth, max_bandwidth;
+  uint64_t weight;
+  for (int i=0; i<MAX_PERFF_RANK; ++i) all_perfrank[i] = 0;
 
   if (device_count ==0) return;
   hip_device_count = device_count;
   hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
 
+  RSMI_IO_LINK_TYPE type;
   // Enumerates Device <-> Device links and store perfRank
   for (int device1 = 0; device1 < device_count; device1++)
   {
     for (int device2 = 0; device2 < device_count; device2++)
     {
       if (device1 == device2) 
-        hip_perf_topo[device1*device_count+device2] = 0;
+      {
+        perfRank = insert_perfrank(UINT64_MAX);
+        if (perfRank > max_perf)
+          max_perf= perfRank;
+        hip_perf_topo[device1*device_count+device2] = perfRank;
+        hops =0;
+        weight = 0;
+        type = RSMI_IOLINK_TYPE_SIZE;
+      }
       else 
       {
-        int perfRank = 0;
         int accessSupported = 0;
+        uint16_t dev_id1, dev_id2;
+        err = rsmi_dev_id_get(device1, &dev_id1);
+        err = rsmi_dev_id_get(device2, &dev_id2);
 
-        kaapi_hip_CheckError(
-          hipDeviceGetP2PAttribute(&accessSupported, hipDevP2PAttrAccessSupported,
-            device1, device2));
-        if (accessSupported)
+        err = rsmi_topo_get_link_type(device1, device2, &hops, &type);
+        if (hops>0)
         {
-          kaapi_hip_CheckError(
-            hipDeviceGetP2PAttribute(&perfRank, hipDevP2PAttrPerformanceRank,
-              device1, device2));
-          if (perfRank < max_perf)
+          err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
+          err = rsmi_topo_get_link_weight(device1, device2,&weight);
+          if (max_bandwidth ==0) max_bandwidth = 1;
+          perfRank = insert_perfrank(max_bandwidth);
+          if (perfRank > max_perf)
             max_perf= perfRank;
-          if (perfRank > min_perf)
+          if (perfRank < min_perf)
             min_perf= perfRank;
-          hip_perf_topo[device1*device_count+device2] = 1+perfRank;
+          hip_perf_topo[device1*device_count+device2] = perfRank;
         }
         else
-          hip_perf_topo[device1*device_count+device2] = -1; /* should be higher than previous value: computed after */
+        {
+          perfRank = 1;
+          if (perfRank < min_perf)
+            min_perf= perfRank;
+          hip_perf_topo[device1*device_count+device2] = insert_perfrank(1); /* should be higher than previous value: computed after */
+        }
       }
+      char* stype = "undefined type";
+      if (type == RSMI_IOLINK_TYPE_PCIEXPRESS) stype = "PCIe";
+      else if (type == RSMI_IOLINK_TYPE_XGMI) stype = "XGMI";
+      else if (type == RSMI_IOLINK_TYPE_UNDEFINED) stype = "undefined";
+
+#if KAAPI_DEBUG
+      if (kaapi_default_param.verbose)
+      {
+        printf("weight:(%i,%i)=%lu\n", device1, device2, weight );
+        printf("type:(%i,%i)=%s\n", device1, device2, stype );
+        printf("hop:(%i,%i)=%lu\n", device1, device2, hops );
+        printf("perfRank: (%i,%i)=%lu\n", device1, device2, perfRank );
+      }
+#endif
     }
   }
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+  {
+    printf("Topo: max perf = %lu\n", max_perf);
+    printf("Topo: min perf = %lu\n", min_perf);
+  }
+#endif
+
+  /* sort in deacreasing order the performance rank */
+  qsort(all_perfrank, MAX_PERFF_RANK, sizeof(uint64_t), comp_perfRank );
+  int i;
+  for (i=0; i<MAX_PERFF_RANK; ++i)
+  {
+    if (all_perfrank[i] ==0) break;
+#if KAAPI_DEBUG
+    if (kaapi_default_param.verbose)
+    {
+      printf("PerRank[%i]=%lu\n", i, all_perfrank[i] );
+    }
+#endif
+  }
+  hip_count_perfrank = i;
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+  {
+    printf("Number of performance rank: %lu\n", hip_count_perfrank);
+  }
+#endif
 
   /* number of performance links: max_perf-min_perf+3  
-     - max_perf-min_perf+1 if GPUs peer access is enable
-     - +1 if GPU peer access is not enable
-     - +1 for local inter access
   */
-  min_perf++;
-  hip_count_perfrank= min_perf-max_perf+2;
-  int perfrank_nolink= min_perf-max_perf+1;
   int rank;
-  for (int device = 0; device < device_count*device_count; device++)
-    if (hip_perf_topo[device] == -1) hip_perf_topo[device] = min_perf+1;
   size_t size = device_count*hip_count_perfrank*sizeof(uint64_t);
   hip_perf_device = malloc( size );
   for (int i=0; i<device_count*hip_count_perfrank; ++i)
@@ -330,15 +405,16 @@ static void _kaapi_get_gpu_topo(void)
   {
     for (int device2 = 0; device2 < device_count; device2++)
     {
-      rank = hip_perf_topo[device1*device_count+device2]; 
-      kaapi_assert( 0<= device1*device_count+ rank );
-      kaapi_assert( device1*hip_count_perfrank+ rank <= device_count*hip_count_perfrank);
+      rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*device_count+device2] );
+      //kaapi_assert( 0<= device1*device_count+ rank );
+      //kaapi_assert( device1*hip_count_perfrank+ rank <= device_count*hip_count_perfrank);
       hip_perf_device[device1*hip_count_perfrank+ rank] |= (1UL<<device2);
+      //hip_perf_topo[device1*device_count+device2] = rank;
     }
   }
 
 #if KAAPI_DEBUG
-  if (getenv("KAAPI_VERBOSE"))
+  if (kaapi_default_param.verbose)
   {
     char buffer[device_count+1];
     buffer[device_count] = 0;
@@ -373,6 +449,7 @@ static void _kaapi_get_gpu_topo(void)
     } 
   } 
 #endif
+  err = rsmi_shut_down();
 }
 #endif
 
@@ -401,7 +478,7 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
 
   /* here we limit the size of allocated memory for the cache system */
-  if (((device->size_alloc - device->size_free) + size) > device->inherited.mem_limit)
+  if (((device->inherited.size_alloc - device->inherited.size_free) + size) > device->inherited.mem_limit)
   {
     if (flag) *flag = KAAPI_MEMORY_DEVICE_FLAG_FULL;
     return 0;
@@ -423,11 +500,11 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
 #if _PLUGIN_DEBUG
   fprintf(stdout, "hip:%s: self:%p, tid:%i, alloc ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
-  device->size_alloc += size;
+  device->inherited.size_alloc += size;
 
   if (flag)
   {
-    if ( 1.0*(device->size_alloc - device->size_free) / device->inherited.mem_limit >= 0.9)
+    if ( 1.0*(device->inherited.size_alloc - device->inherited.size_free) / device->inherited.mem_limit >= 0.9)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
@@ -445,7 +522,7 @@ static void kaapi_hip_free(kaapi_memory_device_t* dev, uintptr_t ptr, size_t siz
 
   res = hipFree((void*)ptr);
   kaapi_hip_CheckError(res);
-  device->size_free += size;
+  device->inherited.size_free += size;
 
 #if _PLUGIN_DEBUG
   fprintf(stdout, "hip:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
@@ -582,9 +659,9 @@ static size_t kaapi_hip_get_free_mem(kaapi_memory_device_t* dev)
   res = hipMemGetInfo(&free, &total);
   kaapi_hip_CheckError(res);
 
-  device->free_mem = (size_t)free;
+  device->inherited.free_mem = (size_t)free;
 
-  return device->free_mem;
+  return device->inherited.free_mem;
 }
 
 
@@ -1059,8 +1136,8 @@ pthread_mutex_lock(&access_lock);
                                      size,
                                      hipMemcpyHostToDevice,
                                      *stream);
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D+= size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)+= size;
             break;
             case KAAPI_IO_COPY_D2H:
               res = hipMemcpyAsync( dest,
@@ -1068,8 +1145,8 @@ pthread_mutex_lock(&access_lock);
                                      size,
                                      hipMemcpyDeviceToHost,
                                      *stream);
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H+= size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)+= size;
             break;
 
             case KAAPI_IO_COPY_D2D:
@@ -1079,8 +1156,8 @@ pthread_mutex_lock(&access_lock);
                                          kaapi_device_ids[op->dev_src->device->device_id],
                                          size,
                                          *stream);
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D+= size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)+= size;
             break;
             default:
               kaapi_assert_debug(0);
@@ -1122,18 +1199,18 @@ pthread_mutex_lock(&access_lock);
             break;
             case KAAPI_IO_COPY_H2D:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyHostToDevice, *stream );
-              COUNTER_CNT_H2D++;
-              COUNTER_SIZE_H2D   += size;
+              COUNTER_CNT_H2D(dev)++;
+              COUNTER_SIZE_H2D(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2H:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToHost, *stream );
-              COUNTER_CNT_D2H++;
-              COUNTER_SIZE_D2H   += size;
+              COUNTER_CNT_D2H(dev)++;
+              COUNTER_SIZE_D2H(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2D:
               res = hipMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice, *stream );
-              COUNTER_CNT_D2D++;
-              COUNTER_SIZE_D2D   += size;
+              COUNTER_CNT_D2D(dev)++;
+              COUNTER_SIZE_D2D(dev)   += size;
             break;
             default:
               kaapi_assert(0);
@@ -1327,25 +1404,25 @@ static int kaapi_hip_stream_advance_pending(
             //goto break_label;
             pthread_yield();
           else {
-#if KAAPI_USE_TRACELIB==1
-            float delay; /* ms */
-            res = hipEventElapsedTime ( &delay, cios->start_events[idx], cios->end_events[idx] );
+#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+            float gpu_delay; /* ms */
+            res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
             if (res != hipSuccess) {
               printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
-              delay = 0;
+              gpu_delay = 0;
               kaapi_assert(0);
             }
             if (op->type != KAAPI_IO_KERN)
             {
               KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*delay));
+                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*gpu_delay));
+//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*gpu_delay));
             }
             else
             {
               KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*delay) );
-//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*delay));
+                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*gpu_delay) );
+//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*gpu_delay));
             }
 #endif
             if (prev_iosokp+1 == ios_okp) ++prev_iosokp;
@@ -1472,6 +1549,18 @@ static int kaapi_hip_stream_process_pending(
           status.gpu_delay *= 1e-3;
           status.cpu_delay = op->t2 - op->t1; 
 #endif
+          if ((op->type >= KAAPI_IO_COPY_H2H) && (op->type <= KAAPI_IO_COPY_D2D))
+          {
+            status.bytes = kaapi_memory_view_size(op->inst.c_io.view_src);
+#if KAAPI_USE_PERFCOUNTER
+            device->sum_comdelay += status.gpu_delay;
+            device->sum_bwd += status.bytes / status.gpu_delay;
+            device->size_com += status.bytes;
+//            printf("(*)%g MB, %g s, bwd: %g\n", status.bytes*1.0/(1024*1024.0), status.gpu_delay, status.bytes / (1024.0*1024.0*status.gpu_delay) );
+            ++device->cnt_com;
+#endif
+          }
+
           if (op->inst.cbk.fnc)
             op->inst.cbk.fnc(status, ios, op->inst.cbk.arg[0], op->inst.cbk.arg[1], op->inst.cbk.arg[2]);
   
@@ -1625,7 +1714,7 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
 
   cpuset = hwloc_bitmap_alloc();
 #  if KAAPI_USE_HIP 
-#    if KAAPI_USE_ROCSMI
+#    if KAAPI_USE_HWLOCROCSMI
   err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
 #    endif
   if (err == 0)
@@ -2042,9 +2131,9 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
   strncpy(device->prop.name, prop.name, 64);
 
   /* memory device */
-  device->size_alloc = 0;
-  device->size_free = 0;
-  device->free_mem = 0;
+  device->inherited.size_alloc = 0;
+  device->inherited.size_free = 0;
+  device->inherited.free_mem = 0;
   if (getenv("KAAPI_NO_GPUALLOCATOR"))
   {
     printf("[XKAAPI] KAAPI_NO_GPUALLOCATOR but Hip driver do not support it. Ignored.\n");
@@ -2062,11 +2151,11 @@ KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* dev)
     res = hipMemGetInfo(&free, &total);
     kaapi_hip_CheckError(res);
 
-    device->free_mem = (size_t)free;
+    device->inherited.free_mem = (size_t)free;
   }
   /* limit the memory allocation: reserve about 180MB for runing something */
   dev->mem_limit = (size_t)((double)kaapi_default_param.cuda_cache_limit
-          * (double)(device->free_mem-180UL*1024UL*1024UL));
+          * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
   dev->memdev.f_get_source = kaapi_hip_get_source;
 
   /* stream device */
@@ -2141,7 +2230,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
       }
       int device1 = kaapi_device_ids[device->inherited.device_id];
       int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
-      int rank = hip_perf_topo[device1*hip_device_count+device2];
+      int rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*hip_device_count+device2]);
       kaapi_assert_debug(rank !=0);
       if (hip_perf_device[ device1*hip_count_perfrank+ rank] & (1<<device2))
       {
@@ -2212,16 +2301,6 @@ KAAPI_PLUGIN_ENTRYPOINT(device_finalize)(kaapi_device_t* dev)
     hipblasDestroy(device->handle);
 #endif
 
-  if (getenv("KAAPI_VERBOSE"))
-  {
-# if KAAPI_USE_PERFCOUNTER
-    printf("%i, TASK: %u\n", device->inherited.device_id, dev->cnt_task);
-# endif
-    printf("%i, MEM : %li, %li\n", device->inherited.device_id, device->size_alloc, device->size_free);
-    printf("%i, H2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_H2D, COUNTER_SIZE_H2D);
-    printf("%i, D2H : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2H, COUNTER_SIZE_D2H);
-    printf("%i, D2D : %li, %li\n", device->inherited.device_id, COUNTER_CNT_D2D, COUNTER_SIZE_D2D);
-  }
   dev->state = KAAPI_DEVICE_STATE_FINALIZED;
   KAAPI_OFFLOAD_TRACE_OUT
 }

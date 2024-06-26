@@ -153,7 +153,8 @@ int xkblas_zher2k_async( int uplo, int trans, int N, int K,
         return 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_HER2K,N,K,Am);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_HER2K,N,K,Am);
 
     xkblas_matrix_descr_t* Ah = xkblas_find(A);
     xkblas_matrix_descr_t* Bh = xkblas_find(B);
@@ -203,7 +204,6 @@ int xkblas_zher2k_async( int uplo, int trans, int N, int K,
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
 
-    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_HER2K, Ch );
 
 #if KAAPI_USE_TRACELIB==1

@@ -450,6 +450,7 @@ kaapi_offload_find_plugins(void)
 #if KAAPI_USE_HOST_PLUGIN
 {
   current = malloc(sizeof(kaapi_driver_t));
+  memset(current, 0, sizeof(*current));
   extern void KAAPI_PLUGIN_ENTRYPOINT(get_host_driver)(kaapi_driver_t* driver);
   KAAPI_PLUGIN_ENTRYPOINT(get_host_driver)(current);
   current->name = "HOST";
@@ -469,6 +470,7 @@ kaapi_offload_find_plugins(void)
 #if KAAPI_USE_CUDA
 {
   current = malloc(sizeof(kaapi_driver_t));
+  memset(current, 0, sizeof(*current));
   extern void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver);
   KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(current);
   current->name = "CUDA";
@@ -486,6 +488,7 @@ kaapi_offload_find_plugins(void)
 #elif KAAPI_USE_HIP
 {
   current = malloc(sizeof(kaapi_driver_t));
+  memset(current, 0, sizeof(*current));
   extern void KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(kaapi_driver_t* driver);
   KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(current);
   current->name = "HIP";
@@ -699,6 +702,22 @@ int kaapi_offload_finalize(void)
   /* */
   while (kaapi_list_drivers !=0)
   {
+#if KAAPI_USE_PERFCOUNTER
+    /* do not print stats for virtual device cpu */
+    if ((kaapi_default_param.verbose>0) && (kaapi_list_drivers->f_get_type() != KAAPI_PROC_TYPE_CPU))
+    {
+      printf("Resume for driver: %s\n", kaapi_list_drivers->name );
+      printf("\tTASK: %u\n", kaapi_list_drivers->cnt_task );
+      printf("\tWORK: %g (cpu s), %g (gpu s)\n", kaapi_list_drivers->sum_cpudelay, kaapi_list_drivers->sum_gpudelay );
+      printf("\tMEM : %lu, %lu\n", kaapi_list_drivers->size_alloc, kaapi_list_drivers->size_free);
+      printf("\tH2D : %li, %li\n", COUNTER_CNT_H2D(kaapi_list_drivers), COUNTER_SIZE_H2D(kaapi_list_drivers));
+      printf("\tD2H : %li, %li\n", COUNTER_CNT_D2H(kaapi_list_drivers), COUNTER_SIZE_D2H(kaapi_list_drivers));
+      printf("\tD2D : %li, %li\n", COUNTER_CNT_D2D(kaapi_list_drivers), COUNTER_SIZE_D2D(kaapi_list_drivers));
+      printf("\tCOM : %g MB, %g s\n", kaapi_list_drivers->size_com*1.0/(1024.0*1024.0), kaapi_list_drivers->sum_comdelay);
+      printf("\tABWD: %g MB/s\n", kaapi_list_drivers->sum_bwd/kaapi_list_drivers->cnt_com /(1024.0*1024.0));
+    }
+#endif
+
     kaapi_driver_t* next_driver = kaapi_list_drivers->next;
     kaapi_list_drivers->f_finalize();
 #if KAAPI_USE_DYNLOADER

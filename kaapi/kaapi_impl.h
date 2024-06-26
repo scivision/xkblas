@@ -58,7 +58,7 @@
 */
 #define KAAPI_SIZE_DSM_MAP 20
 
-/* Define to 1 if xkaapi/xkblas uses its own heap allocator (experimental) else 0
+/* Define to 1 if xkaapi/xkblas uses its own heap allocator else 0
 */
 #define KAAPI_USE_OWN_HEAP_ALLOCATOR 1
 #if KAAPI_USE_OWN_HEAP_ALLOCATOR
@@ -142,6 +142,7 @@ typedef struct kaapi_rtparam_t {
   uint8_t               sys_ngpus;          /* number of GPU plugged to this node */
   uint8_t               ngpus;              /* number of GPU for this node */
   uint32_t              gpu_set;            /* GPU to use */
+  uint8_t               verbose;            /* verbose level. 0 : no verbose */
   double                cuda_cache_factor;  /* percent of total free memory used by cache */
   uint16_t              cuda_stream_capacity;  /* capacity of input stream */
   uint8_t               cuda_conc_stream_kernel;/* number of concurrent cuda kernel stream per device*/
@@ -201,20 +202,20 @@ struct kaapi_queue;
 /* Macro to access to counter or not
 */
 #if KAAPI_USE_PERFCOUNTER==1
+#  define KAAPI_CTXT_PERFREG_COUNTER(ctxt,idx) ((ctxt)->perf_regs[idx])
 #  define KAAPI_CTXT_PERFREG_ADD(ctxt,idx,value) (ctxt)->perf_regs[idx] += value;
 #  define KAAPI_CTXT_PERFREG_INCR(ctxt,idx) ++(ctxt)->perf_regs[idx];
 #else
+#  define KAAPI_CTXT_PERFREG_COUNTER(ctxt,idx)  
 #  define KAAPI_CTXT_PERFREG_ADD(ctxt,idx,value)
 #  define KAAPI_CTXT_PERFREG_INCR(ctxt,idx)
 #endif
 
 
-/** Debug. To serialize output
+/** To serialize output
 */
-#if KAAPI_DEBUG
 extern void _kaapi_lock_print(void);
 extern void _kaapi_unlock_print(void);
-#endif
 
 /* ========================================================================= */
 /* Data type                                                                 */

@@ -13,6 +13,11 @@ find_package(Threads REQUIRED)
 
 if (${HWLOC_FOUND})
   add_compile_options("-DKAAPI_USE_HWLOC=1")
+  message(STATUS "Kaapi configure with HWLOC")
+endif()
+
+if (${HIP_FOUND})
+  message(STATUS "Kaapi configure with HIP")
 endif()
 
 if (${PAPI_FOUND})
@@ -20,23 +25,6 @@ if (${PAPI_FOUND})
 else()
   add_compile_options("-DKAAPI_USE_PAPI=0")
 endif()
-
-
-if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  add_compile_options("-DKAAPI_USE_ROCSMI=0")
-else()
-  find_path(HWLOC_RSMI_INCLUDE_DIRS
-    NAMES hwloc/rsmi.h
-    HINTS ${ROCSMI_PREFIX}/include
-  )
-  if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
-    add_compile_options("-DKAAPI_USE_ROCSMI=0")
-    set(ROCSMI_INCLUDE_DIRS "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  else()
-    add_compile_options("-DKAAPI_USE_ROCSMI=1")
-  endif()
-endif()
-
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -96,12 +84,13 @@ else()
   message(STATUS "XKblas is configured without support for HWLOC")
 endif()
 
+
 if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  message(STATUS "Not found ROCSMI_INCLUDE")
+  message(STATUS "Not found ROCSMI_INCLUDE_DIRS ${ROCSMI_INCLUDE_DIRS}")
 else()
-  message(STATUS "Found ROCSMI_INCLUDE: ${ROCSMI_INCLUDE_DIRS}")
   include_directories(${ROCSMI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${ROCSMI_LIBRARIES})
+  message(STATUS "Found ROCSMI_LIBRARIES: ${ROCSMI_LIBRARIES}")
 endif()
 
 if (${CUDA_DRIVER_FOUND})
@@ -115,7 +104,8 @@ if (${CUDA_RT_FOUND})
 endif()
 
 if (${HIP_FOUND})
-  include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
+	#include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
+  include_directories(${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
 endif()
 

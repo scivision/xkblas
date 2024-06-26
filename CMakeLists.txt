@@ -35,6 +35,13 @@ if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
 endif()
 
+#--- OpenMP
+find_package(OpenMP)
+if (OPENMP_FOUND)
+  #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
 #--- CUDA
 if (KAAPI_USE_CUDA_RT)
   find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
@@ -86,18 +93,52 @@ if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 endif()
 
 #--- HWLOC
+if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+else()
+  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  find_path(HWLOC_RSMI_INCLUDE_DIRS
+    NAMES hwloc/rsmi.h
+    HINTS ${ROCSMI_PREFIX}/include
+  )
+  if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
+    add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
+    set(ROCSMI_INCLUDE_DIRS "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+  endif()
+endif()
+
+
 if (KAAPI_USE_HWLOC)
   find_package(HWLOC)
-  if (${HIP_FOUND} AND ${HWLOC_FOUND})
-    find_path(ROCSMI_INCLUDE_DIRS
-      NAMES rocm_smi/rocm_smi.h
-      HINTS ${ROCSMI_PREFIX}/include 
-    )
-    find_library(ROCSMI_LIBRARIES
-      # Pick the static library first for easier run-time linking.
-      NAMES librocm_smi64.so 
-      HINTS ${ROCSMI_PREFIX}/lib 
-    )
+endif()
+if (${HIP_FOUND})
+  find_path(ROCSMI_INCLUDE_DIRS
+    NAMES rocm_smi/rocm_smi.h
+    HINTS ${ROCM_PATH}/include
+    HINTS ${ROCSMI_PREFIX}/include  
+  )
+  find_library(ROCSMI_LIBRARIES
+    # Pick the static library first for easier run-time linking.
+    NAMES librocm_smi64.so 
+    HINTS ${ROCM_PATH}/lib
+    HINTS ${ROCSMI_PREFIX}/lib  
+  )
+  if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
+    add_compile_options("-DKAAPI_USE_ROCSMI=0")
+    add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
+    message(STATUS "ROCSMI_INCLUDE_DIRS not defined:" ${ROCSMI_INCLUDE_DIRS})
+  else()
+    message(STATUS "ROCSMI_INCLUDE_DIRS defined:" ${ROCSMI_INCLUDE_DIRS})
+    add_compile_options("-DKAAPI_USE_ROCSMI=1")
+    if (HWLOC_FOUND)
+      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=1")
+    else()
+      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
+    endif()
+  endif()
+  if (ROCSMI_LIBRARIES STREQUAL "ROCSMI_LIBRARIES-NOTFOUND")
+     message(STATUS "ROCSMI_LIBRARIES not defined:" ${ROCSMI_LIBRARIES})
+  else()
+     message(STATUS "ROCSMI_LIBRARIES defined:" ${ROCSMI_LIBRARIES})
   endif()
 endif()
 

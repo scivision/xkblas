@@ -113,7 +113,7 @@ static void callback_epilogue(
 
   kaapi_assert_debug( task->device == device );
 
-//printf("Epilogue: GPUdelay: %f / %lu\n", status.gpu_delay, (uint64_t)(1000000000.0*status.gpu_delay));
+//printf("Epilogue: GPUdelay: %f \n", status.gpu_delay );
 
   KAAPI_ATOMIC_INCR(&device->cnt_exec);
   KAAPI_ATOMIC_DECR(&device->cnt_ready);
@@ -128,7 +128,7 @@ static void callback_epilogue(
 #if KAAPI_PIPELINE_GPUTASK
   /* must by try lock to avoid supspending the callback execution thread */
   pthread_mutex_lock(&device->pipe_lock);
-  device->pipeline[index % device->pipe_size] = 0; /* free the slot in the pipeline */
+  device->pipeline[index % device->pipe_size] = 0; /* free the slot in the pipeline */ 
 #if KAAPI_LOG_PIPE
   printf("Task[%i]=%p mark finished\n", index, task );
 #endif
@@ -162,16 +162,23 @@ static void callback_epilogue(
   /* if task does not define cost, assume == 1 */
   double flops = 1.0, dflops= 0, data = 0;
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
-  --device->pendingtasks;
+  ++device->exectasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
+  {
     kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
-  device->flops_tasks += flops+dflops;
-  device->data_tasks += data;
-  device->flops_pendingtasks -= flops+dflops;
-  device->data_pendingtasks -= data;
+    device->flops_exectasks += flops+dflops;
+    device->data_exectasks += data;
+#if KAAPI_USE_PERFCOUNTER
+    kaapi_offloadtask_perfcounter_t* perf = &device->perfcnt.task[fmt->fmtid];
+    perf->time  += status.gpu_delay;
+    perf->flops += flops+dflops;
+    perf->ai += (flops+dflops)/data;
+#endif
+  }
   
 #if KAAPI_USE_PERFCOUNTER
   device->sum_cpudelay += status.cpu_delay;
+  device->sum_gpudelay += status.gpu_delay;
   ++device->cnt_task;
   if (status.cpu_delay > device->max_cpudelay)
   {
@@ -197,15 +204,8 @@ static void callback_epilogue(
   KAAPI_CTXT_PERFREG_INCR(ctxt,KAAPI_PERF_ID_TASKEXEC);
   KAAPI_CTXT_PERFREG_ADD (ctxt,KAAPI_PERF_ID_WORK_CPU, status.cpu_delay);
   KAAPI_CTXT_PERFREG_ADD (ctxt,KAAPI_PERF_ID_WORK_GPU, status.gpu_delay);
-
-  if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
-  {
-    kaapi_offloadtask_perfcounter_t* perf = &device->perfcnt.task[fmt->fmtid];
-    perf->time  += status.gpu_delay;
-    perf->flops += flops;
-    perf->ai += flops/data;
-  }
 #endif
+
   ++device->exec_count;
   KAAPI_ATOMIC_INCR(&task->frame->exec_count);
 //printf("incr: @p\n",task->frame);
@@ -341,14 +341,19 @@ int kaapi_offload_device_execute_task(
 #if KAAPI_DEBUG
   kaapi_assert( task->device ==device );
 #endif
+  kaapi_format_id_t fmtid = kaapi_task_getformat_ref(task)->fmtid;
   KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
-     2 /* begin */, task, kaapi_task_getformat_ref(task)->fmtid, kaapi_task_getargs(task) );
+     2 /* begin */, task, fmtid, kaapi_task_getargs(task) );
   
   /* handle comes form portability layer: for cuda its the gpublas hande */
   ctxt->pc = task;
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(
       task, kaapi_context2thread(ctxt), handle
   );
+
+#if KAAPI_USE_PERFCOUNTER
+  device->perfcnt.task[fmtid].spawn++;
+#endif
 
   KAAPI_OFFLOAD_TRACE_OUT
 
@@ -357,15 +362,16 @@ int kaapi_offload_device_execute_task(
 
 
 #if KAAPI_USE_PREFETCH
-#if KAAPI_DEBUG
 static void callback_epilogue_prefetch_data(
     kaapi_io_status_t status,
     kaapi_io_stream_t* ios,
     void* arg0, void* arg1, void* arg2
 )
 {
+  kaapi_device_t*          device = (kaapi_device_t*)arg0; 
+  kaapi_metadata_info_t*   mdi = (kaapi_metadata_info_t*)arg1;
+  void*                    data = arg2;
 }
-#endif
 
 
 /* Send prefetch for next tasks.
@@ -425,11 +431,7 @@ static void kaapi_do_prefetch_data(
 
       /* else : send prefetch request */
       int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, device->memdev.asid, mdi, 
-#if KAAPI_DEBUG
-              callback_epilogue_prefetch_data, access->data, 0, 0 
-#else
-              0, 0, 0, 0 
-#endif
+              callback_epilogue_prefetch_data, device, mdi, access->data  
       );
       kaapi_assert((err ==0) || (err ==EINPROGRESS));
     }
@@ -465,12 +467,12 @@ static int kaapi_offload_device_prepare_execute_task(
      If task does not define cost function, assume it is 1.
   */
   double flops = 1, dflops =0, data = 0;
-  ++device->pendingtasks;
+  ++device->submittasks;
   if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
   {
     kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
-    device->flops_pendingtasks += (flops+dflops);
-    device->data_pendingtasks += data;
+    device->flops_submittasks += (flops+dflops);
+    device->data_submittasks += data;
   }
 
   KAAPI_CTXT_PERFREG_INCR(kaapi_self_context(),KAAPI_PERF_ID_TASKSTARTEXEC);
@@ -752,14 +754,15 @@ static void callback_replyrequest_memsync(
 
 /* Compute load of device. Return the number of GPUs having the maximal load
 */
-#define KAAPI_IMAX 4
 int _kaapi_compute_load_device(
-    int* pmin,
-    int* pmax, 
-    float* pavrg, 
-    float* pdelta, 
-    int* imax,  /* of size at least KAAPI_IMAX */
-    float* pload
+    float* pmin,    /* min load */
+    float* pmax,    /* max load */
+    float* pavrg,   /* average load */
+    float* pdelta,  /* *pdelta= sum of diff of load of each device versus average */
+    int*   imax,    /* of size at least KAAPI_IMAX, index of max loaded device */
+    int*   pcntzero,/* number of device with load 0 */
+    int*   izero,   /* index of 0 loaded GPU */
+    float* pload    /* number of pending tasks */
 )
 {
   int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
@@ -768,22 +771,37 @@ int _kaapi_compute_load_device(
   int min = INT_MAX;
   float sum = 0.0;
   int iimax = 0;
+  int cntzero = 0;
+  int iizero = 0;
+
+
   for (int i=0; i<ngpu; ++i)
   {
+    load[i] = 0;
     kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU,i);
     if (ld !=0)
     {
-      load[i] = ld->device->pendingtasks;
-      //load[i] = ld->device->flops_tasks;
-      sum += (float)load[i];
-      int l = load[i];
-      if (l> max) {
-        max = l;
-      }
-      if (l < min) 
-        min = l;
+      uint64_t pt = ld->device->submittasks - ld->device->exectasks;
+      load[i] = pt; //ld->device->flops_submittasks - ld->device->flops_exectasks;
     }
   }
+
+  for (int i=0; i<ngpu; ++i)
+  {
+    sum += (float)load[i];
+    float l = load[i];
+    if (l> max) {
+      max = l;
+    }
+    if (l < min) 
+      min = l;
+    if (load[i] ==0)
+    {
+         ++cntzero;
+         izero[iizero++] = i;
+    }
+  }
+
   float minmax = max-min;
   float avrg = sum/ngpu;
   float delta = 0.0;
@@ -794,7 +812,7 @@ int _kaapi_compute_load_device(
     delta += fabs(d);
     if (pload) pload[i] = load[i];
 
-    if (load[i] == max)
+    if ((imax !=0) && (load[i] == max))
     {
       imax[iimax%KAAPI_IMAX]=i;
       ++iimax;
@@ -805,6 +823,7 @@ int _kaapi_compute_load_device(
   *pmax = max;
   *pavrg = avrg;
   *pdelta = delta;
+  *pcntzero = cntzero;
   return iimax;
 }
 
@@ -883,10 +902,11 @@ int kaapi_sched_idle_offload(
           float load[ngpu]; 
           int imax[KAAPI_IMAX]; 
           int max;
-          int min; 
+          int min;
+          int cntzero;
           float avrg;
           float delta;
-          int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, load);
+          int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, load);
           float minmax = max-min;
 
           if ((avrg > 2.0/ngpu) && (delta > 0)) 
@@ -1313,17 +1333,22 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
 
   /* */
   device->time_tasks = 0.0;
-  device->flops_tasks = 0.0;
-  device->data_tasks = 0.0;
-  device->pendingtasks = 0;
-  device->flops_pendingtasks= 0.0;
-  device->data_pendingtasks = 0.0;
+  device->exectasks  = 0;
+  device->flops_exectasks = 0.0;
+  device->data_exectasks = 0.0;
+  device->submittasks = 0;
+  device->flops_submittasks= 0.0;
+  device->data_submittasks = 0.0;
 
 #if KAAPI_USE_PERFCOUNTER
   device->cnt_task     = 0.0;
   device->sum_cpudelay = 0.0;
+  device->sum_gpudelay = 0.0;
   device->max_cpudelay = 0.0;
   device->min_cpudelay = FLT_MAX;
+  device->sum_comdelay = 0;
+  device->sum_bwd = 0;
+  device->size_com = 0;
 #if KAAPI_LOG_DELAY
   char filename[128];
   sprintf(filename,"log_delay.%i",device->device_id);
@@ -1446,7 +1471,44 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_STOPPED);
 
   kaapi_dsm_unregister_device(&kaapi_the_dsm, &device->memdev);
+
+  if (kaapi_default_param.verbose && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
+  {
+    if (kaapi_default_param.verbose >=2)
+    {
+# if KAAPI_USE_PERFCOUNTER
+      printf("%i, TASK: %u, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
+      printf("%i, WORK: %g (cpu s), %g (gpu s)\n", device->device_id, device->sum_cpudelay, device->sum_gpudelay ); 
+//KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_CPU), KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_GPU));
+# endif
+      printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
+      printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
+      printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
+      printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
+      printf("%i, COM : %g MB, %g s\n", device->device_id, device->size_com*1.0 /(1024.0*1024.0), device->sum_comdelay);
+      printf("%i, ABWD: %g MB/s\n", device->device_id, device->sum_bwd/device->cnt_com /(1024.0*1024.0));
+    }
+
+    device->driver->size_alloc += device->size_alloc;
+    device->driver->size_free += device->size_free;
+    device->driver->cnt_task += device->cnt_task;
+    device->driver->sum_cpudelay += device->sum_cpudelay;
+    device->driver->sum_gpudelay += device->sum_gpudelay;
+    device->driver->sum_comdelay += device->sum_comdelay;
+    device->driver->sum_bwd += device->sum_bwd;
+    device->driver->sum_comdelay += device->sum_comdelay;
+    device->driver->size_com += device->size_com;
+    device->driver->cnt_com += device->cnt_com;
+    COUNTER_CNT_H2D(device->driver)  += COUNTER_CNT_H2D(device);
+    COUNTER_SIZE_H2D(device->driver) += COUNTER_SIZE_H2D(device);
+    COUNTER_CNT_D2H(device->driver)  += COUNTER_CNT_D2H(device);
+    COUNTER_SIZE_D2H(device->driver) += COUNTER_SIZE_D2H(device);
+    COUNTER_CNT_D2D(device->driver)  += COUNTER_CNT_D2D(device);
+    COUNTER_SIZE_D2D(device->driver) += COUNTER_SIZE_D2D(device);
+  }
   device->driver->f_device_finalize(device);
+
+  
   kaapi_assert(device->state == KAAPI_DEVICE_STATE_FINALIZED);
   if (device->ld !=0)
   {

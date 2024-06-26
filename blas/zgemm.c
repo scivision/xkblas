@@ -121,8 +121,10 @@ int xkblas_zgemm_async(
                               const Complex64_t *B, int LDB,
     const Complex64_t* beta,        Complex64_t *C, int LDC )
 {
+#if 0
 		printf("[XKBLAS] gemm M %d, N %d, K %d, A %p, LDA %d, B %p, LDB %d, C %p, LDC %d\n",
 										M, N, K, A, LDA, B, LDB, C, LDC );
+#endif
     size_t Am, An, Bm, Bn;
 
     /* Check input arguments */
@@ -182,7 +184,12 @@ int xkblas_zgemm_async(
     size_t Bnb = 0;
 
     /* get default tile size and initialize internal descriptor if not yet */
-    size_t NB = xkblas_auto_tilesize(KERN_GEMM,M,N,K);
+    xkblas_context_t* xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM,M,N,K);
+
+#if 0
+    printf("[XKBLAS] NB =: %lu\n", NB);
+#endif
 
 #if 0
     printf("[XKBLAS] NB =: %lu\n", NB);
@@ -229,7 +236,6 @@ int xkblas_zgemm_async(
 
     Complex64_t zbeta;
 
-    xkblas_context_t* xkctxt = xkblas_context_get();
     xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
 
     kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );

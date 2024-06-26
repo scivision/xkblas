@@ -562,11 +562,6 @@ extern void kaapi_tracelib_taskwait_end(
 /* utility */
 extern size_t kaapi_tracelib_count_perfctr(void);
 
-#if KAAPI_USE_PERFCOUNTER==1
-/* Human readable name for event mask */
-extern size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t ssize, char* buffer);
-#endif
-
 /* Human readable name for event mask */
 extern size_t kaapi_event_get_name_mask( uint64_t eventmask, size_t ssize, char* buffer);
 
@@ -795,6 +790,9 @@ static inline kaapi_event_buffer_t*  kaapi_event_push4(
 
 
 #if KAAPI_USE_PERFCOUNTER==1
+/* Human readable name for event mask */
+extern size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t ssize, char* buffer);
+
 /* Write event counter values in idset to the trace file
 */
 extern kaapi_event_buffer_t* kaapi_event_push_perfctr(

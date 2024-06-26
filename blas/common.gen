@@ -110,11 +110,18 @@ typedef struct {
 
 /*
 */
+#define XKBLAS_MAX_NGPUS 32
 struct xkblas_context {
   /* hash map: matrix -> xkblas_matrix_descr_t */
   kaapi_context_t*        kctxt;
   kaapi_thread_t*         kthread;
   kaapi_team_t*           kteam;
+  
+  /* how to map context to kaapi GPU */
+  size_t                  NB;
+  int                     ngpus;
+  int                     gpuset[XKBLAS_MAX_NGPUS];
+  
   kaapi_hashmap_t         xkblas_ptr2handle;
   kaapi_hashentries_t*    xkblas_mapentries[1ULL<<KAAPI_SIZE_DSM_MAP];
 
