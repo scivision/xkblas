@@ -93,23 +93,10 @@ if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 endif()
 
 #--- HWLOC
-if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-else()
-  add_compile_options("-DKAAPI_USE_ROCSMI=1")
-  find_path(HWLOC_RSMI_INCLUDE_DIRS
-    NAMES hwloc/rsmi.h
-    HINTS ${ROCSMI_PREFIX}/include
-  )
-  if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
-    add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
-    set(ROCSMI_INCLUDE_DIRS "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  endif()
-endif()
-
-
 if (KAAPI_USE_HWLOC)
   find_package(HWLOC)
 endif()
+
 if (${HIP_FOUND})
   find_path(ROCSMI_INCLUDE_DIRS
     NAMES rocm_smi/rocm_smi.h
@@ -123,24 +110,56 @@ if (${HIP_FOUND})
     HINTS ${ROCSMI_PREFIX}/lib  
   )
   if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-    add_compile_options("-DKAAPI_USE_ROCSMI=0")
-    add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
     message(STATUS "ROCSMI_INCLUDE_DIRS not defined:" ${ROCSMI_INCLUDE_DIRS})
+    set(KAAPI_USE_ROCSMI FALSE)
+    set(KAAPI_USE_HWLOCROCSMI FALSE)
   else()
     message(STATUS "ROCSMI_INCLUDE_DIRS defined:" ${ROCSMI_INCLUDE_DIRS})
-    add_compile_options("-DKAAPI_USE_ROCSMI=1")
+    set(KAAPI_USE_ROCSMI TRUE)
     if (HWLOC_FOUND)
-      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=1")
+      find_path(HWLOC_RSMI_INCLUDE_DIRS
+        NAMES hwloc/rsmi.h
+        HINTS ${ROCSMI_PREFIX}/include
+      )
+      if (HWLOC_RSMI_INCLUDE_DIRS  STREQUAL "HWLOC_RSMI_INCLUDE_DIRS-NOTFOUND")
+	set(KAAPI_USE_HWLOCROCSMI FALSE)
+      else()
+	set(KAAPI_USE_HWLOCROCSMI TRUE)
+      endif()
     else()
-      add_compile_options("-DDKAAPI_USE_HWLOCROCSMI=0")
+      set(KAAPI_USE_HWLOCROCSMI FALSE)
     endif()
   endif()
   if (ROCSMI_LIBRARIES STREQUAL "ROCSMI_LIBRARIES-NOTFOUND")
      message(STATUS "ROCSMI_LIBRARIES not defined:" ${ROCSMI_LIBRARIES})
+     set(KAAPI_USE_ROCSMI FALSE)
+     set(KAAPI_USE_HWLOCROCSMI FALSE)
   else()
      message(STATUS "ROCSMI_LIBRARIES defined:" ${ROCSMI_LIBRARIES})
   endif()
 endif()
+
+
+#--- LIBNUMA
+find_path(LIBNUMA_INCLUDE_DIRS
+  NAMES numa.h
+  HINTS /usr/include
+)
+find_library(LIBNUMA_LIBRARIES
+  NAMES libnuma.so
+  HINTS /usr/lib64
+  HINTS /usr/lib
+)
+if (LIBNUMA_INCLUDE_DIRS STREQUAL "LIBNUMA_INCLUDE_DIRS-NOTFOUND")
+  set(KAAPI_USE_LIBNUMA FALSE)
+else()
+  if (LIBNUMA_LIBRARIES STREQUAL "LIBNUMA_LIBRARIES-NOTFOUND")
+    set(KAAPI_USE_LIBNUMA FALSE)
+  else()
+    set(KAAPI_USE_LIBNUMA TRUE)
+  endif()
+endif()
+
 
 #--- BLAS
 if (KAAPI_USE_MKL)

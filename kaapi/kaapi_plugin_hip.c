@@ -59,6 +59,10 @@
 #  include <rocm_smi/rocm_smi.h>
 #endif
 
+#if KAAPI_USE_LIBNUMA
+#  include <numa.h>
+#endif
+
 #if KAAPI_HAVE_IO_THREADS
 #error "Not supported"
 #endif
@@ -72,6 +76,8 @@
 /* use nvlink related function to get topology */
 #define KAAPI_HIP_USE_TOPO 1
 
+
+//#define _OFFLOAD_DEBUG 1
 /* for debuging: 0 device thread, 1 IO helper thread */
 static __thread int thread_type = 0;
 
@@ -209,7 +215,7 @@ static void __kaapi_hip_CheckError( hipError_t err,  char *file, const int line 
     if ( hipSuccess != err )
     {
       tmp = hipGetErrorName( err );
-      snprintf( msg, 256, "cuCheckError() error:%i, failed at %s:%i : %s\n",
+      snprintf( msg, 256, "hipCheckError() error:%i, failed at %s:%i : %s\n",
                  err, file, line, tmp );
       kaapi_memory_cache_print_all();
       kaapi_abort( line, file, msg );
@@ -283,6 +289,7 @@ static int comp_perfRank(const void* a, const void* b)
 /* */
 static void _kaapi_get_gpu_topo(void)
 {
+#if KAAPI_USE_ROCSMI
   hipError_t res;
   uint64_t min_perf= UINT64_MAX; /* min_perf <= max_perf */
   uint64_t max_perf= 0;
@@ -331,9 +338,14 @@ static void _kaapi_get_gpu_topo(void)
         if (hops>0)
         {
           err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
-          err = rsmi_topo_get_link_weight(device1, device2,&weight);
+          err = rsmi_topo_get_link_weight(device1, device2, &weight);
+#if 0 // sort and partition according to bandwidthmax
           if (max_bandwidth ==0) max_bandwidth = 1;
           perfRank = insert_perfrank(max_bandwidth);
+#else // sort and partition according to min_bandwidth
+          if (min_bandwidth ==0) min_bandwidth = 1;
+          perfRank = insert_perfrank(min_bandwidth);
+#endif
           if (perfRank > max_perf)
             max_perf= perfRank;
           if (perfRank < min_perf)
@@ -450,6 +462,7 @@ static void _kaapi_get_gpu_topo(void)
   } 
 #endif
   err = rsmi_shut_down();
+#endif
 }
 #endif
 
@@ -1708,15 +1721,70 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
   int err;
   CPU_ZERO(schedset);
 
-#if KAAPI_USE_HWLOC
+#if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
+  rsmi_status_t rerr ;
+  rerr = rsmi_init(0);
+  if (rerr != RSMI_STATUS_SUCCESS) 
+  {
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("***warning cannot initialize ROCm SMI lib\n");
+#endif
+    return ENOTSUP;
+  }
+
+  int device_count;
+  rerr = rsmi_num_monitor_devices(&device_count);
+  if (rerr != RSMI_STATUS_SUCCESS) goto return_rsmi_error;
+
+  uint32_t numa_node = -1;
+  rerr = rsmi_topo_get_numa_node_number(kaapi_device_ids[device_id], &numa_node);
+  if (rerr != RSMI_STATUS_SUCCESS) goto return_rsmi_error;
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** device id bind on numa_node: %u\n", numa_node); 
+#endif
+
+  if (numa_available() ==-1)
+  {
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** lib numa not defined\n");
+#endif
+    goto return_rsmi_error;
+  }
+
+  int ncpus = numa_num_possible_cpus();
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** Possible #CPUS=%i\n", ncpus);
+#endif
+  struct bitmask *mask = numa_bitmask_alloc( 1024 );
+  err = numa_node_to_cpus((int)numa_node, mask);
+  if (err !=0) 
+  {
+#if KAAPI_DEBUG
+    if (kaapi_default_param.verbose)
+      printf("*** warning cannot access to CPUsetof numa node %i. Errono:%i - %s\n", numa_node, errno, strerror(errno));
+#endif
+    goto return_rsmi_error;
+  }
+
+  for (int i=0; i<ncpus;++i)
+    if (numa_bitmask_isbitset(mask, i)) 
+      CPU_SET(i, schedset); 
+  numa_free_cpumask(mask);
+
+return_rsmi_error:
+  rsmi_shut_down();
+  if (rerr == RSMI_STATUS_SUCCESS) return 0;
+  return ENOTSUP;
+#elif KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_cpuset_t cpuset;
   hwloc_obj_t obj;
 
   cpuset = hwloc_bitmap_alloc();
-#  if KAAPI_USE_HIP 
-#    if KAAPI_USE_HWLOCROCSMI
   err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
-#    endif
   if (err == 0)
   {
     {
@@ -1728,13 +1796,12 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
       }
     }
   }
-#  endif
 #endif
   /* no hwloc: do nothing, op not supported */
   err = ENOTSUP;
 
 retval:
-#if KAAPI_USE_HWLOC 
+#if KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_bitmap_free(cpuset);
 #endif
 
