@@ -1033,7 +1033,6 @@ static char* name_io[] = {
 /* 2022-03-10: I assume hip functions for async copy or kernel launch are not reentrant 
    with global serialization I do not have any deadlock inside internal rocm-4.5 functions.
 */
-#warning "To solve !"
 static pthread_mutex_t access_lock= PTHREAD_MUTEX_INITIALIZER;
 #endif
 
