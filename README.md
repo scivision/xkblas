@@ -1,4 +1,4 @@
-# XKBlas v0.4
+# XKBlas v0.5
 
 XKBlas is a drop in replacement of blas library for multi-GPUs servers similar
 to CUBLASXt but with higher performances especially when matrix dimensions 
@@ -6,10 +6,9 @@ becomes smaller.
 
 XKBlas was only developped and tested on Linux plateform with CUDA >= 8.0 on machine with up to 8 GPUs (DGX-1).
 
-It was ported on AMD GPU with HIP/ROCM enviroment >= 4.5. Note:
+It was ported on AMD GPU with HIP/ROCM enviroment = 4.5, 5.X. Note:
  * ROCM version 4.5.0 has a [buggy TRSM.](https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/CHANGELOG.md?plain=1)
- * XKBlas was successfully port on top of MI50 and MI100 GPU. Other AMD GPUs were not tested. 
- * **Moreover XKBlas v0.4 was not really experimented with more than 1 AMD GPUs or Infinity Frabric interconnect**.
+ * XKBlas was successfully port on top of MI50, MI100 GPU and MI250x GPU. Other AMD GPUs were not tested. 
 
 XKBlas is built from 2 components:
 *  the multi-GPU module of the XKaapi[1,2] runtime that has low overhead in task management.
@@ -30,7 +29,7 @@ This current version of XKBlas only contains BLAS level 3 algorithms, including 
 For classical precision Z, C, D, S.
 
 # Source code
-You can clone the projet or get the tarball [here](https://gitlab.inria.fr/xkblas/versions/-/blob/master/xkblas-v0.4-rc7-0-g513c021b.tgz).
+You can clone the projet or get the tarball [here](https://gitlab.inria.fr/xkblas/versions/).
 
 # Installation
 
@@ -38,7 +37,7 @@ XKBlas needs: a CPU blas library (*e.g.* MKL or OpenBLAS or CrayBLAS) and an a C
 XKBlas was successfully port on CUDA from version 8 until 11 and on HIP/ROCM 4.5.0 to HIP/ROCM 5.0.X
 
 Previous version of XKBlas where based on updating make.inc to local installation. 
-From version 0.4, XKBlas switches to use CMake in order to simplify configuration.
+Since version 0.4, XKBlas switches to use CMake in order to simplify configuration.
 
 ## Selection of the GPU environment
 The two exclusive choices are:
@@ -57,6 +56,8 @@ Exclusive choices are:
 In case the user want to access to execution trace of its applications; XKBlas is able to generate Gantt chart with BLAS calls.
 * -DKAAPI_USE_TRACE=ON
 * -DKAAPI_USE_PERFCTR=ON
+With performance counter on, one can run applications linked with XKBlas with XKBLAS_VERBOSE=1 on the command line in order
+to have some performance counters about the execution. With XKBLAS_VERBOSE=2 more detailed counters are print.
 
 ## Compilation of testing executables
 This option is to active the compilation of the files in testing subdirectory.
@@ -135,7 +136,6 @@ For instance, if you want to run with XKBlas as a drop in replacement BLAS libra
 
 # Any support ?
 Please contact us or fill an [issue here](https://gitlab.inria.fr/xkblas/versions/-/issues/new).
-
 
 
 # References
