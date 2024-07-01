@@ -2250,7 +2250,7 @@ size_t xkblas_auto_tilesize(
             NB = (NB + 63) & ~63UL;
             if (NB <minNB) NB = minNB;
 #  else
-            double ffact = 2;
+            double ffact = 4;
             double fNB = sqrt( (double)M*(double)N / (ffact * (double)(xkctxt->ngpus * kaapi_default_param.cuda_conc_stream_kernel)) );
             NB = ceil(fNB);
 #  endif
@@ -2306,18 +2306,18 @@ printf("%s::%s L0: (M,N,K)=(%llu, %llu, %llu), (W,Wt,D,Pavrg)=(%g,%g,%g,%g) => N
       case KERN_HEMM:
       case KERN_SYMM:
         {
-          fact = 4;
+          fact = 1;
           NB = M / (fact*xkctxt->ngpus);
           NB= NB & ~1023UL;
-          if (NB >4096) NB = M / (2*fact*xkctxt->ngpus);
           if (NB <1024) NB = 1024;
+          if (NB <4096) NB *= 2;
         }
         break;
 
       case KERN_TRMM:
       case KERN_TRSM:
-      case KERN_GEMMT:
-      case KERN_GEMM:
+  //    case KERN_GEMMT:
+  //    case KERN_GEMM:
         {
   //        fact = 2;
           NB = M / (fact*xkctxt->ngpus);
@@ -2326,7 +2326,7 @@ printf("%s::%s L0: (M,N,K)=(%llu, %llu, %llu), (W,Wt,D,Pavrg)=(%g,%g,%g,%g) => N
         }
         break;
 
-#if 0
+#if 1 
       case KERN_GEMMT:
       case KERN_GEMM:
         {
