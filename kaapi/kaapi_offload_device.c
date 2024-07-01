@@ -1474,13 +1474,15 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
 
   if (kaapi_default_param.verbose && (device->driver->f_get_type() != KAAPI_PROC_TYPE_CPU))
   {
-# if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER
     if (kaapi_default_param.verbose >=2)
     {
       printf("%i, TASK: %u, %li\n", device->device_id, device->cnt_task, KAAPI_CTXT_PERFREG_COUNTER(device->ctxt,KAAPI_PERF_ID_TASKEXEC));
       printf("%i, WORK: %g (cpu s), %g (gpu s)\n", device->device_id, device->sum_cpudelay, device->sum_gpudelay ); 
 //KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_CPU), KAAPI_CTXT_PERFREG_COUNTER (device->ctxt,KAAPI_PERF_ID_WORK_GPU));
+# if KAAPI_DEBUG
       printf("%i, MEM : %li, %li\n", device->device_id, device->size_alloc, device->size_free);
+# endif
       printf("%i, H2D : %li, %li\n", device->device_id, COUNTER_CNT_H2D(device), COUNTER_SIZE_H2D(device));
       printf("%i, D2H : %li, %li\n", device->device_id, COUNTER_CNT_D2H(device), COUNTER_SIZE_D2H(device));
       printf("%i, D2D : %li, %li\n", device->device_id, COUNTER_CNT_D2D(device), COUNTER_SIZE_D2D(device));
@@ -1504,7 +1506,7 @@ static void _kaapi_offload_device_finalize(kaapi_device_t* const device)
     COUNTER_SIZE_D2H(device->driver) += COUNTER_SIZE_D2H(device);
     COUNTER_CNT_D2D(device->driver)  += COUNTER_CNT_D2D(device);
     COUNTER_SIZE_D2D(device->driver) += COUNTER_SIZE_D2D(device);
-# endif
+#endif /* KAAPI_USE_PERFCOUNTER */
   }
   device->driver->f_device_finalize(device);
 
