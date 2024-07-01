@@ -173,7 +173,7 @@ typedef struct kaapi_hip_io_stream_t {
   hipStream_t      stream_low;
 #if CONFIG_USE_EVENT
   hipEvent_t*      end_events;               /* size: capacity */
-#  if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   hipEvent_t*      start_events;             /* size: capacity */
 #  endif
 #endif
@@ -689,10 +689,12 @@ static void _kaapi_hip_create_event( kaapi_hip_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER
   res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDefault);
   kaapi_hip_CheckError(res);
-  res = hipEventCreateWithFlags(&cios->start_events[k], hipEventDefault);
-  kaapi_hip_CheckError(res);
 #else
   res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDisableTiming);
+  kaapi_hip_CheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
+  res = hipEventCreateWithFlags(&cios->start_events[k], hipEventDefault);
   kaapi_hip_CheckError(res);
 #endif
 }
@@ -703,10 +705,12 @@ static void _kaapi_hip_destroy_event( kaapi_hip_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER
   res = hipEventDestroy(cios->end_events[k]);
   kaapi_hip_CheckError(res);
-  res = hipEventDestroy(cios->start_events[k]);
-  kaapi_hip_CheckError(res);
 #else
   res = hipEventDestroy(cios->end_events[k]);
+  kaapi_hip_CheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
+  res = hipEventDestroy(cios->start_events[k]);
   kaapi_hip_CheckError(res);
 #endif
 }
@@ -785,7 +789,7 @@ static kaapi_io_stream_t* kaapi_hip_stream_alloc(
 
 #if CONFIG_USE_EVENT
   cios->end_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   cios->start_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
 #  endif
   if (cios->end_events ==0)
@@ -793,7 +797,7 @@ static kaapi_io_stream_t* kaapi_hip_stream_alloc(
     free(cios);
     return 0;
   }
-# if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   if (cios->start_events ==0)
   {
     free(cios->end_events);
@@ -832,7 +836,7 @@ static void kaapi_hip_stream_free(
   _kaapi_hip_destroy_event(cios, k);
 
   free(cios->end_events);
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   free(cios->start_events);
 #  endif
 #endif
@@ -1090,7 +1094,7 @@ static int kaapi_hip_stream_decode(
         kaapi_slowdown_cpu();
 #endif
 
-#if CONFIG_USE_EVENT && KAAPI_USE_PERFCOUNTER
+#if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB)
       instr->t1 = kaapi_get_elapsedtime();
       res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == hipSuccess);
@@ -1292,7 +1296,7 @@ pthread_mutex_unlock(&access_lock);
 {
 pthread_mutex_lock(&access_lock);
 #endif
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
       instr->t1 = kaapi_get_elapsedtime();
 #  if CONFIG_USE_EVENT
       res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
@@ -1416,7 +1420,7 @@ static int kaapi_hip_stream_advance_pending(
             //goto break_label;
             pthread_yield();
           else {
-#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB
             float gpu_delay; /* ms */
             res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
             if (res != hipSuccess) {
@@ -1544,7 +1548,7 @@ static int kaapi_hip_stream_process_pending(
         case KAAPI_IO_END:
         case KAAPI_IO_BARRIER:
         {
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB
           hipError_t res;
 #  if KAAPI_DEBUG
           res = hipEventQuery( cios->start_events[idx] );

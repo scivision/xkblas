@@ -195,7 +195,7 @@ typedef struct kaapi_cuda_io_stream_t {
   cudaStream_t      stream_low;
 #if CONFIG_USE_EVENT
   cudaEvent_t*      end_events;               /* size: capacity */
-#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
+#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
   cudaEvent_t*      start_events;             /* size: capacity */
 #  endif
 #endif
@@ -688,10 +688,12 @@ static void _kaapi_cuda_create_event( kaapi_cuda_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   res = cudaEventCreateWithFlags(&cios->end_events[k], cudaEventDefault);
   CudaCheckError(res);
-  res = cudaEventCreateWithFlags(&cios->start_events[k], cudaEventDefault);
-  CudaCheckError(res);
 #else
   res = cudaEventCreateWithFlags(&cios->end_events[k], cudaEventDisableTiming);
+  CudaCheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
+  res = cudaEventCreateWithFlags(&cios->start_events[k], cudaEventDefault);
   CudaCheckError(res);
 #endif
 }
@@ -702,10 +704,12 @@ static void _kaapi_cuda_destroy_event( kaapi_cuda_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
   res = cudaEventDestroy(cios->end_events[k]);
   CudaCheckError(res);
-  res = cudaEventDestroy(cios->start_events[k]);
-  CudaCheckError(res);
 #else
   res = cudaEventDestroy(cios->end_events[k]);
+  CudaCheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
+  res = cudaEventDestroy(cios->start_events[k]);
   CudaCheckError(res);
 #endif
 }
@@ -780,7 +784,7 @@ static kaapi_io_stream_t* cuda_stream_alloc(
 
 #if CONFIG_USE_EVENT
   cios->end_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
-#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
+#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
   cios->start_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
 #  endif
   if (cios->end_events ==0)
@@ -788,7 +792,7 @@ static kaapi_io_stream_t* cuda_stream_alloc(
     free(cios);
     return 0;
   }
-#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
+#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
   if (cios->start_events ==0)
   {
     free(cios->end_events);
@@ -823,7 +827,7 @@ static void cuda_stream_free(
 
 #if CONFIG_USE_EVENT
   free(cios->end_events);
-#  if KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1)
+#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
   free(cios->start_events);
 #  endif
 #endif
@@ -1070,7 +1074,7 @@ static int cuda_stream_decode_ioinstruction(
         kaapi_slowdown_cpu();
 #endif
 
-#if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER || (KAAPI_USE_TRACELIB==1))
+#if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB)
       instr->t1 = kaapi_get_elapsedtime();
       res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == cudaSuccess);
@@ -1285,7 +1289,7 @@ _kaapi_unlock_print();
       );
       KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
          1 /* begin */, op->reserved );
-#if KAAPI_USE_PERFCOUNTER|| (KAAPI_USE_TRACELIB==1)
+#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
       instr->t1 = kaapi_get_elapsedtime();
 #  if CONFIG_USE_EVENT
       res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
@@ -1315,7 +1319,7 @@ _kaapi_unlock_print();
       res = cudaStreamSynchronize( *stream );
       kaapi_assert(res == CUDA_SUCCESS);
 
-#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
       float gpu_delay;
       res = cudaEventElapsedTime ( &gpu_delay, cios->start_events[ios->pos_wp % ios->count], cios->end_events[ios->pos_wp % ios->count] );
       if (res != cudaSuccess) {
@@ -1538,7 +1542,7 @@ static int cuda_stream_process_pending(
         case KAAPI_IO_END:
         case KAAPI_IO_BARRIER:
         {
-#if KAAPI_USE_PERFCOUNTER|| (KAAPI_USE_TRACELIB==1)
+#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
           cudaError_t res;
 #  if KAAPI_DEBUG
           res = cudaEventQuery( cios->start_events[idx] );
