@@ -1301,6 +1301,12 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   int err = 0;
 
   kaapi_driver_t* driver = device->driver;
+  if( ld != 0 )
+  {
+    ld->device = device;
+    device->ld = ld;
+  }
+
   err = driver->f_device_init(device);
   if (err != 0)
   {
@@ -1312,11 +1318,10 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   /* initialize the locality domain */
   if (ld != 0)
   {
-    ld->device = device;
-    device->ld = ld;
     KAAPI_OFFLOAD_INIT_TRACE_MSG("kaapi_dsm_register_device:: device_id:%i, device@:%X register to localitydomain ldid: %i\n", device->device_id, device, ld->ldid );
     kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
   }
+
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */

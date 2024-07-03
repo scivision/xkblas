@@ -3002,7 +3002,7 @@ int kaapi_dsm_register_device(
 {
   int err;
   if (arch == KAAPI_PROC_TYPE_HOST)
-    device->asid = ldid;//kaapi_local_asid;
+    device->asid = kaapi_local_asid;
   else
     device->asid = kaapi_memory_create_asid(
       0, /* global id */

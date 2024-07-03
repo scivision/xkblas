@@ -280,6 +280,9 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     int type = driver->f_get_type();
     switch (type) {
       case KAAPI_PROC_TYPE_HOST:
+        arg->ld = malloc(sizeof(kaapi_localitydomain_t));
+        kaapi_localitydomain_init(arg->ld, 0);
+        kaapi_localitydomain_attach( KAAPI_LD_NUMA, 0, arg->ld );
         break;
 #if KAAPI_USE_CUDA
       case KAAPI_PROC_TYPE_CUDA:

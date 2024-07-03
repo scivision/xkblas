@@ -564,11 +564,16 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_init)(kaapi_device_t* 
   dev->stream.f_stream_process_pending = host_stream_process_pending;
   dev->stream.f_stream_decode_ioinstruction = host_stream_decode_ioinstruction;
 
+  /*
   kaapi_localitydomain_t* ld = malloc(sizeof(kaapi_localitydomain_t));
   kaapi_localitydomain_init(ld, &device->inherited);
   device->inherited.ld = ld;
+  */
+  device->inherited.ld = dev->ld;
+  /*
   kaapi_localitydomain_attach( KAAPI_LD_NUMA, 0, ld );
   kaapi_dsm_register_device(&kaapi_the_dsm, &dev->memdev, dev->driver->f_get_type(), ld->ldid );
+  */
   dev->state = KAAPI_DEVICE_STATE_INIT;
 
   KAAPI_OFFLOAD_TRACE_OUT
