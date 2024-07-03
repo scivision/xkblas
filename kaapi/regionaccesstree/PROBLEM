@@ -1,0 +1,49 @@
+Un mode d'accès M est soit 'lecture' (in) ou 'écriture' (out)
+
+Un accès est un couple X = (région, mode d'accès) = (R, M)
+
+Soit (Xn) = (X1, X2, ..., Xn) une suite de 'n' accès
+Un graphe d'accès G((Xn)) est défini par:
+    - Xi forment les noeuds
+    - Xi -> Xj si et seulement si (gamma(Ri) n gamma(Rj) est non vide) et (Mi ou Mj est 'écriture') - on dit alors que 'Xi' et 'Xj' sont en conflit
+On dit que 'Xj dépends de Xi'
+
+PROBLEME
+A partir d'une suite d'accès (Xn), donner un algorithme construisant le graphe d'accès G((Xn)).
+
+HYOPOTHESE
+    - un certain degrée de ré-utilisation des accès (O(k^3) tâches plusieurs accès - 1 à 3-, et O(k^2) accès dans le cas d'une routine 
+    en algèbre linéaire dense L3. k ~ découpe d'une matrice MxN en kxk blocs, M==N sans trop de perte de généralité)
+    => la séquence d'accès fait donc apparaître plusieurs fois les même régions.
+
+On cherche donc à construire rapidement ce graphe en particulier avec cette hypothèse.
+
+REMARQUE
+On peut reconstruire le graphe de dépendances au sens 'OpenMP' à partir du graphe d'accès en
+    - attachant les tâches aux accès
+    - filtrant les cycles (si une tâche a plusieurs accès qui entre en conflit)
+
+CAS OPENMP ACTUEL - T1ld0
+Dans le standard actuel OpenMP : T = 1 et ld = 0
+R est de la forme (A, 1, 1, 0), donc gamma(R) = { A } - ne représente qu'un mot.
+Voir solution dans "src/T1ld0/domain.cpp"
+
+Complexité en moyenne
+
+    - en temps - O(1) - constant partout
+        - remarque: ligne 21. pire cas en O(n) si les 'Xi' avec 0 <= i < n
+          sont (A, 'in') et que 'Xn' est (A, 'out') ; mais c'est bien le nombre
+          d'arc minimal qui est demandé, pas de solutions + simple possible au
+          problème
+          [TG]: une solution possible :
+                tu ajoutes un accès "de synchronisation" S qui va gérer le changement de mode
+                d'accès entre un premier ensemble d'accès 'concurrents', dans ton cas les Xi,
+                i<n en 'in', de manière a avoir Xi -> S pour i<n et S -> Xn en 'out' (ou si tu
+                ajoutes un mode concurrent: S -> Xk pour k >=n en 'concurrent write'). Tu créés
+                ensuite un nouveau accès de synchronisation. Ces accès de synchronisation
+                doivent être créer en avance mais tu peux optimiser leur existance si la
+                séquence {X_i}, i<n est de taille 1 avant d'avoir un Xn en 'out'.  De cette
+                manière chaque ajout dans le graphe se fait en O(1). Cf Kaapi dans XKBlas.
+
+    - en espace - O(n) - une entrée dans hmap par addresse différente
+        - remarque: meilleur cas alors O(1) si tous les accès utilisent la même adresse 'A'

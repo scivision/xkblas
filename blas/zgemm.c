@@ -125,8 +125,6 @@ int xkblas_zgemm_async(
 		printf("[XKBLAS] gemm M %d, N %d, K %d, A %p, LDA %d, B %p, LDB %d, C %p, LDC %d\n",
 										M, N, K, A, LDA, B, LDB, C, LDC );
 #endif
-    size_t Am, An, Bm, Bn;
-
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans)) {
         kaapi_error("zgemm", "illegal value of transA");
@@ -135,16 +133,6 @@ int xkblas_zgemm_async(
     if ((transB < CblasNoTrans) || (transB > CblasConjTrans)) {
         kaapi_error("zgemm", "illegal value of transB");
         return -2;
-    }
-    if ( transA == CblasNoTrans ) {
-        Am = M; An = K;
-    } else {
-        Am = K; An = M;
-    }
-    if ( transB == CblasNoTrans ) {
-        Bm = K; Bn = N;
-    } else {
-        Bm = N; Bn = K;
     }
     if (M < 0) {
         kaapi_error("zgemm",  "illegal value of M");
@@ -158,6 +146,19 @@ int xkblas_zgemm_async(
         kaapi_error("zgemm", "illegal value of N");
         return -5;
     }
+
+    size_t Am, An, Bm, Bn;
+    if ( transA == CblasNoTrans ) {
+        Am = M; An = K;
+    } else {
+        Am = K; An = M;
+    }
+    if ( transB == CblasNoTrans ) {
+        Bm = K; Bn = N;
+    } else {
+        Bm = N; Bn = K;
+    }
+
     if (LDA < kaapi_max(1, Am)) {
         kaapi_error("zgemm", "illegal value of LDA");
         return -8;
@@ -176,6 +177,120 @@ int xkblas_zgemm_async(
       ((*alpha == 0.0 || K == 0) && *beta == 1.0))
         return 0;
 
+
+/* new implem */
+# if 1
+
+    xkblas_context_t * xkctxt = xkblas_context_get();
+    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
+    xkblas_tile_t tiling = { NB, NB };
+
+    size_t Amt = XKBLAS_NUM_OF_TILES(Am, tiling.m);
+    size_t Ant = XKBLAS_NUM_OF_TILES(An, tiling.n);
+    size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, tiling.n);
+    size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, tiling.m);
+    size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, NB);
+    size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, NB);
+
+    size_t m, n, k;
+    size_t ldam, ldak, ldbn, ldbk, ldcm;
+    size_t tempmm, tempnn, tempkn, tempkm;
+
+    // TODO : what is this ?
+    xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
+
+    for (m = 0; m < Cmt; m++)
+    {
+        size_t tempmm = m == Cmt-1 ? M-m*Cmb : Cmb;
+        ldcm = LDC; //BLKLDD(C, m);
+        for (n = 0; n < Cnt; n++)
+        {
+            tempnn = n == Cnt-1 ? N-n*Cnb : Cnb;
+            /*
+             *  A: CblasNoTrans / B: CblasNoTrans
+             */
+            if (transA == CblasNoTrans)
+            {
+                ldam = LDA; //BLKLDD(A, m);
+                if (transB == CblasNoTrans)
+                {
+                    for (k = 0; k < Ant; k++)
+                    {
+                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
+                        ldbk = LDB; //BLKLDD(B, k);
+                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
+                        INSERT_TASK_zgemm(
+                            transA, transB,
+                            tempmm, tempnn, tempkn, 
+                            *alpha, A(m, k), ldam,  /* lda * Z */
+                                   B(k, n), ldbk,   /* ldb * Y */
+                            zbeta, C(m, n), ldcm);  /* ldc * Y */
+                    }
+                }
+                /*
+                 *  A: CblasNoTrans / B: Cham[Conj]Trans
+                 */
+                else {
+                    ldbn = LDB; //BLKLDD(B, n);
+                    for (k = 0; k < Ant; k++)
+                    {
+                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
+                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
+                        INSERT_TASK_zgemm(
+                            transA, transB,
+                            tempmm, tempnn, tempkn, 
+                            *alpha, A(m, k), ldam,  /* lda * Z */
+                                    B(n, k), ldbn,  /* ldb * Z */
+                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                    }
+                }
+            }
+            /*
+             *  A: Cham[Conj]Trans / B: CblasNoTrans
+             */
+            else
+            {
+                if (transB == CblasNoTrans)
+                {
+                    for (k = 0; k < Amt; k++)
+                    {
+                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
+                        ldak = LDA; //BLKLDD(A, k);
+                        ldbk = LDB; //BLKLDD(B, k);
+                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
+                        INSERT_TASK_zgemm(
+                            transA, transB,
+                            tempmm, tempnn, tempkm, 
+                            *alpha, A(k, m), ldak,  /* lda * X */
+                                    B(k, n), ldbk,  /* ldb * Y */
+                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                    }
+                }
+                /*
+                 *  A: Cham[Conj]Trans / B: Cham[Conj]Trans
+                 */
+                else
+                {
+                    ldbn = LDB; //BLKLDD(B, n);
+                    for (k = 0; k < Amt; k++)
+                    {
+                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
+                        ldak = LDA; //BLKLDD(A, k);
+                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
+                        INSERT_TASK_zgemm(
+                            transA, transB,
+                            tempmm, tempnn, tempkm, 
+                            *alpha, A(k, m), ldak,  /* lda * X */
+                                    B(n, k), ldbn,  /* ldb * Z */
+                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                    }
+                }
+            }
+        }
+    }
+
+/* previous implem */
+# else
     size_t Cmb = 0;
     size_t Cnb = 0;
     size_t Amb = 0;
@@ -349,6 +464,7 @@ int xkblas_zgemm_async(
             }
         }
     }
+    # endif
     return 0;
 }
 

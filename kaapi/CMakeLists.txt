@@ -147,4 +147,4 @@ endif()
 
 install(TARGETS kaapi DESTINATION lib)
 install(FILES kaapi.h kaapi_atomic.h kaapi_error.h DESTINATION include)
-
+install(FILES kaapi_dependences_cartesian2D.hpp regionaccesstree/src/access.hpp regionaccesstree/src/history.hpp regionaccesstree/src/region.hpp regionaccesstree/src/utils.hpp DESTINATION include)

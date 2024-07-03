@@ -232,6 +232,9 @@ extern int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB
 );
 
+typedef struct {
+    int m, n;
+} xkblas_tile_t;
 
 /* Auto compute tile size
    M,N,K are the input problem sizes.
