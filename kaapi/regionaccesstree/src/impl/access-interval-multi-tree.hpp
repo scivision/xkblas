@@ -199,34 +199,11 @@ class AccessIntervalMultiTree : public History<K> {
             {
 
                 {
-                    # if 0
-                    char color[1024] = {0};
-                    for (int k = 0 ; k < K ; ++k)
-                    {
-                        if (this->parent && this != this->parent->st[k].left && this != this->parent->st[k].right)
-                            continue ;
-                        int i = this->colors[k] == BLACK ? 0 : k + 1;
-                        const char * c = COLORS[i];
-                        strcat(color, c);
-                        if (k != K-1)
-                            strcat(color, ":");
-                    }
-                    # else
                     const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
-                    # endif
-
                     char out[32];
                     snprintf(out, sizeof(out), "%p", this->out);
 
-                    char ins[1024] = {0};
-                    int r = 0;
-                    for (void * obj : this->ins)
-                    {
-                        r += snprintf(ins + r, sizeof(ins) - r, "%p,", obj);
-                        if (r == sizeof(ins))
-                            break ;
-                    }
-                    // TODO : remove me if wanna see the actual obj list
+                    char ins[32];
                     snprintf(ins, sizeof(ins), "%ld", this->ins.size());
 
                     char intervals[1024];
@@ -582,8 +559,10 @@ class AccessIntervalMultiTree : public History<K> {
         {
             tassert(z->colors[k] == RED);
 
+            // Traditional red-black tree balancing...
             while (z->parent && z->parent->colors[k] == RED)
             {
+                // .. but stopping on the k-root
                 if (z->parent->parent && z->parent->parent->k < k)
                 {
                     tassert(z->colors[k]            == RED);
@@ -657,9 +636,10 @@ class AccessIntervalMultiTree : public History<K> {
 
             this->outdate(node);
 
-            // TODO : test this does not break any rules and improve run-time
+            // inserting a new k-subtree, this k-root is black
             if (parent->k < k)
                 node->colors[k] = BLACK;
+            // rebalance the k-subtree
             else
                 this->balance_fixup(node, k);
         }
@@ -735,14 +715,13 @@ class AccessIntervalMultiTree : public History<K> {
             update_includes(node);
         }
 
-        // rebalance the k-subtree
+        // rebalance the k-subtree using a Day-Stout-Warren algorithm
         inline void
         rebalance(Node * root, int k)
         {
             printf("Rebalancing for k=%d\n", k);
             tassert(k == 0 && K == 0 && "Not implemented when K>1");
 
-            // Day-Stout-Warren algorithm
             Node pseudo_root;
             pseudo_root.st[k].right = root;
 
@@ -850,7 +829,7 @@ class AccessIntervalMultiTree : public History<K> {
 
             this->outdate(parent);
         }
-# endif /* CUvoid */
+# endif /* CUT */
 
         void
         insert_from(
@@ -880,14 +859,16 @@ class AccessIntervalMultiTree : public History<K> {
                 {
                    if (region.includes(parent->includes.region))
                    {
-                       // TODO : what if 'node' is not null ?
+                       // TODO : what if 'node' is not null ?  probably want to
+                       // return something to callee for the case (3)
+                       tassert(node == nullptr);
                        this->insert_from_cut(parent, mode, region, obj);
                        break ;
                    }
                 }
 # else
 #  pragma message("Tree cut disabled. Enable it using '-DCUT'")
-# endif /* CUvoid */
+# endif /* CUT */
 
                 // Process 6 cases
 
@@ -939,7 +920,7 @@ class AccessIntervalMultiTree : public History<K> {
                     {
                         if (++k == K)
                         {
-                            tassert(!node);
+                            tassert(node == nullptr);
                             parent->register_access(mode, obj);
                             this->outdate(parent);
                             break ;
@@ -947,6 +928,9 @@ class AccessIntervalMultiTree : public History<K> {
                     }
                     else /* J c I */
                     {
+                        // TODO only work for K \in {1, 2} right now - FIX me for K>=3
+                        assert(K == 1 || K == 2);
+
                         // shrink parent
                         int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
                         parent->region[k] = region[k];
@@ -965,7 +949,7 @@ class AccessIntervalMultiTree : public History<K> {
                             node->inherit_accesses(parent);
                         }
 
-                        // shrink child for dimensions k' > k - TODO only work for K \in {1, 2} right now
+                        // shrink children for dimensions k' > k
                         if (k < K-1)
                         {
                             std::function<void(Node *)> f = [this, &k, &region, &x](Node * node) {

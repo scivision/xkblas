@@ -15,7 +15,7 @@ static int ninsert = 0;
 template<int K>
 static void
 insert(
-    History<K,T> & history,
+    History<K> & history,
     access_mode_t mode,
     interval_t intervals[K]
 ) {
@@ -30,7 +30,7 @@ insert(
 //Generate 'n' disjoint hyperplans
 template<int K, int PLAN_DIM>
 void
-disjoint_hyperplans(History<K,T> & history, int n)
+disjoint_hyperplans(History<K> & history, int n)
 {
     static_assert(0 <= PLAN_DIM && PLAN_DIM < K);
 
@@ -57,7 +57,7 @@ disjoint_hyperplans(History<K,T> & history, int n)
 //Generate 'n' hypercubes that includes all dimensions but one
 template<int K>
 void
-pyramid(History<K,T> & history, int n)
+pyramid(History<K> & history, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -82,7 +82,7 @@ pyramid(History<K,T> & history, int n)
 //Generate 'n' hypercubes that are included on all dimensions but one
 template<int K>
 void
-pyramid_inverted(History<K,T> & history, int n)
+pyramid_inverted(History<K> & history, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -107,7 +107,7 @@ pyramid_inverted(History<K,T> & history, int n)
 // Generate 'n' hypercubes that are successively included into previous ones
 template<int K>
 static void
-squares_included(History<K,T> & history, int n)
+squares_included(History<K> & history, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -122,7 +122,7 @@ squares_included(History<K,T> & history, int n)
 }
 
 template<int Dimensions, int K, class Callable>
-constexpr void meta_for_loop(History<K,T> & history, std::array<int, K> & array, int end, Callable & c)
+constexpr void meta_for_loop(History<K> & history, std::array<int, K> & array, int end, Callable & c)
 {
     static_assert(Dimensions > 0);
     for(int i = 0; i != end; ++i)
@@ -137,7 +137,7 @@ constexpr void meta_for_loop(History<K,T> & history, std::array<int, K> & array,
 
 template<int K, int P>
 static void
-matrix_tiles_insert(History<K,T> & history, std::array<int, K> indices)
+matrix_tiles_insert(History<K> & history, std::array<int, K> indices)
 {
     interval_t intervals[K];
     for (int k = 0 ; k < K ; ++k)
@@ -151,7 +151,7 @@ matrix_tiles_insert(History<K,T> & history, std::array<int, K> indices)
 // Generate n^K tiles of size P
 template<int K, int P>
 static void
-matrix_tiles(History<K,T> & history, int n)
+matrix_tiles(History<K> & history, int n)
 {
     std::array<int, K> array;
     meta_for_loop<K, K>(history, array, n, matrix_tiles_insert<K, P>);
@@ -162,7 +162,7 @@ static int N = 10;
 
 // Launch tests for a history of dimension 'K'
 template<int K>
-static void launch_tests(History<K,T> & history)
+static void launch_tests(History<K> & history)
 {
     printf("Running for K=%d and structure %s\n", K, demangle(history).c_str());
     ninsert = 0;
@@ -172,15 +172,31 @@ static void launch_tests(History<K,T> & history)
     {
 
         # if 0
-
-        matrix_tiles<K, 4>(history, Nth_sqrt);
-        matrix_tiles<K, 5>(history, 4*Nth_sqrt/5+1);
-
-        if (0)
+        for (int i = 0 ; i < N ; ++i)
         {
             interval_t interval[K] = {
-                { .a = 12, .b = 16 },
-                { .a =  4, .b = 16 },
+                { .a = 0,  .b = 16      },
+                { .a = 4*i, .b = 4*(i+1) },
+            };
+            insert<K>(history, OUT, interval);
+        }
+
+        int xx[] = {
+            4, 1024,
+            1028,2048,
+            2564, 4096,
+            2052,2304,
+            2308,2432,
+            2436,2496,
+            2500, 2528,
+            2532,2544,
+        };
+
+        for (unsigned int i = 0 ; i < sizeof(xx) / sizeof(int) ; i += 2)
+        {
+            interval_t interval[K] = {
+                { .a = 0,  .b = 16  },
+                { .a = xx[i+0],  .b = xx[i+1] },
             };
             insert<K>(history, OUT, interval);
         }

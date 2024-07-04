@@ -87,7 +87,7 @@ class Region {
         }
 
         inline bool
-        empty(void)
+        empty(void) const
         {
             for (int i = 0 ; i < K ; ++i)
                 if (intervals[i].a >= intervals[i].b)
@@ -109,13 +109,13 @@ class Region {
         }
 
         inline bool
-        intersects(Region * & region)
+        intersects(Region * & region) const
         {
             return this->intersects(*region);
         }
 
         inline Region
-        intersection(Region & region)
+        intersection(Region & region) const
         {
             interval_t inter[K];
             for (int k = 0 ; k < K ; ++k)
@@ -127,7 +127,7 @@ class Region {
         }
 
         inline bool
-        includes(Region & region)
+        includes(Region & region) const
         {
             for (int k = 0 ; k < K ; ++k)
             {

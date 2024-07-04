@@ -27,7 +27,7 @@ task_new(void)
 
 template<int K>
 inline void
-task_link(const Region<K> & rx, void * x, const Region<K> & ry, void * y)
+task_link(const Region<K> & rx, Task * x, const Region<K> & ry, Task * y)
 {
     (void) rx;
     (void) ry;
