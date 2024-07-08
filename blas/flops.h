@@ -361,14 +361,14 @@
 #define DATA_MAT(m,n) ((double)(m)*(double)(n))
 
 #define DATA__GEMM(m,n,k) ((DATA_MAT((m),(n))+DATA_MAT((m),(k))+DATA_MAT((k),(n))))
-#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double complex)*DATA__GEMM((m),(n),(k)))
-#define DATA_CGEMM(m,n,k) (1.0*sizeof(float complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double _Complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_CGEMM(m,n,k) (1.0*sizeof(float _Complex)*DATA__GEMM((m),(n),(k)))
 #define DATA_DGEMM(m,n,k) (1.0*sizeof(double)*DATA__GEMM((m),(n),(k)))
 #define DATA_SGEMM(m,n,k) (1.0*sizeof(float)*DATA__GEMM((m),(n),(k)))
 
 #define DATA__GEMM(m,n,k) ((DATA_MAT((m),(n))+DATA_MAT((m),(k))+DATA_MAT((k),(n))))
-#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double complex)*DATA__GEMM((m),(n),(k)))
-#define DATA_CGEMM(m,n,k) (1.0*sizeof(float complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_ZGEMM(m,n,k) (1.0*sizeof(double _Complex)*DATA__GEMM((m),(n),(k)))
+#define DATA_CGEMM(m,n,k) (1.0*sizeof(float _Complex)*DATA__GEMM((m),(n),(k)))
 #define DATA_DGEMM(m,n,k) (1.0*sizeof(double)*DATA__GEMM((m),(n),(k)))
 #define DATA_SGEMM(m,n,k) (1.0*sizeof(float)*DATA__GEMM((m),(n),(k)))
 
@@ -378,8 +378,8 @@
 #define FLOPS_SGEMMT(n,k) (0.5 * FLOPS_SGEMM((n), (n), (k)))
 
 #define DATA__GEMMT(n,k) ((0.5*DATA_MAT((n),(n))+DATA_MAT((n),(k))+DATA_MAT((k),(n))))
-#define DATA_ZGEMMT(n,k) (1.0*sizeof(double complex)*DATA__GEMMT((n),(k)))
-#define DATA_CGEMMT(n,k) (1.0*sizeof(float complex)*DATA__GEMMT((n),(k)))
+#define DATA_ZGEMMT(n,k) (1.0*sizeof(double _Complex)*DATA__GEMMT((n),(k)))
+#define DATA_CGEMMT(n,k) (1.0*sizeof(float _Complex)*DATA__GEMMT((n),(k)))
 #define DATA_DGEMMT(n,k) (1.0*sizeof(double)*DATA__GEMMT((n),(k)))
 #define DATA_SGEMMT(n,k) (1.0*sizeof(float)*DATA__GEMMT((n),(k)))
 
@@ -390,14 +390,14 @@
 #define FLOPS_SCOPYSCALE(m,n) (1.0*m*n)
 
 #define DATA__COPYSCALE(m,n) ((DATA_MAT((n),(n))+DATA_MAT((n),(m))+DATA_MAT((m),(n))))
-#define DATA_ZCOPYSCALE(m,n) (1.0*sizeof(double complex)*DATA__COPYSCALE((n),(m)))
-#define DATA_CCOPYSCALE(m,n) (1.0*sizeof(float complex)*DATA__COPYSCALE((n),(m)))
+#define DATA_ZCOPYSCALE(m,n) (1.0*sizeof(double _Complex)*DATA__COPYSCALE((n),(m)))
+#define DATA_CCOPYSCALE(m,n) (1.0*sizeof(float _Complex)*DATA__COPYSCALE((n),(m)))
 #define DATA_DCOPYSCALE(m,n) (1.0*sizeof(double)*DATA__COPYSCALE((n),(m)))
 #define DATA_SCOPYSCALE(m,n) (1.0*sizeof(float)*DATA__COPYSCALE((n),(m)))
 
 #define DATA__TRSM(s,m,n) ((s) == CblasLeft ? (0.5*DATA_MAT((m),(m))+2*DATA_MAT((m),(n))) : (0.5*DATA_MAT((n),(n))+2*DATA_MAT((n),(m))))
-#define DATA_ZTRSM(s,m,n) (1.0*sizeof(double complex)*DATA__TRSM((s),(m),(n)))
-#define DATA_CTRSM(s,m,n) (1.0*sizeof(float complex)*DATA__TRSM((s),(m),(n)))
+#define DATA_ZTRSM(s,m,n) (1.0*sizeof(double _Complex)*DATA__TRSM((s),(m),(n)))
+#define DATA_CTRSM(s,m,n) (1.0*sizeof(float _Complex)*DATA__TRSM((s),(m),(n)))
 #define DATA_DTRSM(s,m,n) (1.0*sizeof(double)*DATA__TRSM((s),(m),(n)))
 #define DATA_STRSM(s,m,n) (1.0*sizeof(float)*DATA__TRSM((s),(m),(n)))
 
@@ -414,14 +414,14 @@
 
 
 #define DATA__SYRK(n,k) (0.5*DATA_MAT((n),(n))+DATA_MAT((n),(k)))
-#define DATA_ZSYRK(n,k) (1.0*sizeof(double complex)*DATA__SYRK((n),(k)))
-#define DATA_CSYRK(n,k) (1.0*sizeof(float complex)*DATA__SYRK((n),(k)))
+#define DATA_ZSYRK(n,k) (1.0*sizeof(double _Complex)*DATA__SYRK((n),(k)))
+#define DATA_CSYRK(n,k) (1.0*sizeof(float _Complex)*DATA__SYRK((n),(k)))
 #define DATA_DSYRK(n,k) (1.0*sizeof(double)*DATA__SYRK((n),(k)))
 #define DATA_SSYRK(n,k) (1.0*sizeof(float)*DATA__SYRK((n),(k)))
 
 #define DATA__SYR2K(n,k) (0.5*DATA_MAT((n),(n))+2*DATA_MAT((n),(k)))
-#define DATA_ZSYR2K(n,k) (1.0*sizeof(double complex)*DATA__SYR2K((n),(k)))
-#define DATA_CSYR2K(n,k) (1.0*sizeof(float complex)*DATA__SYR2K((n),(k)))
+#define DATA_ZSYR2K(n,k) (1.0*sizeof(double _Complex)*DATA__SYR2K((n),(k)))
+#define DATA_CSYR2K(n,k) (1.0*sizeof(float _Complex)*DATA__SYR2K((n),(k)))
 #define DATA_DSYR2K(n,k) (1.0*sizeof(double)*DATA__SYR2K((n),(k)))
 #define DATA_SSYR2K(n,k) (1.0*sizeof(float)*DATA__SYR2K((n),(k)))
 

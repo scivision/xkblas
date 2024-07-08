@@ -153,7 +153,8 @@ static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
   xkblas_ztrsm_async(
       arg->side, arg->uplo, arg->transA, arg->diag,
       arg->m, arg->n,
-      &arg->alpha, arg->A.data, arg->lda,
+      &arg->alpha,
+      arg->A.data, arg->lda,
       arg->B.data, arg->ldb
   );
 }

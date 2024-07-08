@@ -394,6 +394,8 @@ typedef enum kaapi_access_mode {
 /* Return a Human readable char for Kaapi access mode */
 extern char kaapi_getmodename( kaapi_access_mode_t m );
 
+struct kaapi_metadata_info;
+
 /* Kaapi access : used to link together tasks through their memory access.
    There are 2 kinds of access:
     - normal access used to store relation between task and data accessed by the task
@@ -410,7 +412,7 @@ typedef struct kaapi_access {
   struct kaapi_access* sync;      /* sync access. iff kind=1 -> link main syncpoints together */
   kaapi_task_t*        task;      /* the task making this access */
   union {
-    void*              mdi;       /* optim: store pointer to metadata if multi-devices is on */
+    struct kaapi_metadata_info *  mdi; /* optim: store pointer to metadata if multi-devices is on */
     kaapi_atomic_t     wc;        /* iff synchronisation access */
   };
 #if KAAPI_DEBUG

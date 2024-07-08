@@ -264,6 +264,7 @@ endif()
 
 #--- Subdirectories
 include_directories ("kaapi")
+include_directories ("kaapi/regionaccesstree/src")
 
 add_subdirectory(kaapi)
 add_subdirectory(bin)

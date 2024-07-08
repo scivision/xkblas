@@ -121,3 +121,8 @@ add_custom_command(
 )
 
 add_custom_target( testing DEPENDS stesting dtesting ctesting ztesting ${CMAKE_CURRENT_BINARY_DIR}/run_tests )
+
+set_target_properties(stesting PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(ztesting PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(ctesting PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(dtesting PROPERTIES LINKER_LANGUAGE CXX)

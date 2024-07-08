@@ -26,6 +26,7 @@
  *
  */
 #include "common.h"
+#include "kaapi_task_dependences.h"
 #include "xkblas.h"
 #include "ztask.h"
 #include "ztask_internal.h"
@@ -35,6 +36,7 @@
 #warning "Heavy debug enabled. Execution time is highly slow down."
 #include <math.h>
 #endif
+# include <assert.h>
 
 #define STR_EXPAND(tok) #tok
 
@@ -117,48 +119,45 @@ void INSERT_TASK_zgemm_v2(
     kaapi_thread_t * thread = ctxt->kthread;
     size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
     kaapi_task_t * task = kaapi_task_alloc(thread, NAME(task_fmtid), tasksize);
-    NAME(Arg) * taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
+    NAME(Arg) * arg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
-    taskarg->transA = transA;
-    taskarg->transB = transB;
-    taskarg->m = m;
-    taskarg->n = n;
-    taskarg->k = k;
-    taskarg->alpha = alpha;
-    taskarg->lda   = LDA;
-    taskarg->ldb   = LDB;
-    taskarg->beta  = beta;
-    taskarg->ldc   = LDC;
+    arg->transA = transA;
+    arg->transB = transB;
+    arg->m = m;
+    arg->n = n;
+    arg->k = k;
+    arg->alpha = alpha;
+    arg->lda   = LDA;
+    arg->ldb   = LDB;
+    arg->beta  = beta;
+    arg->ldc   = LDC;
 
 #if KAAPI_DEBUG
-    taskarg->A_host_ptr = taskarg->A.data;
-    taskarg->B_host_ptr = taskarg->B.data;
-    taskarg->C_host_ptr = taskarg->C.data;
-    taskarg->Am = A_tm;
-    taskarg->An = A_tn;
-    taskarg->Bm = B_tm;
-    taskarg->Bn = B_tn;
-    taskarg->Cm = C_tm;
-    taskarg->Cn = C_tn;
+    arg->A_host_ptr = arg->A.data;
+    arg->B_host_ptr = arg->B.data;
+    arg->C_host_ptr = arg->C.data;
+    arg->Am = A_tm;
+    arg->An = A_tn;
+    arg->Bm = B_tm;
+    arg->Bn = B_tn;
+    arg->Cm = C_tm;
+    arg->Cn = C_tn;
 #endif
 
-    taskarg->mm = xkblas_get_modemath();
+    arg->mm = xkblas_get_modemath();
 
-    assert(0 && "Not implemented (dependences)");
+    // TODO : this could be optimized if (A == C) or (B == C) or (beta == 0)
 
-    # if 0
-    kaapi_update_dependencies(thread, &taskarg->A, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
-    taskarg->lda = lda;
-    kaapi_update_dependencies(thread, &taskarg->B, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
-    taskarg->ldb = ldb;
-    kaapi_update_dependencies(thread, &taskarg->C, task,
-        beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
-    # endif
+    int BS = m; // TODO : what is block size differs?
+
+    kaapi_access_mode_t modes[NPARAM] = MODE_PARAM;
+    int coords[NPARAM][4];
+    XKBLAS_MATRIX_TILE_COORDINATE(A, LDA, BS, BS, coords[0][0], coords[0][1], coords[0][2], coords[0][3]);
+    XKBLAS_MATRIX_TILE_COORDINATE(B, LDB, BS, BS, coords[1][0], coords[1][1], coords[1][2], coords[1][3]);
+    XKBLAS_MATRIX_TILE_COORDINATE(C, LDC, BS, BS, coords[2][0], coords[2][1], coords[2][2], coords[2][3]);
+   kaapi_dependences_cartesian2D_3(thread, task, modes, coords);
 
 #if KAAPI_USE_OCR
-    /* OCR on the third parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
 #else
     uint16_t ldid = xkblas_get_ld(Ch, Cm, Cn);
@@ -180,35 +179,35 @@ void INSERT_TASK_zgemm(
     kaapi_thread_t* thread = ctxt->kthread;
     size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
     task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
-    NAME(Arg)* taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
+    NAME(Arg)* arg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
 
-    taskarg->transA = transA;
-    taskarg->transB = transB;
-    taskarg->m = m;
-    taskarg->n = n;
-    taskarg->k = k;
-    taskarg->alpha = alpha;
-    kaapi_update_dependencies(thread, &taskarg->A, task,
+    arg->transA = transA;
+    arg->transB = transB;
+    arg->m = m;
+    arg->n = n;
+    arg->k = k;
+    arg->alpha = alpha;
+    kaapi_update_dependencies(thread, &arg->A, task,
         KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
-    taskarg->lda = lda;
-    kaapi_update_dependencies(thread, &taskarg->B, task,
+    arg->lda = lda;
+    kaapi_update_dependencies(thread, &arg->B, task,
         KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
-    taskarg->ldb = ldb;
-    kaapi_update_dependencies(thread, &taskarg->C, task,
+    arg->ldb = ldb;
+    kaapi_update_dependencies(thread, &arg->C, task,
         beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
-    taskarg->beta = beta;
-    taskarg->ldc = ldc;
-    taskarg->mm = xkblas_get_modemath();
+    arg->beta = beta;
+    arg->ldc = ldc;
+    arg->mm = xkblas_get_modemath();
 #if KAAPI_DEBUG
-    taskarg->A_host_ptr = taskarg->A.data;
-    taskarg->B_host_ptr = taskarg->B.data;
-    taskarg->C_host_ptr = taskarg->C.data;
-    taskarg->Am = Am;
-    taskarg->An = An;
-    taskarg->Bm = Bm;
-    taskarg->Bn = Bn;
-    taskarg->Cm = Cm;
-    taskarg->Cn = Cn;
+    arg->A_host_ptr = arg->A.data;
+    arg->B_host_ptr = arg->B.data;
+    arg->C_host_ptr = arg->C.data;
+    arg->Am = Am;
+    arg->An = An;
+    arg->Bm = Bm;
+    arg->Bn = Bn;
+    arg->Cm = Cm;
+    arg->Cn = Cn;
 #endif
 #if KAAPI_USE_OCR
     /* OCR on the third parameter */

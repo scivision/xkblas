@@ -58,10 +58,10 @@
 #if defined(__STDC_NO_COMPLEX__)
 # error "Compiler support for complex number is required."
 #else
-# include <complex.h>
-typedef float complex Complex32_t;
-typedef double complex Complex64_t;
+typedef float _Complex Complex32_t;
+typedef double _Complex Complex64_t;
 typedef double CFloat64_t;
+# include <complex.h>
 #endif
 
 /* xkblas context

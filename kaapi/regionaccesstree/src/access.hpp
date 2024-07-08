@@ -5,6 +5,7 @@ typedef enum    access_mode_e
 {
     IN          = 0,
     OUT         = 1,
+    // OUTSET   = 2 // TODO
     IRRELEVANT  = 127
 }               access_mode_t;
 

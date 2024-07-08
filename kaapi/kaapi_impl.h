@@ -374,6 +374,7 @@ typedef struct kaapi_context {
   kaapi_queue_t*             free_wqueue;      /* free queues list */
   kaapi_queue_t*             suspended_queues; /* suspended queue */
   int                        last_ldid;        /* for round robin distribution */
+  void *                     regions;           /* a KaapiCartesian2DTree * */
 } kaapi_context_t;
 
 

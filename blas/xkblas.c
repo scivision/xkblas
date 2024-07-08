@@ -315,6 +315,7 @@ xkblas_matrix_descr_t* xkblas_find( const void* A )
   return *me;
 }
 
+# if 0
 int
 xkblas_init_matrix_handle_no_deps(
     xkblas_matrix_descr_t* Ah,
@@ -344,6 +345,7 @@ xkblas_init_matrix_handle_no_deps(
 
   return 0;
 }
+# endif
 
 int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB
@@ -367,7 +369,7 @@ int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   if (mt * nt >= Ah->capacity)
   {
     if (Ah->handle) free(Ah->handle);
-    Ah->handle = malloc( (sizeof(uint16_t) + sizeof(kaapi_handle_t))* mt * nt );
+    Ah->handle = (kaapi_handle_t *) malloc( (sizeof(uint16_t) + sizeof(kaapi_handle_t))* mt * nt );
     Ah->capacity = mt*nt;
   }
   Ah->ldid   = (uint16_t*)(Ah->handle + mt * nt);
@@ -420,14 +422,15 @@ uint16_t xkblas_get_ld(
     return lid;
 
   unsigned int count = kaapi_localitydomain_count(KAAPI_LD_GPU);
+  kaapi_handle_t* h = xkblas_get_handle(Ah, i, j);
+  kaapi_metadata_info_t* mdi = h->last->mdi;
+
   if (count ==0)
   {
     lid = lid0;
     goto retval;
   }
 
-  kaapi_handle_t* h = xkblas_get_handle(Ah, i, j);
-  kaapi_metadata_info_t* mdi = h->last->mdi;
   if (mdi !=0)
   {
     int idxvalid[KAAPI_MEMORY_MAX_NODES];
@@ -1064,7 +1067,7 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
   KAAPI_ATOMIC_INCR(&pending_writeback);
 #  endif
   int err = kaapi_dsm_prefetch_on( &kaapi_the_dsm, kaapi_local_asid,
-    taskarg->a.mdi, 
+    taskarg->a.mdi,
     callback_epilogue_writeback, taskarg->a.mdi, taskarg->frame, taskarg
   );
   kaapi_assert((err==0) || (err== EINPROGRESS));

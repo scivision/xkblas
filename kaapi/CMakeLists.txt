@@ -98,7 +98,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 # which point to directories outside the build tree to the install RPATH
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-add_library(kaapi SHARED  ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h kaapi.h kaapi_error.h kaapi_atomic.h kaapi_format.c kaapi_impl.c kaapi_task.c kaapi_rt.c kaapi_hashmap.c kaapi_barrier.c kaapi_memory.c kaapi_offload_stream.c kaapi_offload.c kaapi_offload_device.c kaapi_ld.c kaapi_dbg.c kaapi_plugin_host.c ${ADDITIONAL_SOURCES})
+add_library(kaapi SHARED  ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h kaapi.h kaapi_error.h kaapi_atomic.h kaapi_format.c kaapi_impl.c kaapi_task.c kaapi_rt.c kaapi_hashmap.c kaapi_barrier.c kaapi_memory.c kaapi_offload_stream.c kaapi_offload.c kaapi_offload_device.c kaapi_ld.c kaapi_dbg.c kaapi_plugin_host.c kaapi_task_dependences.cc ${ADDITIONAL_SOURCES})
 target_link_libraries(kaapi PRIVATE Threads::Threads)
 
 if (KAAPI_USE_HWLOC)
@@ -145,6 +145,11 @@ if (${PAPI_FOUND})
   target_link_libraries(kaapi PRIVATE ${PAPI_LIBRARIES})
 endif()
 
+include_directories(regionaccesstree/src/)
+
+set_property(TARGET kaapi PROPERTY CXX_STANDARD 17)
+set_target_properties(kaapi PROPERTIES LINKER_LANGUAGE CXX)
+
 install(TARGETS kaapi DESTINATION lib)
 install(FILES kaapi.h kaapi_atomic.h kaapi_error.h DESTINATION include)
-install(FILES kaapi_dependences_cartesian2D.hpp regionaccesstree/src/access.hpp regionaccesstree/src/history.hpp regionaccesstree/src/region.hpp regionaccesstree/src/utils.hpp DESTINATION include)
+install(FILES kaapi_task_dependences.hpp regionaccesstree/src/access.hpp regionaccesstree/src/history.hpp regionaccesstree/src/region.hpp regionaccesstree/src/utils.hpp DESTINATION include)

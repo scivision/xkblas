@@ -41,10 +41,10 @@
 #if defined(__STDC_NO_COMPLEX__)
 # error "Compiler support for complex number is required."
 #else
-# include <complex.h>
-typedef float complex Complex32_t;
-typedef double complex Complex64_t;
+typedef float _Complex Complex32_t;
+typedef double _Complex Complex64_t;
 typedef double CFloat64_t;
+# include <complex.h>
 #endif
 
 #ifndef KAAPI_NO_INCLUDE_BLAS_H
@@ -136,7 +136,6 @@ struct xkblas_context {
   struct xkblas_context*  next;
 };
 
-
 /* Common Macro... be carrefull, name not so clear */
 #define _XKBLAS_STR_EXPAND2(tok) #tok
 #define _XKBLAS_STR_EXPAND(tok) _XKBLAS_STR_EXPAND2(tok)
@@ -178,9 +177,11 @@ typedef struct xkblas_matrix_descr xkblas_matrix_descr_t;
 
 # define XKBLAS_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
 # define XKBLAS_MATRIX_TILE(A, LD, TI, TJ, SI, SJ) (A+((TJ*SJ) + (LD)*(TI*SI)))
-# define XKBLAS_MATRIX_TILE_COORDINATE(A, LD, X, Y) \
-    int X = (int)A%LD;                              \
-    int Y = (int)A/LD;
+# define XKBLAS_MATRIX_TILE_COORDINATE(A, LD, BX, BY, X0, Y0, X1, Y1)   \
+    X0 = (size_t)A%LD;                                                  \
+    Y0 = (size_t)A/LD;                                                  \
+    X1 = X0 + BX;                                                       \
+    Y1 = Y0 + BY;
 
 extern kaapi_handle_t* xkblas_get_handle(
   xkblas_matrix_descr_t* Ah,

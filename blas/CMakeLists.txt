@@ -22,7 +22,6 @@ if (HIP_FOUND)
   add_compile_options("-DHIPBLAS_V1")
 endif()
 
-
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 
@@ -248,7 +247,7 @@ endif()
 
 target_link_libraries(xkblas PUBLIC kaapi)
 target_link_libraries(xkblas PRIVATE ${CUBLAS_LIBRARIES} ${HIPBLAS_LIBRARIES} ${ROCBLAS_LIBRARIES} stdc++)
-set_target_properties(xkblas PROPERTIES LINKER_LANGUAGE C)
+set_target_properties(xkblas PROPERTIES LINKER_LANGUAGE CXX)
 
 install(TARGETS xkblas DESTINATION lib)
 install(FILES xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/sxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/dxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/cxkblas.h zxkblas.h DESTINATION include)

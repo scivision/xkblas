@@ -1,13 +1,17 @@
-#ifndef __KAAPI_DEPENDENCES_CARTESIAN2D_HPP__
-# define __KAAPI_DEPENDENCES_CARTESIAN2D_HPP__
+#ifndef __KAAPI_TASK_DEPENDENCES_HPP__
+# define  __KAAPI_TASK_DEPENDENCES_HPP__
+
 # include "impl/access-interval-multi-tree.hpp"
+# include "region.hpp"
+
+# include <iostream>
 
 extern "C" {
 # include "kaapi.h"
 };
 
-class KaapiCartesian2DTree : public AccessIntervalMultiTree<2> {
-
+class KaapiCartesian2DTree : public AccessIntervalMultiTree<2>
+{
     public:
         KaapiCartesian2DTree(kaapi_thread_t * th) : thread(th), AccessIntervalMultiTree<2>() {}
 
@@ -26,4 +30,13 @@ class KaapiCartesian2DTree : public AccessIntervalMultiTree<2> {
         kaapi_thread_t * thread;
 };
 
-#endif /* __KAAPI_DEPENDENCES_CARTESIAN2D_HPP__ */
+template<int N>
+void
+kaapi_dependences_cartesian2D(
+    kaapi_thread_t * thread,
+    kaapi_task_t * task,
+    kaapi_access_mode_t mode[N],
+    int coordinates[N][4]
+);
+
+#endif /* __KAAPI_TASK_DEPENDENCES_HPP__ */

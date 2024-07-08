@@ -33,9 +33,9 @@
 #if defined(__STDC_NO_COMPLEX__)
 # error "Compiler support for complex number is required."
 #else
+typedef float _Complex ct32_helper;
+typedef double _Complex ct64_helper;
 # include <complex.h>
-typedef float complex ct32_helper;
-typedef double complex ct64_helper;
 #endif
 
 #if defined(KAAPI_BLAS_USE_OPENBLAS)||defined(KAAPI_BLAS_USE_CRAYBLAS)

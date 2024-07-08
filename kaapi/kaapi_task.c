@@ -957,6 +957,7 @@ kaapi_thread_t* kaapi_thread_bind(int proctype, size_t user_size)
   ctxt->kid    = 0;
   ctxt->team   = 0;
   ctxt->last_ldid = 0;
+  ctxt->regions = NULL;
   kaapi_atomic_initlock(&ctxt->lock);
   ctxt->queue  = kaapi_data_push(&ctxt->thread, sizeof(kaapi_queue_t));
   kaapi_task_t** bloc0= malloc(sizeof(kaapi_task_t*)*QUEUE_DEFAULT_SIZE);
