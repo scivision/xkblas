@@ -64,6 +64,12 @@ typedef double complex Complex64_t;
 typedef double CFloat64_t;
 #endif
 
+void xkblas_activate_custom_alloc();
+void xkblas_deactivate_custom_alloc();
+
+void xkblas_prefetch_memory_on_gpu();
+void xkblas_end_prefetch_memory_on_gpu();
+
 /* xkblas context
 */
 struct xkblas_context;

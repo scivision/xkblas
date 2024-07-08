@@ -593,12 +593,15 @@ static int kaapi_offload_device_prepare_execute_task(
       &mdi->replicas[lid]->view);
 
     /* update pointer in the task arguments */
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
     access->data    = new_data;
     kaapi_format_set_access_param(fmt, ith, kaapi_task_getargs(task), access );
     kaapi_format_set_view_param(fmt, ith,
       kaapi_task_getargs(task),
       &mdi->replicas[lid]->view
     );
+#else
+#endif//KAAPI_UNIFIED
   }
 
 #if KAAPI_USE_PREFETCH
@@ -1624,8 +1627,8 @@ size_t kaapi_offload_get_mem_info(
   if (mem_limit) *mem_limit = (size_t)-1UL;
   // kaapi_assert(device->state >= KAAPI_DEVICE_STATE_COMMIT);
   {
-    if (mem_total) *mem_total = device->mem_total;
-    if (mem_limit) *mem_limit = device->mem_limit;
+    if (mem_total) *mem_total = 0.5 * device->mem_total;
+    if (mem_limit) *mem_limit = 0.5 * device->mem_limit;
   }
   KAAPI_OFFLOAD_TRACE_OUT
   return retval;

@@ -404,10 +404,11 @@ static inline void kaapi_cuda_plugin_unlock(void)
 #if KAAPI_CUDA_CACHE
 /*
 */
-#define PERCENTAGE    0.8
+#define PERCENTAGE    0.2
 static void cuda_mem_cache_init(kaapi_device_cuda_t* dev)
 {
   void* ptr =0;
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
   cudaError_t res;
   size_t size;
   
@@ -417,6 +418,9 @@ static void cuda_mem_cache_init(kaapi_device_cuda_t* dev)
   CudaCheckError(res);
 
   kaapi_assert(ptr != 0);
+//#else
+//  ptr = 1;
+//#endif//KAAPI_UNIFIED
   dev->cache = calloc(1, sizeof(cuda_cache_t));
   dev->cache->base = (uintptr_t)ptr;
   dev->cache->size = size;
@@ -492,6 +496,7 @@ static void cuda_mem_free_cache(kaapi_memory_device_t* dev, uintptr_t ptr, size_
 */
 static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
   void* ptr;
   cudaError_t res;
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
@@ -527,6 +532,9 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
+//#else
+//  return 1;
+//#endif//KAAPI_UNIFIED
 }
 
 
@@ -940,6 +948,7 @@ void* kaapi_cuda_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
           //printf("%p:: cudaHostRegister ptr: %p, size: %lu\n", pthread_self(), req.ptr, req.size);
           if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
@@ -949,15 +958,28 @@ void* kaapi_cuda_register_thread(void* dummy )
             printf("***[%s]: cudaHostRegister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#else
+	  struct cudaMemLocation loc;
+	  loc.type = cudaMemLocationTypeDevice;
+	  loc.id = 0;
+	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
+	  cudaMemPrefetchAsync(req.ptr, req.size, 0, NULL );
+	  cudaStreamSynchronize( NULL );
+#endif//KAAPI_UNIFIED
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           err = cudaHostUnregister(req.ptr);
           if (!( (cudaSuccess == err) || (cudaErrorHostMemoryNotRegistered == err)))
           {
             printf("***[%s]: cudaHostUnregister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#else
+	  struct cudaMemLocation loc;
+	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
+#endif//KAAPI_UNIFIED
         }
       }
 #if KAAPI_USE_PERFCOUNTER
@@ -1105,6 +1127,7 @@ static int cuda_stream_decode_ioinstruction(
       {
         case KAAPI_MEMORY_VIEW_1D:
         {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
           switch (instr->type)
@@ -1122,11 +1145,13 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
                                      cudaMemcpyHostToDevice,
                                      *stream);
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_H2D(dev)++;
               COUNTER_SIZE_H2D(dev) += size;
             break;
@@ -1136,11 +1161,13 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
                                      cudaMemcpyDeviceToHost,
                                      *stream);
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_D2H(dev)++;
               COUNTER_SIZE_D2H(dev)+= size;
             break;
@@ -1151,12 +1178,14 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpyPeerAsync( dest,
                                          kaapi_device_ids[op->dev_dest->device->device_id],
                                          src,
                                          kaapi_device_ids[op->dev_src->device->device_id],
                                          size,
                                          *stream);
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_D2D(dev)++;
               COUNTER_SIZE_D2D(dev)+= size;
             break;
@@ -1164,10 +1193,12 @@ _kaapi_unlock_print();
               kaapi_assert_debug(0);
           };
           CudaCheckError(res);
+#endif//KAAPI_UNIFIED
         } break;
 
         case KAAPI_MEMORY_VIEW_2D:
         {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           size_t width, height, dpitch, spitch;
           if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
           {
@@ -1192,7 +1223,9 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
+//#endif//KAAPI_UNIFIED
             break;
             case KAAPI_IO_COPY_H2D:
 #if 0// KAAPI_DEBUG
@@ -1200,7 +1233,9 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_H2D(dev)++;
               COUNTER_SIZE_H2D(dev)   += size;
             break;
@@ -1210,7 +1245,9 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_D2H(dev)++;
               COUNTER_SIZE_D2H(dev)   += size;
             break;
@@ -1220,13 +1257,16 @@ _kaapi_lock_print();
 	      printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
 _kaapi_unlock_print();
 #endif
+//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, *stream );
+//#endif//KAAPI_UNIFIED
               COUNTER_CNT_D2D(dev)++;
               COUNTER_SIZE_D2D(dev) += size;
             break;
             default:
               kaapi_assert(0);
           };
+#endif//KAAPI_UNIFIED
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:

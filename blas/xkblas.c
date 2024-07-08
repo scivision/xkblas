@@ -95,6 +95,25 @@ static const char* get_xkblas_info(void);
 /* default tile size */
 static size_t NB = 0;
 
+void xkblas_activate_custom_alloc(){}
+void xkblas_deactivate_custom_alloc(){}
+
+void xkblas_prefetch_memory_on_gpu( void* ptr, size_t size )
+{
+  //struct cudaMemLocation loc;
+  //loc.type = cudaMemLocationTypeDevice;
+  //loc.id = 0;
+  //cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc );
+  //cudaMemPrefetchAsync( ptr, size, 0, NULL );
+  //cudaStreamSynchronize(NULL);
+}
+
+void xkblas_end_prefetch_memory_on_gpu( void* ptr, size_t size )
+{
+  //struct cudaMemLocation loc;
+  //cudaMemAdvise_v2( ptr, size, cudaMemAdviseUnsetPreferredLocation, loc );
+}
+
 /* Deallocate the current xkblas_context */
 static void
 xkblas_pthread_context_clean(void* arg)
