@@ -176,6 +176,11 @@ typedef struct xkblas_matrix_descr xkblas_matrix_descr_t;
 
 #define xkblas_num_of_tiles(M,NB) (((M)+(NB)-1)/(NB))
 
+# define XKBLAS_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
+# define XKBLAS_MATRIX_TILE(A, LD, TI, TJ, SI, SJ) (A+((TJ*SJ) + (LD)*(TI*SI)))
+# define XKBLAS_MATRIX_TILE_COORDINATE(A, LD, X, Y) \
+    int X = (int)A%LD;                              \
+    int Y = (int)A/LD;
 
 extern kaapi_handle_t* xkblas_get_handle(
   xkblas_matrix_descr_t* Ah,

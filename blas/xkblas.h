@@ -226,6 +226,9 @@ extern int xkblas_matrix_descr_isinit(
   xkblas_matrix_descr_t* Ah
 );
 
+extern int xkblas_init_matrix_handle_no_deps(xkblas_matrix_descr_t* Ah,
+        const void* A, size_t M, size_t N, size_t LD, size_t eltsize);
+
 /*
  */
 extern int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,

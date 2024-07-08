@@ -38,6 +38,16 @@
 #ifndef _kblas_task_z
 #define _kblas_task_z
 
+void INSERT_TASK_zgemm_v2(
+    int transA, int transB,
+    size_t m, size_t n, size_t k,
+    Complex64_t alpha,
+    const Complex64_t * A, size_t A_tm, size_t A_tn, size_t LDA,
+    const Complex64_t * B, size_t B_tm, size_t B_tn, size_t LDB,
+    Complex64_t beta,
+    const Complex64_t * C, size_t C_tm, size_t C_tn, size_t LDC
+);
+
 void INSERT_TASK_zgemm(
     int transA, int transB,
     size_t m, size_t n, size_t k,

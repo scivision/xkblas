@@ -315,6 +315,35 @@ xkblas_matrix_descr_t* xkblas_find( const void* A )
   return *me;
 }
 
+int
+xkblas_init_matrix_handle_no_deps(
+    xkblas_matrix_descr_t* Ah,
+    const void* A, size_t M, size_t N, size_t LD, size_t eltsize
+) {
+  xkblas_context_t* ctxt = xkblas_context_get();
+
+#if KAAPI_DEBUG
+  Ah->gen = ctxt->xkblas_generation_cache;
+  Ah->owner = pthread_self();
+#endif
+
+  Ah->addr = A;
+  Ah->eltsize = eltsize;
+  Ah->ld =  LD;
+  Ah->M  =  M;
+  Ah->N  =  N;
+
+  // keeping these fields for retro compatibility
+  Ah->mb = -1;                  // unused
+  Ah->nb = -1;                  // unused
+  Ah->mt = -1;                  // unused
+  Ah->nt = -1;                  // unused
+  Ah->handle   = NULL;          // unused
+  Ah->capacity = -1;            // unused
+  Ah->ldid = (uint16_t*)(-1);   // unused
+
+  return 0;
+}
 
 int xkblas_init_matrix_handle( xkblas_matrix_descr_t* Ah,
   void* A, size_t M, size_t N, size_t LD, size_t eltsize, size_t MB, size_t NB

@@ -104,6 +104,70 @@
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
 
+void INSERT_TASK_zgemm_v2(
+    int transA, int transB,
+    size_t m, size_t n, size_t k,
+    Complex64_t alpha,
+    const Complex64_t * A, size_t A_tm, size_t A_tn, size_t LDA,
+    const Complex64_t * B, size_t B_tm, size_t B_tn, size_t LDB,
+    Complex64_t beta,
+    const Complex64_t * C, size_t C_tm, size_t C_tn, size_t LDC
+) {
+    xkblas_context_t * ctxt = xkblas_context_get();
+    kaapi_thread_t * thread = ctxt->kthread;
+    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
+    kaapi_task_t * task = kaapi_task_alloc(thread, NAME(task_fmtid), tasksize);
+    NAME(Arg) * taskarg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
+
+    taskarg->transA = transA;
+    taskarg->transB = transB;
+    taskarg->m = m;
+    taskarg->n = n;
+    taskarg->k = k;
+    taskarg->alpha = alpha;
+    taskarg->lda   = LDA;
+    taskarg->ldb   = LDB;
+    taskarg->beta  = beta;
+    taskarg->ldc   = LDC;
+
+#if KAAPI_DEBUG
+    taskarg->A_host_ptr = taskarg->A.data;
+    taskarg->B_host_ptr = taskarg->B.data;
+    taskarg->C_host_ptr = taskarg->C.data;
+    taskarg->Am = A_tm;
+    taskarg->An = A_tn;
+    taskarg->Bm = B_tm;
+    taskarg->Bn = B_tn;
+    taskarg->Cm = C_tm;
+    taskarg->Cn = C_tn;
+#endif
+
+    taskarg->mm = xkblas_get_modemath();
+
+    assert(0 && "Not implemented (dependences)");
+
+    # if 0
+    kaapi_update_dependencies(thread, &taskarg->A, task,
+        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
+    taskarg->lda = lda;
+    kaapi_update_dependencies(thread, &taskarg->B, task,
+        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
+    taskarg->ldb = ldb;
+    kaapi_update_dependencies(thread, &taskarg->C, task,
+        beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
+    # endif
+
+#if KAAPI_USE_OCR
+    /* OCR on the third parameter */
+    kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
+#else
+    uint16_t ldid = xkblas_get_ld(Ch, Cm, Cn);
+    kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
+#endif
+    kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
+    kaapi_task_commit( thread, task );
+}
+
 void INSERT_TASK_zgemm(
     int transA, int transB,
     size_t m, size_t n, size_t k, 

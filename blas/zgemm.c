@@ -111,10 +111,6 @@
  *
  */
 
-#define A(m, n) A##h,  m,  n
-#define B(m, n) B##h,  m,  n
-#define C(m, n) C##h,  m,  n
-
 int xkblas_zgemm_async(
     int transA, int transB, int M, int N, int K,
     const Complex64_t* alpha, const Complex64_t *A, int LDA,
@@ -148,6 +144,9 @@ int xkblas_zgemm_async(
     }
 
     size_t Am, An, Bm, Bn;
+    const size_t Cm = M;
+    const size_t Cn = N;
+
     if ( transA == CblasNoTrans ) {
         Am = M; An = K;
     } else {
@@ -177,294 +176,132 @@ int xkblas_zgemm_async(
       ((*alpha == 0.0 || K == 0) && *beta == 1.0))
         return 0;
 
-
-/* new implem */
-# if 1
-
     xkblas_context_t * xkctxt = xkblas_context_get();
     size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
-    xkblas_tile_t tiling = { NB, NB };
 
-    size_t Amt = XKBLAS_NUM_OF_TILES(Am, tiling.m);
-    size_t Ant = XKBLAS_NUM_OF_TILES(An, tiling.n);
-    size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, tiling.n);
-    size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, tiling.m);
-    size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, NB);
-    size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, NB);
+    // TODO : set tiling parameters
+    size_t Amb = NB;
+    size_t Anb = NB;
+    size_t Bmb = NB;
+    size_t Bnb = NB;
+    size_t Cmb = NB;
+    size_t Cnb = NB;
 
-    size_t m, n, k;
-    size_t ldam, ldak, ldbn, ldbk, ldcm;
-    size_t tempmm, tempnn, tempkn, tempkm;
+    size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
+    size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
+    size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
+    size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
+    size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
+    size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
 
-    // TODO : what is this ?
-    xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
+    size_t bs_mm, bs_nn, bs_kn, bs_km;
 
-    for (m = 0; m < Cmt; m++)
-    {
-        size_t tempmm = m == Cmt-1 ? M-m*Cmb : Cmb;
-        ldcm = LDC; //BLKLDD(C, m);
-        for (n = 0; n < Cnt; n++)
-        {
-            tempnn = n == Cnt-1 ? N-n*Cnb : Cnb;
-            /*
-             *  A: CblasNoTrans / B: CblasNoTrans
-             */
-            if (transA == CblasNoTrans)
-            {
-                ldam = LDA; //BLKLDD(A, m);
-                if (transB == CblasNoTrans)
-                {
-                    for (k = 0; k < Ant; k++)
-                    {
-                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        ldbk = LDB; //BLKLDD(B, k);
-                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkn, 
-                            *alpha, A(m, k), ldam,  /* lda * Z */
-                                   B(k, n), ldbk,   /* ldb * Y */
-                            zbeta, C(m, n), ldcm);  /* ldc * Y */
-                    }
-                }
-                /*
-                 *  A: CblasNoTrans / B: Cham[Conj]Trans
-                 */
-                else {
-                    ldbn = LDB; //BLKLDD(B, n);
-                    for (k = 0; k < Ant; k++)
-                    {
-                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkn, 
-                            *alpha, A(m, k), ldam,  /* lda * Z */
-                                    B(n, k), ldbn,  /* ldb * Z */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
-                    }
-                }
-            }
-            /*
-             *  A: Cham[Conj]Trans / B: CblasNoTrans
-             */
-            else
-            {
-                if (transB == CblasNoTrans)
-                {
-                    for (k = 0; k < Amt; k++)
-                    {
-                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
-                        ldak = LDA; //BLKLDD(A, k);
-                        ldbk = LDB; //BLKLDD(B, k);
-                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkm, 
-                            *alpha, A(k, m), ldak,  /* lda * X */
-                                    B(k, n), ldbk,  /* ldb * Y */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
-                    }
-                }
-                /*
-                 *  A: Cham[Conj]Trans / B: Cham[Conj]Trans
-                 */
-                else
-                {
-                    ldbn = LDB; //BLKLDD(B, n);
-                    for (k = 0; k < Amt; k++)
-                    {
-                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
-                        ldak = LDA; //BLKLDD(A, k);
-                        Complex64_t zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkm, 
-                            *alpha, A(k, m), ldak,  /* lda * X */
-                                    B(n, k), ldbn,  /* ldb * Z */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
-                    }
-                }
-            }
-        }
-    }
-
-/* previous implem */
-# else
-    size_t Cmb = 0;
-    size_t Cnb = 0;
-    size_t Amb = 0;
-    size_t Anb = 0;
-    size_t Bmb = 0;
-    size_t Bnb = 0;
-
-    /* get default tile size and initialize internal descriptor if not yet */
-    xkblas_context_t* xkctxt = xkblas_context_get();
-    size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM,M,N,K);
-
-#if 0
-    printf("[XKBLAS] NB =: %lu\n", NB);
-#endif
-
-    xkblas_matrix_descr_t* Ah = xkblas_find(A);
-    xkblas_matrix_descr_t* Bh = xkblas_find(B);
-    xkblas_matrix_descr_t* Ch = xkblas_find(C);
+    // we want no matrix descriptor
+    # if 0
+    // TODO : we retrieve handle without initializing dependences handle
+    xkblas_matrix_descr_t * Ah = xkblas_find(A);
+    xkblas_matrix_descr_t * Bh = xkblas_find(B);
+    xkblas_matrix_descr_t * Ch = xkblas_find(C);
 
     if (!xkblas_matrix_descr_isinit(Ah))
-    {
-      xkblas_init_matrix_handle(Ah, (void*)A, Am, An, LDA, sizeof(Complex64_t), NB, NB);
-      kaapi_assert_debug( (Ah->ld == LDA) && (Ah->M == Am) && (Ah->N == An) );
-    }
+        xkblas_init_matrix_handle_no_deps(Ah, A, Am, An, LDA, sizeof(Complex64_t));
     if (!xkblas_matrix_descr_isinit(Bh))
-    {
-      xkblas_init_matrix_handle(Bh, (void*)B, Bm, Bn, LDB, sizeof(Complex64_t), NB, NB);
-      kaapi_assert_debug( (Bh->ld == LDB) && (Bh->M == Bm) && (Bh->N == Bn) );
-    }
+        xkblas_init_matrix_handle_no_deps(Bh, B, Bm, Bn, LDB, sizeof(Complex64_t));
     if (!xkblas_matrix_descr_isinit(Ch))
+        xkblas_init_matrix_handle_no_deps(Ch, C, Cm, Cn, LDC, sizeof(Complex64_t));
+
+    // TODO : what is this ?
+    xkblas_auto_map(xkctxt, KERN_GEMM, Ch);
+    # endif
+
+    // iterator on tiles
+    for (size_t tm = 0; tm < Cmt; ++tm)
     {
-      xkblas_init_matrix_handle(Ch, C, M, N, LDC, sizeof(Complex64_t), NB, NB);
-      kaapi_assert_debug( (Ch->ld == LDC) && (Ch->M == M) && (Ch->N == N) );
-    }
-
-    Cmb = Ch->mb;
-    Cnb = Ch->nb;
-    size_t Cmt = Ch->mt;
-    size_t Cnt = Ch->nt;
-
-    Amb = Ah->mb;
-    Anb = Ah->nb;
-    size_t Amt = Ah->mt;
-    size_t Ant = Ah->nt;
-
-    Bmb = Bh->mb;
-    Bnb = Bh->nb;
-    size_t Bmt = Bh->mt;
-    size_t Bnt = Bh->nt;
-
-    size_t m, n, k;
-    size_t ldam, ldak, ldbn, ldbk, ldcm;
-    size_t tempmm, tempnn, tempkn, tempkm;
-
-    Complex64_t zbeta;
-
-    xkblas_auto_map( xkctxt, KERN_GEMM, Ch );
-
-    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "A", Ah, 0 ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "B", Bh, 0 ) );
-    kaapi_assert_debug( 0 == xkblas_dbg_setname_with_flags( "C", Ch, 0 ) );
-    
-#if KAAPI_USE_TRACELIB==1
-    kaapi_context_t* ctxt = xkctxt->kctxt;
-    kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 0 /*begin*/ );
-    if (evt)
-    {
-      strncpy(evt->u.s.d0.c8,"zgemm",8);
-      evt->u.s.d1.u = M;
-      evt->u.s.d2.u = N;
-      evt->u.s.d3.u = K;
-      KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
-    }
-    evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_CALL, 2 /*info*/ );
-    if (evt)
-    {
-      evt->u.s.d0.u = NB;
-      evt->u.s.d1.u = transA;
-      evt->u.s.d2.u = transB;
-      evt->u.s.d3.u = 0;
-      KAAPI_EVENT_PUSH(&ctxt->kproc, KAAPI_EVT_CALL);
-    }
-#endif
-
-    for (m = 0; m < Cmt; m++)
-    {
-        tempmm = m == Cmt-1 ? M-m*Cmb : Cmb;
-        ldcm = LDC; //BLKLDD(C, m);
-        for (n = 0; n < Cnt; n++)
+        size_t bs_mm = (tm == Cmt-1) ? (M-tm*Cmb) : Cmb;
+        for (size_t tn = 0; tn < Cnt; tn++)
         {
-            tempnn = n == Cnt-1 ? N-n*Cnb : Cnb;
-            /*
-             *  A: CblasNoTrans / B: CblasNoTrans
-             */
+            bs_nn = (tn == Cnt-1) ? (N-tn*Cnb) : Cnb;
+
+            // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
             {
-                ldam = LDA; //BLKLDD(A, m);
                 if (transB == CblasNoTrans)
                 {
-                    for (k = 0; k < Ant; k++)
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
-                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        ldbk = LDB; //BLKLDD(B, k);
-                        zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkn, 
-                            *alpha, A(m, k), ldam,  /* lda * Z */
-                                   B(k, n), ldbk,   /* ldb * Y */
-                            zbeta, C(m, n), ldcm);  /* ldc * Y */
+                        bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        Complex64_t zbeta = (tk == 0) ? *beta : 1.0;
+                        INSERT_TASK_zgemm_v2(
+                                transA, transB,
+                                bs_mm, bs_nn, bs_kn,
+                                *alpha,
+                                A, tm, tk, LDA,
+                                B, tk, tn, LDB,
+                                zbeta,
+                                C, tm, tn, LDC
+                        );
                     }
                 }
-                /*
-                 *  A: CblasNoTrans / B: Cham[Conj]Trans
-                 */
-                else {
-                    ldbn = LDB; //BLKLDD(B, n);
-                    for (k = 0; k < Ant; k++)
+                // A: CblasNoTrans / B: Cham[Conj]Trans
+                else
+                {
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
-                        tempkn = k == Ant-1 ? An-k*Anb : Anb;
-                        zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkn, 
-                            *alpha, A(m, k), ldam,  /* lda * Z */
-                                    B(n, k), ldbn,  /* ldb * Z */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                        bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        Complex64_t zbeta = (tk == 0) ? *beta : 1.0;
+                        INSERT_TASK_zgemm_v2(
+                                transA, transB,
+                                bs_mm, bs_nn, bs_kn,
+                                *alpha,
+                                A, tm, tk, LDA,
+                                B, tn, tk, LDB,
+                                zbeta,
+                                C, tm, tn, LDC
+                        );
                     }
                 }
             }
-            /*
-             *  A: Cham[Conj]Trans / B: CblasNoTrans
-             */
+            // A: Cham[Conj]Trans / B: CblasNoTrans
             else
             {
                 if (transB == CblasNoTrans)
                 {
-                    for (k = 0; k < Amt; k++)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
-                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
-                        ldak = LDA; //BLKLDD(A, k);
-                        ldbk = LDB; //BLKLDD(B, k);
-                        zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkm, 
-                            *alpha, A(k, m), ldak,  /* lda * X */
-                                    B(k, n), ldbk,  /* ldb * Y */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                        bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        Complex64_t zbeta = (tk == 0) ? *beta : 1.0;
+                        INSERT_TASK_zgemm_v2(
+                                transA, transB,
+                                bs_mm, bs_nn, bs_kn,
+                                *alpha,
+                                A, tk, tm, LDA,
+                                B, tk, tn, LDB,
+                                zbeta,
+                                C, tm, tn, LDC
+                        );
                     }
                 }
-                /*
-                 *  A: Cham[Conj]Trans / B: Cham[Conj]Trans
-                 */
+                // A: Cham[Conj]Trans / B: Cham[Conj]Trans
                 else
                 {
-                    ldbn = LDB; //BLKLDD(B, n);
-                    for (k = 0; k < Amt; k++)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
-                        tempkm = k == Amt-1 ? Am-k* Amb : Amb;
-                        ldak = LDA; //BLKLDD(A, k);
-                        zbeta = k == 0 ? *beta : 1.0;
-                        INSERT_TASK_zgemm(
-                            transA, transB,
-                            tempmm, tempnn, tempkm, 
-                            *alpha, A(k, m), ldak,  /* lda * X */
-                                    B(n, k), ldbn,  /* ldb * Z */
-                            zbeta,  C(m, n), ldcm); /* ldc * Y */
+                        bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        Complex64_t zbeta = (tk == 0) ? *beta : 1.0;
+                        INSERT_TASK_zgemm_v2(
+                                transA, transB,
+                                bs_mm, bs_nn, bs_kn,
+                                *alpha,
+                                A, tk, tm, LDA,
+                                B, tn, tk, LDB,
+                                zbeta,
+                                C, tm, tn, LDC
+                        );
                     }
                 }
             }
         }
     }
-    # endif
     return 0;
 }
 
