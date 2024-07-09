@@ -46,7 +46,7 @@
 /* Here is assumed the pointer to the struct argument is 'arg'.
    Must be passed as a macro parameter.
  */
- 
+
 /* Macros to defined the task format data structure for GEMM computation.
    GEMM == C <- alpha*A*B + beta C.
    A, B are read access data. C is either write accessed if beta==0 or read-write access data.
@@ -76,32 +76,20 @@
  *
  */
  typedef struct {
-  int transA;
-  int transB;
-  size_t m;
-  size_t n;
-  size_t k;
-  Complex64_t alpha;
-  kaapi_access_t A;
-  size_t lda;
-  kaapi_access_t B;
-  size_t ldb;
-  Complex64_t beta;
-  kaapi_access_t C;
-  size_t ldc;
-#if KAAPI_DEBUG
-	/* debug */
-	void* A_host_ptr;
-	void* B_host_ptr;
-	void* C_host_ptr;
-	size_t Am;
-	size_t An;
-	size_t Bm;
-	size_t Bn;
-	size_t Cm;
-	size_t Cn;
-#endif
-  xkblas_mode_math_t mm;
+     int transA;
+     int transB;
+     size_t m;
+     size_t n;
+     size_t k;
+     Complex64_t alpha;
+     Complex64_t * A;
+     size_t lda;
+     Complex64_t * B;
+     size_t ldb;
+     Complex64_t beta;
+     Complex64_t * C;
+     size_t ldc;
+     xkblas_mode_math_t mm;
 } NAME(Arg);
 
 static kaapi_format_id_t NAME(task_fmtid) = 0;
@@ -123,28 +111,15 @@ void INSERT_TASK_zgemm_v2(
 
     arg->transA = transA;
     arg->transB = transB;
-    arg->m = m;
-    arg->n = n;
-    arg->k = k;
-    arg->alpha = alpha;
-    arg->lda   = LDA;
-    arg->ldb   = LDB;
-    arg->beta  = beta;
-    arg->ldc   = LDC;
-
-#if KAAPI_DEBUG
-    arg->A_host_ptr = arg->A.data;
-    arg->B_host_ptr = arg->B.data;
-    arg->C_host_ptr = arg->C.data;
-    arg->Am = A_tm;
-    arg->An = A_tn;
-    arg->Bm = B_tm;
-    arg->Bn = B_tn;
-    arg->Cm = C_tm;
-    arg->Cn = C_tn;
-#endif
-
-    arg->mm = xkblas_get_modemath();
+    arg->m      = m;
+    arg->n      = n;
+    arg->k      = k;
+    arg->alpha  = alpha;
+    arg->lda    = LDA;
+    arg->ldb    = LDB;
+    arg->beta   = beta;
+    arg->ldc    = LDC;
+    arg->mm     = xkblas_get_modemath();
 
     // TODO : this could be optimized if (A == C) or (B == C) or (beta == 0)
 
@@ -155,7 +130,7 @@ void INSERT_TASK_zgemm_v2(
     XKBLAS_MATRIX_TILE_COORDINATE(A, LDA, BS, BS, coords[0][0], coords[0][1], coords[0][2], coords[0][3]);
     XKBLAS_MATRIX_TILE_COORDINATE(B, LDB, BS, BS, coords[1][0], coords[1][1], coords[1][2], coords[1][3]);
     XKBLAS_MATRIX_TILE_COORDINATE(C, LDC, BS, BS, coords[2][0], coords[2][1], coords[2][2], coords[2][3]);
-   kaapi_dependences_cartesian2D_3(thread, task, modes, coords);
+    kaapi_dependences_cartesian2D_3(thread, task, modes, coords);
 
 #if KAAPI_USE_OCR
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
@@ -166,60 +141,6 @@ void INSERT_TASK_zgemm_v2(
     kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
     kaapi_task_commit( thread, task );
 }
-
-void INSERT_TASK_zgemm(
-    int transA, int transB,
-    size_t m, size_t n, size_t k, 
-    Complex64_t alpha, xkblas_matrix_descr_t *Ah, size_t Am, size_t An, size_t lda,
-                       xkblas_matrix_descr_t *Bh, size_t Bm, size_t Bn, size_t ldb,
-    Complex64_t beta,  xkblas_matrix_descr_t *Ch, size_t Cm, size_t Cn, size_t ldc)
-{
-    kaapi_task_t* task;
-    xkblas_context_t* ctxt = xkblas_context_get();
-    kaapi_thread_t* thread = ctxt->kthread;
-    size_t tasksize = sizeof(NAME(Arg)) + sizeof(kaapi_task_withperfcnt_t);
-    task = kaapi_task_alloc( thread, NAME(task_fmtid), tasksize );
-    NAME(Arg)* arg = kaapi_task_getargst((kaapi_task_withperfcnt_t*)task,NAME(Arg));
-
-    arg->transA = transA;
-    arg->transB = transB;
-    arg->m = m;
-    arg->n = n;
-    arg->k = k;
-    arg->alpha = alpha;
-    kaapi_update_dependencies(thread, &arg->A, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Ah, Am, An));
-    arg->lda = lda;
-    kaapi_update_dependencies(thread, &arg->B, task,
-        KAAPI_ACCESS_MODE_R, xkblas_get_handle(Bh, Bm, Bn));
-    arg->ldb = ldb;
-    kaapi_update_dependencies(thread, &arg->C, task,
-        beta == 0.0 ? KAAPI_ACCESS_MODE_W : KAAPI_ACCESS_MODE_RW, xkblas_get_handle(Ch, Cm, Cn));
-    arg->beta = beta;
-    arg->ldc = ldc;
-    arg->mm = xkblas_get_modemath();
-#if KAAPI_DEBUG
-    arg->A_host_ptr = arg->A.data;
-    arg->B_host_ptr = arg->B.data;
-    arg->C_host_ptr = arg->C.data;
-    arg->Am = Am;
-    arg->An = An;
-    arg->Bm = Bm;
-    arg->Bn = Bn;
-    arg->Cm = Cm;
-    arg->Cn = Cn;
-#endif
-#if KAAPI_USE_OCR
-    /* OCR on the third parameter */
-    kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 2);
-#else
-    uint16_t ldid = xkblas_get_ld(Ch, Cm, Cn);
-    kaapi_task_set_ld(task, KAAPI_TASK_LD_BOUND, ldid);
-#endif
-    kaapi_taskflag_set(task, KAAPI_TASK_PERFCNT);
-    kaapi_task_commit( thread, task );
-}
-
 
 static void NAME(task_body_cpu)( kaapi_task_t* task, kaapi_thread_t* thread )
 {

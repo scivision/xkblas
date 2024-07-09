@@ -9,8 +9,11 @@ add_library(xkblas SHARED
     src/xkblas.cc
     src/kernel/zgemm.cc
     src/logger/logger.cc
-    src/scheduler/sync.cc
+    src/scheduler/thread.cc
 )
+
+# flags
+target_compile_options(xkblas PRIVATE -fcoroutines)
 
 # Include directory
 include_directories(include/)

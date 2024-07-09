@@ -196,24 +196,6 @@ int xkblas_zgemm_async(
 
     size_t bs_mm, bs_nn, bs_kn, bs_km;
 
-    // we want no matrix descriptor
-    # if 0
-    // TODO : we retrieve handle without initializing dependences handle
-    xkblas_matrix_descr_t * Ah = xkblas_find(A);
-    xkblas_matrix_descr_t * Bh = xkblas_find(B);
-    xkblas_matrix_descr_t * Ch = xkblas_find(C);
-
-    if (!xkblas_matrix_descr_isinit(Ah))
-        xkblas_init_matrix_handle_no_deps(Ah, A, Am, An, LDA, sizeof(Complex64_t));
-    if (!xkblas_matrix_descr_isinit(Bh))
-        xkblas_init_matrix_handle_no_deps(Bh, B, Bm, Bn, LDB, sizeof(Complex64_t));
-    if (!xkblas_matrix_descr_isinit(Ch))
-        xkblas_init_matrix_handle_no_deps(Ch, C, Cm, Cn, LDC, sizeof(Complex64_t));
-
-    // TODO : what is this ?
-    xkblas_auto_map(xkctxt, KERN_GEMM, Ch);
-    # endif
-
     // iterator on tiles
     for (size_t tm = 0; tm < Cmt; ++tm)
     {
