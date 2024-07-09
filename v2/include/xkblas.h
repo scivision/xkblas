@@ -9,6 +9,10 @@ extern "C" {
     /* Wait for the completion of asynchronous operation spawned on the calling threads */
     void xkblas_sync(void);
 
+    /* deinitialize the runtime */
+    void xkblas_deinit(void);
+
+
 };
 
 #endif /* __XKBLAS_H__ */

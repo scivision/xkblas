@@ -1391,8 +1391,8 @@ int xkblas_init(void)
   if (getenv("XKBLAS_NKERNELS_PER_STREAM"))
   {
     if (!getenv("XKBLAS_NKERNELS"))
-      printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM' use 'XKBLAS_NKERNELS'\n");
-    setenv("KAAPI_CUDA_KERNEL_PER_STREAM",getenv("XKBLAS_NKERNELS_PER_STREAM"),1);
+     XKBLAS_NGPUS printf("[XKBlas] deprecated 'XKBLAS_NKERNELS_PER_STREAM' use 'XKBLAS_NKERNELS'\n");
+    setenv("KAAPXKBLAS_GPUSETI_CUDA_KERNEL_PER_STREAM",getenv("XKBLAS_NKERNELS_PER_STREAM"),1);
   }
   if (getenv("XKBLAS_NKERNELS"))
   {

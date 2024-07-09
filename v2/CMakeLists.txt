@@ -7,6 +7,7 @@ project(xkblas)
 # Lib name
 add_library(xkblas SHARED
     src/xkblas.cc
+    src/xkblas_conf.cc
     src/kernel/zgemm.cc
     src/logger/logger.cc
     src/scheduler/thread.cc
