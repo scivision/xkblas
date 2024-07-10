@@ -85,13 +85,4 @@ static inline int xkblas_blas2cblas_diag( const char* diag )
     X1 = X0 + BX;                                                       \
     Y1 = Y0 + BY;
 
-# ifndef MIN
-#  define MIN(X, Y) ((Y) < (X) ? (Y) : (X))
-# endif /* MIN */
-
-# ifndef MAX
-#  define MAX(X, Y) ((X) < (Y) ? (Y) : (X))
-# endif /* MAX */
-
-
 #endif /* __BLAS_H__ */

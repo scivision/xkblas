@@ -8,8 +8,7 @@
 // Runtime configuration
 xkblas_conf_t XKBLAS_CONF = {
     .stackblocsize              = (uint64_t)-1,
-    .ncpus                      = 1,
-    .ngpus                      = 1,
+    .ngpus                      = (uint8_t)-1,
     .gpu_set                    = (uint32_t) ~0,
     .cuda_stream_capacity       = 64,
     .cuda_conc_stream_kernel    = 2,
@@ -41,6 +40,8 @@ __parse_ngpus(char const * value)
 {
     if (value)
         XKBLAS_CONF.ngpus = atoi(value);
+    else
+        XKBLAS_CONF.ngpus = UINT8_MAX;
 }
 
 static void

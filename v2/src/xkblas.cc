@@ -1,6 +1,6 @@
 # include "conf/conf.h"
 # include "logger/logger.h"
-# include "device/devices.h"
+# include "device/driver.h"
 # include "sync/spinlock.h"
 
 # include <atomic>
@@ -26,14 +26,6 @@ xkblas_register_format(void)
     // [...]
 }
 
-static inline void
-__xkblas_init(void)
-{
-    xkblas_init_conf();
-    xkblas_register_format();
-    xkblas_devices_init();
-}
-
 extern "C" int
 xkblas_init(void)
 {
@@ -48,7 +40,9 @@ xkblas_init(void)
         {
             if (initialized == 0)
             {
-                __xkblas_init();
+                xkblas_init_conf();
+                xkblas_register_format();
+                xkblas_drivers_init();
                 initialized = 1;
             }
         }
@@ -62,6 +56,7 @@ extern "C" void
 xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
+    xkblas_drivers_deinit();
 }
 
 //////////////////////////////

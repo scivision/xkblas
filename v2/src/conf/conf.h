@@ -9,7 +9,6 @@
 typedef struct  xkblas_conf_s
 {
     uint64_t    stackblocsize;          /* default stack bloc size */
-    uint8_t     ncpus;                  /* number of CPU for this node */
     uint8_t     ngpus;                  /* number of GPU for this node */
     uint32_t    gpu_set;                /* GPU to use */
     uint16_t    cuda_stream_capacity;   /* capacity of input stream */

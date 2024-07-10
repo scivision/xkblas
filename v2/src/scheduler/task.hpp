@@ -1,7 +1,12 @@
 #ifndef __TASK_HPP__
 # define __TASK_HPP__
 
-#include <atomic>
+# include <atomic>
+# include <cstdint>
+# include <vector>
+
+
+typedef uint16_t xkblas_task_body_t;
 
 class Task
 {

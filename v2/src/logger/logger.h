@@ -29,8 +29,10 @@ extern int XKBLAS_VERBOSE;
         {                                                               \
             SPINLOCK_LOCK(XKBLAS_PRINT_MTX);                            \
             if (isatty(STDOUT_FILENO))                                  \
-                fprintf(stdout, "[\033[1;37mXKBLAS\033[0m] "            \
+                fprintf(stdout, "[TID=%d] "                             \
+                                "[\033[1;37mXKBLAS\033[0m] "            \
                                 "[%s%s\033[0m] ",                       \
+                                gettid(),                               \
                                 XKBLAS_PRINT_COLORS[LVL],               \
                                 XKBLAS_PRINT_HEADERS[LVL]);             \
             else                                                        \
