@@ -31,6 +31,9 @@ void xkblas_drivers_deinit(void);
 # define XKBLAS_DRIVER_ENTRYPOINT_NAME( func_name ) XKBLAS_DRIVER_PREFIX_NAME #func_name
 # define XKBLAS_DRIVER_ENTRYPOINT( func_name ) XKBLAS_DRIVER_ ## func_name
 
+# if 0
+
+Romain: do we actually need this abstraction ? 1 device = 1 memory should be sufficient
 
 ////////////////////////
 // Locality domain //
@@ -80,6 +83,7 @@ typedef struct  xkblas_localitydomain_t
     struct xkblas_localitydomain_t**subld;
 }               xkblas_localitydomain_t;
 
+# endif
 
 
 

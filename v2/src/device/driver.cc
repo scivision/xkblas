@@ -39,21 +39,15 @@ xkblas_device_thread_main(void * a)
     assert(device);
     DEVICES[arg->global_device_id] = device;
 
-
-    # if 0
-
-
-    /* recopy thread id */
-    device->tid = arg->tid;
+    // device->tid = arg->tid;
 
     /* basic initialisation */
     xkblas_offload_device_init(device, arg->ld);
 
-    XKBLAS_INFO("device_id:%i, thread:%p, initialized @:%X\n",device->device_id, device->tid, device);
-
     /* release the thread argument */
     free(a);
 
+    # if 0
     device->state = XKBLAS_DEVICE_STATE_INIT;
     xkblas_offload_device_push( device );
 
@@ -222,5 +216,8 @@ void
 xkblas_drivers_deinit(void)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
-    sleep(2);
+
+    XKBLAS_INFO("Infinite loop... CTRL+C to exit");
+    while (1)
+        sleep(1);
 }
