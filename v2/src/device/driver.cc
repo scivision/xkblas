@@ -1,6 +1,7 @@
 # include "min-max.h"
 # include "conf/conf.h"
-# include "device/driver/driver.h"
+# include "device/device.h"
+# include "device/driver.h"
 # include "logger/logger.h"
 
 # include <cassert>
@@ -17,7 +18,7 @@
 static xkblas_driver_t DRIVERS[XKBLAS_DRIVER_MAX];
 
 // Devices
-static xkblas_device_t DEVICES[XKBLAS_DEVICES_MAX];
+static xkblas_device_t * DEVICES[XKBLAS_DEVICES_MAX];
 static uint8_t DEVICES_USED = 0;
 
 /* Main entry thread created per device */
@@ -28,21 +29,19 @@ xkblas_device_thread_main(void * a)
 
     xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) a;
     xkblas_driver_t * driver = arg->driver;
-    xkblas_device_t * device = DEVICES + arg->device_id;
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
-    XKBLAS_INFO("Starting thread for %s device %d on cpu %d of node %d", driver->f_get_name(), arg->device_id, cpu, node);
+    XKBLAS_INFO("Starting thread for %s device (driver=%d, global=%d) on cpu %d of node %d",
+            driver->f_get_name(), arg->driver_device_id, arg->global_device_id, cpu, node);
 
-    driver->f_device_create(driver, device, arg->device_id);
+    xkblas_device_t * device = driver->f_device_create(driver, arg->driver_device_id);
+    assert(device);
+    DEVICES[arg->global_device_id] = device;
 
 
     # if 0
 
-    _xkblas_offload_config_data_field_device(driver, device);
-
-    /* register the new device in global table */
-    xkblas_offload_devices[arg->global_device_id] = device;
 
     /* recopy thread id */
     device->tid = arg->tid;
@@ -138,7 +137,6 @@ xkblas_driver_init(xkblas_driver_t * driver)
     XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
     if (n_devices < 1)
         return ;
-    memset(DEVICES + DEVICES_USED, 0, n_devices * sizeof(xkblas_device_t));
 
     # pragma message(TODO "Move that to the 'Thread' interfaces")
     cpu_set_t save_schedset;
@@ -169,7 +167,7 @@ xkblas_driver_init(xkblas_driver_t * driver)
 
         xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) malloc(sizeof(xkblas_driver_thread_arg_t));
         arg->driver = driver;
-        arg->device_id = i;
+        arg->driver_device_id = i;
         arg->global_device_id = DEVICES_USED;
         arg->tid = 0;
         arg->ld = 0;
@@ -209,7 +207,6 @@ xkblas_drivers_init(void)
     void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
 
-    memset(DRIVERS, 0, sizeof(DRIVERS));
     for (int i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
     {
         xkblas_driver_t * driver = DRIVERS + i;

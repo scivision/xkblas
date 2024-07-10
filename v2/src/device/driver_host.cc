@@ -1,4 +1,4 @@
-# include "device/driver/driver.h"
+# include "device/driver.h"
 # include "logger/logger.h"
 
 typedef struct  xkblas_device_host

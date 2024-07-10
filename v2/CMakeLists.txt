@@ -13,10 +13,10 @@ project(xkblas)
 add_library(xkblas SHARED
     src/xkblas.cc
     src/conf/conf.cc
-    src/device/devices.cc
-    src/device/driver/driver.cc
-    src/device/driver/driver_cuda.cc
-    src/device/driver/driver_host.cc
+    src/device/device.cc
+    src/device/driver.cc
+    src/device/driver_cuda.cc
+    src/device/driver_host.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
     src/scheduler/thread.cc

@@ -9,14 +9,15 @@
 
 extern volatile int XKBLAS_PRINT_MTX;
 
-# define XKBLAS_PRINT_FATAL_ID    0
-# define XKBLAS_PRINT_INFO_ID     1
-# define XKBLAS_PRINT_ERROR_ID    2
-# define XKBLAS_PRINT_WARN_ID     3
-# define XKBLAS_PRINT_DEBUG_ID    4
+# define XKBLAS_PRINT_FATAL_ID      0
+# define XKBLAS_PRINT_INFO_ID       1
+# define XKBLAS_PRINT_ERROR_ID      2
+# define XKBLAS_PRINT_WARN_ID       3
+# define XKBLAS_PRINT_IMPL_ID       4
+# define XKBLAS_PRINT_DEBUG_ID      5
 
-extern char * XKBLAS_PRINT_COLORS[5];
-extern char * XKBLAS_PRINT_HEADERS[5];
+extern char * XKBLAS_PRINT_COLORS[6];
+extern char * XKBLAS_PRINT_HEADERS[6];
 
 extern int XKBLAS_VERBOSE;
 
@@ -49,15 +50,16 @@ extern int XKBLAS_VERBOSE;
         }                                                               \
     } while (0)
 
-# define XKBLAS_NOT_IMPLEMENTED() XKBLAS_NOT_IMPLEMENTED_WARN("")       \
+# define XKBLAS_NOT_IMPLEMENTED() XKBLAS_NOT_IMPLEMENTED_WARN("")
 
 # define XKBLAS_NOT_IMPLEMENTED_WARN(S)                                 \
-    XKBLAS_WARN("Not implemented '%s' at %s:%d in %s()",                \
+    XKBLAS_IMPL("'%s' at %s:%d in %s()",                                \
             S, __FILE__, __LINE__, __func__);
 
 # define XKBLAS_INFO(...)  XKBLAS_PRINT(XKBLAS_PRINT_INFO_ID,  __VA_ARGS__)
 # define XKBLAS_WARN(...)  XKBLAS_PRINT(XKBLAS_PRINT_WARN_ID,  __VA_ARGS__)
 # define XKBLAS_ERROR(...) XKBLAS_PRINT(XKBLAS_PRINT_ERROR_ID, __VA_ARGS__)
+# define XKBLAS_IMPL(...) XKBLAS_PRINT(XKBLAS_PRINT_IMPL_ID, __VA_ARGS__)
 # define XKBLAS_DEBUG(...) XKBLAS_PRINT(XKBLAS_PRINT_DEBUG_ID, __VA_ARGS__)
 # define XKBLAS_FATAL(...) XKBLAS_PRINT(XKBLAS_PRINT_FATAL_ID, __VA_ARGS__)
 

@@ -361,7 +361,7 @@ typedef enum    xkblas_device_op_t
    ios[1] point to the first output stream, and ios[2] to the first kernel thread.
 */
 typedef struct xkblas_offload_stream {
-  struct xkblas_device*   device;
+//  struct xkblas_device_t*   device;
   int                    count[XKBLAS_IO_STREAM_ALL];    /* number of iostream per type */
   std::atomic<int>         next[XKBLAS_IO_STREAM_ALL];     /* next  stream fifo */
   xkblas_io_stream_t**    ios[XKBLAS_IO_STREAM_ALL];      /* basic stream */
@@ -400,9 +400,9 @@ typedef struct  xkblas_device_t
 
     Thread  * thread;                               /* running thread */
     std::atomic<int>             cnt_push;          /* number of times the ressource is pushed */
-    unsigned int                device_id;         /* Internal id for a specific device type (ordering) */
+    unsigned int                device_id;          /* Interval device id */
     pthread_t                   tid;
-    struct xkblas_driver*        driver;
+   // struct xkblas_driver*        driver;
     uint64_t                    spawn_count;       /* number of tasks */
     uint64_t                    exec_count;        /* number of tasks completed */
     int volatile                finalize;          /* true iff driver stop device */
@@ -415,7 +415,7 @@ typedef struct  xkblas_device_t
     uint64_t                    submittasks;       /* #tasks (between prepare data and end of execution) */
     double                      flops_submittasks; /* idem for pending tasks (between prepare data and end of execution) */
     double                      data_submittasks;  /* idem for pending tasks */
-    const char*                 name;              /* Device name */
+    // const char*                 name;              /* Device name */
 
     size_t                      mem_limit;
     size_t                      mem_total;
@@ -494,7 +494,7 @@ typedef struct  xkblas_driver_t
     /* Set the cpuset of the attr for creating the thread that will manage the device dev */
     int (*f_device_set_cpuset)(cpu_set_t*, int);
     /* create device object and initialize device_id field with argument */
-    int (*f_device_create)(xkblas_driver_t *, struct xkblas_device_t *, int);
+    xkblas_device_t * (*f_device_create)(xkblas_driver_t *, int);
     int (*f_device_destroy)(xkblas_device_t*);
     /* initialize device fields, especially with virtual functions */
     const char* (*f_device_info)(xkblas_device_t*);
@@ -514,7 +514,7 @@ typedef struct  xkblas_driver_t
 typedef struct  xkblas_driver_thread_arg_t
 {
   xkblas_driver_t* driver;
-  int device_id;
+  int driver_device_id;
   int global_device_id;
   xkblas_localitydomain_t* ld;
   pthread_t tid;

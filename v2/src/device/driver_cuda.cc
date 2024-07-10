@@ -1,5 +1,6 @@
 # include "conf/conf.h"
-# include "device/driver/driver.h"
+# include "device/device.h"
+# include "device/driver.h"
 # include "logger/logger.h"
 # include "sync/mutex.h"
 
@@ -1521,32 +1522,11 @@ int XKBLAS_DRIVER_ENTRYPOINT(host_register_testwait)(
 
 /*
 */
-static xkblas_device_t*
-XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t* driver, int dev)
-{
-  xkblas_device_cuda_t* cudadevice = (xkblas_device_cuda_t*)malloc(sizeof(xkblas_device_cuda_t));
-  memset(cudadevice, 0, sizeof(xkblas_device_cuda_t) );
-  cudadevice->inherited.device_id = dev;
-#if XKBLAS_USE_CUDA_RUNTIME_API
-  cudadevice->save_device_id = -1;
-#endif
-  return &cudadevice->inherited;
-}
 
 
 /*
 */
-static int
-XKBLAS_DRIVER_ENTRYPOINT(device_destroy)(xkblas_device_t* dev)
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
 
-  dev->state = XKBLAS_DEVICE_STATE_DESTROY;
-
-  free(device);
-
-  return 0;
-}
 
 
 /*
@@ -1915,13 +1895,30 @@ XKBLAS_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_id)
             err = ENOTSUP;
     }
     else
-    {
         XKBLAS_WARN("Could not get a 'cpuset' for CUDA device %d, falling back to glibc...", device_id);
-    }
 
     hwloc_bitmap_free(cpuset);
-
     return err;
+}
+
+static xkblas_device_t *
+XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_id)
+{
+    xkblas_device_cuda_t * device = (xkblas_device_cuda_t *) malloc(sizeof(xkblas_device_cuda_t));
+    memset(device, 0, sizeof(xkblas_device_cuda_t));
+    device->save_device_id = -1;
+
+    xkblas_device_init(&device->inherited, device_id);
+
+    return &device->inherited;
+}
+
+static int
+XKBLAS_DRIVER_ENTRYPOINT(device_destroy)(xkblas_device_t * device)
+{
+    device->state = XKBLAS_DEVICE_STATE_DESTROY;
+    free(device);
+    return 0;
 }
 
 void
@@ -1935,6 +1932,8 @@ XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t * driver)
     EP(get_ndevices);
     EP(get_ndevices_max);
     EP(device_set_cpuset);
+    EP(device_create);
+    EP(device_destroy);
 
     #if 0
 
@@ -1944,8 +1943,6 @@ XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t * driver)
     EP(host_register_testwait);
     EP(host_unregister);
 
-    EP(device_create);
-    EP(device_destroy);
     EP(device_info);
     EP(device_init);
     EP(device_commit);
