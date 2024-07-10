@@ -1,7 +1,7 @@
 #ifndef __XKBLAS_PRINT_H__
 # define __XKBLAS_PRINT_H__
 
-# include "spinlock.h"
+# include "sync/spinlock.h"
 
 # include <unistd.h>
 # include <stdio.h>
@@ -19,6 +19,9 @@ extern char * XKBLAS_PRINT_COLORS[5];
 extern char * XKBLAS_PRINT_HEADERS[5];
 
 extern int XKBLAS_VERBOSE;
+
+# define XKBLAS_PRINT_LINE() \
+    fprintf(stderr, "%s:%d (%s)", __FILE__, __LINE__, __func__);
 
 # define XKBLAS_PRINT(LVL, ...)                                         \
     do {                                                                \
@@ -38,12 +41,17 @@ extern int XKBLAS_VERBOSE;
             SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                          \
             if (LVL == XKBLAS_PRINT_FATAL_ID)                           \
             {                                                           \
-                fprintf(stderr,                                         \
-                        "%s:%d (%s)", __FILE__, __LINE__, __func__);    \
+                XKBLAS_PRINT_LINE();                                    \
                 abort();                                                \
             }                                                           \
         }                                                               \
     } while (0)
+
+# define XKBLAS_NOT_IMPLEMENTED() XKBLAS_NOT_IMPLEMENTED_WARN("")       \
+
+# define XKBLAS_NOT_IMPLEMENTED_WARN(S)                                 \
+    XKBLAS_WARN("Not implemented '%s' at %s:%d in %s()",                \
+            S, __FILE__, __LINE__, __func__);
 
 # define XKBLAS_INFO(...)  XKBLAS_PRINT(XKBLAS_PRINT_INFO_ID,  __VA_ARGS__)
 # define XKBLAS_WARN(...)  XKBLAS_PRINT(XKBLAS_PRINT_WARN_ID,  __VA_ARGS__)

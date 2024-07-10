@@ -1415,7 +1415,7 @@ int xkblas_init(void)
       printf("[XKBlas] unkown math mode '%s', use default\n", m);
   }
   xkblas_register_task_format();
-  kaapi_register_format_writeback();
+  kaape_register_format_writeback();
   kaapi_register_format_invalidate();
   kaapi_register_format_distribute();
   KAAPI_ATOMIC_WRITE(&_xkblas_thread_idx,0);

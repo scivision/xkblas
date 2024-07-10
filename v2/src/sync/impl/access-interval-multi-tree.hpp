@@ -64,8 +64,8 @@ typedef enum    Direction
 }               Direction;
 
 /* K is the number of dimensions */
-template<int K>
-class AccessIntervalMultiTree : public History<K> {
+template<int K, typename T>
+class AccessIntervalMultiTree : public History<K, T> {
 
     class Node {
 
@@ -101,8 +101,9 @@ class AccessIntervalMultiTree : public History<K> {
             subtree_t st[K];
             Region<K> region;
             Color colors[K];
-            std::vector<void *> ins;
-            void * out;
+            std::vector<T> ins;
+            T out;
+            bool has_out;
             struct {
                 Region<K> region;   // subtree englobing intervals
                 int nout;           // subtree number of 'out' elements
@@ -128,7 +129,8 @@ class AccessIntervalMultiTree : public History<K> {
                 region(r),
                 colors{BLACK},
                 ins(),
-                out(nullptr)
+                out(),
+                has_out(0)
             {
                 memset(this->st, 0, sizeof(this->st));
 
@@ -167,15 +169,16 @@ class AccessIntervalMultiTree : public History<K> {
             }
 
             inline void
-            register_access(access_mode_t mode, void * obj)
+            register_access(access_mode_t mode, T obj)
             {
                 if (obj == nullptr)
                     return ;
 
                 if (mode == OUT)
                 {
-                    this->out = obj;
                     this->ins.clear();
+                    this->out = obj;
+                    this->has_out = 1;
                 }
                 else if (mode == IN)
                 {
@@ -192,6 +195,7 @@ class AccessIntervalMultiTree : public History<K> {
                     std::make_move_iterator(parent->ins.end())
                 );
                 this->out = parent->out;
+                this->has_out = parent->has_out;
             }
 
             void
@@ -201,7 +205,7 @@ class AccessIntervalMultiTree : public History<K> {
                 {
                     const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
                     char out[32];
-                    snprintf(out, sizeof(out), "%p", this->out);
+                    snprintf(out, sizeof(out), "%d", this->has_out);
 
                     char ins[32];
                     snprintf(ins, sizeof(ins), "%ld", this->ins.size());
@@ -233,7 +237,7 @@ class AccessIntervalMultiTree : public History<K> {
                         this->region[0].a, 0,
                         this->region[0].b, 2,
                         this->region[0].a, this->region[0].b,
-                        this->ins.size(), this->out ? 1 : 0
+                        this->ins.size(), this->has_out
                     );
                 }
                 else if (K == 2)
@@ -243,7 +247,7 @@ class AccessIntervalMultiTree : public History<K> {
                         this->region[0].b, this->region[1].b,
                         this->region[0].a, this->region[0].b,
                         this->region[1].a, this->region[1].b,
-                        this->ins.size(), this->out ? 1 : 0
+                        this->ins.size(), this->has_out
                     );
                 }
 
@@ -383,7 +387,7 @@ class AccessIntervalMultiTree : public History<K> {
         static inline void
         update_includes_nout(Node * node)
         {
-            node->includes.nout = node->out ? 1 : 0;
+            node->includes.nout = node->has_out ? 1 : 0;
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
                 node->includes.nout += child->includes.nout;
@@ -627,7 +631,7 @@ class AccessIntervalMultiTree : public History<K> {
             Direction dir,
             Node * node,
             access_mode_t mode,
-            void * obj
+            T & obj
         ) {
             tassert(node);
             parent->st[k].children[dir] = node;
@@ -804,7 +808,7 @@ class AccessIntervalMultiTree : public History<K> {
             Node * parent,
             access_mode_t mode,
             Region<K> & region,
-            void * obj
+            T & obj
         ) {
             tassert(mode == OUT);
 
@@ -836,7 +840,7 @@ class AccessIntervalMultiTree : public History<K> {
             Node * parent,
             access_mode_t mode,
             Region<K> & region,
-            void * obj,
+            T & obj,
             int k,
             Node * node
         ) {
@@ -1043,7 +1047,7 @@ class AccessIntervalMultiTree : public History<K> {
 
         // Insert the new access in the tree
         void
-        insert(access_mode_t mode, Region<K> & region, void * obj)
+        insert(access_mode_t mode, Region<K> & region, T & obj)
         {
             DEBUG("##############################");
             DEBUG("--- New insert of dimension %d and type %s for obj %p", K, (mode == IN) ? "in" : (mode == OUT) ? "out" : "unkn", obj);
@@ -1079,7 +1083,7 @@ class AccessIntervalMultiTree : public History<K> {
         }
 
         void
-        intersect_from(Node * node, access_mode_t mode, Region<K> & region, void * obj) const
+        intersect_from(Node * node, access_mode_t mode, Region<K> & region, T & obj) const
         {
             if (node == nullptr)
                 return ;
@@ -1093,9 +1097,9 @@ class AccessIntervalMultiTree : public History<K> {
             if (region.intersects(node->region))
             {
                 if (mode == OUT && node->ins.size())
-                    for (void * pred : node->ins)
+                    for (T & pred : node->ins)
                         this->on_hazard(node->region, pred, region, obj);
-                else if (node->out)
+                else if (node->has_out)
                     this->on_hazard(node->region, node->out, region, obj);
             }
 
@@ -1108,7 +1112,7 @@ class AccessIntervalMultiTree : public History<K> {
 
         // Retrieve objects previously inserted that intersect with the interval
         void
-        intersect(access_mode_t mode, Region<K> & region, void * obj) const
+        intersect(access_mode_t mode, Region<K> & region, T & obj) const
         {
             this->intersect_from(this->root, mode, region, obj);
         }

@@ -3,6 +3,9 @@
 
 # include <stdint.h>
 
+# include "logger/todo.h"
+# pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
+
 typedef struct  xkblas_conf_s
 {
     uint64_t    stackblocsize;          /* default stack bloc size */

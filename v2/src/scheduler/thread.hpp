@@ -7,6 +7,8 @@ class Thread
         Thread() {}
         ~Thread() {}
 
+        void init(void);
+
     private:
 
 };

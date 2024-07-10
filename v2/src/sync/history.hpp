@@ -4,7 +4,7 @@
 # include "access.hpp"
 # include "region.hpp"
 
-template<int K>
+template<int K, typename T>
 class History {
 
     public:
@@ -15,7 +15,7 @@ class History {
          * Insert a new region 'region' in the history with the access mode
          * 'mode' and attach 'obj' to that region.
          */
-        virtual void intersect(access_mode_t mode, Region<K> & region, void * obj) const = 0;
+        virtual void intersect(access_mode_t mode, Region<K> & region, T & obj) const = 0;
 
         /**
          *  Intersect previously inserted regions with 'region' with respect to
@@ -23,7 +23,7 @@ class History {
          *  callback is called with (first argument) the previously attached
          *  objects of conflicting regions and (second argument) 'obj'
          */
-        virtual void insert(access_mode_t mode, Region<K> & region, void * obj) = 0;
+        virtual void insert(access_mode_t mode, Region<K> & region, T & obj) = 0;
 
         /**
          *  Return the number of regions represented by the history
@@ -33,7 +33,7 @@ class History {
         /**
          *  Callback when a dependence is detected
          */
-        virtual void on_hazard(const Region<K> & rx, void * x, const Region<K> & ry, void * y) const = 0;
+        virtual void on_hazard(const Region<K> & rx, T & x, const Region<K> & ry, T & y) const = 0;
 
 }; /* class History */
 
