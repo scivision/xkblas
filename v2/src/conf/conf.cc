@@ -98,10 +98,12 @@ static xkblas_conf_parse_t CONF_PARSE[] = {
 void
 __parse_help(char const * value)
 {
-    (void) value;
-    XKBLAS_INFO("Available environment variables");
-    for (xkblas_conf_parse_t * var = CONF_PARSE ; var->name ; ++var)
-        XKBLAS_INFO("  '%s' - %s", var->name, var->descr);
+    if (value)
+    {
+        XKBLAS_INFO("Available environment variables");
+        for (xkblas_conf_parse_t * var = CONF_PARSE ; var->name ; ++var)
+            XKBLAS_INFO("  '%s' - %s", var->name, var->descr);
+    }
 }
 
 void

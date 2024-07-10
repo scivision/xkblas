@@ -1,8 +1,25 @@
 # CMake Minimum version
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.7)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 # Project name
 project(xkblas)
+
+# Options
+option(USE_CUDA "Whether to build the NVIDIA GPU plugin" ON)
+if (USE_CUDA)
+    find_package(CUDA REQUIRED)
+    find_package(CUDA_RT)
+    if (NOT ${CUDA_RT_FOUND})
+        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUDA_RT could not be found.")
+    endif()
+    find_package(CUBLAS)
+    if (NOT ${CUBLAS_FOUND})
+        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUBLAS could not be found.")
+    endif()
+    add_compile_options("-DUSE_CUDA=1")
+    message(STATUS "Configuring with CUDA runtime plugin")
+endif()
 
 # Lib name
 add_library(xkblas SHARED
