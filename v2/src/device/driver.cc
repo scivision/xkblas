@@ -37,14 +37,10 @@ xkblas_device_thread_main(void * a)
 
     xkblas_device_t * device = driver->f_device_create(driver, arg->driver_device_id);
     assert(device);
+    xkblas_device_init(driver, device, arg->driver_device_id);
     DEVICES[arg->global_device_id] = device;
 
-    // device->tid = arg->tid;
-
-    /* basic initialisation */
-    xkblas_offload_device_init(device, arg->ld);
-
-    /* release the thread argument */
+    /* release the thread argument, no longer needed */
     free(a);
 
     # if 0
@@ -164,23 +160,6 @@ xkblas_driver_init(xkblas_driver_t * driver)
         arg->driver_device_id = i;
         arg->global_device_id = DEVICES_USED;
         arg->tid = 0;
-        arg->ld = 0;
-
-        # pragma message(TODO "Implement locality domain")
-        # if 0
-        int type = driver->type;
-        switch (type) {
-            case XKBLAS_DRIVER_HOST:
-                break;
-            case XKBLAS_DRIVER_CUDA:
-                arg->ld = (xkblas_localitydomain_t *) malloc(sizeof(xkblas_localitydomain_t));
-                xkblas_localitydomain_init(arg->ld, 0);
-                xkblas_localitydomain_attach(XKBLAS_LD_GPU, 0, arg->ld);
-                break;
-            default:
-                abort();
-        };
-        # endif
 
         err = pthread_create(&arg->tid, &attr, xkblas_device_thread_main, arg);
         assert(err ==0);
@@ -194,7 +173,7 @@ xkblas_driver_init(xkblas_driver_t * driver)
 void
 xkblas_drivers_init(void)
 {
-    XKBLAS_NOT_IMPLEMENTED_WARN("Dynamic driver loading not implemented. Only supporting built-in CUDA driver");
+    # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in CUDA driver")
 
     extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
 

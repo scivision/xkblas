@@ -14,7 +14,7 @@
 static inline void
 xkblas_register_format(void)
 {
-    XKBLAS_NOT_IMPLEMENTED();
+    # pragma message(TODO "Register task format")
     // TODO : what does this do ?
     // xkblas_register_task_format();
     // kaapi_register_format_writeback();
