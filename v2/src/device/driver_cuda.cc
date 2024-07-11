@@ -1548,68 +1548,6 @@ int XKBLAS_DRIVER_ENTRYPOINT(host_register_testwait)(
 */
 
 
-/* Call on all devices of the driver after they have been initialized
-*/
-static int XKBLAS_DRIVER_ENTRYPOINT(device_commit)(xkblas_device_t* dev)
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
-
-  /* all other devices 'peer' context have been initialized, enable peer */
-#if CONFIG_USE_P2P
-  cudaError_t res;
-#if XKBLAS_DEBUG
-  int devid;
-  cudaGetDevice(&devid);
-  assert(devid == CUDA_DEVICE_ID[device->inherited.device_id]);
-#endif
-
-  /* similar to cuda_perf_device but with ldid index in place of cuda device number */
-  xkblas_localitydomain_t* ld = device->inherited.ld;
-  assert(ld !=0);
-  ld->perfrank = cuda_count_perfrank-1;
-  ld->affinity = (uint64_t*)malloc( sizeof(uint64_t)* ld->perfrank);
-  device->affinity = (uint64_t*)malloc( sizeof(uint64_t)* ld->perfrank );
-  for (int i=0; i<cuda_count_perfrank-1; ++i)
-  {
-    ld->affinity[i] = 0;
-    device->affinity[i] = 0;
-  }
-
-  for (int j=0; j<DEVICES_USED; j++)
-  {
-    if ( device != xkblas_device_list[j] )
-    {
-      int access;
-      res = cudaDeviceCanAccessPeer(&access,
-        CUDA_DEVICE_ID[device->inherited.device_id],
-        CUDA_DEVICE_ID[xkblas_device_list[j]->inherited.device_id]);
-      __check_error(res);
-      if (access)
-      {
-        res = cudaDeviceEnablePeerAccess(CUDA_DEVICE_ID[xkblas_device_list[j]->inherited.device_id], 0 );
-        if ((res == cudaSuccess)||(res ==cudaErrorPeerAccessAlreadyEnabled))
-        {
-          int device1 = CUDA_DEVICE_ID[device->inherited.device_id];
-          int device2 = CUDA_DEVICE_ID[xkblas_device_list[j]->inherited.device_id];
-          int rank = cuda_perf_topo[device1*cuda_device_count+device2];
-          assert(rank !=0);
-          if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
-          {
-            device->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-            ld->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-          }
-        }
-      }
-    }
-    else
-    { /* add device with itself */
-      device->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-      ld->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-    }
-  }
-#endif // CONFIG_USE_P2P
-}
-
 
 /*
 */
@@ -1658,22 +1596,6 @@ XKBLAS_DRIVER_ENTRYPOINT(device_finalize)(xkblas_device_t* dev)
 
 /*
 */
-static int
-XKBLAS_DRIVER_ENTRYPOINT(device_attach)(xkblas_device_t* dev)
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
-  assert(INITIALIZED == true);
-
-  assert(device->save_device_id == -1);
-  cudaError_t res;
-  res = cudaGetDevice(&device->save_device_id);
-  __check_error(res);
-  res = cudaSetDevice( CUDA_DEVICE_ID[device->inherited.device_id] );
-  __check_error(res);
-
-  return 0;
-}
-
 
 /*
 */
@@ -1801,12 +1723,6 @@ XKBLAS_DRIVER_ENTRYPOINT(get_name)(void)
     return "CUDA";
 }
 
-static unsigned int
-XKBLAS_DRIVER_ENTRYPOINT(get_ndevices)(void)
-{
-    return 0;
-}
-
 static int
 XKBLAS_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_id)
 {
@@ -1843,6 +1759,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_id)
 
     xkblas_device_cuda_t * device = DEVICES + device_id;
     device->save_device_id = -1;
+
     return (xkblas_device_t *) device;
 }
 
@@ -1912,6 +1829,78 @@ XKBLAS_DRIVER_ENTRYPOINT(device_destroy)(xkblas_device_t * device)
     return 0;
 }
 
+static int
+XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_id)
+{
+    assert(INITIALIZED);
+
+    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+    assert(device->save_device_id == -1);
+
+    cudaError_t res;
+    res = cudaGetDevice(&device->save_device_id);
+    __check_error(res);
+
+    res = cudaSetDevice(__get_device_cuda_id(device_id));
+    __check_error(res);
+
+    return 0;
+}
+
+/* Called on all devices of the driver after they have been initialized */
+static int
+XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
+{
+    /* all other devices 'peer' context have been initialized, enable peer */
+    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+
+    for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
+    {
+        if (i != device_id)
+        {
+            xkblas_device_cuda_t * odevice = __get_device_cuda(i);
+            if (odevice->inherited.state != XKBLAS_DEVICE_STATE_INIT)
+                continue ;
+
+            int device1 = __get_device_cuda_id(device_id);
+            int device2 = __get_device_cuda_id(i);
+
+            int access;
+            cudaError_t res;
+            res = cudaDeviceCanAccessPeer(&access, device1, device2);
+            __check_error(res);
+
+            if (access)
+            {
+                res = cudaDeviceEnablePeerAccess(device2, 0);
+                if ((res == cudaSuccess) || (res ==cudaErrorPeerAccessAlreadyEnabled))
+                {
+                    # pragma message(TODO "Do we still need devices affinity ?")
+                    # if 0
+                    int rank = cuda_perf_topo[device1*cuda_device_count+device2];
+                    assert(rank !=0);
+                    if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
+                    {
+                        device->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
+                        ld->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
+                    }
+                    # endif
+                }
+            }
+        }
+        /* add device with itself */
+        else
+        {
+            # pragma message(TODO "Do we still need devices affinity ?")
+            # if 0
+            device->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
+            ld->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
+            # endif
+        }
+    }
+    return 0;
+}
+
 void
 XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t * driver)
 {
@@ -1920,12 +1909,13 @@ XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t * driver)
     EP(init);
     EP(finalize);
     EP(get_name);
-    EP(get_ndevices);
     EP(get_ndevices_max);
     EP(device_set_cpuset);
     EP(device_create);
     EP(device_destroy);
     EP(device_init);
+    EP(device_attach);
+    EP(device_commit);
 
     #if 0
 
@@ -1936,9 +1926,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t * driver)
     EP(host_unregister);
 
     EP(device_info);
-    EP(device_commit);
     EP(device_finalize);
-    EP(device_attach);
     EP(device_detach);
     EP(get_gpublas_handle);
 

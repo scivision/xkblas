@@ -27,7 +27,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_name)(void)
 }
 
 static unsigned int
-XKBLAS_DRIVER_ENTRYPOINT(get_ndevices)(void)
+XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
     return 1;
 }
@@ -40,8 +40,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t * driver)
     EP(init);
     EP(finalize);
     EP(get_name);
-    EP(get_ndevices);
-
+    EP(get_ndevices_max);
 
     #if 0
 

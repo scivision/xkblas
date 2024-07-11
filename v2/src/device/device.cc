@@ -1,10 +1,23 @@
+# include "min-max.h"
 # include "conf/conf.h"
+# include "device/device.h"
 # include "device/driver.h"
 # include "device/stream.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
+# include "sync/mem.h"
 
 # include <cassert>
+# include <cstring>
+# include <cerrno>
+
+# pragma message(TODO "Move this to an xkblas_context_t")
+
+
+# pragma message(TODO "global + atomic variable = meh")
+// Devices
+static xkblas_device_t * DEVICES[XKBLAS_DEVICES_MAX];
+static std::atomic<uint8_t> DEVICES_USED = 0;
 
 # pragma message(TODO "Move these initializer into class member functions")
 
@@ -58,18 +71,32 @@ xkblas_device_stream_init(xkblas_device_t * device, Stream * stream, unsigned in
     # endif
 }
 
-void
+static void
+xkblas_device_commit(xkblas_driver_t * driver, xkblas_device_t * device, int driver_device_id)
+{
+    assert(driver->f_device_commit);
+    int err = driver->f_device_commit(driver_device_id);
+    if (err)
+        XKBLAS_FATAL("Commit fail device %d of driver %s", driver_device_id, driver->f_get_name());
+    assert(0 == pthread_mutex_lock(&device->lock));
+    assert(0 == pthread_cond_signal(&device->cond_sleep));
+    assert(0 == pthread_mutex_unlock(&device->lock));
+
+    assert(device->state == XKBLAS_DEVICE_STATE_INIT);
+    device->state = XKBLAS_DEVICE_STATE_COMMIT;
+}
+
+static void
 xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int driver_device_id)
 {
     device->driver_device_id = driver_device_id;
-    device->state  = XKBLAS_DEVICE_STATE_CREATE;
     device->tid = 0;
     device->spawn_count = 0;
     device->exec_count = 0;
     device->finalize = false;
-    assert( 0 == pthread_mutex_init(&device->lock, 0));
-    assert( 0 == pthread_cond_init(&device->cond, 0));
-    assert( 0 == pthread_cond_init(&device->cond_sleep, 0));
+    assert(0 == pthread_mutex_init(&device->lock, 0));
+    assert(0 == pthread_cond_init(&device->cond, 0));
+    assert(0 == pthread_cond_init(&device->cond_sleep, 0));
     device->issleeping = 0;
     device->request.op = XKBLAS_DEVICEOP_NOP;
     device->request.arg = 0;
@@ -104,8 +131,95 @@ xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int drive
     xkblas_device_stream_init(device, &device->stream, XKBLAS_STREAM_CAPACITY);
 
     assert(0 == pthread_mutex_lock(&device->lock));
-    if (device->state == XKBLAS_DEVICE_STATE_CREATE)
-        device->state = XKBLAS_DEVICE_STATE_INIT;
     assert(0 == pthread_cond_signal(&device->cond_sleep));
     assert(0 == pthread_mutex_unlock(&device->lock));
+
+    if (driver->f_device_attach(driver_device_id))
+        XKBLAS_FATAL("Could not attach to device %d of driver %s", driver_device_id, driver->f_get_name());
+
+    assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
+    device->state = XKBLAS_DEVICE_STATE_INIT;
 }
+
+static xkblas_device_t *
+xkblas_device_create(xkblas_driver_t * driver, int driver_device_id)
+{
+    int global_device_id = DEVICES_USED++;
+    xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
+    assert(device);
+    DEVICES[global_device_id] = device;
+    device->state = XKBLAS_DEVICE_STATE_CREATE;
+    return device;
+}
+
+/* Main entry thread created per device */
+void *
+xkblas_device_thread_main(void * a)
+{
+    # pragma message(TODO "Implement device thread")
+
+    xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) a;
+    xkblas_driver_t * driver = arg->driver;
+    int driver_device_id = arg->driver_device_id;
+    free(arg);
+
+    unsigned int cpu, node;
+    getcpu(&cpu, &node);
+    XKBLAS_INFO("Starting thread for %s device (driver=%d) on cpu %d of node %d",
+            driver->f_get_name(), driver_device_id, cpu, node);
+
+    xkblas_device_t * device = xkblas_device_create(driver, driver_device_id);
+    xkblas_device_init(driver, device, driver_device_id);
+
+    // wait for all devices of that driver to be in the 'init' state
+    ++driver->ndevices_inited;
+    while (driver->ndevices_inited < driver->ndevices_targeted)
+        mem_pause();
+
+    xkblas_device_commit(driver, device, driver_device_id);
+    ++driver->ndevices_commited;
+
+    // thread ready for execution
+    device->state = XKBLAS_DEVICE_STATE_START;
+    mem_barrier(); // TODO : do we really need this ?
+
+    # if 0
+
+    /* */
+#if XKBLAS_SLEEP_DEVICETHREAD
+    xkblas_fifo_register_waiter( device->ld->queue, (void (*)(void *))xkblas_offload_device_wakeup, device );
+#else
+    xkblas_fifo_register_waiter( device->ld->queue, 0, 0);
+#endif
+
+    /* infinite loop with the device context */
+    int err = xkblas_sched_idle_offload(thread, _xkblas_device_finalize, device);
+    assert((err==0)||(err==EINTR));
+
+    /* thread is stopped */
+    assert(0 == pthread_mutex_lock(&device->lock));
+    device->state = XKBLAS_DEVICE_STATE_STOPPED;
+    assert(0 == pthread_cond_signal(&device->cond_sleep));
+    assert(0 == pthread_mutex_unlock(&device->lock));
+
+    assert(0 == pthread_mutex_lock(&device->lock));
+    _xkblas_offload_device_finalize(device);
+    xkblas_offload_device_pop( device );
+    xkblas_localitydomain_destroy(device->ld);
+    device->state = XKBLAS_DEVICE_STATE_FINALIZED;
+
+    if (err != EINTR)
+    {
+        XKBLAS_FATAL("device %d/%p abort with natural interrup\n", device->device_id, (void*)device);
+    }
+    assert(0 == pthread_mutex_unlock(&device->lock));
+    xkblas_thread_unbind(thread);
+    _xkblas_self_context = 0;
+    device->state = XKBLAS_DEVICE_STATE_DESTROYED;
+
+# endif
+
+    return NULL;
+}
+
+

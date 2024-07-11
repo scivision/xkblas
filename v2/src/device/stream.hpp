@@ -12,7 +12,6 @@
 # include <cuda.h>
 # include <cuda_runtime.h>
 
-
 typedef struct  xkblas_io_status_t
 {
   int error;

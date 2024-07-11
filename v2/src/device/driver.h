@@ -170,10 +170,18 @@ typedef struct  xkblas_device_t
 
 typedef struct  xkblas_driver_t
 {
+    /* number of devices targeted, used in initialization */
+    volatile std::atomic<int> ndevices_targeted;
+
+    /* number of devices in the INIT state */
+    volatile std::atomic<int> ndevices_inited;
+
+    /* number of devices in the COMMIT state */
+    volatile std::atomic<int> ndevices_commited;
+
     /* Function handlers: accessor to meta data */
     const char   *(*f_get_name)(void);          /* name of the driver (human-readable) */
     unsigned int (*f_get_flags)(void);          /* flags: not really used */
-    unsigned int (*f_get_ndevices)(void);       /* number of devices managed by the driver */
     unsigned int (*f_get_ndevices_max)(void);   /* return the number of devices available to the driver */
 
     /* life cycle functions for the driver of devices (1 device == 1 ressource) */
@@ -218,10 +226,10 @@ typedef struct  xkblas_driver_t
     /* initialize device fields, especially with virtual functions */
     const char* (*f_device_info)(xkblas_device_t*);
     void (*f_device_init)(int device_id);
-    int (*f_device_commit)(xkblas_device_t*);
+    int (*f_device_commit)(int device_id);
     void (*f_device_finalize)(xkblas_device_t*);
     /* consider device as the current device */
-    int (*f_device_attach)(xkblas_device_t*);
+    int (*f_device_attach)(int device_id);
     /* consider device as the current device */
     int (*f_device_detach)(xkblas_device_t*);
 
@@ -229,13 +237,5 @@ typedef struct  xkblas_driver_t
     void* (*f_get_gpublas_handle)(xkblas_device_t*);
 
 }               xkblas_driver_t;
-
-typedef struct  xkblas_driver_thread_arg_t
-{
-    xkblas_driver_t * driver;
-    int driver_device_id;
-    int global_device_id;
-    pthread_t tid;
-}               xkblas_driver_thread_arg_t;
 
 #endif /* __DRIVER_H__ */

@@ -3,6 +3,7 @@
 # include "device/device.h"
 # include "device/driver.h"
 # include "logger/logger.h"
+# include "sync/spinlock.h"
 
 # include <cassert>
 # include <cstring>
@@ -16,100 +17,6 @@
 # define XKBLAS_DRIVER_GPU      XKBLAS_DRIVER_CUDA
 # define XKBLAS_DRIVER_DEFAULT  XKBLAS_DRIVER_GPU
 static xkblas_driver_t DRIVERS[XKBLAS_DRIVER_MAX];
-
-// Devices
-static xkblas_device_t * DEVICES[XKBLAS_DEVICES_MAX];
-static uint8_t DEVICES_USED = 0;
-
-/* Main entry thread created per device */
-static void *
-xkblas_device_thread_main(void * a)
-{
-    # pragma message(TODO "Implement device thread")
-
-    xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) a;
-    xkblas_driver_t * driver = arg->driver;
-
-    unsigned int cpu, node;
-    getcpu(&cpu, &node);
-    XKBLAS_INFO("Starting thread for %s device (driver=%d, global=%d) on cpu %d of node %d",
-            driver->f_get_name(), arg->driver_device_id, arg->global_device_id, cpu, node);
-
-    xkblas_device_t * device = driver->f_device_create(driver, arg->driver_device_id);
-    assert(device);
-    xkblas_device_init(driver, device, arg->driver_device_id);
-    DEVICES[arg->global_device_id] = device;
-
-    /* release the thread argument, no longer needed */
-    free(a);
-
-    # if 0
-    device->state = XKBLAS_DEVICE_STATE_INIT;
-    xkblas_offload_device_push( device );
-
-    xkblas_thread_t* thread = xkblas_thread_bind(device->driver->f_get_type(),0);
-    assert( thread !=0);
-    xkblas_context_t* ctxt = xkblas_thread2context(thread);
-    device->ctxt = ctxt;
-    ctxt->device = device;
-    ctxt->ld = device->ld;
-    _xkblas_self_context = ctxt;
-
-    XKBLAS_ATOMIC_INCR(&driver->ndevices);
-    xkblas_mem_barrier();
-
-    /* we need to wait all threads of the driver before doing commit */
-    int ndevices = driver->f_get_number();
-
-    while (XKBLAS_ATOMIC_READ(&driver->ndevices) < ndevices)
-        xkblas_slowdown_cpu();
-
-    xkblas_offload_device_commit(device);
-    assert( device->state == XKBLAS_DEVICE_STATE_COMMIT);
-
-    /* thread ready for execution */
-    device->state = XKBLAS_DEVICE_STATE_START;
-    XKBLAS_ATOMIC_INCR(&driver->ndevices_commit);
-
-    xkblas_mem_barrier();
-    XKBLAS_INFO("device_id:%i, thread:%p, commited @:%X\n",device->device_id, device->tid, device);
-
-    /* */
-#if XKBLAS_SLEEP_DEVICETHREAD
-    xkblas_fifo_register_waiter( device->ld->queue, (void (*)(void *))xkblas_offload_device_wakeup, device );
-#else
-    xkblas_fifo_register_waiter( device->ld->queue, 0, 0);
-#endif
-
-    /* infinite loop with the device context */
-    int err = xkblas_sched_idle_offload(thread, _xkblas_device_finalize, device);
-    assert((err==0)||(err==EINTR));
-
-    /* thread is stopped */
-    assert(0 == pthread_mutex_lock(&device->lock));
-    device->state = XKBLAS_DEVICE_STATE_STOPPED;
-    assert(0 == pthread_cond_signal(&device->cond_sleep));
-    assert(0 == pthread_mutex_unlock(&device->lock));
-
-    assert(0 == pthread_mutex_lock(&device->lock));
-    _xkblas_offload_device_finalize(device);
-    xkblas_offload_device_pop( device );
-    xkblas_localitydomain_destroy(device->ld);
-    device->state = XKBLAS_DEVICE_STATE_FINALIZED;
-
-    if (err != EINTR)
-    {
-        XKBLAS_FATAL("device %d/%p abort with natural interrup\n", device->device_id, (void*)device);
-    }
-    assert(0 == pthread_mutex_unlock(&device->lock));
-    xkblas_thread_unbind(thread);
-    _xkblas_self_context = 0;
-    device->state = XKBLAS_DEVICE_STATE_DESTROYED;
-
-# endif
-
-    return NULL;
-}
 
 static void
 xkblas_driver_init(xkblas_driver_t * driver)
@@ -127,6 +34,7 @@ xkblas_driver_init(xkblas_driver_t * driver)
     XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
     if (n_devices < 1)
         return ;
+    driver->ndevices_targeted = n_devices;
 
     # pragma message(TODO "Move that to the 'Thread' interfaces")
     cpu_set_t save_schedset;
@@ -135,11 +43,12 @@ xkblas_driver_init(xkblas_driver_t * driver)
     for (int i = 0; i < n_devices; ++i)
     {
         cpu_set_t schedset;
-        assert(driver->f_get_ndevices_max);
+        assert(driver->f_device_set_cpuset);
         int err = driver->f_device_set_cpuset(&schedset, i);
         if (err)
         {
             XKBLAS_ERROR("cannot use device %d", i);
+            --driver->ndevices_targeted;
             continue ;
         }
 
@@ -150,20 +59,21 @@ xkblas_driver_init(xkblas_driver_t * driver)
         if (err)
         {
             XKBLAS_ERROR("invalid cpu_set returned by the driver for device %d", i);
+            --driver->ndevices_targeted;
             continue ;
         }
+
         pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
         for (int i=0; i<10; ++i) sched_yield();
 
+        // start the device thread
         xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) malloc(sizeof(xkblas_driver_thread_arg_t));
         arg->driver = driver;
         arg->driver_device_id = i;
-        arg->global_device_id = DEVICES_USED;
-        arg->tid = 0;
 
-        err = pthread_create(&arg->tid, &attr, xkblas_device_thread_main, arg);
+        pthread_t thread;
+        err = pthread_create(&thread, &attr, xkblas_device_thread_main, arg);
         assert(err ==0);
-        ++DEVICES_USED;
     }
 
     // move back the current thread to its initial cpu set
@@ -187,8 +97,18 @@ xkblas_drivers_init(void)
         xkblas_driver_init(driver);
     }
 
-    if (XKBLAS_CONF.ngpus > DEVICES_USED)
-        XKBLAS_WARN("Requested %d GPUs but only found %d", XKBLAS_CONF.ngpus, DEVICES_USED);
+    /* wait all threads for each devices of each driver */
+    int total_devices = 0;
+    for (int i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
+    {
+        xkblas_driver_t * driver = DRIVERS + i;
+        while (driver->ndevices_commited < driver->ndevices_targeted)
+            mem_pause();
+        total_devices += driver->ndevices_targeted;
+    }
+
+    XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, XKBLAS_CONF.ngpus);
+    assert(total_devices < XKBLAS_CONF.ngpus);
 }
 
 void
