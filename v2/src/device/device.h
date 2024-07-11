@@ -1,14 +1,102 @@
 #ifndef __DEVICE_H__
 # define __DEVICE_H__
 
-# include "device/driver.h"
+# include <stdint.h>    /* uint64_t */
 
-typedef struct  xkblas_driver_thread_arg_t
+# include "device/address-space.h"
+# include "device/stream.hpp"
+# include "logger/todo.h"
+# include "scheduler/task.hpp"
+# include "scheduler/thread.hpp"
+# include "sync/cache-line-size.h"
+# include "sync/mutex.h"
+
+typedef enum    xkblas_device_state_t
 {
-    xkblas_driver_t * driver;
-    int driver_device_id;
-}               xkblas_driver_thread_arg_t;
+    XKBLAS_DEVICE_STATE_CREATE,
+    XKBLAS_DEVICE_STATE_INIT,
+    XKBLAS_DEVICE_STATE_COMMIT,
+    XKBLAS_DEVICE_STATE_DOSTART,
+    XKBLAS_DEVICE_STATE_START,
+    XKBLAS_DEVICE_STATE_STOP,
+    XKBLAS_DEVICE_STATE_STOPPED,
+    XKBLAS_DEVICE_STATE_FINALISE,
+    XKBLAS_DEVICE_STATE_FINALIZED,
+    XKBLAS_DEVICE_STATE_DESTROY,
+    XKBLAS_DEVICE_STATE_DESTROYED
+}               xkblas_device_state_t;
 
-void * xkblas_device_thread_main(void * a);
+typedef enum    xkblas_device_op_t
+{
+    XKBLAS_DEVICEOP_NOP =0,
+    XKBLAS_DEVICEOP_REPLY,
+    XKBLAS_DEVICEOP_WRITEBACK,
+    XKBLAS_DEVICEOP_WRITEBACK_WAIT,
+    XKBLAS_DEVICEOP_MEMSYNC,
+    XKBLAS_DEVICEOP_INVALIDATE_CACHES
+}               xkblas_device_op_t;
+
+
+/* A device virtualize a ressource with its one address space and
+   a communication stream between host and the ressource */
+typedef struct  xkblas_device_t
+{
+    xkblas_device_memory_t  memdev;             /* casted to xkblas_device */
+    Stream                  stream;             /* communication streams host<->device */
+    int                     driver_device_id;   /* driver device id in [0..ngpus_for_device] */
+    xkblas_device_state_t   state;              /* True if driver is initialized */
+
+# if 0
+
+    Thread  * thread;                               /* running thread */
+    std::atomic<int>             cnt_push;          /* number of times the ressource is pushed */
+    pthread_t                   tid;
+   // struct xkblas_driver*        driver;
+    uint64_t                    spawn_count;       /* number of tasks */
+    uint64_t                    exec_count;        /* number of tasks completed */
+    int volatile                finalize;          /* true iff driver stop device */
+
+    double                      time_tasks;        /* cumulative time for all executed tasks */
+    uint64_t                    exectasks;         /* #tasks executed */
+    double                      flops_exectasks;   /* cumulative flops for all executed tasks */
+    double                      data_exectasks;    /* cumulative data for all executed tasks */
+    uint64_t                    submittasks;       /* #tasks (between prepare data and end of execution) */
+    double                      flops_submittasks; /* idem for pending tasks (between prepare data and end of execution) */
+    double                      data_submittasks;  /* idem for pending tasks */
+    // const char*                 name;              /* Device name */
+
+    size_t                      mem_limit;
+    size_t                      mem_total;
+
+    # pragma message(TODO "Replace with xkblas-specific synchronization primitives")
+    pthread_mutex_t             lock;              /* used to synchronize device thread */
+    pthread_cond_t              cond;              /* and cpu threads if any */
+    pthread_cond_t              cond_sleep;        /* and cpu threads if any */
+    int                         issleeping;        /* */
+    struct {
+        xkblas_device_op_t      op;                   /* op request for a device */
+        uintptr_t              arg;
+        std::atomic<int64_t>   counter;              /* for MEMSYNC or WRITEBACK request */
+        int                    err;                  /* error returned by the request */
+    } request;
+
+    /* pipline: a way to enforce execution order of kernel to device */
+    pthread_mutex_t             pipe_lock __attribute__((aligned(CACHE_LINE_SIZE)));
+    uint64_t                    pipe_size;
+    Task **                     pipeline;          /* circular buffer to store pipeline of task to run on the device */
+    uint64_t                    p_write;           /* next position in the pipeline to write a new task */
+    uint64_t                    p_ready;           /* position of the first ready task submitted to stream but not yet tested finish */
+    uint64_t                    p_finish;          /* position in the stream of the next task to finish */
+
+    size_t                      free_mem;
+    size_t                      size_alloc;
+    size_t                      size_free;
+
+    std::atomic<int16_t>        cnt_pending;       /* number of tasks waiting for data (not too much) */
+    std::atomic<int16_t>        cnt_ready;         /* number of ready tasks inserted into device stream  (not too much) */
+    std::atomic<int32_t>        cnt_exec;          /* number of tasks executed */
+    # endif
+
+}               xkblas_device_t;
 
 #endif /* __DEVICE_H__ */

@@ -20,7 +20,13 @@ typedef struct  xkblas_device_cuda_t
 {
     xkblas_device_t inherited;
     int save_device_id;
-    uint64_t * affinity; /* of size cuda_count_perfrank -1 */
+
+    size_t mem_limit;
+    size_t mem_total;
+    size_t free_mem;
+    size_t size_alloc;
+    size_t size_free;
+
 
     /* device properties (from NVIDIA website) */
     struct
@@ -242,7 +248,6 @@ _xkblas_get_gpu_topo(void)
 static
 uint64_t cuda_get_free_mem(int device_id)
 {
-    xkblas_device_t * device = __get_device(device_id);
     cudaError_t res = cudaSetDevice(__get_device_cuda_id(device_id));
     __check_error(res);
 
@@ -250,6 +255,7 @@ uint64_t cuda_get_free_mem(int device_id)
     res = cudaMemGetInfo(&free, &total);
     __check_error(res);
 
+    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
     device->free_mem = (size_t)free;
     return device->free_mem;
 }
@@ -257,7 +263,7 @@ uint64_t cuda_get_free_mem(int device_id)
 static uintptr_t
 cuda_alloc(int device_id, size_t size, int * flag)
 {
-    xkblas_device_t * device = __get_device(device_id);
+    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
 
     # pragma message(TODO "Cache system is always disabled, do we need this ?")
     /* here we limit the size of allocated memory for the cache system */
@@ -297,7 +303,7 @@ cuda_free(int device_id, uintptr_t ptr, size_t size)
 
   res = cudaFree((void*)ptr);
   __check_error(res);
-  device->inherited.size_free += size;
+  device->size_free += size;
 
 #if XKBLAS_DEBUG
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
@@ -1786,12 +1792,12 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     strncpy(device->prop.name, prop.name, 64);
 
     /* memory device */
-    device->inherited.mem_total = prop.totalGlobalMem;
-    device->inherited.size_alloc = 0;
-    device->inherited.size_free = 0;
-    device->inherited.free_mem = 0;
-    device->inherited.mem_limit = (size_t)((double)XKBLAS_CONF.cuda_cache_limit
-            * (double)(device->inherited.free_mem-180UL*1024UL*1024UL));
+    device->mem_total = prop.totalGlobalMem;
+    device->size_alloc = 0;
+    device->size_free = 0;
+    device->free_mem = 0;
+    device->mem_limit = (size_t)((double)XKBLAS_CONF.cuda_cache_limit
+            * (double)(device->free_mem-180UL*1024UL*1024UL));
     if (getenv("XKBLAS_NO_GPUALLOCATOR"))
         XKBLAS_ERROR("XKBLAS_NO_GPUALLOCATOR but code do not compile for this option");
 
