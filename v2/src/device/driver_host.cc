@@ -4,9 +4,6 @@
 typedef struct  xkblas_device_host
 {
     xkblas_device_t inherited;
-    size_t         total_mem;
-    size_t         free_mem;
-    size_t         used_mem;
 }               xkblas_device_host_t;
 
 static int

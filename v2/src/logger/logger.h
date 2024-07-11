@@ -3,9 +3,11 @@
 
 # include "sync/spinlock.h"
 
+# include <time.h>
 # include <unistd.h>
 # include <stdio.h>
 # include <stdlib.h>
+# include <stdint.h>
 
 extern volatile int XKBLAS_PRINT_MTX;
 
@@ -21,6 +23,9 @@ extern char * XKBLAS_PRINT_HEADERS[6];
 
 extern int XKBLAS_VERBOSE;
 
+extern volatile uint64_t XKBLAS_TIME_ELAPSED;
+extern volatile uint64_t XKBLAS_LAST_TIME;
+
 # define XKBLAS_PRINT_LINE() \
     fprintf(stderr, "%s:%d (%s)", __FILE__, __LINE__, __func__);
 
@@ -29,16 +34,32 @@ extern int XKBLAS_VERBOSE;
         if (LVL <= XKBLAS_VERBOSE)                                      \
         {                                                               \
             SPINLOCK_LOCK(XKBLAS_PRINT_MTX);                            \
+            struct timespec ts;                                         \
+            clock_gettime(CLOCK_MONOTONIC, &ts);                        \
+            uint64_t t = (uint64_t)(ts.tv_sec * 1000000000) +           \
+                            (uint64_t) ts.tv_nsec;                      \
+            if (XKBLAS_LAST_TIME == 0)                                  \
+                XKBLAS_LAST_TIME = t;                                   \
+            else                                                        \
+                XKBLAS_TIME_ELAPSED += t - XKBLAS_LAST_TIME;            \
+            double td = XKBLAS_TIME_ELAPSED / 1e9;                      \
             if (isatty(STDOUT_FILENO))                                  \
-                fprintf(stdout, "[TID=%d] "                             \
+                fprintf(stdout, "[%8lf] "                               \
+                                "[TID=%d] "                             \
                                 "[\033[1;37mXKBLAS\033[0m] "            \
                                 "[%s%s\033[0m] ",                       \
+                                td,                                     \
                                 gettid(),                               \
                                 XKBLAS_PRINT_COLORS[LVL],               \
                                 XKBLAS_PRINT_HEADERS[LVL]);             \
             else                                                        \
-                fprintf(stdout, "[XKBLAS] [%s] ",                       \
-                        XKBLAS_PRINT_HEADERS[LVL]);                     \
+                fprintf(stdout, "[%8lf]"                                \
+                                "[TID=%d] "                             \
+                                "[XKBLAS] "                             \
+                                "[%s] ",                                \
+                                td,                                     \
+                                gettid(),                               \
+                                XKBLAS_PRINT_HEADERS[LVL]);             \
             fprintf(stdout, __VA_ARGS__);                               \
             fprintf(stdout, "\n");                                      \
             SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                          \
