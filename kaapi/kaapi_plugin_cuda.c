@@ -1127,6 +1127,7 @@ static int cuda_stream_decode_ioinstruction(
       {
         case KAAPI_MEMORY_VIEW_1D:
         {
+
 #ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
@@ -1266,6 +1267,7 @@ _kaapi_unlock_print();
             default:
               kaapi_assert(0);
           };
+	CudaCheckError(res);
 #endif//KAAPI_UNIFIED
         } break;
 
