@@ -17,10 +17,6 @@
 # include "sync/cache-line-size.h"
 # include "sync/mutex.h"
 
-void xkblas_drivers_init(void);
-void xkblas_drivers_deinit(void);
-
-
 # pragma message(TODO "Organize this file, split independent part in multiple files")
 
 # define XKBLAS_DEVICES_MAX 32
@@ -110,5 +106,14 @@ typedef struct  xkblas_driver_thread_arg_t
 }               xkblas_driver_thread_arg_t;
 
 void * xkblas_device_thread_main(void * a);
+
+typedef enum    xkblas_driver_type_t
+{
+    XKBLAS_DRIVER_CUDA = 0,
+    XKBLAS_DRIVER_MAX  = 1,
+}               xkblas_driver_type_t;
+
+void xkblas_drivers_init(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX]);
+void xkblas_drivers_deinit(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX]);
 
 #endif /* __DRIVER_H__ */

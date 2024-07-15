@@ -9,9 +9,11 @@ typedef volatile int spinlock_t;
     do {                                                        \
         int zero = 0;                                           \
         while (__sync_val_compare_and_swap(&L, zero, 1) == 1)   \
-            mem_pause();
+            mem_pause();                                        \
+    } while (0)
 
 # define SPINLOCK_UNLOCK(L)             \
+    do {                                \
         __sync_fetch_and_xor(&L, L);    \
     } while (0)
 

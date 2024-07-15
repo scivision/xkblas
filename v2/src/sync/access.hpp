@@ -1,12 +1,19 @@
-#ifndef __ACCESS_H__
-# define __ACCESS_H__
+#ifndef __ACCESS_HPP__
+# define __ACCESS_HPP__
 
-typedef enum    access_mode_e
+# include "access-mode.h"
+# include "intervals.hpp"
+
+template<int K>
+struct access_t
 {
-    IN          = 0,
-    OUT         = 1,
-    // OUTSET   = 2 // TODO
-    IRRELEVANT  = 127
-}               access_mode_t;
+    access_mode_t mode;
+    Intervals<K> intervals;
 
-#endif /* __ACCESS_H__ */
+    access_t() : mode(ACCESS_MODE_VOID), intervals() {}
+    access_t(const access_t & access) : mode(access.mode), intervals(access.intervals) {}
+    access_t(access_mode_t mode, const Intervals<K> & intervals) : mode(mode), intervals(intervals) {}
+    ~access_t() {}
+};
+
+#endif /* __ACCESS_HPP__ */

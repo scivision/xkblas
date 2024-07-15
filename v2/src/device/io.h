@@ -93,9 +93,9 @@ struct xkblas_io_barrier {
   to execute the kernel.
 */
 struct xkblas_io_kernel {
-  xkblas_io_callback_func_t           fnc;
-  void*                        arg[3];
-  xkblas_task_body_t            body;
+    xkblas_io_callback_func_t           fnc;
+    void*                        arg[3];
+    task_body_t            body;
   Task *                task;
 };
 

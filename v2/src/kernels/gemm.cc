@@ -1,17 +1,103 @@
 # include "blas.h"
 # include "min-max.h"
+# include "logger/todo.h"
 # include "logger/logger.h"
+
+# include "sync/alignedas.h"
+# include "scheduler/thread.hpp"
+# include "sync/access.hpp"
+
+# include <cassert>
+
+typedef struct alignas(std::hardware_constructive_interference_size)    args_t
+{
+    args_t(int transA, int transB,
+            int M, int N, int K,
+            const TYPE * alpha,
+            const TYPE * A, int Atm, int Atn, int LDA,
+            const TYPE * B, int Btm, int Btn, int LDB,
+            const TYPE * beta,
+                  TYPE * C, int Ctm, int Ctn, int LDC) :
+        transA(transA), transB(transB),
+        M(M), N(N), K(K),
+        alpha(alpha),
+        A(A), Atm(Atm), Atn(Atn), LDA(LDA),
+        B(B), Btm(Btm), Btn(Btn), LDB(LDB),
+        beta(beta),
+        C(C), Ctm(Ctm), Ctn(Ctn), LDC(LDC)
+    {}
+
+    ~args_t() {}
+
+    int transA;
+    int transB;
+    int M;
+    int N;
+    int K;
+    const TYPE * alpha;
+    const TYPE * A;
+    int Atm;
+    int Atn;
+    int LDA;
+    const TYPE * B;
+    int Btm;
+    int Btn;
+    int LDB;
+    const TYPE * beta;
+    TYPE * C;
+    int Ctm;
+    int Ctn;
+    int LDC;
+}                                                                       args_t;
 
 int
 xkblas_£gemm_tile_async(
     int transA, int transB,
     int M, int N, int K,
     const TYPE * alpha,
-    const TYPE *A, int Atm, int Atn, int LDA,
-    const TYPE *B, int Btm, int Btn, int LDB,
-    const TYPE* beta,
-    TYPE *C, int Ctm, int Ctn, int LDC
+    const TYPE * A, int Atm, int Atn, int LDA,
+    const TYPE * B, int Btm, int Btn, int LDB,
+    const TYPE * beta,
+          TYPE * C, int Ctm, int Ctn, int LDC
 ) {
+    # pragma message(TODO "Implement tile sending")
+    Thread * thread = Thread::get();
+
+    // const uint64_t task_size = alignedas(sizeof(Task),   std::hardware_constructive_interference_size);
+    const uint64_t task_size = sizeof(Task);
+    const uint64_t args_size = sizeof(args_t);
+    assert(is_alignedas(task_size, std::hardware_constructive_interference_size));
+    assert(is_alignedas(args_size, std::hardware_constructive_interference_size));
+
+    uint8_t * mem  = thread->allocate(task_size + args_size);
+
+    Task    * task = reinterpret_cast<Task *>  (mem + 0);
+    new(task) Task(TASK_BODY_GEMM);
+
+    # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'LDC' ?")
+    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    new(args) args_t(transA, transB, M, N, K, alpha, A, Atm, Atn, LDA, B, Btm, Btn, LDB, beta, C, Ctm, Ctn, LDC);
+
+    # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
+
+    # if 0
+    # define NACCESSES 3
+
+    task->push_access(ACCESS_MODE_R, TODO);
+    task->push_access(ACCESS_MODE_R, TODO);
+    task->push_access((*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW, TODO);
+
+    int coords[NACCESSES][4];
+    XKBLAS_MATRIX_TILE_COORDINATE(A, LDA, BS, BS, coords[0][0], coords[0][1], coords[0][2], coords[0][3]);
+    XKBLAS_MATRIX_TILE_COORDINATE(B, LDB, BS, BS, coords[1][0], coords[1][1], coords[1][2], coords[1][3]);
+    XKBLAS_MATRIX_TILE_COORDINATE(C, LDC, BS, BS, coords[2][0], coords[2][1], coords[2][2], coords[2][3]);
+
+    thread->task_access<NACCESSES>(task, modes, coords);
+
+    # undef NACCESSES
+    # endif
+
+    thread->submit(task);
 
     return 0;
 }
@@ -21,10 +107,10 @@ xkblas_£gemm_async(
     int transA, int transB,
     int M, int N, int K,
     const TYPE * alpha,
-    const TYPE *A, int LDA,
-    const TYPE *B, int LDB,
-    const TYPE* beta,
-    TYPE *C, int LDC
+    const TYPE * A, int LDA,
+    const TYPE * B, int LDB,
+    const TYPE * beta,
+          TYPE * C, int LDC
 ) {
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans))

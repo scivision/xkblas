@@ -162,6 +162,7 @@ xkblas_device_create(xkblas_driver_t * driver, int driver_device_id)
     return device;
 }
 
+/* main loop for the thread responsible the passed device */
 static inline int
 xkblas_device_thread_main_loop(
     xkblas_driver_t * driver,

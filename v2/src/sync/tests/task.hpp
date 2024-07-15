@@ -6,7 +6,11 @@
 typedef struct  Task
 {
     std::vector<struct Task *> successors;
+
     Task() : successors() {}
+    Task(const Task & task) : successors(task.successors) {}
+    ~Task() {}
+
 }               Task;
 
 # define MAX_TASKS 5000000
@@ -27,7 +31,7 @@ task_new(void)
 
 template<int K>
 inline void
-task_link(const Region<K> & rx, Task * x, const Region<K> & ry, Task * y)
+task_link(const Intervals<K> & rx, Task * x, const Intervals<K> & ry, Task * y)
 {
     (void) rx;
     (void) ry;

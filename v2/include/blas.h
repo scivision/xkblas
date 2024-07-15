@@ -10,23 +10,6 @@ typedef enum {CblasNonUnit=131, CblasUnit=132} CBLAS_DIAG;
 typedef enum {CblasLeft=141, CblasRight=142} CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 
-typedef enum {
-  KERN_VOID,
-  KERN_GEMM,
-  KERN_GEMMT,
-  KERN_TRMM,
-  KERN_TRSM,
-  KERN_SYMM,
-  KERN_SYRK,
-  KERN_SYR2K,
-  KERN_HEMM,
-  KERN_HERK,
-  KERN_HER2K,
-  KERN_SWAP,
-  KERN_COPYSCALE
-
-} xkblas_kernel_t;
-
 static inline int xkblas_blas2cblas_trans( const char* trans )
 {
   switch (trans[0]) {

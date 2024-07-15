@@ -1,18 +1,27 @@
 #ifndef __XKBLAS_H__
 # define __XKBLAS_H__
 
+# include "blas.h"
+
 extern "C" {
 
-    /* initialize the runtime */
+    /* initialize the runtime (must be called by the main thread) */
     void xkblas_init(void);
 
-    /* Wait for the completion of asynchronous operation spawned on the calling threads */
+    /* Wait for the completion of every threads */
     void xkblas_sync(void);
 
-    /* deinitialize the runtime */
+    /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
 
+    /* initialize the thread (must be called by any threads) */
+    void xkblas_thread_init(void);
 
+    /* Wait for the completion of the current thread */
+    void xkblas_thread_sync(void);
+
+    /* initialize the thread (must be called by any threads) */
+    void xkblas_thread_deinit(void);
 };
 
 #endif /* __XKBLAS_H__ */

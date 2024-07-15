@@ -4,12 +4,12 @@
 # include "access-interval-multi-tree.hpp"
 
 template<int K>
-class TaskAccessIntervalMultiTree : public AccessIntervalMultiTree<K> {
+class TaskAccessIntervalMultiTree : public AccessIntervalMultiTree<K, Task> {
 
     void
-    on_hazard(const Region<K> & rx, void * x, const Region<K> & ry, void * y) const
+    on_hazard(const Intervals<K> & rx, Task * x, const Intervals<K> & ry, Task * y) const
     {
-        task_link(rx, (Task *) x, ry, (Task *) y);
+        task_link(rx, x, ry, y);
     }
 };
 

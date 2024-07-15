@@ -11,7 +11,7 @@ project(xkblas)
 
 # Lib name
 add_library(xkblas SHARED
-    src/xkblas.cc
+    src/xkblas-context.cc
     src/conf/conf.cc
     src/device/device.cc
     src/device/driver.cc

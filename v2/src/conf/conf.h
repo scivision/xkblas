@@ -20,8 +20,6 @@ typedef struct  xkblas_conf_s
     float       cuda_cache_limit;       /* percent reserved for cache */
 }               xkblas_conf_t;
 
-extern xkblas_conf_t XKBLAS_CONF;
-
-void xkblas_init_conf(void);
+void xkblas_init_conf(xkblas_conf_t * conf);
 
 #endif /* __XKBLAS_CONF_H__ */

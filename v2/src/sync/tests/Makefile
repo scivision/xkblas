@@ -2,7 +2,7 @@ CXX=g++
 CFLAGS=-Wall -Werror -Wextra
 CFLAGS+=-Wno-error=write-strings
 CFLAGS+=-g -O0
-CFLAGS+=-I . -I ../src -I ../src/impl
+CFLAGS+=-I . -I ../ -I ../impl -I ../../../include/
 #CFLAGS+=-DDEBUG
 CFLAGS+=-DNDEBUG
 CFLAGS+=-DCUT -DREBALANCE

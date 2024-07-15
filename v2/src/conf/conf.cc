@@ -5,61 +5,38 @@
 # include <stdlib.h>
 # include <string.h>
 
-// Runtime configuration
-xkblas_conf_t XKBLAS_CONF = {
-    .stackblocsize              = (uint64_t)-1,
-    .ngpus                      = (uint8_t)-1,
-    .gpu_set                    = (uint32_t) ~0,
-    .cuda_stream_capacity       = 64,
-    .cuda_conc_stream_kernel    = 2,
-    .cuda_conc_kernel           = 8,
-    .cuda_conc_h2d              = 1,
-    .cuda_conc_d2h              = 1,
-    .cuda_conc_d2d              = 1,
-    .cuda_cache_limit           = 0.98
-};
-
-extern char ** environ;
-
-typedef struct  xkblas_conf_parse_t
-{
-    char const * name;
-    void (*parse)(char const * value);
-    char const * descr;
-}               xkblas_conf_parse_t;
-
 static void
-__parse_verbose(char const * value)
+__parse_verbose(xkblas_conf_t * conf, char const * value)
 {
     if (value)
         XKBLAS_VERBOSE = atoi(value);
 }
 
 static void
-__parse_ngpus(char const * value)
+__parse_ngpus(xkblas_conf_t * conf, char const * value)
 {
     if (value)
-        XKBLAS_CONF.ngpus = atoi(value);
+        conf->ngpus = atoi(value);
     else
-        XKBLAS_CONF.ngpus = UINT8_MAX;
+        conf->ngpus = UINT8_MAX;
 }
 
 static void
-__parse_gpuset(char const * value)
+__parse_gpuset(xkblas_conf_t * conf, char const * value)
 {
     if (value)
     {
         unsigned int gpuset = atoi(value);
-        if (__builtin_popcount(gpuset) < XKBLAS_CONF.ngpus)
-            XKBLAS_CONF.ngpus = __builtin_popcount(gpuset);
-        else if (XKBLAS_CONF.ngpus ==0)
+        if (__builtin_popcount(gpuset) < conf->ngpus)
+            conf->ngpus = __builtin_popcount(gpuset);
+        else if (conf->ngpus ==0)
             gpuset = 0;
         else
         {
             /* take only the first ngpus bits to 1 in gpuset */
             int tmp = gpuset;
             int idx = 0;
-            for (int i=0; i<XKBLAS_CONF.ngpus; ++i)
+            for (int i=0; i<conf->ngpus; ++i)
             {
                 idx = __builtin_ffs((unsigned int)tmp);
                 assert( idx != 0);
@@ -69,17 +46,26 @@ __parse_gpuset(char const * value)
             /* here idx == index of the ngpus bits to 1 in gpuset */
             gpuset &= ((1<<(1+idx))-1);
         }
-        XKBLAS_CONF.gpu_set = gpuset;
-        assert(__builtin_popcount(XKBLAS_CONF.gpu_set)  == XKBLAS_CONF.ngpus);
+        conf->gpu_set = gpuset;
+        assert(__builtin_popcount(conf->gpu_set)  == conf->ngpus);
     }
     else
     {
-        XKBLAS_CONF.gpu_set = (1 << XKBLAS_CONF.ngpus) - 1;
+        conf->gpu_set = (1 << conf->ngpus) - 1;
     }
 }
 
-// TODO : implement this
-void __parse_help(char const * value);
+void __parse_help(xkblas_conf_t * conf, char const * value);
+
+extern char ** environ;
+
+typedef struct  xkblas_conf_parse_t
+{
+    char const * name;
+    void (*parse)(xkblas_conf_t * conf, char const * value);
+    char const * descr;
+}               xkblas_conf_parse_t;
+
 
 // variables are parsed in-order
 static xkblas_conf_parse_t CONF_PARSE[] = {
@@ -97,7 +83,7 @@ static xkblas_conf_parse_t CONF_PARSE[] = {
 };
 
 void
-__parse_help(char const * value)
+__parse_help(xkblas_conf_t * conf, char const * value)
 {
     if (value)
     {
@@ -108,7 +94,7 @@ __parse_help(char const * value)
 }
 
 void
-xkblas_init_conf(void)
+xkblas_init_conf(xkblas_conf_t * conf)
 {
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)
@@ -136,9 +122,8 @@ xkblas_init_conf(void)
     for (xkblas_conf_parse_t * var = CONF_PARSE ; var->name ; ++var)
     {
         if (var->parse)
-            var->parse(getenv(var->name));
+            var->parse(conf, getenv(var->name));
         else
             XKBLAS_NOT_IMPLEMENTED_WARN(var->name);
     }
-
 }
