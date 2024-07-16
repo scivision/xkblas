@@ -1052,7 +1052,7 @@ class AccessIntervalMultiTree : public History<K, T> {
                 DEBUG("---  [%d, %d[", intervals[i].a, intervals[i].b);
             DEBUG("##############################");
 
-            tassert(!intervals.empty());
+            tassert(!intervals.is_empty());
 
             if (this->root == nullptr)
             {

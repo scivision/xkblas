@@ -34,7 +34,7 @@ Thread::get(void)
 Thread::Thread() :
     memory_stack_bottom(),
     memory_stack_ptr(memory_stack_bottom),
-    deque()
+    queue()
 {
     XKBLAS_INFO("New Xkblas thread");
     memset(this->memory_stack_bottom, 0, THREAD_MAX_MEMORY);
@@ -58,10 +58,4 @@ void
 Thread::deallocate_all(void)
 {
     this->memory_stack_ptr = this->memory_stack_bottom;
-}
-
-void
-Thread::submit(Task * task)
-{
-    // TODO
 }

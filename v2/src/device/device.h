@@ -11,29 +11,29 @@
 # include "sync/cache-line-size.h"
 # include "sync/mutex.h"
 
-typedef enum    xkblas_device_state_t
+typedef enum    xkblas_device_state_t : uint8_t
 {
-    XKBLAS_DEVICE_STATE_CREATE,
-    XKBLAS_DEVICE_STATE_INIT,
-    XKBLAS_DEVICE_STATE_COMMIT,
-    XKBLAS_DEVICE_STATE_DOSTART,
-    XKBLAS_DEVICE_STATE_START,
-    XKBLAS_DEVICE_STATE_STOP,
-    XKBLAS_DEVICE_STATE_STOPPED,
-    XKBLAS_DEVICE_STATE_FINALISE,
-    XKBLAS_DEVICE_STATE_FINALIZED,
-    XKBLAS_DEVICE_STATE_DESTROY,
-    XKBLAS_DEVICE_STATE_DESTROYED
+    XKBLAS_DEVICE_STATE_CREATE      = 0,
+    XKBLAS_DEVICE_STATE_INIT        = 1,
+    XKBLAS_DEVICE_STATE_COMMIT      = 2,
+    XKBLAS_DEVICE_STATE_RUNNING     = 3,
+    XKBLAS_DEVICE_STATE_SLEEPING    = 4,
+    XKBLAS_DEVICE_STATE_STOP        = 5,
+    XKBLAS_DEVICE_STATE_STOPPED     = 6,
+    XKBLAS_DEVICE_STATE_FINALISE    = 7,
+    XKBLAS_DEVICE_STATE_FINALIZED   = 8,
+    XKBLAS_DEVICE_STATE_DESTROY     = 9,
+    XKBLAS_DEVICE_STATE_DESTROYED   = 10,
 }               xkblas_device_state_t;
 
 typedef enum    xkblas_device_op_t
 {
-    XKBLAS_DEVICEOP_NOP =0,
-    XKBLAS_DEVICEOP_REPLY,
-    XKBLAS_DEVICEOP_WRITEBACK,
-    XKBLAS_DEVICEOP_WRITEBACK_WAIT,
-    XKBLAS_DEVICEOP_MEMSYNC,
-    XKBLAS_DEVICEOP_INVALIDATE_CACHES
+    XKBLAS_DEVICEOP_NOP                 = 0,
+    XKBLAS_DEVICEOP_REPLY               = 1,
+    XKBLAS_DEVICEOP_WRITEBACK           = 2,
+    XKBLAS_DEVICEOP_WRITEBACK_WAIT      = 3,
+    XKBLAS_DEVICEOP_MEMSYNC             = 4,
+    XKBLAS_DEVICEOP_INVALIDATE_CACHES   = 5
 }               xkblas_device_op_t;
 
 
@@ -41,10 +41,23 @@ typedef enum    xkblas_device_op_t
    a communication stream between host and the ressource */
 typedef struct  xkblas_device_t
 {
-    xkblas_device_memory_t  memdev;             /* casted to xkblas_device */
-    Stream                  stream;             /* communication streams host<->device */
-    int                     driver_device_id;   /* driver device id in [0..ngpus_for_device] */
-    xkblas_device_state_t   state;              /* True if driver is initialized */
+    xkblas_device_memory_t      memdev;             /* casted to xkblas_device */
+    Stream                      stream;             /* communication streams host<->device */
+    int                         driver_device_id;   /* driver device id in [0..ngpus_for_device] */
+    std::atomic<uint8_t>        state;              /* True if driver is initialized */
+
+    # pragma message(TODO "Replace with xkblas-specific synchronization primitives")
+    struct {
+        pthread_mutex_t         lock;               /* used to synchronize device thread */
+        pthread_cond_t          cond;               /* and cpu threads if any */
+    } sleep;
+
+    struct {
+        xkblas_device_op_t      op;                 /* op request for a device */
+        uintptr_t               arg;
+        std::atomic<uint64_t> * counter;            /* for MEMSYNC or WRITEBACK request */
+        int                     err;                /* error returned by the request */
+    } request;
 
 # if 0
 
@@ -68,10 +81,6 @@ typedef struct  xkblas_device_t
     size_t                      mem_limit;
     size_t                      mem_total;
 
-    # pragma message(TODO "Replace with xkblas-specific synchronization primitives")
-    pthread_mutex_t             lock;              /* used to synchronize device thread */
-    pthread_cond_t              cond;              /* and cpu threads if any */
-    pthread_cond_t              cond_sleep;        /* and cpu threads if any */
     int                         issleeping;        /* */
     struct {
         xkblas_device_op_t      op;                   /* op request for a device */

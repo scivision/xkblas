@@ -1,6 +1,4 @@
-# include "xkblas-context.h"
 # include "min-max.h"
-# include "conf/conf.h"
 # include "device/device.h"
 # include "device/driver.h"
 # include "logger/logger.h"
@@ -13,8 +11,10 @@
 # pragma message(TODO "Implement host driver ?")
 
 static void
-xkblas_driver_init(xkblas_driver_t * driver)
+xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 {
+    xkblas_driver_t * driver = drivers->list + driver_id;
+
     XKBLAS_INFO("Loading driver '%s'", driver->f_get_name());
     assert(driver->f_init);
 
@@ -24,7 +24,7 @@ xkblas_driver_init(xkblas_driver_t * driver)
     # pragma message(TODO "Currently, the only devices supported are GPUs")
     assert(driver->f_get_ndevices_max);
     int n_devices_max = driver->f_get_ndevices_max();
-    int n_devices = MIN(xkblas_context.conf.ngpus, n_devices_max);
+    int n_devices = MIN(ngpus, n_devices_max);
     XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
     if (n_devices < 1)
         return ;
@@ -61,8 +61,9 @@ xkblas_driver_init(xkblas_driver_t * driver)
         for (int i=0; i<10; ++i) sched_yield();
 
         // start the device thread
-        xkblas_driver_thread_arg_t * arg = (xkblas_driver_thread_arg_t *) malloc(sizeof(xkblas_driver_thread_arg_t));
-        arg->driver = driver;
+        xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) malloc(sizeof(xkblas_driver_device_thread_arg_t));
+        arg->drivers = drivers;
+        arg->driver_id = driver_id;
         arg->driver_device_id = i;
 
         pthread_t thread;
@@ -75,7 +76,7 @@ xkblas_driver_init(xkblas_driver_t * driver)
 }
 
 void
-xkblas_drivers_init(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX])
+xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in CUDA driver")
 
@@ -84,29 +85,31 @@ xkblas_drivers_init(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX])
     void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
 
-    for (int i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
+    uint8_t i;
+    for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
     {
-        xkblas_driver_t * driver = drivers + i;
-        loaders[i](driver);
-        xkblas_driver_init(driver);
+        loaders[i](drivers->list + i);
+        xkblas_driver_init(drivers, i, ngpus);
+        if (drivers->devices.n == ngpus)
+            break ;
     }
 
     /* wait all threads for each devices of each driver */
     int total_devices = 0;
-    for (int i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
+    for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
     {
-        xkblas_driver_t * driver = drivers + i;
+        xkblas_driver_t * driver = drivers->list + i;
         while (driver->ndevices_commited < driver->ndevices_targeted)
             mem_pause();
         total_devices += driver->ndevices_targeted;
     }
 
-    XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, xkblas_context.conf.ngpus);
-    assert(total_devices < xkblas_context.conf.ngpus);
+    XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, ngpus);
+    assert(total_devices < ngpus);
 }
 
 void
-xkblas_drivers_deinit(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX])
+xkblas_drivers_deinit(xkblas_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
 

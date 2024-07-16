@@ -8,11 +8,11 @@ template<int K>
 struct access_t
 {
     access_mode_t mode;
-    Intervals<K> intervals;
+    Intervals<K> region;
 
-    access_t() : mode(ACCESS_MODE_VOID), intervals() {}
-    access_t(const access_t & access) : mode(access.mode), intervals(access.intervals) {}
-    access_t(access_mode_t mode, const Intervals<K> & intervals) : mode(mode), intervals(intervals) {}
+    access_t() : mode(ACCESS_MODE_VOID), region() {}
+    access_t(const access_t & access) : mode(access.mode), region(access.region) {}
+    access_t(const access_mode_t mode, const Intervals<K> & region) : mode(mode), region(region) {}
     ~access_t() {}
 };
 

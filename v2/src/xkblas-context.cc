@@ -61,9 +61,9 @@ xkblas_init(void)
         {
             if (xkblas_context.state.current == XKBLAS_CONTEXT_DEINITIALIZED)
             {
+                // load
                 xkblas_init_conf(&(xkblas_context.conf));
-                // xkblas_register_format();
-                xkblas_drivers_init(xkblas_context.drivers);
+                xkblas_drivers_init(&(xkblas_context.drivers), xkblas_context.conf.ngpus);
                 xkblas_context.state.current = XKBLAS_CONTEXT_INITIALIZED;
             }
         }
@@ -82,7 +82,7 @@ xkblas_deinit(void)
         {
             if (xkblas_context.state.current == XKBLAS_CONTEXT_INITIALIZED)
             {
-                xkblas_drivers_deinit(xkblas_context.drivers);
+                xkblas_drivers_deinit(&xkblas_context.drivers);
             }
         }
         SPINLOCK_UNLOCK(xkblas_context.state.spinlock);

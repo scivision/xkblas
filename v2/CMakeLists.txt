@@ -19,6 +19,7 @@ add_library(xkblas SHARED
     src/device/driver_host.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
+    src/scheduler/task.cc
     src/scheduler/thread.cc
 )
 

@@ -80,24 +80,23 @@ xkblas_£gemm_tile_async(
 
     # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
 
-    # if 0
+    // block size
+    int BS = 16;
+
     # define NACCESSES 3
 
-    task->push_access(ACCESS_MODE_R, TODO);
-    task->push_access(ACCESS_MODE_R, TODO);
-    task->push_access((*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW, TODO);
+    task_access_t accesses[NACCESSES];
 
-    int coords[NACCESSES][4];
-    XKBLAS_MATRIX_TILE_COORDINATE(A, LDA, BS, BS, coords[0][0], coords[0][1], coords[0][2], coords[0][3]);
-    XKBLAS_MATRIX_TILE_COORDINATE(B, LDB, BS, BS, coords[1][0], coords[1][1], coords[1][2], coords[1][3]);
-    XKBLAS_MATRIX_TILE_COORDINATE(C, LDC, BS, BS, coords[2][0], coords[2][1], coords[2][2], coords[2][3]);
+    accesses[0].mode    = ACCESS_MODE_R;
+    accesses[0].region  = Intervals<2>(reinterpret_cast<uintptr_t>(A), LDA, BS, BS);
 
-    thread->task_access<NACCESSES>(task, modes, coords);
+    accesses[1].mode    = ACCESS_MODE_R;
+    accesses[1].region  = Intervals<2>(reinterpret_cast<uintptr_t>(B), LDB, BS, BS);
 
-    # undef NACCESSES
-    # endif
+    accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
+    accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
 
-    thread->submit(task);
+    thread->submit<NACCESSES>(task, accesses);
 
     return 0;
 }
@@ -178,7 +177,7 @@ xkblas_£gemm_async(
 
     // xkblas_context_t * xkctxt = xkblas_context_get();
     // int NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
-    int NB = 512;
+    int NB = 16;
 
     // TODO : set tiling parameters
     int Amb = NB;

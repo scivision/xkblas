@@ -2,28 +2,27 @@
 # define __DEQUE_HPP__
 
 # include "sync/spinlock.h"
+# include "scheduler/iqueue.hpp"
 
 # include <atomic>
-# include <new>
 
 // THE protocol from 'The Implementation of the Cilk-5 Multithreaded Language'
 
-template<int C>
-class Deque
+template<typename OBJ, int C>
+class Deque : IQueue<OBJ>
 {
     public:
 
-        // TODO : replace all std::atomic access with explicit memory ordering
+        Deque() : objects(), lock(0), T(0), H(0) {}
+        virtual ~Deque() {}
 
-        /** Add a new object to the deque (by the worker */
         void
-        push(void * obj)
+        push(OBJ & obj)
         {
             ++T;
         }
 
-        /* Remove an object from the deque (by the worker) */
-        void *
+        OBJ
         pop(void)
         {
             --T;
@@ -45,8 +44,7 @@ class Deque
             return nullptr; // SUCCESS
         }
 
-        /* Steal from the deque (by the thief) */
-        void *
+        OBJ
         steal(void)
         {
             SPINLOCK_LOCK(lock);
@@ -65,9 +63,10 @@ class Deque
 
     private:
 
-        void * objects[C];
+        OBJ objects[C];
 
         // TODO : what to alignas(std::hardware_constructive_interference_size) ?
+        // TODO : replace all std::atomic access with explicit memory ordering
         spinlock_t lock;
         std::atomic<int> H;
         std::atomic<int> T;

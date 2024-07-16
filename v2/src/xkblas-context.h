@@ -19,9 +19,7 @@ typedef struct  xkblas_context_t
     } state;
 
     xkblas_conf_t conf;
-
-    xkblas_driver_t drivers[XKBLAS_DRIVER_MAX];
-
+    xkblas_drivers_t drivers;
 }               xkblas_context_t;
 
 // TODO : currently using a global variable to preserve previous 'xkblas_init'

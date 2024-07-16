@@ -1,7 +1,9 @@
 #ifndef __THREAD_HPP__
 # define __THREAD_HPP__
 
+# include "logger/todo.h"
 # include "scheduler/deque.hpp"
+# include "scheduler/memory-tree.hpp"
 # include "scheduler/task.hpp"
 
 # include <new>
@@ -11,7 +13,7 @@
 #  define THREAD_MAX_MEMORY (64*1024*1024)
 # endif /* THREAD_MAX_MEMORY */
 
-// Maximum tasks queued in this thread deque
+// Maximum tasks queued in this thread queue
 # ifndef THREAD_DEQUE_CAPACITY
 #  define THREAD_DEQUE_CAPACITY 16384
 # endif /* THREAD_DEQUE_CAPACITY */
@@ -46,7 +48,22 @@ class alignas(std::hardware_constructive_interference_size) Thread
         void deallocate_all(void);
 
         /* submit a task */
-        void submit(Task * task);
+        template<int N>
+        void
+        submit(Task * task, task_access_t accesses[N])
+        {
+            # pragma message(TODO "Memory ordering")
+
+            task->wc.fetch_add(1, std::memory_order_seq_cst);
+
+            for (int i = 0 ; i < N ; ++i)
+            {
+                // TODO : set access i
+            }
+
+            if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+                this->queue.push(task);
+        }
 
     private:
 
@@ -57,7 +74,10 @@ class alignas(std::hardware_constructive_interference_size) Thread
         uint8_t * memory_stack_ptr;
 
         /* per-thread queue */
-        Deque<THREAD_DEQUE_CAPACITY> deque;
+        Deque<Task *, THREAD_DEQUE_CAPACITY> queue;
+
+        /* Memory mapping */
+        MemoryTree memtree;
 };
 
 #endif /* __THREAD_HPP__ */

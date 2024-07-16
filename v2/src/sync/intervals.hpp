@@ -3,6 +3,7 @@
 
 # include "min-max.h"
 # include "interval.hpp"
+# include "region.hpp"
 
 # include <cstdlib>
 # include <ostream>
@@ -13,7 +14,7 @@
 
 /* K is the number of dimensions */
 template<int K>
-class Intervals {
+class Intervals : Region {
 
     public:
         interval_t list[K];
@@ -23,14 +24,30 @@ class Intervals {
             memset(this->list, 0, sizeof(this->list));
         }
 
-        Intervals(interval_t list[K])
+        Intervals(const interval_t list[K])
         {
-            this->set_intervals(list);
+            this->set_list(list);
         }
 
         Intervals(const Intervals & copy)
         {
-            this->set_intervals(copy.list);
+            this->set_list(copy.list);
+        }
+
+        // TODO : super-dirty stuff, to make xkblas code looks good
+        Intervals(const uintptr_t & A, const int & LD, const int & BX, const int & BY)
+        {
+            if constexpr(K == 2)
+            {
+                this->list[0].a = (uint64_t)(A % LD);
+                this->list[0].b = (uint64_t)(A / LD);
+                this->list[1].a = this->list[0].a + BX;
+                this->list[1].b = this->list[0].b + BY;
+            }
+            else
+            {
+                // # pragma message("Constructor not supported for K != 2")
+            }
         }
 
         virtual ~Intervals() {}
@@ -38,11 +55,11 @@ class Intervals {
         void
         copy(const Intervals & other)
         {
-            this->set_intervals(other.list);
+            this->set_list(other.list);
         }
 
         void
-        set_intervals(const interval_t list[K])
+        set_list(const interval_t list[K])
         {
             memcpy(this->list, list, sizeof(this->list));
         }
@@ -64,15 +81,6 @@ class Intervals {
             }
         }
 
-        inline bool
-        empty(void) const
-        {
-            for (int i = 0 ; i < K ; ++i)
-                if (this->list[i].a >= this->list[i].b)
-                    return true;
-            return false;
-        }
-
         // return true if intervals intersects on each dimension
         inline bool
         intersects(const Intervals & intervals) const
@@ -86,14 +94,8 @@ class Intervals {
             return true;
         }
 
-        inline bool
-        intersects(Intervals * & intervals) const
-        {
-            return this->intersects(*intervals);
-        }
-
         inline Intervals
-        intersection(Intervals & intervals) const
+        intersection(const Intervals & intervals) const
         {
             interval_t inter[K];
             for (int k = 0 ; k < K ; ++k)
@@ -105,7 +107,25 @@ class Intervals {
         }
 
         inline bool
-        includes(Intervals & intervals) const
+        intersects(const Intervals * & intervals) const
+        {
+            return this->intersects(*intervals);
+        }
+
+        inline bool
+        equals(const Intervals & intervals)
+        {
+            for (int k = 0 ; k < K ; ++k)
+            {
+                if (this->list[k] == intervals.list[k])
+                    continue ;
+                return false;
+            }
+            return true;
+        }
+
+        inline bool
+        includes(const Intervals & intervals) const
         {
             for (int k = 0 ; k < K ; ++k)
             {
@@ -114,6 +134,15 @@ class Intervals {
                 return false;
             }
             return true;
+        }
+
+        inline bool
+        is_empty(void) const
+        {
+            for (int i = 0 ; i < K ; ++i)
+                if (this->list[i].a >= this->list[i].b)
+                    return true;
+            return false;
         }
 
         friend std::ostream &
@@ -128,17 +157,6 @@ class Intervals {
             return os;
         }
 
-        friend bool
-        operator==(const Intervals & lhs, const Intervals & rhs)
-        {
-            for (int k = 0 ; k < K ; ++k)
-            {
-                if (lhs->list[k] == rhs.list[k])
-                    continue ;
-                return false;
-            }
-            return true;
-        }
 }; /* class Intervals */
 
 #endif /* __INTERVALS_HPP__ */

@@ -48,10 +48,10 @@ typedef struct  task_edge_t
 class alignas(std::hardware_constructive_interference_size) Task
 {
     public:
-        Task(task_body_t body) : body(body), edges(), accesses(), wc(1) {}
-        ~Task() {}
+        Task(task_body_t body);
+        virtual ~Task();
 
-    private:
+        // TODO : make attributes private and add inline member methods ?
 
         /* task body */
         task_body_t body;
@@ -63,7 +63,7 @@ class alignas(std::hardware_constructive_interference_size) Task
         task_access_t accesses[TASK_MAX_ACCESSES];
 
         /* wait counter - the task may be scheduled once it reached 0 */
-        alignas(std::hardware_constructive_interference_size) std::atomic<int> wc;
+        alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
 };
 
 #endif /* __TASK_HPP__ */

@@ -19,7 +19,7 @@
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
 
-# define XKBLAS_DEVICES_MAX 32
+# define XKBLAS_DEVICES_MAX 8
 
 # define XKBLAS_STREAM_CAPACITY 512
 
@@ -99,12 +99,6 @@ typedef struct  xkblas_driver_t
 
 }               xkblas_driver_t;
 
-typedef struct  xkblas_driver_thread_arg_t
-{
-    xkblas_driver_t * driver;
-    int driver_device_id;
-}               xkblas_driver_thread_arg_t;
-
 void * xkblas_device_thread_main(void * a);
 
 typedef enum    xkblas_driver_type_t
@@ -113,7 +107,23 @@ typedef enum    xkblas_driver_type_t
     XKBLAS_DRIVER_MAX  = 1,
 }               xkblas_driver_type_t;
 
-void xkblas_drivers_init(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX]);
-void xkblas_drivers_deinit(xkblas_driver_t drivers[XKBLAS_DRIVER_MAX]);
+typedef struct  xkblas_drivers_t
+{
+    xkblas_driver_t list[XKBLAS_DRIVER_MAX];
+    struct {
+        xkblas_device_t * array[XKBLAS_DEVICES_MAX];
+        std::atomic<uint8_t> n;
+    } devices;
+}               xkblas_drivers_t;
+
+typedef struct  xkblas_driver_device_thread_arg_t
+{
+    xkblas_drivers_t * drivers;
+    uint8_t driver_id;
+    uint8_t driver_device_id;
+}               xkblas_driver_device_thread_arg_t;
+
+void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
+void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
 
 #endif /* __DRIVER_H__ */
