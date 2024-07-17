@@ -33,7 +33,6 @@ using namespace std::placeholders;
 
 # include "access-mode.h"
 # include "history.hpp"
-# include "region.hpp"
 # include "utils.hpp"
 
 ///////////////
@@ -68,7 +67,6 @@ template<int K, typename T>
 class AccessIntervalMultiTree : public History<K, T> {
 
     protected:
-        using Region = Intervals<K>;
 
         class Node {
 
@@ -102,13 +100,13 @@ class AccessIntervalMultiTree : public History<K, T> {
                 Node * parent;
                 int k;
                 subtree_t st[K];
-                Region region;
+                Intervals<K> region;
                 Color colors[K];
                 std::vector<T *> last_reads;
                 T * last_write;
                 bool has_write;
                 struct {
-                    Region region; // subtree englobing region
+                    Intervals<K> region; // subtree englobing region
                     int nwrites;            // subtree number of 'writes' elements
                     int nelements[K];       // subtree number of elements
                     int height[K];          // subtree height
@@ -124,9 +122,9 @@ class AccessIntervalMultiTree : public History<K, T> {
                 // constructor
                 Node() {}
 
-                Node(Region & r) : Node(r, 0, BLACK) {}
+                Node(Intervals<K> & r) : Node(r, 0, BLACK) {}
 
-                Node(Region & r, int k, Color color) :
+                Node(Intervals<K> & r, int k, Color color) :
                     parent(nullptr),
                     k(k),
                     region(r),
@@ -807,7 +805,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         insert_from_cut(
             Node * parent,
             access_mode_t mode,
-            Region & region,
+            Intervals<K> & region,
             T * obj
         ) {
             tassert(mode & ACCESS_MODE_W);
@@ -839,7 +837,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         insert_from(
             Node * parent,
             access_mode_t mode,
-            Region & region,
+            Intervals<K> & region,
             T * obj,
             int k,
             Node * node
@@ -944,7 +942,7 @@ class AccessIntervalMultiTree : public History<K, T> {
                         {
                             if (x[2*i+0] == x[2*i+1])
                                 continue ;
-                            Region r(parent->region);
+                            Intervals<K> r(parent->region);
                             r[k].a = x[2*i+0];
                             r[k].b = x[2*i+1];
                             Node * node = new Node(r, k, RED);
@@ -962,7 +960,7 @@ class AccessIntervalMultiTree : public History<K, T> {
                                 {
                                     if (x[2*i+0] == x[2*i+1])
                                         continue ;
-                                    Region r(node->region);
+                                    Intervals<K> r(node->region);
                                     r[k].a = x[2*i+0];
                                     r[k].b = x[2*i+1];
                                     Node * split = new Node(r, k, RED);
@@ -986,7 +984,7 @@ class AccessIntervalMultiTree : public History<K, T> {
                     {
                         if (xs[i+0] == xs[i+1])
                             continue ;
-                        Region r(region);
+                        Intervals<K> r(region);
                         r[k].a = xs[i+0];
                         r[k].b = xs[i+1];
                      // this->insert_from(parent, mode, r, nullptr, k, node);
@@ -1047,7 +1045,7 @@ class AccessIntervalMultiTree : public History<K, T> {
 
         // Insert the new access in the tree
         void
-        insert(access_mode_t mode, Region & region, T * obj)
+        insert(access_mode_t mode, Intervals<K> & region, T * obj)
         {
             DEBUG("##############################");
             DEBUG("--- New insert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
@@ -1083,7 +1081,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         }
 
         void
-        intersect_from(Node * node, access_mode_t mode, Region & region, T * obj) const
+        intersect_from(Node * node, access_mode_t mode, Intervals<K> & region, T * obj) const
         {
             if (node == nullptr)
                 return ;
@@ -1112,7 +1110,7 @@ class AccessIntervalMultiTree : public History<K, T> {
 
         // Retrieve objects previously inserted that intersect with the interval
         void
-        intersect(access_mode_t mode, Region & region, T * obj) const
+        intersect(access_mode_t mode, Intervals<K> & region, T * obj) const
         {
             this->intersect_from(this->root, mode, region, obj);
         }

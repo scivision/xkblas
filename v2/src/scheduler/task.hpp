@@ -35,11 +35,15 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
+using Region = Intervals<2>;
+
 struct task_access_t : access_t<2>
 {
     task_access_t() : access_t<2>() {}
     ~task_access_t() {}
 };
+
+class Task;
 
 /**
  *  An edge between two tasks.

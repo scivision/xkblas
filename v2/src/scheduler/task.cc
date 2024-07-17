@@ -1,5 +1,7 @@
 # include "task.hpp"
 
+# include <assert.h>
+
 Task::Task(task_body_t body) :
     body(body),
     edges(8),
@@ -15,7 +17,6 @@ void
 Task::precedes(const Task * successor, const Region & region)
 {
     assert(!region.is_empty());
-    assert(this->nedges < TASK_MAX_EDGES);
 
     task_edge_t edge = {
         .successor = successor,

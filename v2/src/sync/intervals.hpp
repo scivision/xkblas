@@ -3,7 +3,6 @@
 
 # include "min-max.h"
 # include "interval.hpp"
-# include "region.hpp"
 
 # include <cstdlib>
 # include <ostream>
@@ -14,7 +13,7 @@
 
 /* K is the number of dimensions */
 template<int K>
-class Intervals : Region {
+class Intervals {
 
     public:
         interval_t list[K];

@@ -50,7 +50,7 @@ class MemoryTree : public AccessIntervalMultiTree<2, Task> {
     void
     on_hazard(const Region & rx, Task * x, const Region & ry, Task * y) const
     {
-        x->precedes(rx.intersection(ry), y);
+        x->precedes(y, rx.intersection(ry));
     }
 };
 
