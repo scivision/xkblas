@@ -1,33 +1,30 @@
 # include "logger/logger.h"
-# include "scheduler/thread.hpp"
+# include "scheduler/producer-thread.hpp"
 
 # include <cassert>
 # include <cstring>
 
 // The thread local storage
-thread_local Thread * __TLS;
+thread_local ThreadProducer * __TLS;
 
 // static members
 
 void
-Thread::init(void)
+ThreadProducer::init(void)
 {
     assert(!__TLS);
-    __TLS = new Thread();
-
-    // TODO : register the new '__TLS' thread to a 'Thread tree' for work
-    // stealing topologically
+    __TLS = new ThreadProducer();
 }
 
 void
-Thread::deinit(void)
+ThreadProducer::deinit(void)
 {
     assert(__TLS);
     delete __TLS;
 }
 
-Thread *
-Thread::get(void)
+ThreadProducer *
+ThreadProducer::get(void)
 {
     assert(__TLS);
     return __TLS;
@@ -35,22 +32,22 @@ Thread::get(void)
 
 // non-static members
 
-Thread::Thread() :
+ThreadProducer::ThreadProducer() :
     memory_stack_bottom(),
     memory_stack_ptr(memory_stack_bottom),
     queue()
 {
-    XKBLAS_INFO("New Xkblas thread");
+    XKBLAS_INFO("New producer thread");
     memset(this->memory_stack_bottom, 0, THREAD_MAX_MEMORY);
 }
 
-Thread::~Thread()
+ThreadProducer::~ThreadProducer()
 {
-    XKBLAS_INFO("Delete Xkblas thread");
+    XKBLAS_INFO("Delete producer thread");
 }
 
 uint8_t *
-Thread::allocate(uint64_t size)
+ThreadProducer::allocate(uint64_t size)
 {
     assert(this->memory_stack_ptr < this->memory_stack_bottom + THREAD_MAX_MEMORY);
     uint8_t * memory = this->memory_stack_ptr;
@@ -59,7 +56,7 @@ Thread::allocate(uint64_t size)
 }
 
 void
-Thread::deallocate_all(void)
+ThreadProducer::deallocate_all(void)
 {
     this->memory_stack_ptr = this->memory_stack_bottom;
 }

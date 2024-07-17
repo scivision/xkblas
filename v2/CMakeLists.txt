@@ -20,7 +20,8 @@ add_library(xkblas SHARED
     src/kernels/zgemm.cc
     src/logger/logger.cc
     src/scheduler/task.cc
-    src/scheduler/thread.cc
+    src/scheduler/thread-producer.cc
+    src/scheduler/thread-worker.cc
 )
 
 # Include directory

@@ -68,7 +68,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 
         pthread_t thread;
         err = pthread_create(&thread, &attr, xkblas_device_thread_main, arg);
-        assert(err ==0);
+        assert(err == 0);
     }
 
     // move back the current thread to its initial cpu set

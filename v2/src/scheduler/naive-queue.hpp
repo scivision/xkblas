@@ -46,6 +46,7 @@ class NaiveQueue : IQueue<T>
         T
         steal(void)
         {
+            assert(0); // no workstealing implemented
             return this->pop();
         }
 

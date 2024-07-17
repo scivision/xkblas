@@ -39,9 +39,9 @@ class Intervals {
             if constexpr(K == 2)
             {
                 this->list[0].a = (uint64_t)(A % LD);
-                this->list[0].b = (uint64_t)(A / LD);
-                this->list[1].a = this->list[0].a + BX;
-                this->list[1].b = this->list[0].b + BY;
+                this->list[0].b = this->list[0].a + BX;
+                this->list[1].a = (uint64_t)(A / LD);
+                this->list[1].b = this->list[1].a + BY;
             }
             else
             {

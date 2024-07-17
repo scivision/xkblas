@@ -6,6 +6,8 @@
 
 # include <atomic>
 
+// TODO : unused - there is no workstealing implemented
+
 // THE protocol from 'The Implementation of the Cilk-5 Multithreaded Language'
 
 template<typename OBJ, int C>

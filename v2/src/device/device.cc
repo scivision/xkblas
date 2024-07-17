@@ -4,6 +4,7 @@
 # include "device/stream.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
+# include "scheduler/thread-worker.hpp"
 # include "sync/mem.h"
 
 # include <cassert>
@@ -260,6 +261,10 @@ xkblas_device_thread_main(void * a)
     while (driver->ndevices_inited < driver->ndevices_targeted)
         mem_pause();
 
+    // register the current device so the scheduler may assign work to it
+    WorkerThread::init();
+
+    // can now commit my device
     xkblas_device_commit(driver, device, driver_device_id);
     ++driver->ndevices_commited;
 

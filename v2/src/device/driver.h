@@ -13,8 +13,6 @@
 # include "device/stream.hpp"
 # include "logger/todo.h"
 # include "scheduler/task.hpp"
-# include "scheduler/thread.hpp"
-# include "sync/cache-line-size.h"
 # include "sync/mutex.h"
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")

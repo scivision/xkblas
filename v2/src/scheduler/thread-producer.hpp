@@ -1,5 +1,5 @@
-#ifndef __THREAD_HPP__
-# define __THREAD_HPP__
+#ifndef __THREAD_PRODUCER_HPP__
+# define __THREAD_PRODUCER_HPP__
 
 # include "logger/todo.h"
 // # include "scheduler/deque.hpp"
@@ -10,16 +10,14 @@
 # include <new>
 
 // Maximum number of bytes allocated for tasks descriptor
-# ifndef THREAD_MAX_MEMORY
-#  define THREAD_MAX_MEMORY (64*1024*1024)
-# endif /* THREAD_MAX_MEMORY */
+# ifndef THREAD_PRODUCER_MAX_MEMORY
+#  define THREAD_PRODUCER_MAX_MEMORY (64*1024*1024)
+# endif /* THREAD_PRODUCER_MAX_MEMORY */
 
-// Maximum tasks queued in this thread queue
-# ifndef THREAD_DEQUE_CAPACITY
-#  define THREAD_DEQUE_CAPACITY 16384
-# endif /* THREAD_DEQUE_CAPACITY */
-
-class alignas(std::hardware_constructive_interference_size) Thread
+/**
+ *  This class represents an xkblas user thread, that is producing tasks
+ */
+class alignas(std::hardware_constructive_interference_size) ThreadProducer
 {
     public:
 
@@ -34,13 +32,13 @@ class alignas(std::hardware_constructive_interference_size) Thread
         static void deinit(void);
 
         /* retrieve the tls */
-        static Thread * get(void);
+        static ThreadProducer * get(void);
 
         ////////////////////////
         // NON-STATIC MEMBERS //
         ////////////////////////
-        Thread();
-        virtual ~Thread();
+        ThreadProducer();
+        virtual ~ThreadProducer();
 
         /* allocates memory */
         uint8_t * allocate(uint64_t size);
@@ -54,7 +52,7 @@ class alignas(std::hardware_constructive_interference_size) Thread
          *  scheduled before its return by any thread
          */
         template<int N>
-        void commit(Task * task)
+        void commit(Scheduler * scheduler, Task * task)
         {
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
@@ -69,23 +67,20 @@ class alignas(std::hardware_constructive_interference_size) Thread
 
             // commit the task
             if (task->commit() == TASK_STATE_READY)
-                this->queue.push(task);
+                scheduler->push(task);
         }
 
     private:
 
         /* tasks stack */
-        alignas(std::hardware_constructive_interference_size) uint8_t memory_stack_bottom[THREAD_MAX_MEMORY];
+        alignas(std::hardware_constructive_interference_size)
+            uint8_t memory_stack_bottom[THREAD_PRODUCER_MAX_MEMORY];
 
         /* next free task pointer in the stack */
         uint8_t * memory_stack_ptr;
-
-        /* per-thread queue */
-        // Deque<Task *, THREAD_DEQUE_CAPACITY> queue;
-        NaiveQueue<Task *> queue;
 
         /* Memory mapping */
         MemoryTree memtree;
 };
 
-#endif /* __THREAD_HPP__ */
+#endif /* __THREAD_PRODUCER_HPP__ */

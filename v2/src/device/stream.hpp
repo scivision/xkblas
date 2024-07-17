@@ -52,7 +52,6 @@ class Stream
         std::atomic<int> next[XKBLAS_IO_STREAM_ALL];        /* next  stream fifo */
         xkblas_io_stream_t ** ios[XKBLAS_IO_STREAM_ALL];    /* basic stream */
 
-
     private:
         cudaStream_t cuStream;
 
