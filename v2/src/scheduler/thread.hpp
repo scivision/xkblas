@@ -47,6 +47,14 @@ class alignas(std::hardware_constructive_interference_size) Thread
         /* free all allocated memory */
         void deallocate_all(void);
 
+        /**
+         *  Process task dependence.
+         *  A task cannot be scheduled before a 'commit' call, but may be
+         *  scheduled before its return by any thread
+         */
+        template<int N>
+        void commit(Thread * thread);
+
     private:
 
         /* tasks stack */
