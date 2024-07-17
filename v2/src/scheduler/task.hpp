@@ -4,10 +4,10 @@
 # include <atomic>
 # include <cstdint>
 # include <new>
+# include <vector>
 
 # include "sync/access.hpp"
 
-# define TASK_MAX_EDGES     4
 # define TASK_MAX_ACCESSES  4
 
 # if 0
@@ -41,8 +41,15 @@ struct task_access_t : access_t<2>
     ~task_access_t() {}
 };
 
+/**
+ *  An edge between two tasks.
+ *      successor - the successor task
+ *      region - accessed by both tasks, with at least one writing
+ */
 typedef struct  task_edge_t
 {
+    const Task * successor;
+    const Region region;
 }               task_edge_t;
 
 class alignas(std::hardware_constructive_interference_size) Task
@@ -57,15 +64,17 @@ class alignas(std::hardware_constructive_interference_size) Task
         task_body_t body;
 
         /* list of out-going edges */
-        task_edge_t edges[TASK_MAX_EDGES];
+        std::vector<task_edge_t> edges;
 
         /* task accesses */
         task_access_t accesses[TASK_MAX_ACCESSES];
-        uint8_t naccesses;
 
         /* wait counter - the task may be scheduled once it reached 0 */
         # pragma message(TODO "Memory accesses ordering this atomic")
         alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
+
+        /* this task precedes the passed task */
+        void precedes(const Task * successor, const Region & region);
 };
 
 #endif /* __TASK_HPP__ */

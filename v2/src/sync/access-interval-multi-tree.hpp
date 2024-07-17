@@ -163,13 +163,13 @@ class AccessIntervalMultiTree : public History<K, T> {
                 }
 
                 inline int
-                    height(void) const
-                    {
-                        int height = 0;
-                        for (int k = 0 ; k < K ; ++k)
-                            height = MAX(height, this->includes.height[k]);
-                        return height;
-                    }
+                height(void) const
+                {
+                    int height = 0;
+                    for (int k = 0 ; k < K ; ++k)
+                        height = MAX(height, this->includes.height[k]);
+                    return height;
+                }
 
                 inline void
                 register_access(access_mode_t mode, T * obj)
