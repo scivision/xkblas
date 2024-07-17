@@ -14,6 +14,9 @@ Thread::init(void)
 {
     assert(!__TLS);
     __TLS = new Thread();
+
+    // TODO : register the new '__TLS' thread to a 'Thread tree' for work
+    // stealing topologically
 }
 
 void

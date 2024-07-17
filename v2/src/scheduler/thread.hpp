@@ -2,7 +2,8 @@
 # define __THREAD_HPP__
 
 # include "logger/todo.h"
-# include "scheduler/deque.hpp"
+// # include "scheduler/deque.hpp"
+# include "scheduler/naive-queue.hpp"
 # include "scheduler/memory-tree.hpp"
 # include "scheduler/task.hpp"
 
@@ -55,9 +56,6 @@ class alignas(std::hardware_constructive_interference_size) Thread
         template<int N>
         void commit(Task * task)
         {
-            // the task cannot be scheduled
-            task->wc.fetch_add(1, std::memory_order_seq_cst);
-
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
             {
@@ -69,8 +67,8 @@ class alignas(std::hardware_constructive_interference_size) Thread
             for (int i = 0 ; i < N ; ++i)
                 this->memtree.insert(task->accesses[i].mode, task->accesses[i].region, task);
 
-            // the task may not be scheduled
-            if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+            // commit the task
+            if (task->commit() == TASK_STATE_READY)
                 this->queue.push(task);
         }
 
@@ -83,7 +81,8 @@ class alignas(std::hardware_constructive_interference_size) Thread
         uint8_t * memory_stack_ptr;
 
         /* per-thread queue */
-        Deque<Task *, THREAD_DEQUE_CAPACITY> queue;
+        // Deque<Task *, THREAD_DEQUE_CAPACITY> queue;
+        NaiveQueue<Task *> queue;
 
         /* Memory mapping */
         MemoryTree memtree;

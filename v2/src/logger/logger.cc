@@ -2,8 +2,8 @@
 
 volatile int XKBLAS_PRINT_MTX = 0;
 
-volatile uint64_t XKBLAS_TIME_ELAPSED = 0;
-volatile uint64_t XKBLAS_LAST_TIME = 0;
+volatile double   XKBLAS_TIME_ELAPSED = 0.0;
+volatile uint64_t XKBLAS_LAST_TIME    = 0;
 
 # define NLVL 6
 

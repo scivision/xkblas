@@ -81,7 +81,7 @@ xkblas_£gemm_tile_async(
     # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
 
     // block size
-    int BS = 16;
+    int BS = M / 4;
 
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
@@ -96,6 +96,8 @@ xkblas_£gemm_tile_async(
     task->accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
 
     thread->commit<NACCESSES>(task);
+
+    # undef NACCESSES
 
     return 0;
 }

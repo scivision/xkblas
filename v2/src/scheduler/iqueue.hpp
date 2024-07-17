@@ -7,7 +7,7 @@ class IQueue
     public:
 
         /** Add a new object to the deque (by the worker */
-        virtual void push(T & obj) = 0;
+        virtual void push(const T & obj) = 0;
 
         /* Remove an object from the deque (by the worker) */
         virtual T pop(void) = 0;

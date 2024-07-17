@@ -23,7 +23,7 @@ extern char * XKBLAS_PRINT_HEADERS[6];
 
 extern int XKBLAS_VERBOSE;
 
-extern volatile uint64_t XKBLAS_TIME_ELAPSED;
+extern volatile double   XKBLAS_TIME_ELAPSED;
 extern volatile uint64_t XKBLAS_LAST_TIME;
 
 # define XKBLAS_PRINT_LINE() \
@@ -38,17 +38,15 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
             clock_gettime(CLOCK_MONOTONIC, &ts);                        \
             uint64_t t = (uint64_t)(ts.tv_sec * 1000000000) +           \
                             (uint64_t) ts.tv_nsec;                      \
-            if (XKBLAS_LAST_TIME == 0)                                  \
-                XKBLAS_LAST_TIME = t;                                   \
-            else                                                        \
-                XKBLAS_TIME_ELAPSED += t - XKBLAS_LAST_TIME;            \
-            double td = XKBLAS_TIME_ELAPSED / 1e9;                      \
+            if (XKBLAS_LAST_TIME != 0)                                  \
+                XKBLAS_TIME_ELAPSED += (t - XKBLAS_LAST_TIME) / 1e9;    \
+            XKBLAS_LAST_TIME = t;                                       \
             if (isatty(STDOUT_FILENO))                                  \
                 fprintf(stdout, "[%8lf] "                               \
                                 "[TID=%d] "                             \
                                 "[\033[1;37mXKBLAS\033[0m] "            \
                                 "[%s%s\033[0m] ",                       \
-                                td,                                     \
+                                XKBLAS_TIME_ELAPSED,                    \
                                 gettid(),                               \
                                 XKBLAS_PRINT_COLORS[LVL],               \
                                 XKBLAS_PRINT_HEADERS[LVL]);             \
@@ -57,7 +55,7 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
                                 "[TID=%d] "                             \
                                 "[XKBLAS] "                             \
                                 "[%s] ",                                \
-                                td,                                     \
+                                XKBLAS_TIME_ELAPSED,                    \
                                 gettid(),                               \
                                 XKBLAS_PRINT_HEADERS[LVL]);             \
             fprintf(stdout, __VA_ARGS__);                               \
@@ -80,7 +78,7 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
 # define XKBLAS_INFO(...)  XKBLAS_PRINT(XKBLAS_PRINT_INFO_ID,  __VA_ARGS__)
 # define XKBLAS_WARN(...)  XKBLAS_PRINT(XKBLAS_PRINT_WARN_ID,  __VA_ARGS__)
 # define XKBLAS_ERROR(...) XKBLAS_PRINT(XKBLAS_PRINT_ERROR_ID, __VA_ARGS__)
-# define XKBLAS_IMPL(...) XKBLAS_PRINT(XKBLAS_PRINT_IMPL_ID, __VA_ARGS__)
+# define XKBLAS_IMPL(...)  XKBLAS_PRINT(XKBLAS_PRINT_IMPL_ID,  __VA_ARGS__)
 # define XKBLAS_DEBUG(...) XKBLAS_PRINT(XKBLAS_PRINT_DEBUG_ID, __VA_ARGS__)
 # define XKBLAS_FATAL(...) XKBLAS_PRINT(XKBLAS_PRINT_FATAL_ID, __VA_ARGS__)
 
