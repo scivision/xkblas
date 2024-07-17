@@ -95,7 +95,7 @@ xkblas_£gemm_tile_async(
     task->accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
     task->accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
 
-    task->commit<NACCESSES>(thread);
+    thread->commit<NACCESSES>(task);
 
     return 0;
 }

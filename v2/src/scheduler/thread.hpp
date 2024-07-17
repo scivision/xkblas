@@ -53,7 +53,26 @@ class alignas(std::hardware_constructive_interference_size) Thread
          *  scheduled before its return by any thread
          */
         template<int N>
-        void commit(Thread * thread);
+        void commit(Task * task)
+        {
+            // the task cannot be scheduled
+            task->wc.fetch_add(1, std::memory_order_seq_cst);
+
+            // set edges with previously inserted tasks
+            for (int i = 0 ; i < N ; ++i)
+            {
+                assert(task->accesses[i].mode);
+                this->memtree.intersect(task->accesses[i].mode, task->accesses[i].region, task);
+            }
+
+            // register accesses for linking with future tasks
+            for (int i = 0 ; i < N ; ++i)
+                this->memtree.insert(task->accesses[i].mode, task->accesses[i].region, task);
+
+            // the task may not be scheduled
+            if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+                this->queue.push(task);
+        }
 
     private:
 

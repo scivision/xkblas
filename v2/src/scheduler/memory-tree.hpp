@@ -2,6 +2,7 @@
 # define __MEMORY_TREE_HPP__
 
 # include "logger/todo.h"
+# include "scheduler/task.hpp"
 # include "sync/access-interval-multi-tree.hpp"
 
 # include <stdint.h>
@@ -44,7 +45,7 @@ class MemoryBlock {
 /**
  *  A tree of memory blocks, to keep track of replicates and task dependences
  */
-class MemoryTree : AccessIntervalMultiTree<2, Task> {
+class MemoryTree : public AccessIntervalMultiTree<2, Task> {
 
     void
     on_hazard(const Region & rx, Task * x, const Region & ry, Task * y) const

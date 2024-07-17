@@ -67,11 +67,12 @@ typedef enum    Direction
 template<int K, typename T>
 class AccessIntervalMultiTree : public History<K, T> {
 
-    using Region = Intervals<K>;
+    protected:
+        using Region = Intervals<K>;
 
-    class Node {
+        class Node {
 
-        # define FOREACH_CHILD_BEGIN(N, C, I, D)                    \
+            # define FOREACH_CHILD_BEGIN(N, C, I, D)                \
             do {                                                    \
                 for (int I = 0 ; I < K ; ++I)                       \
                 {                                                   \
@@ -80,183 +81,183 @@ class AccessIntervalMultiTree : public History<K, T> {
                         Node * C = N->st[I].children[D];            \
                         if (C)                                      \
                         {
-        # define FOREACH_CHILD_END(N, C, I, D)                      \
+                            # define FOREACH_CHILD_END(N, C, I, D)  \
                         }                                           \
                     }                                               \
                 }                                                   \
             } while (0)                                             \
 
-        public:
-            // structs used as class members
-            typedef union
-            {
-                Node * children[2];
+            public:
+                // structs used as class members
+                typedef union
+                {
+                    Node * children[2];
+                    struct {
+                        Node * left;
+                        Node * right;
+                    };
+                } subtree_t;
+
+                // members
+                Node * parent;
+                int k;
+                subtree_t st[K];
+                Region region;
+                Color colors[K];
+                std::vector<T *> last_reads;
+                T * last_write;
+                bool has_write;
                 struct {
-                    Node * left;
-                    Node * right;
-                };
-            } subtree_t;
+                    Region region; // subtree englobing region
+                    int nwrites;            // subtree number of 'writes' elements
+                    int nelements[K];       // subtree number of elements
+                    int height[K];          // subtree height
+                    int outdated;           // whether 'includes' struct must be recomputed
+                } includes;
 
-            // members
-            Node * parent;
-            int k;
-            subtree_t st[K];
-            Region region;
-            Color colors[K];
-            std::vector<T *> last_reads;
-            T * last_write;
-            bool has_write;
-            struct {
-                Region region; // subtree englobing region
-                int nwrites;            // subtree number of 'writes' elements
-                int nelements[K];       // subtree number of elements
-                int height[K];          // subtree height
-                int outdated;           // whether 'includes' struct must be recomputed
-            } includes;
+                #ifndef NDEBUG
+                struct {
+                    int id;
+                } checks;
+                #endif /* NDEBUG */
 
-            #ifndef NDEBUG
-            struct {
-                int id;
-            } checks;
-            #endif /* NDEBUG */
+                // constructor
+                Node() {}
 
-            // constructor
-            Node() {}
+                Node(Region & r) : Node(r, 0, BLACK) {}
 
-            Node(Region & r) : Node(r, 0, BLACK) {}
-
-            Node(Region & r, int k, Color color) :
-                parent(nullptr),
-                k(k),
-                region(r),
-                colors{BLACK},
-                last_reads(),
-                last_write(),
-                has_write(0)
-            {
-                memset(this->st, 0, sizeof(this->st));
-
-                this->includes.region.copy(r);
-                this->includes.nwrites = 0;
-                this->includes.outdated = 0;
-
-                memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
-                this->includes.nelements[k] = 1;
-
-                memset(this->includes.height, 0, sizeof(this->includes.height));
-                for (int i = k ; i < K ; ++i)
-                    this->includes.height[i] = 1;
-
-                this->colors[k] = color;
-            }
-
-            virtual ~Node() {}
-
-            inline int
-            size(void) const
-            {
-                int nelements = 0;
-                for (int k = 0 ; k < K ; ++k)
-                    nelements += this->includes.nelements[k];
-                return nelements;
-            }
-
-            inline int
-            height(void) const
-            {
-                int height = 0;
-                for (int k = 0 ; k < K ; ++k)
-                    height = MAX(height, this->includes.height[k]);
-                return height;
-            }
-
-            inline void
-            register_access(access_mode_t mode, T * obj)
-            {
-                if (mode & ACCESS_MODE_W)
+                Node(Region & r, int k, Color color) :
+                    parent(nullptr),
+                    k(k),
+                    region(r),
+                    colors{BLACK},
+                    last_reads(),
+                    last_write(),
+                    has_write(0)
                 {
-                    this->last_reads.clear();
-                    this->last_write = obj;
-                    this->has_write = 1;
-                }
-                else if (mode == ACCESS_MODE_R)
-                {
-                    this->last_reads.push_back(obj);
-                }
-            }
+                    memset(this->st, 0, sizeof(this->st));
 
-            void
-            inherit_accesses(Node * parent)
-            {
-                this->last_reads.insert(
-                    this->last_reads.end(),
-                    std::make_move_iterator(parent->last_reads.begin()),
-                    std::make_move_iterator(parent->last_reads.end())
-                );
-                this->last_write = parent->last_write;
-                this->has_write = parent->has_write;
-            }
+                    this->includes.region.copy(r);
+                    this->includes.nwrites = 0;
+                    this->includes.outdated = 0;
 
-            void
-            dump(FILE * f) const
-            {
+                    memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
+                    this->includes.nelements[k] = 1;
 
-                {
-                    const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
-                    char writes[32];
-                    snprintf(writes, sizeof(writes), "%d", this->has_write);
+                    memset(this->includes.height, 0, sizeof(this->includes.height));
+                    for (int i = k ; i < K ; ++i)
+                        this->includes.height[i] = 1;
 
-                    char reads[32];
-                    snprintf(reads, sizeof(reads), "%ld", this->last_reads.size());
-
-                    char region[1024];
-                    this->region.tostring(region, sizeof(region));
-
-                    char include_region[1024];
-                    this->includes.region.tostring(include_region, sizeof(include_region));
-
-                    fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\nreads=%s\\nwrites=%s\\n\\n--- includes ---\\n%s\\nnwrites=%d\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, reads, writes, include_region, this->includes.nwrites, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+                    this->colors[k] = color;
                 }
 
-                FOREACH_CHILD_BEGIN(this, child, k, dir)
-                {
-                    child->dump(f);
-                    fprintf(f, "    N%p->N%p ; \n", this, child);
-                }
-                FOREACH_CHILD_END(this, child, k, dir);
-            }
+                virtual ~Node() {}
 
-            void
-            dump_region(FILE * f) const
-            {
-                assert(K == 1 || K == 2);
-                if (K == 1)
+                inline int
+                size(void) const
                 {
-                    fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ \\\\ reads: %ld \\\\ write:     $%d$};\n",
-                        this->region[0].a, 0,
-                        this->region[0].b, 2,
-                        this->region[0].a, this->region[0].b,
-                        this->last_reads.size(), this->has_write
-                    );
-                }
-                else if (K == 2)
-                {
-                    fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[ \\\\ reads: %ld \\\\ write: %d};\n",
-                        this->region[0].a, this->region[1].a,
-                        this->region[0].b, this->region[1].b,
-                        this->region[0].a, this->region[0].b,
-                        this->region[1].a, this->region[1].b,
-                        this->last_reads.size(), this->has_write
-                    );
+                    int nelements = 0;
+                    for (int k = 0 ; k < K ; ++k)
+                        nelements += this->includes.nelements[k];
+                    return nelements;
                 }
 
-                FOREACH_CHILD_BEGIN(this, child, k, dir)
+                inline int
+                    height(void) const
+                    {
+                        int height = 0;
+                        for (int k = 0 ; k < K ; ++k)
+                            height = MAX(height, this->includes.height[k]);
+                        return height;
+                    }
+
+                inline void
+                register_access(access_mode_t mode, T * obj)
                 {
-                    child->dump_region(f);
+                    if (mode & ACCESS_MODE_W)
+                    {
+                        this->last_reads.clear();
+                        this->last_write = obj;
+                        this->has_write = 1;
+                    }
+                    else if (mode == ACCESS_MODE_R)
+                    {
+                        this->last_reads.push_back(obj);
+                    }
                 }
-                FOREACH_CHILD_END(this, child, k, dir);
-            }
-    }; /* class Node */
+
+                void
+                inherit_accesses(Node * parent)
+                {
+                    this->last_reads.insert(
+                            this->last_reads.end(),
+                            std::make_move_iterator(parent->last_reads.begin()),
+                            std::make_move_iterator(parent->last_reads.end())
+                            );
+                    this->last_write = parent->last_write;
+                    this->has_write = parent->has_write;
+                }
+
+                void
+                dump(FILE * f) const
+                {
+
+                    {
+                        const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
+                        char writes[32];
+                        snprintf(writes, sizeof(writes), "%d", this->has_write);
+
+                        char reads[32];
+                        snprintf(reads, sizeof(reads), "%ld", this->last_reads.size());
+
+                        char region[1024];
+                        this->region.tostring(region, sizeof(region));
+
+                        char include_region[1024];
+                        this->includes.region.tostring(include_region, sizeof(include_region));
+
+                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\nreads=%s\\nwrites=%s\\n\\n--- includes ---\\n%s\\nnwrites=%d\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, reads, writes, include_region, this->includes.nwrites, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+                    }
+
+                    FOREACH_CHILD_BEGIN(this, child, k, dir)
+                    {
+                        child->dump(f);
+                        fprintf(f, "    N%p->N%p ; \n", this, child);
+                    }
+                    FOREACH_CHILD_END(this, child, k, dir);
+                }
+
+                void
+                dump_region(FILE * f) const
+                {
+                    assert(K == 1 || K == 2);
+                    if (K == 1)
+                    {
+                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ \\\\ reads: %ld \\\\ write:     $%d$};\n",
+                                this->region[0].a, 0,
+                                this->region[0].b, 2,
+                                this->region[0].a, this->region[0].b,
+                                this->last_reads.size(), this->has_write
+                               );
+                    }
+                    else if (K == 2)
+                    {
+                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[ \\\\ reads: %ld \\\\ write: %d};\n",
+                                this->region[0].a, this->region[1].a,
+                                this->region[0].b, this->region[1].b,
+                                this->region[0].a, this->region[0].b,
+                                this->region[1].a, this->region[1].b,
+                                this->last_reads.size(), this->has_write
+                               );
+                    }
+
+                    FOREACH_CHILD_BEGIN(this, child, k, dir)
+                    {
+                        child->dump_region(f);
+                    }
+                    FOREACH_CHILD_END(this, child, k, dir);
+                }
+        }; /* class Node */
 
     public:
         AccessIntervalMultiTree() : root(nullptr), limbs(), outdated() {}
