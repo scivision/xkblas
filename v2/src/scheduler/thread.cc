@@ -26,6 +26,7 @@ Thread::deinit(void)
 Thread *
 Thread::get(void)
 {
+    assert(__TLS);
     return __TLS;
 }
 

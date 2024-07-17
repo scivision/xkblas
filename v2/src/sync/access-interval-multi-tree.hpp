@@ -33,7 +33,7 @@ using namespace std::placeholders;
 
 # include "access-mode.h"
 # include "history.hpp"
-# include "intervals.hpp"
+# include "region.hpp"
 # include "utils.hpp"
 
 ///////////////
@@ -67,6 +67,8 @@ typedef enum    Direction
 template<int K, typename T>
 class AccessIntervalMultiTree : public History<K, T> {
 
+    using Region = Intervals<K>;
+
     class Node {
 
         # define FOREACH_CHILD_BEGIN(N, C, I, D)                    \
@@ -99,13 +101,13 @@ class AccessIntervalMultiTree : public History<K, T> {
             Node * parent;
             int k;
             subtree_t st[K];
-            Intervals<K> intervals;
+            Region region;
             Color colors[K];
             std::vector<T *> last_reads;
             T * last_write;
             bool has_write;
             struct {
-                Intervals<K> intervals; // subtree englobing intervals
+                Region region; // subtree englobing region
                 int nwrites;            // subtree number of 'writes' elements
                 int nelements[K];       // subtree number of elements
                 int height[K];          // subtree height
@@ -121,12 +123,12 @@ class AccessIntervalMultiTree : public History<K, T> {
             // constructor
             Node() {}
 
-            Node(Intervals<K> & r) : Node(r, 0, BLACK) {}
+            Node(Region & r) : Node(r, 0, BLACK) {}
 
-            Node(Intervals<K> & r, int k, Color color) :
+            Node(Region & r, int k, Color color) :
                 parent(nullptr),
                 k(k),
-                intervals(r),
+                region(r),
                 colors{BLACK},
                 last_reads(),
                 last_write(),
@@ -134,7 +136,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             {
                 memset(this->st, 0, sizeof(this->st));
 
-                this->includes.intervals.copy(r);
+                this->includes.region.copy(r);
                 this->includes.nwrites = 0;
                 this->includes.outdated = 0;
 
@@ -207,13 +209,13 @@ class AccessIntervalMultiTree : public History<K, T> {
                     char reads[32];
                     snprintf(reads, sizeof(reads), "%ld", this->last_reads.size());
 
-                    char intervals[1024];
-                    this->intervals.tostring(intervals, sizeof(intervals));
+                    char region[1024];
+                    this->region.tostring(region, sizeof(region));
 
-                    char include_intervals[1024];
-                    this->includes.intervals.tostring(include_intervals, sizeof(include_intervals));
+                    char include_region[1024];
+                    this->includes.region.tostring(include_region, sizeof(include_region));
 
-                    fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\nreads=%s\\nwrites=%s\\n\\n--- includes ---\\n%s\\nnwrites=%d\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, intervals, reads, writes, include_intervals, this->includes.nwrites, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+                    fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\nreads=%s\\nwrites=%s\\n\\n--- includes ---\\n%s\\nnwrites=%d\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, reads, writes, include_region, this->includes.nwrites, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
                 }
 
                 FOREACH_CHILD_BEGIN(this, child, k, dir)
@@ -225,32 +227,32 @@ class AccessIntervalMultiTree : public History<K, T> {
             }
 
             void
-            dump_intervals(FILE * f) const
+            dump_region(FILE * f) const
             {
                 assert(K == 1 || K == 2);
                 if (K == 1)
                 {
                     fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ \\\\ reads: %ld \\\\ write:     $%d$};\n",
-                        this->intervals[0].a, 0,
-                        this->intervals[0].b, 2,
-                        this->intervals[0].a, this->intervals[0].b,
+                        this->region[0].a, 0,
+                        this->region[0].b, 2,
+                        this->region[0].a, this->region[0].b,
                         this->last_reads.size(), this->has_write
                     );
                 }
                 else if (K == 2)
                 {
                     fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[ \\\\ reads: %ld \\\\ write: %d};\n",
-                        this->intervals[0].a, this->intervals[1].a,
-                        this->intervals[0].b, this->intervals[1].b,
-                        this->intervals[0].a, this->intervals[0].b,
-                        this->intervals[1].a, this->intervals[1].b,
+                        this->region[0].a, this->region[1].a,
+                        this->region[0].b, this->region[1].b,
+                        this->region[0].a, this->region[0].b,
+                        this->region[1].a, this->region[1].b,
                         this->last_reads.size(), this->has_write
                     );
                 }
 
                 FOREACH_CHILD_BEGIN(this, child, k, dir)
                 {
-                    child->dump_intervals(f);
+                    child->dump_region(f);
                 }
                 FOREACH_CHILD_END(this, child, k, dir);
             }
@@ -338,10 +340,10 @@ class AccessIntervalMultiTree : public History<K, T> {
             if (r)
                 fprintf(stderr, "dot failed\n");
 
-            file = fopen("intervals.tex", "w");
-            this->dump_intervals(file);
+            file = fopen("region.tex", "w");
+            this->dump_region(file);
             fclose(file);
-            r = system("pdflatex -interaction=nonstopmode intervals.tex > /dev/null 2>&1");
+            r = system("pdflatex -interaction=nonstopmode region.tex > /dev/null 2>&1");
             if (r)
                 fprintf(stderr, "pdflatex failed\n");
         }
@@ -397,19 +399,19 @@ class AccessIntervalMultiTree : public History<K, T> {
         {
             for (int k = 0 ; k < K ; ++k)
             {
-                node->includes.intervals[k].a = node->intervals[k].a;
-                node->includes.intervals[k].b = node->intervals[k].b;
+                node->includes.region[k].a = node->region[k].a;
+                node->includes.region[k].b = node->region[k].b;
 
                 FOREACH_CHILD_BEGIN(node, child, kk, dir)
                 {
-                    node->includes.intervals[k].a = MIN(
-                             node->includes.intervals[k].a,
-                            child->includes.intervals[k].a
+                    node->includes.region[k].a = MIN(
+                             node->includes.region[k].a,
+                            child->includes.region[k].a
                     );
 
-                    node->includes.intervals[k].b = MAX(
-                             node->includes.intervals[k].b,
-                            child->includes.intervals[k].b
+                    node->includes.region[k].b = MAX(
+                             node->includes.region[k].b,
+                            child->includes.region[k].b
                     );
                 }
                 FOREACH_CHILD_END(node, child, kk, dir);
@@ -804,7 +806,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         insert_from_cut(
             Node * parent,
             access_mode_t mode,
-            Intervals<K> & intervals,
+            Region & region,
             T * obj
         ) {
             tassert(mode & ACCESS_MODE_W);
@@ -816,10 +818,10 @@ class AccessIntervalMultiTree : public History<K, T> {
             }
             FOREACH_CHILD_END(parent, child, k, dir);
 
-            parent->intervals.copy(intervals);
+            parent->region.copy(region);
             parent->register_access(mode, obj);
 
-            parent->includes.intervals.copy(intervals);
+            parent->includes.region.copy(region);
             parent->includes.nwrites = 1;
 
             for (int k = 0 ; k < K ; ++k)
@@ -836,20 +838,20 @@ class AccessIntervalMultiTree : public History<K, T> {
         insert_from(
             Node * parent,
             access_mode_t mode,
-            Intervals<K> & intervals,
+            Region & region,
             T * obj,
             int k,
             Node * node
         ) {
             DEBUG("---  (start) subinsert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
             for (int i = 0 ; i < K ; ++i)
-                DEBUG("---   [%d, %d[", intervals[i].a, intervals[i].b);
+                DEBUG("---   [%d, %d[", region[i].a, region[i].b);
 
             // TODO : optimisation
             //  Unroll this loop using a recursive template
             while (k < K)
             {
-                // quick-way out, if the intervals includes all subintervals with an
+                // quick-way out, if the region includes all subregion with an
                 // 'out' access, we can discard all children
 # ifdef CUT
 #  pragma message("Tree cut enable")
@@ -858,12 +860,12 @@ class AccessIntervalMultiTree : public History<K, T> {
                 // <k dimensions
                 if (mode & ACCESS_MODE_W)
                 {
-                   if (intervals.includes(parent->includes.intervals))
+                   if (region.includes(parent->includes.region))
                    {
                        // TODO : what if 'node' is not null ?  probably want to
                        // return something to callee for the case (3)
                        tassert(node == nullptr);
-                       this->insert_from_cut(parent, mode, intervals, obj);
+                       this->insert_from_cut(parent, mode, region, obj);
                        break ;
                    }
                 }
@@ -875,12 +877,12 @@ class AccessIntervalMultiTree : public History<K, T> {
 
 
                 // case (1)    J << I
-                if (intervals[k].b <= parent->intervals[k].a)
+                if (region[k].b <= parent->region[k].a)
                 {
                     if (parent->st[k].left == nullptr)
                     {
                         if (node == nullptr)
-                            node = new Node(intervals, k, RED);
+                            node = new Node(region, k, RED);
                         else
                         {
                             node->k = k;
@@ -895,12 +897,12 @@ class AccessIntervalMultiTree : public History<K, T> {
                     }
                 }
                 // case (2)     J >> I
-                else if (intervals[k].a >= parent->intervals[k].b)
+                else if (region[k].a >= parent->region[k].b)
                 {
                     if (parent->st[k].right == nullptr)
                     {
                         if (node == nullptr)
-                            node = new Node(intervals, k, RED);
+                            node = new Node(region, k, RED);
                         else
                         {
                             node->k = k;
@@ -915,9 +917,9 @@ class AccessIntervalMultiTree : public History<K, T> {
                     }
                 }
                 // case (3)     J c I   (or I == J)
-                else if (parent->intervals[k].a <= intervals[k].a && intervals[k].b <= parent->intervals[k].b)
+                else if (parent->region[k].a <= region[k].a && region[k].b <= parent->region[k].b)
                 {
-                    if (intervals[k].a == parent->intervals[k].a && intervals[k].b == parent->intervals[k].b)   /* I == J */
+                    if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)   /* I == J */
                     {
                         if (++k == K)
                         {
@@ -933,15 +935,15 @@ class AccessIntervalMultiTree : public History<K, T> {
                         assert(K == 1 || K == 2);
 
                         // shrink parent
-                        int x[4] = { parent->intervals[k].a, intervals[k].a, intervals[k].b, parent->intervals[k].b };
-                        parent->intervals[k] = intervals[k];
+                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
+                        parent->region[k] = region[k];
 
                         // reinsert 2 nodes for parent's shrinked borders
                         for (int i = 0 ; i < 2 ; ++i)
                         {
                             if (x[2*i+0] == x[2*i+1])
                                 continue ;
-                            Intervals<K> r(parent->intervals);
+                            Region r(parent->region);
                             r[k].a = x[2*i+0];
                             r[k].b = x[2*i+1];
                             Node * node = new Node(r, k, RED);
@@ -953,13 +955,13 @@ class AccessIntervalMultiTree : public History<K, T> {
                         // shrink children for dimensions k' > k
                         if (k < K-1)
                         {
-                            std::function<void(Node *)> f = [this, &k, &intervals, &x](Node * node) {
-                                node->intervals[k] = intervals[k];
+                            std::function<void(Node *)> f = [this, &k, &region, &x](Node * node) {
+                                node->region[k] = region[k];
                                 for (int i = 0 ; i < 2 ; ++i)
                                 {
                                     if (x[2*i+0] == x[2*i+1])
                                         continue ;
-                                    Intervals<K> r(node->intervals);
+                                    Region r(node->region);
                                     r[k].a = x[2*i+0];
                                     r[k].b = x[2*i+1];
                                     Node * split = new Node(r, k, RED);
@@ -976,14 +978,14 @@ class AccessIntervalMultiTree : public History<K, T> {
                     } /* I == J ||  J c I */
                 }
                 // case (4)     I c J
-                else if (intervals[k].a <= parent->intervals[k].a && parent->intervals[k].b <= intervals[k].b)
+                else if (region[k].a <= parent->region[k].a && parent->region[k].b <= region[k].b)
                 {
-                    int xs[4] = { intervals[k].a, parent->intervals[k].a, parent->intervals[k].b, intervals[k].b };
+                    int xs[4] = { region[k].a, parent->region[k].a, parent->region[k].b, region[k].b };
                     for (int i = 0 ; i < 3 ; ++i)
                     {
                         if (xs[i+0] == xs[i+1])
                             continue ;
-                        Intervals<K> r(intervals);
+                        Region r(region);
                         r[k].a = xs[i+0];
                         r[k].b = xs[i+1];
                      // this->insert_from(parent, mode, r, nullptr, k, node);
@@ -993,44 +995,44 @@ class AccessIntervalMultiTree : public History<K, T> {
                     break ;
                 }
                 // case (5)     J < I    (and I n J != o)   is (1) + (3)
-                else if (parent->intervals[k].a <= intervals[k].b && intervals[k].b <= parent->intervals[k].b)
+                else if (parent->region[k].a <= region[k].b && region[k].b <= parent->region[k].b)
                 {
-                    const int a = intervals[k].a;
-                    const int b = intervals[k].b;
+                    const int a = region[k].a;
+                    const int b = region[k].b;
 
-                 // intervals[k].a = intervals[k].a;
-                    intervals[k].b = parent->intervals[k].a;
-                    this->insert_from(parent, mode, intervals, obj, k, node);  // (1)
-                 // this->insert_from(this->root, mode, intervals, obj, 0, node);  // (1)
+                 // region[k].a = region[k].a;
+                    region[k].b = parent->region[k].a;
+                    this->insert_from(parent, mode, region, obj, k, node);  // (1)
+                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (1)
 
-                    intervals[k].a = parent->intervals[k].a;
-                    intervals[k].b = b;
-                    this->insert_from(parent, mode, intervals, obj, k, node);  // (3)
-                 // this->insert_from(this->root, mode, intervals, obj, 0, node);  // (3)
+                    region[k].a = parent->region[k].a;
+                    region[k].b = b;
+                    this->insert_from(parent, mode, region, obj, k, node);  // (3)
+                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
 
-                    intervals[k].a = a;
-                    intervals[k].b = b;
+                    region[k].a = a;
+                    region[k].b = b;
 
                     ++k;
                 }
                 // case (6)     J > I    (and I n J != o)   is (2) + (3)
-                else if (parent->intervals[k].a <= intervals[k].a && intervals[k].a <= parent->intervals[k].b)
+                else if (parent->region[k].a <= region[k].a && region[k].a <= parent->region[k].b)
                 {
-                    int a = intervals[k].a;
-                    int b = intervals[k].b;
+                    int a = region[k].a;
+                    int b = region[k].b;
 
-                 // intervals[k].a = intervals[k].a;
-                    intervals[k].b = parent->intervals[k].b;
-                    this->insert_from(parent, mode, intervals, obj, k, node);  // (3)
-                 // this->insert_from(this->root, mode, intervals, obj, 0, node);  // (3)
+                 // region[k].a = region[k].a;
+                    region[k].b = parent->region[k].b;
+                    this->insert_from(parent, mode, region, obj, k, node);  // (3)
+                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
 
-                    intervals[k].a = parent->intervals[k].b;
-                    intervals[k].b = b;
-                    this->insert_from(parent, mode, intervals, obj, k, node);  // (2)
-                 // this->insert_from(this->root, mode, intervals, obj, k, node);  // (2)
+                    region[k].a = parent->region[k].b;
+                    region[k].b = b;
+                    this->insert_from(parent, mode, region, obj, k, node);  // (2)
+                 // this->insert_from(this->root, mode, region, obj, k, node);  // (2)
 
-                    intervals[k].a = a;
-                    intervals[k].b = b;
+                    region[k].a = a;
+                    region[k].b = b;
 
                     ++k;
                 }
@@ -1044,25 +1046,25 @@ class AccessIntervalMultiTree : public History<K, T> {
 
         // Insert the new access in the tree
         void
-        insert(access_mode_t mode, Intervals<K> & intervals, T * obj)
+        insert(access_mode_t mode, Region & region, T * obj)
         {
             DEBUG("##############################");
             DEBUG("--- New insert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
             for (int i = 0 ; i < K ; ++i)
-                DEBUG("---  [%d, %d[", intervals[i].a, intervals[i].b);
+                DEBUG("---  [%d, %d[", region[i].a, region[i].b);
             DEBUG("##############################");
 
-            tassert(!intervals.is_empty());
+            tassert(!region.is_empty());
 
             if (this->root == nullptr)
             {
-                this->root = new Node(intervals);
+                this->root = new Node(region);
                 this->root->register_access(mode, obj);
                 update_includes(this->root);
             }
             else
             {
-                this->insert_from(this->root, mode, intervals, obj, 0, nullptr);
+                this->insert_from(this->root, mode, region, obj, 0, nullptr);
                 this->update();
             }
 
@@ -1080,7 +1082,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         }
 
         void
-        intersect_from(Node * node, access_mode_t mode, Intervals<K> & intervals, T * obj) const
+        intersect_from(Node * node, access_mode_t mode, Region & region, T * obj) const
         {
             if (node == nullptr)
                 return ;
@@ -1088,30 +1090,30 @@ class AccessIntervalMultiTree : public History<K, T> {
             if (mode == ACCESS_MODE_R && node->includes.nwrites == 0)
                 return ;
 
-            if (!intervals.intersects(node->includes.intervals))
+            if (!region.intersects(node->includes.region))
                 return ;
 
-            if (intervals.intersects(node->intervals))
+            if (region.intersects(node->region))
             {
                 if (mode & ACCESS_MODE_W && node->last_reads.size())
                     for (T * & pred : node->last_reads)
-                        this->on_hazard(node->intervals, pred, intervals, obj);
+                        this->on_hazard(node->region, pred, region, obj);
                 else if (node->has_write)
-                    this->on_hazard(node->intervals, node->last_write, intervals, obj);
+                    this->on_hazard(node->region, node->last_write, region, obj);
             }
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
-                this->intersect_from(child, mode, intervals, obj);
+                this->intersect_from(child, mode, region, obj);
             }
             FOREACH_CHILD_END(node, child, k, dir);
         }
 
         // Retrieve objects previously inserted that intersect with the interval
         void
-        intersect(access_mode_t mode, Intervals<K> & intervals, T * obj) const
+        intersect(access_mode_t mode, Region & region, T * obj) const
         {
-            this->intersect_from(this->root, mode, intervals, obj);
+            this->intersect_from(this->root, mode, region, obj);
         }
 
         // Dump the tree to the given file
@@ -1124,9 +1126,9 @@ class AccessIntervalMultiTree : public History<K, T> {
             fprintf(f, "}\n");
         }
 
-        // Dump represented intervals to the given file
+        // Dump represented region to the given file
         void
-        dump_intervals(FILE * f) const
+        dump_region(FILE * f) const
         {
             fprintf(f, "\\documentclass[crop,tikz]{standalone}\n");
             fprintf(f, "\\usetikzlibrary{shapes.multipart}\n");
@@ -1136,7 +1138,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             if constexpr (K == 1 || K == 2)
             {
                 if (this->root)
-                    this->root->dump_intervals(f);
+                    this->root->dump_region(f);
             }
             else
             {
@@ -1208,46 +1210,46 @@ class AccessIntervalMultiTree : public History<K, T> {
         }
 
         void
-        coherency_intervals_includes_check(Node * ref, void * args) const
+        coherency_region_includes_check(Node * ref, void * args) const
         {
             Node * root = (Node *) args;
-            tassert(root->includes.intervals.includes(ref->intervals));
+            tassert(root->includes.region.includes(ref->region));
         }
 
         void
-        coherency_intervals_includes_foreach(Node * node, void * args) const
+        coherency_region_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_intervals_includes_check, this, _1, _2);
+            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
-        coherency_intervals_includes(Node * root) const
+        coherency_region_includes(Node * root) const
         {
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_intervals_includes_foreach, this, _1, _2);
+            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
         void
-        coherency_intervals_disjoint_compare(Node * ref, void * args) const
+        coherency_region_disjoint_compare(Node * ref, void * args) const
         {
             Node * node = (Node *) args;
-            tassert(node == ref || !node->intervals.intersects(ref->intervals));
+            tassert(node == ref || !node->region.intersects(ref->region));
         }
 
         void
-        coherency_intervals_disjoint_for(Node * node, void * args) const
+        coherency_region_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_intervals_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
-        coherency_intervals_disjoint(Node * root) const
+        coherency_region_disjoint(Node * root) const
         {
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_intervals_disjoint_for, this, _1, _2);
+            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1339,7 +1341,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             {
                 tassert(child->k == k);
                 tassert(node->k <= child->k);
-                tassert(k == 0 || node->intervals[k-1] == child->intervals[k-1]);
+                tassert(k == 0 || node->region[k-1] == child->region[k-1]);
                 coherency_k_hierarchy(child);
             }
             FOREACH_CHILD_END(node, child, k, dir);
@@ -1360,11 +1362,11 @@ class AccessIntervalMultiTree : public History<K, T> {
             // TODO : this fail
             // TODO : all new nodes for a new dimension should be black ?
 
-            /* 5. intervals must be disjoint (weak check) */
-            coherency_intervals_disjoint(root);
+            /* 5. region must be disjoint (weak check) */
+            coherency_region_disjoint(root);
 
-            /* 6. check includes intervals */
-            coherency_intervals_includes(root);
+            /* 6. check includes region */
+            coherency_region_includes(root);
 
             /* 7. includeness relationship between nodes dimension */
             coherency_k(root);

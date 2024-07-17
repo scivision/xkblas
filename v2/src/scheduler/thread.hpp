@@ -47,24 +47,6 @@ class alignas(std::hardware_constructive_interference_size) Thread
         /* free all allocated memory */
         void deallocate_all(void);
 
-        /* submit a task */
-        template<int N>
-        void
-        submit(Task * task, task_access_t accesses[N])
-        {
-            # pragma message(TODO "Memory ordering")
-
-            task->wc.fetch_add(1, std::memory_order_seq_cst);
-
-            for (int i = 0 ; i < N ; ++i)
-            {
-                // TODO : set access i
-            }
-
-            if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
-                this->queue.push(task);
-        }
-
     private:
 
         /* tasks stack */

@@ -84,19 +84,18 @@ xkblas_£gemm_tile_async(
     int BS = 16;
 
     # define NACCESSES 3
+    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
 
-    task_access_t accesses[NACCESSES];
+    task->accesses[0].mode    = ACCESS_MODE_R;
+    task->accesses[0].region  = Intervals<2>(reinterpret_cast<uintptr_t>(A), LDA, BS, BS);
 
-    accesses[0].mode    = ACCESS_MODE_R;
-    accesses[0].region  = Intervals<2>(reinterpret_cast<uintptr_t>(A), LDA, BS, BS);
+    task->accesses[1].mode    = ACCESS_MODE_R;
+    task->accesses[1].region  = Intervals<2>(reinterpret_cast<uintptr_t>(B), LDB, BS, BS);
 
-    accesses[1].mode    = ACCESS_MODE_R;
-    accesses[1].region  = Intervals<2>(reinterpret_cast<uintptr_t>(B), LDB, BS, BS);
+    task->accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
+    task->accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
 
-    accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
-
-    thread->submit<NACCESSES>(task, accesses);
+    task->commit<NACCESSES>(thread);
 
     return 0;
 }

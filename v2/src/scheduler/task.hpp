@@ -5,6 +5,7 @@
 # include <cstdint>
 # include <new>
 
+# include "scheduler/thread.hpp"
 # include "sync/access.hpp"
 
 # define TASK_MAX_EDGES     4
@@ -61,9 +62,19 @@ class alignas(std::hardware_constructive_interference_size) Task
 
         /* task accesses */
         task_access_t accesses[TASK_MAX_ACCESSES];
+        uint8_t naccesses;
 
         /* wait counter - the task may be scheduled once it reached 0 */
+        # pragma message(TODO "Memory accesses ordering this atomic")
         alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
+
+        /**
+         *  Process task dependence in the passed 'thread' context.
+         *  A task cannot be scheduled before a 'commit' call, but may be scheduled before its return
+         */
+        template<int N>
+        void commit(Thread * thread);
+
 };
 
 #endif /* __TASK_HPP__ */
