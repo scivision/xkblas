@@ -17,6 +17,12 @@ class alignas(std::hardware_constructive_interference_size) ThreadWorker
         // STATIC MEMBERS //
         ////////////////////
 
+        /* initialize the TLS */
+        static void init(void);
+
+        /* deinitialize the TLS */
+        static void deinit(void);
+
         /* retrieve the tls */
         static ThreadWorker * get(void);
 
@@ -27,9 +33,14 @@ class alignas(std::hardware_constructive_interference_size) ThreadWorker
         virtual ~ThreadWorker();
 
         /**
-         *  Push a task to be executed by this worker
+         *  Register a task for later execution
          */
         void push(Task * task);
+
+        /**
+         *  Pop the next task to execute by this worker
+         */
+        Task * pop(void);
 
     private:
 

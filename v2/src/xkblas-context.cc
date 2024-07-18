@@ -3,7 +3,7 @@
 # include "conf/conf.h"
 # include "logger/logger.h"
 # include "device/driver.h"
-# include "scheduler/producer-thread.hpp"
+# include "scheduler/thread-producer.hpp"
 # include "sync/spinlock.h"
 
 # include <atomic>
@@ -92,13 +92,13 @@ xkblas_deinit(void)
 extern "C" void
 xkblas_thread_init(void)
 {
-    ProducerThread::init();
+    ThreadProducer::init();
 }
 
 extern "C" void
 xkblas_thread_deinit(void)
 {
-    ProducerThread::deinit();
+    ThreadProducer::deinit();
 }
 
 //////////////////////////////

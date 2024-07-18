@@ -196,6 +196,67 @@ __device_wakeup(xkblas_device_t * device)
     XKBLAS_DEBUG("Woke up device %p", device);
 }
 
+static inline void
+xkblas_device_progress(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device
+) {
+    switch (device->request.op)
+    {
+        case (XKBLAS_DEVICEOP_NOP):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICEOP_REPLY):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICEOP_WRITEBACK):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICEOP_WRITEBACK_WAIT):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICEOP_MEMSYNC):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICEOP_INVALIDATE_CACHES):
+        {
+            // TODO
+            break ;
+        }
+
+        default:
+        {
+            XKBLAS_FATAL("Invalid request op code");
+            break ;
+        }
+    }
+}
+
+static inline void
+xkblas_device_prepare_task(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+    Task * task
+) {
+    // TODO
+}
+
+
 /* main loop for the thread responsible the passed device */
 static inline int
 xkblas_device_thread_main_loop(
@@ -210,28 +271,23 @@ xkblas_device_thread_main_loop(
     # pragma message(TODO "do we really need this mem_barrier here?")
     mem_barrier();
 
-    do
+    ThreadWorker * thread = ThreadWorker::get();
+
+    while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
-        # if 0
-        while ((device->request.op == KAAPI_DEVICEOP_NOP)
-                && kaapi_queue_empty(ctxt->queue)
-                && (device->exec_count == device->spawn_count + device->ld->queue->push_count)
-                && (device->ld->queue->push_count == device->ld->queue->pop_count)
-                && kaapi_offload_stream_isempty(&device->stream, KAAPI_IO_STREAM_ALL)
-              )
-        # endif
-        {
-            if (device->state != XKBLAS_DEVICE_STATE_RUNNING)
-                goto r_exit;
+        // If there is no tasks and streams are empty, sleep the thread
+        Task * task;
+        while ((task = thread->pop()) == NULL &&
+                device->stream.is_empty(XKBLAS_IO_STREAM_ALL) &&
+                device->request.op == XKBLAS_DEVICEOP_NOP)
             __device_sleep(device);
-        }
 
+        if (task)
+            xkblas_device_prepare_task(task);
+        else
+            xkblas_device_progress(driver, device);
+    }
 
-
-
-    } while (device->state == XKBLAS_DEVICE_STATE_RUNNING);
-
-r_exit:
     return EINTR;
 }
 
@@ -262,7 +318,7 @@ xkblas_device_thread_main(void * a)
         mem_pause();
 
     // register the current device so the scheduler may assign work to it
-    WorkerThread::init();
+    ThreadWorker::init();
 
     // can now commit my device
     xkblas_device_commit(driver, device, driver_device_id);

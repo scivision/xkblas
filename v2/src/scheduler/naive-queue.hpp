@@ -5,6 +5,7 @@
 # include "scheduler/iqueue.hpp"
 
 # include <atomic>
+# include <assert.h>
 # include <stack>
 
 /**

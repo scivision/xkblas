@@ -16,7 +16,6 @@ Task::precedes(Task * successor, const Region & region)
         .region = region
     };
     this->edges.push_back(edge);
-    std::cout << this << " -> " << successor << " on region " << region << std::endl;
 }
 
 task_state_t

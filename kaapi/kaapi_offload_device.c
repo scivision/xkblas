@@ -861,9 +861,6 @@ int kaapi_sched_idle_offload(
       if (f_fini && f_fini(arg)) goto r_exit;
       kaapi_offload_device_sleep(device);
     }
-#else
-      if (f_fini && f_fini(arg)) goto r_exit;
-#endif
 
     /* highly active loop to test if task has been enqueued and if asynchronous event has been completed
        - at each loop iteration the thread test:
@@ -875,116 +872,6 @@ int kaapi_sched_idle_offload(
       /* pop on local queue */
       if (task ==0)
         task = kaapi_fifo_queue_pop(device->ld->queue);
-
-#if KAAPI_WS_GPUTASK
-      /* no task ? try to steal */
-      if (task ==0)
-      {
-        if (tidle_start ==0) tidle_start = kaapi_get_elapsedns();
-        else if (1e-9*(kaapi_get_elapsedns() - tidle_start) > 0.01)
-#if 0//KAAPI_USE_PERFCOUNTER
-        else if ((device->cnt_task!=0) 
-              && (1e-9*(kaapi_get_elapsedns() - tidle_start) > global_max_cpudelay/kaapi_default_param.cuda_conc_kernel) ///kaapi_default_param.cuda_conc_stream_kernel)) 
-        ) 
-#endif
-        {
-          /* Affinity: compute the best (=ldid with at least a write of the task, see IPDPS2013.
-             It remains to transfer the affinity during the steal operations where device
-             may has the capacity to select the best task or at least:
-  	       0- a task with most of its input on the device.
-  	       1- a task with inputs on the device close to the target device.
-  	       2- a task with inputs on the device. 
-  	       3- a task with inputs on the machine. 
-          */
-          kaapi_localitydomain_t* ld;
-#if 1
-          int ngpu= kaapi_localitydomain_count(KAAPI_LD_GPU);
-          float load[ngpu]; 
-          int imax[KAAPI_IMAX]; 
-          int max;
-          int min;
-          int cntzero;
-          float avrg;
-          float delta;
-          int iimax = _kaapi_compute_load_device(&min, &max, &avrg, &delta, imax, &cntzero, load);
-          float minmax = max-min;
-
-          if ((avrg > 2.0/ngpu) && (delta > 0)) 
-          //if ((avrg >= 1.0) && (delta >= 1.0*kaapi_default_param.cuda_conc_kernel))
-          //if ((avrg >= kaapi_default_param.cuda_conc_kernel/2.0) && (delta > 1.0*kaapi_default_param.cuda_conc_kernel))
-          {
-            int d = rand_r(&ctxt->seed) % 100;
-            for (int i=d; i<d+iimax; ++i)
-            {
-              kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, i % iimax );
-              task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, 1);
-              if (task!=0) break;
-              task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, 2);
-              if (task!=0) break;
-            }
-            if (task ==0)
-              for (int i=d; i<d+iimax; ++i)
-              {
-                kaapi_localitydomain_t* ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, i % iimax );
-                task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, 3);
-                if (task!=0) break;
-              }
-#if 0
-            task = kaapi_fifo_queue_steal(ld->queue);
-            if (task==0) task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, 2);
-#endif
-#if 0 // OUTPUT
-            if (task != 0) 
-            {
-              char buffer[128];
-              char* b = buffer;
-              ssize_t sz = 0;
-              sz = sprintf(b, "%02i:: Load: Avrg=%10f, Delta=%10f, MinMax=%10f iimax:%i  ::", device->ld->ldid, avrg, delta, minmax, iimax );
-              b += sz;
-              for (int i=0; i<ngpu; ++i)
-              {
-                sz = sprintf(b, " %02i", load[i] );
-                b += sz;
-              } 
-              printf("%s\n",buffer);
-            }
-#endif
-          }
-
-#elif 0
-        {
-          int rank;
-          for (rank=1; rank<device->ld->perfrank; ++rank)
-          {
-            uint64_t affinity = device->ld->affinity[rank];
-            int nb = __builtin_popcount(affinity);
-            if (nb >0)
-            {
-              int victim = rand_r(&device->ctxt->seed) % nb;
-              int ldid = 0;
-              ldid = __builtin_ffsll(affinity);
-              for (int i=0; i<victim; ++i)
-              {
-                ldid = __builtin_ffsll(affinity);
-                kaapi_assert( ldid != 0);
-                ldid;
-                affinity &= ~(1UL << ldid);
-              }
-              kaapi_localitydomain_t* ld = kaapi_localitydomain_get(ldid);
-              task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, rank);
-            }
-            if (task !=0) break;
-          }
-          if (task ==0)
-          {
-            ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, rand_r(&device->ctxt->seed) % kaapi_localitydomain_count(KAAPI_LD_GPU) );
-            task = kaapi_fifo_queue_steal_with_affinity(ld->queue, device, 3);
-          }
-        }
-#endif
-        }
-      }
-#endif // KAAPI_WS_GPUTASK
     }
     if (task ==0)
     {
@@ -1016,23 +903,19 @@ do_writeback:
             if (send_msg >0)
               KAAPI_ATOMIC_ADD64(device->request.counter, send_msg);
             /* make progress of requests */
-#if KAAPI_USE_STREAM_D2D
             /* test completion of input back data */
             err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
             if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
             err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2D);
             if (err) goto out_device_writeback;
-#endif
             /* test completion of input back data */
             err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
             if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
             err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H);
             if (err) goto out_device_writeback;
-            
             /* reply if decr contribution to this device */
             if (KAAPI_ATOMIC_SUB64(device->request.counter, (1ULL<<32ULL)) ==0)
               kaapi_offload_requestreply( device, 0 );
-            
             device->request.op = KAAPI_DEVICEOP_WRITEBACK_WAIT;
           }
           break;
@@ -1046,18 +929,15 @@ out_device_writeback:
         {
           LOGDEBUG(printf("DEVICEOP_WRITEBACK_WAIT\n"));
 
-#if KAAPI_USE_STREAM_D2D
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2D);
           if (err) goto out_device_writeback;
-#endif
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
           if (err) goto out_device_writeback;
 
-          //if ((send_msg >0) &&
           if (device->request.counter && (KAAPI_ATOMIC_READ(device->request.counter) ==0))
           {
             send_msg = 0;
@@ -1080,12 +960,10 @@ out_device_writeback:
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_KERN);
           if (err) goto out_device_memsync;
 
-#if KAAPI_USE_STREAM_D2D
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
           err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2D);
           if (err) goto out_device_memsync;
-#endif
 
           err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
           if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
@@ -1096,12 +974,6 @@ out_device_writeback:
           if (task ==0)
             task = kaapi_fifo_queue_pop(device->ld->queue);
           if (task !=0) goto prepare_execute;
-
-#if 0
-          /* wait more task */
-          if (device->exec_count < device->spawn_count + device->ld->queue->push_count)
-            break;
-#endif
 
           /* non empty stream */
           if (kaapi_offload_stream_size( &device->stream, KAAPI_IO_STREAM_ALL ) != 0)
@@ -1147,7 +1019,6 @@ prepare_execute:
           ctxt->queue);
       )
       
-#if 1
 #if KAAPI_USE_STREAM_D2D
       err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -1156,16 +1027,13 @@ prepare_execute:
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
       err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_H2D );
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-#endif
 
       while (!kaapi_offload_device_accept_new_task(device))
       {
-#if KAAPI_USE_STREAM_D2D
          err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
          if ((err != 0) && (err != EINPROGRESS)) goto out_device_memsync;
          err = kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2D);
          if (err) goto out_device_memsync;
-#endif
          kaapi_offload_poll_device( device );
       }
 

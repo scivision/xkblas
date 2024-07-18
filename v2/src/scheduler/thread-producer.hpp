@@ -48,11 +48,11 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
 
         /**
          *  Process task dependence.
-         *  A task cannot be scheduled before a 'commit' call, but may be
-         *  scheduled before its return by any thread
+         *  A task cannot be scheduled before a 'commit' call.
+         *  The task may be scheduled before the 'commmit' returned 
          */
         template<int N>
-        void commit(Scheduler * scheduler, Task * task)
+        void commit(Task * task)
         {
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
@@ -67,7 +67,9 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
 
             // commit the task
             if (task->commit() == TASK_STATE_READY)
-                scheduler->push(task);
+            {
+                // TODO : defer the task to a consumer thread
+            }
         }
 
     private:
