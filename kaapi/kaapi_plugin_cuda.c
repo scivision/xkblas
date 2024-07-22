@@ -979,6 +979,8 @@ void* kaapi_cuda_register_thread(void* dummy )
 #else
 	  struct cudaMemLocation loc;
 	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
+	  cudaMemPrefetchAsync(req.ptr, req.size, cudaCpuDeviceId, NULL );
+	  cudaStreamSynchronize( NULL );
 #endif//KAAPI_UNIFIED
         }
       }
