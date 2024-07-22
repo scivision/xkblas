@@ -433,76 +433,50 @@ int32_t kaapi_thread_push( kaapi_thread_t* thread, kaapi_task_t* task)
         if (mdi != 0) 
         { /* */
           // version where take random valid bit if several bit exists
-          KAAPI_MEMORY_VALUE_TYPE bit = KAAPI_ATOMIC_READ(&mdi->valid);
-          bit &= ~(1<< kaapi_memory_asid_get_lid(kaapi_local_asid));
-          if (bit !=0)
+          KAAPI_MEMORY_VALUE_TYPE bit = KAAPI_ATOMIC_READ(&mdi->valid); // valid bitfield of that access
+          bit &= ~(1<< kaapi_memory_asid_get_lid(kaapi_local_asid));    // get bitfield of all devices where the access is valid (but host)
+          if (bit !=0)  // if valid on any device
           {
             kaapi_context_t* ctxt = kaapi_thread2context(thread);
-            uint16_t lid = _kaapi_get_random_bit1(bit, &ctxt->seed ); 
-            --lid;
-            ld = kaapi_localitydomain_get(lid);
+            uint16_t lid = _kaapi_get_random_bit1(bit, &ctxt->seed );   // get a random device
+            --lid;                                                      // host is 0, device bit is (device_id+1)
+            ld = kaapi_localitydomain_get(lid);                         // retrievve device Ld
           }
-          if (ld ==0)
+          if (ld ==0)   // if not valid on any device, move from the host
           {
-            bit = KAAPI_ATOMIC_READ(&mdi->wish);
-            if (bit !=0)
+            bit = KAAPI_ATOMIC_READ(&mdi->wish);    // wish device bit = where the user wants the execute
+            if (bit !=0)    // there is a wished device
             {
               uint16_t lid = KAAPI_MEMORY_FFS( bit );
               --lid;
-              ld = kaapi_localitydomain_get(lid);
-#if 0
-  _kaapi_lock_print();
-  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, no LD, wish:%i\n",pthread_self(), task,access,lid);
-  _kaapi_unlock_print();
-#endif
+              ld = kaapi_localitydomain_get(lid);       // get its locality domain
             }
-#if 0
-else 
-{
-  _kaapi_lock_print();
-  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, no LD no wish bit:%i\n",pthread_self(), task,access);
-  _kaapi_unlock_print();
-}
-#endif
           }
-#if 0
-else
-{
-  _kaapi_lock_print();
-  printf("%x:: Meta data mdi attach to the access with OCR flag: task:%p, access:%p, LD is:%i\n",pthread_self(), task,access,ld->ldid);
-  _kaapi_unlock_print();
-}
-#endif
         } // mdi !=0
         else {
           printf("Bad MDI index %p\n", access);
           kaapi_assert(0);
         }
-      } 
+
+        // we have a valid LD
+      }
       else {
         printf("Bad OCR index\n");
         kaapi_assert(0);
       }
     }
-    else 
+    else    // user gave directly the ld
       ld = kaapi_localitydomain_get(ldid);
   }
 
-  if (ld ==0) 
+  if (ld ==0)   // no device found using OCR or wish
   {
-#if 0
-_kaapi_lock_print();
-printf("%x:: No locality domain, take the next one:%i \n", pthread_self(), ctxt->last_ldid);
-_kaapi_unlock_print();
-#endif
-    ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ctxt->last_ldid++);
-    int count = kaapi_localitydomain_count(KAAPI_LD_GPU);
-    if (ctxt->last_ldid >= count) ctxt->last_ldid = 0;
+      // cyclic attribution to devices
+      ld = kaapi_localitydomain_get_bytype(KAAPI_LD_GPU, ctxt->last_ldid++);
+      int count = kaapi_localitydomain_count(KAAPI_LD_GPU);
+      if (ctxt->last_ldid >= count) ctxt->last_ldid = 0;
   }
 
-  if (ld == ctxt->ld)
-    return
-      kaapi_fifo_queue_owner_push(ld->queue, task );
   return
     kaapi_fifo_queue_push(
         ld->queue,
