@@ -283,7 +283,7 @@ xkblas_device_thread_main_loop(
             __device_sleep(device);
 
         if (task)
-            xkblas_device_prepare_task(task);
+            xkblas_device_prepare_task(driver, device, task);
         else
             xkblas_device_progress(driver, device);
     }

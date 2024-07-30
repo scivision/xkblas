@@ -26,13 +26,14 @@
 class Stream
 {
     public:
-        Stream() {}
-        ~Stream() {}
+        Stream();
+        virtual ~Stream();
 
         # pragma message(TODO "Use C++ abstract method and inheritance instead of 'C-style' abstract class")
-
         xkblas_io_stream_t* (*f_stream_alloc)(int device_id,  int type, unsigned int capacity);
         void (*f_stream_free)(int device_id, xkblas_io_stream_t * io_stream);
+
+        bool is_empty(xkblas_io_stream_type_t type) const;
 
         # if 0
         int (*f_stream_process_pending)(
@@ -47,7 +48,6 @@ class Stream
                 );
         # endif
 
-    public:
         int count[XKBLAS_IO_STREAM_ALL];                    /* number of iostream per type */
         std::atomic<int> next[XKBLAS_IO_STREAM_ALL];        /* next  stream fifo */
         xkblas_io_stream_t ** ios[XKBLAS_IO_STREAM_ALL];    /* basic stream */

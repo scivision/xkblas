@@ -34,25 +34,28 @@ class NaiveQueue : IQueue<T>
         T
         pop(void)
         {
-            T t;
-            SPINLOCK_LOCK(this->lock);
+            if (!this->stack.empty())
             {
-                t = this->stack.top();
-                this->stack.pop();
+                SPINLOCK_LOCK(this->lock);
+
+                    T t = this->stack.top();
+                    this->stack.pop();
+
+                SPINLOCK_UNLOCK(this->lock);
+
+                return t;
             }
-            SPINLOCK_UNLOCK(this->lock);
-            return t;
+            return nullptr;
         }
 
         T
         steal(void)
         {
             assert(0); // no workstealing implemented
-            return this->pop();
+            return nullptr;
         }
 
     private:
-
         std::stack<T> stack;
         spinlock_t lock;
 };

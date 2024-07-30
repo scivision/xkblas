@@ -17,6 +17,7 @@ add_library(xkblas SHARED
     src/device/driver.cc
     src/device/driver_cuda.cc
     src/device/driver_host.cc
+    src/device/stream.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
     src/scheduler/task.cc
