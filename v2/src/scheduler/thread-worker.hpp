@@ -1,10 +1,13 @@
-#ifndef __WORKER_THREAD_HPP__
-# define __WORKER_THREAD_HPP__
+#ifndef __THREAD_WORKER_HPP__
+# define __THREAD_WORKER_HPP__
 
 # include "scheduler/naive-queue.hpp"
 # include "scheduler/task.hpp"
 
 # include <stack>
+
+/* maximum number of workers */
+# define XKBLAS_WORKERS_MAX 8
 
 /**
  *  This class represents an xkblas user thread, that is producing tasks
@@ -45,8 +48,8 @@ class alignas(std::hardware_constructive_interference_size) ThreadWorker
     private:
 
         /* per-thread queue */
-        // Deque<Task *, WORKER_THREAD_DEQUE_CAPACITY> queue;
+        // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
         NaiveQueue<Task *> queue;
 };
 
-#endif /* __WORKER_THREAD_HPP__ */
+#endif /* __THREAD_WORKER_HPP__ */

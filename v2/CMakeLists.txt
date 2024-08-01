@@ -20,6 +20,7 @@ add_library(xkblas SHARED
     src/device/stream.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
+    src/scheduler/scheduler.cc
     src/scheduler/task.cc
     src/scheduler/thread-producer.cc
     src/scheduler/thread-worker.cc

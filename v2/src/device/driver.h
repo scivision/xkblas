@@ -8,6 +8,7 @@
 # include <stdint.h>    /* uint64_t */
 
 # include "device/address-space.h"
+# include "device/consts.h"
 # include "device/device.h"
 # include "device/io.h"
 # include "device/stream.hpp"
@@ -16,8 +17,6 @@
 # include "sync/mutex.h"
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
-
-# define XKBLAS_DEVICES_MAX 8
 
 # define XKBLAS_STREAM_CAPACITY 512
 
@@ -109,7 +108,7 @@ typedef struct  xkblas_drivers_t
 {
     xkblas_driver_t list[XKBLAS_DRIVER_MAX];
     struct {
-        xkblas_device_t * array[XKBLAS_DEVICES_MAX];
+        xkblas_device_t * list[XKBLAS_DEVICES_MAX];
         std::atomic<uint8_t> n;
     } devices;
 }               xkblas_drivers_t;

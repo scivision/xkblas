@@ -7,7 +7,7 @@
 void
 Task::precedes(Task * successor, const Region & region)
 {
-    assert(this->state      >= TASK_STATE_COMMITED);
+    assert(this->state      >= TASK_STATE_ALLOCATED);
     assert(successor->state >= TASK_STATE_ALLOCATED);
     assert(!region.is_empty());
 
@@ -18,17 +18,17 @@ Task::precedes(Task * successor, const Region & region)
     this->edges.push_back(edge);
 }
 
-task_state_t
+bool
 Task::commit(void)
 {
     assert(this->state == TASK_STATE_ALLOCATED);
 
     if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+    {
         this->state = TASK_STATE_READY;
-    else
-        this->state = TASK_STATE_COMMITED;
-
-    return this->state;
+        return true;
+    }
+    return false;
 }
 
 task_state_t

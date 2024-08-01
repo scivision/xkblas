@@ -13,12 +13,11 @@
 typedef enum    task_state_t : uint8_t
 {
     TASK_STATE_ALLOCATED        = 0,    // Task is allocated
-    TASK_STATE_COMMITED         = 1,    // Task dependences can be procesesd
-    TASK_STATE_READY            = 2,    // Task body can be executed
-    TASK_STATE_RUNNING          = 3,    // Task body is executing
-    TASK_STATE_EXECUTED         = 4,    // Task body executed
-    TASK_STATE_COMPLETED        = 5,    // Task completed, dependences can be resolved
-    TASK_STATE_DEALLOCATED      = 6,    // Task is deallocated (virtual state, never set)
+    TASK_STATE_READY            = 1,    // Task body can be executed
+    TASK_STATE_RUNNING          = 2,    // Task body is executing
+    TASK_STATE_EXECUTED         = 3,    // Task body executed
+    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved
+    TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
 }               task_state_t;
 
 enum task_body_t : uint8_t
@@ -61,13 +60,15 @@ class alignas(std::hardware_constructive_interference_size) Task
             body(body),
             edges(8),
             accesses(),
+            ocr_access_index(UINT8_MAX),
+            targetted_device_id(UINT8_MAX),
             wc(1),
             state(TASK_STATE_ALLOCATED)
         {}
 
         ~Task()
         {
-            // this->state = TASK_STATE_DEALLOCATED;
+            this->state = TASK_STATE_DEALLOCATED;
         }
 
         ////////////////
@@ -83,6 +84,12 @@ class alignas(std::hardware_constructive_interference_size) Task
         /* task accesses */
         task_access_t accesses[TASK_MAX_ACCESSES];
 
+        /* OCR parameter index, or -1 if none */
+        uint8_t ocr_access_index;
+
+        /* worker id on where to schedule once ready */
+        uint8_t targetted_device_id;
+
         /* wait counter - the task may be scheduled once it reached 0 */
         # pragma message(TODO "Memory accesses ordering this atomic")
         alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
@@ -97,10 +104,10 @@ class alignas(std::hardware_constructive_interference_size) Task
         /* this task precedes the passed task */
         void precedes(Task * successor, const Region & region);
 
-        /* every accesses had been declared, commit the task transitionning
-         * whether to 'TASK_STATE_COMMITED' or 'TASK_STATE_READY' dependending
-         * on edges resolution; returning the task state */
-        task_state_t commit(void);
+        /**
+         * Return 'true' if the task is ready to be queued, 'false' otherwise
+         */
+        bool commit(void);
 
         /* resolve the passed edge, and return the successor state */
         static task_state_t finalize(const Task * pred, task_edge_t & edge);

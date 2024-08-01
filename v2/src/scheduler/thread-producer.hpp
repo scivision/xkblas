@@ -6,6 +6,8 @@
 # include "scheduler/naive-queue.hpp"
 # include "scheduler/memory-tree.hpp"
 # include "scheduler/task.hpp"
+# include "scheduler/thread-worker.hpp"
+# include "scheduler/scheduler.hpp"
 
 # include <new>
 
@@ -47,12 +49,14 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
         void deallocate_all(void);
 
         /**
-         *  Process task dependence.
+         *  Commit the passed task
+         *      - compute its dependences
+         *      - submit if ready
          *  A task cannot be scheduled before a 'commit' call.
-         *  The task may be scheduled before the 'commmit' returned 
+         *  The task may be scheduled before this function returns
          */
         template<int N>
-        void commit(Task * task)
+        void commit(xkblas_scheduler_t * scheduler, Task * task)
         {
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
@@ -66,9 +70,10 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
                 this->memtree.insert(task->accesses[i].mode, task->accesses[i].region, task);
 
             // commit the task
-            if (task->commit() == TASK_STATE_READY)
+            if (task->commit())
             {
-                // TODO : defer the task to a consumer thread
+                // defer the task to consumer threads
+                xkblas_scheduler_enqueue(scheduler, task);
             }
         }
 

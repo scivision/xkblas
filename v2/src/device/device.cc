@@ -1,3 +1,4 @@
+# include "xkblas-context.h"
 # include "conf/conf.h"
 # include "device/device.h"
 # include "device/driver.h"
@@ -144,8 +145,11 @@ xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int drive
 }
 
 static xkblas_device_t *
-xkblas_device_create(xkblas_drivers_t * drivers, uint8_t driver_id, int driver_device_id)
-{
+xkblas_device_create(
+    xkblas_drivers_t * drivers,
+    uint8_t driver_id,
+    int driver_device_id
+) {
     if (drivers->devices.n == XKBLAS_DEVICES_MAX)
         XKBLAS_FATAL("Too many devices. Increase 'XKBLAS_DEVICES_MAX' and recompile Xkblas");
 
@@ -153,7 +157,7 @@ xkblas_device_create(xkblas_drivers_t * drivers, uint8_t driver_id, int driver_d
     xkblas_driver_t * driver = drivers->list + driver_id;
     xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
     assert(device);
-    drivers->devices.array[global_device_id] = device;
+    drivers->devices.list[global_device_id] = device;
 
     pthread_mutex_init(&device->sleep.lock, 0);
     pthread_cond_init (&device->sleep.cond, 0);
@@ -164,6 +168,17 @@ xkblas_device_create(xkblas_drivers_t * drivers, uint8_t driver_id, int driver_d
     device->request.err     = 0;
 
     device->state = XKBLAS_DEVICE_STATE_CREATE;
+
+    // register worker thread, using a nasty global variable here :-(
+    ThreadWorker::init();
+    ThreadWorker * thread = ThreadWorker::get();
+    assert(thread);
+
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    xkblas_scheduler_register(&context->scheduler, thread, global_device_id);
+
     return device;
 }
 
@@ -316,9 +331,6 @@ xkblas_device_thread_main(void * a)
     ++driver->ndevices_inited;
     while (driver->ndevices_inited < driver->ndevices_targeted)
         mem_pause();
-
-    // register the current device so the scheduler may assign work to it
-    ThreadWorker::init();
 
     // can now commit my device
     xkblas_device_commit(driver, device, driver_device_id);

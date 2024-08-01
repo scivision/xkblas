@@ -3,6 +3,7 @@
 
 # include "conf/conf.h"
 # include "device/driver.h"
+# include "scheduler/scheduler.hpp"
 # include "sync/spinlock.h"
 
 typedef enum    xkblas_context_state_t
@@ -20,6 +21,7 @@ typedef struct  xkblas_context_t
 
     xkblas_conf_t conf;
     xkblas_drivers_t drivers;
+    xkblas_scheduler_t scheduler;
 }               xkblas_context_t;
 
 // TODO : currently using a global variable to preserve previous 'xkblas_init'
@@ -27,5 +29,11 @@ typedef struct  xkblas_context_t
 // have them taking an 'xkblas_context_t' argument that the user must keep
 // track of
 extern xkblas_context_t xkblas_context;
+
+static inline xkblas_context_t *
+xkblas_context_get(void)
+{
+    return &xkblas_context;
+}
 
 #endif /* __XKBLAS_CONTEXT_H__ */

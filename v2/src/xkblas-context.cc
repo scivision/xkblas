@@ -33,6 +33,10 @@ xkblas_context_t xkblas_context = {
         .cuda_cache_limit           = 0.98
     },
     .drivers = {0},
+    .scheduler = {
+        .workers = {0},
+        .round_robin_device_id = {0},
+    }
 };
 
 static inline void
