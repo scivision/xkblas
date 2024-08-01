@@ -117,3 +117,42 @@ xkblas_drivers_deinit(xkblas_drivers_t * drivers)
     while (1)
         sleep(1);
 }
+
+// Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
+void
+xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
+{
+    assert(task->state == TASK_STATE_READY);
+
+    // Find the worker to offload the task
+    uint8_t device_id = task->targetted_device_id;
+
+    // if an ocr parameter is set, retrieve the device accordingly
+    if (task->ocr_access_index < drivers->devices.n)
+    {
+        assert(task->ocr_access_index >= 0);
+        XKBLAS_WARN("OCR feature is not implemented");
+        // TODO
+    }
+
+    // targetted device and OCR failed, fallback to round robin
+    if (device_id >= drivers->devices.n)
+    {
+        do {
+            device_id = drivers->devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
+            device_id = device_id % drivers->devices.n;
+        } while (drivers->devices.list[device_id] == nullptr);
+    }
+
+    // we found the thread
+    assert(device_id >= 0 && device_id < drivers->devices.n);
+    ThreadWorker * worker = drivers->devices.list[device_id]->thread;
+    if (worker == NULL)
+    {
+        XKBLAS_ERROR("Trying to enqueue a task to an uninitialized worker %d", device_id);
+        return ;
+    }
+
+    // XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
+    worker->push(task);
+}

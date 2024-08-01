@@ -6,7 +6,8 @@
 # include "device/address-space.h"
 # include "device/stream.hpp"
 # include "logger/todo.h"
-# include "scheduler/task.hpp"
+# include "device/task.hpp"
+# include "device/thread-worker.hpp"
 # include "sync/cache-line-size.h"
 # include "sync/mutex.h"
 
@@ -16,13 +17,12 @@ typedef enum    xkblas_device_state_t : uint8_t
     XKBLAS_DEVICE_STATE_INIT        = 1,
     XKBLAS_DEVICE_STATE_COMMIT      = 2,
     XKBLAS_DEVICE_STATE_RUNNING     = 3,
-    XKBLAS_DEVICE_STATE_SLEEPING    = 4,
-    XKBLAS_DEVICE_STATE_STOP        = 5,
-    XKBLAS_DEVICE_STATE_STOPPED     = 6,
-    XKBLAS_DEVICE_STATE_FINALISE    = 7,
-    XKBLAS_DEVICE_STATE_FINALIZED   = 8,
-    XKBLAS_DEVICE_STATE_DESTROY     = 9,
-    XKBLAS_DEVICE_STATE_DESTROYED   = 10,
+    XKBLAS_DEVICE_STATE_STOP        = 4,
+    XKBLAS_DEVICE_STATE_STOPPED     = 5,
+    XKBLAS_DEVICE_STATE_FINALISE    = 6,
+    XKBLAS_DEVICE_STATE_FINALIZED   = 7,
+    XKBLAS_DEVICE_STATE_DESTROY     = 8,
+    XKBLAS_DEVICE_STATE_DESTROYED   = 9,
 }               xkblas_device_state_t;
 
 typedef enum    xkblas_device_op_t
@@ -45,11 +45,7 @@ typedef struct  xkblas_device_t
     int                         driver_device_id;   /* driver device id in [0..ngpus_for_device] */
     std::atomic<uint8_t>        state;              /* True if driver is initialized */
 
-    # pragma message(TODO "Replace with xkblas-specific synchronization primitives")
-    struct {
-        pthread_mutex_t         lock;               /* used to synchronize device thread */
-        pthread_cond_t          cond;               /* and cpu threads if any */
-    } sleep;
+    ThreadWorker                * thread;           /* the device worker thread */
 
     struct {
         xkblas_device_op_t      op;                 /* op request for a device */

@@ -18,12 +18,11 @@ add_library(xkblas SHARED
     src/device/driver_cuda.cc
     src/device/driver_host.cc
     src/device/stream.cc
+    src/device/task.cc
+    src/device/thread-producer.cc
+    src/device/thread-worker.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
-    src/scheduler/scheduler.cc
-    src/scheduler/task.cc
-    src/scheduler/thread-producer.cc
-    src/scheduler/thread-worker.cc
 )
 
 # Include directory

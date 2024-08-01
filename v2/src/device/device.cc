@@ -5,7 +5,7 @@
 # include "device/stream.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
-# include "scheduler/thread-worker.hpp"
+# include "device/thread-worker.hpp"
 # include "sync/mem.h"
 
 # include <cassert>
@@ -159,9 +159,6 @@ xkblas_device_create(
     assert(device);
     drivers->devices.list[global_device_id] = device;
 
-    pthread_mutex_init(&device->sleep.lock, 0);
-    pthread_cond_init (&device->sleep.cond, 0);
-
     device->request.op      = XKBLAS_DEVICEOP_NOP;
     device->request.arg     = 0;
     device->request.counter = NULL;
@@ -171,44 +168,10 @@ xkblas_device_create(
 
     // register worker thread, using a nasty global variable here :-(
     ThreadWorker::init();
-    ThreadWorker * thread = ThreadWorker::get();
-    assert(thread);
-
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    xkblas_scheduler_register(&context->scheduler, thread, global_device_id);
+    device->thread = ThreadWorker::get();
+    assert(device->thread);
 
     return device;
-}
-
-static inline void
-__device_sleep(xkblas_device_t * device)
-{
-    XKBLAS_DEBUG("Sleeping device %p", device);
-    pthread_mutex_lock(&device->sleep.lock);
-    {
-        assert(device->state == XKBLAS_DEVICE_STATE_RUNNING);
-        device->state = XKBLAS_DEVICE_STATE_SLEEPING;
-        while (device->state == XKBLAS_DEVICE_STATE_SLEEPING)
-            pthread_cond_wait(&device->sleep.cond, &device->sleep.lock);
-    }
-    pthread_mutex_unlock(&device->sleep.lock);
-    XKBLAS_DEBUG("Slept device %p", device);
-}
-
-static inline void
-__device_wakeup(xkblas_device_t * device)
-{
-    XKBLAS_DEBUG("Waking up device %p", device);
-    pthread_mutex_lock(&device->sleep.lock);
-    if (device->state == XKBLAS_DEVICE_STATE_SLEEPING)
-    {
-        device->state = XKBLAS_DEVICE_STATE_RUNNING;
-        pthread_cond_signal(&device->sleep.cond);
-    }
-    pthread_mutex_unlock(&device->sleep.lock);
-    XKBLAS_DEBUG("Woke up device %p", device);
 }
 
 static inline void
@@ -216,6 +179,8 @@ xkblas_device_progress(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
+    // TODO : implement 'kaapi_sched_idle_offload' switch case
+
     switch (device->request.op)
     {
         case (XKBLAS_DEVICEOP_NOP):
@@ -269,6 +234,9 @@ xkblas_device_prepare_task(
     Task * task
 ) {
     // TODO
+    XKBLAS_DEBUG("Scheduling task %p", task);
+
+    // TODO : check 'prepare_execute' label in 'kaapi_sched_idle_offload'
 }
 
 
@@ -295,7 +263,7 @@ xkblas_device_thread_main_loop(
         while ((task = thread->pop()) == NULL &&
                 device->stream.is_empty(XKBLAS_IO_STREAM_ALL) &&
                 device->request.op == XKBLAS_DEVICEOP_NOP)
-            __device_sleep(device);
+            device->thread->pause();
 
         if (task)
             xkblas_device_prepare_task(driver, device, task);
@@ -378,5 +346,3 @@ xkblas_device_thread_main(void * a)
 
     return NULL;
 }
-
-

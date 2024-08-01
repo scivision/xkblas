@@ -4,7 +4,7 @@
 # include "device/memory.h"
 # include "device/io.h"
 # include "logger/todo.h"
-# include "scheduler/task.hpp"
+# include "device/task.hpp"
 # include "sync/cache-line-size.h"
 # include "sync/mutex.h"
 

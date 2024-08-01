@@ -1,6 +1,6 @@
-# include "device/consts.h"
 # include "logger/logger.h"
-# include "scheduler/scheduler.hpp"
+# include "device/consts.h"
+# include "device/scheduler.hpp"
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
@@ -31,10 +31,10 @@ xkblas_scheduler_enqueue(xkblas_scheduler_t * scheduler, Task * task)
         do {
             device_id = scheduler->round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
             device_id = device_id % XKBLAS_DEVICES_MAX;
-        } while (((volatile ThreadWorker *)scheduler->workers[device_id]) == nullptr);
+        } while (((volatile ThreadWorker *)scheduler->workers.list[device_id]) == nullptr);
     }
 
-    ThreadWorker * worker = scheduler->workers[device_id];
+    ThreadWorker * worker = scheduler->workers.list[device_id];
     if (worker == NULL)
     {
         XKBLAS_ERROR("Trying to enqueue a task to an uninitialized worker %d", device_id);
@@ -53,6 +53,7 @@ xkblas_scheduler_register(
 ) {
     assert(device_id >= 0);
     assert(device_id < XKBLAS_DEVICES_MAX);
-    assert(scheduler->workers[device_id] == nullptr);
-    scheduler->workers[device_id] = worker;
+    assert(scheduler->workers.list[device_id] == nullptr);
+    scheduler->workers.list[device_id] = worker;
+    scheduler->workers.n = MAX(scheduler->workers.n, device_id);
 }

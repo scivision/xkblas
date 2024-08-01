@@ -2,7 +2,7 @@
 # define __DEQUE_HPP__
 
 # include "sync/spinlock.h"
-# include "scheduler/iqueue.hpp"
+# include "device/iqueue.hpp"
 
 # include <atomic>
 # include <assert.h>

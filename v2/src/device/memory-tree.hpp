@@ -2,7 +2,7 @@
 # define __MEMORY_TREE_HPP__
 
 # include "logger/todo.h"
-# include "scheduler/task.hpp"
+# include "device/task.hpp"
 # include "sync/access-interval-multi-tree.hpp"
 
 # include <stdint.h>

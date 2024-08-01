@@ -2,12 +2,12 @@
 # define __THREAD_PRODUCER_HPP__
 
 # include "logger/todo.h"
-// # include "scheduler/deque.hpp"
-# include "scheduler/naive-queue.hpp"
-# include "scheduler/memory-tree.hpp"
-# include "scheduler/task.hpp"
-# include "scheduler/thread-worker.hpp"
-# include "scheduler/scheduler.hpp"
+// # include "device/deque.hpp"
+# include "device/naive-queue.hpp"
+# include "device/memory-tree.hpp"
+# include "device/task.hpp"
+# include "device/thread-worker.hpp"
+# include "device/driver.h"
 
 # include <new>
 
@@ -56,7 +56,7 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
          *  The task may be scheduled before this function returns
          */
         template<int N>
-        void commit(xkblas_scheduler_t * scheduler, Task * task)
+        void commit(xkblas_drivers_t * drivers, Task * task)
         {
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
@@ -73,7 +73,7 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
             if (task->commit())
             {
                 // defer the task to consumer threads
-                xkblas_scheduler_enqueue(scheduler, task);
+                xkblas_drivers_enqueue(drivers, task);
             }
         }
 

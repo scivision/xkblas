@@ -1,8 +1,8 @@
 #ifndef __THREAD_WORKER_HPP__
 # define __THREAD_WORKER_HPP__
 
-# include "scheduler/naive-queue.hpp"
-# include "scheduler/task.hpp"
+# include "device/naive-queue.hpp"
+# include "device/task.hpp"
 
 # include <stack>
 
@@ -45,11 +45,28 @@ class alignas(std::hardware_constructive_interference_size) ThreadWorker
          */
         Task * pop(void);
 
+        /**
+         *  Sleep the thread until signaled
+         */
+        void pause(void);
+
+        /**
+         *  Wake up the thread
+         */
+        void wakeup(void);
+
     private:
 
         /* per-thread queue */
         // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
         NaiveQueue<Task *> queue;
+
+        /* lock and condition to sleep the mutex */
+        struct {
+            pthread_mutex_t lock;
+            pthread_cond_t  cond;
+            volatile bool   sleeping;
+        } sleep;
 };
 
 #endif /* __THREAD_WORKER_HPP__ */

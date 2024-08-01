@@ -3,8 +3,7 @@
 # include "xkblas-context.h"
 # include "logger/todo.h"
 # include "logger/logger.h"
-# include "scheduler/thread-producer.hpp"
-# include "scheduler/scheduler.hpp"
+# include "device/thread-producer.hpp"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 
@@ -53,7 +52,7 @@ typedef struct alignas(std::hardware_constructive_interference_size)    args_t
 
 int
 xkblas_£gemm_tile_async(
-    xkblas_scheduler_t * scheduler,
+    xkblas_drivers_t * drivers,
     int transA, int transB,
     int BS_M, int BS_N, int BS_K,
     const TYPE * alpha,
@@ -99,7 +98,7 @@ xkblas_£gemm_tile_async(
     task->accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
     task->accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
 
-    thread->commit<NACCESSES>(scheduler, task);
+    thread->commit<NACCESSES>(drivers, task);
 
     # undef NACCESSES
 
@@ -201,7 +200,7 @@ xkblas_£gemm_async(
 
     int bs_mm, bs_nn, bs_kn, bs_km;
 
-    xkblas_scheduler_t * scheduler = &(context->scheduler);
+    xkblas_drivers_t * drivers = &(context->drivers);
 
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
@@ -221,7 +220,7 @@ xkblas_£gemm_async(
                         bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                scheduler,
+                                drivers,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -240,7 +239,7 @@ xkblas_£gemm_async(
                         bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                scheduler,
+                                drivers,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -262,7 +261,7 @@ xkblas_£gemm_async(
                         bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                scheduler,
+                                drivers,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -281,7 +280,7 @@ xkblas_£gemm_async(
                         bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                scheduler,
+                                drivers,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,

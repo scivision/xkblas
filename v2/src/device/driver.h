@@ -8,12 +8,12 @@
 # include <stdint.h>    /* uint64_t */
 
 # include "device/address-space.h"
-# include "device/consts.h"
 # include "device/device.h"
 # include "device/io.h"
 # include "device/stream.hpp"
 # include "logger/todo.h"
-# include "scheduler/task.hpp"
+# include "device/consts.h"
+# include "device/task.hpp"
 # include "sync/mutex.h"
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
@@ -106,11 +106,20 @@ typedef enum    xkblas_driver_type_t
 
 typedef struct  xkblas_drivers_t
 {
+    /* list of drivers */
     xkblas_driver_t list[XKBLAS_DRIVER_MAX];
+
     struct {
+        /* list of devices */
         xkblas_device_t * list[XKBLAS_DEVICES_MAX];
+
+        /* number of devices */
         std::atomic<uint8_t> n;
+
+        /* next worker to offload round robin mode */
+        std::atomic<uint8_t> round_robin_device_id;
     } devices;
+
 }               xkblas_drivers_t;
 
 typedef struct  xkblas_driver_device_thread_arg_t
@@ -122,5 +131,6 @@ typedef struct  xkblas_driver_device_thread_arg_t
 
 void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
 void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
+void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
 #endif /* __DRIVER_H__ */

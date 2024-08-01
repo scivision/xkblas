@@ -6,6 +6,7 @@
 # include <new>
 # include <vector>
 
+# include "device/consts.h"
 # include "sync/access.hpp"
 
 # define TASK_MAX_ACCESSES  4
@@ -60,8 +61,8 @@ class alignas(std::hardware_constructive_interference_size) Task
             body(body),
             edges(8),
             accesses(),
-            ocr_access_index(UINT8_MAX),
-            targetted_device_id(UINT8_MAX),
+            ocr_access_index(XKBLAS_DEVICES_MAX),
+            targetted_device_id(XKBLAS_DEVICES_MAX),
             wc(1),
             state(TASK_STATE_ALLOCATED)
         {}

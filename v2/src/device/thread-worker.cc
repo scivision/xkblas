@@ -1,5 +1,5 @@
 # include "logger/logger.h"
-# include "scheduler/thread-worker.hpp"
+# include "device/thread-worker.hpp"
 
 # include <cassert>
 # include <cstring>
@@ -34,6 +34,9 @@ ThreadWorker::get(void)
 ThreadWorker::ThreadWorker() : queue()
 {
     XKBLAS_INFO("New worker thread");
+    pthread_mutex_init(&this->sleep.lock, 0);
+    pthread_cond_init (&this->sleep.cond, 0);
+    this->sleep.sleeping = false;
 }
 
 ThreadWorker::~ThreadWorker()
@@ -45,10 +48,35 @@ void
 ThreadWorker::push(Task * task)
 {
     this->queue.push(task);
+    this->wakeup();
 }
 
 Task *
 ThreadWorker::pop(void)
 {
     return this->queue.pop();
+}
+
+void
+ThreadWorker::pause(void)
+{
+    pthread_mutex_lock(&this->sleep.lock);
+    {
+        this->sleep.sleeping = true;
+        while (this->sleep.sleeping)
+            pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
+}
+
+void
+ThreadWorker::wakeup(void)
+{
+    pthread_mutex_lock(&this->sleep.lock);
+    if (this->sleep.sleeping)
+    {
+        this->sleep.sleeping = false;
+        pthread_cond_signal(&this->sleep.cond);
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
 }
