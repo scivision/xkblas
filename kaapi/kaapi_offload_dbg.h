@@ -58,6 +58,11 @@
 #define _OFFLOAD_DEBUG  0
 #endif
 
+#ifdef KAAPI_NVTX
+#include <nvtx3/nvToolsExt.h>
+#else
+#endif
+
 #if _OFFLOAD_DEBUG
 #include <stdio.h>
 #  define KAAPI_OFFLOAD_TRACE_IN \

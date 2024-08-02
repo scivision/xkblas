@@ -773,6 +773,10 @@ static int _kaapi_offload_waittest_stream(
     int blocking
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
 
   int err;
   kaapi_assert((stype == KAAPI_IO_STREAM_D2H)
@@ -811,6 +815,10 @@ static int _kaapi_offload_waittest_stream(
       }
     }
 
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
   return 0;
 }
 

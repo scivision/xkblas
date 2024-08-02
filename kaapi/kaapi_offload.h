@@ -271,6 +271,15 @@ typedef struct kaapi_driver {
     /* GPU blas support */
     void* (*f_get_gpublas_handle)(kaapi_device_t*);
 
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL) && KAAPI_USE_CUDA
+    void* (*f_unified_get_data)(size_t);
+    void  (*f_unified_retrieve_data)(void*,void*,size_t);
+#endif // KAAPI_UNIFIED, KAAPI_UNIFIED_PARTIAL, KAAPI_USE_CUDA
+
+#if defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
+    void  (*f_safe_2d_copy)(void*,void*,int,size_t,size_t,size_t);
+#endif //defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
+ 
     /* linked list of all drivers */
     struct kaapi_driver* next;
 

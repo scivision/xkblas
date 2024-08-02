@@ -168,6 +168,11 @@ static bool kaapi_offload_load_plugin(
   DLSYM (device_attach);
   DLSYM (device_detach);
   DLSYM (get_gpublas_handle);
+#if defined(KAAPI_PSEUDO_UNIFIED) && defined(KAAPI_UNIFIED)
+  // TODO check if this part is used
+  DLSYM (unified_get_data);
+  DLSYM (unified_retrieve_data);
+#endif // KAAPI_PSEUDO_UNIFIED
 
 out:
   if(err != NULL){
@@ -548,9 +553,14 @@ unsigned int kaapi_offload_ndevices(void)
 */
 int kaapi_offload_poll_device( kaapi_device_t* device)
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   int err =0;
   kaapi_assert_debug( kaapi_offload_self_device() == device );
 
+#ifndef KAAPI_UNIFIED
 #if KAAPI_USE_STREAM_D2D
   err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -561,6 +571,7 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
 
   err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+#endif // KAAPI_UNIFIED
 
   err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -568,6 +579,7 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
   err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_KERN);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 
+#ifndef KAAPI_UNIFIED
 #if KAAPI_USE_STREAM_D2D
   err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_D2D);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -577,6 +589,11 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
 
   err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+#endif //KAAPI_UNIFIED
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
   return err;
 }
 

@@ -144,6 +144,11 @@ typedef struct kaapi_localitydomain kaapi_localitydomain_t;
 
 typedef struct kaapi_listrequest_iterator kaapi_listrequest_iterator_t;
 
+#ifdef KAAPI_UNIFIED
+void* kaapi_unified_get_data( size_t size );
+void kaapi_unified_retrieve_data( void* dst, void* src, size_t size );
+#endif // KAAPI_UNIFIED
+
 
 /** \ingroup Kaapi
     Identifier to a locality domain 

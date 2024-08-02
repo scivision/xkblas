@@ -70,6 +70,11 @@ void xkblas_deactivate_custom_alloc();
 void xkblas_prefetch_memory_on_gpu();
 void xkblas_end_prefetch_memory_on_gpu();
 
+void* xkblas_unified_get_data( size_t size );
+void xkblas_unified_retrieve_data( void* dst, void* src, size_t size );
+
+void xkblas_2D_copy( void* dst, void* src, int nrow, size_t col_size, size_t lddst, size_t ldsrc );
+
 /* xkblas context
 */
 struct xkblas_context;

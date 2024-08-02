@@ -86,8 +86,10 @@ static void callback_epilogue_perparam(
     uint64_t arg
 )
 {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
   kaapi_device_t* device = (kaapi_device_t*)arg;
   kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
+#endif//KAAPI_UNIFIED
 }
 
 
@@ -99,6 +101,9 @@ static void callback_epilogue(
     void* arg0, void* arg1, void* arg2
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+#endif
   KAAPI_OFFLOAD_TRACE_IN
 #if _OFFLOAD_DEBUG
   fprintf(stdout, "%s\n", __FUNCTION__);
@@ -211,6 +216,10 @@ static void callback_epilogue(
 //printf("incr: @p\n",task->frame);
   task->flags |= KAAPI_TASK_FLAG_EXEC;
   KAAPI_OFFLOAD_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 }
 
 
@@ -334,6 +343,10 @@ int kaapi_offload_device_execute_task(
      void* handle
  )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_context_t* ctxt = device->ctxt;
   kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
@@ -356,6 +369,10 @@ int kaapi_offload_device_execute_task(
 #endif
 
   KAAPI_OFFLOAD_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 
   return 0;
 }
@@ -548,6 +565,7 @@ static int kaapi_offload_device_prepare_execute_task(
         &view
     );
 
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
     do {
       /* findaccess has already allocated the replica for asid with the right view.
           error code ENOMEM should be processed inside the dsm_acuire data that
@@ -593,7 +611,6 @@ static int kaapi_offload_device_prepare_execute_task(
       &mdi->replicas[lid]->view);
 
     /* update pointer in the task arguments */
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
     access->data    = new_data;
     kaapi_format_set_access_param(fmt, ith, kaapi_task_getargs(task), access );
     kaapi_format_set_view_param(fmt, ith,
@@ -838,6 +855,10 @@ int kaapi_sched_idle_offload(
     int (*f_fini)(void*), void* arg
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   int err;
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
   kaapi_device_t* device = ctxt->device;
@@ -1178,6 +1199,10 @@ prepare_execute:
   } while (f_fini && !f_fini(arg));
 
 r_exit:
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 
   return EINTR;
 }
@@ -1627,8 +1652,8 @@ size_t kaapi_offload_get_mem_info(
   if (mem_limit) *mem_limit = (size_t)-1UL;
   // kaapi_assert(device->state >= KAAPI_DEVICE_STATE_COMMIT);
   {
-    if (mem_total) *mem_total = 0.5 * device->mem_total;
-    if (mem_limit) *mem_limit = 0.5 * device->mem_limit;
+    if (mem_total) *mem_total = device->mem_total;
+    if (mem_limit) *mem_limit = device->mem_limit;
   }
   KAAPI_OFFLOAD_TRACE_OUT
   return retval;

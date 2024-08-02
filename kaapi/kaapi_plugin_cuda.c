@@ -136,6 +136,9 @@ static __thread int thread_type = 0;
 //#  define CONFIG_SYNCHRONOUS_KERNEL 1
 
 /* counters */
+#ifdef KAAPI_UNIFIED
+cudaStream_t kaapi_prefetch_stream;
+#endif //KAAPI_UNIFIED
 
 #if KAAPI_CUDA_CACHE
 typedef struct cuda_cache_blk cuda_cache_blk_t;
@@ -491,12 +494,17 @@ static void cuda_mem_free_cache(kaapi_memory_device_t* dev, uintptr_t ptr, size_
 }
 #endif // KAAPI_CUDA_CACHE
 
-
 /*
 */
 static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
-//#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
+	/*
+	 * - If unified memory is activated, we does not need to allocate on the GPU
+	 * - If partial unified memory is activated (for graceHopper), we allocate a managed buffer binded to the GPU memory
+	 */
+#if defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL) // Unified memory, nothing to do
+  return NULL;
+#else // We need to allocate something
   void* ptr;
   cudaError_t res;
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
@@ -510,7 +518,17 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 
   kaapi_assert(plugin_initialized == true);
 
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+  // Allocate managed memory, target GPU and initialize pages
+  res = cudaMallocManaged( &ptr, size, cudaMemAttachGlobal );
+  struct cudaMemLocation loc;
+  loc.type = cudaMemLocationTypeDevice; 
+  cudaGetDevice( &loc.id ); // TODO check error
+  cudaMemAdvise_v2( ptr, size, cudaMemAdviseSetPreferredLocation, loc ); // TODO check error
+  cudaMemset( ptr, 0, size ); // TODO check error
+#else
   res = cudaMalloc( &ptr, size );
+#endif
   if (res == cudaErrorMemoryAllocation )
   {
     printf(" CUDA ERROR:: free %li, request: %li\n", cuda_get_free_mem(dev), size);
@@ -532,9 +550,7 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
-//#else
-//  return 1;
-//#endif//KAAPI_UNIFIED
+#endif // else of: defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL)
 }
 
 
@@ -739,6 +755,10 @@ static void kaapi_cuda_init_cuda_stream(
   res = cudaDeviceGetStreamPriorityRange ( &leastPriority, &greatestPriority );
   CudaCheckError(res);
 
+#ifdef KAAPI_UNIFIED
+  cudaStreamCreateWithPriority (&kaapi_prefetch_stream, cudaStreamNonBlocking, greatestPriority);
+#endif //KAAPI_UNIFIED
+       //
   res = cudaStreamCreateWithPriority (&cios->stream, cudaStreamNonBlocking, greatestPriority);
   CudaCheckError(res);
   /* used by prefetching operation */
@@ -895,6 +915,7 @@ typedef struct host_register_queue {
 static int all_rrl_size = 0;
 static host_register_queue_t* all_rrl = 0;
 
+
 static void kaapi_cuda_init_reqreg_list( host_register_queue_t* rrl )
 {
   rrl->posw = 0;
@@ -948,40 +969,53 @@ void* kaapi_cuda_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
-          err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
-          //printf("%p:: cudaHostRegister ptr: %p, size: %lu\n", pthread_self(), req.ptr, req.size);
-          if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
-          //CUresult err = cuMemHostRegister( ptr, size, CU_MEMHOSTREGISTER_PORTABLE );
-          //if ((err != CUDA_SUCCESS) && (err != CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED))
-          {
-            printf("***[%s]: cudaHostRegister error: %i\n", __func__, err);
-            req.err = EALREADY;
-          }
-#else
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+		// Nothing to do, the copy is handled by others functions
+#endif //defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+
+#if defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL)
+		// We need to prefetch the data
 	  struct cudaMemLocation loc;
 	  loc.type = cudaMemLocationTypeDevice;
 	  loc.id = 0;
-	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
-	  cudaMemPrefetchAsync(req.ptr, req.size, 0, NULL );
-	  cudaStreamSynchronize( NULL );
-#endif//KAAPI_UNIFIED
+	  err = cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
+	  //err = cudaMemPrefetchAsync(req.ptr, req.size, 0, kaapi_prefetch_stream );
+#endif //defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL)
+
+#if !defined(KAAPI_UNIFIED)
+		// Register
+          err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
+          if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
+          {
+            printf("***[%s]: cudaHostRegister error: %i : %s\n", __func__, err,cudaGetErrorString(err));
+            req.err = EALREADY;
+          }
+#endif //!defined(KAAPI_UNIFIED)
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+		// Nothing to do, the copy is handled by others functions
+#endif //defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+
+#if defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL)
+	  struct cudaMemLocation loc;
+	  loc.type = cudaMemLocationTypeHost;
+	  loc.id = 0;
+	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
+	  //cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc);
+	  //cudaMemPrefetchAsync(req.ptr, req.size, cudaCpuDeviceId, kaapi_prefetch_stream );
+	  //cudaStreamSynchronize( kaapi_prefetch_stream );
+#endif //defined(KAAPI_UNIFIED) && !defined(KAAPI_UNIFIED_PARTIAL)
+
+#if !defined(KAAPI_UNIFIED)
           err = cudaHostUnregister(req.ptr);
           if (!( (cudaSuccess == err) || (cudaErrorHostMemoryNotRegistered == err)))
           {
-            printf("***[%s]: cudaHostUnregister error: %i\n", __func__, err);
+            printf("***[%s]: cudaHostUnregister error: %i: %s\n", __func__, err, cudaGetErrorString(err));
             req.err = EALREADY;
           }
-#else
-	  struct cudaMemLocation loc;
-	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
-	  cudaMemPrefetchAsync(req.ptr, req.size, cudaCpuDeviceId, NULL );
-	  cudaStreamSynchronize( NULL );
-#endif//KAAPI_UNIFIED
+#endif //!defined(KAAPI_UNIFIED)
         }
       }
 #if KAAPI_USE_PERFCOUNTER
@@ -1393,6 +1427,10 @@ static int cuda_stream_advance_pending(
     int blocking
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   KAAPI_PLUGIN_TRACE_IN
 
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev;
@@ -1401,8 +1439,13 @@ static int cuda_stream_advance_pending(
 
   kaapi_cuda_io_stream_t* cios = (kaapi_cuda_io_stream_t*)ios;
   if (kaapi_io_stream_emptypending(ios))
+  {
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
     return 0;
-
+  }
 #if CONFIG_USE_EVENT 
   if (blocking)
   {
@@ -1411,6 +1454,10 @@ static int cuda_stream_advance_pending(
     res = cudaStreamSynchronize( cios->stream_low );
     CudaCheckError(res);
     ios->ok_p = ios->pos_wp;
+#ifdef KAAPI_NVTX
+    //nvtxRangePushA( __func__ );
+    nvtxRangePop();
+#endif
     return 0;
   }
 
@@ -1506,8 +1553,16 @@ break_label:
   if (prev_iosokp != ios_okp-1) 
   {
     ios->ok_p = prev_iosokp+1;
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
     return 0;
   }
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
   return EINPROGRESS;
 
 #elif CONFIG_SYNCHRONOUS_COPY && CONFIG_SYNCHRONOUS_KERNEL
@@ -1522,6 +1577,10 @@ break_label:
     res = cudaStreamSynchronize( cios->stream_low );
     CudaCheckError(res);
     ios->ok_p = ios->pos_wp;
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
     return 0;
   }
   else
@@ -1530,6 +1589,10 @@ break_label:
     if (res == cudaErrorNotReady)
     {
       KAAPI_PLUGIN_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
       return EINPROGRESS;
     }
     CudaCheckError(res);
@@ -1537,12 +1600,20 @@ break_label:
     if (res == cudaErrorNotReady)
     {
       KAAPI_PLUGIN_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
       return EINPROGRESS;
     }
     CudaCheckError(res);
 
     ios->ok_p = ios->pos_wp;
   }
+#endif
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
 #endif
   KAAPI_PLUGIN_TRACE_OUT
 }
@@ -1557,6 +1628,10 @@ static int cuda_stream_process_pending(
     int blocking
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__  );
+  //nvtxRangePop();
+#endif
   kaapi_cuda_io_stream_t* cios = (kaapi_cuda_io_stream_t*)ios;
 
   do {
@@ -1643,6 +1718,10 @@ static int cuda_stream_process_pending(
     }
   } while (0); 
   KAAPI_PLUGIN_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
   return 0;
 }
 
@@ -2385,6 +2464,53 @@ KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
   return 0;
 }
 
+#if defined(KAAPI_UNIFIED)
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(safe_2d_copy)( void* dst, void* src, int nrow, size_t col_size, size_t lddst, size_t ldsrc )
+{
+  // TODO check colision
+  // TODO !!! not double
+  cudaMemcpy2D( dst, lddst, src, ldsrc, col_size, nrow, cudaMemcpyDefault );
+}
+#endif //defined(KAAPI_UNIFIED)
+
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+void* unified_buffer = NULL;
+size_t unified_buffer_size = 45L * 1024L * 1024L * 1024L; // 45 GiB
+int unified_buffer_used = 0;
+
+KAAPI_CLASS_ENTRYPOINT void* 
+KAAPI_PLUGIN_ENTRYPOINT(unified_get_data)( size_t size )
+{
+  // Not thread safe
+  if( unified_buffer == NULL )
+  {
+    printf("Need to allocate new unified buffer\n");
+    cudaError_t err;
+    cudaMallocManaged( &unified_buffer, unified_buffer_size, cudaMemAttachGlobal );
+    struct cudaMemLocation loc;
+    loc.type = cudaMemLocationTypeDevice; 
+    loc.id = 0;
+    //cudaGetDevice( &loc.id ); // TODO check error
+    cudaMemAdvise_v2( unified_buffer, size, cudaMemAdviseSetPreferredLocation, loc ); // TODO check error
+    cudaMemset( unified_buffer, 0, size ); // TODO check error
+  }
+  if( size > unified_buffer_size )
+  {
+    printf("Buffer size to small %lld < %lld (Go)\n", unified_buffer_size/1000000000L, size/1000000000);
+    return NULL;
+  }
+
+  //printf("Return the buffer %p\n", unified_buffer);
+  return unified_buffer;
+}
+
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(unified_retrieve_data)(void* dst, void* src, size_t size)
+{
+  cudaMemcpy( dst, src, size, cudaMemcpyDefault ); // TODO check error
+}
+#endif // defined(KAAPI_UNIFIED) defined(KAAPI_UNIFIED_PARTIAL)
 
 /*
 */
@@ -2449,5 +2575,13 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (device_attach);
   EP (device_detach);
   EP (get_gpublas_handle);
+
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL)
+  EP (unified_get_data);
+  EP (unified_retrieve_data);
+#endif
+#if defined(KAAPI_UNIFIED)
+  EP (safe_2d_copy);
+#endif //defined(KAAPI_UNIFIED)
 }
 #endif

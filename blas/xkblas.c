@@ -98,6 +98,60 @@ static size_t NB = 0;
 void xkblas_activate_custom_alloc(){}
 void xkblas_deactivate_custom_alloc(){}
 
+/*
+uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
+{
+#if KAAPI_USE_CUDA||KAAPI_USE_HIP
+// warning in this version, if USE_HIP is defined, then also is USE_CUDA 
+// (the file is hipyfied to be compiled with hip)
+#if KAAPI_USE_HIP
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#elif KAAPI_USE_CUDA 
+  kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+  if (driver ==0) return 0;
+  return driver->f_host_register( ptr, sz, 0, 0, 0, 0);
+#endif
+  return 0;
+}
+*/
+
+void* xkblas_unified_get_data( size_t size )
+{
+	void* ptr = NULL;
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL) && KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+	struct timespec t0, t1;
+	clock_gettime( CLOCK_MONOTONIC, &t0 );
+	ptr = driver->f_unified_get_data( size ); // kaapi_unified_get_data( size );
+	clock_gettime( CLOCK_MONOTONIC, &t1 );
+	double t = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec)/1e9;
+	printf("Front size %lld elements in %lf s, %lf GB/s\n", size/sizeof(double), t, size/1e9/t );
+#endif // KAAPI_UNIFIED && KAAPI_UNIFIED_PARTIAL
+	return ptr;
+}
+	
+void xkblas_unified_retrieve_data( void* dst, void* src, size_t size )
+{
+#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL) && KAAPI_USE_CUDA
+	struct timespec t0, t1;
+	clock_gettime( CLOCK_MONOTONIC, &t0 );
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+	driver->f_unified_retrieve_data( dst, src, size );	
+	clock_gettime( CLOCK_MONOTONIC, &t1 );
+	double t = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec)/1e9;
+	printf("Data move in in %lf s, %lf GB/s\n", size/sizeof(double), t, size/1e9/t );
+#endif // KAAPI_UNIFIED && KAAPI_UNIFIED_PARTIAL
+}
+
+void xkblas_2D_copy( void* dst, void* src, int nrow, size_t col_size, size_t lddst, size_t ldsrc )
+{
+#if defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+	driver->f_safe_2d_copy( dst, src, nrow, col_size, lddst, ldsrc );
+#endif //defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
+}
+
 void xkblas_prefetch_memory_on_gpu( void* ptr, size_t size )
 {
   //struct cudaMemLocation loc;
