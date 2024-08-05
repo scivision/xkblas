@@ -589,18 +589,14 @@ static int kaapi_offload_request2device( kaapi_device_t* device, kaapi_device_op
   pthread_mutex_lock(&device->lock);
   while (device->request.op != KAAPI_DEVICEOP_NOP)
   {
-#if KAAPI_SLEEP_DEVICETHREAD
     kaapi_offload_device_wakeup_(device);
-#endif
     pthread_cond_wait(&device->cond, &device->lock);
   }  
 
   /* send op */
   device->request.arg = 0;
   device->request.op = op;
-#if KAAPI_SLEEP_DEVICETHREAD
   kaapi_offload_device_wakeup_(device);
-#endif
   pthread_mutex_unlock(&device->lock);
   return res;
 }
@@ -614,9 +610,7 @@ static int kaapi_offload_requestwait( kaapi_device_t* device)
   pthread_mutex_lock(&device->lock);
   while (device->request.op != KAAPI_DEVICEOP_REPLY)
   {
-#if KAAPI_SLEEP_DEVICETHREAD
     kaapi_offload_device_wakeup_(device);
-#endif
     pthread_cond_wait(&device->cond, &device->lock);
   }
   res = device->request.err;
@@ -759,7 +753,6 @@ int kaapi_sched_idle_offload(
 
   do
   {
-#if KAAPI_SLEEP_DEVICETHREAD
     while ((device->request.op == KAAPI_DEVICEOP_NOP)
         && kaapi_queue_empty(ctxt->queue)
         && (device->exec_count == device->spawn_count + device->ld->queue->push_count)
@@ -927,11 +920,9 @@ prepare_execute:
           kaapi_task_get_priority(task),
           ctxt->queue);
       )
-      
-#if KAAPI_USE_STREAM_D2D
+
       err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-#endif
       err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
       err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_H2D );
