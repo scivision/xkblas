@@ -10,7 +10,7 @@
 # include "device/address-space.h"
 # include "device/device.h"
 # include "device/io.h"
-# include "device/stream.hpp"
+# include "device/memory-tree.hpp"
 # include "logger/todo.h"
 # include "device/consts.h"
 # include "device/task.hpp"
@@ -119,6 +119,9 @@ typedef struct  xkblas_drivers_t
         /* next worker to offload round robin mode */
         std::atomic<uint8_t> round_robin_device_id;
     } devices;
+
+    /* memory mapping */
+    MemoryTree memtree;
 
 }               xkblas_drivers_t;
 

@@ -451,43 +451,10 @@ static int kaapi_offload_device_prepare_execute_task(
      kaapi_task_t* task
  )
 {
-  KAAPI_OFFLOAD_TRACE_IN
   int err;
   uint16_t lid = kaapi_memory_asid_get_lid( device->memdev.asid );
   const kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
   kaapi_assert(fmt !=0);
-
-#if KAAPI_DEBUG
-  /* the device that starts a task is also the device that complete the task */
-  kaapi_assert( task->device ==0 );
-  task->device = device;
-#endif
-
-  /* Register counters for performance analysis.
-     If task does not define cost function, assume it is 1.
-  */
-  double flops = 1, dflops =0, data = 0;
-  ++device->submittasks;
-  if (kaapi_taskflag_get(task,KAAPI_TASK_PERFCNT))
-  {
-    kaapi_format_get_cost(fmt, kaapi_task_getargs(task), task, &flops, &dflops, &data );
-    device->flops_submittasks += (flops+dflops);
-    device->data_submittasks += data;
-  }
-
-  KAAPI_CTXT_PERFREG_INCR(kaapi_self_context(),KAAPI_PERF_ID_TASKSTARTEXEC);
-  KAAPI_CTXT_PERFREG_ADD(kaapi_self_context(),KAAPI_PERF_ID_FLOPS_GPU, flops);
-  KAAPI_CTXT_PERFREG_ADD(kaapi_self_context(),KAAPI_PERF_ID_DFLOPS_GPU, dflops);
-  KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
-       1 /* Async Start exec */, task, fmt->fmtid, kaapi_task_getargs(task));
-
-  kaapi_assert_debug(device == kaapi_offload_self_device());
-  kaapi_assert_debug(KAAPI_ATOMIC_READ(&task->wc) ==0);
-
-#if KAAPI_USE_PREFETCH
-  int prefetch_taskcnt = 0;
-  kaapi_task_t* prefetch_tasklist[KAAPI_MAX_PREFETCH_WINDOW];
-#endif
 
   /* take 'pseudo' lock to avoid activation of the task when data is received.
      Wait until all  parameters have been processed.
@@ -495,15 +462,11 @@ static int kaapi_offload_device_prepare_execute_task(
   KAAPI_ATOMIC_INCR(&task->wc);
   KAAPI_ATOMIC_INCR(&device->cnt_pending);
 
-#if KAAPI_PIPELINE_GPUTASK
   /* Insert the task into the pipeline: no lock, only device thread may insert
      increment p_write after wc value is computed.
    */
   uint64_t index = device->p_write;
   device->pipeline[index % device->pipe_size] = task;
-#else
-  uint64_t index = 0;
-#endif
 
   unsigned int ith;
   kaapi_memory_view_t view;
@@ -569,24 +532,6 @@ static int kaapi_offload_device_prepare_execute_task(
     } while (err == ENOMEM);
     kaapi_assert((err ==0) || (err ==EINPROGRESS));
 
-#if KAAPI_USE_PREFETCH
-    if (KAAPI_ACCESS_IS_WRITE(mp))
-    {
-      /* look for next dependent in order to prefetch data */
-      kaapi_access_t* an = access->sync->next;
-      if ((an !=0))// && KAAPI_ACCESS_IS_READ(an->mode))
-      {
-        kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
-        if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW)) 
-        {
-          prefetch_tasklist[prefetch_taskcnt++] = an->task;
-        }
-        if (an->sync) an = (kaapi_access_t*)an->sync->next;
-        else an = an->next;
-      }
-    }
-#endif
-
     /* store in the data access the pointer translated by the original offset */
     new_data = kaapi_memory_view2pointer(
       kaapi_pointer2void(mdi->replicas[lid]->ptr),
@@ -601,32 +546,14 @@ static int kaapi_offload_device_prepare_execute_task(
     );
   }
 
-#if KAAPI_USE_PREFETCH
-  /* prefetch data before launching kernel */
-  if (prefetch_taskcnt>0)
-  {
-    kaapi_do_prefetch_data( device, prefetch_taskcnt, prefetch_tasklist );
-  }
-#endif
-  
-#if KAAPI_PIPELINE_GPUTASK
   /* if the current task is the leading ready task then insert it
      lock reading p_ready to avoid situation where callback also try
      to read/incr and insert the task in the stream
   */
   ++device->p_write;
   pthread_mutex_lock(&device->pipe_lock);
-#endif //KAAPI_PIPELINE_GPUTASK
-  
-# if KAAPI_REORDER_TASK_EXEC || (KAAPI_PIPELINE_GPUTASK==0)
-  if (KAAPI_ATOMIC_DECR(&task->wc) ==0)
-# else
   if ((KAAPI_ATOMIC_DECR(&task->wc) ==0) && (device->p_ready == index))
-# endif
   {
-# if KAAPI_LOG_PIPE
-    printf("Task[%i]=%p insert into stream\n",index, task);
-# endif
     kaapi_stream_insert_io_task_inst(
       &device->stream,
       KAAPI_IO_STREAM_KERN,
@@ -636,29 +563,11 @@ static int kaapi_offload_device_prepare_execute_task(
     );
     KAAPI_ATOMIC_INCR(&device->cnt_ready);
     KAAPI_ATOMIC_DECR(&device->cnt_pending);
-#if KAAPI_REORDER_TASK_EXEC && KAAPI_USE_PERFCOUNTER
-    if (device->p_ready != index)
-      KAAPI_CTXT_PERFREG_INCR(device->ctxt,KAAPI_PERF_ID_REORDER_HIT);
-#endif
-//#if KAAPI_PIPELINE_GPUTASK==0
     kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
-//#endif
 
-#if KAAPI_PIPELINE_GPUTASK
-# if KAAPI_REORDER_TASK_EXEC
-  if (device->p_ready == index)
-# endif
     ++device->p_ready;
-#endif
   }
-  
-#if KAAPI_PIPELINE_GPUTASK
-# if KAAPI_LOG_PIPE
-  else
-    printf("Task[%i]=%p not ready into stream\n",index, task);
-# endif
   pthread_mutex_unlock(&device->pipe_lock);
-#endif //KAAPI_PIPELINE_GPUTASK
   return 0;
 }
 

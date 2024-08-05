@@ -122,7 +122,7 @@ xkblas_drivers_deinit(xkblas_drivers_t * drivers)
 void
 xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
 {
-    assert(task->state == TASK_STATE_READY);
+    assert(task->state.value == TASK_STATE_READY);
 
     // Find the worker to offload the task
     uint8_t device_id = task->targetted_device_id;

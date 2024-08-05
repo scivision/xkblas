@@ -1,5 +1,5 @@
-#ifndef __ACCESS_INTERVAL_MULTI_TREE_H__
-# define __ACCESS_INTERVAL_MULTI_TREE_H__
+#ifndef __ACCESS_BTREE_H__
+# define __ACCESS_BTREE_H__
 
 // tree assert, must be called within a member function
 # ifdef NDEBUG
@@ -64,7 +64,7 @@ typedef enum    Direction
 
 /* K is the number of dimensions */
 template<int K, typename T>
-class AccessIntervalMultiTree : public History<K, T> {
+class AccessBtree : public History<K, T> {
 
     protected:
 
@@ -258,7 +258,7 @@ class AccessIntervalMultiTree : public History<K, T> {
         }; /* class Node */
 
     public:
-        AccessIntervalMultiTree() : root(nullptr), limbs(), outdated() {}
+        AccessBtree() : root(nullptr), limbs(), outdated() {}
 
         static void
         subtree_delete(Node * node)
@@ -283,7 +283,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             this->limbs.clear();
         }
 
-        virtual ~AccessIntervalMultiTree()
+        virtual ~AccessBtree()
         {
             subtree_delete(this->root);
             this->garbage_collector_run();
@@ -783,7 +783,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             return this->requires_rebalance<1>(nelements, height);
         }
 
-        // if the multi-tree at 'root' requires rebalance
+        // if the btree at 'root' requires rebalance
         inline int
         requires_rebalance(Node * root) const
         {
@@ -792,7 +792,7 @@ class AccessIntervalMultiTree : public History<K, T> {
             return this->requires_rebalance<K>(nelements, height);
         }
 
-        // if 'this' multi-tree requires rebalance
+        // if 'this' btree requires rebalance
         inline bool
         requires_rebalance(void) const
         {
@@ -1219,14 +1219,14 @@ class AccessIntervalMultiTree : public History<K, T> {
         coherency_region_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_includes_check, this, _1, _2);
+            auto f = std::bind(&AccessBtree<K, T>::coherency_region_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_region_includes(Node * root) const
         {
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_includes_foreach, this, _1, _2);
+            auto f = std::bind(&AccessBtree<K, T>::coherency_region_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1241,14 +1241,14 @@ class AccessIntervalMultiTree : public History<K, T> {
         coherency_region_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&AccessBtree<K, T>::coherency_region_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_region_disjoint(Node * root) const
         {
-            auto f = std::bind(&AccessIntervalMultiTree<K, T>::coherency_region_disjoint_for, this, _1, _2);
+            auto f = std::bind(&AccessBtree<K, T>::coherency_region_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1402,4 +1402,4 @@ class AccessIntervalMultiTree : public History<K, T> {
 
 #undef tassert
 
-#endif /* __ACCESS_INTERVAL_MULTI_TREE_H__ */
+#endif /* __ACCESS_BTREE_H__ */

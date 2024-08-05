@@ -65,12 +65,14 @@ xkblas_device_stream_init(xkblas_device_t * device, Stream * stream, unsigned in
 }
 
 static void
-xkblas_device_commit(xkblas_driver_t * driver, xkblas_device_t * device, int driver_device_id)
-{
+xkblas_device_commit(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device
+) {
     assert(driver->f_device_commit);
-    int err = driver->f_device_commit(driver_device_id);
+    int err = driver->f_device_commit(device->driver_id);
     if (err)
-        XKBLAS_FATAL("Commit fail device %d of driver %s", driver_device_id, driver->f_get_name());
+        XKBLAS_FATAL("Commit fail device %d of driver %s", device->driver_id, driver->f_get_name());
 
     # if 0
     assert(0 == pthread_mutex_lock(&device->lock));
@@ -83,10 +85,10 @@ xkblas_device_commit(xkblas_driver_t * driver, xkblas_device_t * device, int dri
 }
 
 static void
-xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int driver_device_id)
-{
-    device->driver_device_id = driver_device_id;
-
+xkblas_device_init(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device
+) {
     # if 0
     device->tid = 0;
     device->spawn_count = 0;
@@ -103,19 +105,21 @@ xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int drive
     device->cnt_push = 0;
     # endif
 
-    driver->f_device_init(driver_device_id);
+    driver->f_device_init(device->driver_id);
+
+    int err;
+    err = pthread_mutex_init(&device->pipe_lock, 0);
+    assert(err == 0);
+
+    device->p_write   = 0;
+    device->p_ready   = 0;
+    device->p_finish  = 0;
+    device->pipe_size = xkblas_context.conf.cuda_conc_kernel;
+    device->pipeline  = (Task **) malloc(sizeof(Task *) * device->pipe_size);
+    for (int i = 0; i < device->pipe_size; ++i)
+        device->pipeline[i] = nullptr;
 
     # if 0
-    assert(0== pthread_mutex_init(&device->pipe_lock, 0));
-
-    device->p_write   = 0; /* next position where to write new task */
-    device->p_ready   = 0; /* position of the next task to insert into the kernel submission stream */
-    device->p_finish  = 0; /* position of the next task to erase from the pipeline */
-    device->pipe_size = XKBLAS_CONF.cuda_conc_kernel;
-    device->pipeline  = (Task**)malloc(sizeof(Task*)*device->pipe_size);
-    for (int i=0; i<device->pipe_size; ++i)
-        device->pipeline[i] = 0;
-
     device->time_tasks = 0.0;
     device->exectasks  = 0;
     device->flops_exectasks = 0.0;
@@ -137,8 +141,8 @@ xkblas_device_init(xkblas_driver_t * driver, xkblas_device_t * device, int drive
     assert(0 == pthread_mutex_unlock(&device->lock));
     # endif
 
-    if (driver->f_device_attach(driver_device_id))
-        XKBLAS_FATAL("Could not attach to device %d of driver %s", driver_device_id, driver->f_get_name());
+    if (driver->f_device_attach(device->driver_id))
+        XKBLAS_FATAL("Could not attach to device %d of driver %s", device->driver_id, driver->f_get_name());
 
     assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
     device->state = XKBLAS_DEVICE_STATE_INIT;
@@ -148,23 +152,24 @@ static xkblas_device_t *
 xkblas_device_create(
     xkblas_drivers_t * drivers,
     uint8_t driver_id,
-    int driver_device_id
+    uint8_t driver_device_id
 ) {
     if (drivers->devices.n == XKBLAS_DEVICES_MAX)
         XKBLAS_FATAL("Too many devices. Increase 'XKBLAS_DEVICES_MAX' and recompile Xkblas");
 
-    int global_device_id = drivers->devices.n++;
     xkblas_driver_t * driver = drivers->list + driver_id;
     xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
     assert(device);
-    drivers->devices.list[global_device_id] = device;
 
     device->request.op      = XKBLAS_DEVICEOP_NOP;
     device->request.arg     = 0;
     device->request.counter = NULL;
     device->request.err     = 0;
+    device->state           = XKBLAS_DEVICE_STATE_CREATE;
+    device->driver_id       = driver_device_id;
+    device->global_id       = drivers->devices.n++;
 
-    device->state = XKBLAS_DEVICE_STATE_CREATE;
+    drivers->devices.list[device->global_id] = device;
 
     // register worker thread, using a nasty global variable here :-(
     ThreadWorker::init();
@@ -172,6 +177,39 @@ xkblas_device_create(
     assert(device->thread);
 
     return device;
+}
+
+static inline int
+xkblas_device_poll(xkblas_device_t * device)
+{
+    int err = 0;
+    assert(ThreadWorker::get() == device->thread);
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_H2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2H);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_KERN);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_KERN);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_D2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_H2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_D2H);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    return err;
 }
 
 static inline void
@@ -185,13 +223,13 @@ xkblas_device_progress(
     {
         case (XKBLAS_DEVICEOP_NOP):
         {
-            // TODO
+            pthread_yield();
+            xkblas_device_poll(device);
             break ;
         }
 
         case (XKBLAS_DEVICEOP_REPLY):
         {
-            // TODO
             break ;
         }
 
@@ -227,16 +265,74 @@ xkblas_device_progress(
     }
 }
 
+
+/* Return 1 iff device may accept new runing offloaded task
+ */
+static inline int
+xkblas_device_accept_new_task(xkblas_device_t * device)
+{
+    return (device && (device->p_write - device->p_finish) < device->pipe_size &&
+            (device->p_write - device->p_ready) < (1+xkblas_context.conf.cuda_conc_kernel) / 2);
+}
+
 static inline void
 xkblas_device_prepare_task(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task
 ) {
-    // TODO
+    // TODO : implement this routine
     XKBLAS_DEBUG("Scheduling task %p", task);
+    xkblas_context_t * context = xkblas_context_get();
 
-    // TODO : check 'prepare_execute' label in 'kaapi_sched_idle_offload'
+    // 'prepare_execute:' label
+
+    // TODO : this part of the code had been changed quite a bit, check performances impact
+    xkblas_device_poll(device);
+    while (!xkblas_device_accept_new_task(device))
+    {
+        xkblas_device_poll(device);
+        int err = device->stream.wait(XKBLAS_IO_STREAM_D2D);   // Romain: why wait on D2D ?
+        assert(err == 0);
+        xkblas_device_poll(device);
+    }
+
+    // 'kaapi_offload_device_prepare_execute_task'
+
+    /* take 'pseudo' lock to avoid activation of the task when data is received.
+       Wait until all  parameters have been processed. */
+    assert(task->wc == 0);
+    task->wc.fetch_add(1, std::memory_order_seq_cst);
+
+    uint64_t index = device->p_write;
+    device->pipeline[index % device->pipe_size] = task;
+
+    /* use task->wc as counter for asynchronous callback to detect
+       completion of them
+       - each callback decr counter
+       - each access without need for callback decr it
+       - after all parameters have been visited, then decr the counter.
+       The last decr that set counter to 0 push the task on the kernel stream
+       */
+    for (int i = 0 ; i < TASK_MAX_ACCESSES ; ++i)
+    {
+        task_access_t * access = task->accesses + i;
+        if (access->mode == ACCESS_MODE_VOID)
+            break ;
+
+        // TODO : do we need to take some lock here ?
+        // We are executing 'task' that accesses are already synchronized via
+        // dependences, so i believe not
+        auto process = [] (MemoryBlock block) {
+            // TODO : check that replicate is up to date, if not, move data
+        };
+        // context->drivers.memtree.intersect_all(access.region);
+
+        // TODO : loop against each mdi intersecting this access
+        // for (...)
+        //     xkblas_metadata_info_t * mdi =  [...]
+
+    }
 }
 
 
@@ -244,8 +340,7 @@ xkblas_device_prepare_task(
 static inline int
 xkblas_device_thread_main_loop(
     xkblas_driver_t * driver,
-    xkblas_device_t * device,
-    int driver_device_id
+    xkblas_device_t * device
 ) {
     // thread ready for execution
     assert(device->state == XKBLAS_DEVICE_STATE_COMMIT);
@@ -255,7 +350,6 @@ xkblas_device_thread_main_loop(
     mem_barrier();
 
     ThreadWorker * thread = ThreadWorker::get();
-
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
         // If there is no tasks and streams are empty, sleep the thread
@@ -293,7 +387,7 @@ xkblas_device_thread_main(void * a)
             driver->f_get_name(), driver_device_id, cpu, node);
 
     xkblas_device_t * device = xkblas_device_create(drivers, driver_id, driver_device_id);
-    xkblas_device_init(driver, device, driver_device_id);
+    xkblas_device_init(driver, device);
 
     // wait for all devices of that driver to be in the 'init' state
     ++driver->ndevices_inited;
@@ -301,11 +395,11 @@ xkblas_device_thread_main(void * a)
         mem_pause();
 
     // can now commit my device
-    xkblas_device_commit(driver, device, driver_device_id);
+    xkblas_device_commit(driver, device);
     ++driver->ndevices_commited;
 
     /* infinite loop with the device context */
-    int err = xkblas_device_thread_main_loop(driver, device, driver_device_id);
+    int err = xkblas_device_thread_main_loop(driver, device);
     assert((err==0) || (err==EINTR));
 
     # if 0

@@ -2,10 +2,7 @@
 # define __MEMORY_TREE_HPP__
 
 # include "logger/todo.h"
-# include "device/task.hpp"
-# include "sync/access-interval-multi-tree.hpp"
-
-# include <stdint.h>
+# include "sync/access-btree.hpp"
 
 typedef enum    memory_block_replicate_state_t : uint8_t
 {
@@ -18,40 +15,24 @@ typedef enum    memory_block_replicate_state_t : uint8_t
 typedef struct  memory_block_replicate_t
 {
     memory_block_replicate_state_t state;
+
 }               memory_block_replicate_t;
 
 class MemoryBlock {
 
     public:
-        MemoryBlock() {}
-        virtual ~MemoryBlock() {}
 
-        # if 0
-        void shrink(Region & to);
-        void merge(Region & with);
-        # endif
-
-    private:
-
-        # if 0
-        /* Matrix */
-        uintptr_t A;
-        int LD;
-        int M;
-        int N;
-        # endif
+        /* replicate state per device */
+        memory_block_replicate_t replicates[XKBLAS_DEVICES_MAX];
 };
 
-/**
- *  A tree of memory blocks, to keep track of replicates and task dependences
- */
-class MemoryTree : public AccessIntervalMultiTree<2, Task> {
+class MemoryTree {
 
-    void
-    on_hazard(const Region & rx, Task * x, const Region & ry, Task * y) const
-    {
-        x->precedes(y, rx.intersection(ry));
-    }
+    public:
+
+
+
+
 };
 
 #endif /* __MEMORY_TREE_HPP__ */

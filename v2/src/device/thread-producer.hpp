@@ -2,12 +2,11 @@
 # define __THREAD_PRODUCER_HPP__
 
 # include "logger/todo.h"
-// # include "device/deque.hpp"
+# include "device/dependency-tree.hpp"
+# include "device/driver.h"
 # include "device/naive-queue.hpp"
-# include "device/memory-tree.hpp"
 # include "device/task.hpp"
 # include "device/thread-worker.hpp"
-# include "device/driver.h"
 
 # include <new>
 
@@ -62,12 +61,12 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
             for (int i = 0 ; i < N ; ++i)
             {
                 assert(task->accesses[i].mode);
-                this->memtree.intersect(task->accesses[i].mode, task->accesses[i].region, task);
+                this->deptree.intersect(task->accesses[i].mode, task->accesses[i].region, task);
             }
 
             // register accesses for linking with future tasks
             for (int i = 0 ; i < N ; ++i)
-                this->memtree.insert(task->accesses[i].mode, task->accesses[i].region, task);
+                this->deptree.insert(task->accesses[i].mode, task->accesses[i].region, task);
 
             // commit the task
             if (task->commit())
@@ -87,7 +86,7 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
         uint8_t * memory_stack_ptr;
 
         /* Memory mapping */
-        MemoryTree memtree;
+        DependencyTree deptree;
 };
 
 #endif /* __THREAD_PRODUCER_HPP__ */

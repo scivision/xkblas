@@ -8,6 +8,7 @@
 
 # include "device/consts.h"
 # include "sync/access.hpp"
+# include "sync/spinlock.h"
 
 # define TASK_MAX_ACCESSES  4
 
@@ -34,11 +35,11 @@ enum task_body_t : uint8_t
 
 using Region = Intervals<2>;
 
-struct task_access_t : access_t<2>
+typedef struct  task_access_t : access_t<2>
 {
     task_access_t() : access_t<2>() {}
     ~task_access_t() {}
-};
+}               task_access_t;
 
 class Task;
 
@@ -64,12 +65,12 @@ class alignas(std::hardware_constructive_interference_size) Task
             ocr_access_index(XKBLAS_DEVICES_MAX),
             targetted_device_id(XKBLAS_DEVICES_MAX),
             wc(1),
-            state(TASK_STATE_ALLOCATED)
+            state({.lock=0, .value=TASK_STATE_ALLOCATED})
         {}
 
         ~Task()
         {
-            this->state = TASK_STATE_DEALLOCATED;
+            this->state.value = TASK_STATE_DEALLOCATED;
         }
 
         ////////////////
@@ -96,7 +97,10 @@ class alignas(std::hardware_constructive_interference_size) Task
         alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
 
         /* task state */
-        task_state_t state;
+        struct {
+            spinlock_t      lock;
+            task_state_t    value;
+        } state;
 
         ////////////////////////////////////
         // Methods to transition the task //
@@ -105,13 +109,12 @@ class alignas(std::hardware_constructive_interference_size) Task
         /* this task precedes the passed task */
         void precedes(Task * successor, const Region & region);
 
-        /**
-         * Return 'true' if the task is ready to be queued, 'false' otherwise
-         */
+        /* Return 'true' if the task is ready to be queued, 'false' otherwise */
         bool commit(void);
 
-        /* resolve the passed edge, and return the successor state */
-        static task_state_t finalize(const Task * pred, task_edge_t & edge);
+        // TODO
+        void execute(void);
+        void complete(void);
 };
 
 #endif /* __TASK_HPP__ */

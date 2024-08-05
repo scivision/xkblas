@@ -34,6 +34,9 @@ class Stream
         void (*f_stream_free)(int device_id, xkblas_io_stream_t * io_stream);
 
         bool is_empty(xkblas_io_stream_type_t type) const;
+        int process_instruction(xkblas_io_stream_type_t type);
+        int test(xkblas_io_stream_type_t type);
+        int wait(xkblas_io_stream_type_t type);
 
         # if 0
         int (*f_stream_process_pending)(

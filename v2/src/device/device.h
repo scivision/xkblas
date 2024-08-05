@@ -42,7 +42,8 @@ typedef struct  xkblas_device_t
 {
     xkblas_device_memory_t      memdev;             /* casted to xkblas_device */
     Stream                      stream;             /* communication streams host<->device */
-    int                         driver_device_id;   /* driver device id in [0..ngpus_for_device] */
+    uint8_t                     driver_id;          /* driver device id in [0..ngpus_for_device] */
+    uint8_t                     global_id;          /* global device id in [0, XKBLAS_DEVICES_MAX[ */
     std::atomic<uint8_t>        state;              /* True if driver is initialized */
 
     ThreadWorker                * thread;           /* the device worker thread */
@@ -53,6 +54,15 @@ typedef struct  xkblas_device_t
         std::atomic<uint64_t> * counter;            /* for MEMSYNC or WRITEBACK request */
         int                     err;                /* error returned by the request */
     } request;
+
+    /* pipline: a way to enforce execution order of kernel to device */
+    pthread_mutex_t             pipe_lock __attribute__((aligned(CACHE_LINE_SIZE)));
+    uint64_t                    pipe_size;
+    Task **                     pipeline;          /* circular buffer to store pipeline of task to run on the device */
+    uint64_t                    p_write;           /* next position in the pipeline to write a new task */
+    uint64_t                    p_ready;           /* position of the first ready task submitted to stream but not yet tested finish */
+    uint64_t                    p_finish;          /* position in the stream of the next task to finish */
+
 
 # if 0
 
@@ -83,14 +93,6 @@ typedef struct  xkblas_device_t
         std::atomic<int64_t>   counter;              /* for MEMSYNC or WRITEBACK request */
         int                    err;                  /* error returned by the request */
     } request;
-
-    /* pipline: a way to enforce execution order of kernel to device */
-    pthread_mutex_t             pipe_lock __attribute__((aligned(CACHE_LINE_SIZE)));
-    uint64_t                    pipe_size;
-    Task **                     pipeline;          /* circular buffer to store pipeline of task to run on the device */
-    uint64_t                    p_write;           /* next position in the pipeline to write a new task */
-    uint64_t                    p_ready;           /* position of the first ready task submitted to stream but not yet tested finish */
-    uint64_t                    p_finish;          /* position in the stream of the next task to finish */
 
     size_t                      free_mem;
     size_t                      size_alloc;
