@@ -1,0 +1,5 @@
+PRIORITY TODO
+
+- Ensure the task dependency graph is correct for GEMM
+- Define interfaces for the MemoryTree
+- Implemnets interfaces of the MemoryTree
