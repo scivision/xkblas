@@ -66,7 +66,11 @@ class alignas(std::hardware_constructive_interference_size) Task
             targetted_device_id(XKBLAS_DEVICES_MAX),
             wc(1),
             state({.lock=0, .value=TASK_STATE_ALLOCATED})
-        {}
+        {
+            # ifndef NDEBUG
+            strcpy(this->label, "(unamed task)");
+            # endif /* NDEBUG */
+        }
 
         ~Task()
         {
@@ -101,6 +105,10 @@ class alignas(std::hardware_constructive_interference_size) Task
             spinlock_t      lock;
             task_state_t    value;
         } state;
+
+        # ifndef NDEBUG
+        char label[128];
+        # endif /* NDEBUG */
 
         ////////////////////////////////////
         // Methods to transition the task //

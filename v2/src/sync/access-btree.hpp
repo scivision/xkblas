@@ -32,35 +32,10 @@ using namespace std::placeholders;
 # include <iostream>
 
 # include "access-mode.h"
+# include "color.h"
+# include "direction.h"
 # include "history.hpp"
 # include "utils.hpp"
-
-///////////////
-// Constants //
-///////////////
-
-typedef enum    Color
-{
-    BLACK   = 0,
-    RED     = 1,
-}               Color;
-
-static const char * COLORS[] = {
-    "#000000",
-    "#FF0000",
-    "#00FF00",
-    "#0000FF",
-    "#FFFF00",
-    "#FF00FF",
-    "#00FFFF",
-};
-
-typedef enum    Direction
-{
-    LEFT            = 0,
-    RIGHT           = 1,
-    DIRECTION_MAX   = 2,
-}               Direction;
 
 /* K is the number of dimensions */
 template<int K, typename T>
@@ -102,11 +77,11 @@ class AccessBtree : public History<K, T> {
                 subtree_t st[K];
                 Intervals<K> region;
                 Color colors[K];
-                std::vector<T *> last_reads;
-                T * last_write;
+                std::vector<T> last_reads;
+                T last_write;
                 bool has_write;
                 struct {
-                    Intervals<K> region; // subtree englobing region
+                    Intervals<K> region;    // subtree englobing region
                     int nwrites;            // subtree number of 'writes' elements
                     int nelements[K];       // subtree number of elements
                     int height[K];          // subtree height
@@ -151,6 +126,12 @@ class AccessBtree : public History<K, T> {
 
                 virtual ~Node() {}
 
+                inline void
+                shrink(const Intervals<K> & r, int k)
+                {
+                    this->region[k] = r[k];
+                }
+
                 inline int
                 size(void) const
                 {
@@ -170,7 +151,7 @@ class AccessBtree : public History<K, T> {
                 }
 
                 inline void
-                register_access(access_mode_t mode, T * obj)
+                register_access(access_mode_t mode, const T & obj)
                 {
                     if (mode & ACCESS_MODE_W)
                     {
@@ -188,10 +169,10 @@ class AccessBtree : public History<K, T> {
                 inherit_accesses(Node * parent)
                 {
                     this->last_reads.insert(
-                            this->last_reads.end(),
-                            std::make_move_iterator(parent->last_reads.begin()),
-                            std::make_move_iterator(parent->last_reads.end())
-                            );
+                        this->last_reads.end(),
+                        std::make_move_iterator(parent->last_reads.begin()),
+                        std::make_move_iterator(parent->last_reads.end())
+                    );
                     this->last_write = parent->last_write;
                     this->has_write = parent->has_write;
                 }
@@ -629,7 +610,7 @@ class AccessBtree : public History<K, T> {
             Direction dir,
             Node * node,
             access_mode_t mode,
-            T * obj
+            const T & obj
         ) {
             tassert(node);
             parent->st[k].children[dir] = node;
@@ -806,7 +787,7 @@ class AccessBtree : public History<K, T> {
             Node * parent,
             access_mode_t mode,
             Intervals<K> & region,
-            T * obj
+            const T & obj
         ) {
             tassert(mode & ACCESS_MODE_W);
 
@@ -838,7 +819,7 @@ class AccessBtree : public History<K, T> {
             Node * parent,
             access_mode_t mode,
             Intervals<K> & region,
-            T * obj,
+            const T & obj,
             int k,
             Node * node
         ) {
@@ -935,7 +916,7 @@ class AccessBtree : public History<K, T> {
 
                         // shrink parent
                         int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
-                        parent->region[k] = region[k];
+                        parent->shrink(region, k);
 
                         // reinsert 2 nodes for parent's shrinked borders
                         for (int i = 0 ; i < 2 ; ++i)
@@ -947,15 +928,15 @@ class AccessBtree : public History<K, T> {
                             r[k].b = x[2*i+1];
                             Node * node = new Node(r, k, RED);
                             // this->insert_from(parent, mode, r, nullptr, k, node);
-                            this->insert_from(this->root, mode, r, nullptr, 0, node);
+                            this->insert_from(this->root, ACCESS_MODE_VOID, r, obj, 0, node);
                             node->inherit_accesses(parent);
                         }
 
                         // shrink children for dimensions k' > k
                         if (k < K-1)
                         {
-                            std::function<void(Node *)> f = [this, &k, &region, &x](Node * node) {
-                                node->region[k] = region[k];
+                            std::function<void(Node *)> f = [this, &k, &region, &x, &obj](Node * node) {
+                                node->shrink(region, k);
                                 for (int i = 0 ; i < 2 ; ++i)
                                 {
                                     if (x[2*i+0] == x[2*i+1])
@@ -965,14 +946,14 @@ class AccessBtree : public History<K, T> {
                                     r[k].b = x[2*i+1];
                                     Node * split = new Node(r, k, RED);
                                     // TODO : probably no need to restart from root and dim 0
-                                    this->insert_from(this->root, ACCESS_MODE_VOID, r, nullptr, 0, split);
+                                    this->insert_from(this->root, ACCESS_MODE_VOID, r, obj, 0, split);
                                     split->inherit_accesses(node);
                                 }
                             };
                             foreach_k_child(parent, k+1, f);
                         }
 
-                        // TODO : optimisation, unnecessary if we outdated another child
+                        // TODO : unnecessary if we outdated another child
                         this->outdate(parent);
                     } /* I == J ||  J c I */
                 }
@@ -1045,7 +1026,7 @@ class AccessBtree : public History<K, T> {
 
         // Insert the new access in the tree
         void
-        insert(access_mode_t mode, Intervals<K> & region, T * obj)
+        insert(access_mode_t mode, Intervals<K> & region, const T & obj)
         {
             DEBUG("##############################");
             DEBUG("--- New insert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
@@ -1081,7 +1062,7 @@ class AccessBtree : public History<K, T> {
         }
 
         void
-        intersect_from(Node * node, access_mode_t mode, Intervals<K> & region, T * obj) const
+        intersect_from(Node * node, access_mode_t mode, Intervals<K> & region, const T & obj) const
         {
             if (node == nullptr)
                 return ;
@@ -1095,7 +1076,7 @@ class AccessBtree : public History<K, T> {
             if (region.intersects(node->region))
             {
                 if (mode & ACCESS_MODE_W && node->last_reads.size())
-                    for (T * & pred : node->last_reads)
+                    for (T & pred : node->last_reads)
                         this->on_hazard(node->region, pred, region, obj);
                 else if (node->has_write)
                     this->on_hazard(node->region, node->last_write, region, obj);
@@ -1110,7 +1091,7 @@ class AccessBtree : public History<K, T> {
 
         // Retrieve objects previously inserted that intersect with the interval
         void
-        intersect(access_mode_t mode, Intervals<K> & region, T * obj) const
+        intersect(access_mode_t mode, Intervals<K> & region, const T & obj) const
         {
             this->intersect_from(this->root, mode, region, obj);
         }

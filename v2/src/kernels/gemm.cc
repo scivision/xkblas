@@ -102,6 +102,12 @@ xkblas_£gemm_tile_async(
 
     # undef NACCESSES
 
+    # ifndef NDEBUG
+    assert(transA == CblasNoTrans);
+    assert(transB == CblasNoTrans);
+    snprintf(task->label, sizeof(task->label), "gemm(%d, %d, %d)", Atm, Atn, Btn);
+    # endif /* NDEBUG */
+
     return 0;
 }
 
@@ -181,7 +187,8 @@ xkblas_£gemm_async(
 
     xkblas_context_t * context = xkblas_context_get();
     // int BS = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
-    const int BS = M / 4;
+    const int NTILES = 2;
+    const int BS = M / NTILES;
 
     // TODO : set tiling parameters
     int Amb = BS;
@@ -294,5 +301,13 @@ xkblas_£gemm_async(
             }
         }
     }
+
+#ifndef NDEBUG
+    ThreadProducer * thread = ThreadProducer::get();
+    FILE * f = fopen("gemm.dot", "w");
+    thread->dump_tasks(f);
+    fclose(f);
+# endif /* NDEBUG */
+
     return 0;
 }

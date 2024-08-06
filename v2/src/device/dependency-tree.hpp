@@ -4,14 +4,18 @@
 # include "device/task.hpp"
 # include "sync/access-btree.hpp"
 
-class DependencyTree : public AccessBtree<2, Task> {
+class DependencyTree : public AccessBtree<2, Task *> {
 
    /**
     *  Callback when a dependence is detected
     */
     void
-    on_hazard(const Region & rx, Task * x, const Region & ry, Task * y) const
-    {
+    on_hazard(
+        const Region & rx,
+        Task * const & x,
+        const Region & ry,
+        Task * const & y
+    ) const {
         x->precedes(y, rx.intersection(ry));
     }
 };

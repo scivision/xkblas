@@ -74,7 +74,26 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
                 // defer the task to consumer threads
                 xkblas_drivers_enqueue(drivers, task);
             }
+
+            # ifndef NDEBUG
+            tasks.push_back(task);
+            # endif
         }
+
+        # ifndef NDEBUG
+        void
+        dump_tasks(FILE * f)
+        {
+            fprintf(f, "digraph G {\n");
+            for (Task * & task : this->tasks)
+                fprintf(f, "    \"%p\" [label=\"%s\"] ;\n", task, task->label);
+
+            for (Task * & pred : this->tasks)
+                for (task_edge_t & edge : pred->edges)
+                    fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, edge.successor);
+            fprintf(f, "}\n");
+        }
+        # endif /* NDEBUG */
 
     private:
 
@@ -85,8 +104,12 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
         /* next free task pointer in the stack */
         uint8_t * memory_stack_ptr;
 
-        /* Memory mapping */
+        /* Dependency tree */
         DependencyTree deptree;
+
+        #ifndef NDEBUG
+        std::vector<Task *> tasks;
+        #endif /* NDEBUG */
 };
 
 #endif /* __THREAD_PRODUCER_HPP__ */

@@ -307,6 +307,9 @@ xkblas_device_prepare_task(
     uint64_t index = device->p_write;
     device->pipeline[index % device->pipe_size] = task;
 
+    /* retrieve the memory state */
+    MemoryTree * mem = &(context->drivers.memtree);
+
     /* use task->wc as counter for asynchronous callback to detect
        completion of them
        - each callback decr counter
@@ -320,9 +323,10 @@ xkblas_device_prepare_task(
         if (access->mode == ACCESS_MODE_VOID)
             break ;
 
-        // TODO : do we need to take some lock here ?
-        // We are executing 'task' that accesses are already synchronized via
-        // dependences, so i believe not
+        // TODO : do we need to take some lock here ?  We are executing 'task'
+        // that accesses are already synchronized via dependences But another
+        // independent access might modify the memory tree concurrently...
+
         auto process = [] (MemoryBlock block) {
             // TODO : check that replicate is up to date, if not, move data
         };

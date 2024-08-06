@@ -23,6 +23,7 @@ add_library(xkblas SHARED
     src/device/thread-worker.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
+    src/sync/color.cc
 )
 
 # Include directory

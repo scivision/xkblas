@@ -20,7 +20,7 @@ main(void)
     double _Complex alpha = 1.0;
     double _Complex beta  = 1.0;
 
-    # if 1
+    # if 0
     const double _Complex * A = (const double _Complex *) malloc(sizeof(double _Complex) * LDA * LDA);
     const double _Complex * B = (const double _Complex *) malloc(sizeof(double _Complex) * LDB * LDB);
           double _Complex * C = (      double _Complex *) malloc(sizeof(double _Complex) * LDC * LDC);
