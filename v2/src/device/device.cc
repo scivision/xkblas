@@ -299,8 +299,7 @@ xkblas_device_prepare_task(
 
     // 'kaapi_offload_device_prepare_execute_task'
 
-    /* take 'pseudo' lock to avoid activation of the task when data is received.
-       Wait until all  parameters have been processed. */
+    /* re-use the wait counter to ensure all data accesses had been copied to the device */
     assert(task->wc == 0);
     task->wc.fetch_add(1, std::memory_order_seq_cst);
 
@@ -309,33 +308,11 @@ xkblas_device_prepare_task(
 
     /* retrieve the memory state */
     MemoryTree * mem = &(context->drivers.memtree);
+    mem->fetch(device, task);
 
-    /* use task->wc as counter for asynchronous callback to detect
-       completion of them
-       - each callback decr counter
-       - each access without need for callback decr it
-       - after all parameters have been visited, then decr the counter.
-       The last decr that set counter to 0 push the task on the kernel stream
-       */
-    for (int i = 0 ; i < TASK_MAX_ACCESSES ; ++i)
+    if (task->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
     {
-        task_access_t * access = task->accesses + i;
-        if (access->mode == ACCESS_MODE_VOID)
-            break ;
-
-        // TODO : do we need to take some lock here ?  We are executing 'task'
-        // that accesses are already synchronized via dependences But another
-        // independent access might modify the memory tree concurrently...
-
-        auto process = [] (MemoryBlock block) {
-            // TODO : check that replicate is up to date, if not, move data
-        };
-        // context->drivers.memtree.intersect_all(access.region);
-
-        // TODO : loop against each mdi intersecting this access
-        // for (...)
-        //     xkblas_metadata_info_t * mdi =  [...]
-
+        // TODO : 'task' kernel can be executed on the GPU
     }
 }
 

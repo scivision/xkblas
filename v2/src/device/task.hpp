@@ -62,6 +62,7 @@ class alignas(std::hardware_constructive_interference_size) Task
             body(body),
             edges(8),
             accesses(),
+            naccesses(0),
             ocr_access_index(XKBLAS_DEVICES_MAX),
             targetted_device_id(XKBLAS_DEVICES_MAX),
             wc(1),
@@ -89,6 +90,7 @@ class alignas(std::hardware_constructive_interference_size) Task
 
         /* task accesses */
         task_access_t accesses[TASK_MAX_ACCESSES];
+        uint8_t naccesses;
 
         /* OCR parameter index, or -1 if none */
         uint8_t ocr_access_index;

@@ -57,6 +57,8 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
         template<int N>
         void commit(xkblas_drivers_t * drivers, Task * task)
         {
+            task->naccesses = N;
+
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
             {

@@ -1,7 +1,7 @@
 #ifndef __ACCESS_MODE_H__
 # define __ACCESS_MODE_H__
 
-typedef enum    access_mode_e
+typedef enum    access_mode_t
 {
     ACCESS_MODE_VOID    = 0b00000000,
     ACCESS_MODE_R       = 0b00000001,
