@@ -78,243 +78,244 @@ twopow(int n)
 # include "access-mode.h"
 # include "color.h"
 # include "direction.h"
-# include "utils.hpp"
 
-# define FOREACH_CHILD_BEGIN(N, C, I, D)                \
-do {                                                    \
-    for (int I = 0 ; I < K ; ++I)                       \
-    {                                                   \
-        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)    \
-        {                                               \
-            KIntervalNode * C = N->st[I].children[D];   \
-            if (C)                                      \
+# define FOREACH_CHILD_BEGIN(N, C, I, D)                    \
+do {                                                        \
+    for (int I = 0 ; I < K ; ++I)                           \
+    {                                                       \
+        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)        \
+        {                                                   \
+            KIntervalBtreeNode * C = N->st[I].children[D];  \
+            if (C)                                          \
             {
-# define FOREACH_CHILD_END(N, C, I, D)                  \
-            }                                           \
-        }                                               \
-    }                                                   \
+# define FOREACH_CHILD_END(N, C, I, D)                      \
+            }                                               \
+        }                                                   \
+    }                                                       \
 } while (0)
+
+/* A node */
+template<int K>
+class KIntervalBtreeNode {
+
+    public:
+
+        /* a node subtree */
+        typedef union
+        {
+            KIntervalBtreeNode * children[2];
+            struct {
+                KIntervalBtreeNode * left;
+                KIntervalBtreeNode * right;
+            };
+        } subtree_t;
+
+        /* node's parent */
+        KIntervalBtreeNode * parent;
+
+        /* node's child */
+        subtree_t st[K];
+
+        /* node's color in each subtree */
+        Color colors[K];
+
+        /* the region represented by this node */
+        Intervals<K> region;
+
+        /* the dimension represented by this node */
+        int k;
+
+        struct {
+            Intervals<K> region;    // subtree englobing region
+            int nelements[K];       // subtree number of elements
+            int height[K];          // subtree height
+            int outdated;           // whether 'includes' struct must be recomputed
+        } includes;
+
+        #ifndef NDEBUG
+        struct {
+            int id;
+        } checks;
+        #endif /* NDEBUG */
+
+    public:
+
+        KIntervalBtreeNode(Intervals<K> & r) : KIntervalBtreeNode(r, 0, BLACK) {}
+
+        KIntervalBtreeNode(Intervals<K> & r, int k, Color color) :
+            parent(nullptr),
+            k(k),
+            region(r),
+            colors{BLACK}
+        {
+            memset(this->st, 0, sizeof(this->st));
+
+            this->includes.region.copy(r);
+            this->includes.outdated = 0;
+
+            memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
+            this->includes.nelements[k] = 1;
+
+            memset(this->includes.height, 0, sizeof(this->includes.height));
+            for (int i = k ; i < K ; ++i)
+                this->includes.height[i] = 1;
+
+            this->colors[k] = color;
+        }
+
+        virtual ~KIntervalBtreeNode() {}
+
+        inline void
+        shrink(const Intervals<K> & r, int k)
+        {
+            this->region[k] = r[k];
+        }
+
+        inline void
+        update_includes_height(void)
+        {
+            for (int k = 0 ; k < K ; ++k)
+            {
+                int hleft  = this->st[k].left  ? this->st[k].left->includes.height[k]   : 0;
+                int hright = this->st[k].right ? this->st[k].right->includes.height[k]  : 0;
+                this->includes.height[k] = 1 + MAX(hleft, hright);
+            }
+        }
+
+        // TODO : maintaining the size (n-k) per k-tree is a bothersome O(K²)
+        // It is currently used to detecting imbalance on a k-subtree
+        //
+        // Another way would to be maintain the size (n) for the entire b-tree,
+        // and if load imbalance is detected - h >=2*K*log(n) - then compute
+        // the n-k's and rebalance where it needs
+        inline void
+        update_includes_nelements(void)
+        {
+            for (int k = 0 ; k < K ; ++k)
+                this->includes.nelements[k] = 0;
+            this->includes.nelements[this->k] = 1;
+
+            for (int k = this->k ; k < K ; ++k)
+            {
+                for (int kk = 0 ; kk < K ; ++kk)
+                {
+                    int nl = this->st[kk].left  ? this->st[kk].left->includes.nelements[k]  : 0;
+                    int nr = this->st[kk].right ? this->st[kk].right->includes.nelements[k] : 0;
+                    this->includes.nelements[k] += nr + nl;
+                }
+            }
+        }
+
+        inline void
+        update_includes_interval(void)
+        {
+            for (int k = 0 ; k < K ; ++k)
+            {
+                this->includes.region[k].a = this->region[k].a;
+                this->includes.region[k].b = this->region[k].b;
+
+                FOREACH_CHILD_BEGIN(this, child, kk, dir)
+                {
+                    this->includes.region[k].a = MIN(
+                         this->includes.region[k].a,
+                        child->includes.region[k].a
+                    );
+
+                    this->includes.region[k].b = MAX(
+                         this->includes.region[k].b,
+                        child->includes.region[k].b
+                    );
+                }
+                FOREACH_CHILD_END(this, child, kk, dir);
+            }
+        }
+
+        virtual inline void
+        update_includes(void)
+        {
+            this->update_includes_interval();
+            this->update_includes_nelements();
+            this->update_includes_height();
+        }
+
+        inline int
+        size(void) const
+        {
+            int nelements = 0;
+            for (int k = 0 ; k < K ; ++k)
+                nelements += this->includes.nelements[k];
+            return nelements;
+        }
+
+        inline int
+        height(void) const
+        {
+            int height = 0;
+            for (int k = 0 ; k < K ; ++k)
+                height = MAX(height, this->includes.height[k]);
+            return height;
+        }
+
+        void
+        dump(FILE * f) const
+        {
+            {
+                const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
+
+                char region[1024];
+                this->region.tostring(region, sizeof(region));
+
+                char include_region[1024];
+                this->includes.region.tostring(include_region, sizeof(include_region));
+
+                fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\n\\n--- includes ---\\n%s\\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, include_region, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+            }
+
+            FOREACH_CHILD_BEGIN(this, child, k, dir)
+            {
+                child->dump(f);
+                fprintf(f, "    N%p->N%p ; \n", this, child);
+            }
+            FOREACH_CHILD_END(this, child, k, dir);
+        }
+
+        void
+        dump_region(FILE * f) const
+        {
+            assert(K == 1 || K == 2);
+            if (K == 1)
+            {
+                fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[};\n",
+                        this->region[0].a, 0,
+                        this->region[0].b, 2,
+                        this->region[0].a, this->region[0].b
+                );
+            }
+            else if (K == 2)
+            {
+                fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[};\n",
+                        this->region[0].a, this->region[1].a,
+                        this->region[0].b, this->region[1].b,
+                        this->region[0].a, this->region[0].b,
+                        this->region[1].a, this->region[1].b,
+                );
+            }
+
+            FOREACH_CHILD_BEGIN(this, child, k, dir)
+            {
+                child->dump_region(f);
+            }
+            FOREACH_CHILD_END(this, child, k, dir);
+        }
+}; /* class KIntervalBtreeNode */
+
+
 
 /* K is the number of dimensions */
 template<int K, typename N>
 class KIntervalBtree {
 
-    /* A node */
-    class Node {
-
-        public:
-
-            /* a node subtree */
-            typedef union
-            {
-                KIntervalNode * children[2];
-                struct {
-                    KIntervalNode * left;
-                    KIntervalNode * right;
-                };
-            } subtree_t;
-
-            /* node's parent */
-            KIntervalNode * parent;
-
-            /* node's child */
-            subtree_t st[K];
-
-            /* node's color in each subtree */
-            Color colors[K];
-
-            /* the region represented by this node */
-            Intervals<K> region;
-
-            /* the dimension represented by this node */
-            int k;
-
-            struct {
-                Intervals<K> region;    // subtree englobing region
-                int nelements[K];       // subtree number of elements
-                int height[K];          // subtree height
-                int outdated;           // whether 'includes' struct must be recomputed
-            } includes;
-
-            #ifndef NDEBUG
-            struct {
-                int id;
-            } checks;
-            #endif /* NDEBUG */
-
-            // constructor
-            KIntervalNode() : KIntervalNode(Intervals<K>()) {}
-
-            KIntervalNode(Intervals<K> & r) : KIntervalNode(r, 0, BLACK) {}
-
-            KIntervalNode(Intervals<K> & r, int k, Color color) :
-                parent(nullptr),
-                k(k),
-                region(r),
-                colors{BLACK}
-            {
-                memset(this->st, 0, sizeof(this->st));
-
-                this->includes.region.copy(r);
-                this->includes.outdated = 0;
-
-                memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
-                this->includes.nelements[k] = 1;
-
-                memset(this->includes.height, 0, sizeof(this->includes.height));
-                for (int i = k ; i < K ; ++i)
-                    this->includes.height[i] = 1;
-
-                this->colors[k] = color;
-            }
-
-            virtual ~KIntervalNode() {}
-
-            inline void
-            shrink(const Intervals<K> & r, int k)
-            {
-                this->region[k] = r[k];
-            }
-
-            inline void
-            update_includes_height(void)
-            {
-                for (int k = 0 ; k < K ; ++k)
-                {
-                    int hleft  = this->st[k].left  ? this->st[k].left->includes.height[k]   : 0;
-                    int hright = this->st[k].right ? this->st[k].right->includes.height[k]  : 0;
-                    this->includes.height[k] = 1 + MAX(hleft, hright);
-                }
-            }
-
-            // TODO : maintaining the size (n-k) per k-tree is a bothersome O(K²)
-            // It is currently used to detecting imbalance on a k-subtree
-            //
-            // Another way would to be maintain the size (n) for the entire b-tree,
-            // and if load imbalance is detected - h >=2*K*log(n) - then compute
-            // the n-k's and rebalance where it needs
-            inline void
-            update_includes_nelements(void)
-            {
-                for (int k = 0 ; k < K ; ++k)
-                    this->includes.nelements[k] = 0;
-                this->includes.nelements[this->k] = 1;
-
-                for (int k = this->k ; k < K ; ++k)
-                {
-                    for (int kk = 0 ; kk < K ; ++kk)
-                    {
-                        int nl = this->st[kk].left  ? this->st[kk].left->includes.nelements[k]  : 0;
-                        int nr = this->st[kk].right ? this->st[kk].right->includes.nelements[k] : 0;
-                        this->includes.nelements[k] += nr + nl;
-                    }
-                }
-            }
-
-            inline void
-            update_includes_interval(void)
-            {
-                for (int k = 0 ; k < K ; ++k)
-                {
-                    this->includes.region[k].a = this->region[k].a;
-                    this->includes.region[k].b = this->region[k].b;
-
-                    FOREACH_CHILD_BEGIN(this, child, kk, dir)
-                    {
-                        this->includes.region[k].a = MIN(
-                             this->includes.region[k].a,
-                            child->includes.region[k].a
-                        );
-
-                        this->includes.region[k].b = MAX(
-                             this->includes.region[k].b,
-                            child->includes.region[k].b
-                        );
-                    }
-                    FOREACH_CHILD_END(this, child, kk, dir);
-                }
-            }
-
-            virtual inline void
-            update_includes(void)
-            {
-                this->update_includes_interval();
-                this->update_includes_nelements();
-                this->update_includes_height();
-            }
-
-            inline int
-            size(void) const
-            {
-                int nelements = 0;
-                for (int k = 0 ; k < K ; ++k)
-                    nelements += this->includes.nelements[k];
-                return nelements;
-            }
-
-            inline int
-            height(void) const
-            {
-                int height = 0;
-                for (int k = 0 ; k < K ; ++k)
-                    height = MAX(height, this->includes.height[k]);
-                return height;
-            }
-
-            void
-            dump(FILE * f) const
-            {
-                {
-                    const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
-
-                    char region[1024];
-                    this->region.tostring(region, sizeof(region));
-
-                    char include_region[1024];
-                    this->includes.region.tostring(include_region, sizeof(include_region));
-
-                    fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\n\\n--- includes ---\\n%s\\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, include_region, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
-                }
-
-                FOREACH_CHILD_BEGIN(this, child, k, dir)
-                {
-                    child->dump(f);
-                    fprintf(f, "    N%p->N%p ; \n", this, child);
-                }
-                FOREACH_CHILD_END(this, child, k, dir);
-            }
-
-            void
-            dump_region(FILE * f) const
-            {
-                assert(K == 1 || K == 2);
-                if (K == 1)
-                {
-                    fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[};\n",
-                            this->region[0].a, 0,
-                            this->region[0].b, 2,
-                            this->region[0].a, this->region[0].b
-                    );
-                }
-                else if (K == 2)
-                {
-                    fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[};\n",
-                            this->region[0].a, this->region[1].a,
-                            this->region[0].b, this->region[1].b,
-                            this->region[0].a, this->region[0].b,
-                            this->region[1].a, this->region[1].b,
-                    );
-                }
-
-                FOREACH_CHILD_BEGIN(this, child, k, dir)
-                {
-                    child->dump_region(f);
-                }
-                FOREACH_CHILD_END(this, child, k, dir);
-            }
-    }; /* class KIntervalNode */
-
-    static_assert std::is_base_of<KIntervalNode, N>::value;
+    static_assert std::is_base_of<KIntervalBtreeNode<K>, N>::value;
 
     private:
 
@@ -1084,6 +1085,10 @@ class KIntervalBtree {
                     return ;
                 }
             }
+            else
+            {
+                # error "Must implemented 'intersect_test' routine"
+            }
 
             if (region.intersects(node->region))
             {
@@ -1095,16 +1100,6 @@ class KIntervalBtree {
                 this->intersect_from(child, mode, region, obj);
             }
             FOREACH_CHILD_END(node, child, k, dir);
-        }
-
-        /**
-         * Insert a new intervals 'intervals' in the history with the access mode
-         * 'mode' and attach 'obj' to that intervals.
-         */
-        void
-        intersect(access_mode_t mode, Intervals<K> & region, const T & obj) const
-        {
-            this->intersect_from(this->root, mode, region, obj);
         }
 
         // Dump the tree to the given file

@@ -63,12 +63,12 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
             for (int i = 0 ; i < N ; ++i)
             {
                 assert(task->accesses[i].mode);
-                this->deptree.intersect(task->accesses[i].mode, task->accesses[i].region, task);
+                this->deptree.intersect(task, task->accesses + i);
             }
 
             // register accesses for linking with future tasks
             for (int i = 0 ; i < N ; ++i)
-                this->deptree.insert(task->accesses[i].mode, task->accesses[i].region, task);
+                this->deptree.insert(task, task->accesses + i);
 
             // commit the task
             if (task->commit())

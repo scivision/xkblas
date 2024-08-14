@@ -2,9 +2,10 @@
 # define __DEPENDENCY_TREE_HPP__
 
 # include "device/task.hpp"
-# include "sync/access-btree.hpp"
+# include "sync/kinterval-btree.hpp"
 
-class DependencyNode : public Node<2> {
+template <int K>
+class DependencyTreeNode : public KIntervalBtreeNode<K> {
 
     public:
 
@@ -19,11 +20,11 @@ class DependencyNode : public Node<2> {
 
     public:
 
-        DependencyNode() : DependencyNode(Intervals<K>()) {}
+        DependencyTreeNode() : DependencyTreeNode(Region()) {}
 
-        DependencyNode(Intervals<K> & r) : {}
+        DependencyTreeNode(Region & r) : {}
 
-        DependencyNode(Intervals<K> & r, int k, Color color) :
+        DependencyTreeNode(Region & r, int k, Color color) :
             Node(r, k, color),
             last_reads(),
             last_write(nullptr),
@@ -77,16 +78,29 @@ class DependencyNode : public Node<2> {
 
         /* return true to stop intersection search */
         inline bool
-        intersect_test(Intervals<K> & region)
+        intersect_test(Region & region)
         {
             if (mode == ACCESS_MODE_R && node->includes.nwrites == 0)
                 return true;
             return false;
         }
 
+        /**
+         *  Callback when a dependence is detected
+         */
+        inline void
+        on_hazard(
+            const Region & rx,
+            Task * const & x,
+            const Region & ry,
+            Task * const & y
+        ) const {
+            x->precedes(y, rx.intersection(ry));
+        }
+
         /* we are intersecting 'region' and it intersected with 'this' node */
         inline void
-        on_intersect(Intervals<K> & region)
+        on_intersect(Region & region)
         {
             if (mode & ACCESS_MODE_W && this->last_reads.size())
                 for (Task * & pred : node->last_reads)
@@ -96,20 +110,26 @@ class DependencyNode : public Node<2> {
         }
 };
 
-class DependencyTree : public AccessBtree<2> {
+class DependencyTree : public KIntervalBtree<2, DependencyTreeNode> {
 
-   /**
-    *  Callback when a dependence is detected
-    */
-    void
-    on_hazard(
-        const Region & rx,
-        Task * const & x,
-        const Region & ry,
-        Task * const & y
-    ) const {
-        x->precedes(y, rx.intersection(ry));
-    }
+    public:
+
+        /**
+         * Insert a new intervals 'intervals' in the history with the access mode
+         * 'mode' and attach 'obj' to that intervals.
+         */
+        inline void
+        intersect(Task * task, const task_access_t * access) const
+        {
+            // TODO
+            // this->intersect_from(this->root, mode, region, obj);
+        }
+
+        inline void
+        insert(Task * task, const task_access_t * access)
+        {
+            // TODO
+        }
 };
 
 #endif /* __DEPENDENCY_TREE_HPP__ */
