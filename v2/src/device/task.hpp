@@ -33,13 +33,12 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
-using Region = Intervals<2>;
-
-typedef struct  task_access_t : access_t<2>
+template<int K>
+struct task_access_t : access_t<K>
 {
-    task_access_t() : access_t<2>() {}
+    task_access_t() : access_t<K>() {}
     ~task_access_t() {}
-}               task_access_t;
+};
 
 class Task;
 
@@ -51,7 +50,7 @@ class Task;
 typedef struct  task_edge_t
 {
     Task * successor;
-    const Region region;
+    const Intervals<2> region;
 }               task_edge_t;
 
 class alignas(std::hardware_constructive_interference_size) Task
@@ -89,7 +88,7 @@ class alignas(std::hardware_constructive_interference_size) Task
         std::vector<task_edge_t> edges;
 
         /* task accesses */
-        task_access_t accesses[TASK_MAX_ACCESSES];
+        task_access_t<2> accesses[TASK_MAX_ACCESSES];
         uint8_t naccesses;
 
         /* OCR parameter index, or -1 if none */
@@ -117,7 +116,7 @@ class alignas(std::hardware_constructive_interference_size) Task
         ////////////////////////////////////
 
         /* this task precedes the passed task */
-        void precedes(Task * successor, const Region & region);
+        void precedes(Task * successor, task_access_t<2> access);
 
         /* Return 'true' if the task is ready to be queued, 'false' otherwise */
         bool commit(void);

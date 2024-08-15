@@ -1,5 +1,5 @@
-#ifndef __ACCESS_BTREE_H__
-# define __ACCESS_BTREE_H__
+#ifndef __KINTERVAL_BTREE_H__
+# define __KINTERVAL_BTREE_H__
 
 // tree assert, must be called within a member function
 # ifdef NDEBUG
@@ -29,7 +29,6 @@
 using namespace std::placeholders;
 
 # include <type_traits>
-# include "has_member.hpp"
 
 # include <ostream>
 # include <iostream>
@@ -79,24 +78,26 @@ twopow(int n)
 # include "color.h"
 # include "direction.h"
 
-# define FOREACH_CHILD_BEGIN(N, C, I, D)                    \
-do {                                                        \
-    for (int I = 0 ; I < K ; ++I)                           \
-    {                                                       \
-        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)        \
-        {                                                   \
-            KIntervalBtreeNode * C = N->st[I].children[D];  \
-            if (C)                                          \
+# define FOREACH_CHILD_BEGIN(N, C, I, D)                        \
+do {                                                            \
+    for (int I = 0 ; I < K ; ++I)                               \
+    {                                                           \
+        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)            \
+        {                                                       \
+            KIntervalBtreeNode<K> * C = N->st[I].children[D];   \
+            if (C)                                              \
             {
-# define FOREACH_CHILD_END(N, C, I, D)                      \
-            }                                               \
-        }                                                   \
-    }                                                       \
+# define FOREACH_CHILD_END(N, C, I, D)                          \
+            }                                                   \
+        }                                                       \
+    }                                                           \
 } while (0)
 
 /* A node */
 template<int K>
 class KIntervalBtreeNode {
+
+    using Region = Intervals<K>;
 
     public:
 
@@ -120,13 +121,13 @@ class KIntervalBtreeNode {
         Color colors[K];
 
         /* the region represented by this node */
-        Intervals<K> region;
+        Region region;
 
         /* the dimension represented by this node */
         int k;
 
         struct {
-            Intervals<K> region;    // subtree englobing region
+            Region region;    // subtree englobing region
             int nelements[K];       // subtree number of elements
             int height[K];          // subtree height
             int outdated;           // whether 'includes' struct must be recomputed
@@ -140,9 +141,7 @@ class KIntervalBtreeNode {
 
     public:
 
-        KIntervalBtreeNode(Intervals<K> & r) : KIntervalBtreeNode(r, 0, BLACK) {}
-
-        KIntervalBtreeNode(Intervals<K> & r, int k, Color color) :
+        KIntervalBtreeNode(Region & r, int k, Color color) :
             parent(nullptr),
             k(k),
             region(r),
@@ -166,7 +165,7 @@ class KIntervalBtreeNode {
         virtual ~KIntervalBtreeNode() {}
 
         inline void
-        shrink(const Intervals<K> & r, int k)
+        shrink(const Region & r, int k)
         {
             this->region[k] = r[k];
         }
@@ -297,7 +296,7 @@ class KIntervalBtreeNode {
                         this->region[0].a, this->region[1].a,
                         this->region[0].b, this->region[1].b,
                         this->region[0].a, this->region[0].b,
-                        this->region[1].a, this->region[1].b,
+                        this->region[1].a, this->region[1].b
                 );
             }
 
@@ -307,17 +306,17 @@ class KIntervalBtreeNode {
             }
             FOREACH_CHILD_END(this, child, k, dir);
         }
+
 }; /* class KIntervalBtreeNode */
-
-
 
 /* K is the number of dimensions */
 template<int K, typename N>
 class KIntervalBtree {
 
-    static_assert std::is_base_of<KIntervalBtreeNode<K>, N>::value;
+    static_assert(std::is_base_of<KIntervalBtreeNode<K>, N>::value);
+    using Region = Intervals<K>;
 
-    private:
+    public:
 
         /* Root node */
         N * root;
@@ -331,7 +330,7 @@ class KIntervalBtree {
     public:
         KIntervalBtree() : root(nullptr), limbs(), outdated() {}
 
-        static inline void
+        inline void
         subtree_delete(N * node)
         {
             if (node == nullptr)
@@ -553,8 +552,8 @@ class KIntervalBtree {
             update_includes(B);
         }
 
-        void
-        balance_fixup(N * z, int k)
+        inline void
+        balance_fixup(int k, N * z)
         {
             tassert(z->colors[k] == RED);
 
@@ -619,32 +618,31 @@ class KIntervalBtree {
             this->root->colors[k] = BLACK;
         }
 
-        void
+        inline void
         insert_fixup(
             N * parent,
             int k,
             Direction dir,
-            N * node,
-            access_mode_t mode,
-            const T & obj
+            N * node
         ) {
             tassert(node);
             parent->st[k].children[dir] = node;
             node->parent = parent;
-            node->register_access(mode, obj);
-
             this->outdate(node);
 
             // inserting a new k-subtree, this k-root is black
             if (parent->k < k)
+            {
                 node->colors[k] = BLACK;
+            }
             // rebalance the k-subtree
             else
-                this->balance_fixup(node, k);
+            {
+                this->balance_fixup(k, node);
+            }
         }
 
 # ifdef REBALANCE
-
         static inline void
         compress(N * root, int k, int m)
         {
@@ -797,266 +795,9 @@ class KIntervalBtree {
         }
 # endif /* REBALANCE */
 
-# ifdef CUT
         void
-        insert_from_cut(
-            N * parent,
-            access_mode_t mode,
-            Intervals<K> & region,
-            const T & obj
-        ) {
-            tassert(mode & ACCESS_MODE_W);
-
-            FOREACH_CHILD_BEGIN(parent, child, k, dir)
-            {
-                this->limbs.push_back(child);
-                parent->st[k].children[dir] = nullptr;
-            }
-            FOREACH_CHILD_END(parent, child, k, dir);
-
-            parent->region.copy(region);
-            parent->register_access(mode, obj);
-
-            this->outdate(parent);
-        }
-# endif /* CUT */
-
-        void
-        insert_from(
-            N * parent,
-            access_mode_t mode,
-            Intervals<K> & region,
-            const T & obj,
-            int k,
-            N * node
-        ) {
-            DEBUG("---  (start) subinsert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
-            for (int i = 0 ; i < K ; ++i)
-                DEBUG("---   [%d, %d[", region[i].a, region[i].b);
-
-            // TODO : optimisation
-            //  Unroll this loop using a recursive template
-            while (k < K)
-            {
-                // quick-way out, if the region includes all subregion with an
-                // 'out' access, we can discard all children
-# ifdef CUT
-#  pragma message("Tree cut enable")
-                // TODO : the includes test could be accelerated simply
-                // checking >=k dimensions, as we know we are already matching
-                // <k dimensions
-                if (mode & ACCESS_MODE_W)
-                {
-                   if (region.includes(parent->includes.region))
-                   {
-                       // TODO : what if 'node' is not null ?  probably want to
-                       // return something to callee for the case (3)
-                       tassert(node == nullptr);
-                       this->insert_from_cut(parent, mode, region, obj);
-                       break ;
-                   }
-                }
-# else
-#  pragma message("Tree cut disabled. Enable it using '-DCUT'")
-# endif /* CUT */
-
-                // Process 6 cases
-
-
-                // case (1)    J << I
-                if (region[k].b <= parent->region[k].a)
-                {
-                    if (parent->st[k].left == nullptr)
-                    {
-                        if (node == nullptr)
-                            node = new N(region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        this->insert_fixup(parent, k, LEFT, node, mode, obj);
-                        break ;
-                    }
-                    else
-                    {
-                        parent = parent->st[k].left;
-                    }
-                }
-                // case (2)     J >> I
-                else if (region[k].a >= parent->region[k].b)
-                {
-                    if (parent->st[k].right == nullptr)
-                    {
-                        if (node == nullptr)
-                            node = new N(region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        this->insert_fixup(parent, k, RIGHT, node, mode, obj);
-                        break ;
-                    }
-                    else
-                    {
-                        parent = parent->st[k].right;
-                    }
-                }
-                // case (3)     J c I   (or I == J)
-                else if (parent->region[k].a <= region[k].a && region[k].b <= parent->region[k].b)
-                {
-                    if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)   /* I == J */
-                    {
-                        if (++k == K)
-                        {
-                            tassert(node == nullptr);
-                            parent->register_access(mode, obj);
-                            this->outdate(parent);
-                            break ;
-                        }
-                    }
-                    else /* J c I */
-                    {
-                        // TODO only work for K \in {1, 2} right now - FIX me for K>=3
-                        assert(K == 1 || K == 2);
-
-                        // shrink parent
-                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
-                        parent->shrink(region, k);
-
-                        // reinsert 2 nodes for parent's shrinked borders
-                        for (int i = 0 ; i < 2 ; ++i)
-                        {
-                            if (x[2*i+0] == x[2*i+1])
-                                continue ;
-                            Intervals<K> r(parent->region);
-                            r[k].a = x[2*i+0];
-                            r[k].b = x[2*i+1];
-                            N * node = new N(r, k, RED);
-                            // this->insert_from(parent, mode, r, nullptr, k, node);
-                            this->insert_from(this->root, ACCESS_MODE_VOID, r, obj, 0, node);
-                            node->inherit_accesses(parent);
-                        }
-
-                        // shrink children for dimensions k' > k
-                        if (k < K-1)
-                        {
-                            std::function<void(N *)> f = [this, &k, &region, &x, &obj](N * node) {
-                                node->shrink(region, k);
-                                for (int i = 0 ; i < 2 ; ++i)
-                                {
-                                    if (x[2*i+0] == x[2*i+1])
-                                        continue ;
-                                    Intervals<K> r(node->region);
-                                    r[k].a = x[2*i+0];
-                                    r[k].b = x[2*i+1];
-                                    N * split = new N(r, k, RED);
-                                    // TODO : probably no need to restart from root and dim 0
-                                    this->insert_from(this->root, ACCESS_MODE_VOID, r, obj, 0, split);
-                                    split->inherit_accesses(node);
-                                }
-                            };
-                            foreach_k_child(parent, k+1, f);
-                        }
-
-                        // TODO : unnecessary if we outdated another child
-                        this->outdate(parent);
-                    } /* I == J ||  J c I */
-                }
-                // case (4)     I c J
-                else if (region[k].a <= parent->region[k].a && parent->region[k].b <= region[k].b)
-                {
-                    int xs[4] = { region[k].a, parent->region[k].a, parent->region[k].b, region[k].b };
-                    for (int i = 0 ; i < 3 ; ++i)
-                    {
-                        if (xs[i+0] == xs[i+1])
-                            continue ;
-                        Intervals<K> r(region);
-                        r[k].a = xs[i+0];
-                        r[k].b = xs[i+1];
-                     // this->insert_from(parent, mode, r, nullptr, k, node);
-                        this->insert_from(this->root, mode, r, obj, 0, node);
-                    }
-                    this->outdate(parent);
-                    break ;
-                }
-                // case (5)     J < I    (and I n J != o)   is (1) + (3)
-                else if (parent->region[k].a <= region[k].b && region[k].b <= parent->region[k].b)
-                {
-                    const int a = region[k].a;
-                    const int b = region[k].b;
-
-                 // region[k].a = region[k].a;
-                    region[k].b = parent->region[k].a;
-                    this->insert_from(parent, mode, region, obj, k, node);  // (1)
-                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (1)
-
-                    region[k].a = parent->region[k].a;
-                    region[k].b = b;
-                    this->insert_from(parent, mode, region, obj, k, node);  // (3)
-                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
-
-                    region[k].a = a;
-                    region[k].b = b;
-
-                    ++k;
-                }
-                // case (6)     J > I    (and I n J != o)   is (2) + (3)
-                else if (parent->region[k].a <= region[k].a && region[k].a <= parent->region[k].b)
-                {
-                    int a = region[k].a;
-                    int b = region[k].b;
-
-                 // region[k].a = region[k].a;
-                    region[k].b = parent->region[k].b;
-                    this->insert_from(parent, mode, region, obj, k, node);  // (3)
-                 // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
-
-                    region[k].a = parent->region[k].b;
-                    region[k].b = b;
-                    this->insert_from(parent, mode, region, obj, k, node);  // (2)
-                 // this->insert_from(this->root, mode, region, obj, k, node);  // (2)
-
-                    region[k].a = a;
-                    region[k].b = b;
-
-                    ++k;
-                }
-                else
-                {
-                    tassert(0 && "Impossible occured");
-                }
-            }
-            DEBUG("---  (done) subinsert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
-        }
-
-        /**
-         *  Intersect previously inserted intervalss with 'intervals'
-         */
-        void
-        insert(access_mode_t mode, Intervals<K> & region, const T & obj)
+        post_insert(void)
         {
-            DEBUG("##############################");
-            DEBUG("--- New insert of dimension %d and type %s for obj %p", K, access_mode_to_str(mode), obj);
-            for (int i = 0 ; i < K ; ++i)
-                DEBUG("---  [%d, %d[", region[i].a, region[i].b);
-            DEBUG("##############################");
-
-            tassert(!region.is_empty());
-
-            if (this->root == nullptr)
-            {
-                this->root = new N(region);
-                this->root->register_access(mode, obj);
-                update_includes(this->root);
-            }
-            else
-            {
-                this->insert_from(this->root, mode, region, obj, 0, nullptr);
-                this->update();
-            }
-
 # ifdef REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
@@ -1068,38 +809,6 @@ class KIntervalBtree {
 # ifndef NDEBUG
             this->coherency();
 # endif /* NDEBUG */
-        }
-
-        define_has_member(intersect_test);
-
-        void
-        intersect_from(N * node, access_mode_t mode, Intervals<K> & region, const T & obj) const
-        {
-            if (node == nullptr || !region.intersects(node->includes.region))
-                return ;
-
-            if constexpr has_member(N, intersect_test)
-            {
-                if (node->intersect_test(region))
-                {
-                    return ;
-                }
-            }
-            else
-            {
-                # error "Must implemented 'intersect_test' routine"
-            }
-
-            if (region.intersects(node->region))
-            {
-                node->on_intersect(region);
-            }
-
-            FOREACH_CHILD_BEGIN(node, child, k, dir)
-            {
-                this->intersect_from(child, mode, region, obj);
-            }
-            FOREACH_CHILD_END(node, child, k, dir);
         }
 
         // Dump the tree to the given file
@@ -1196,14 +905,14 @@ class KIntervalBtree {
         coherency_region_includes_foreach(N * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_includes_check, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, N>::coherency_region_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_region_includes(N * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, N>::coherency_region_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1218,14 +927,14 @@ class KIntervalBtree {
         coherency_region_disjoint_for(N * node, void * args) const
         {
             N * root = (N *) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, N>::coherency_region_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_region_disjoint(N * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, N>::coherency_region_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1377,6 +1086,4 @@ class KIntervalBtree {
 
 };
 
-#undef tassert
-
-#endif /* __ACCESS_BTREE_H__ */
+#endif /* __KINTERVAL_BTREE_H__ */

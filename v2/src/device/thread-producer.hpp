@@ -107,7 +107,7 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
         uint8_t * memory_stack_ptr;
 
         /* Dependency tree */
-        DependencyTree deptree;
+        DependencyTree<2> deptree;
 
         #ifndef NDEBUG
         std::vector<Task *> tasks;
