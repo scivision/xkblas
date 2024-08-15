@@ -41,6 +41,7 @@ struct task_access_t : access_t<K>
 };
 
 class Task;
+using Region = Intervals<2>;
 
 /**
  *  An edge between two tasks.
@@ -50,7 +51,7 @@ class Task;
 typedef struct  task_edge_t
 {
     Task * successor;
-    const Intervals<2> region;
+    const Region region;
 }               task_edge_t;
 
 class alignas(std::hardware_constructive_interference_size) Task
@@ -116,7 +117,7 @@ class alignas(std::hardware_constructive_interference_size) Task
         ////////////////////////////////////
 
         /* this task precedes the passed task */
-        void precedes(Task * successor, task_access_t<2> access);
+        void precedes(Task * successor, const Region & region);
 
         /* Return 'true' if the task is ready to be queued, 'false' otherwise */
         bool commit(void);
