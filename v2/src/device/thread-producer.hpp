@@ -7,8 +7,7 @@
 # include "device/naive-queue.hpp"
 # include "device/task.hpp"
 # include "device/thread-worker.hpp"
-
-# include <new>
+# include "sync/cache-line-size.hpp"
 
 // Maximum number of bytes allocated for tasks descriptor
 # ifndef THREAD_PRODUCER_MAX_MEMORY
@@ -18,7 +17,7 @@
 /**
  *  This class represents an xkblas user thread, that is producing tasks
  */
-class alignas(std::hardware_constructive_interference_size) ThreadProducer
+class alignas(CACHE_LINE_SIZE) ThreadProducer
 {
     public:
 
@@ -103,7 +102,7 @@ class alignas(std::hardware_constructive_interference_size) ThreadProducer
     private:
 
         /* tasks stack */
-        alignas(std::hardware_constructive_interference_size)
+        alignas(CACHE_LINE_SIZE)
             uint8_t memory_stack_bottom[THREAD_PRODUCER_MAX_MEMORY];
 
         /* next free task pointer in the stack */

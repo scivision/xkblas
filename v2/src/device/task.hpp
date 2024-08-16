@@ -3,11 +3,11 @@
 
 # include <atomic>
 # include <cstdint>
-# include <new>
 # include <vector>
 
 # include "device/consts.h"
 # include "sync/access.hpp"
+# include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"
 
 # define TASK_MAX_ACCESSES  4
@@ -54,7 +54,7 @@ typedef struct  task_edge_t
     const Region region;
 }               task_edge_t;
 
-class alignas(std::hardware_constructive_interference_size) Task
+class alignas(CACHE_LINE_SIZE) Task
 {
     public:
 
@@ -100,7 +100,8 @@ class alignas(std::hardware_constructive_interference_size) Task
 
         /* wait counter - the task may be scheduled once it reached 0 */
         # pragma message(TODO "Memory accesses ordering this atomic")
-        alignas(std::hardware_constructive_interference_size) std::atomic<uint16_t> wc;
+        alignas(CACHE_LINE_SIZE)
+            std::atomic<uint16_t> wc;
 
         /* task state */
         struct {

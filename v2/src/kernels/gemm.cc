@@ -6,10 +6,11 @@
 # include "device/thread-producer.hpp"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
+# include "sync/cache-line-size.hpp"
 
 # include <cassert>
 
-typedef struct alignas(std::hardware_constructive_interference_size)    args_t
+typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
     args_t(int transA, int transB,
             int BS_M, int BS_N, int BS_K,
@@ -64,11 +65,11 @@ xkblas_£gemm_tile_async(
     # pragma message(TODO "Implement tile sending")
     ThreadProducer * thread = ThreadProducer::get();
 
-    // const uint64_t task_size = alignedas(sizeof(Task),   std::hardware_constructive_interference_size);
+    // const uint64_t task_size = alignedas(sizeof(Task), CACHE_LINE_SIZE);
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, std::hardware_constructive_interference_size));
-    assert(is_alignedas(args_size, std::hardware_constructive_interference_size));
+    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
+    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
     uint8_t * mem  = thread->allocate(task_size + args_size);
 

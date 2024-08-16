@@ -86,20 +86,28 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
-    extern void XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t *);
-    extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
+    void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
+    memset(loaders, 0, sizeof(loaders));
 
-    void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *) = {0};
+    extern void XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_ENTRYPOINT(get_host_driver);
+
+# if USE_CUDA
+    extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
+# endif /* USE_CUDA */
 
     uint8_t i;
     for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
     {
-        loaders[i](drivers->list + i);
-        xkblas_driver_init(drivers, i, ngpus);
-        if (drivers->devices.n == ngpus)
-            break ;
+        void (*loader)(xkblas_driver_t *) = loaders[i];
+        if (loader)
+        {
+            loader(drivers->list + i);
+            xkblas_driver_init(drivers, i, ngpus);
+            if (drivers->devices.n == ngpus)
+                break ;
+        }
     }
 
     /* wait all threads for each devices of each driver */

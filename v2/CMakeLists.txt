@@ -15,7 +15,6 @@ add_library(xkblas SHARED
     src/conf/conf.cc
     src/device/device.cc
     src/device/driver.cc
-    src/device/driver_cuda.cc
     src/device/driver_host.cc
     src/device/stream.cc
     src/device/task.cc
@@ -66,6 +65,9 @@ if (USE_CUDA)
     include_directories("${CUDA_INCLUDE_DIRS}")
     target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
+
+    add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
+
 endif()
 
 ################

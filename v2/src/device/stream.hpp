@@ -5,14 +5,14 @@
 # include "device/io.h"
 # include "logger/todo.h"
 # include "device/task.hpp"
-# include "sync/cache-line-size.h"
 # include "sync/mutex.h"
-
-# include <cuda.h>
-# include <cuda_runtime.h>
 
 # pragma message(TODO "Abstract this class, currently implemented for Cuda only")
 
+# ifdef USE_CUDA
+#  include <cuda.h>
+#  include <cuda_runtime.h>
+# endif /* USE_CUDA */
 
 /* Kaapi offload stream is virtual interface to be implemented by a device.
    Streams are decoupled from H2D/D2H/D2D/kernel executions.
@@ -56,7 +56,10 @@ class Stream
         xkblas_io_stream_t ** ios[XKBLAS_IO_STREAM_ALL];    /* basic stream */
 
     private:
+
+# ifdef USE_CUDA
         cudaStream_t cuStream;
+# endif /* USE_CUDA */
 
 };
 

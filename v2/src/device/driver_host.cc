@@ -5,13 +5,6 @@
 # include "logger/logger.h"
 # include "sync/mutex.h"
 
-# include <cuda_runtime.h>
-# include <cublas_v2.h>
-# include <hwloc.h>
-# include <hwloc/cuda.h>
-# include <hwloc/cudart.h>
-# include <hwloc/glibc-sched.h>
-
 # include <cassert>
 # include <cstdio>
 # include <cstdint>

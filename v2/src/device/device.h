@@ -8,7 +8,7 @@
 # include "logger/todo.h"
 # include "device/task.hpp"
 # include "device/thread-worker.hpp"
-# include "sync/cache-line-size.h"
+# include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
 
 typedef enum    xkblas_device_state_t : uint8_t

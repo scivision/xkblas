@@ -4,7 +4,7 @@
 # include "device/memory.h"
 # include "logger/todo.h"
 # include "device/task.hpp"
-# include "sync/cache-line-size.h"
+# include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
 
 typedef struct  xkblas_io_status_t

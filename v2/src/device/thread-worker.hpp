@@ -3,6 +3,7 @@
 
 # include "device/naive-queue.hpp"
 # include "device/task.hpp"
+# include "sync/cache-line-size.hpp"
 
 # include <stack>
 
@@ -12,7 +13,7 @@
 /**
  *  This class represents an xkblas user thread, that is producing tasks
  */
-class alignas(std::hardware_constructive_interference_size) ThreadWorker
+class alignas(CACHE_LINE_SIZE) ThreadWorker
 {
     public:
 
