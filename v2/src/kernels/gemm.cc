@@ -76,6 +76,12 @@ xkblas_£gemm_tile_async(
     Task    * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(TASK_BODY_GEMM);
 
+    # ifndef NDEBUG
+    assert(transA == CblasNoTrans);
+    assert(transB == CblasNoTrans);
+    snprintf(task->label, sizeof(task->label), "gemm(%d, %d, %d)", Atm, Atn, Btn);
+    # endif /* NDEBUG */
+
     # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'LDC' ?")
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
     new(args) args_t(transA, transB, BS_M, BS_N, BS_K, alpha, A, Atm, Atn, LDA, B, Btm, Btn, LDB, beta, C, Ctm, Ctn, LDC);
@@ -87,27 +93,27 @@ xkblas_£gemm_tile_async(
     assert(BS_M == BS_N);
     assert(BS_M == BS_K);
 
+    const uintptr_t AP = reinterpret_cast<uintptr_t>(A);
+    const uintptr_t BP = reinterpret_cast<uintptr_t>(B);
+    const uintptr_t CP = reinterpret_cast<uintptr_t>(C);
+    uintptr_t AA = XKBLAS_MATRIX_TILE(AP, LDA, Atm, Atn, BS, BS);
+    uintptr_t BB = XKBLAS_MATRIX_TILE(BP, LDB, Btm, Btn, BS, BS);
+    uintptr_t CC = XKBLAS_MATRIX_TILE(CP, LDC, Ctm, Ctn, BS, BS);
+
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
 
     task->accesses[0].mode    = ACCESS_MODE_R;
-    task->accesses[0].region  = Intervals<2>(reinterpret_cast<uintptr_t>(A), LDA, BS, BS);
+    task->accesses[0].region  = Intervals<2>(AA, LDA, BS, BS);
 
     task->accesses[1].mode    = ACCESS_MODE_R;
-    task->accesses[1].region  = Intervals<2>(reinterpret_cast<uintptr_t>(B), LDB, BS, BS);
+    task->accesses[1].region  = Intervals<2>(BB, LDB, BS, BS);
 
     task->accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    task->accesses[2].region  = Intervals<2>(reinterpret_cast<uintptr_t>(C), LDC, BS, BS);
+    task->accesses[2].region  = Intervals<2>(CC, LDC, BS, BS);
 
     thread->commit<NACCESSES>(drivers, task);
-
     # undef NACCESSES
-
-    # ifndef NDEBUG
-    assert(transA == CblasNoTrans);
-    assert(transB == CblasNoTrans);
-    snprintf(task->label, sizeof(task->label), "gemm(%d, %d, %d)", Atm, Atn, Btn);
-    # endif /* NDEBUG */
 
     return 0;
 }
@@ -190,6 +196,10 @@ xkblas_£gemm_async(
     // int BS = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
     const int NTILES = 2;
     const int BS = M / NTILES;
+
+    assert(M % BS == 0);
+    assert(N % BS == 0);
+    assert(K % BS == 0);
 
     // TODO : set tiling parameters
     int Amb = BS;

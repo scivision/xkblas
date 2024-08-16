@@ -114,7 +114,7 @@ class alignas(CACHE_LINE_SIZE) Task
             # endif /* NDEBUG */
         }
 
-        ~Task()
+        virtual ~Task()
         {
             this->state.value = TASK_STATE_DEALLOCATED;
         }
