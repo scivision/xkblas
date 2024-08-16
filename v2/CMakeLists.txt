@@ -39,6 +39,8 @@ endif()
 ##########
 
 # Lib name
+add_compile_definitions(REBALANCE=1)
+add_compile_definitions(CUT=1)
 add_library(xkblas SHARED
     src/xkblas-context.cc
     src/conf/conf.cc
@@ -74,8 +76,6 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 
 # Flags
 add_compile_options("-DXKBLAS_DEBUG=1")
-
-
 
 ################
 # Sub projects #

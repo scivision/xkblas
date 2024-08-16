@@ -84,7 +84,7 @@ do {                                                            \
     {                                                           \
         for (int D = LEFT ; D < DIRECTION_MAX ; ++D)            \
         {                                                       \
-            auto * C = N->st[I].children[D];   \
+            auto * C = N->st[I].children[D];                    \
             if (C)                                              \
             {
 # define FOREACH_CHILD_END(N, C, I, D)                          \
@@ -118,9 +118,6 @@ class KIntervalBtree {
                 /* node's parent */
                 Node * parent;
 
-                /* node's child */
-                subtree_t st[K];
-
                 /* node's color in each subtree */
                 Color colors[K];
 
@@ -129,6 +126,9 @@ class KIntervalBtree {
 
                 /* the dimension represented by this node */
                 int k;
+
+                /* node's child */
+                subtree_t st[K];
 
                 struct {
                     Region region;    // subtree englobing region
@@ -145,11 +145,16 @@ class KIntervalBtree {
 
             public:
 
+                Node() :
+                    parent(nullptr),
+                    colors{BLACK}
+                {}
+
                 Node(const Region & r, int k, Color color) :
                     parent(nullptr),
-                    k(k),
+                    colors{BLACK},
                     region(r),
-                    colors{BLACK}
+                    k(k)
                 {
                     memset(this->st, 0, sizeof(this->st));
 
@@ -320,7 +325,6 @@ class KIntervalBtree {
         Node * root;
 
     private:
-
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
 
@@ -345,7 +349,14 @@ class KIntervalBtree {
             delete node;
         }
 
-        void
+        inline void
+        cut(Node * parent, int k, int dir)
+        {
+            this->limbs.push_back(parent->st[k].children[dir]);
+            parent->st[k].children[dir] = nullptr;
+        }
+
+        inline void
         garbage_collector_run(void)
         {
             for (Node * & node : this->limbs)
@@ -709,7 +720,7 @@ class KIntervalBtree {
 
             node->parent = parent;
             node->colors[k] = (height == depth) ? RED : BLACK;
-            update_includes(node);
+            node->update_includes();
         }
 
         // rebalance the k-subtree using a Day-Stout-Warren algorithm
@@ -719,7 +730,7 @@ class KIntervalBtree {
             printf("Rebalancing for k=%d\n", k);
             tassert(k == 0 && K == 0 && "Not implemented when K>1");
 
-            N pseudo_root;
+            Node pseudo_root;
             pseudo_root.st[k].right = root;
 
             rbtree_to_vine(&pseudo_root, k);

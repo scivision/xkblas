@@ -8,6 +8,7 @@
 void
 Task::precedes(Task * succ, const Region & region)
 {
+    assert(succ);
     assert(this->state.value >= TASK_STATE_ALLOCATED);
     assert(succ->state.value >= TASK_STATE_ALLOCATED);
     assert(!region.is_empty());

@@ -6,6 +6,7 @@
 # include <vector>
 
 # include "device/consts.h"
+# include "logger/todo.h"
 # include "sync/access.hpp"
 # include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"
@@ -57,27 +58,6 @@ typedef struct  task_edge_t
 class alignas(CACHE_LINE_SIZE) Task
 {
     public:
-
-        Task(task_body_t body) :
-            body(body),
-            edges(8),
-            accesses(),
-            naccesses(0),
-            ocr_access_index(XKBLAS_DEVICES_MAX),
-            targetted_device_id(XKBLAS_DEVICES_MAX),
-            wc(1),
-            state({.lock=0, .value=TASK_STATE_ALLOCATED})
-        {
-            # ifndef NDEBUG
-            strcpy(this->label, "(unamed task)");
-            # endif /* NDEBUG */
-        }
-
-        ~Task()
-        {
-            this->state.value = TASK_STATE_DEALLOCATED;
-        }
-
         ////////////////
         // Attributes //
         ////////////////
@@ -112,6 +92,32 @@ class alignas(CACHE_LINE_SIZE) Task
         # ifndef NDEBUG
         char label[128];
         # endif /* NDEBUG */
+
+    public:
+
+        Task() : Task(TASK_BODY_NOOP) {}
+
+        Task(task_body_t body) :
+            body(body),
+            edges(),
+            accesses(),
+            naccesses(0),
+            ocr_access_index(XKBLAS_DEVICES_MAX),
+            targetted_device_id(XKBLAS_DEVICES_MAX),
+            wc(1),
+            state({.lock=0, .value=TASK_STATE_ALLOCATED})
+        {
+            edges.reserve(8);
+
+            # ifndef NDEBUG
+            strcpy(this->label, "(unamed task)");
+            # endif /* NDEBUG */
+        }
+
+        ~Task()
+        {
+            this->state.value = TASK_STATE_DEALLOCATED;
+        }
 
         ////////////////////////////////////
         // Methods to transition the task //

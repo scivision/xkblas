@@ -25,10 +25,10 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
     public:
 
         DependencyTreeNode(const Region & r, int k, Color color) :
+            KIntervalBtree<K>::Node(r, k, color),
             last_reads(),
             last_write(nullptr),
-            nwrites(0),
-            KIntervalBtree<K>::Node(r, k, color)
+            nwrites(0)
         {}
 
         inline DependencyTreeNode *
@@ -56,8 +56,10 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
         }
 
         inline void
-        register_access(Task * task, const Region & region, const access_mode_t mode)
-        {
+        register_access(
+            Task * task,
+            const access_mode_t mode
+        ) {
             if (mode & ACCESS_MODE_W)
             {
                 this->last_reads.clear();
@@ -143,19 +145,18 @@ class DependencyTree : public KIntervalBtree<K> {
             Task * task,
             Region & region,
             const access_mode_t mode,
-            N * parent
+            Node * parent
         ) {
-            tassert(access->mode & ACCESS_MODE_W);
+            tassert(mode & ACCESS_MODE_W);
 
             FOREACH_CHILD_BEGIN(parent, child, k, dir)
             {
-                this->limbs.push_back(child);
-                parent->st[k].children[dir] = nullptr;
+                this->cut(parent, k, dir);
             }
             FOREACH_CHILD_END(parent, child, k, dir);
 
-            parent->region.copy(access->region);
-            parent->register_access(task, access);
+            parent->region.copy(region);
+            parent->register_access(task, mode);
 
             this->outdate(parent);
         }
@@ -177,13 +178,13 @@ class DependencyTree : public KIntervalBtree<K> {
 #  pragma message("Tree cut enable")
                 // quick-way out, if the region includes all subregion with an
                 // 'out' access, we can discard all children
-                if (access->mode & ACCESS_MODE_W)
+                if (mode & ACCESS_MODE_W)
                 {
                     // TODO : the includes test could be accelerated simply
                     // checking >=k dimensions, as we know we are already matching
                     // <k dimensions
 
-                    if (access->region.includes(parent->includes.region))
+                    if (region.includes(parent->includes.region))
                     {
                         // TODO : what if 'node' is not null ?  probably want to
                         // return something to callee for the case (3)
@@ -208,7 +209,7 @@ class DependencyTree : public KIntervalBtree<K> {
                             node->k = k;
                             node->colors[k] = RED;
                         }
-                        node->register_access(task, region, mode);
+                        node->register_access(task, mode);
                         this->insert_fixup(parent, k, LEFT, node);
                         break ;
                     }
@@ -229,7 +230,7 @@ class DependencyTree : public KIntervalBtree<K> {
                             node->k = k;
                             node->colors[k] = RED;
                         }
-                        node->register_access(task, region, mode);
+                        node->register_access(task, mode);
                         this->insert_fixup(parent, k, RIGHT, node);
                         break ;
                     }
@@ -246,7 +247,7 @@ class DependencyTree : public KIntervalBtree<K> {
                         if (++k == K)
                         {
                             tassert(node == nullptr);
-                            parent->register_access(task, region, mode);
+                            parent->register_access(task, mode);
                             this->outdate(parent);
                             break ;
                         }
@@ -395,7 +396,7 @@ class DependencyTree : public KIntervalBtree<K> {
             if (this->root == nullptr)
             {
                 this->root = new Node(region, 0, BLACK);
-                reinterpret_cast<Node *>(this->root)->register_access(task, region, mode);
+                reinterpret_cast<Node *>(this->root)->register_access(task, mode);
                 this->root->update_includes();
             }
             else

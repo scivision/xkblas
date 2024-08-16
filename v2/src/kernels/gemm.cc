@@ -308,6 +308,7 @@ xkblas_£gemm_async(
     FILE * f = fopen("gemm.dot", "w");
     thread->dump_tasks(f);
     fclose(f);
+    system("dot -Tpdf gemm.dot > gemm.pdf");
 # endif /* NDEBUG */
 
     return 0;
