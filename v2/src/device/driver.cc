@@ -95,6 +95,9 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 # if USE_CUDA
     extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
+    XKBLAS_DEBUG("using cuda");
+    # else
+    XKBLAS_DEBUG("not using cuda");
 # endif /* USE_CUDA */
 
     uint8_t i;

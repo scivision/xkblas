@@ -5,6 +5,35 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 # Project name
 project(xkblas)
 
+###############
+# DEPENDENCES #
+###############
+
+# HWLOC
+option(USE_HWLOC "Whether to build the NVIDIA GPU plugin." ON)
+if (USE_HWLOC)
+    find_package(HWLOC)
+    include_directories(${HWLOC_INCLUDE_DIRS})
+    message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
+endif()
+
+# CUDA
+option(USE_CUDA "Whether to build the NVIDIA GPU plugin." ON)
+if (USE_CUDA)
+    add_compile_definitions(USE_CUDA=1)
+    find_package(CUDA REQUIRED)
+    find_package(CUDA_RT)
+    if (NOT ${CUDA_RT_FOUND})
+        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUDA_RT could not be found.")
+    endif()
+    find_package(CUBLAS)
+    if (NOT ${CUBLAS_FOUND})
+        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUBLAS could not be found.")
+    endif()
+    include_directories("${CUDA_INCLUDE_DIRS}")
+    message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
+endif()
+
 ##########
 # XKBLAS #
 ##########
@@ -25,6 +54,16 @@ add_library(xkblas SHARED
     src/sync/color.cc
 )
 
+if (${HWLOC_FOUND})
+    target_link_libraries(xkblas PRIVATE ${HWLOC_LIBRARIES})
+endif()
+
+if (${CUDA_RT_FOUND})
+    target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
+    target_link_libraries(xkblas PRIVATE xkblas_driver_cuda)
+endif()
+
 # Include directory
 include_directories(include/)
 include_directories(src/)
@@ -36,39 +75,7 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 # Flags
 add_compile_options("-DXKBLAS_DEBUG=1")
 
-###############
-# DEPENDENCES #
-###############
 
-# HWLOC
-option(USE_HWLOC "Whether to build the NVIDIA GPU plugin." ON)
-if (USE_HWLOC)
-    find_package(HWLOC)
-    include_directories(${HWLOC_INCLUDE_DIRS})
-    target_link_libraries(xkblas PRIVATE ${HWLOC_LIBRARIES})
-    message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
-endif()
-
-# CUDA
-option(USE_CUDA "Whether to build the NVIDIA GPU plugin." ON)
-if (USE_CUDA)
-    add_compile_options("-DUSE_CUDA=1")
-    find_package(CUDA REQUIRED)
-    find_package(CUDA_RT)
-    if (NOT ${CUDA_RT_FOUND})
-        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUDA_RT could not be found.")
-    endif()
-    find_package(CUBLAS)
-    if (NOT ${CUBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUBLAS could not be found.")
-    endif()
-    include_directories("${CUDA_INCLUDE_DIRS}")
-    target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
-
-    add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
-
-endif()
 
 ################
 # Sub projects #
