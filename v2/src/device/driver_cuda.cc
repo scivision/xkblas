@@ -100,14 +100,16 @@ static xkblas_mutex_t DRIVER_MUTEX = XKBLAS_MUTEX_INITIALIZER;
 /* hwloc topology */
 static hwloc_topology_t TOPOLOGY;
 
-static void
+static int
 __check_error(cudaError_t err)
 {
     if (cudaSuccess != err)
     {
         const char * errstr = cudaGetErrorName(err);
-        XKBLAS_FATAL("cuCheckError() error: %s (%i)", errstr, err);
+        XKBLAS_ERROR("cuCheckError() error: %s (%i)", errstr, err);
+        return 1;
     }
+    return 0;
 }
 
 // NVLINK TOPOLOGY
@@ -1641,7 +1643,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_gpublas_handle)(xkblas_device_t* dev)
 static unsigned int
 XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
-    int device_count;
+    int device_count = 0;
     __check_error(cudaGetDeviceCount(&device_count));
     return (unsigned int)device_count;
 }

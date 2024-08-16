@@ -100,8 +100,9 @@ void * xkblas_device_thread_main(void * a);
 
 typedef enum    xkblas_driver_type_t
 {
-    XKBLAS_DRIVER_CUDA = 0,
-    XKBLAS_DRIVER_MAX  = 1,
+    XKBLAS_DRIVER_HOST = 0,
+    XKBLAS_DRIVER_CUDA = 1,
+    XKBLAS_DRIVER_MAX  = 2,
 }               xkblas_driver_type_t;
 
 typedef struct  xkblas_drivers_t

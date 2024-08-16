@@ -25,7 +25,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
     assert(driver->f_get_ndevices_max);
     int n_devices_max = driver->f_get_ndevices_max();
     int n_devices = MIN(ngpus, n_devices_max);
-    XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
+    // XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
     if (n_devices < 1)
         return ;
     driver->ndevices_targeted = n_devices;
@@ -36,25 +36,26 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 
     for (int i = 0; i < n_devices; ++i)
     {
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+
         cpu_set_t schedset;
         assert(driver->f_device_set_cpuset);
         int err = driver->f_device_set_cpuset(&schedset, i);
         if (err)
         {
-            XKBLAS_ERROR("cannot use device %d", i);
-            --driver->ndevices_targeted;
-            continue ;
+            XKBLAS_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
         }
-
-        // move the current thread to the device cpu set
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
-        if (err)
+        else
         {
-            XKBLAS_ERROR("invalid cpu_set returned by the driver for device %d", i);
-            --driver->ndevices_targeted;
-            continue ;
+            // move the current thread to the device cpu set
+            err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
+            if (err)
+            {
+                XKBLAS_ERROR("Invalid cpuset returned by the driver for device %d", i);
+                --driver->ndevices_targeted;
+                continue ;
+            }
         }
 
         pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
@@ -68,7 +69,12 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 
         pthread_t thread;
         err = pthread_create(&thread, &attr, xkblas_device_thread_main, arg);
-        assert(err == 0);
+        if (err)
+        {
+            XKBLAS_ERROR("could not create a thread for the device %d", i);
+            --driver->ndevices_targeted;
+            continue ;
+        }
     }
 
     // move back the current thread to its initial cpu set
@@ -78,11 +84,13 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 void
 xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 {
-    # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in CUDA driver")
+    # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
+    extern void XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t *);
     extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
 
-    void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
+    void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *) = {0};
+    loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_ENTRYPOINT(get_host_driver);
     loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
 
     uint8_t i;
@@ -103,6 +111,9 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
             mem_pause();
         total_devices += driver->ndevices_targeted;
     }
+
+    if (total_devices == 0)
+        XKBLAS_FATAL("No devices found :-(");
 
     XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, ngpus);
     assert(total_devices < ngpus);
