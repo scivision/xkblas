@@ -2,12 +2,13 @@
 
 MemoryTree::MemoryTree() {}
 
-
 void
 MemoryTree::fetch(
     xkblas_device_t * device,
     Task * task
 ) {
+
+    # if 0
 
     /* bitfield for this device (all bits to 0 but the one of this device) */
     memory_block_bitfield_t devbit = (1 << device->global_id);
@@ -30,4 +31,6 @@ MemoryTree::fetch(
                 "joined in a single memcpy")
 
     }
+
+    # endif
 }

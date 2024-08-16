@@ -6,24 +6,9 @@
 
 class MemoryTree {
 
-    protected:
-        class Node {
-
-            typedef union
-            {
-                Node * children[2];
-                struct {
-                    Node * left;
-                    Node * right;
-                };
-            } subtree_t;
-
-        }; /* class Node */
-
     public:
         MemoryTree() {}
         virtual ~MemoryTree() {}
-
 
     public:
 

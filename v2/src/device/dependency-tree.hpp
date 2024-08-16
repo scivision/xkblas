@@ -56,14 +56,14 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
         }
 
         inline void
-        register_access(Task * task, const task_access_t<K> * access)
+        register_access(Task * task, const Region & region, const access_mode_t mode)
         {
-            if (access->mode & ACCESS_MODE_W)
+            if (mode & ACCESS_MODE_W)
             {
                 this->last_reads.clear();
                 this->last_write = task;
             }
-            else if (access->mode == ACCESS_MODE_R)
+            else if (mode == ACCESS_MODE_R)
             {
                 this->last_reads.push_back(task);
             }
@@ -97,39 +97,40 @@ class DependencyTree : public KIntervalBtree<K> {
         inline void
         intersect_from(
             Task * task,
-            const task_access_t<K> * access,
+            const Region & region,
+            const access_mode_t mode,
             Node * node
         ) const {
 
-            if (node == nullptr || !access->region.intersects(node->includes.region))
+            if (node == nullptr || !region.intersects(node->includes.region))
                 return ;
 
-            if (access->mode == ACCESS_MODE_R && node->nwrites == 0)
+            if (mode == ACCESS_MODE_R && node->nwrites == 0)
                 return ;
 
-            if (access->region.intersects(node->region))
+            if (region.intersects(node->region))
             {
-                if (access->mode & ACCESS_MODE_W && node->last_reads.size())
+                if (mode & ACCESS_MODE_W && node->last_reads.size())
                     for (Task * & pred : node->last_reads)
-                        pred->precedes(task, node->region.intersection(access->region));
+                        pred->precedes(task, node->region.intersection(region));
                 else if (node->last_write)
                 {
                     Task * pred = node->last_write;
-                    pred->precedes(task, node->region.intersection(access->region));
+                    pred->precedes(task, node->region.intersection(region));
                 }
             }
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
-                this->intersect_from(task, access, reinterpret_cast<Node *>(child));
+                this->intersect_from(task, region, mode, reinterpret_cast<Node *>(child));
             }
             FOREACH_CHILD_END(node, child, k, dir);
         }
 
         inline void
-        intersect(Task * task, const task_access_t<K> * access) const
+        intersect(Task * task, const Region & region, const access_mode_t mode) const
         {
-            this->intersect_from(task, access, reinterpret_cast<Node *>(this->root));
+            this->intersect_from(task, region, mode, reinterpret_cast<Node *>(this->root));
         }
 
         //////////////
@@ -140,7 +141,8 @@ class DependencyTree : public KIntervalBtree<K> {
         inline void
         insert_from_cut(
             Task * task,
-            const task_access_t<K> * access,
+            Region & region,
+            const access_mode_t mode,
             N * parent
         ) {
             tassert(access->mode & ACCESS_MODE_W);
@@ -162,15 +164,12 @@ class DependencyTree : public KIntervalBtree<K> {
         inline void
         insert_from(
             Task * task,
-            const task_access_t<K> * access,
+            Region & region,
+            const access_mode_t mode,
             Node * parent,
             int k,
             Node * node
         ) {
-            // TODO : this avoid copies, but may have side effects if the user
-            // uses the 'access' in parallel
-            const Region & region = access->region;
-
             // TODO : ensure that loop is unrolled
             while (k < K)
             {
@@ -189,7 +188,7 @@ class DependencyTree : public KIntervalBtree<K> {
                         // TODO : what if 'node' is not null ?  probably want to
                         // return something to callee for the case (3)
                         tassert(node == nullptr);
-                        this->insert_from_cut(task, access, parent);
+                        this->insert_from_cut(task, region, mode, parent);
                         break ;
                     }
                 }
@@ -209,7 +208,7 @@ class DependencyTree : public KIntervalBtree<K> {
                             node->k = k;
                             node->colors[k] = RED;
                         }
-                        node->register_access(task, access);
+                        node->register_access(task, region, mode);
                         this->insert_fixup(parent, k, LEFT, node);
                         break ;
                     }
@@ -230,7 +229,7 @@ class DependencyTree : public KIntervalBtree<K> {
                             node->k = k;
                             node->colors[k] = RED;
                         }
-                        node->register_access(task, access);
+                        node->register_access(task, region, mode);
                         this->insert_fixup(parent, k, RIGHT, node);
                         break ;
                     }
@@ -247,7 +246,7 @@ class DependencyTree : public KIntervalBtree<K> {
                         if (++k == K)
                         {
                             tassert(node == nullptr);
-                            parent->register_access(task, access);
+                            parent->register_access(task, region, mode);
                             this->outdate(parent);
                             break ;
                         }
@@ -271,7 +270,7 @@ class DependencyTree : public KIntervalBtree<K> {
                             r[k].b = x[2*i+1];
                             Node * node = new Node(r, k, RED);
                             // this->insert_from(parent, mode, r, nullptr, k, node);
-                            this->insert_from(task, nullptr, this->root, 0, node);
+                            this->insert_from(task, region, ACCESS_MODE_VOID, this->root, 0, node);
                             node->inherit_accesses(parent);
                         }
 
@@ -289,7 +288,7 @@ class DependencyTree : public KIntervalBtree<K> {
                                     r[k].b = x[2*i+1];
                                     Node * split = new Node(r, k, RED);
                                     // TODO : probably no need to restart from root and dim 0
-                                    this->insert_from(task, nullptr, this->root, 0, split);
+                                    this->insert_from(task, region, ACCESS_MODE_VOID, this->root, 0, split);
                                     split->inherit_accesses(reinterpret_cast<Node *>(node));
                                 }
                             };
@@ -312,7 +311,7 @@ class DependencyTree : public KIntervalBtree<K> {
                         r[k].a = xs[i+0];
                         r[k].b = xs[i+1];
                         // this->insert_from(parent, mode, r, nullptr, k, node);
-                        this->insert_from(task, access, this->root, 0, node);
+                        this->insert_from(task, region, mode, this->root, 0, node);
                     }
                     this->outdate(parent);
                     break ;
@@ -325,12 +324,12 @@ class DependencyTree : public KIntervalBtree<K> {
 
                     // region[k].a = region[k].a;
                     region[k].b = parent->region[k].a;
-                    this->insert_from(task, access, parent, k, node);  // (1)
+                    this->insert_from(task, region, mode, parent, k, node);  // (1)
                     // this->insert_from(this->root, mode, region, obj, 0, node);  // (1)
 
                     region[k].a = parent->region[k].a;
                     region[k].b = b;
-                    this->insert_from(task, access, parent, k, node);   // (3)
+                    this->insert_from(task, region, mode, parent, k, node);   // (3)
                     // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
 
                     region[k].a = a;
@@ -346,12 +345,12 @@ class DependencyTree : public KIntervalBtree<K> {
 
                     // region[k].a = region[k].a;
                     region[k].b = parent->region[k].b;
-                    this->insert_from(task, access, parent, k, node);  // (3)
+                    this->insert_from(task, region, mode, parent, k, node);  // (3)
                     // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
 
                     region[k].a = parent->region[k].b;
                     region[k].b = b;
-                    this->insert_from(task, access, parent, k, node);  // (2)
+                    this->insert_from(task, region, mode, parent, k, node);  // (2)
                     // this->insert_from(this->root, mode, region, obj, k, node);  // (2)
 
                     region[k].a = a;
@@ -369,14 +368,16 @@ class DependencyTree : public KIntervalBtree<K> {
         inline void
         insert_from(
             Task * task,
-            const task_access_t<K> * access,
+            Region & region,
+            const access_mode_t mode,
             BaseNode * parent,
             int k,
             BaseNode * node
         ) {
             this->insert_from(
                 task,
-                access,
+                region,
+                mode,
                 reinterpret_cast<Node *>(parent),
                 k,
                 reinterpret_cast<Node *>(node)
@@ -384,19 +385,22 @@ class DependencyTree : public KIntervalBtree<K> {
         }
 
         inline void
-        insert(Task * task, const task_access_t<K> * access)
-        {
-            tassert(!access->region.is_empty());
+        insert(
+            Task * task,
+            Region & region,
+            const access_mode_t mode
+        ) {
+            tassert(!region.is_empty());
 
             if (this->root == nullptr)
             {
-                this->root = new Node(access->region, 0, BLACK);
-                reinterpret_cast<Node *>(this->root)->register_access(task, access);
+                this->root = new Node(region, 0, BLACK);
+                reinterpret_cast<Node *>(this->root)->register_access(task, region, mode);
                 this->root->update_includes();
             }
             else
             {
-                this->insert_from(task, access, this->root, 0, nullptr);
+                this->insert_from(task, region, mode, this->root, 0, nullptr);
                 this->update();
             }
 

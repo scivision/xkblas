@@ -3,6 +3,8 @@
 
 # include "logger/todo.h"
 
+# include <cstdint>
+
 typedef enum    memory_block_replicate_state_t : uint8_t
 {
     MEMORY_BLOCK_REPLICATE_DEALLOCATED  = 0,
