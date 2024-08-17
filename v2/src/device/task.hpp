@@ -2,6 +2,7 @@
 # define __TASK_HPP__
 
 # include <atomic>
+# include <cassert>
 # include <cstdint>
 # include <vector>
 
@@ -34,61 +35,69 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
-class task_access_t : public access_t<2>
+template <int K>
+class alignas(CACHE_LINE_SIZE) KTask
 {
-    public:
-
-        /* matrix host address (passed to the BLAS kernel) */
-        uintptr_t host_addr;
-
-        /* matrix LD */
-        int LD;
-
-        /* tile accessed (in [0..ntiles[) */
-        int tm;
-        int tn;
-
-        /* tile size */
-        int bs_m;
-        int bs_n;
+    using Region = Intervals<K>;
 
     public:
 
-        task_access_t() {}
+        class Access : public access_t<K>
+        {
+            public:
 
-        task_access_t(
-            const access_mode_t & m,
-            const uintptr_t & host_addr,
-            const int & LD,
-            const int & tm,   const int & tn,
-            const int & bs_m, const int & bs_n
-        ) :
-            access_t<2>(m, host_addr, LD, tm, tn, bs_m, bs_n),
-            host_addr(host_addr),
-            LD(LD),
-            tm(tm),     tn(tn),
-            bs_m(bs_m), bs_n(bs_n)
-        {}
+                /* matrix host address (passed to the BLAS kernel) */
+                uintptr_t host_addr;
 
-        virtual ~task_access_t() {}
-};
+                /* matrix LD */
+                int LD;
 
-class Task;
-using Region = Intervals<2>;
+                /* tile accessed (in [0..ntiles[) */
+                int tm;
+                int tn;
 
-/**
- *  An edge between two tasks.
- *      successor - the successor task
- *      region - accessed by both tasks, with at least one writing
- */
-typedef struct  task_edge_t
-{
-    Task * successor;
-    const Region region;
-}               task_edge_t;
+                /* tile size */
+                int bs_m;
+                int bs_n;
 
-class alignas(CACHE_LINE_SIZE) Task
-{
+            public:
+
+                Access() {}
+
+                Access(
+                    const access_mode_t & m,
+                    const uintptr_t & host_addr,
+                    const int & LD,
+                    const int & tm,   const int & tn,
+                    const int & bs_m, const int & bs_n
+                ) :
+                    access_t<K>(m, host_addr, LD, tm, tn, bs_m, bs_n),
+                    host_addr(host_addr),
+                    LD(LD),
+                    tm(tm),     tn(tn),
+                    bs_m(bs_m), bs_n(bs_n)
+                {}
+
+                virtual ~Access() {}
+
+        }; /* Access */
+
+    public:
+
+        /**
+         *  An edge between two tasks.
+         *      successor - the successor task
+         *      region - accessed by both tasks, with at least one writing
+         */
+        class Edge {
+            public:
+                KTask * successor;
+                const Region region;
+            public:
+                Edge(KTask * s, const Region & r) : successor(s), region(r) {}
+                virtual ~Edge() {}
+        }; /* Edge */
+
     public:
         ////////////////
         // Attributes //
@@ -98,10 +107,10 @@ class alignas(CACHE_LINE_SIZE) Task
         task_body_t body;
 
         /* list of out-going edges */
-        std::vector<task_edge_t> edges;
+        std::vector<Edge> edges;
 
         /* task accesses */
-        task_access_t accesses[TASK_MAX_ACCESSES];
+        Access accesses[TASK_MAX_ACCESSES];
         uint8_t naccesses;
 
         /* OCR parameter index, or -1 if none */
@@ -127,9 +136,9 @@ class alignas(CACHE_LINE_SIZE) Task
 
     public:
 
-        Task() : Task(TASK_BODY_NOOP) {}
+        KTask() : KTask(TASK_BODY_NOOP) {}
 
-        Task(task_body_t body) :
+        KTask(task_body_t body) :
             body(body),
             edges(),
             accesses(),
@@ -146,7 +155,7 @@ class alignas(CACHE_LINE_SIZE) Task
             # endif /* NDEBUG */
         }
 
-        virtual ~Task()
+        virtual ~KTask()
         {
             this->state.value = TASK_STATE_DEALLOCATED;
         }
@@ -156,14 +165,70 @@ class alignas(CACHE_LINE_SIZE) Task
         ////////////////////////////////////
 
         /* this task precedes the passed task */
-        void precedes(Task * successor, const Region & region);
+        void
+        precedes(KTask * succ, const Region & region)
+        {
+            assert(succ);
+            assert(this->state.value >= TASK_STATE_ALLOCATED);
+            assert(succ->state.value >= TASK_STATE_ALLOCATED);
+            assert(!region.is_empty());
+
+            if (this->state.value < TASK_STATE_COMPLETED)
+            {
+                Edge edge(succ, region);
+
+                SPINLOCK_LOCK(this->state.lock);
+                {
+                    if (this->state.value < TASK_STATE_EXECUTED)
+                    {
+                        succ->wc.fetch_add(1, std::memory_order_seq_cst);
+                        this->edges.push_back(edge);
+                    }
+                }
+                SPINLOCK_UNLOCK(this->state.lock);
+            }
+        }
 
         /* Return 'true' if the task is ready to be queued, 'false' otherwise */
-        bool commit(void);
+        bool
+        commit(void)
+        {
+            assert(this->state.value == TASK_STATE_ALLOCATED);
+            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+            {
+                this->state.value = TASK_STATE_READY;
+                return true;
+            }
+            return false;
+        }
 
-        // TODO
-        void execute(void);
-        void complete(void);
+        void
+        execute(void)
+        {
+            SPINLOCK_LOCK(this->state.lock);
+            {
+                this->state.value = TASK_STATE_EXECUTED;
+            }
+            SPINLOCK_UNLOCK(this->state.lock);
+        }
+
+        void
+        complete(void)
+        {
+            assert(this->state.value == TASK_STATE_EXECUTED);
+            this->state.value = TASK_STATE_COMPLETED;
+
+            for (Edge & edge : this->edges)
+            {
+                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+                {
+                    edge.successor->state.value = TASK_STATE_READY;
+                    // TODO : queue 'succ'
+                }
+            }
+        }
 };
+
+using Task = KTask<2>;
 
 #endif /* __TASK_HPP__ */

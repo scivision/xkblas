@@ -47,9 +47,7 @@ add_library(xkblas SHARED
     src/device/device.cc
     src/device/driver.cc
     src/device/driver_host.cc
-    src/device/memory-tree.cc
     src/device/stream.cc
-    src/device/task.cc
     src/device/thread-producer.cc
     src/device/thread-worker.cc
     src/kernels/zgemm.cc

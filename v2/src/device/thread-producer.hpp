@@ -61,14 +61,14 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
             {
-                task_access_t * access = task->accesses + i;
+                Task::Access * access = task->accesses + i;
                 this->deptree.intersect(task, access->region, access->mode);
             }
 
             // register accesses for linking with future tasks
             for (int i = 0 ; i < N ; ++i)
             {
-                task_access_t * access = task->accesses + i;
+                Task::Access * access = task->accesses + i;
                 this->deptree.insert(task, access->region, access->mode);
             }
 
@@ -93,7 +93,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
                 fprintf(f, "    \"%p\" [label=\"%s\"] ;\n", task, task->label);
 
             for (Task * & pred : this->tasks)
-                for (task_edge_t & edge : pred->edges)
+                for (Task::Edge & edge : pred->edges)
                     fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, edge.successor);
             fprintf(f, "}\n");
         }
@@ -109,7 +109,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
         uint8_t * memory_stack_ptr;
 
         /* Dependency tree */
-        DependencyTree<2> deptree;
+        DependencyTree deptree;
 
         #ifndef NDEBUG
         std::vector<Task *> tasks;

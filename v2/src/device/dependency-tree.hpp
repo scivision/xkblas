@@ -5,11 +5,11 @@
 # include "sync/kinterval-btree.hpp"
 
 template <int K>
-class DependencyTreeNode : public KIntervalBtree<K>::Node {
+class KDependencyTreeNode : public KIntervalBtree<K>::Node {
 
     using Base = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
-    using Node = DependencyTreeNode<K>;
+    using Node = KDependencyTreeNode<K>;
 
     public:
 
@@ -24,17 +24,17 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
 
     public:
 
-        DependencyTreeNode(const Region & r, int k, Color color) :
+        KDependencyTreeNode(const Region & r, int k, Color color) :
             KIntervalBtree<K>::Node(r, k, color),
             last_reads(),
             last_write(nullptr),
             nwrites(0)
         {}
 
-        inline DependencyTreeNode *
+        inline KDependencyTreeNode *
         get_child(int k, Direction dir)
         {
-            return reinterpret_cast<DependencyTreeNode *>(this->st[k].children[dir]);
+            return reinterpret_cast<KDependencyTreeNode *>(this->st[k].children[dir]);
         }
 
         inline void
@@ -72,7 +72,7 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
         }
 
         inline void
-        inherit_accesses(DependencyTreeNode * parent)
+        inherit_accesses(KDependencyTreeNode * parent)
         {
             this->last_reads.insert(
                 this->last_reads.end(),
@@ -84,10 +84,10 @@ class DependencyTreeNode : public KIntervalBtree<K>::Node {
 };
 
 template<int K>
-class DependencyTree : public KIntervalBtree<K> {
+class KDependencyTree : public KIntervalBtree<K> {
 
     using Base = KIntervalBtree<K>;
-    using Node = DependencyTreeNode<K>;
+    using Node = KDependencyTreeNode<K>;
     using BaseNode = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
 
@@ -408,5 +408,7 @@ class DependencyTree : public KIntervalBtree<K> {
             Base::post_insert();
         }
 };
+
+using DependencyTree = KDependencyTree<2>;
 
 #endif /* __DEPENDENCY_TREE_HPP__ */
