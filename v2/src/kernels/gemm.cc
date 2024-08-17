@@ -49,7 +49,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     const int Ctm;
     const int Ctn;
     const int LDC;
-}                                                                       args_t;
+} args_t;
 
 int
 xkblas_£gemm_tile_async(

@@ -282,7 +282,8 @@ xkblas_device_prepare_task(
     Task * task
 ) {
     // TODO : implement this routine
-    XKBLAS_DEBUG("Scheduling task %p", task);
+    XKBLAS_DEBUG("Scheduling task `%s` on device %d on driver `%s`",
+            task->label, device->driver_id, driver->f_get_name());
     xkblas_context_t * context = xkblas_context_get();
 
     // 'prepare_execute:' label
@@ -420,4 +421,11 @@ xkblas_device_thread_main(void * a)
 # endif
 
     return NULL;
+}
+
+xkblas_device_host_t *
+xkblas_get_device_host(xkblas_drivers_t * drivers)
+{
+    assert(drivers->devices.n);
+    return drivers->devices.list[0];
 }

@@ -5,29 +5,44 @@ MemoryTree::MemoryTree() {}
 MemoryTree::~MemoryTree() {}
 
 void
+MemoryTree::find(
+    task_access_t * access,
+    std::vector<MemoryBlock> & blocks
+) {
+    // TODO : implement me
+    //  - fill the 'blocks' list with matching memory blocks
+    //  - ensure the tree represents all memory bytes represented by 'access' -
+    //    assuming it is initially valid on the host device
+}
+
+void
 MemoryTree::fetch(
     xkblas_device_t * device,
     Task * task
 ) {
-
     /* bitfield for this device (all bits to 0 but the one of this device) */
     memory_block_bitfield_t devbit = (1 << device->global_id);
 
-    /* use task->wc as counter for asynchronous callback to detect
-       completion of them
-       - each callback decr counter
-       - each access without need for callback decr it
-       - after all parameters have been visited, then decr the counter.
-       The last decr that set counter to 0 push the task on the kernel stream
-       */
+    # pragma message(TODO " currently, continuous blocks on the same device "   \
+            "could be detected here and fetched with a single request")
+
+    /* use task->wc to detect completion of every fetchs */
+    task->wc.fetch_add(1, std::memory_order_seq_cst);
+
+    std::vector<MemoryBlock> blocks;
     assert(task->naccesses <= TASK_MAX_ACCESSES);
     for (int i = 0 ; i < task->naccesses ; ++i)
     {
-        task_access_t<2> * access = task->accesses + i;
+        this->find(task->accesses + i, blocks);
+        for (MemoryBlock & block : blocks)
+        {
+            // TODO : check block validity on 'device'
+        }
+        blocks.clear();
+    }
 
-        # pragma message(TODO " currently, continuous blocks on the same device "   \
-                "may be  fetched with multiple memcpy, while they could be "        \
-                "joined in a single memcpy")
-
+    if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+    {
+        // TODO : kernel is ready - queue it
     }
 }
