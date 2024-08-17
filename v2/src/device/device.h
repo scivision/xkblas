@@ -105,7 +105,4 @@ typedef struct  xkblas_device_t
 
 }               xkblas_device_t;
 
-/* return the host device */
-xkblas_device_host_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
-
 #endif /* __DEVICE_H__ */

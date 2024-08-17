@@ -137,4 +137,7 @@ void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
 void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
 void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
+/* return the host device */
+xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
+
 #endif /* __DRIVER_H__ */

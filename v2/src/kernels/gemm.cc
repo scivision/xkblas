@@ -96,9 +96,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) task_access_t<2>(ACCESS_MODE_R, (uintptr_t)A, LDA, Atm, Atn, BS, BS);
-    new(task->accesses + 1) task_access_t<2>(ACCESS_MODE_R, (uintptr_t)B, LDB, Btm, Btn, BS, BS);
-    new(task->accesses + 2) task_access_t<2>(Cmode,         (uintptr_t)C, LDC, Ctm, Ctn, BS, BS);
+    new(task->accesses + 0) task_access_t(ACCESS_MODE_R, (uintptr_t)A, LDA, Atm, Atn, BS, BS);
+    new(task->accesses + 1) task_access_t(ACCESS_MODE_R, (uintptr_t)B, LDB, Btm, Btn, BS, BS);
+    new(task->accesses + 2) task_access_t(Cmode,         (uintptr_t)C, LDC, Ctm, Ctn, BS, BS);
     thread->commit<NACCESSES>(drivers, task);
     # undef NACCESSES
 

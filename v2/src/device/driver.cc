@@ -178,3 +178,10 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
     // XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
     worker->push(task);
 }
+
+xkblas_device_t *
+xkblas_get_device_host(xkblas_drivers_t * drivers)
+{
+    assert(drivers->devices.n);
+    return drivers->devices.list[0];
+}

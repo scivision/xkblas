@@ -26,6 +26,8 @@ MemoryTree::fetch(
     # pragma message(TODO " currently, continuous blocks on the same device "   \
             "could be detected here and fetched with a single request")
 
+    # pragma message(TODO " need synchronizations on memory tree use, as blocks may be split / merged")
+
     /* use task->wc to detect completion of every fetchs */
     task->wc.fetch_add(1, std::memory_order_seq_cst);
 
@@ -40,13 +42,22 @@ MemoryTree::fetch(
             /* if reading, fetch if invalid on 'device' */
             if (access->mode & ACCESS_MODE_R)
             {
-                // TODO
+                if (block.valid & devbit)
+                {
+                    /* data is valid on that device, no need to fetch */
+                }
+                else
+                {
+                    /* data must be fetched */
+                    task->wc.fetch_add(1, std::memory_order_seq_cst);
+                    // TODO : fetch data and decr wc on completion
+                }
             }
 
             /* if writting, invalidate on every other devices */
             if (access->mode & ACCESS_MODE_W)
             {
-                block->valid = devbit;
+                block.valid = devbit;
             }
         }
         blocks.clear();

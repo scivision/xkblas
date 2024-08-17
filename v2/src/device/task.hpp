@@ -34,8 +34,7 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
-template<int K>
-class task_access_t : public access_t<K>
+class task_access_t : public access_t<2>
 {
     public:
 
@@ -64,7 +63,7 @@ class task_access_t : public access_t<K>
             const int & tm,   const int & tn,
             const int & bs_m, const int & bs_n
         ) :
-            access_t<K>(m, host_addr, LD, tm, tn, bs_m, bs_n),
+            access_t<2>(m, host_addr, LD, tm, tn, bs_m, bs_n),
             host_addr(host_addr),
             LD(LD),
             tm(tm),     tn(tn),
@@ -102,7 +101,7 @@ class alignas(CACHE_LINE_SIZE) Task
         std::vector<task_edge_t> edges;
 
         /* task accesses */
-        task_access_t<2> accesses[TASK_MAX_ACCESSES];
+        task_access_t accesses[TASK_MAX_ACCESSES];
         uint8_t naccesses;
 
         /* OCR parameter index, or -1 if none */

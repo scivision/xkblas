@@ -422,10 +422,3 @@ xkblas_device_thread_main(void * a)
 
     return NULL;
 }
-
-xkblas_device_host_t *
-xkblas_get_device_host(xkblas_drivers_t * drivers)
-{
-    assert(drivers->devices.n);
-    return drivers->devices.list[0];
-}
