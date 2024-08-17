@@ -33,10 +33,21 @@ MemoryTree::fetch(
     assert(task->naccesses <= TASK_MAX_ACCESSES);
     for (int i = 0 ; i < task->naccesses ; ++i)
     {
-        this->find(task->accesses + i, blocks);
+        task_access_t * access = task->accesses + i;
+        this->find(access, blocks);
         for (MemoryBlock & block : blocks)
         {
-            // TODO : check block validity on 'device'
+            /* if reading, fetch if invalid on 'device' */
+            if (access->mode & ACCESS_MODE_R)
+            {
+                // TODO
+            }
+
+            /* if writting, invalidate on every other devices */
+            if (access->mode & ACCESS_MODE_W)
+            {
+                block->valid = devbit;
+            }
         }
         blocks.clear();
     }
