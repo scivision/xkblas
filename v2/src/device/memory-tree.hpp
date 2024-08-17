@@ -19,9 +19,6 @@ class KMemoryTreeNode : public KIntervalBtree<K>::Node {
         /* the memory block represented by this node */
         MemoryBlock block;
 
-        // TODO : add an included tracking of the device bit mask, to fastly
-        // cut the search
-
     public:
 
         KMemoryTreeNode(const Region & r, int k, Color color) :
@@ -99,14 +96,41 @@ class KMemoryTree : public KIntervalBtree<K> {
             }
         }
 
+        void
+        find_from(
+            const Access * access,
+            std::vector<MemoryBlock> & blocks,
+            Node * parent,
+            int k
+        ) {
+            // TODO : ensure that loop is unrolled - else maybe generate code
+            while (k < K)
+            {
+                // TODO
+            }
+        }
+
         /** find memory blocks required for the given task - if not found, new
          * blocks are inserted assumed valid on the host device only */
         void
-        find(Access * access, std::vector<MemoryBlock> & blocks)
-        {
-            // TODO : implement me - fill the 'blocks' list with matching
-            // memory blocks - ensure the tree represents all memory bytes
-            // represented by 'access' -
+        find(
+            const Access * access,
+            std::vector<MemoryBlock> & blocks
+        ) {
+            tassert(!access->region.is_empty());
+
+            if (this->root == nullptr)
+            {
+                this->root = new Node(access->region, 0, BLACK);
+                this->root->update_includes();
+            }
+            else
+            {
+                this->find_from(access, blocks, reinterpret_cast<Node *>(this->root), 0);
+                this->update();
+            }
+
+            Base::post_insert();
         }
 
 };

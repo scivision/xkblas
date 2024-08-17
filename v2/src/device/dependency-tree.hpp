@@ -171,7 +171,7 @@ class KDependencyTree : public KIntervalBtree<K> {
             int k,
             Node * node
         ) {
-            // TODO : ensure that loop is unrolled
+            // TODO : ensure that loop is unrolled - else maybe generate code
             while (k < K)
             {
 # ifdef CUT
@@ -180,11 +180,9 @@ class KDependencyTree : public KIntervalBtree<K> {
                 // 'out' access, we can discard all children
                 if (mode & ACCESS_MODE_W)
                 {
-                    // TODO : the includes test could be accelerated simply
-                    // checking >=k dimensions, as we know we are already matching
-                    // <k dimensions
-
-                    if (region.includes(parent->includes.region))
+                    // the includes test is accelerated as we know we are
+                    // already matching dimensions <k
+                    if (region.includes(parent->includes.region, k))
                     {
                         // TODO : what if 'node' is not null ?  probably want to
                         // return something to callee for the case (3)
@@ -296,7 +294,7 @@ class KDependencyTree : public KIntervalBtree<K> {
                             this->foreach_k_child(reinterpret_cast<BaseNode *>(parent), k+1, f);
                         }
 
-                        // TODO : unnecessary if we d another child
+                        // TODO : unnecessary if we outdated another child
                         this->outdate(parent);
                     } /* I == J ||  J c I */
                 }

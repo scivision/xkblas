@@ -223,7 +223,7 @@ xkblas_device_progress(
     {
         case (XKBLAS_DEVICEOP_NOP):
         {
-            pthread_yield();
+            sched_yield();
             xkblas_device_poll(device);
             break ;
         }

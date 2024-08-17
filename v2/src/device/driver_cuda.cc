@@ -1009,7 +1009,7 @@ static int cuda_stream_advance_pending(
           assert((res == cudaErrorNotReady)  || (res == cudaSuccess));
           if (res == cudaErrorNotReady)
             //goto break_label;
-            pthread_yield();
+            sched_yield();
           else {
 #if XKBLAS_USE_TRACELIB==1
             float delay; /* ms */
@@ -1233,7 +1233,7 @@ static int xkblas_cuda_io_thread( xkblas_device_cuda_t* device, xkblas_io_stream
       cuda_stream_advance_pending( &device->inherited, stream->ios[type][i], 0 );
       if (old_ok_p != stream->ios[type][i]->ok_p) ++count;
     }
-    if (count ==0) pthread_yield();
+    if (count ==0) sched_yield();
   }
 }
 

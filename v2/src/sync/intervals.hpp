@@ -129,15 +129,21 @@ class Intervals {
         }
 
         inline bool
-        includes(const Intervals & intervals) const
+        includes(const Intervals & intervals, int k) const
         {
-            for (int k = 0 ; k < K ; ++k)
+            for ( ; k < K ; ++k)
             {
                 if (this->list[k].a <= intervals.list[k].a && intervals.list[k].b <= this->list[k].b)
                     continue ;
                 return false;
             }
             return true;
+        }
+
+        inline bool
+        includes(const Intervals & intervals) const
+        {
+            return this->includes(intervals, 0);
         }
 
         inline bool
