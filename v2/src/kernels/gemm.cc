@@ -93,25 +93,12 @@ xkblas_£gemm_tile_async(
     assert(BS_M == BS_N);
     assert(BS_M == BS_K);
 
-    const uintptr_t AP = reinterpret_cast<uintptr_t>(A);
-    const uintptr_t BP = reinterpret_cast<uintptr_t>(B);
-    const uintptr_t CP = reinterpret_cast<uintptr_t>(C);
-    uintptr_t AA = XKBLAS_MATRIX_TILE(AP, LDA, Atm, Atn, BS, BS);
-    uintptr_t BB = XKBLAS_MATRIX_TILE(BP, LDB, Btm, Btn, BS, BS);
-    uintptr_t CC = XKBLAS_MATRIX_TILE(CP, LDC, Ctm, Ctn, BS, BS);
-
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-
-    task->accesses[0].mode    = ACCESS_MODE_R;
-    task->accesses[0].region  = Intervals<2>(AA, LDA, BS, BS);
-
-    task->accesses[1].mode    = ACCESS_MODE_R;
-    task->accesses[1].region  = Intervals<2>(BB, LDB, BS, BS);
-
-    task->accesses[2].mode    = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    task->accesses[2].region  = Intervals<2>(CC, LDC, BS, BS);
-
+    access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
+    new(task->accesses + 0) task_access_t<2>(ACCESS_MODE_R, (uintptr_t)A, LDA, Atm, Atn, BS, BS);
+    new(task->accesses + 1) task_access_t<2>(ACCESS_MODE_R, (uintptr_t)B, LDB, Btm, Btn, BS, BS);
+    new(task->accesses + 2) task_access_t<2>(Cmode,         (uintptr_t)C, LDC, Ctm, Ctn, BS, BS);
     thread->commit<NACCESSES>(drivers, task);
     # undef NACCESSES
 

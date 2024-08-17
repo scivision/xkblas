@@ -1,6 +1,7 @@
 #ifndef __MEMORY_BLOCK_HPP__
 # define __MEMORY_BLOCK_HPP__
 
+# include "device/consts.h"
 # include "logger/todo.h"
 
 # include <cstdint>

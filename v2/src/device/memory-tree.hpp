@@ -1,14 +1,15 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
+# include "device/device.h"
 # include "device/memory-block.hpp"
 # include "logger/todo.h"
 
 class MemoryTree {
 
     public:
-        MemoryTree() {}
-        virtual ~MemoryTree() {}
+        MemoryTree();
+        virtual ~MemoryTree();
 
     public:
 

@@ -1,6 +1,7 @@
 #ifndef __INTERVALS_HPP__
 # define __INTERVALS_HPP__
 
+# include "matrix-tile.h"
 # include "min-max.h"
 # include "interval.hpp"
 
@@ -34,18 +35,22 @@ class Intervals {
         }
 
         // TODO : super-dirty stuff, to make xkblas code looks good
-        Intervals(const uintptr_t & A, const int & LD, const int & BX, const int & BY)
-        {
+        Intervals(
+            const uintptr_t & P,
+            const int & LD,
+            const int & tm, const int & tn,
+            const int & bs_m, const int & bs_n
+        ) {
             if constexpr(K == 2)
             {
-                this->list[0].a = (uint64_t)(A % LD);
-                this->list[0].b = this->list[0].a + BX;
-                this->list[1].a = (uint64_t)(A / LD);
-                this->list[1].b = this->list[1].a + BY;
+                uintptr_t PP = XKBLAS_MATRIX_TILE(P, LD, tm, tn, bs_m, bs_n);
+                this->list[0].a = (uint64_t)(PP % LD);
+                this->list[0].b = this->list[0].a + bs_m;
+                this->list[1].a = (uint64_t)(PP / LD);
+                this->list[1].b = this->list[1].a + bs_n;
             }
             else
             {
-                // # pragma message("Constructor not supported for K != 2")
             }
         }
 

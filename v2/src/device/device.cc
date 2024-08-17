@@ -307,9 +307,8 @@ xkblas_device_prepare_task(
     device->pipeline[index % device->pipe_size] = task;
 
     /* retrieve the memory state */
-    // MemoryTree * mem = &(context->drivers.memtree);
-    // mem->fetch(device, task);
-    // TODO
+    MemoryTree * mem = &(context->drivers.memtree);
+    mem->fetch(device, task);
 
     if (task->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
     {

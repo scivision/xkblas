@@ -11,7 +11,7 @@
 # include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"
 
-# define TASK_MAX_ACCESSES  4
+# define TASK_MAX_ACCESSES 3
 
 typedef enum    task_state_t : uint8_t
 {
@@ -35,10 +35,43 @@ enum task_body_t : uint8_t
 };
 
 template<int K>
-struct task_access_t : access_t<K>
+class task_access_t : public access_t<K>
 {
-    task_access_t() : access_t<K>() {}
-    ~task_access_t() {}
+    public:
+
+        /* matrix host address (passed to the BLAS kernel) */
+        uintptr_t host_addr;
+
+        /* matrix LD */
+        int LD;
+
+        /* tile accessed (in [0..ntiles[) */
+        int tm;
+        int tn;
+
+        /* tile size */
+        int bs_m;
+        int bs_n;
+
+    public:
+
+        task_access_t() {}
+
+        task_access_t(
+            const access_mode_t & m,
+            const uintptr_t & host_addr,
+            const int & LD,
+            const int & tm,   const int & tn,
+            const int & bs_m, const int & bs_n
+        ) :
+            access_t<K>(m, host_addr, LD, tm, tn, bs_m, bs_n),
+            host_addr(host_addr),
+            LD(LD),
+            tm(tm),     tn(tn),
+            bs_m(bs_m), bs_n(bs_n)
+        {}
+
+        virtual ~task_access_t() {}
 };
 
 class Task;
