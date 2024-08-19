@@ -7,9 +7,9 @@
 template <int K>
 class KDependencyTreeNode : public KIntervalBtree<K>::Node {
 
-    using Base = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
     using Node = KDependencyTreeNode<K>;
+    using NodeBase = typename KIntervalBtree<K>::Node;
 
     public:
 
@@ -24,17 +24,17 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
 
     public:
 
-        KDependencyTreeNode(const Region & r, int k, Color color) :
-            KIntervalBtree<K>::Node(r, k, color),
+        KDependencyTreeNode<K>(const Region & r, int k, Color color) :
+            NodeBase(r, k, color),
             last_reads(),
             last_write(nullptr),
             nwrites(0)
         {}
 
-        inline KDependencyTreeNode *
+        inline Node *
         get_child(int k, Direction dir)
         {
-            return reinterpret_cast<KDependencyTreeNode *>(this->st[k].children[dir]);
+            return reinterpret_cast<Node *>(this->st[k].children[dir]);
         }
 
         inline void
@@ -43,7 +43,7 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
             this->nwrites = this->last_write ? 1 : 0;
             FOREACH_CHILD_BEGIN(this, child, k, dir)
             {
-                this->nwrites += reinterpret_cast<Node *>(child)->nwrites;
+                this->nwrites += child->nwrites;
             }
             FOREACH_CHILD_END(this, child, k, dir);
         }
@@ -88,7 +88,7 @@ class KDependencyTree : public KIntervalBtree<K> {
 
     using Base = KIntervalBtree<K>;
     using Node = KDependencyTreeNode<K>;
-    using BaseNode = typename KIntervalBtree<K>::Node;
+    using NodeBase = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
 
     public:
@@ -101,9 +101,10 @@ class KDependencyTree : public KIntervalBtree<K> {
             Task * task,
             const Region & region,
             const access_mode_t mode,
-            Node * node
+            NodeBase * nodebase
         ) const {
 
+            Node * node = reinterpret_cast<Node *>(nodebase);
             if (node == nullptr || !region.intersects(node->includes.region))
                 return ;
 
@@ -124,7 +125,7 @@ class KDependencyTree : public KIntervalBtree<K> {
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
-                this->intersect_from(task, region, mode, reinterpret_cast<Node *>(child));
+                this->intersect_from(task, region, mode, child);
             }
             FOREACH_CHILD_END(node, child, k, dir);
         }
@@ -132,7 +133,7 @@ class KDependencyTree : public KIntervalBtree<K> {
         inline void
         intersect(Task * task, const Region & region, const access_mode_t mode) const
         {
-            this->intersect_from(task, region, mode, reinterpret_cast<Node *>(this->root));
+            this->intersect_from(task, region, mode, this->root);
         }
 
         //////////////
@@ -167,10 +168,12 @@ class KDependencyTree : public KIntervalBtree<K> {
             Task * task,
             Region & region,
             const access_mode_t mode,
-            Node * parent,
+            NodeBase * parentbase,
             int k,
             Node * node
         ) {
+            Node * parent = reinterpret_cast<Node *>(parentbase);
+
             // TODO : ensure that loop is unrolled - else maybe generate code
             while (k < K)
             {
@@ -276,7 +279,7 @@ class KDependencyTree : public KIntervalBtree<K> {
                         // shrink children for dimensions k' > k
                         if (k < K-1)
                         {
-                            std::function<void(BaseNode *)> f = [this, &k, &region, &x, &task](BaseNode * node) {
+                            std::function<void(Node *)> f = [this, &k, &region, &x, &task](Node * node) {
                                 node->shrink(region, k);
                                 for (int i = 0 ; i < 2 ; ++i)
                                 {
@@ -288,10 +291,10 @@ class KDependencyTree : public KIntervalBtree<K> {
                                     Node * split = new Node(r, k, RED);
                                     // TODO : probably no need to restart from root and dim 0
                                     this->insert_from(task, region, ACCESS_MODE_VOID, this->root, 0, split);
-                                    split->inherit_accesses(reinterpret_cast<Node *>(node));
+                                    split->inherit_accesses(node);
                                 }
                             };
-                            this->foreach_k_child(reinterpret_cast<BaseNode *>(parent), k+1, f);
+                            this->template foreach_k_child<Node>(parent, k+1, f);
                         }
 
                         // TODO : unnecessary if we outdated another child
@@ -365,25 +368,6 @@ class KDependencyTree : public KIntervalBtree<K> {
         }
 
         inline void
-        insert_from(
-            Task * task,
-            Region & region,
-            const access_mode_t mode,
-            BaseNode * parent,
-            int k,
-            BaseNode * node
-        ) {
-            this->insert_from(
-                task,
-                region,
-                mode,
-                reinterpret_cast<Node *>(parent),
-                k,
-                reinterpret_cast<Node *>(node)
-            );
-        }
-
-        inline void
         insert(
             Task * task,
             Region & region,
@@ -393,14 +377,14 @@ class KDependencyTree : public KIntervalBtree<K> {
 
             if (this->root == nullptr)
             {
-                this->root = new Node(region, 0, BLACK);
-                reinterpret_cast<Node *>(this->root)->register_access(task, mode);
-                this->root->update_includes();
+                Node * node = new Node(region, 0, BLACK);
+                node->register_access(task, mode);
+                this->root = node;
+                this->outdate(this->root);
             }
             else
             {
                 this->insert_from(task, region, mode, this->root, 0, nullptr);
-                this->update();
             }
 
             Base::post_insert();

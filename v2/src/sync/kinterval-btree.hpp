@@ -78,19 +78,19 @@ twopow(int n)
 # include "color.h"
 # include "direction.h"
 
-# define FOREACH_CHILD_BEGIN(N, C, I, D)                        \
-do {                                                            \
-    for (int I = 0 ; I < K ; ++I)                               \
-    {                                                           \
-        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)            \
-        {                                                       \
-            auto * C = N->st[I].children[D];                    \
-            if (C)                                              \
+# define FOREACH_CHILD_BEGIN(N, C, I, D)                                \
+do {                                                                    \
+    for (int I = 0 ; I < K ; ++I)                                       \
+    {                                                                   \
+        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)                    \
+        {                                                               \
+            Node * C = reinterpret_cast<Node *>(N->st[I].children[D]);  \
+            if (C)                                                      \
             {
-# define FOREACH_CHILD_END(N, C, I, D)                          \
-            }                                                   \
-        }                                                       \
-    }                                                           \
+# define FOREACH_CHILD_END(N, C, I, D)                                  \
+            }                                                           \
+        }                                                               \
+    }                                                                   \
 } while (0)
 
 /* K is the number of dimensions */
@@ -373,15 +373,18 @@ class KIntervalBtree {
         ///////////
         // UTILS //
         ///////////
+        template <typename T>
         void
         foreach_k_child(
-            Node * root,
+            T * root,
             int k,
-            std::function<void(Node *)> f
+            std::function<void(T *)> f
         ) {
+            static_assert(std::is_base_of<Node, T>::value);
+
             for (int i = 0 ; i < 2 ; ++i)
             {
-                Node * child = root->st[k].children[i];
+                T * child = reinterpret_cast<T *>(root->st[k].children[i]);
                 if (child)
                 {
                     f(child);
@@ -809,6 +812,8 @@ class KIntervalBtree {
         void
         post_insert(void)
         {
+            this->update();
+
 # ifdef REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
