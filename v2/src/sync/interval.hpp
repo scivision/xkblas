@@ -1,22 +1,28 @@
 #ifndef __INTERVAL_HPP__
 # define __INTERVAL_HPP__
 
-typedef struct  interval_s
-{
-    int a, b;
+class Interval {
+
+    public:
+        int a, b;
+
+    public:
+        Interval() : Interval(0, 0) {}
+        Interval(int aa, int bb) : a(aa), b(bb) {}
+        virtual ~Interval() {}
 
     friend bool
-    operator==(const struct interval_s & lhs, const struct interval_s & rhs)
+    operator==(const Interval & lhs, const Interval & rhs)
     {
         return lhs.a == rhs.a && lhs.b == rhs.b;
     }
 
     friend bool
-    operator!=(const struct interval_s & lhs, const struct interval_s & rhs)
+    operator!=(const Interval & lhs, const Interval & rhs)
     {
         return lhs.a != rhs.a || lhs.b != rhs.b;
     }
 
-}               interval_t;
+};
 
 #endif /* __INTERVAL_HPP__ */

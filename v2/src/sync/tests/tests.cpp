@@ -63,14 +63,14 @@ static void
 insert(
     KDependencyTree<K> & tree,
     access_mode_t mode,
-    interval_t intervals[K]
+    Interval intervals[K]
 ) {
     Intervals<K> region(intervals);
+    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "rw" : mode == ACCESS_MODE_R ? "r" : mode == ACCESS_MODE_W ? "w" :  "unk") << " " << region << std::endl;
     KTask<K> * task = task_new<K>();
     tree.intersect(task, region, mode);
     tree.insert(task, region, mode);
     ++NINSERT;
-//    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "out" : mode == IN ? "in" : "unk") << " " << region << std::endl;
 }
 
 //Generate 'n' disjoint hyperplans
@@ -82,7 +82,7 @@ disjoint_hyperplans(KDependencyTree<K> & tree, int n)
 
     for (int i = 0 ; i < n ; ++i)
     {
-        interval_t intervals[K];
+        Interval intervals[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k != PLAN_DIM)
@@ -107,7 +107,7 @@ pyramid(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        interval_t intervals[K];
+        Interval intervals[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k < K - 1)
@@ -132,7 +132,7 @@ pyramid_inverted(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        interval_t intervals[K];
+        Interval intervals[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k < K - 1)
@@ -157,7 +157,7 @@ squares_included(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        interval_t intervals[K];
+        Interval intervals[K];
         for (int k = 0 ; k < K ; ++k)
         {
             intervals[k].a =     i*4;
@@ -185,7 +185,7 @@ template<int K, int P>
 static void
 matrix_tiles_insert(KDependencyTree<K> & tree, std::array<int, K> indices)
 {
-    interval_t intervals[K];
+    Interval intervals[K];
     for (int k = 0 ; k < K ; ++k)
     {
         intervals[k].a = (indices[k]+0)*P;
@@ -214,35 +214,21 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-
         # if 0
-        for (int i = 0 ; i < N ; ++i)
-        {
-            interval_t interval[K] = {
-                { .a = 0,  .b = 16      },
-                { .a = 4*i, .b = 4*(i+1) },
-            };
-            insert<K>(tree, ACCESS_MODE_RW, interval);
-        }
+        static_assert(K == 2);
 
-        int xx[] = {
-            4, 1024,
-            1028,2048,
-            2564, 4096,
-            2052,2304,
-            2308,2432,
-            2436,2496,
-            2500, 2528,
-            2532,2544,
+        Interval intervals[] = {
+            Interval(0, 8), Interval(0, 2),
+            Interval(0, 8), Interval(2, 4),
+            Interval(0, 8), Interval(4, 6),
+
+            Interval(2, 6), Interval(0, 2),
         };
 
-        for (unsigned int i = 0 ; i < sizeof(xx) / sizeof(int) ; i += 2)
+        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
         {
-            interval_t interval[K] = {
-                { .a = 0,  .b = 16  },
-                { .a = xx[i+0],  .b = xx[i+1] },
-            };
-            insert<K>(tree, ACCESS_MODE_RW, interval);
+            Interval x[K] = { intervals[i+0], intervals[i+1] };
+            insert<K>(tree, ACCESS_MODE_RW, x);
         }
 
         # else

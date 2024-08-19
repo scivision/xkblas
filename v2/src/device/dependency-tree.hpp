@@ -260,106 +260,57 @@ class KDependencyTree : public KIntervalBtree<K> {
                     // J c I
                     else
                     {
-                        // TODO only work for K \in {1, 2} right now - FIX me for K>=3
+                        // TODO only tested for K \in {1, 2} - ensure it works for higher dimensions as well
                         assert(K == 1 || K == 2);
 
-                        # if 0
-                        if (k == 1)
+                        // can we do better than that ?
+                        //  - shrink all the (k+1)-subtree and save shrinked nodes
+                        //  - reinsert each node twice
+                        class ReinsertRegion {
+                            public:
+                                Node * sibling;
+                                Region region;
+                            public:
+                                ReinsertRegion(Node * s, Region & r) : sibling(s), region(r) {}
+                                virtual ~ReinsertRegion() {}
+                        };
+
+                        std::vector<ReinsertRegion> to_reinsert;
+                        std::function<void(Node *)> f = [&task, &mode, &to_reinsert, &region, &k](Node * node)
                         {
-                            // save parent coordinates
-                            int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
-
-                            // shrink parent
-                            parent->region[k] = region[k];
-
-                            // reinsert 2 nodes for parent's shrinked borders
+                            // generate side nodes region
+                            int x[4] = { node->region[k].a, region[k].a, region[k].b, node->region[k].b };
                             for (int i = 0 ; i < 2 ; ++i)
                             {
                                 if (x[2*i+0] == x[2*i+1])
                                     continue ;
-                                Node * node = new Node(parent->region, k, RED);
-                                node->region[k].a = x[2*i+0];
-                                node->region[k].b = x[2*i+1];
-                                this->insert_from(task, node->region, ACCESS_MODE_VOID, parent, k, node);
-                                node->inherit_accesses(parent);
+                                ReinsertRegion rr(node, node->region);
+                                rr.region[k].a = x[2*i+0];
+                                rr.region[k].b = x[2*i+1];
+                                to_reinsert.push_back(rr);
                             }
-                        }
-                        # endif
 
-                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
-                        parent->region[k] = region[k];
+                            // shrink node and register access
+                            node->region[k] = region[k];
+                            node->register_access(task, mode);
+                        };
 
-                        {
-                            for (int i = 0 ; i < 2 ; ++i)
-                            {
-                                if (x[2*i+0] == x[2*i+1])
-                                    continue ;
-                                Node * node = new Node(parent->region, k, RED);
-                                node->region[k].a = x[2*i+0];
-                                node->region[k].b = x[2*i+1];
-                                this->insert_from(task, node->region, ACCESS_MODE_VOID, parent, k, node);
-                                node->inherit_accesses(parent);
-                            }
-                        }
+                        f(parent);
 
                         if (k < K - 1)
-                        {
-                            // can we do better than that ?
-                            //  - shrink all the (k+1)-subtree and save shrinked nodes
-                            //  - reinsert each node twice
-                            std::vector<Region> to_reinsert;
-                            std::function<void(Node *)> f = [&to_reinsert, &x, &region, &k](Node * node)
-                            {
-                                node->region[k] = region[k];
-
-                                for (int i = 0 ; i < 2 ; ++i)
-                                {
-                                    if (x[2*i+0] == x[2*i+1] || i == 1)
-                                        continue ;
-
-                                    Region r(node->region);
-                                    r[k].a = x[2*i+0];
-                                    r[k].b = x[2*i+1];
-
-                                    to_reinsert.push_back(r);
-                                }
-                            };
                             this->template foreach_k_child<Node>(parent, k+1, f);
-                            if (to_reinsert.empty())
-                            {
-                                // nothing to do
-                            }
-                            else
-                            {
-                                assert(0);
-                            }
-                        }
 
-                        # if 0
-                        // shrink children for dimensions k' > k
-                        if (k < K-1)
+                        // insert all side nodes
+                        for (ReinsertRegion & rr : to_reinsert)
                         {
-                            std::function<void(Node *)> f = [this, &k, &region, &x, &task](Node * node) {
-                                node->shrink(region, k);
-                                for (int i = 0 ; i < 2 ; ++i)
-                                {
-                                    if (x[2*i+0] == x[2*i+1])
-                                        continue ;
-                                    Region r(node->region);
-                                    r[k].a = x[2*i+0];
-                                    r[k].b = x[2*i+1];
-                                    Node * split = new Node(r, k, RED);
-                                    // TODO : probably no need to restart from root and dim 0
-                                    this->insert_from(task, split->region, ACCESS_MODE_VOID, this->root, 0, split);
-                                    split->inherit_accesses(node);
-                                }
-                            };
-                            this->template foreach_k_child<Node>(parent, k+1, f);
+                            Node * node = new Node(rr.region, k, RED);
+                            this->insert_from(task, node->region, ACCESS_MODE_VOID, parent, k, node);
+                            node->inherit_accesses(rr.sibling);
                         }
-                        # endif
 
                         // TODO : may be unnecessary if we outdated another child
                         this->outdate(parent);
+                        break ;
 
                     } /* I == J ||  J c I */
                 }

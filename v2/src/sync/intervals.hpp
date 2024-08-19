@@ -17,14 +17,14 @@ template<int K>
 class Intervals {
 
     public:
-        interval_t list[K];
 
-        Intervals()
-        {
-            memset(this->list, 0, sizeof(this->list));
-        }
+        Interval list[K];
 
-        Intervals(const interval_t list[K])
+    public:
+
+        Intervals() : list() {}
+
+        Intervals(const Interval list[K])
         {
             this->set_list(list);
         }
@@ -63,13 +63,21 @@ class Intervals {
         }
 
         void
-        set_list(const interval_t list[K])
+        set_list(const Interval src[K])
         {
-            memcpy(this->list, list, sizeof(this->list));
+            // TODO : I'd rather memcpy the whole thing
+            # if 0
+            memcpy(this->list, src, sizeof(this->list));
+            # else
+            for (int k = 0 ; k < K ; ++k)
+            {
+                this->list[k] = src[k];
+            }
+            # endif
         }
 
-        interval_t   operator [](int i) const { return this->list[i]; }
-        interval_t & operator [](int i) { return this->list[i]; }
+        Interval   operator [](int i) const { return this->list[i]; }
+        Interval & operator [](int i) { return this->list[i]; }
 
         void
         tostring(char * buffer, int size) const
@@ -101,7 +109,7 @@ class Intervals {
         inline Intervals
         intersection(const Intervals & intervals) const
         {
-            interval_t inter[K];
+            Interval inter[K];
             for (int k = 0 ; k < K ; ++k)
             {
                 inter[k].a = MAX(this->list[k].a, intervals.list[k].a);

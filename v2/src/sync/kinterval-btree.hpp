@@ -279,7 +279,7 @@ class KIntervalBtree {
                         char include_region[1024];
                         this->includes.region.tostring(include_region, sizeof(include_region));
 
-                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\n\\n--- includes ---\\n%s\\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, include_region, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, include_region, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
                     }
 
                     FOREACH_CHILD_BEGIN(this, child, k, dir)
