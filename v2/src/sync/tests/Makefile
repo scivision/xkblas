@@ -2,11 +2,11 @@ CXX=g++
 CFLAGS=-Wall -Werror -Wextra
 CFLAGS+=-Wno-error=write-strings
 CFLAGS+=-g -O0
-CFLAGS+=-I . -I ../ -I ../impl -I ../../../include/
+CFLAGS+=-I . -I ../ -I ../../ -I ../../device -I ../../../include
 #CFLAGS+=-DDEBUG
 CFLAGS+=-DNDEBUG
 CFLAGS+=-DCUT -DREBALANCE
-#CFLAGS+=-DEXPORT_PDF
+CFLAGS+=-DEXPORT_PDF
 CFLAGS+=
 LDFLAGS+=
 

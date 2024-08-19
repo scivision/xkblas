@@ -110,6 +110,9 @@ void
 xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
+    XKBLAS_INFO("Infinite loop... CTRL+C to exit");
+    while (1)
+        sleep(1);
 }
 
 extern "C"

@@ -174,12 +174,6 @@ class KIntervalBtree {
                 virtual ~Node() {}
 
                 inline void
-                shrink(const Region & r, int k)
-                {
-                    this->region[k] = r[k];
-                }
-
-                inline void
                 update_includes_height(void)
                 {
                     for (int k = 0 ; k < K ; ++k)
@@ -268,6 +262,15 @@ class KIntervalBtree {
                 dump(FILE * f) const
                 {
                     {
+                        const char * COLORS[] = {
+                            "#000000",
+                            "#FF0000",
+                            "#00FF00",
+                            "#0000FF",
+                            "#FFFF00",
+                            "#FF00FF",
+                            "#00FFFF",
+                        };
                         const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
 
                         char region[1024];

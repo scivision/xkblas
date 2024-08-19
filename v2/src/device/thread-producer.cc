@@ -42,7 +42,7 @@ ThreadProducer::ThreadProducer() :
 
 ThreadProducer::~ThreadProducer()
 {
-    // XKBLAS_DEBUG("Delete producer thread");
+    XKBLAS_DEBUG("Delete producer thread");
 }
 
 uint8_t *

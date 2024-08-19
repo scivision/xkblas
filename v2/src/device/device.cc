@@ -281,6 +281,9 @@ xkblas_device_prepare_task(
     xkblas_device_t * device,
     Task * task
 ) {
+    assert(task->wc == 0);
+    assert(task->state.value == TASK_STATE_READY);
+
     // TODO : implement this routine
     XKBLAS_DEBUG("Scheduling task `%s` on device %d on driver `%s`",
             task->label, device->driver_id, driver->f_get_name());
@@ -299,19 +302,12 @@ xkblas_device_prepare_task(
     }
 
     // 'kaapi_offload_device_prepare_execute_task'
-
-    /* re-use the wait counter to ensure all data accesses had been copied to the device */
-    assert(task->wc == 0);
-    task->wc.fetch_add(1, std::memory_order_seq_cst);
-
     uint64_t index = device->p_write;
     device->pipeline[index % device->pipe_size] = task;
 
     /* retrieve the memory state */
     MemoryTree * mem = &(context->drivers.memtree);
-    mem->fetch(device, task);
-
-    if (task->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
+    if (mem->fetch(device, task) == TASK_STATE_DATA_FETCHED)
     {
         // TODO : 'task' kernel can be executed on the GPU
     }

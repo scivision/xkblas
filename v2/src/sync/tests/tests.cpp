@@ -1,36 +1,82 @@
 # include "demangle.hpp"
 # include "intervals.hpp"
+# include "dependency-tree.hpp"
 # include "task.hpp"
-# include "task-access-interval-multi-tree.hpp"
 
 # include <cmath>
 # include <cstdlib>
 
-typedef Task T;
+# define MAX_TASKS 100000
 
-// number of insertion counter
-static int ninsert = 0;
+static int NINSERT = 0;
 
-// Insert a region into the history
+template<int K>
+static inline KTask<K> *
+get_tasks(void)
+{
+    static KTask<K> tasks[MAX_TASKS];
+    return tasks;
+}
+
+template<int K>
+static inline int &
+get_ntasks()
+{
+    static int ntasks = 0;
+    return ntasks;
+}
+
+template<int K>
+static inline int
+get_nedges(void)
+{
+    KTask<K> * tasks = get_tasks<K>();
+    int ntasks = get_ntasks<K>();
+    int nedges = 0;
+    for (int i = 0 ; i < ntasks ; ++i)
+    {
+        Task * task = tasks + i;
+        nedges += task->edges.size();
+    }
+    return nedges;
+}
+
+template<int K>
+KTask<K> *
+task_new(void)
+{
+    KTask<K> * tasks = get_tasks<K>();
+    int & ntasks = get_ntasks<K>();
+
+    KTask<K> * task = &(tasks[ntasks++]);
+    if (ntasks > MAX_TASKS)
+    {
+        fprintf(stderr, "Increase 'MAX_TASKS' in %s:%d\n", __FILE__, __LINE__);
+        exit(0);
+    }
+    return task;
+}
+
+// Insert a region into the tree
 template<int K>
 static void
 insert(
-    History<K,T> & history,
+    KDependencyTree<K> & tree,
     access_mode_t mode,
     interval_t intervals[K]
 ) {
     Intervals<K> region(intervals);
-    Task * task = task_new();
-    history.intersect(mode, region, task);
-    history.insert(mode, region, task);
-    ++ninsert;
+    KTask<K> * task = task_new<K>();
+    tree.intersect(task, region, mode);
+    tree.insert(task, region, mode);
+    ++NINSERT;
 //    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "out" : mode == IN ? "in" : "unk") << " " << region << std::endl;
 }
 
 //Generate 'n' disjoint hyperplans
 template<int K, int PLAN_DIM>
 void
-disjoint_hyperplans(History<K,T> & history, int n)
+disjoint_hyperplans(KDependencyTree<K> & tree, int n)
 {
     static_assert(0 <= PLAN_DIM && PLAN_DIM < K);
 
@@ -50,14 +96,14 @@ disjoint_hyperplans(History<K,T> & history, int n)
                 intervals[k].b = 4*(i+1);
             }
         }
-        insert(history, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, intervals);
     }
 }
 
 //Generate 'n' hypercubes that includes all dimensions but one
 template<int K>
 void
-pyramid(History<K,T> & history, int n)
+pyramid(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -75,14 +121,14 @@ pyramid(History<K,T> & history, int n)
                 intervals[k].b = 4*(i+1);
             }
         }
-        insert(history, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, intervals);
     }
 }
 
 //Generate 'n' hypercubes that are included on all dimensions but one
 template<int K>
 void
-pyramid_inverted(History<K,T> & history, int n)
+pyramid_inverted(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -100,14 +146,14 @@ pyramid_inverted(History<K,T> & history, int n)
                 intervals[k].b = 4*(i+1);
             }
         }
-        insert(history, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, intervals);
     }
 }
 
 // Generate 'n' hypercubes that are successively included into previous ones
 template<int K>
 static void
-squares_included(History<K,T> & history, int n)
+squares_included(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
@@ -117,27 +163,27 @@ squares_included(History<K,T> & history, int n)
             intervals[k].a =     i*4;
             intervals[k].b = n*8-i*4;
         }
-        insert<K>(history, ACCESS_MODE_RW, intervals);
+        insert<K>(tree, ACCESS_MODE_RW, intervals);
     }
 }
 
 template<int Dimensions, int K, class Callable>
-constexpr void meta_for_loop(History<K,T> & history, std::array<int, K> & array, int end, Callable & c)
+constexpr void meta_for_loop(KDependencyTree<K> & tree, std::array<int, K> & array, int end, Callable & c)
 {
     static_assert(Dimensions > 0);
     for(int i = 0; i != end; ++i)
     {
         array[Dimensions-1] = i;
         if constexpr(Dimensions > 1)
-            meta_for_loop<Dimensions-1, K>(history, array, end, c);
+            meta_for_loop<Dimensions-1, K>(tree, array, end, c);
         else
-            c(history, array);
+            c(tree, array);
     }
 }
 
 template<int K, int P>
 static void
-matrix_tiles_insert(History<K,T> & history, std::array<int, K> indices)
+matrix_tiles_insert(KDependencyTree<K> & tree, std::array<int, K> indices)
 {
     interval_t intervals[K];
     for (int k = 0 ; k < K ; ++k)
@@ -145,28 +191,26 @@ matrix_tiles_insert(History<K,T> & history, std::array<int, K> indices)
         intervals[k].a = (indices[k]+0)*P;
         intervals[k].b = (indices[k]+1)*P;
     }
-    insert(history, ACCESS_MODE_RW, intervals);
+    insert(tree, ACCESS_MODE_RW, intervals);
 }
 
 // Generate n^K tiles of size P
 template<int K, int P>
 static void
-matrix_tiles(History<K,T> & history, int n)
+matrix_tiles(KDependencyTree<K> & tree, int n)
 {
     std::array<int, K> array;
-    meta_for_loop<K, K>(history, array, n, matrix_tiles_insert<K, P>);
+    meta_for_loop<K, K>(tree, array, n, matrix_tiles_insert<K, P>);
 }
 
 // Test size
 static int N = 10;
 
-// Launch tests for a history of dimension 'K'
-template<int K, typename T>
-static void launch_tests(History<K,T> & history)
+// Launch tests for a tree of dimension 'K'
+template<int K>
+static void launch_tests(KDependencyTree<K> & tree)
 {
-    printf("Running for K=%d and structure %s\n", K, demangle(history).c_str());
-    ninsert = 0;
-    task_clear();
+    printf("Running for K=%d and structure %s\n", K, demangle(tree).c_str());
 
     uint64_t t0 = get_nanotime();
     {
@@ -178,7 +222,7 @@ static void launch_tests(History<K,T> & history)
                 { .a = 0,  .b = 16      },
                 { .a = 4*i, .b = 4*(i+1) },
             };
-            insert<K>(history, ACCESS_MODE_RW, interval);
+            insert<K>(tree, ACCESS_MODE_RW, interval);
         }
 
         int xx[] = {
@@ -198,30 +242,30 @@ static void launch_tests(History<K,T> & history)
                 { .a = 0,  .b = 16  },
                 { .a = xx[i+0],  .b = xx[i+1] },
             };
-            insert<K>(history, ACCESS_MODE_RW, interval);
+            insert<K>(tree, ACCESS_MODE_RW, interval);
         }
 
         # else
 
         // hyperplans
-        disjoint_hyperplans<K, K-1>(history, N);
-        disjoint_hyperplans<K,   0>(history, N);
+        disjoint_hyperplans<K, K-1>(tree, N);
+        disjoint_hyperplans<K,   0>(tree, N);
 
         // matrix test
         int Nth_sqrt = std::pow(N, 1.0/K);
-        matrix_tiles<K, 2>(history, Nth_sqrt/2*2+1);
-        matrix_tiles<K, 3>(history, Nth_sqrt/3*2+1);
-        matrix_tiles<K, 5>(history, Nth_sqrt/5*2+1);
-        matrix_tiles<K, 7>(history, Nth_sqrt/7*2+1);
+        matrix_tiles<K, 2>(tree, Nth_sqrt/2*2+1);
+        matrix_tiles<K, 3>(tree, Nth_sqrt/3*2+1);
+        matrix_tiles<K, 5>(tree, Nth_sqrt/5*2+1);
+        matrix_tiles<K, 7>(tree, Nth_sqrt/7*2+1);
 
         // include squares
-        squares_included<K>(history, N);
+        squares_included<K>(tree, N);
 
         // pyramid inverted
-        pyramid_inverted<K>(history, N);
+        pyramid_inverted<K>(tree, N);
 
         // pyramid
-        pyramid<K>(history, N);
+        pyramid<K>(tree, N);
 
         # endif
     }
@@ -229,11 +273,12 @@ static void launch_tests(History<K,T> & history)
 
     // finish
     double dt = (tf - t0) / 1e9;
-    int nelements = history.size();
-    int nedges = task_nedges();
+    int nelements = tree.size();
+    int ntasks = get_ntasks<K>();
+    int nedges = get_nedges<K>();
     printf("Took %lf s.\n", dt);
-    printf("    Inserted %d regions and %d elements\n", ninsert, nelements);
-    printf("        Intervals/s. = %.2lf\n", ninsert / dt);
+    printf("    Inserted %d regions and %d elements\n", ntasks, nelements);
+    printf("        Intervals/s. = %.2lf\n", ntasks / dt);
     printf("         Elements/s. = %.2lf\n", nelements / dt);
     printf("    Set %d task edges\n", nedges);
     printf("        Edges/s. = %.2lf\n", nedges / dt);
@@ -244,7 +289,7 @@ static void launch_tests(History<K,T> & history)
 template<int K>
 static void run(void)
 {
-    TaskAccessIntervalMultiTree<K> tree;
+    KDependencyTree<K> tree;
     launch_tests(tree);
 
     # ifdef EXPORT_PDF

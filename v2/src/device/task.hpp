@@ -17,11 +17,12 @@
 typedef enum    task_state_t : uint8_t
 {
     TASK_STATE_ALLOCATED        = 0,    // Task is allocated
-    TASK_STATE_READY            = 1,    // Task body can be executed
-    TASK_STATE_RUNNING          = 2,    // Task body is executing
-    TASK_STATE_EXECUTED         = 3,    // Task body executed
-    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved
-    TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
+    TASK_STATE_READY            = 1,    // Task data can be fetched
+    TASK_STATE_DATA_FETCHING    = 2,    // Task data is being fetched
+    TASK_STATE_DATA_FETCHED     = 3,    // Task data is fetched, kernel can be executed
+    TASK_STATE_EXECUTED         = 4,    // Task kernel executed
+    TASK_STATE_COMPLETED        = 5,    // Task completed, dependences can be resolved
+    TASK_STATE_DEALLOCATED      = 6,    // Task is deallocated (virtual state, never set)
 }               task_state_t;
 
 enum task_body_t : uint8_t
@@ -203,8 +204,24 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         void
-        execute(void)
+        fetch(void)
         {
+            assert(this->state.value == TASK_STATE_READY);
+            assert(this->wc.load(std::memory_order_seq_cst) == 0);
+            this->state.value = TASK_STATE_DATA_FETCHING;
+        }
+
+        void
+        fetched(void)
+        {
+            assert(this->state.value == TASK_STATE_DATA_FETCHING);
+            this->state.value = TASK_STATE_DATA_FETCHED;
+        }
+
+        void
+        executed(void)
+        {
+            assert(this->state.value == TASK_STATE_DATA_FETCHED);
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_EXECUTED;

@@ -134,10 +134,6 @@ void
 xkblas_drivers_deinit(xkblas_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
-
-    XKBLAS_INFO("Infinite loop... CTRL+C to exit");
-    while (1)
-        sleep(1);
 }
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
