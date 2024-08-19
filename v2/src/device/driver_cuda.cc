@@ -84,7 +84,7 @@ static inline void
 __set_device_cuda_id(int device_id, int cuda_device_id)
 {
     CUDA_DEVICE_ID[device_id] = cuda_device_id;
-    XKBLAS_DEBUG("driver device id = %d ; cuda device id = %d", device_id, cuda_device_id);
+    // XKBLAS_DEBUG("driver device id = %d ; cuda device id = %d", device_id, cuda_device_id);
 }
 
 static inline int

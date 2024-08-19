@@ -33,7 +33,7 @@ ThreadWorker::get(void)
 
 ThreadWorker::ThreadWorker() : queue()
 {
-    XKBLAS_INFO("New worker thread");
+    // XKBLAS_DEBUG("New worker thread");
     pthread_mutex_init(&this->sleep.lock, 0);
     pthread_cond_init (&this->sleep.cond, 0);
     this->sleep.sleeping = false;
@@ -41,7 +41,7 @@ ThreadWorker::ThreadWorker() : queue()
 
 ThreadWorker::~ThreadWorker()
 {
-    XKBLAS_INFO("Delete worker thread");
+    // XKBLAS_DEBUG("Delete worker thread");
 }
 
 void

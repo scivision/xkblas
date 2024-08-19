@@ -365,7 +365,7 @@ xkblas_device_thread_main(void * a)
     xkblas_driver_t * driver = drivers->list + driver_id;
     unsigned int cpu, node;
     getcpu(&cpu, &node);
-    XKBLAS_INFO("Starting thread for %s device (driver=%d) on cpu %d of node %d",
+    XKBLAS_INFO("Starting thread for %s device (driver_device_id=%d) on cpu %d of node %d",
             driver->f_get_name(), driver_device_id, cpu, node);
 
     xkblas_device_t * device = xkblas_device_create(drivers, driver_id, driver_device_id);
