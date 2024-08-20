@@ -112,52 +112,84 @@ class KMemoryTree : public KIntervalBtree<K> {
         task_state_t
         fetch(xkblas_device_t * device, Task * task)
         {
-            task->fetch();
-
             # pragma message(TODO " currently, continuous blocks on the same device "   \
                     "could be detected here and fetched with a single request")
 
             # pragma message(TODO " need synchronizations on memory tree use, " \
                     "as blocks may be split / merged")
 
+
             /* use task->wc to detect completion of every fetches */
-            task->wc.fetch_add(1, std::memory_order_seq_cst);
+            task->fetching();
 
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
             {
                 Access * access = task->accesses + i;
-                if ((access->mode & ACCESS_MODE_R) != ACCESS_MODE_R)
-                    continue ;
 
-                /* find fetches to perform */
-                std::vector<ReplicateFetch> fetches;
+                /* ensure it is represented in the memory tree */
                 this->lock();
-                this->find_fetches(access, fetches, device->global_id);
+                {
+                    this->insert(access, device->global_id);
+                }
                 this->unlock();
 
-                /* fetch each block */
-                for (ReplicateFetch & fetch : fetches)
+                /* if the kernel reads that memory */
+                if (access->mode & ACCESS_MODE_R)
                 {
-                    task->wc.fetch_add(1, std::memory_order_seq_cst);
-                    // TODO : fetch data and on completion :
-                    //  - decr wc
-                    //  - update the memory tree's block valid bits
-                    //  - update the memory tree's block state (from 'fetching' to 'fecthed')
-                    task->wc.fetch_sub(1, std::memory_order_seq_cst); // this on completion
+                    /* find invalid memory blocks on that device */
+                    std::vector<ReplicateFetch> invalids;
+                    this->lock();
+                    {
+                        this->intersect(access, device->global_id, invalids);
+                    }
+                    this->unlock();
+
+                    /* initiate fetching of each block */
+                    for (ReplicateFetch & fetch : invalids)
+                    {
+                        task->fetching();
+
+                        // TODO : fetch data and on completion :
+                        //  - call task->fetched()
+                        //  - update the memory tree's block valid bits
+                        //  - update the memory tree's block state (from 'fetching' to 'fecthed')
+
+                        task->fetched();
+                    }
                 }
             }
 
-            if (task->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
-            {
-                // TODO : kernel is ready - queue it
-                XKBLAS_DEBUG("Task `%s` is ready for kernel execution", task->label);
-                task->fetched();
-            }
-
-            return task->state.value;
+            return task->fetched();
         }
+
+        ////////////////
+        //  INTERSECT //
+        ////////////////
+
+        /* find memory block that are invalid on the given device */
+        inline void
+        intersect(
+            const Access * access,
+            uint8_t device_global_id,
+            std::vector<ReplicateFetch> & invalids
+        ) {
+        }
+
+        //////////////
+        //  INSERT  //
+        //////////////
+
+        /* ensure the given access is represented in the memory tree */
+        inline void
+        insert(
+            const Access * access,
+            uint8_t device_global_id
+        ) {
+        }
+
+# if 0
 
         /** the given block must be fetched */
         void
@@ -219,7 +251,7 @@ class KMemoryTree : public KIntervalBtree<K> {
             if (this->root == nullptr)
             {
                 this->root = new Node(access->region, 0, BLACK);
-                this->outdate(this->root);
+                this->root->update_includes();
                 find_fetches_push(access, fetches, device_global_id, this->root);
             }
             else
@@ -229,6 +261,7 @@ class KMemoryTree : public KIntervalBtree<K> {
 
             Base::post_insert();
         }
+# endif
 
 };
 

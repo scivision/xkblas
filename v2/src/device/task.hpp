@@ -7,6 +7,7 @@
 # include <vector>
 
 # include "device/consts.h"
+# include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/access.hpp"
 # include "sync/cache-line-size.hpp"
@@ -204,18 +205,26 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         void
-        fetch(void)
+        fetching(void)
         {
-            assert(this->state.value == TASK_STATE_READY);
-            assert(this->wc.load(std::memory_order_seq_cst) == 0);
-            this->state.value = TASK_STATE_DATA_FETCHING;
+            if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
+            {
+                assert(this->state.value == TASK_STATE_READY);
+                this->state.value = TASK_STATE_DATA_FETCHING;
+            }
         }
 
-        void
+        task_state_t
         fetched(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
-            this->state.value = TASK_STATE_DATA_FETCHED;
+            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+            {
+                this->state.value = TASK_STATE_DATA_FETCHED;
+                XKBLAS_DEBUG("Task `%s` is ready for kernel execution", this->label);
+                return TASK_STATE_DATA_FETCHED;
+            }
+            return TASK_STATE_DATA_FETCHING;
         }
 
         void

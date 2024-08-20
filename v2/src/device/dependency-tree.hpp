@@ -380,10 +380,9 @@ insert_from_case_3_equals:
 
             if (this->root == nullptr)
             {
-                Node * node = new Node(region, 0, BLACK);
-                node->register_access(task, mode);
-                this->root = node;
-                this->outdate(this->root);
+                this->root = new Node(region, 0, BLACK);
+                reinterpret_cast<Node *>(this->root)->register_access(task, mode);
+                this->root->update_includes();
             }
             else
             {
