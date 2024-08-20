@@ -306,6 +306,8 @@ xkblas_£gemm_async(
     thread->dump_tasks(f);
     fclose(f);
     system("dot -Tpdf gemm.dot > gemm.pdf");
+
+    thread->deptree.export_pdf();
 # endif /* NDEBUG */
 
     return 0;

@@ -108,12 +108,13 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
         /* next free task pointer in the stack */
         uint8_t * memory_stack_ptr;
 
-        /* Dependency tree */
-        DependencyTree deptree;
-
         #ifndef NDEBUG
+    public:
         std::vector<Task *> tasks;
         #endif /* NDEBUG */
+
+        /* Dependency tree */
+        DependencyTree deptree;
 };
 
 #endif /* __THREAD_PRODUCER_HPP__ */
