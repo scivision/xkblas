@@ -264,22 +264,18 @@ class KIntervalBtree {
                     {
                         const char * COLORS[] = {
                             "#000000",
-                            "#FF0000",
-                            "#00FF00",
-                            "#0000FF",
+                            "#EE3333",
+                            "#3333EE",
+                            "#33EE33",
                             "#FFFF00",
                             "#FF00FF",
                             "#00FFFF",
                         };
                         const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
 
-                        char region[1024];
-                        this->region.tostring(region, sizeof(region));
-
-                        char include_region[1024];
-                        this->includes.region.tostring(include_region, sizeof(include_region));
-
-                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\nk=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d\", style=filled, fillcolor=\"%s\"] ;\n", this, this->k, region, include_region, this->size(), this->includes.nelements[0], this->includes.nelements[1], this->height(), color);
+                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\n", this);
+                        this->dump_str(f);
+                        fprintf(f, "\", style=filled, fillcolor=\"%s\"] ;\n", color);
                     }
 
                     FOREACH_CHILD_BEGIN(this, child, k, dir)
@@ -288,6 +284,26 @@ class KIntervalBtree {
                         fprintf(f, "    N%p->N%p ; \n", this, child);
                     }
                     FOREACH_CHILD_END(this, child, k, dir);
+                }
+
+                virtual void
+                dump_str(FILE * f) const
+                {
+                    char region[1024];
+                    this->region.tostring(region, sizeof(region));
+
+                    char include_region[1024];
+                    this->includes.region.tostring(include_region, sizeof(include_region));
+
+                    fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d",
+                            this->k,
+                            region,
+                            include_region,
+                            this->size(),
+                            this->includes.nelements[0],
+                            this->includes.nelements[1],
+                            this->height()
+                    );
                 }
 
                 void
@@ -304,12 +320,12 @@ class KIntervalBtree {
                     }
                     else if (K == 2)
                     {
-                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[ x [%d..%d[};\n",
-                                this->region[0].a, this->region[1].a,
-                                this->region[0].b, this->region[1].b,
-                                this->region[0].a, this->region[0].b,
-                                this->region[1].a, this->region[1].b
+                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {",
+                            this->region[0].a, this->region[1].a,
+                            this->region[0].b, this->region[1].b
                         );
+                        this->dump_region_str(f);
+                        fprintf(f, "};\n");
                     }
 
                     FOREACH_CHILD_BEGIN(this, child, k, dir)
@@ -317,6 +333,15 @@ class KIntervalBtree {
                         child->dump_region(f);
                     }
                     FOREACH_CHILD_END(this, child, k, dir);
+                }
+
+                virtual void
+                dump_region_str(FILE * f) const
+                {
+                    fprintf(f, "[%d..%d[ x [%d..%d[",
+                        this->region[0].a, this->region[0].b,
+                        this->region[1].a, this->region[1].b
+                    );
                 }
 
         }; /* class Node */

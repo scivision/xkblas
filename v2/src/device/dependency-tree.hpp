@@ -84,6 +84,27 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
             }
             this->last_write = parent->last_write;
         }
+
+        virtual void
+        dump_str(FILE * f) const
+        {
+            KIntervalBtree<K>::Node::dump_str(f);
+            fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write ? 1 : 0);
+        }
+
+        virtual void
+        dump_region_str(FILE * f) const
+        {
+            KIntervalBtree<K>::Node::dump_region_str(f);
+            fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write ? 1 : 0);
+            if (this->last_reads.size())
+            {
+                fprintf(f, "\\\\ reads = [ ");
+                for (const KTask<K> * task : this->last_reads)
+                    fprintf(f, "%zu ", ((uintptr_t)task) % 131072);
+                fprintf(f, "]");
+            }
+        }
 };
 
 template<int K>
@@ -177,7 +198,6 @@ class KDependencyTree : public KIntervalBtree<K> {
         ) {
             Node * parent = reinterpret_cast<Node *>(parentbase);
 
-            // TODO : ensure that loop is unrolled - else maybe generate code
             while (k < K)
             {
 # ifdef CUT
@@ -249,6 +269,7 @@ class KDependencyTree : public KIntervalBtree<K> {
                     // I == J
                     if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)
                     {
+insert_from_case_3_equals:
                         if (++k == K)
                         {
                             tassert(node == nullptr);
@@ -260,12 +281,23 @@ class KDependencyTree : public KIntervalBtree<K> {
                     // J c I
                     else
                     {
-                        // TODO only tested for K \in {1, 2} - ensure it works for higher dimensions as well
+                        // prerequisities here:
+                        //  - all dimensions k' < k is equal some parent node
+                        //  - dimension k is included in the parent node
+                        //  - we don't know about dimensions k" > k
+                        // how we insert
+                        //  - shrink dimension 'k' of the current node and all its (k+1) subtree
+                        //  - dupplicate shrinked nodes and reinsert them
+
+                        // TODO : we can probably do better than above performance-wide, by
+                        //  - dupplicating the subtree
+                        //  - rewritting its included information
+                        //  - connecting it to 'parent'
+
+                        // TODO only tested for K \in {1, 2} - it should work
+                        // for higher dimensions as well, but needs to be verified
                         assert(K == 1 || K == 2);
 
-                        // can we do better than that ?
-                        //  - shrink all the (k+1)-subtree and save shrinked nodes
-                        //  - reinsert each node twice
                         class ReinsertRegion {
                             public:
                                 Node * sibling;
@@ -275,11 +307,12 @@ class KDependencyTree : public KIntervalBtree<K> {
                                 virtual ~ReinsertRegion() {}
                         };
 
+                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
+
                         std::vector<ReinsertRegion> to_reinsert;
-                        std::function<void(Node *)> f = [&task, &mode, &to_reinsert, &region, &k](Node * node)
+                        std::function<void(Node *)> f = [&x, &to_reinsert, &region, &k](Node * node)
                         {
                             // generate side nodes region
-                            int x[4] = { node->region[k].a, region[k].a, region[k].b, node->region[k].b };
                             for (int i = 0 ; i < 2 ; ++i)
                             {
                                 if (x[2*i+0] == x[2*i+1])
@@ -290,9 +323,8 @@ class KDependencyTree : public KIntervalBtree<K> {
                                 to_reinsert.push_back(rr);
                             }
 
-                            // shrink node and register access
+                            // shrink node 
                             node->region[k] = region[k];
-                            node->register_access(task, mode);
                         };
 
                         f(parent);
@@ -308,8 +340,10 @@ class KDependencyTree : public KIntervalBtree<K> {
                             node->inherit_accesses(rr.sibling);
                         }
 
-                        // TODO : may be unnecessary if we outdated another child
-                        this->outdate(parent);
+                        // continue inserting, the node 
+
+                        assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
+                        goto insert_from_case_3_equals;
                         break ;
 
                     } /* I == J ||  J c I */

@@ -153,6 +153,8 @@ class KMemoryTree : public KIntervalBtree<K> {
             uint8_t device_global_id,
             NodeBase * nodebase
         ) {
+            (void) access;
+
             Node * node = reinterpret_cast<Node *>(nodebase);
 
             const int devbit = (1 << device_global_id);
@@ -177,6 +179,9 @@ class KMemoryTree : public KIntervalBtree<K> {
             NodeBase * parentbase,
             int k
         ) {
+            (void) access;
+            (void) fetches;
+
             Node * parent = reinterpret_cast<Node *>(parentbase);
 
             // TODO : ensure that loop is unrolled - else maybe generate code
