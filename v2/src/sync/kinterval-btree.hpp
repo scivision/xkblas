@@ -10,7 +10,7 @@
     do {                                                                        \
         if (!(expr))                                                            \
         {                                                                       \
-            this->export_pdf();                                                 \
+            this->export_pdf("kinterval");                                      \
             fprintf(stdout, "%s:%d: assertion `" #expr "` failed in `%s`\n",    \
                    __FILE__,__LINE__,__func__);                                 \
             abort();                                                            \
@@ -447,19 +447,33 @@ class KIntervalBtree {
         }
 
         void
-        export_pdf(void) const
+        export_pdf(const char * label) const
         {
-            FILE * file = fopen("tree.dot", "w");
+            char filename[512];
+
+            snprintf(filename, sizeof(filename), "%s-tree.dot", label);
+            FILE * file = fopen(filename, "w");
             this->dump(file);
             fclose(file);
-            int r = system("dot -Tpdf tree.dot > tree.pdf"); (void) r;
+
+            snprintf(filename, sizeof(filename),
+                    "dot -Tpdf %s-tree.dot > %s-tree.pdf",
+                    label, label
+            );
+            int r = system(filename);
             if (r)
                 fprintf(stderr, "dot failed\n");
 
-            file = fopen("region.tex", "w");
+            snprintf(filename, sizeof(filename), "%s-region.tex", label);
+            file = fopen(filename, "w");
             this->dump_region(file);
             fclose(file);
-            r = system("pdflatex -interaction=nonstopmode region.tex > /dev/null 2>&1");
+
+            snprintf(filename, sizeof(filename),
+                    "pdflatex -interaction=nonstopmode %s-region.tex > /dev/null 2>&1",
+                    label
+            );
+            r = system(filename);
             if (r)
                 fprintf(stderr, "pdflatex failed\n");
         }

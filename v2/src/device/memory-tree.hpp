@@ -17,41 +17,6 @@ class KMemoryTreeNode : public KIntervalBtree<K>::Node {
 
     public:
 
-        /* an on-going memory block fetch */
-        class ReplicateFetch {
-
-            public:
-
-                /* region */
-                Region region;
-
-                /* the replicate view */
-                memory_block_replicate_view_t replicate_view;
-
-                /* a view of the memory block */
-                memory_block_view_t block_view;
-
-                /* devices on which the block is valid */
-                memory_block_bitfield_t valid;
-
-            public:
-
-                ReplicateFetch(
-                    Node * node,
-                    uint8_t device_global_id
-                ) :
-                    region(node->region),
-                    replicate_view(node->block.replicates[device_global_id].view),
-                    block_view(node->block.view),
-                    valid(node->block.valid)
-                {}
-
-                virtual ~ReplicateFetch() {}
-
-        }; /* ReplicateFetch */
-
-    public:
-
         /* the memory block represented by this node */
         MemoryBlock block;
 
@@ -62,7 +27,56 @@ class KMemoryTreeNode : public KIntervalBtree<K>::Node {
             block()
         {}
 
+        virtual void
+        dump_str(FILE * f) const
+        {
+            KIntervalBtree<K>::Node::dump_str(f);
+        }
+
+        virtual void
+        dump_region_str(FILE * f) const
+        {
+            KIntervalBtree<K>::Node::dump_region_str(f);
+        }
+
 }; /* KMemoryTreeNode */
+
+/* an on-going memory block fetch */
+template <int K>
+class KMemoryBlockReplicateFetch {
+
+    using Region = Intervals<K>;
+    using Node = KMemoryTreeNode<K>;
+
+    public:
+
+        /* region */
+        Region region;
+
+        /* the replicate view */
+        memory_block_replicate_view_t replicate_view;
+
+        /* a view of the memory block */
+        memory_block_view_t block_view;
+
+        /* devices on which the block is valid */
+        memory_block_bitfield_t valid;
+
+    public:
+
+        KMemoryBlockReplicateFetch(
+            Node * node,
+            uint8_t device_global_id
+        ) :
+            region(node->region),
+            replicate_view(node->block.replicates[device_global_id].view),
+            block_view(node->block.view),
+            valid(node->block.valid)
+        {}
+
+        virtual ~KMemoryBlockReplicateFetch() {}
+
+}; /* KMemoryBlockReplicateFetch */
 
 template <int K>
 class KMemoryTree : public KIntervalBtree<K> {
@@ -70,7 +84,7 @@ class KMemoryTree : public KIntervalBtree<K> {
     using Base = KIntervalBtree<K>;
     using Node = KMemoryTreeNode<K>;
     using NodeBase = typename KIntervalBtree<K>::Node;
-    using ReplicateFetch = typename KMemoryTreeNode<K>::ReplicateFetch;
+    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
     using Region = Intervals<K>;
     using Task = KTask<K>;
     using Access = typename KTask<K>::Access;

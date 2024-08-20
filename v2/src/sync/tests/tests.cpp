@@ -218,12 +218,12 @@ static void launch_tests(KDependencyTree<K> & tree)
         static_assert(K == 2);
 
         Interval intervals[] = {
-            Interval( 0, 16), Interval( 0,  4),
             Interval( 0, 16), Interval( 4,  8),
             Interval( 0, 16), Interval( 8, 12),
             Interval( 0, 16), Interval(12, 16),
 
             Interval( 2, 14), Interval( 0,  4),
+            Interval( 0, 16), Interval( 0,  4),
         };
 
         for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
@@ -281,7 +281,7 @@ static void run(void)
 
     # ifdef EXPORT_PDF
     std::cout << "Exporting pdf..." << std::endl;
-    tree.export_pdf();
+    tree.export_pdf("dependency");
     # endif /* EXPORT_PDF */
 }
 

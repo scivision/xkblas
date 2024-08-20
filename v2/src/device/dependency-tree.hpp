@@ -238,9 +238,7 @@ class KDependencyTree : public KIntervalBtree<K> {
                         break ;
                     }
                     else
-                    {
                         parent = parent->get_child(k, LEFT);
-                    }
                 }
                 // case (2)     J >> I
                 else if (region[k].a >= parent->region[k].b)
@@ -259,9 +257,7 @@ class KDependencyTree : public KIntervalBtree<K> {
                         break ;
                     }
                     else
-                    {
                         parent = parent->get_child(k, RIGHT);
-                    }
                 }
                 // case (3)     J c I   (or I == J)
                 else if (parent->region[k].a <= region[k].a && region[k].b <= parent->region[k].b)
@@ -323,7 +319,7 @@ insert_from_case_3_equals:
                                 to_reinsert.push_back(rr);
                             }
 
-                            // shrink node 
+                            // shrink node
                             node->region[k] = region[k];
                         };
 
@@ -336,80 +332,40 @@ insert_from_case_3_equals:
                         for (ReinsertRegion & rr : to_reinsert)
                         {
                             Node * node = new Node(rr.region, k, RED);
-                            this->insert_from(task, node->region, ACCESS_MODE_VOID, parent, k, node);
+                            this->insert_from(task, node->region, ACCESS_MODE_VOID, this->root, 0, node);
                             node->inherit_accesses(rr.sibling);
                         }
 
-                        // continue inserting, the node 
-
+                        // continue inserting, the node
                         assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
                         goto insert_from_case_3_equals;
-                        break ;
 
                     } /* I == J ||  J c I */
                 }
-                // case (4)     I c J
-                else if (region[k].a <= parent->region[k].a && parent->region[k].b <= region[k].b)
-                {
-                    int xs[4] = { region[k].a, parent->region[k].a, parent->region[k].b, region[k].b };
-                    for (int i = 0 ; i < 3 ; ++i)
-                    {
-                        if (xs[i+0] == xs[i+1])
-                            continue ;
-                        Region r(region);
-                        r[k].a = xs[i+0];
-                        r[k].b = xs[i+1];
-                        // this->insert_from(task, r, mode, parent, k, node);
-                        this->insert_from(task, r, mode, this->root, 0, node);
-                    }
-                    this->outdate(parent);
-                    break ;
-                }
-                // case (5)     J < I    (and I n J != o)   is (1) + (3)
-                else if (parent->region[k].a <= region[k].b && region[k].b <= parent->region[k].b)
-                {
-                    const int a = region[k].a;
-                    const int b = region[k].b;
-
-                    // region[k].a = region[k].a;
-                    region[k].b = parent->region[k].a;
-                    this->insert_from(task, region, mode, parent, k, node);         // (1)
-                    // this->insert_from(this->root, mode, region, obj, 0, node);   // (1)
-
-                    region[k].a = parent->region[k].a;
-                    region[k].b = b;
-                    this->insert_from(task, region, mode, parent, k, node);         // (3)
-                    // this->insert_from(this->root, mode, region, obj, 0, node);   // (3)
-
-                    region[k].a = a;
-                    region[k].b = b;
-
-                    ++k;
-                }
-                // case (6)     J > I    (and I n J != o)   is (2) + (3)
-                else if (parent->region[k].a <= region[k].a && region[k].a <= parent->region[k].b)
-                {
-                    int a = region[k].a;
-                    int b = region[k].b;
-
-                    // region[k].a = region[k].a;
-                    region[k].b = parent->region[k].b;
-                    this->insert_from(task, region, mode, parent, k, node);  // (3)
-                    // this->insert_from(this->root, mode, region, obj, 0, node);  // (3)
-
-                    region[k].a = parent->region[k].b;
-                    region[k].b = b;
-                    this->insert_from(task, region, mode, parent, k, node);  // (2)
-                    // this->insert_from(this->root, mode, region, obj, k, node);  // (2)
-
-                    region[k].a = a;
-                    region[k].b = b;
-
-                    ++k;
-                }
+                // case (4)     I n J != o is (1) + (2) + (3)
                 else
                 {
-                    tassert(0 && "Impossible occured");
+                    // (1)
+                    if (region[k].a < parent->region[k].a)
+                    {
+                        const int b = region[k].b;
+                        region[k].b = parent->region[k].a;
+                        this->insert_from(task, region, mode, this->root, 0, node);
+                        region[k].b = b;
+                    }
+
+                    // (2)
+                    if (parent->region[k].b < region[k].b)
+                    {
+                        region[k].a = parent->region[k].b;
+                        this->insert_from(task, region, mode, this->root, 0, node);
+                    }
+
+                    // (3)
+                    region[k].a = parent->region[k].a;
+                    region[k].b = parent->region[k].b;
+                    assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
+                    goto insert_from_case_3_equals;
                 }
             }
         }

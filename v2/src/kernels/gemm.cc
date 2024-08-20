@@ -307,7 +307,7 @@ xkblas_£gemm_async(
     fclose(f);
     system("dot -Tpdf gemm.dot > gemm.pdf");
 
-    thread->deptree.export_pdf();
+    thread->deptree.export_pdf("dependency");
 # endif /* NDEBUG */
 
     return 0;
