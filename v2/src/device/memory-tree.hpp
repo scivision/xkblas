@@ -11,8 +11,8 @@
 template <int K>
 class KMemoryTreeNode : public KIntervalBtree<K>::Node {
 
-    using Base = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
+    using Base = typename KIntervalBtree<K>::Node;
     using Node = KMemoryTreeNode<K>;
 
     public:
@@ -26,6 +26,19 @@ class KMemoryTreeNode : public KIntervalBtree<K>::Node {
             KIntervalBtree<K>::Node(r, k, color),
             block()
         {}
+
+        virtual void
+        on_insert(
+            void * & t,
+            const access_mode_t mode
+        ) {
+        }
+
+        virtual void
+        on_inherit(const Base * base)
+        {
+            const Node * node = reinterpret_cast<const Node *>(base);
+        }
 
         virtual void
         dump_str(FILE * f) const
@@ -180,6 +193,16 @@ class KMemoryTree : public KIntervalBtree<K> {
         //////////////
         //  INSERT  //
         //////////////
+
+        virtual Node *
+        new_node(
+            const Region & region,
+            const int k,
+            const Color color
+        ) const {
+            return new Node(region, k, color);
+        }
+
 
         /* ensure the given access is represented in the memory tree */
         inline void

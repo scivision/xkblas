@@ -5,11 +5,12 @@
 # include "sync/kinterval-btree.hpp"
 
 template <int K>
-class KDependencyTreeNode : public KIntervalBtree<K>::Node {
+class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
 
     using Region = Intervals<K>;
+    using Task = KTask<K>;
     using Node = KDependencyTreeNode<K>;
-    using NodeBase = typename KIntervalBtree<K>::Node;
+    using Base = typename KIntervalBtree<K, KTask<K> *>::Node;
 
     public:
 
@@ -25,18 +26,31 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
     public:
 
         KDependencyTreeNode<K>(const Region & r, int k, Color color) :
-            NodeBase(r, k, color),
+            Base(r, k, color),
             last_reads(),
             last_write(nullptr),
             nwrites(0)
         {}
 
-        inline Node *
-        get_child(int k, Direction dir)
+        ////////////////////////////
+        //  MANAGEMENT INTERFACES //
+        ////////////////////////////
+        virtual void
+        on_insert(Task * & t, const access_mode_t mode)
         {
-            return reinterpret_cast<Node *>(this->st[k].children[dir]);
+            this->register_access(t, mode);
         }
 
+        void
+        on_inherit(const Base * base)
+        {
+            const Node * node = reinterpret_cast<const Node *>(base);
+            this->inherit_accesses(node);
+        }
+
+        //////////
+        // IMPL //
+        //////////
         inline void
         update_includes_nwrites(void)
         {
@@ -51,7 +65,7 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
         inline void
         update_includes(void)
         {
-            KIntervalBtree<K>::Node::update_includes();
+            KIntervalBtree<K, KTask<K> *>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
@@ -72,7 +86,7 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
         }
 
         inline void
-        inherit_accesses(KDependencyTreeNode * parent)
+        inherit_accesses(const Node * parent)
         {
             if (!parent->last_reads.empty())
             {
@@ -88,14 +102,14 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
         virtual void
         dump_str(FILE * f) const
         {
-            KIntervalBtree<K>::Node::dump_str(f);
+            KIntervalBtree<K, KTask<K> *>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write ? 1 : 0);
         }
 
         virtual void
         dump_region_str(FILE * f) const
         {
-            KIntervalBtree<K>::Node::dump_region_str(f);
+            KIntervalBtree<K, KTask<K> *>::Node::dump_region_str(f);
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write ? 1 : 0);
             if (this->last_reads.size())
             {
@@ -108,12 +122,13 @@ class KDependencyTreeNode : public KIntervalBtree<K>::Node {
 };
 
 template<int K>
-class KDependencyTree : public KIntervalBtree<K> {
+class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
 
-    using Base = KIntervalBtree<K>;
-    using Node = KDependencyTreeNode<K>;
-    using NodeBase = typename KIntervalBtree<K>::Node;
     using Region = Intervals<K>;
+    using Task = KTask<K>;
+    using Node = KDependencyTreeNode<K>;
+    using Base = KIntervalBtree<K, KTask<K> *>;
+    using NodeBase = typename KIntervalBtree<K, KTask<K> *>::Node;
 
     public:
 
@@ -163,233 +178,13 @@ class KDependencyTree : public KIntervalBtree<K> {
         //////////////
         //  INSERT  //
         //////////////
-
-# ifdef CUT
-        inline void
-        insert_from_cut(
-            Task * task,
-            Region & region,
-            const access_mode_t mode,
-            Node * parent
-        ) {
-            tassert(mode & ACCESS_MODE_W);
-
-            FOREACH_CHILD_BEGIN(parent, child, k, dir)
-            {
-                this->cut(parent, k, dir);
-            }
-            FOREACH_CHILD_END(parent, child, k, dir);
-
-            parent->region.copy(region);
-            parent->register_access(task, mode);
-
-            this->outdate(parent);
-        }
-# endif /* CUT */
-
-        inline void
-        insert_from(
-            Task * task,
-            Region & region,
-            const access_mode_t mode,
-            NodeBase * parentbase,
-            int k,
-            Node * node
-        ) {
-            Node * parent = reinterpret_cast<Node *>(parentbase);
-
-            while (k < K)
-            {
-# ifdef CUT
-#  pragma message("Tree cut enable")
-                // quick-way out, if the region includes all subregion with an
-                // 'out' access, we can discard all children
-                if (mode & ACCESS_MODE_W)
-                {
-                    // the includes test is accelerated as we know we are
-                    // already matching dimensions <k
-                    if (region.includes(parent->includes.region, k))
-                    {
-                        // TODO : what if 'node' is not null ?  probably want to
-                        // return something to callee for the case (3)
-                        tassert(node == nullptr);
-                        this->insert_from_cut(task, region, mode, parent);
-                        break ;
-                    }
-                }
-# else
-#  pragma message("Tree cut disabled. Enable it using '-DCUT'")
-# endif /* CUT */
-
-                // case (1)    J << I
-                if (region[k].b <= parent->region[k].a)
-                {
-                    if (parent->st[k].left == nullptr)
-                    {
-                        if (node == nullptr)
-                            node = new Node(region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        node->register_access(task, mode);
-                        this->insert_fixup(parent, k, LEFT, node);
-                        break ;
-                    }
-                    else
-                        parent = parent->get_child(k, LEFT);
-                }
-                // case (2)     J >> I
-                else if (region[k].a >= parent->region[k].b)
-                {
-                    if (parent->st[k].right == nullptr)
-                    {
-                        if (node == nullptr)
-                            node = new Node(region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        node->register_access(task, mode);
-                        this->insert_fixup(parent, k, RIGHT, node);
-                        break ;
-                    }
-                    else
-                        parent = parent->get_child(k, RIGHT);
-                }
-                // case (3)     J c I   (or I == J)
-                else if (parent->region[k].a <= region[k].a && region[k].b <= parent->region[k].b)
-                {
-                    // I == J
-                    if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)
-                    {
-insert_from_case_3_equals:
-                        if (++k == K)
-                        {
-                            tassert(node == nullptr);
-                            parent->register_access(task, mode);
-                            this->outdate(parent);
-                            break ;
-                        }
-                    }
-                    // J c I
-                    else
-                    {
-                        // prerequisities here:
-                        //  - all dimensions k' < k is equal some parent node
-                        //  - dimension k is included in the parent node
-                        //  - we don't know about dimensions k" > k
-                        // how we insert
-                        //  - shrink dimension 'k' of the current node and all its (k+1) subtree
-                        //  - dupplicate shrinked nodes and reinsert them
-
-                        // TODO : we can probably do better than above performance-wide, by
-                        //  - dupplicating the subtree
-                        //  - rewritting its included information
-                        //  - connecting it to 'parent'
-
-                        // TODO only tested for K \in {1, 2} - it should work
-                        // for higher dimensions as well, but needs to be verified
-                        assert(K == 1 || K == 2);
-
-                        class ReinsertRegion {
-                            public:
-                                Node * sibling;
-                                Region region;
-                            public:
-                                ReinsertRegion(Node * s, Region & r) : sibling(s), region(r) {}
-                                virtual ~ReinsertRegion() {}
-                        };
-
-                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
-
-                        std::vector<ReinsertRegion> to_reinsert;
-                        std::function<void(Node *)> f = [&x, &to_reinsert, &region, &k](Node * node)
-                        {
-                            // generate side nodes region
-                            for (int i = 0 ; i < 2 ; ++i)
-                            {
-                                if (x[2*i+0] == x[2*i+1])
-                                    continue ;
-                                ReinsertRegion rr(node, node->region);
-                                rr.region[k].a = x[2*i+0];
-                                rr.region[k].b = x[2*i+1];
-                                to_reinsert.push_back(rr);
-                            }
-
-                            // shrink node
-                            node->region[k] = region[k];
-                        };
-
-                        f(parent);
-
-                        if (k < K - 1)
-                            this->template foreach_k_child<Node>(parent, k+1, f);
-
-                        // insert all side nodes
-                        for (ReinsertRegion & rr : to_reinsert)
-                        {
-                            Node * node = new Node(rr.region, k, RED);
-                            this->insert_from(task, node->region, ACCESS_MODE_VOID, this->root, 0, node);
-                            node->inherit_accesses(rr.sibling);
-                        }
-
-                        // continue inserting, the node
-                        assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
-                        goto insert_from_case_3_equals;
-
-                    } /* I == J ||  J c I */
-                }
-                // case (4)     I n J != o is (1) + (2) + (3)
-                else
-                {
-                    // (1)
-                    if (region[k].a < parent->region[k].a)
-                    {
-                        const int b = region[k].b;
-                        region[k].b = parent->region[k].a;
-                        this->insert_from(task, region, mode, this->root, 0, node);
-                        region[k].b = b;
-                    }
-
-                    // (2)
-                    if (parent->region[k].b < region[k].b)
-                    {
-                        region[k].a = parent->region[k].b;
-                        this->insert_from(task, region, mode, this->root, 0, node);
-                    }
-
-                    // (3)
-                    region[k].a = parent->region[k].a;
-                    region[k].b = parent->region[k].b;
-                    assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
-                    goto insert_from_case_3_equals;
-                }
-            }
-        }
-
-        inline void
-        insert(
-            Task * task,
-            Region & region,
-            const access_mode_t mode
-        ) {
-            tassert(!region.is_empty());
-
-            if (this->root == nullptr)
-            {
-                this->root = new Node(region, 0, BLACK);
-                reinterpret_cast<Node *>(this->root)->register_access(task, mode);
-                this->root->update_includes();
-            }
-            else
-            {
-                this->insert_from(task, region, mode, this->root, 0, nullptr);
-            }
-
-            Base::post_insert();
+        virtual Node *
+        new_node(
+            const Region & region,
+            const int k,
+            const Color color
+        ) const {
+            return new KDependencyTreeNode<K>(region, k, color);
         }
 };
 
