@@ -173,12 +173,26 @@ class KIntervalBtree {
 
                 virtual ~Node() {}
 
+                /////////////////////////
+                // ABSTRACT INTERFACES //
+                /////////////////////////
+
                 /* called whenever this node is added to the tree with an
                  * access (this->region, mode) */
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
 
                 /* called whenever 'this' is split from 'node' */
                 virtual void on_inherit(const Node * node) = 0;
+
+                /* called to detect whether the access intersects with 'this' node */
+                virtual bool intersect_test(T & t, const Region & region, const access_mode_t mode) const = 0;
+
+                /* called whenever 'this' intersects with the access */
+                virtual void on_intersect(T & t, const Region & region, const access_mode_t mode) const = 0;
+
+                ///////////////
+                // Utilities //
+                ///////////////
 
                 inline Node *
                 get_child(int k, Direction dir) const
@@ -359,21 +373,41 @@ class KIntervalBtree {
 
         }; /* class Node */
 
-        /* pseudo node to implement Day-Stout-Warren algorithm */
+        /* pseudo node to implement Day-Stout-Warren algorithm. Abstract
+         * interfaces are not used, so just implemented them as 'no-op' */
         class PseudoNode : public Node {
 
-                /* called whenever this node is added to the tree with an
-                 * access (this->region, mode) */
                 void
                 on_insert(T & t, const access_mode_t mode)
                 {
+                    (void) t;
+                    (void) mode;
                     assert(0);
                 }
 
-                /* called whenever 'this' is split from 'node' */
                 void
                 on_inherit(const Node * node)
                 {
+                    (void) node;
+                    assert(0);
+                }
+
+                bool
+                intersect_test(T & t, const Region & region, const access_mode_t mode) const
+                {
+                    (void) t;
+                    (void) region;
+                    (void) mode;
+                    assert(0);
+                    return true;
+                }
+
+                void
+                on_intersect(T & t, const Region & region, const access_mode_t mode) const
+                {
+                    (void) t;
+                    (void) region;
+                    (void) mode;
                     assert(0);
                 }
 
@@ -510,6 +544,47 @@ class KIntervalBtree {
             if (r)
                 fprintf(stderr, "pdflatex failed\n");
         }
+
+        //////////////////
+        //  INTERSECT   //
+        //////////////////
+        inline void
+        intersect_from(
+            T & t,
+            const Region & region,
+            const access_mode_t mode,
+            Node * node
+        ) const {
+
+            if (node == nullptr || !region.intersects(node->includes.region))
+                return ;
+
+            if (node->intersect_test(t, region, mode))
+                return ;
+
+            if (region.intersects(node->region))
+                node->on_intersect(t, region, mode);
+
+            FOREACH_CHILD_BEGIN(node, child, k, dir)
+            {
+                this->intersect_from(t, region, mode, child);
+            }
+            FOREACH_CHILD_END(node, child, k, dir);
+        }
+
+        inline void
+        intersect(
+            T & t,
+            const Region & region,
+            const access_mode_t mode
+        ) const {
+            this->intersect_from(t, region, mode, this->root);
+        }
+
+
+        //////////////
+        //  INSERT  //
+        //////////////
 
         // TODO : proecssing 'outdated' list by depth-order would remove
         // redundant updates
@@ -887,10 +962,6 @@ class KIntervalBtree {
             return this->root && requires_rebalance(this->root);
         }
 # endif /* REBALANCE */
-
-        //////////////
-        //  INSERT  //
-        //////////////
 
         virtual Node *
         new_node(

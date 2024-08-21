@@ -32,13 +32,48 @@ class KMemoryTreeNode : public KIntervalBtree<K>::Node {
             void * & t,
             const access_mode_t mode
         ) {
+            (void) t;
+            (void) mode;
+            assert(0); // TODO
         }
 
         virtual void
         on_inherit(const Base * base)
         {
             const Node * node = reinterpret_cast<const Node *>(base);
+            assert(0); // TODO
         }
+
+        //////////////////
+        //  INTERSECT   //
+        //////////////////
+        inline bool
+        intersect_test(
+            void * & t,
+            const Region & region,
+            const access_mode_t mode
+        ) const {
+            (void) t;
+            (void) region;
+            (void) mode;
+
+            // TODO
+            assert(0);
+            return false;
+        }
+
+        inline void
+        on_intersect(
+            void * & t,
+            const Region & region,
+            const access_mode_t mode
+        ) const {
+            (void) t;
+            (void) region;
+            (void) mode;
+            assert(0); // TODO
+        }
+
 
         virtual void
         dump_str(FILE * f) const
@@ -177,19 +212,6 @@ class KMemoryTree : public KIntervalBtree<K> {
             return task->fetched();
         }
 
-        ////////////////
-        //  INTERSECT //
-        ////////////////
-
-        /* find memory block that are invalid on the given device */
-        inline void
-        intersect(
-            const Access * access,
-            uint8_t device_global_id,
-            std::vector<ReplicateFetch> & invalids
-        ) {
-        }
-
         //////////////
         //  INSERT  //
         //////////////
@@ -204,6 +226,22 @@ class KMemoryTree : public KIntervalBtree<K> {
         }
 
 
+
+
+# if 0
+        ////////////////
+        //  INTERSECT //
+        ////////////////
+
+        /* find memory block that are invalid on the given device */
+        inline void
+        intersect(
+            const Access * access,
+            uint8_t device_global_id,
+            std::vector<ReplicateFetch> & invalids
+        ) {
+        }
+
         /* ensure the given access is represented in the memory tree */
         inline void
         insert(
@@ -211,8 +249,6 @@ class KMemoryTree : public KIntervalBtree<K> {
             uint8_t device_global_id
         ) {
         }
-
-# if 0
 
         /** the given block must be fetched */
         void

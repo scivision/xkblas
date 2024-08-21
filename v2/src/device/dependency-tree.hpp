@@ -32,43 +32,9 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             nwrites(0)
         {}
 
-        ////////////////////////////
-        //  MANAGEMENT INTERFACES //
-        ////////////////////////////
-        virtual void
-        on_insert(Task * & t, const access_mode_t mode)
-        {
-            this->register_access(t, mode);
-        }
-
-        void
-        on_inherit(const Base * base)
-        {
-            const Node * node = reinterpret_cast<const Node *>(base);
-            this->inherit_accesses(node);
-        }
-
-        //////////
-        // IMPL //
-        //////////
-        inline void
-        update_includes_nwrites(void)
-        {
-            this->nwrites = this->last_write ? 1 : 0;
-            FOREACH_CHILD_BEGIN(this, child, k, dir)
-            {
-                this->nwrites += child->nwrites;
-            }
-            FOREACH_CHILD_END(this, child, k, dir);
-        }
-
-        inline void
-        update_includes(void)
-        {
-            KIntervalBtree<K, KTask<K> *>::Node::update_includes();
-            this->update_includes_nwrites();
-        }
-
+        ////////////////////////////////
+        // When an access is inserted //
+        ////////////////////////////////
         inline void
         register_access(
             Task * task,
@@ -85,6 +51,16 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             }
         }
 
+        virtual void
+        on_insert(Task * & t, const access_mode_t mode)
+        {
+            this->register_access(t, mode);
+        }
+
+        /////////////////////////////
+        // When an access is split //
+        /////////////////////////////
+
         inline void
         inherit_accesses(const Node * parent)
         {
@@ -97,6 +73,62 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
                 );
             }
             this->last_write = parent->last_write;
+        }
+
+        void
+        on_inherit(const Base * base)
+        {
+            const Node * node = reinterpret_cast<const Node *>(base);
+            this->inherit_accesses(node);
+        }
+
+        //////////////////
+        //  INTERSECT   //
+        //////////////////
+        inline bool
+        intersect_test(
+            Task * & task,
+            const Region & region,
+            const access_mode_t mode
+        ) const {
+            (void) task;
+            (void) region;
+            return (mode == ACCESS_MODE_R && this->nwrites == 0);
+        }
+
+        inline void
+        on_intersect(
+            Task * & task,
+            const Region & region,
+            const access_mode_t mode
+        ) const {
+            Region intersection = this->region.intersection(region);
+            if (mode & ACCESS_MODE_W && this->last_reads.size())
+                for (Task * const & pred : this->last_reads)
+                    pred->precedes(task, intersection);
+            else if (this->last_write)
+                this->last_write->precedes(task, intersection);
+        }
+
+        ////////////
+        // UPDATE //
+        ////////////
+        inline void
+        update_includes_nwrites(void)
+        {
+            this->nwrites = this->last_write ? 1 : 0;
+            FOREACH_CHILD_BEGIN(this, child, k, dir)
+            {
+                this->nwrites += child->nwrites;
+            }
+            FOREACH_CHILD_END(this, child, k, dir);
+        }
+
+        inline void
+        update_includes(void)
+        {
+            KIntervalBtree<K, KTask<K> *>::Node::update_includes();
+            this->update_includes_nwrites();
         }
 
         virtual void
@@ -132,48 +164,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
 
     public:
 
-        //////////////////
-        //  INTERSECT   //
-        //////////////////
-        inline void
-        intersect_from(
-            Task * task,
-            const Region & region,
-            const access_mode_t mode,
-            NodeBase * nodebase
-        ) const {
 
-            Node * node = reinterpret_cast<Node *>(nodebase);
-            if (node == nullptr || !region.intersects(node->includes.region))
-                return ;
-
-            if (mode == ACCESS_MODE_R && node->nwrites == 0)
-                return ;
-
-            if (region.intersects(node->region))
-            {
-                if (mode & ACCESS_MODE_W && node->last_reads.size())
-                    for (Task * & pred : node->last_reads)
-                        pred->precedes(task, node->region.intersection(region));
-                else if (node->last_write)
-                {
-                    Task * pred = node->last_write;
-                    pred->precedes(task, node->region.intersection(region));
-                }
-            }
-
-            FOREACH_CHILD_BEGIN(node, child, k, dir)
-            {
-                this->intersect_from(task, region, mode, child);
-            }
-            FOREACH_CHILD_END(node, child, k, dir);
-        }
-
-        inline void
-        intersect(Task * task, const Region & region, const access_mode_t mode) const
-        {
-            this->intersect_from(task, region, mode, this->root);
-        }
 
         //////////////
         //  INSERT  //
