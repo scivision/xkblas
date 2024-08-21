@@ -12,7 +12,7 @@ main(void)
 
     int transA = CblasNoTrans;
     int transB = CblasNoTrans;
-    int M = 8;
+    int M = 16;
     int N = M;
     int K = M;
     int LDA = K+M;
@@ -28,8 +28,8 @@ main(void)
     # else
     assert(M == N);
     assert(N == K);
-    const double _Complex * A = (const double _Complex *) (LDA * N);
-    const double _Complex * B = (const double _Complex *) (N);
+    const double _Complex * A = (const double _Complex *) (N);
+    const double _Complex * B = (const double _Complex *) (LDA * N);
           double _Complex * C = (      double _Complex *) (LDA * N + N);
     # endif
     xkblas_zgemm_async(transA, transB, M, N, K, &alpha, A, LDA, B, LDB, &beta, C, LDC);

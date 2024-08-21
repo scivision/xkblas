@@ -35,7 +35,7 @@ get_nedges(void)
     int nedges = 0;
     for (int i = 0 ; i < ntasks ; ++i)
     {
-        Task * task = tasks + i;
+        KTask<K> * task = tasks + i;
         nedges += task->edges.size();
     }
     return nedges;
@@ -214,7 +214,7 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 1
+        # if 0
         static_assert(K == 2);
 
         Interval intervals[] = {

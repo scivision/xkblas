@@ -87,7 +87,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
         //  INTERSECT   //
         //////////////////
         inline bool
-        intersect_test(
+        intersect_stop_test(
             Task * & task,
             const Region & region,
             const access_mode_t mode
@@ -102,7 +102,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             Task * & task,
             const Region & region,
             const access_mode_t mode
-        ) const {
+        ) {
             Region intersection = this->region.intersection(region);
             if (mode & ACCESS_MODE_W && this->last_reads.size())
                 for (Task * const & pred : this->last_reads)
@@ -132,14 +132,14 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             this->update_includes_nwrites();
         }
 
-        virtual void
+        void
         dump_str(FILE * f) const
         {
             KIntervalBtree<K, KTask<K> *>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write ? 1 : 0);
         }
 
-        virtual void
+        void
         dump_region_str(FILE * f) const
         {
             KIntervalBtree<K, KTask<K> *>::Node::dump_region_str(f);

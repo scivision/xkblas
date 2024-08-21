@@ -34,7 +34,7 @@ class KMemoryBlockReplicateFetch {
             const Region & r,
             const memory_block_view_t & bview,
             const memory_block_replicate_view_t & rview,
-            const memory_block_bitfield_t & v
+            const memory_block_bitfield_t v
         ) :
             region(r),
             replicate_view(rview),
@@ -49,6 +49,9 @@ class KMemoryBlockReplicateFetch {
 template <int K>
 class DeviceInvalidKRegions {
 
+    using Access = typename KTask<K>::Access;
+    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
+
     public:
 
         /* device global id which has to perform the fetches */
@@ -57,8 +60,11 @@ class DeviceInvalidKRegions {
         /* list of invalid replicate */
         std::vector<KMemoryBlockReplicateFetch<K>> list;
 
+        /* the access being inserted / intersected */
+        Access * access;
+
     public:
-        DeviceInvalidKRegions(uint8_t id) : device_global_id(id), list() {}
+        DeviceInvalidKRegions(uint8_t id) : device_global_id(id), list(), access(nullptr) {}
         virtual ~DeviceInvalidKRegions() {}
 
 }; /* DeviceInvalidKRegions */
@@ -66,6 +72,7 @@ class DeviceInvalidKRegions {
 template <int K>
 class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node {
 
+    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
     using DeviceInvalidRegions = DeviceInvalidKRegions<K>;
     using Region = Intervals<K>;
     using Base = typename KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node;
@@ -94,10 +101,10 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
             const Node * src
         ) :
             Base(src->region, k, color),
-            block()
-        {
-            // TODO - copy 'src->block' infos to 'this->block'
-        }
+            block(src->block)
+        {}
+
+    public:
 
         void
         on_insert(
@@ -113,7 +120,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
         //  INTERSECT   //
         //////////////////
         inline bool
-        intersect_test(
+        intersect_stop_test(
             DeviceInvalidRegions & dir,
             const Region & region,
             const access_mode_t mode
@@ -132,11 +139,36 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
             DeviceInvalidRegions & dir,
             const Region & region,
             const access_mode_t mode
-        ) const {
-            (void) dir;
-            (void) region;
-            (void) mode;
-            XKBLAS_DEBUG("A memory region intersects!");
+        ) {
+
+            assert(dir.access->mode == mode);
+            assert(dir.access->region.equals(region));
+            assert(this->region.intersects(region));
+
+            /* the block is valid on that device, nothing to do */
+            const int devbit = (1 << dir.device_global_id);
+            if (this->block.valid & devbit)
+                return ;
+            assert(!(this->block.valid & devbit));
+
+            /* check if the block is not already being fetched by another access */
+            if (this->block.fetching & devbit)
+            {
+                // TODO : this block is being fetched by another access
+                // need to notify the task performing 'access' when its done
+                return ;
+            }
+
+            /* add this block to the fetching list */
+            this->block.fetching |= devbit;
+            dir.list.push_back(
+                ReplicateFetch(
+                    this->region,
+                    this->block.view,
+                    this->block.replicates[dir.device_global_id],
+                    this->block.valid
+                )
+            );
         }
 
 
@@ -150,6 +182,20 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
         dump_region_str(FILE * f) const
         {
             KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_region_str(f);
+            fprintf(f, "\\\\ LD=%d, m=%d, n=%d", this->block.view.LD, this->block.view.m, this->block.view.n);
+
+            // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
+            for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            {
+                const int devbit = (1 << device_global_id);
+                fprintf(f, "\\\\ dev %d - addr=%p - valid=%d - fetching=%d",
+                        device_global_id,
+                        (void *) this->block.replicates[device_global_id].addr,
+                        this->block.valid    & devbit ? 1 : 0,
+                        this->block.fetching & devbit ? 1 : 0
+
+                );
+            }
         }
 
 }; /* KMemoryTreeNode */
@@ -202,22 +248,22 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
             {
-                Access * access = task->accesses + i;
+                invalids.access = task->accesses + i;
 
                 /* ensure it is represented in the memory tree */
                 this->lock();
                 {
-                    this->insert(invalids, access->region, access->mode);
+                    this->insert(invalids, invalids.access->region, invalids.access->mode);
                 }
                 this->unlock();
 
                 /* if the kernel reads that memory */
-                if (access->mode & ACCESS_MODE_R)
+                if (invalids.access->mode & ACCESS_MODE_R)
                 {
                     /* find invalid memory blocks on that device */
                     this->lock();
                     {
-                        this->intersect(invalids, access->region, access->mode);
+                        this->intersect(invalids, invalids.access->region, invalids.access->mode);
                     }
                     this->unlock();
                 }
@@ -262,27 +308,6 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
         }
 
 # if 0
-        ////////////////
-        //  INTERSECT //
-        ////////////////
-
-        /* find memory block that are invalid on the given device */
-        inline void
-        intersect(
-            const Access * access,
-            uint8_t device_global_id,
-            std::vector<ReplicateFetch> & invalids
-        ) {
-        }
-
-        /* ensure the given access is represented in the memory tree */
-        inline void
-        insert(
-            const Access * access,
-            uint8_t device_global_id
-        ) {
-        }
-
         /** the given block must be fetched */
         void
         find_fetches_push(
@@ -292,26 +317,6 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
             NodeBase * nodebase
         ) {
             (void) access;
-
-            Node * node = reinterpret_cast<Node *>(nodebase);
-
-            const int devbit = (1 << device_global_id);
-            assert(!(node->block.valid & devbit));
-
-            /* check if the block is not already being fetched by another access */
-            if (node->block.fetching & devbit)
-            {
-                // TODO : this block is being fetched by another access
-                // need to notify the task performing 'access' when its done
-                return ;
-            }
-            node->block.fetching |= devbit;
-            fetches.push_back(ReplicateFetch(node, device_global_id));
-            124             node->region),
-125             replicate_view(node->block.replicates[device_global_id].view),
-126             block_view(node->block.view),
-127             valid(node->block.valid)
-
         }
 
 # endif

@@ -12,6 +12,7 @@ typedef struct  memory_block_replicate_view_t
     uintptr_t addr; // starting address of the block
 
     memory_block_replicate_view_t() : addr(0) {}
+    memory_block_replicate_view_t(const memory_block_replicate_view_t & src) : addr(src.addr) {}
     virtual ~memory_block_replicate_view_t() {}
 
 }               memory_block_replicate_view_t;
@@ -24,23 +25,10 @@ typedef struct  memory_block_view_t
     uint32_t  n;    // number of cols
 
     memory_block_view_t() : LD(0), m(0), n(0) {}
+    memory_block_view_t(const memory_block_view_t & src) : LD(src.LD), m(src.m), n(src.n) {}
     virtual ~memory_block_view_t() {}
 
 }               memory_block_view_t;
-
-# pragma message(TODO "Make this as small as possible")
-class MemoryBlockReplicate {
-
-    public:
-
-        /* view of the block replicate */
-        memory_block_replicate_view_t view;
-
-    public:
-        MemoryBlockReplicate() : view() {}
-        virtual ~MemoryBlockReplicate() {}
-
-}; /* MemoryBlockReplicate */
 
 // if greater than 8, then gotta increase the bitfield type
 static_assert(XKBLAS_DEVICES_MAX <= 8);
@@ -54,7 +42,7 @@ class MemoryBlock {
         memory_block_view_t view;
 
         /* per device replicate info */
-        MemoryBlockReplicate replicates[XKBLAS_DEVICES_MAX];
+        memory_block_replicate_view_t replicates[XKBLAS_DEVICES_MAX];
 
         /* if i-th bit is set, the i-th device has a valid copy */
         volatile memory_block_bitfield_t valid;
@@ -63,7 +51,18 @@ class MemoryBlock {
         volatile memory_block_bitfield_t fetching;
 
     public:
+
         MemoryBlock() : view(), replicates(), valid(0), fetching(0) {}
+
+        MemoryBlock(
+            const MemoryBlock & block
+        ) :
+            view(block.view),
+            replicates(block.replicates),
+            valid(block.valid),
+            fetching(block.fetching)
+        {}
+
         virtual ~MemoryBlock() {}
 
 }; /* MemoryBlock */

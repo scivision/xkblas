@@ -105,6 +105,8 @@ xkblas_device_init(
     device->cnt_push = 0;
     # endif
 
+    xkblas_context_t * ctx = xkblas_context_get();
+
     driver->f_device_init(device->driver_id);
 
     int err;
@@ -114,7 +116,7 @@ xkblas_device_init(
     device->p_write   = 0;
     device->p_ready   = 0;
     device->p_finish  = 0;
-    device->pipe_size = xkblas_context.conf.cuda_conc_kernel;
+    device->pipe_size = ctx->conf.cuda_conc_kernel;
     device->pipeline  = (Task **) malloc(sizeof(Task *) * device->pipe_size);
     for (int i = 0; i < device->pipe_size; ++i)
         device->pipeline[i] = nullptr;
@@ -271,8 +273,9 @@ xkblas_device_progress(
 static inline int
 xkblas_device_accept_new_task(xkblas_device_t * device)
 {
+    xkblas_context_t * ctx = xkblas_context_get();
     return (device && (device->p_write - device->p_finish) < device->pipe_size &&
-            (device->p_write - device->p_ready) < (1+xkblas_context.conf.cuda_conc_kernel) / 2);
+            (device->p_write - device->p_ready) < (1+ctx->conf.cuda_conc_kernel) / 2);
 }
 
 static inline void

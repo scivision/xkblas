@@ -26,12 +26,6 @@ typedef struct  xkblas_context_t
 // and 'xkblas_deinit' interfaces that takes no arguments.  Instead, we should
 // have them taking an 'xkblas_context_t' argument that the user must keep
 // track of
-extern xkblas_context_t xkblas_context;
-
-static inline xkblas_context_t *
-xkblas_context_get(void)
-{
-    return &xkblas_context;
-}
+xkblas_context_t * xkblas_context_get(void);
 
 #endif /* __XKBLAS_CONTEXT_H__ */

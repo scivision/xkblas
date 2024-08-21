@@ -186,10 +186,10 @@ class KIntervalBtree {
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
 
                 /* called to detect whether the access intersects with 'this' node */
-                virtual bool intersect_test(T & t, const Region & region, const access_mode_t mode) const = 0;
+                virtual bool intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const = 0;
 
                 /* called whenever 'this' intersects with the access */
-                virtual void on_intersect(T & t, const Region & region, const access_mode_t mode) const = 0;
+                virtual void on_intersect(T & t, const Region & region, const access_mode_t mode) = 0;
 
                 ///////////////
                 // Utilities //
@@ -387,7 +387,7 @@ class KIntervalBtree {
                 }
 
                 bool
-                intersect_test(T & t, const Region & region, const access_mode_t mode) const
+                intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const
                 {
                     (void) t;
                     (void) region;
@@ -397,7 +397,7 @@ class KIntervalBtree {
                 }
 
                 void
-                on_intersect(T & t, const Region & region, const access_mode_t mode) const
+                on_intersect(T & t, const Region & region, const access_mode_t mode)
                 {
                     (void) t;
                     (void) region;
@@ -553,7 +553,7 @@ class KIntervalBtree {
             if (node == nullptr || !region.intersects(node->includes.region))
                 return ;
 
-            if (node->intersect_test(t, region, mode))
+            if (node->intersect_stop_test(t, region, mode))
                 return ;
 
             if (region.intersects(node->region))

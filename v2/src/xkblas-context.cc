@@ -15,25 +15,30 @@
 //////////////////////////////
 
 // singleton of runtime context
-xkblas_context_t xkblas_context = {
-    .state = {
-        .spinlock = 0,
-        .current = XKBLAS_CONTEXT_DEINITIALIZED,
-    },
-    .conf = {
-        .stackblocsize              = (uint64_t)-1,
-        .ngpus                      = (uint8_t)-1,
-        .gpu_set                    = (uint32_t) ~0,
-        .cuda_stream_capacity       = 64,
-        .cuda_conc_stream_kernel    = 2,
-        .cuda_conc_kernel           = 8,
-        .cuda_conc_h2d              = 1,
-        .cuda_conc_d2h              = 1,
-        .cuda_conc_d2d              = 1,
-        .cuda_cache_limit           = 0.98
-    },
-    .drivers = {0},
-};
+xkblas_context_t *
+xkblas_context_get(void)
+{
+    static xkblas_context_t ctx = {
+        .state = {
+            .spinlock = 0,
+            .current = XKBLAS_CONTEXT_DEINITIALIZED,
+        },
+        .conf = {
+            .stackblocsize              = (uint64_t)-1,
+            .ngpus                      = (uint8_t)-1,
+            .gpu_set                    = (uint32_t) ~0,
+            .cuda_stream_capacity       = 64,
+            .cuda_conc_stream_kernel    = 2,
+            .cuda_conc_kernel           = 8,
+            .cuda_conc_h2d              = 1,
+            .cuda_conc_d2h              = 1,
+            .cuda_conc_d2d              = 1,
+            .cuda_cache_limit           = 0.98
+        },
+        .drivers = {0},
+    };
+    return &ctx;
+}
 
 static inline void
 xkblas_register_format(void)
@@ -55,19 +60,20 @@ xkblas_init(void)
 {
     XKBLAS_INFO("Initializing Xkblas");
 
-    if (xkblas_context.state.current == XKBLAS_CONTEXT_DEINITIALIZED)
+    xkblas_context_t * ctx = xkblas_context_get();
+    if (ctx->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
     {
-        SPINLOCK_LOCK(xkblas_context.state.spinlock);
+        SPINLOCK_LOCK(ctx->state.spinlock);
         {
-            if (xkblas_context.state.current == XKBLAS_CONTEXT_DEINITIALIZED)
+            if (ctx->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
             {
                 // load
-                xkblas_init_conf(&(xkblas_context.conf));
-                xkblas_drivers_init(&(xkblas_context.drivers), xkblas_context.conf.ngpus);
-                xkblas_context.state.current = XKBLAS_CONTEXT_INITIALIZED;
+                xkblas_init_conf(&(ctx->conf));
+                xkblas_drivers_init(&(ctx->drivers), ctx->conf.ngpus);
+                ctx->state.current = XKBLAS_CONTEXT_INITIALIZED;
             }
         }
-        SPINLOCK_UNLOCK(xkblas_context.state.spinlock);
+        SPINLOCK_UNLOCK(ctx->state.spinlock);
     }
 }
 
@@ -76,16 +82,17 @@ xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
 
-    if (xkblas_context.state.current == XKBLAS_CONTEXT_INITIALIZED)
+    xkblas_context_t * ctx = xkblas_context_get();
+    if (ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
     {
-        SPINLOCK_LOCK(xkblas_context.state.spinlock);
+        SPINLOCK_LOCK(ctx->state.spinlock);
         {
-            if (xkblas_context.state.current == XKBLAS_CONTEXT_INITIALIZED)
+            if (ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
             {
-                xkblas_drivers_deinit(&xkblas_context.drivers);
+                xkblas_drivers_deinit(&ctx->drivers);
             }
         }
-        SPINLOCK_UNLOCK(xkblas_context.state.spinlock);
+        SPINLOCK_UNLOCK(ctx->state.spinlock);
     }
 }
 
@@ -110,6 +117,12 @@ void
 xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
+    sleep(1);
+
+    xkblas_context_t * ctx = xkblas_context_get();
+    ctx->drivers.memtree.export_pdf("memory");
+    exit(0);
+
     XKBLAS_INFO("Infinite loop... CTRL+C to exit");
     while (1)
         sleep(1);
