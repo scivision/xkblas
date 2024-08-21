@@ -37,9 +37,55 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
+typedef struct  matrix_tile_t
+{
+    /* matrix address (passed to the BLAS kernel) */
+    uintptr_t addr;
+
+    /* matrix LD */
+    int LD;
+
+    /* tile accessed (in [0..ntiles[) */
+    int tm;
+    int tn;
+
+    /* tile size */
+    int bs_m;
+    int bs_n;
+
+    matrix_tile_t() : matrix_tile_t(static_cast<uintptr_t>(0), 0, 0, 0, 0, 0) {}
+
+    matrix_tile_t(const void * addr, int ld, int tm, int tn, int bs_m, int bs_n) :
+        matrix_tile_t((uintptr_t)addr, LD, tm, tn, bs_m, bs_n)
+    {}
+
+    matrix_tile_t(uintptr_t addr, int LD, int tm, int tn, int bs_m, int bs_n) :
+        addr(addr),
+        LD(LD),
+        tm(tm),
+        tn(tn),
+        bs_m(bs_m),
+        bs_n(bs_n)
+    {}
+
+    matrix_tile_t(const matrix_tile_t & src) :
+        addr(src.addr),
+        LD(src.LD),
+        tm(src.tm),
+        tn(src.tn),
+        bs_m(src.bs_m),
+        bs_n(src.bs_n)
+    {}
+
+    ~matrix_tile_t() {}
+}               matrix_tile_t;
+
 template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
 {
+    /* only supporting dimension K == 2 */
+    static_assert(K == 2);
+
     using Region = Intervals<K>;
 
     public:
@@ -47,37 +93,23 @@ class alignas(CACHE_LINE_SIZE) KTask
         class Access : public access_t<K>
         {
             public:
-
-                /* matrix host address (passed to the BLAS kernel) */
-                uintptr_t host_addr;
-
-                /* matrix LD */
-                int LD;
-
-                /* tile accessed (in [0..ntiles[) */
-                int tm;
-                int tn;
-
-                /* tile size */
-                int bs_m;
-                int bs_n;
+                matrix_tile_t tile;
 
             public:
 
                 Access() {}
 
                 Access(
-                    const access_mode_t & m,
-                    const uintptr_t & host_addr,
+                    const uintptr_t & addr,
                     const int & LD,
-                    const int & tm,   const int & tn,
-                    const int & bs_m, const int & bs_n
+                    const int & tm,
+                    const int & tn,
+                    const int & bs_m,
+                    const int & bs_n,
+                    const access_mode_t & m
                 ) :
-                    access_t<K>(m, host_addr, LD, tm, tn, bs_m, bs_n),
-                    host_addr(host_addr),
-                    LD(LD),
-                    tm(tm),     tn(tn),
-                    bs_m(bs_m), bs_n(bs_n)
+                    tile(addr, LD, tm, tn, bs_m, bs_n),
+                    access_t<K>(addr, LD, tm, tn, bs_m, bs_n, m)
                 {}
 
                 virtual ~Access() {}

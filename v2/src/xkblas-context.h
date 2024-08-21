@@ -3,6 +3,7 @@
 
 # include "conf/conf.h"
 # include "device/driver.h"
+# include "memory/memory-tree.hpp"
 # include "sync/spinlock.h"
 
 typedef enum    xkblas_context_state_t
@@ -13,13 +14,21 @@ typedef enum    xkblas_context_state_t
 
 typedef struct  xkblas_context_t
 {
+    /* context state */
     struct {
         spinlock_t spinlock;
         volatile std::atomic<xkblas_context_state_t> current;
     } state;
 
+    /* user conf */
     xkblas_conf_t conf;
+
+    /* driver list */
     xkblas_drivers_t drivers;
+
+    /* memory state on each device */
+    MemoryTree memtree;
+
 }               xkblas_context_t;
 
 // TODO : currently using a global variable to preserve previous 'xkblas_init'

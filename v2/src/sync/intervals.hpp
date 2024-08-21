@@ -125,7 +125,7 @@ class Intervals {
         }
 
         inline bool
-        equals(const Intervals & intervals)
+        equals(const Intervals & intervals) const
         {
             for (int k = 0 ; k < K ; ++k)
             {

@@ -96,9 +96,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Task::Access(ACCESS_MODE_R, (uintptr_t)A, LDA, Atm, Atn, BS, BS);
-    new(task->accesses + 1) Task::Access(ACCESS_MODE_R, (uintptr_t)B, LDB, Btm, Btn, BS, BS);
-    new(task->accesses + 2) Task::Access(Cmode,         (uintptr_t)C, LDC, Ctm, Ctn, BS, BS);
+    new(task->accesses + 0) Task::Access((uintptr_t) A, LDA, Atm, Atn, BS, BS, ACCESS_MODE_R);
+    new(task->accesses + 1) Task::Access((uintptr_t) B, LDB, Btm, Btn, BS, BS, ACCESS_MODE_R);
+    new(task->accesses + 2) Task::Access((uintptr_t) C, LDC, Ctm, Ctn, BS, BS, Cmode        );
     thread->commit<NACCESSES>(drivers, task);
     # undef NACCESSES
 
@@ -234,6 +234,8 @@ xkblas_£gemm_async(
                                 &zbeta,
                                 C, tm, tn, LDC
                         );
+                        // TODO : remove this return (0) to generate all tiles
+                        return 0;
                     }
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans

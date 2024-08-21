@@ -2,8 +2,9 @@
 # define __MEMORY_TREE_HPP__
 
 # include "device/device.h"
-# include "device/memory-block.hpp"
+# include "device/driver.h"
 # include "device/task.hpp"
+# include "memory/memory-block.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/kinterval-btree.hpp"
@@ -15,9 +16,6 @@ class KMemoryBlockReplicateFetch {
     using Region = Intervals<K>;
 
     public:
-
-        /* region */
-        const Region region;
 
         /* a view of the memory block */
         const memory_block_view_t block_view;
@@ -31,12 +29,10 @@ class KMemoryBlockReplicateFetch {
     public:
 
         KMemoryBlockReplicateFetch(
-            const Region & r,
             const memory_block_view_t & bview,
             const memory_block_replicate_view_t & rview,
             const memory_block_bitfield_t v
         ) :
-            region(r),
             replicate_view(rview),
             block_view(bview),
             valid(v)
@@ -77,6 +73,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
     using Region = Intervals<K>;
     using Base = typename KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node;
     using Node = KMemoryTreeNode<K>;
+    using Access = typename KTask<K>::Access;
 
     public:
 
@@ -85,16 +82,24 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
 
     public:
 
+        /* the region was never accessed before, create a new node */
         KMemoryTreeNode<K>(
+            const Access * access,
             const Region & r,
             const int k,
             const Color color
         ) :
             Base(r, k, color),
-            block()
-        {}
+            block(access->tile)
+        {
+            // TODO : is access->region != r ; then the access resulted in
+            // several insertion nodes, which i snot s upported yet
+            assert(access->region.equals(r));
+        }
 
+        /* the region was accessed before, create a new node and inherit from 'src' state */
         KMemoryTreeNode<K>(
+            const Access * access,
             const Region & r,
             const int k,
             const Color color,
@@ -113,7 +118,13 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
         ) {
             (void) dir;
             (void) mode;
-            XKBLAS_DEBUG("Inserted a new memory region");
+        }
+
+        void
+        on_shrink(void)
+        {
+            // TODO : not implemented
+            assert(0);
         }
 
         //////////////////
@@ -140,7 +151,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
             const Region & region,
             const access_mode_t mode
         ) {
-
             assert(dir.access->mode == mode);
             assert(dir.access->region.equals(region));
             assert(this->region.intersects(region));
@@ -163,14 +173,12 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
             this->block.fetching |= devbit;
             dir.list.push_back(
                 ReplicateFetch(
-                    this->region,
                     this->block.view,
                     this->block.replicates[dir.device_global_id],
                     this->block.valid
                 )
             );
         }
-
 
         void
         dump_str(FILE * f) const
@@ -181,8 +189,10 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
         void
         dump_region_str(FILE * f) const
         {
-            KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_region_str(f);
-            fprintf(f, "\\\\ LD=%d, m=%d, n=%d", this->block.view.LD, this->block.view.m, this->block.view.n);
+            // KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_region_str(f);
+            fprintf(f, "\\\\ host-addr=%p", (void *) this->block.view.addr);
+            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - LD=%d", this->block.view.bs_m, this->block.view.bs_n, this->block.view.LD);
+            fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.view.tm,   this->block.view.tn);
 
             // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
@@ -233,8 +243,12 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
 
         /** initiate memory transfer to ensure coherency */
         task_state_t
-        fetch(xkblas_device_t * device, Task * task)
-        {
+        fetch(
+            xkblas_driver_t * driver,
+            xkblas_device_t * device,
+            Task * task
+        ) {
+
             # pragma message(TODO "continuous blocks on the same device "       \
                     "could be detected here and fetched with a single request")
 
@@ -282,6 +296,9 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                 task->fetched();
             }
 
+            this->export_pdf("memory");
+            exit(0);
+
             return task->fetched();
         }
 
@@ -290,37 +307,24 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
         //////////////
         Node *
         new_node(
+            DeviceInvalidRegions & dir,
             const Region & region,
             const int k,
             const Color color
         ) const {
-            return new Node(region, k, color);
+            return new Node(dir.access, region, k, color);
         }
 
         Node *
         new_node(
+            DeviceInvalidRegions & dir,
             const Region & region,
             const int k,
             const Color color,
             const NodeBase * nodebase
         ) const {
-            return new Node(region, k, color, reinterpret_cast<const Node *>(nodebase));
+            return new Node(dir.access, region, k, color, reinterpret_cast<const Node *>(nodebase));
         }
-
-# if 0
-        /** the given block must be fetched */
-        void
-        find_fetches_push(
-            const Access * access,
-            std::vector<ReplicateFetch> & fetches,
-            uint8_t device_global_id,
-            NodeBase * nodebase
-        ) {
-            (void) access;
-        }
-
-# endif
-
 };
 
 using MemoryTree = KMemoryTree<2>;

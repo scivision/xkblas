@@ -120,7 +120,7 @@ xkblas_sync(void)
     sleep(1);
 
     xkblas_context_t * ctx = xkblas_context_get();
-    ctx->drivers.memtree.export_pdf("memory");
+    ctx->memtree.export_pdf("memory");
     exit(0);
 
     XKBLAS_INFO("Infinite loop... CTRL+C to exit");

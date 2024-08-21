@@ -1,3 +1,8 @@
+// TODO PERFORMANCES IDEA
+//  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
+//  - check loop unrolling
+
+
 #ifndef __KINTERVAL_BTREE_H__
 # define __KINTERVAL_BTREE_H__
 
@@ -94,7 +99,7 @@ do {                                                                    \
 } while (0)
 
 /* K is the number of dimensions */
-template<int K, typename T = void *>
+template<int K, typename T>
 class KIntervalBtree {
 
     using Region = Intervals<K>;
@@ -184,6 +189,9 @@ class KIntervalBtree {
                 /* called whenever this node is added to the tree with an
                  * access (this->region, mode) */
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
+
+                /* called whenever this node was shrinked */
+                virtual void on_shrink(void) = 0;
 
                 /* called to detect whether the access intersects with 'this' node */
                 virtual bool intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const = 0;
@@ -383,6 +391,12 @@ class KIntervalBtree {
                 {
                     (void) t;
                     (void) mode;
+                    assert(0);
+                }
+
+                void
+                on_shrink(void)
+                {
                     assert(0);
                 }
 
@@ -955,11 +969,13 @@ class KIntervalBtree {
         {
             return this->root && requires_rebalance(this->root);
         }
+
 # endif /* REBALANCE */
 
         /* called to create a new node */
         virtual Node *
         new_node(
+            T & t,
             const Region & region,
             const int k,
             const Color color
@@ -968,6 +984,7 @@ class KIntervalBtree {
         /* called to create a new node from a split of 'src */
         virtual Node *
         new_node(
+            T & t,
             const Region & region,
             const int k,
             const Color color,
@@ -1054,7 +1071,7 @@ class KIntervalBtree {
                     if (parent->st[k].left == nullptr)
                     {
                         if (node == nullptr)
-                            node = this->new_node(region, k, RED);
+                            node = this->new_node(t, region, k, RED);
                         else
                         {
                             node->k = k;
@@ -1072,7 +1089,7 @@ class KIntervalBtree {
                     if (parent->st[k].right == nullptr)
                     {
                         if (node == nullptr)
-                            node = this->new_node(region, k, RED);
+                            node = this->new_node(t, region, k, RED);
                         else
                         {
                             node->k = k;
@@ -1146,6 +1163,7 @@ insert_from_case_3_equals:
 
                             // shrink node
                             node->region[k] = region[k];
+                            node->on_shrink();
                         };
 
                         f(parent);
@@ -1156,7 +1174,7 @@ insert_from_case_3_equals:
                         // insert all side nodes
                         for (ReinsertRegion & rr : to_reinsert)
                         {
-                            Node * node = this->new_node(rr.region, k, RED, rr.sibling);
+                            Node * node = this->new_node(t, rr.region, k, RED, rr.sibling);
                             this->insert_from(t, node->region, ACCESS_MODE_VOID, this->root, 0, node);
                         }
 
@@ -1204,7 +1222,7 @@ insert_from_case_3_equals:
 
             if (this->root == nullptr)
             {
-                this->root = this->new_node(region, 0, BLACK);
+                this->root = this->new_node(t, region, 0, BLACK);
                 this->root->on_insert(t, mode);
                 this->root->update_includes();
             }

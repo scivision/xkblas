@@ -18,17 +18,7 @@ typedef struct  memory_block_replicate_view_t
 }               memory_block_replicate_view_t;
 
 // view of the memory block
-typedef struct  memory_block_view_t
-{
-    uint32_t  LD;   // leading dimension
-    uint32_t  m;    // number of rows
-    uint32_t  n;    // number of cols
-
-    memory_block_view_t() : LD(0), m(0), n(0) {}
-    memory_block_view_t(const memory_block_view_t & src) : LD(src.LD), m(src.m), n(src.n) {}
-    virtual ~memory_block_view_t() {}
-
-}               memory_block_view_t;
+using memory_block_view_t = matrix_tile_t;
 
 // if greater than 8, then gotta increase the bitfield type
 static_assert(XKBLAS_DEVICES_MAX <= 8);
@@ -52,7 +42,17 @@ class MemoryBlock {
 
     public:
 
-        MemoryBlock() : view(), replicates(), valid(0), fetching(0) {}
+        /* a new memory block, assume it is valid on the host (device id = 0) */
+        MemoryBlock(const matrix_tile_t & tile) :
+            view(tile),
+            replicates(),
+            valid(0),
+            fetching(0)
+        {
+            const int devid = 0;
+            this->valid = (1 << devid);
+            this->replicates[devid].addr = XKBLAS_MATRIX_TILE(tile.addr, tile.LD, tile.tm, tile.tn, tile.bs_m, tile.bs_m);
+        }
 
         MemoryBlock(
             const MemoryBlock & block

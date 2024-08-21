@@ -77,10 +77,16 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             }
         }
 
-        virtual void
+        void
         on_insert(Task * & t, const access_mode_t mode)
         {
             this->register_access(t, mode);
+        }
+
+        void
+        on_shrink(void)
+        {
+            // nothing to do
         }
 
         //////////////////
@@ -170,6 +176,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
         //////////////
         Node *
         new_node(
+            Task * & task,
             const Region & region,
             const int k,
             const Color color
@@ -179,6 +186,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
 
         Node *
         new_node(
+            Task * & task,
             const Region & region,
             const int k,
             const Color color,

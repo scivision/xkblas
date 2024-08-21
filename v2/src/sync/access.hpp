@@ -8,8 +8,8 @@ template<int K>
 class access_t
 {
     public:
-        access_mode_t mode;
         Intervals<K> region;
+        access_mode_t mode;
 
     public:
         access_t() :
@@ -28,14 +28,16 @@ class access_t
         {}
 
         access_t(
-            const access_mode_t & m,
             const uintptr_t & P,
             const int & LD,
-            const int & tm,   const int & tn,
-            const int & bs_m, const int & bs_n
+            const int & tm,
+            const int & tn,
+            const int & bs_m,
+            const int & bs_n,
+            const access_mode_t & m
         ) :
-            mode(m),
-            region(P, LD, tm, tn, bs_m, bs_n)
+            region(P, LD, tm, tn, bs_m, bs_n),
+            mode(m)
         {}
 
         virtual ~access_t() {}

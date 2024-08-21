@@ -290,7 +290,6 @@ xkblas_device_prepare_task(
     // TODO : implement this routine
     XKBLAS_DEBUG("Scheduling task `%s` on device %d on driver `%s`",
             task->label, device->driver_id, driver->f_get_name());
-    xkblas_context_t * context = xkblas_context_get();
 
     // 'prepare_execute:' label
 
@@ -309,8 +308,8 @@ xkblas_device_prepare_task(
     device->pipeline[index % device->pipe_size] = task;
 
     /* retrieve the memory state */
-    MemoryTree * mem = &(context->drivers.memtree);
-    if (mem->fetch(device, task) == TASK_STATE_DATA_FETCHED)
+    xkblas_context_t * ctx = xkblas_context_get();
+    if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         // TODO : 'task' kernel can be executed on the GPU
     }
