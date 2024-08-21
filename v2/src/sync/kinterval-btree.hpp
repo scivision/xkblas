@@ -150,7 +150,11 @@ class KIntervalBtree {
                     colors{BLACK}
                 {}
 
-                Node(const Region & r, int k, Color color) :
+                Node(
+                    const Region & r,
+                    const int k,
+                    const Color color
+                ) :
                     parent(nullptr),
                     colors{BLACK},
                     region(r),
@@ -180,9 +184,6 @@ class KIntervalBtree {
                 /* called whenever this node is added to the tree with an
                  * access (this->region, mode) */
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
-
-                /* called whenever 'this' is split from 'node' */
-                virtual void on_inherit(const Node * node) = 0;
 
                 /* called to detect whether the access intersects with 'this' node */
                 virtual bool intersect_test(T & t, const Region & region, const access_mode_t mode) const = 0;
@@ -382,13 +383,6 @@ class KIntervalBtree {
                 {
                     (void) t;
                     (void) mode;
-                    assert(0);
-                }
-
-                void
-                on_inherit(const Node * node)
-                {
-                    (void) node;
                     assert(0);
                 }
 
@@ -963,11 +957,21 @@ class KIntervalBtree {
         }
 # endif /* REBALANCE */
 
+        /* called to create a new node */
         virtual Node *
         new_node(
             const Region & region,
             const int k,
             const Color color
+        ) const = 0;
+
+        /* called to create a new node from a split of 'src */
+        virtual Node *
+        new_node(
+            const Region & region,
+            const int k,
+            const Color color,
+            const Node * src
         ) const = 0;
 
         void
@@ -1152,9 +1156,8 @@ insert_from_case_3_equals:
                         // insert all side nodes
                         for (ReinsertRegion & rr : to_reinsert)
                         {
-                            Node * node = this->new_node(rr.region, k, RED);
+                            Node * node = this->new_node(rr.region, k, RED, rr.sibling);
                             this->insert_from(t, node->region, ACCESS_MODE_VOID, this->root, 0, node);
-                            node->on_inherit(rr.sibling);
                         }
 
                         // continue inserting, the node

@@ -25,12 +25,38 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
 
     public:
 
-        KDependencyTreeNode<K>(const Region & r, int k, Color color) :
+        KDependencyTreeNode<K>(
+            const Region & r,
+            const int k,
+            const Color color
+        ) :
             Base(r, k, color),
             last_reads(),
             last_write(nullptr),
             nwrites(0)
         {}
+
+        /* a new node from a split, inherit 'src' accesses */
+        KDependencyTreeNode<K>(
+            const Region & r,
+            const int k,
+            const Color color,
+            const Node * src
+        ) :
+            Base(r, k, color),
+            last_reads(),
+            last_write(src->last_write),
+            nwrites(0)
+        {
+            if (!src->last_reads.empty())
+            {
+                this->last_reads.insert(
+                    this->last_reads.end(),
+                    std::make_move_iterator(src->last_reads.begin()),
+                    std::make_move_iterator(src->last_reads.end())
+                );
+            }
+        }
 
         ////////////////////////////////
         // When an access is inserted //
@@ -55,31 +81,6 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
         on_insert(Task * & t, const access_mode_t mode)
         {
             this->register_access(t, mode);
-        }
-
-        /////////////////////////////
-        // When an access is split //
-        /////////////////////////////
-
-        inline void
-        inherit_accesses(const Node * parent)
-        {
-            if (!parent->last_reads.empty())
-            {
-                this->last_reads.insert(
-                    this->last_reads.end(),
-                    std::make_move_iterator(parent->last_reads.begin()),
-                    std::make_move_iterator(parent->last_reads.end())
-                );
-            }
-            this->last_write = parent->last_write;
-        }
-
-        void
-        on_inherit(const Base * base)
-        {
-            const Node * node = reinterpret_cast<const Node *>(base);
-            this->inherit_accesses(node);
         }
 
         //////////////////
@@ -164,18 +165,26 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
 
     public:
 
-
-
         //////////////
         //  INSERT  //
         //////////////
-        virtual Node *
+        Node *
         new_node(
             const Region & region,
             const int k,
             const Color color
         ) const {
-            return new KDependencyTreeNode<K>(region, k, color);
+            return new Node(region, k, color);
+        }
+
+        Node *
+        new_node(
+            const Region & region,
+            const int k,
+            const Color color,
+            const NodeBase * nodebase
+        ) const {
+            return new Node(region, k, color, reinterpret_cast<const Node *>(nodebase));
         }
 };
 
