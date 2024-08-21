@@ -254,6 +254,7 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
 
             /* list of invalid blocks on that device */
             DeviceInvalidRegions invalids(device->global_id);
+            const int devbit = (1 << device->global_id);
 
             /* use task->wc to detect completion of every fetches */
             task->fetching();
@@ -281,23 +282,34 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                     }
                     this->unlock();
                 }
+
+                /* initiate fetching of each invalid block for that access */
+                for (ReplicateFetch & fetch : invalids.list)
+                {
+                    task->fetching();
+
+                    // TODO sequentially but asynchronously
+                    //
+                    //  - if needed, allocate the device replicate
+                    //  - move the data to the device
+                    //      - update the fetching bit
+                    //      - update the valid bits
+                    //  - call task->fetched()
+                    //      - if wc reached 0, execute kernel
+                    if (fetch.replicate_view.addr == 0)
+                    {
+                        // TODO : allocate
+                    }
+
+                    assert(fetch.valid & devbit == 0);
+                    // TODO : fetch
+
+                    task->fetched();
+                }
+
+                /* reset the invalid list for the next access */
+                invalids.list.clear();
             }
-
-            /* initiate fetching of each invalid block */
-            for (ReplicateFetch & fetch : invalids.list)
-            {
-                task->fetching();
-
-                // TODO : fetch data and on completion :
-                //  - call task->fetched()
-                //  - update the memory tree's block valid bits
-                //  - update the memory tree's block state (from 'fetching' to 'fetched')
-
-                task->fetched();
-            }
-
-            this->export_pdf("memory");
-            exit(0);
 
             return task->fetched();
         }

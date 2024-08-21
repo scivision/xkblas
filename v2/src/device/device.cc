@@ -298,7 +298,7 @@ xkblas_device_prepare_task(
     while (!xkblas_device_accept_new_task(device))
     {
         xkblas_device_poll(device);
-        int err = device->stream.wait(XKBLAS_IO_STREAM_D2D);   // Romain: why wait on D2D ?
+        int err = device->stream.wait(XKBLAS_IO_STREAM_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
         assert(err == 0);
         xkblas_device_poll(device);
     }
@@ -311,6 +311,7 @@ xkblas_device_prepare_task(
     xkblas_context_t * ctx = xkblas_context_get();
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
+        XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
         // TODO : 'task' kernel can be executed on the GPU
     }
 }
