@@ -13,10 +13,12 @@
 typedef struct  xkblas_device_host_t
 {
     xkblas_device_t inherited;
+
 }               xkblas_device_host_t;
 
-/* the host device */
-static xkblas_device_host_t HOST_DEVICE = { 0 };
+/* the host devices (should be '1' - using >1 for debug purposes when no cuda/gpu available :-) */
+# define N_HOST_DEVICE 2
+static xkblas_device_host_t DEVICES[N_HOST_DEVICE];
 
 /* initialization synchronization */
 static bool INITIALIZED = false;
@@ -25,7 +27,7 @@ static xkblas_mutex_t DRIVER_MUTEX = XKBLAS_MUTEX_INITIALIZER;
 static unsigned int
 XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
-    return 1;
+    return N_HOST_DEVICE;
 }
 
 static int
@@ -84,15 +86,13 @@ static xkblas_device_t *
 XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_id)
 {
     assert(INITIALIZED);
-    assert(device_id == 0);
-    return (xkblas_device_t *) &HOST_DEVICE;
+    return (xkblas_device_t *) DEVICES + device_id;
 }
 
 static void
 XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
 {
     assert(INITIALIZED);
-    assert(device_id == 0);
 }
 
 static int

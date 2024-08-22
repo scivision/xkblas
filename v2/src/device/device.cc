@@ -320,8 +320,8 @@ xkblas_device_prepare_task(
     xkblas_context_t * ctx = xkblas_context_get();
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
-        XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
-        // TODO : 'task' kernel can be executed on the GPU
+        /* all data has been fetched, the task kernel is ready for execution */
+        XKBLAS_INFO("Task `%s` is ready for kernel execution (early)", task->label);
     }
 }
 

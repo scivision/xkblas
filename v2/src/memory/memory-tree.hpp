@@ -9,6 +9,11 @@
 # include "logger/todo.h"
 # include "sync/kinterval-btree.hpp"
 
+# pragma message(TODO "Currently memory tree is cut on 'write' accesses, but we "   \
+        "therefore loose allocation information on devices... Two ideas, "          \
+        "whether: (1) do not cut, keeping all blocks and invalidating them or "     \
+        "(2) free the device blocks in the destructor of a KMemoryTreeNode")
+
 /* an on-going memory block fetch */
 template <int K>
 class KMemoryBlockReplicateFetch {
@@ -16,6 +21,9 @@ class KMemoryBlockReplicateFetch {
     using Region = Intervals<K>;
 
     public:
+
+        /* the memory-tree region view */
+        const Region region;
 
         /* a view of the memory block */
         const memory_block_view_t block_view;
@@ -29,10 +37,12 @@ class KMemoryBlockReplicateFetch {
     public:
 
         KMemoryBlockReplicateFetch(
+            const Region & r,
             const memory_block_view_t & bview,
             const memory_block_replicate_view_t & rview,
             const memory_block_bitfield_t v
         ) :
+            region(r),
             replicate_view(rview),
             block_view(bview),
             valid(v)
@@ -48,38 +58,91 @@ class KMemoryBlockReplicateFetch {
 
 }; /* KMemoryBlockReplicateFetch */
 
+/* storage passed when searching in the tree */
 template <int K>
-class DeviceInvalidKRegions {
+class KMemoryTreeNodeSearch {
 
     using Access = typename KTask<K>::Access;
-    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
+    using Region = Intervals<K>;
 
     public:
 
-        /* device global id which has to perform the fetches */
+        /* different search type */
+        enum Type : uint8_t {
+            INSERTING_BLOCKS            = 0,
+            SEARCH_FOR_INVALID_BLOCKS   = 1,
+            VALIDATE_BLOCKS             = 2
+        };
+
+    public:
+
+        /////////////////////////////////
+        // used in all types of search //
+        /////////////////////////////////
+
+        /* type of search performing */
+        Type type;
+
+        /* device global id, on which we are looking for invalid blocks or validating blocks */
         const uint8_t device_global_id;
 
-        /* list of invalid replicate */
-        std::vector<KMemoryBlockReplicateFetch<K>> list;
+        //////////////////////////////////////
+        // used if type == INSERTING_BLOCKS //
+        //////////////////////////////////////
 
         /* the access being inserted / intersected */
         Access * access;
 
-    public:
-        DeviceInvalidKRegions(uint8_t id) : device_global_id(id), list(), access(nullptr) {}
-        virtual ~DeviceInvalidKRegions() {}
+        ///////////////////////////////////////////////
+        // used if type == SEARCH_FOR_INVALID_BLOCKS //
+        ///////////////////////////////////////////////
 
-}; /* DeviceInvalidKRegions */
+        /* list of invalid replicate */
+        std::vector<KMemoryBlockReplicateFetch<K>> invalids;
+
+        /////////////////////////////////////
+        // used if type == VALIDATE_BLOCKS //
+        /////////////////////////////////////
+        Region region;
+
+    public:
+
+        KMemoryTreeNodeSearch(uint8_t devid) : device_global_id(devid), access(nullptr), invalids(), region() {}
+        virtual ~KMemoryTreeNodeSearch() {}
+
+        void
+        prepare_insert(Access * a)
+        {
+            this->type = INSERTING_BLOCKS;
+            this->access = a;
+        }
+
+        void
+        prepare_search_invalids(void)
+        {
+            this->type = SEARCH_FOR_INVALID_BLOCKS;
+            this->invalids.clear();
+        }
+
+        void
+        prepare_validate(const Region & r)
+        {
+            this->type = VALIDATE_BLOCKS;
+            this->region.copy(r);
+        }
+
+}; /* KMemoryTreeNodeSearch */
+
 
 template <int K>
-class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node {
+class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node {
 
     using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
-    using DeviceInvalidRegions = DeviceInvalidKRegions<K>;
     using Region = Intervals<K>;
-    using Base = typename KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node;
+    using Base = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Node = KMemoryTreeNode<K>;
     using Access = typename KTask<K>::Access;
+    using Search = KMemoryTreeNodeSearch<K>;
 
     public:
 
@@ -119,11 +182,12 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
 
         void
         on_insert(
-            DeviceInvalidRegions & dir,
+            Search & search,
             const access_mode_t mode
         ) {
-            (void) dir;
+            (void) search;
             (void) mode;
+            assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
 
         void
@@ -138,11 +202,11 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
         //////////////////
         inline bool
         intersect_stop_test(
-            DeviceInvalidRegions & dir,
+            Search & search,
             const Region & region,
             const access_mode_t mode
         ) const {
-            (void) dir;
+            (void) search;
             (void) region;
             (void) mode;
 
@@ -153,43 +217,67 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
 
         inline void
         on_intersect(
-            DeviceInvalidRegions & dir,
+            Search & search,
             const Region & region,
             const access_mode_t mode
         ) {
-            assert(dir.access->mode == mode);
-            assert(dir.access->region.equals(region));
             assert(this->region.intersects(region));
+            const int devbit = (1 << search.device_global_id);
 
-            /* the block is valid on that device, nothing to do */
-            const int devbit = (1 << dir.device_global_id);
-            if (this->block.valid & devbit)
-                return ;
-            assert(!(this->block.valid & devbit));
-
-            /* check if the block is not already being fetched by another access */
-            if (this->block.fetching & devbit)
+            /* two intersection search possible : whether looking for invalid
+             * blocks to initiate fetches, whether setting them valid (after
+             * fetching) */
+            switch (search.type)
             {
-                // TODO : this block is being fetched by another access
-                // need to notify the task performing 'access' when its done
-                return ;
-            }
+                case (Search::Type::SEARCH_FOR_INVALID_BLOCKS):
+                {
+                    /* the block is valid on that device, nothing to do */
+                    if (this->block.valid & devbit)
+                        return ;
+                    assert(!(this->block.valid & devbit));
 
-            /* add this block to the fetching list */
-            this->block.fetching |= devbit;
-            dir.list.push_back(
-                ReplicateFetch(
-                    this->block.view,
-                    this->block.replicates[dir.device_global_id],
-                    this->block.valid
-                )
-            );
+                    /* check if the block is not already being fetched by another access */
+                    if (this->block.fetching & devbit)
+                    {
+                        // TODO : this block is being fetched by another access
+                        // need to notify the task performing 'access' when its done
+                        return ;
+                    }
+
+                    /* add this block to the fetching list */
+                    this->block.fetching |= devbit;
+                    search.invalids.push_back(
+                        ReplicateFetch(
+                            this->region.intersection(region),
+                            this->block.view,
+                            this->block.replicates[search.device_global_id],
+                            this->block.valid
+                        )
+                    );
+                    break ;
+                }
+
+                case (Search::Type::VALIDATE_BLOCKS):
+                {
+                    assert(this->block.fetching & devbit);
+                    assert(!(this->block.valid & devbit));
+                    this->block.fetching &= ~(devbit);
+                    this->block.valid |= devbit;
+                    break ;
+                }
+
+                default:
+                {
+                    XKBLAS_FATAL("Invalid search type in memory tree");
+                    assert(0);
+                }
+            }
         }
 
         void
         dump_str(FILE * f) const
         {
-            KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_str(f);
+            KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
         }
 
         void
@@ -217,16 +305,16 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
 }; /* KMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
+class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
     using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
-    using DeviceInvalidRegions = DeviceInvalidKRegions<K>;
-    using Base = KIntervalBtree<K, DeviceInvalidKRegions<K>>;
+    using Base = KIntervalBtree<K, KMemoryTreeNodeSearch<K>>;
     using Node = KMemoryTreeNode<K>;
-    using NodeBase = typename KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node;
+    using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Region = Intervals<K>;
     using Task = KTask<K>;
     using Access = typename KTask<K>::Access;
+    using Search = KMemoryTreeNodeSearch<K>;
 
     public:
 
@@ -259,66 +347,84 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                     "could be detected here and fetched with a single request")
 
             /* list of invalid blocks on that device */
-            DeviceInvalidRegions invalids(device->global_id);
+            Search search(device->global_id);
             const int devbit = (1 << device->global_id);
 
-            /* use task->wc to detect completion of every fetches */
+            /* increase task 'fetching' counter so it does not get ready early
+             * (eg before we processed all accesses bellow)
+             */
             task->fetching();
 
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
             {
-                invalids.access = task->accesses + i;
+                Access * access = task->accesses + i;
 
                 /* ensure it is represented in the memory tree */
+                search.prepare_insert(access);
                 this->lock();
                 {
-                    this->insert(invalids, invalids.access->region, invalids.access->mode);
+                    this->insert(search, access->region, access->mode);
                 }
                 this->unlock();
 
                 /* if the kernel reads that memory */
-                if (invalids.access->mode & ACCESS_MODE_R)
+                if (access->mode & ACCESS_MODE_R)
                 {
                     /* find invalid memory blocks on that device */
+                    search.prepare_search_invalids();
                     this->lock();
                     {
-                        this->intersect(invalids, invalids.access->region, invalids.access->mode);
+                        this->intersect(search, access->region, access->mode);
                     }
                     this->unlock();
                 }
 
-                /* initiate fetching of each invalid block for that access */
-                for (ReplicateFetch & fetch : invalids.list)
-                {
-                    assert(fetch.valid & devbit == 0);
+                # pragma message(TODO "merge 'ReplicateFetch' on continuous "   \
+                        "memory addresses - for now, just perform one data "    \
+                        "transfer per block")
 
+                /* initiate fetching of each invalid block for that access */
+                for (ReplicateFetch & fetch : search.invalids)
+                {
+                    assert(!(fetch.valid & devbit));
+
+                    /* increase task 'fetching' counter : the kernel execution
+                     * must wait for one fetch to complete */
                     task->fetching();
 
-                    // TODO sequentially but asynchronously
-                    //
-                    //  - if needed, allocate the device replicate
-                    //  - move the data to the device, and then
-                    //      - update the valid and fetching bits in the memory
-                    //        tree (= need to lock + search again here...)
-                    //      - call task->fetched()
-
+                    /* allocate the replicate on the device if needed */
                     const bool require_allocation = (fetch.replicate_view.addr == 0);
                     if (require_allocation)
                     {
-                        // TODO :
+                        # pragma message(TODO "allocator, P-E is working on it")
+                        // TODO : uncomment this
                         //  uint64_t size = fetch.size()
-                        //  allocate(driver, device, size)
+                        //  void * addr = xkblas_memory_allocate(driver, device, size)
                     }
 
-                    // TODO : fetch
+                    // TODO : launch asynchronous fetch here
 
-                    task->fetched();
+
+                    // TODO : call this on fetch completion
+                    {
+                        /* update the valid and fetching bits in the memory tree */
+                        search.prepare_validate(fetch.region);
+                        this->lock();
+                        {
+                            this->intersect(search, fetch.region, ACCESS_MODE_VOID);
+                        }
+                        this->unlock();
+
+                        /* a fetch completed */
+                        if (task->fetched() == TASK_STATE_DATA_FETCHED)
+                        {
+                            /* all data has been fetched, the task kernel is ready for execution */
+                            XKBLAS_INFO("Task `%s` is ready for kernel execution (late)", task->label);
+                        }
+                    }
                 }
-
-                /* reset the invalid list for the next access */
-                invalids.list.clear();
             }
 
             return task->fetched();
@@ -329,23 +435,25 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
         //////////////
         Node *
         new_node(
-            DeviceInvalidRegions & dir,
+            Search & search,
             const Region & region,
             const int k,
             const Color color
         ) const {
-            return new Node(dir.access, region, k, color);
+            assert(search.type == Search::Type::INSERTING_BLOCKS);
+            return new Node(search.access, region, k, color);
         }
 
         Node *
         new_node(
-            DeviceInvalidRegions & dir,
+            Search & search,
             const Region & region,
             const int k,
             const Color color,
             const NodeBase * nodebase
         ) const {
-            return new Node(dir.access, region, k, color, reinterpret_cast<const Node *>(nodebase));
+            assert(search.type == Search::Type::INSERTING_BLOCKS);
+            return new Node(search.access, region, k, color, reinterpret_cast<const Node *>(nodebase));
         }
 };
 

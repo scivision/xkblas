@@ -235,6 +235,8 @@ xkblas_£gemm_async(
                                 C, tm, tn, LDC
                         );
                     }
+                    // TODO : remove me, only generating 1 tile atm
+                    return 0;
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans
                 else

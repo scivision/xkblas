@@ -45,7 +45,6 @@ class Intervals {
                 this->list[0].b = this->list[0].a + tile.bs_m;
                 this->list[1].a = (uint64_t)(PP % (tile.LD * tile.sizeof_type));
                 this->list[1].b = this->list[1].a + tile.bs_n * tile.sizeof_type;
-
 # else
 
                 uintptr_t PP = XKBLAS_MATRIX_TILE(P, LD, tm, tn, bs_m, bs_n, 1);

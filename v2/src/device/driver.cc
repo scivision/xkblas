@@ -158,7 +158,7 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
     {
         do {
             device_id = drivers->devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = device_id % drivers->devices.n;
+            device_id = (device_id + 1) % drivers->devices.n;
         } while (drivers->devices.list[device_id] == nullptr);
     }
 
