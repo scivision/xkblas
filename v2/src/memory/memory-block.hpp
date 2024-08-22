@@ -50,7 +50,7 @@ class MemoryBlock {
             fetching(0)
         {
             const int devid = 0;
-            this->valid = (1 << devid);
+            this->valid = (1 << devid); // assume valid on host
             this->replicates[devid].addr = XKBLAS_MATRIX_TILE(tile.addr, tile.LD, tile.tm, tile.tn, tile.bs_m, tile.bs_m);
         }
 

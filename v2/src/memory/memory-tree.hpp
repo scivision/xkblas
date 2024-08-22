@@ -291,16 +291,12 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                     // TODO sequentially but asynchronously
                     //
                     //  - if needed, allocate the device replicate
-                    //  - move the data to the device
-                    //      - update the fetching bit
-                    //      - update the valid bits
-                    //  - call task->fetched()
-                    //      - if wc reached 0, execute kernel
-                    if (fetch.replicate_view.addr == 0)
-                    {
-                        // TODO : allocate
-                    }
+                    //  - move the data to the device, and then
+                    //      - update the valid and fetching bits in the memory
+                    //        tree (= need to lock + search again here...)
+                    //      - call task->fetched()
 
+                    bool require_allocation = (fetch.replicate_view.addr == 0);
                     assert(fetch.valid & devbit == 0);
                     // TODO : fetch
 
