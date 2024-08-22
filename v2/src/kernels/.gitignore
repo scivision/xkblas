@@ -1,3 +1,4 @@
+bgemm.cc
 cgemm.cc
 ckernel.h
 dgemm.cc

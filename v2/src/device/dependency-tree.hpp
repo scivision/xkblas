@@ -181,6 +181,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
             const int k,
             const Color color
         ) const {
+            (void) task;
             return new Node(region, k, color);
         }
 
@@ -192,6 +193,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
             const Color color,
             const NodeBase * nodebase
         ) const {
+            (void) task;
             return new Node(region, k, color, reinterpret_cast<const Node *>(nodebase));
         }
 };

@@ -6,6 +6,8 @@
 # include <cstdint>
 # include <vector>
 
+# include "matrix-tile.h"
+
 # include "device/consts.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
@@ -37,49 +39,6 @@ enum task_body_t : uint8_t
     TASK_BODY_MAX       = 4,
 };
 
-typedef struct  matrix_tile_t
-{
-    /* matrix address (passed to the BLAS kernel) */
-    uintptr_t addr;
-
-    /* matrix LD */
-    int LD;
-
-    /* tile accessed (in [0..ntiles[) */
-    int tm;
-    int tn;
-
-    /* tile size */
-    int bs_m;
-    int bs_n;
-
-    matrix_tile_t() : matrix_tile_t(static_cast<uintptr_t>(0), 0, 0, 0, 0, 0) {}
-
-    matrix_tile_t(const void * addr, int ld, int tm, int tn, int bs_m, int bs_n) :
-        matrix_tile_t((uintptr_t)addr, LD, tm, tn, bs_m, bs_n)
-    {}
-
-    matrix_tile_t(uintptr_t addr, int LD, int tm, int tn, int bs_m, int bs_n) :
-        addr(addr),
-        LD(LD),
-        tm(tm),
-        tn(tn),
-        bs_m(bs_m),
-        bs_n(bs_n)
-    {}
-
-    matrix_tile_t(const matrix_tile_t & src) :
-        addr(src.addr),
-        LD(src.LD),
-        tm(src.tm),
-        tn(src.tn),
-        bs_m(src.bs_m),
-        bs_n(src.bs_n)
-    {}
-
-    ~matrix_tile_t() {}
-}               matrix_tile_t;
-
 template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
 {
@@ -100,16 +59,24 @@ class alignas(CACHE_LINE_SIZE) KTask
                 Access() {}
 
                 Access(
-                    const uintptr_t & addr,
+                    const void * addr,
                     const int & LD,
                     const int & tm,
                     const int & tn,
-                    const int & bs_m,
-                    const int & bs_n,
+                    const int & bm,
+                    const int & bn,
+                    const uint32_t & sizeof_type,
                     const access_mode_t & m
                 ) :
-                    tile(addr, LD, tm, tn, bs_m, bs_n),
-                    access_t<K>(addr, LD, tm, tn, bs_m, bs_n, m)
+                    Access(matrix_tile_t(addr, LD, tm, tn, bm, bn, sizeof_type), m)
+                {}
+
+                Access(
+                    const matrix_tile_t & t,
+                    const access_mode_t & m
+                ) :
+                    tile(t),
+                    access_t<K>(t, m)
                 {}
 
                 virtual ~Access() {}

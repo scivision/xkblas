@@ -96,9 +96,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Task::Access((uintptr_t) A, LDA, Atm, Atn, BS, BS, ACCESS_MODE_R);
-    new(task->accesses + 1) Task::Access((uintptr_t) B, LDB, Btm, Btn, BS, BS, ACCESS_MODE_R);
-    new(task->accesses + 2) Task::Access((uintptr_t) C, LDC, Ctm, Ctn, BS, BS, Cmode        );
+    new(task->accesses + 0) Task::Access(A, LDA, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Task::Access(B, LDB, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Task::Access(C, LDC, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(drivers, task);
     # undef NACCESSES
 
@@ -234,8 +234,6 @@ xkblas_£gemm_async(
                                 &zbeta,
                                 C, tm, tn, LDC
                         );
-                        // TODO : remove this return (0) to generate all tiles
-                        return 0;
                     }
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans
@@ -303,6 +301,7 @@ xkblas_£gemm_async(
     }
 
 #ifndef NDEBUG
+    XKBLAS_DEBUG("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::get();
     FILE * f = fopen("gemm.dot", "w");
     thread->dump_tasks(f);
@@ -310,6 +309,7 @@ xkblas_£gemm_async(
     system("dot -Tpdf gemm.dot > gemm.pdf");
 
     thread->deptree.export_pdf("dependency");
+    XKBLAS_DEBUG("Done");
 # endif /* NDEBUG */
 
     return 0;

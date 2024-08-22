@@ -1,8 +1,17 @@
 # include "xkblas.h"
-# include "xkblas-zkernel.h"
 
 # include <assert.h>
 # include <stdlib.h>
+
+# if 1
+# include "xkblas-zkernel.h"
+# define TYPE               double _Complex
+# define xkblas_gemm_async  xkblas_zgemm_async
+# else
+# include "xkblas-bkernel.h"
+# define TYPE               char
+# define xkblas_gemm_async  xkblas_bgemm_async
+# endif
 
 int
 main(void)
@@ -18,8 +27,8 @@ main(void)
     int LDA = K+M;
     int LDB = K+M;
     int LDC = K+M;
-    double _Complex alpha = 1.0;
-    double _Complex beta  = 1.0;
+    TYPE alpha = 1.0;
+    TYPE beta  = 1.0;
 
     # if 0
     const double _Complex * A = (const double _Complex *) malloc(sizeof(double _Complex) * LDA * LDA);
@@ -28,11 +37,11 @@ main(void)
     # else
     assert(M == N);
     assert(N == K);
-    const double _Complex * A = (const double _Complex *) (N);
-    const double _Complex * B = (const double _Complex *) (LDA * N);
-          double _Complex * C = (      double _Complex *) (LDA * N + N);
+    const TYPE * A = (const TYPE *) (      N * sizeof(TYPE)                   );
+    const TYPE * B = (const TYPE *) (LDA * N * sizeof(TYPE)                   );
+          TYPE * C = (      TYPE *) (LDA * N * sizeof(TYPE) + N * sizeof(TYPE));
     # endif
-    xkblas_zgemm_async(transA, transB, M, N, K, &alpha, A, LDA, B, LDB, &beta, C, LDC);
+    xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LDA, B, LDB, &beta, C, LDC);
     xkblas_sync();
 
     xkblas_thread_deinit();

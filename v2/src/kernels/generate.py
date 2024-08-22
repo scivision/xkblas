@@ -9,6 +9,7 @@ files=[
 ]
 
 modes=[
+    ("b", "char"),
     ("z", "double _Complex"),
     ("c", "float _Complex"),
     ("d", "double"),

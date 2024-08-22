@@ -40,6 +40,12 @@ class KMemoryBlockReplicateFetch {
 
         virtual ~KMemoryBlockReplicateFetch() {}
 
+        uint64_t
+        size(void) const
+        {
+            return this->block_view.bs_m * this->block_view.bs_n * this->block_view.sizeof_type;
+        }
+
 }; /* KMemoryBlockReplicateFetch */
 
 template <int K>
@@ -198,9 +204,9 @@ class KMemoryTreeNode : public KIntervalBtree<K, DeviceInvalidKRegions<K>>::Node
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
-                fprintf(f, "\\\\ dev %d - addr=%p - valid=%d - fetching=%d",
+                fprintf(f, "\\\\ dev %d - addr=%zu - valid=%d - fetching=%d",
                         device_global_id,
-                        (void *) this->block.replicates[device_global_id].addr,
+                        this->block.replicates[device_global_id].addr,
                         this->block.valid    & devbit ? 1 : 0,
                         this->block.fetching & devbit ? 1 : 0
 
@@ -286,6 +292,8 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                 /* initiate fetching of each invalid block for that access */
                 for (ReplicateFetch & fetch : invalids.list)
                 {
+                    assert(fetch.valid & devbit == 0);
+
                     task->fetching();
 
                     // TODO sequentially but asynchronously
@@ -296,8 +304,14 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                     //        tree (= need to lock + search again here...)
                     //      - call task->fetched()
 
-                    bool require_allocation = (fetch.replicate_view.addr == 0);
-                    assert(fetch.valid & devbit == 0);
+                    const bool require_allocation = (fetch.replicate_view.addr == 0);
+                    if (require_allocation)
+                    {
+                        // TODO :
+                        //  uint64_t size = fetch.size()
+                        //  allocate(driver, device, size)
+                    }
+
                     // TODO : fetch
 
                     task->fetched();
