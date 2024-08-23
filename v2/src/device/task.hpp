@@ -9,6 +9,7 @@
 # include "matrix-tile.h"
 
 # include "device/consts.h"
+# include "device/task-format.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/access.hpp"
@@ -27,17 +28,6 @@ typedef enum    task_state_t : uint8_t
     TASK_STATE_COMPLETED        = 5,    // Task completed, dependences can be resolved
     TASK_STATE_DEALLOCATED      = 6,    // Task is deallocated (virtual state, never set)
 }               task_state_t;
-
-enum task_body_t : uint8_t
-{
-    TASK_BODY_NOOP      = 0,
-
-    TASK_BODY_GEMM      = 1,
-    TASK_BODY_TRSM      = 2,
-    TASK_BODY_COPYSCALE = 3,
-
-    TASK_BODY_MAX       = 4,
-};
 
 template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
@@ -91,12 +81,15 @@ class alignas(CACHE_LINE_SIZE) KTask
          *      region - accessed by both tasks, with at least one writing
          */
         class Edge {
+
             public:
                 KTask * successor;
                 const Region region;
+
             public:
                 Edge(KTask * s, const Region & r) : successor(s), region(r) {}
                 virtual ~Edge() {}
+
         }; /* Edge */
 
     public:
@@ -104,8 +97,8 @@ class alignas(CACHE_LINE_SIZE) KTask
         // Attributes //
         ////////////////
 
-        /* task body */
-        task_body_t body;
+        /* task format id */
+        task_format_id_t format;
 
         /* list of out-going edges */
         std::vector<Edge> edges;
@@ -137,10 +130,11 @@ class alignas(CACHE_LINE_SIZE) KTask
 
     public:
 
-        KTask() : KTask(TASK_BODY_NOOP) {}
+        KTask() : KTask(TASK_FORMAT_NULL) {}
 
-        KTask(task_body_t body) :
-            body(body),
+        KTask(task_format_id_t f) :
+            format(f),
+            precision(p)
             edges(),
             accesses(),
             naccesses(0),

@@ -17,7 +17,7 @@ typedef struct  xkblas_device_host_t
 }               xkblas_device_host_t;
 
 /* the host devices (should be '1' - using >1 for debug purposes when no cuda/gpu available :-) */
-# define N_HOST_DEVICE 2
+# define N_HOST_DEVICE 1
 static xkblas_device_host_t DEVICES[N_HOST_DEVICE];
 
 /* initialization synchronization */

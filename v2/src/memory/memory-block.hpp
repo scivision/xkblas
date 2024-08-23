@@ -22,9 +22,9 @@ typedef struct  memory_block_replicate_view_t
 // view of the memory block
 using memory_block_view_t = matrix_tile_t;
 
-// if greater than 8, then gotta increase the bitfield type
-static_assert(XKBLAS_DEVICES_MAX <= 8);
-typedef uint8_t memory_block_bitfield_t;
+// if greater than 16, then gotta increase the bitfield type
+static_assert(XKBLAS_DEVICES_MAX <= 16);
+typedef uint16_t memory_block_bitfield_t;
 
 class MemoryBlock {
 

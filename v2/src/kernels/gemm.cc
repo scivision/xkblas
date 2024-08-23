@@ -74,7 +74,7 @@ xkblas_£gemm_tile_async(
     uint8_t * mem  = thread->allocate(task_size + args_size);
 
     Task    * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(TASK_BODY_GEMM);
+    new(task) Task(TASK_BODY_GEMM, PRECISION);
 
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);

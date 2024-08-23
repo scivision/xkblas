@@ -211,7 +211,8 @@ _xkblas_get_gpu_topo(void)
     }
 
 #if XKBLAS_DEBUG
-    if (xkblas_context.conf.verbose)
+    xkblas_context_t * ctx = xkblas_context_get();
+    if (ctx->conf.verbose)
     {
         char buffer[device_count+1];
         buffer[device_count] = 0;
@@ -975,10 +976,10 @@ static int cuda_stream_advance_pending(
 
 #if 0 // best
   int queue_max[4];
-  queue_max[XKBLAS_IO_STREAM_H2D]  = xkblas_context.conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_KERN] = xkblas_context.conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_D2H]  = xkblas_context.conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_D2D]  = xkblas_context.conf.cuda_conc_kernel;
+  queue_max[XKBLAS_IO_STREAM_H2D]  = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_IO_STREAM_KERN] = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_IO_STREAM_D2H]  = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_IO_STREAM_D2D]  = ctx->conf.cuda_conc_kernel;
   if ((len_p >1) && (len_p>= queue_max[ios->type]))
   {
     int shift = 0; //(ios->type == XKBLAS_IO_STREAM_KERN ? 0: len_p/2-1);
@@ -1328,25 +1329,26 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
   __check_error(res);
 
   xkblas_device_list = (xkblas_device_cuda_t**)calloc( device_count, sizeof(xkblas_device_cuda_t) );
-  xkblas_context.conf.sys_ngpus = device_count;
+  xkblas_context_t * ctx = xkblas_context_get();
+  ctx->conf.sys_ngpus = device_count;
 
-  if (xkblas_context.conf.ngpus == (uint8_t)-1)
+  if (ctx->conf.ngpus == (uint8_t)-1)
   {
-    xkblas_context.conf.ngpus = device_count;
-    xkblas_context.conf.gpu_set = (1<<device_count)-1;
+    ctx->conf.ngpus = device_count;
+    ctx->conf.gpu_set = (1<<device_count)-1;
   }
 
   /* bad number of GPUS ? */
-  if (xkblas_context.conf.ngpus > device_count)
+  if (ctx->conf.ngpus > device_count)
   {
-    printf("[%s] too many GPUs requested: %i. Use system default count: %i\n",__func__, xkblas_context.conf.ngpus, device_count);
-    xkblas_context.conf.ngpus = device_count;
+    printf("[%s] too many GPUs requested: %i. Use system default count: %i\n",__func__, ctx->conf.ngpus, device_count);
+    ctx->conf.ngpus = device_count;
   }
 
-  DEVICES_USED = xkblas_context.conf.ngpus;
-  CUDA_DEVICE_ID = (int*)malloc( xkblas_context.conf.ngpus*sizeof(int) );
-  int gpuset = xkblas_context.conf.gpu_set;
-  for (int i=0; i<xkblas_context.conf.ngpus; ++i)
+  DEVICES_USED = ctx->conf.ngpus;
+  CUDA_DEVICE_ID = (int*)malloc( ctx->conf.ngpus*sizeof(int) );
+  int gpuset = ctx->conf.gpu_set;
+  for (int i=0; i<ctx->conf.ngpus; ++i)
   {
     int idx = __builtin_ffs((unsigned int)gpuset);
     assert( idx != 0);
@@ -1356,7 +1358,7 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
     //fprintf(stdout,"[%s] take GPU id:%2i= device_id:%i\n", __FUNCTION__, i, idx);
   }
 
-  DEVICES_USED = xkblas_context.conf.ngpus;
+  DEVICES_USED = ctx->conf.ngpus;
   INITIALIZED = true;
   xkblas_cuda_plugin_unlock();
 #if _DRIVER_DEBUG
@@ -1369,7 +1371,7 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
 
   int nrrl = getenv("XKBLAS_RRL_SIZE") ? atoi(getenv("XKBLAS_RRL_SIZE")) : 1;
   if (nrrl <=0) nrrl = 1;
-  if (nrrl >= xkblas_context.conf.ngpus) nrrl = xkblas_context.conf.ngpus;
+  if (nrrl >= ctx->conf.ngpus) nrrl = ctx->conf.ngpus;
   //printf("*** NEW: #rrl=%i\n", nrrl);
   all_rrl_size =nrrl;
   all_rrl = (host_register_queue_t*)malloc(all_rrl_size* sizeof(host_register_queue_t));
@@ -1666,7 +1668,8 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
         unsigned int ndevices = XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)();
-        uint32_t gpuset = xkblas_context.conf.gpu_set;
+        xkblas_context_t * ctx = xkblas_context_get();
+        uint32_t gpuset = ctx->conf.gpu_set;
         for (int i = 0; i < ndevices ; ++i)
         {
             int idx = __builtin_ffs((unsigned int)gpuset);
@@ -1692,8 +1695,8 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
     int nrrl = getenv("XKBLAS_RRL_SIZE") ? atoi(getenv("XKBLAS_RRL_SIZE")) : 1;
     if (nrrl <= 0)
         nrrl = 1;
-    if (nrrl >= xkblas_context.conf.ngpus)
-        nrrl = xkblas_context.conf.ngpus;
+    if (nrrl >= ctx->conf.ngpus)
+        nrrl = ctx->conf.ngpus;
 
     all_rrl_size = nrrl;
     all_rrl = (host_register_queue_t*)malloc(all_rrl_size* sizeof(host_register_queue_t));
@@ -1799,7 +1802,8 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->size_alloc = 0;
     device->size_free = 0;
     device->free_mem = 0;
-    device->mem_limit = (size_t)((double)xkblas_context.conf.cuda_cache_limit
+    xkblas_context_t * ctx = xkblas_context_get();
+    device->mem_limit = (size_t)((double)ctx->conf.cuda_cache_limit
             * (double)(device->free_mem-180UL*1024UL*1024UL));
     if (getenv("XKBLAS_NO_GPUALLOCATOR"))
         XKBLAS_ERROR("XKBLAS_NO_GPUALLOCATOR but code do not compile for this option");
@@ -1910,25 +1914,93 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
     return 0;
 }
 
+template<f, >
+static inline void
+cublasGemm()
+{
+
+}
+
 int
 XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
-    xkblas_device_t * dev,
+    int device_id,
     xkblas_io_stream_t * ios,
     xkblas_io_instruction_t * instr
 ) {
+    static char * name_io[] = {
+        "IO_NOP",
+        "IO_BEGIN",
+        "IO_END",
+        "IO_COPY_H2H",
+        "IO_COPY_H2D",
+        "IO_COPY_D2H",
+        "IO_COPY_D2D",
+        "IO_BARRIER",
+        "IO_KERN"
+    };
 
-    xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
+    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+    assert(device);
 
-    XKBLAS_DEBUG("%s: instr '%s'\n", __FUNCTION__, name_io[instr->type]);
+    xkblas_cuda_io_stream_t * cios = (xkblas_cuda_io_stream_t *) ios;
+    assert(cios);
 
-    xkblas_cuda_io_stream_t* cios = (xkblas_cuda_io_stream_t*)ios;
-    cudaError_t res = cudaSuccess;
-    cudaStream_t* stream = 0;
-    //cudaSetDevice(CUDA_DEVICE_ID[device->inherited.device_id]);
-    uint8_t type; /* 1D, 2D */
+    XKBLAS_DEBUG("Executing instruction `%s` on device %d of driver %s",
+            name_io[instr->type], device_id, "CUDA");
 
     switch (instr->type)
     {
+        case (XKBLAS_IO_NOP):
+        case (XKBLAS_IO_BEGIN):
+        case (XKBLAS_IO_END):
+        {
+            return 0;
+        }
+
+        case (XKBLAS_IO_COPY_H2D):
+        {
+            return 0;
+        }
+
+        case (XKBLAS_IO_BARRIER):
+        {
+            cudaError_t res = cudaStreamSynchronize( cios->stream );
+            assert(res == cudaSuccess);
+            res = cudaStreamSynchronize( cios->stream_low );
+            assert(res == cudaSuccess);
+            ++ios->ok_p;
+            return 0;
+        }
+
+        case (XKBLAS_IO_KERN):
+        {
+            cudaStream_t * stream = &cios->stream;
+            xkblas_io_kernel_t * op = &instr->inst.k_io;
+
+            // TODO : launch task kernel
+
+            cudaError_t err = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream);
+            assert(err == cudaSuccess);
+
+        } /* XKBLAS_IO_KERN */
+
+        case (XKBLAS_IO_COPY_H2H):
+        case (XKBLAS_IO_COPY_D2H):
+        case (XKBLAS_IO_COPY_D2D):
+        {
+            XKBLAS_IMPL("Instruction `%s` not implemented", name_io[instr->type]);
+            return ENOSYS;
+        }
+
+        default:
+            return EINVAL;
+    }
+
+    /* unreachable code */
+    assert(0);
+
+
+            # if 0
         case XKBLAS_IO_NOP:
         case XKBLAS_IO_BEGIN:
         case XKBLAS_IO_END:
@@ -2149,8 +2221,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                         );
             }
     }
-
-    return EINPROGRESS;
+    # endif
 }
 
 

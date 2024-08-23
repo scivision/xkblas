@@ -55,7 +55,7 @@ struct xkblas_memory_view_t;
 /* io instruction to write/read data from the corresponding device
    src == host emitting the request
    */
-struct xkblas_io_copy {
+typedef struct xkblas_io_copy_t {
     xkblas_io_callback_func_t           fnc;
     void*                        arg[3];
     xkblas_io_copy_priority_t     prio;
@@ -65,41 +65,40 @@ struct xkblas_io_copy {
     void*                        dest;
     const xkblas_memory_view_t*   view_dest;
     struct xkblas_device_memory_t *  dev_dest;
-};
+} xkblas_io_copy_t;
 
 /* marker begin...end for group of request
 */
-struct xkblas_io_begin {
+typedef struct xkblas_io_begin_t {
     xkblas_io_callback_func_t           fnc;
     void*                        arg[3];
     struct xkblas_io_instruction* first;
-};
+} xkblas_io_begin_t;
 
-struct xkblas_io_end {
+typedef struct xkblas_io_end_t {
     xkblas_io_callback_func_t           fnc;
     void*                        arg[3];
     struct xkblas_io_instruction* last;
-};
+} xkblas_io_end_t;
 
 
 /* marker call back, acts as a full memory barrier : any write, read or kernel instructon
    before the sync are never re-ordered after the sync.
    */
-struct xkblas_io_barrier {
+typedef struct xkblas_io_barrier_t {
     xkblas_io_callback_func_t           fnc;
     void*                        arg[3];
-};
+} xkblas_io_barrier_t;
 
 /* io instruction kernel : to launch kernel on the device
    The delay field of the status arguments of the callback, if defined, is the delay in millisecond
    to execute the kernel.
    */
-struct xkblas_io_kernel {
+typedef struct xkblas_io_kernel_t {
     xkblas_io_callback_func_t fnc;
     void * arg[3];
-    task_body_t body;
     Task * task;
-};
+} xkblas_io_kernel_t;
 
 /* A Kaapi stream of IO requests
    - bounded io instructions
@@ -116,18 +115,18 @@ struct xkblas_io_kernel {
    and calls the callback at when events are posted.
 
 */
-typedef struct xkblas_io_instruction
+typedef struct  xkblas_io_instruction_t
 {
-    xkblas_io_type_t          type;
+    xkblas_io_type_t type;
     union {
-        struct xkblas_io_callback_t callback;   /* callback info always first fields of structure */
-        struct xkblas_io_begin      f_io;
-        struct xkblas_io_end        l_io;
-        struct xkblas_io_copy       c_io;
-        struct xkblas_io_kernel     k_io;
-        struct xkblas_io_barrier    b_io;
+        xkblas_io_callback_t callback;   /* callback info always first fields of structure. Romain: why ?*/
+        xkblas_io_begin_t   f_io;
+        xkblas_io_end_t     l_io;
+        xkblas_io_copy_t    c_io;
+        xkblas_io_kernel_t  k_io;
+        xkblas_io_barrier_t b_io;
     } inst;
-} xkblas_io_instruction_t;
+}               xkblas_io_instruction_t;
 
 typedef enum xkblas_io_stream_type {
     XKBLAS_IO_STREAM_H2D  = 0, /* from CPU to GPU */
@@ -137,6 +136,7 @@ typedef enum xkblas_io_stream_type {
     XKBLAS_IO_STREAM_ALL       /* internal purpose */
 } xkblas_io_stream_type_t;
 
+# pragma message(TODO "make this a C++ class and use inheritance/pure virtual")
 typedef struct  xkblas_io_stream_t
 {
     xkblas_io_stream_type_t       type;

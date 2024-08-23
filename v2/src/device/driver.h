@@ -84,7 +84,7 @@ typedef struct  xkblas_driver_t
     //  DRIVER STREAM MANAGEMENT  //
     ////////////////////////////////
     int (*f_stream_decode_io_instruction)(
-        xkblas_device_t * dev,
+        int device_id,
         xkblas_io_stream_t * ios,
         xkblas_io_instruction_t * instr
     );
@@ -135,6 +135,9 @@ typedef enum    xkblas_driver_type_t
     XKBLAS_DRIVER_CUDA,
     XKBLAS_DRIVER_MAX
 }               xkblas_driver_type_t;
+
+/* one function per task per driver */
+static_assert(XKBLAS_DRIVER_MAX <= TASK_FORMAT_MAX_FUNC);
 
 typedef struct  xkblas_drivers_t
 {
