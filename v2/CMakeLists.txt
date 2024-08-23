@@ -51,7 +51,9 @@ add_library(xkblas SHARED
     src/device/task-format.cc
     src/device/thread-producer.cc
     src/device/thread-worker.cc
-    src/kernels/bgemm.cc
+    src/kernels/sgemm.cc
+    src/kernels/cgemm.cc
+    src/kernels/dgemm.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
 )

@@ -1914,13 +1914,6 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
     return 0;
 }
 
-template<f, >
-static inline void
-cublasGemm()
-{
-
-}
-
 int
 XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
     int device_id,

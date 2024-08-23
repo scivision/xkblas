@@ -1,18 +1,67 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
+# include "device/consts.h"
 # include "device/device.h"
 # include "device/driver.h"
 # include "device/task.hpp"
-# include "memory/memory-block.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/kinterval-btree.hpp"
+# include <cstdint>
 
-# pragma message(TODO "Currently memory tree is cut on 'write' accesses, but we "   \
-        "therefore loose allocation information on devices... Two ideas, "          \
-        "whether: (1) do not cut, keeping all blocks and invalidating them or "     \
-        "(2) free the device blocks in the destructor of a KMemoryTreeNode")
+
+# pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
+
+
+// if greater than 16, then gotta increase the bitfield type
+static_assert(XKBLAS_DEVICES_MAX <= 16);
+typedef uint16_t memory_replicates_bitfield_t;
+
+class MemoryBlock {
+
+    public:
+
+        /* memory view of that block */
+        memory_view_t view;
+
+        /* per device replicate info */
+        memory_replicate_view_t replicates[XKBLAS_DEVICES_MAX];
+
+        /* if i-th bit is set, the i-th device has a valid copy */
+        volatile memory_replicates_bitfield_t valid;
+
+        /* if i-th bit is set, the i-th device is fetching */
+        volatile memory_replicates_bitfield_t fetching;
+
+    public:
+
+        /* a new memory block, assume it is valid on the host (device id = 0) */
+        MemoryBlock(const memory_view_t & v) :
+            view(v),
+            replicates(),
+            valid(0),
+            fetching(0)
+        {
+            const int host_devid = 0;
+            this->valid = (1 << host_devid);
+            this->replicates[host_devid].addr = view.begin_addr();
+            this->replicates[host_devid].LD = view.LD;
+        }
+
+        MemoryBlock(
+            const MemoryBlock & block
+        ) :
+            view(block.view),
+            replicates(block.replicates),
+            valid(block.valid),
+            fetching(block.fetching)
+        {}
+
+        virtual ~MemoryBlock() {}
+
+}; /* MemoryBlock */
+
 
 /* an on-going memory block fetch */
 template <int K>
@@ -26,21 +75,21 @@ class KMemoryBlockReplicateFetch {
         const Region region;
 
         /* a view of the memory block */
-        const memory_block_view_t block_view;
+        const memory_view_t block_view;
 
         /* the replicate view */
-        const memory_block_replicate_view_t replicate_view;
+        const memory_replicate_view_t replicate_view;
 
         /* devices on which the block is valid */
-        const memory_block_bitfield_t valid;
+        const memory_replicates_bitfield_t valid;
 
     public:
 
         KMemoryBlockReplicateFetch(
             const Region & r,
-            const memory_block_view_t & bview,
-            const memory_block_replicate_view_t & rview,
-            const memory_block_bitfield_t v
+            const memory_view_t & bview,
+            const memory_replicate_view_t & rview,
+            const memory_replicates_bitfield_t v
         ) :
             region(r),
             replicate_view(rview),
@@ -58,11 +107,18 @@ class KMemoryBlockReplicateFetch {
 
 }; /* KMemoryBlockReplicateFetch */
 
+
+# pragma message(TODO "Currently memory tree is cut on 'write' accesses, but we "   \
+        "therefore loose allocation information on devices... Two ideas, "          \
+        "whether: (1) do not cut, keeping all blocks and invalidating them or "     \
+        "(2) free the device blocks in the destructor of a KMemoryTreeNode")
+
+
 /* storage passed when searching in the tree */
 template <int K>
 class KMemoryTreeNodeSearch {
 
-    using Access = typename KTask<K>::Access;
+    using Access = KMemoryAccess<K>;
     using Region = Intervals<K>;
 
     public:
@@ -141,7 +197,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
     using Region = Intervals<K>;
     using Base = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Node = KMemoryTreeNode<K>;
-    using Access = typename KTask<K>::Access;
+    using Access = KMemoryAccess<K>;
     using Search = KMemoryTreeNodeSearch<K>;
 
     public:
@@ -159,7 +215,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Color color
         ) :
             Base(r, k, color),
-            block(access->tile)
+            block(access->host_view)
         {
             // TODO : is access->region != r ; then the access resulted in
             // several insertion nodes, which i snot s upported yet
@@ -313,7 +369,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
     using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Region = Intervals<K>;
     using Task = KTask<K>;
-    using Access = typename KTask<K>::Access;
+    using Access = KMemoryAccess<K>;
     using Search = KMemoryTreeNodeSearch<K>;
 
     public:

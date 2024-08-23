@@ -2,28 +2,49 @@
 
 import os
 
-# sed files
-files=[
-    "gemm.cc",
-    "kernel.h"
+kernels=[
+    "gemm"
 ]
 
-modes=[
-    ("b",   "char",               "TASK_PRECISION_B"),
-    ("s",   "float",              "TASK_PRECISION_S"),
-    ("c",   "float _Complex",     "TASK_PRECISION_C"),
-    ("d",   "double",             "TASK_PRECISION_D"),
-    ("z",   "double _Complex",    "TASK_PRECISION_Z")
+# sed files
+files=[
+    "kernel.h"
 ]
+files += ["{}.cc".format(kernel) for kernel in kernels]
+
+modes=[
+    ("s",   "float",            "float"),
+    ("c",   "float _Complex",   "cuComplex"),
+    ("d",   "double",           "double"),
+    ("z",   "double _Complex",  "cuDoubleComplex")
+]
+
+def cmd(s):
+    print(s)
+    os.system(s)
 
 for f in files:
     for mode in modes:
-        cmd="cat {} | sed 's/£/{}/g' | sed 's/TYPE/{}/g' | sed 's/PRECISION/{}/g' > {}{}".format(f, mode[0], mode[1], mode[2], mode[0], f)
-        print(cmd)
-        os.system(cmd)
+        cmd("cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/CU_TYPE/{}/g' | sed 's/TYPE/{}/g' > {}{}".format(
+                f,
+                mode[0].upper(),
+                mode[0],
+                mode[2],
+                mode[1],
+                mode[0],
+                f
+            )
+        )
 
 # move header files
 for mode in modes:
-    cmd="mv {}kernel.h ../../include/xkblas-{}kernel.h".format(mode[0], mode[0])
-    print(cmd)
-    os.system(cmd)
+    cmd("mv {}kernel.h ../../include/xkblas-{}kernel.h".format(mode[0], mode[0]))
+
+# task format register
+f = "kernel-task-format-register"
+cmd("echo -n '' > {}.cc".format(f))
+cmd("echo -n '' > {}.h".format(f))
+for kernel in kernels:
+    for mode in modes:
+        cmd("echo 'register_{}{}_format();' >> {}.cc".format(mode[0], kernel, f))
+        cmd("echo 'void register_{}{}_format(void);' >> {}.h".format(mode[0], kernel, f))

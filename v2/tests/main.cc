@@ -3,7 +3,7 @@
 # include <assert.h>
 # include <stdlib.h>
 
-# if 0
+# if 1
 # include "xkblas-zkernel.h"
 # define TYPE               double _Complex
 # define xkblas_gemm_async  xkblas_zgemm_async

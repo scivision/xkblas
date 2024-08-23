@@ -6,12 +6,11 @@
 # include <cstdint>
 # include <vector>
 
-# include "matrix-tile.h"
-
 # include "device/consts.h"
 # include "device/task-format.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
+# include "memory/memory-access.hpp"
 # include "sync/access.hpp"
 # include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"
@@ -34,44 +33,8 @@ class alignas(CACHE_LINE_SIZE) KTask
 {
     /* only supporting dimension K == 2 */
     static_assert(K == 2);
-
+    using Access = KMemoryAccess<K>;
     using Region = Intervals<K>;
-
-    public:
-
-        class Access : public access_t<K>
-        {
-            public:
-                matrix_tile_t tile;
-
-            public:
-
-                Access() {}
-
-                Access(
-                    const void * addr,
-                    const int & LD,
-                    const int & tm,
-                    const int & tn,
-                    const int & bm,
-                    const int & bn,
-                    const uint32_t & sizeof_type,
-                    const access_mode_t & m
-                ) :
-                    Access(matrix_tile_t(addr, LD, tm, tn, bm, bn, sizeof_type), m)
-                {}
-
-                Access(
-                    const matrix_tile_t & t,
-                    const access_mode_t & m
-                ) :
-                    tile(t),
-                    access_t<K>(t, m)
-                {}
-
-                virtual ~Access() {}
-
-        }; /* Access */
 
     public:
 
@@ -98,7 +61,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         ////////////////
 
         /* task format id */
-        task_format_id_t format;
+        task_format_id_t fmtid;
 
         /* list of out-going edges */
         std::vector<Edge> edges;
@@ -133,8 +96,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         KTask() : KTask(TASK_FORMAT_NULL) {}
 
         KTask(task_format_id_t f) :
-            format(f),
-            precision(p)
+            fmtid(f),
             edges(),
             accesses(),
             naccesses(0),

@@ -1,6 +1,7 @@
 # include "xkblas-context.h"
 
 # include "conf/conf.h"
+# include "kernels/kernel-task-format-register.h"
 # include "logger/logger.h"
 # include "device/driver.h"
 # include "device/thread-producer.hpp"
@@ -41,7 +42,7 @@ xkblas_context_get(void)
 }
 
 static inline void
-xkblas_register_format(void)
+xkblas_task_format_register(void)
 {
     # pragma message(TODO "Register task format")
     // TODO : what does this do ?
@@ -53,6 +54,8 @@ xkblas_register_format(void)
     // TODO : and this ?
     // KAAPI_REGISTER_BASICTYPEFORMAT(kaapi_schar_format, signed char, "%hhi")
     // [...]
+
+    # include "kernels/kernel-task-format-register.cc"
 }
 
 extern "C" void
@@ -69,6 +72,7 @@ xkblas_init(void)
             {
                 // load
                 xkblas_init_conf(&(ctx->conf));
+                xkblas_task_format_register();
                 xkblas_drivers_init(&(ctx->drivers), ctx->conf.ngpus);
                 ctx->state.current = XKBLAS_CONTEXT_INITIALIZED;
             }

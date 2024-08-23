@@ -61,14 +61,14 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
             // set edges with previously inserted tasks
             for (int i = 0 ; i < N ; ++i)
             {
-                Task::Access * access = task->accesses + i;
+                Access * access = task->accesses + i;
                 this->deptree.intersect(task, access->region, access->mode);
             }
 
             // register accesses for linking with future tasks
             for (int i = 0 ; i < N ; ++i)
             {
-                Task::Access * access = task->accesses + i;
+                Access * access = task->accesses + i;
                 this->deptree.insert(task, access->region, access->mode);
             }
 

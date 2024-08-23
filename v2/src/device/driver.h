@@ -137,7 +137,7 @@ typedef enum    xkblas_driver_type_t
 }               xkblas_driver_type_t;
 
 /* one function per task per driver */
-static_assert(XKBLAS_DRIVER_MAX <= TASK_FORMAT_MAX_FUNC);
+static_assert(XKBLAS_DRIVER_MAX <= TASK_FORMAT_FUNC_MAX);
 
 typedef struct  xkblas_drivers_t
 {

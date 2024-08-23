@@ -1,9 +1,11 @@
 # include "blas.h"
 # include "min-max.h"
 # include "xkblas-context.h"
+
+# include "device/thread-producer.hpp"
 # include "logger/todo.h"
 # include "logger/logger.h"
-# include "device/thread-producer.hpp"
+# include "kernels/kernel_param.h"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 # include "sync/cache-line-size.hpp"
@@ -12,50 +14,40 @@
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
-    args_t(int transA, int transB,
-            int BS_M, int BS_N, int BS_K,
-            const TYPE * alpha,
-            const TYPE * A, int Atm, int Atn, int LDA,
-            const TYPE * B, int Btm, int Btn, int LDB,
-            const TYPE * beta,
-                  TYPE * C, int Ctm, int Ctn, int LDC) :
-        transA(transA), transB(transB),
-        BS_M(BS_M), BS_N(BS_N), BS_K(BS_K),
+    args_t(
+        int transA, int transB,
+        int m, int n, int k,
+        const TYPE alpha,
+        const TYPE beta
+    ) :
+        transA(transA),
+        transB(transB),
+        m(m),
+        n(n),
+        k(k),
         alpha(alpha),
-        A(A), Atm(Atm), Atn(Atn), LDA(LDA),
-        B(B), Btm(Btm), Btn(Btn), LDB(LDB),
-        beta(beta),
-        C(C), Ctm(Ctm), Ctn(Ctn), LDC(LDC)
+        beta(beta)
     {}
 
     ~args_t() {}
 
     const int transA;
     const int transB;
-    const int BS_M;
-    const int BS_N;
-    const int BS_K;
-    const TYPE * alpha;
-    const TYPE * A;
-    const int Atm;
-    const int Atn;
-    const int LDA;
-    const TYPE * B;
-    const int Btm;
-    const int Btn;
-    const int LDB;
-    const TYPE * beta;
-          TYPE * C;
-    const int Ctm;
-    const int Ctn;
-    const int LDC;
+    const int m;
+    const int n;
+    const int k;
+    const TYPE alpha;
+    const TYPE beta;
+
 } args_t;
+
+static task_format_id_t format_id;
 
 int
 xkblas_£gemm_tile_async(
     xkblas_drivers_t * drivers,
     int transA, int transB,
-    int BS_M, int BS_N, int BS_K,
+    int bs_m, int bs_n, int bs_k,
     const TYPE * alpha,
     const TYPE * A, int Atm, int Atn, int LDA,
     const TYPE * B, int Btm, int Btn, int LDB,
@@ -74,7 +66,7 @@ xkblas_£gemm_tile_async(
     uint8_t * mem  = thread->allocate(task_size + args_size);
 
     Task    * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(TASK_BODY_GEMM, PRECISION);
+    new(task) Task(format_id);
 
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);
@@ -84,21 +76,21 @@ xkblas_£gemm_tile_async(
 
     # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'LDC' ?")
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
-    new(args) args_t(transA, transB, BS_M, BS_N, BS_K, alpha, A, Atm, Atn, LDA, B, Btm, Btn, LDB, beta, C, Ctm, Ctn, LDC);
+    new(args) args_t(transA, transB, bs_m, bs_n, bs_k, *alpha, *beta);
 
     # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
 
     // block size
-    const int BS = BS_M;
-    assert(BS_M == BS_N);
-    assert(BS_M == BS_K);
+    const int BS = bs_m;
+    assert(bs_m == bs_n);
+    assert(bs_m == bs_k);
 
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Task::Access(A, LDA, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Task::Access(B, LDB, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Task::Access(C, LDC, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(A, LDA, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(B, LDB, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(C, LDC, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(drivers, task);
     # undef NACCESSES
 
@@ -315,4 +307,62 @@ xkblas_£gemm_async(
 # endif /* NDEBUG */
 
     return 0;
+}
+
+# pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
+
+# if USE_CUDA
+#  include "cuda-helper.h"
+
+static void
+body_cuda(void * vparam)
+{
+    task_format_kernel_param_t * param = (task_format_kernel_param_t *) vparam;
+    assert(param);
+
+    void * handle = param->handle;
+
+    const Access * A = param->task->accesses + 0;
+    const Access * B = param->task->accesses + 1;
+    const Access * C = param->task->accesses + 2;
+
+    args_t * args = (args_t *) (param->task + 1);
+
+    // TODO : cublasSetMathMode ???
+
+    # pragma message(TODO "Call cublas with allocated device accesses")
+    # pragma message(TODO "Does alpha/beta host or device pointers ?")
+
+    cublasStatus_t res = cublas££gemm(
+        (cublasHandle_t) handle,
+        cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
+        args->m, args->n, args->k,
+        (const CU_TYPE *) &args->alpha,
+        (const CU_TYPE *) A->device_view.addr, A->device_view.LD,
+        (const CU_TYPE *) B->device_view.addr, B->device_view.LD,
+        (const CU_TYPE *) &args->beta,
+        (      CU_TYPE *) C->device_view.addr, C->device_view.LD
+    );
+    assert(res == CUBLAS_STATUS_SUCCESS);
+}
+# endif /* USE_CUDA */
+
+static void
+body_host(void * args)
+{
+    XKBLAS_DEBUG("Executing a gemm on host");
+}
+
+//////////////////////////
+// TASK FORMAT REGISTER //
+//////////////////////////
+
+void
+register_£gemm_format(void)
+{
+    task_format_t format;
+    strcpy(format.label, "£gemm");
+    format.f[XKBLAS_DRIVER_HOST] = body_host;
+    format.f[XKBLAS_DRIVER_CUDA] = body_cuda;
+    task_format_create(&format);
 }

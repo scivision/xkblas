@@ -1,3 +1,5 @@
+kernel-task-format-register.h
+kernel-task-format-register.cc
 bgemm.cc
 cgemm.cc
 ckernel.h
