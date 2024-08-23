@@ -21,11 +21,9 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
     if (driver->f_init())
         return ;
 
-    # pragma message(TODO "Currently, the only devices supported are GPUs")
     assert(driver->f_get_ndevices_max);
     int n_devices_max = driver->f_get_ndevices_max();
     int n_devices = MIN(ngpus, n_devices_max);
-    // XKBLAS_INFO("using %d devices out of %d available", n_devices, n_devices_max);
     if (n_devices < 1)
         return ;
     driver->ndevices_targeted = n_devices;
@@ -167,7 +165,7 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
     ThreadWorker * worker = drivers->devices.list[device_id]->thread;
     if (worker == NULL)
     {
-        XKBLAS_ERROR("Trying to enqueue a task to an uninitialized worker %d", device_id);
+        XKBLAS_FATAL("Trying to enqueue a task to an uninitialized worker %d", device_id);
         return ;
     }
 

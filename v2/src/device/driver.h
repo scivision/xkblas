@@ -24,6 +24,7 @@
 # define XKBLAS_DRIVER_ENTRYPOINT( func_name ) XKBLAS_DRIVER_ ## func_name
 
 # pragma message(TODO "Replace 'xkblas_driver_t' with a C++ abstract class")
+# pragma message(TODO "Add metadata to each interface, for instance, whether its implementation if mandatory or optional")
 
 typedef struct  xkblas_driver_t
 {
@@ -36,22 +37,65 @@ typedef struct  xkblas_driver_t
     /* number of devices in the COMMIT state */
     volatile std::atomic<int> ndevices_commited;
 
-    /* Function handlers: accessor to meta data */
+    ///////////////////////
+    //  DRIVER META DATA //
+    ///////////////////////
+
     const char   *(*f_get_name)(void);          /* name of the driver (human-readable) */
     unsigned int (*f_get_flags)(void);          /* flags: not really used */
     unsigned int (*f_get_ndevices_max)(void);   /* return the number of devices available to the driver */
 
-    /* life cycle functions for the driver of devices (1 device == 1 ressource) */
+    ///////////////////////
+    //  DRIVER LIFECYCLE //
+    ///////////////////////
     int (*f_init)(void);
     void (*f_finalize)(void);
 
     /* driver specific functions for all devices managed by the driver */
     /* Memory registration of host memory */
     uint64_t (*f_host_register)(
-            void * ptr, uint64_t sz,
-            xkblas_io_callback_func_t callback,
-            void * arg0, void * arg1, void * arg2
+        void * ptr, uint64_t sz,
+        xkblas_io_callback_func_t callback,
+        void * arg0, void * arg1, void * arg2
     );
+
+    /////////////////////////////////
+    //  DRIVER DEVICES MANAGEMENT  //
+    /////////////////////////////////
+
+    /* Set the cpuset of the attr for creating the thread that will manage the device dev */
+    int (*f_device_set_cpuset)(cpu_set_t*, int);
+
+    /* create device object and initialize device_id field with argument */
+    xkblas_device_t * (*f_device_create)(xkblas_driver_t *, int);
+    int (*f_device_destroy)(xkblas_device_t*);
+
+    /* initialize device fields, especially with virtual functions */
+    const char* (*f_device_info)(xkblas_device_t*);
+    void (*f_device_init)(int device_id);
+    int (*f_device_commit)(int device_id);
+    void (*f_device_finalize)(xkblas_device_t*);
+
+    /* consider device as the current device */
+    int (*f_device_attach)(int device_id);
+    int (*f_device_detach)(xkblas_device_t*);
+
+    ////////////////////////////////
+    //  DRIVER STREAM MANAGEMENT  //
+    ////////////////////////////////
+    int (*f_stream_decode_io_instruction)(
+        xkblas_device_t * dev,
+        xkblas_io_stream_t * ios,
+        xkblas_io_instruction_t * instr
+    );
+
+    ///////////////////////
+    //  UNUSED YET       //
+    ///////////////////////
+
+
+    # if 0
+
 
     /* test completion of asynchronous host_register operation.
        Argument is the handle returned by host_register (if != -1).
@@ -75,23 +119,11 @@ typedef struct  xkblas_driver_t
         void * arg0, void * arg1, void * arg2
     );
 
-    /* Set the cpuset of the attr for creating the thread that will manage the device dev */
-    int (*f_device_set_cpuset)(cpu_set_t*, int);
-    /* create device object and initialize device_id field with argument */
-    xkblas_device_t * (*f_device_create)(xkblas_driver_t *, int);
-    int (*f_device_destroy)(xkblas_device_t*);
-    /* initialize device fields, especially with virtual functions */
-    const char* (*f_device_info)(xkblas_device_t*);
-    void (*f_device_init)(int device_id);
-    int (*f_device_commit)(int device_id);
-    void (*f_device_finalize)(xkblas_device_t*);
-    /* consider device as the current device */
-    int (*f_device_attach)(int device_id);
-    /* consider device as the current device */
-    int (*f_device_detach)(xkblas_device_t*);
-
     /* GPU blas support */
     void* (*f_get_gpublas_handle)(xkblas_device_t*);
+
+    # endif
+
 
 }               xkblas_driver_t;
 

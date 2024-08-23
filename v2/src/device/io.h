@@ -1,3 +1,5 @@
+// TODO : clear this file formatting
+
 #ifndef __IO_H__
 # define __IO_H__
 
@@ -9,17 +11,17 @@
 
 typedef struct  xkblas_io_status_t
 {
-  int error;
-  float cpu_delay;  /* time on CPU between launch and completion (s)*/
-  float gpu_delay;  /* time of CPU between launch and completion (s)*/
-  uint64_t bytes;     /* bytes transfered in case of memory copy */
+    int error;
+    float cpu_delay;  /* time on CPU between launch and completion (s)*/
+    float gpu_delay;  /* time of CPU between launch and completion (s)*/
+    uint64_t bytes;     /* bytes transfered in case of memory copy */
 }               xkblas_io_status_t;
 
 typedef void (*xkblas_io_callback_func_t)(
-    xkblas_io_status_t,
-    struct xkblas_io_stream_t *,
-    void *, void *, void *
-);
+        xkblas_io_status_t,
+        struct xkblas_io_stream_t *,
+        void *, void *, void *
+        );
 
 typedef struct  xkblas_io_callback_t
 {
@@ -42,9 +44,9 @@ typedef enum    xkblas_io_type
 }               xkblas_io_type_t;
 
 typedef enum xkblas_io_copy_priority {
-  XKBLAS_IO_COPY_PRIORITY_LOW    = 0,
-  XKBLAS_IO_COPY_PRIORITY_NORMAL = 1,
-  XKBLAS_IO_COPY_PRIORITY_HIGH   = 2
+    XKBLAS_IO_COPY_PRIORITY_LOW    = 0,
+    XKBLAS_IO_COPY_PRIORITY_NORMAL = 1,
+    XKBLAS_IO_COPY_PRIORITY_HIGH   = 2
 } xkblas_io_copy_priority_t;
 
 # pragma message(TODO "Bad dependence on 'xkblas_memory_view_t' here")
@@ -89,17 +91,15 @@ struct xkblas_io_barrier {
 };
 
 /* io instruction kernel : to launch kernel on the device
-  The delay field of the status arguments of the callback, if defined, is the delay in millisecond
-  to execute the kernel.
-*/
+   The delay field of the status arguments of the callback, if defined, is the delay in millisecond
+   to execute the kernel.
+   */
 struct xkblas_io_kernel {
     xkblas_io_callback_func_t fnc;
     void * arg[3];
     task_body_t body;
     Task * task;
 };
-
-
 
 /* A Kaapi stream of IO requests
    - bounded io instructions
@@ -118,15 +118,15 @@ struct xkblas_io_kernel {
 */
 typedef struct xkblas_io_instruction
 {
-  xkblas_io_type_t          type;
-  union {
-    struct xkblas_io_callback_t callback;   /* callback info always first fields of structure */
-    struct xkblas_io_begin      f_io;
-    struct xkblas_io_end        l_io;
-    struct xkblas_io_copy       c_io;
-    struct xkblas_io_kernel     k_io;
-    struct xkblas_io_barrier    b_io;
-  } inst;
+    xkblas_io_type_t          type;
+    union {
+        struct xkblas_io_callback_t callback;   /* callback info always first fields of structure */
+        struct xkblas_io_begin      f_io;
+        struct xkblas_io_end        l_io;
+        struct xkblas_io_copy       c_io;
+        struct xkblas_io_kernel     k_io;
+        struct xkblas_io_barrier    b_io;
+    } inst;
 } xkblas_io_instruction_t;
 
 typedef enum xkblas_io_stream_type {

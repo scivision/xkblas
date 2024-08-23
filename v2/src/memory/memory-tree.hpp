@@ -406,7 +406,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
                     // TODO : launch asynchronous fetch here
 
-
                     // TODO : call this on fetch completion
                     {
                         /* update the valid and fetching bits in the memory tree */

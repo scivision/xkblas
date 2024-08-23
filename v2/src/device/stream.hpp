@@ -51,9 +51,14 @@ class Stream
                 );
         # endif
 
-        int count[XKBLAS_IO_STREAM_ALL];                    /* number of iostream per type */
-        std::atomic<int> next[XKBLAS_IO_STREAM_ALL];        /* next  stream fifo */
-        xkblas_io_stream_t ** ios[XKBLAS_IO_STREAM_ALL];    /* basic stream */
+        /* number of iostream per type */
+        int count[XKBLAS_IO_STREAM_ALL];
+
+        /* next stream fifo */
+        std::atomic<int> next[XKBLAS_IO_STREAM_ALL];
+
+        /* basic stream */
+        xkblas_io_stream_t ** ios[XKBLAS_IO_STREAM_ALL];
 
     private:
 
