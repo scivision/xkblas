@@ -19,25 +19,17 @@
 xkblas_context_t *
 xkblas_context_get(void)
 {
+    # pragma message(TODO "Optimize this default conf")
+
     static xkblas_context_t ctx = {
         .state = {
             .spinlock = 0,
             .current = XKBLAS_CONTEXT_DEINITIALIZED,
         },
-        .conf = {
-            .stackblocsize              = (uint64_t)-1,
-            .ngpus                      = (uint8_t)-1,
-            .gpu_set                    = (uint32_t) ~0,
-            .cuda_stream_capacity       = 64,
-            .cuda_conc_stream_kernel    = 2,
-            .cuda_conc_kernel           = 8,
-            .cuda_conc_h2d              = 1,
-            .cuda_conc_d2h              = 1,
-            .cuda_conc_d2d              = 1,
-            .cuda_cache_limit           = 0.98
-        },
-        .drivers = {0},
+        .conf = {},
+        .drivers = {},
     };
+
     return &ctx;
 }
 

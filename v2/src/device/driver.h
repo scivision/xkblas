@@ -9,15 +9,14 @@
 
 # include "device/address-space.h"
 # include "device/device.h"
-# include "device/io.h"
-# include "logger/todo.h"
+# include "device/stream.h"
 # include "device/consts.h"
 # include "device/task.hpp"
+# include "logger/todo.h"
+# include "kernels/kernel-param.h"
 # include "sync/mutex.h"
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
-
-# define XKBLAS_STREAM_CAPACITY 512
 
 # define XKBLAS_DRIVER_PREFIX_NAME "XKBLAS_DRIVER_"
 # define XKBLAS_DRIVER_ENTRYPOINT_NAME( func_name ) XKBLAS_DRIVER_PREFIX_NAME #func_name
@@ -26,8 +25,18 @@
 # pragma message(TODO "Replace 'xkblas_driver_t' with a C++ abstract class")
 # pragma message(TODO "Add metadata to each interface, for instance, whether its implementation if mandatory or optional")
 
+typedef enum    xkblas_driver_type_t
+{
+    XKBLAS_DRIVER_HOST,
+    XKBLAS_DRIVER_CUDA,
+    XKBLAS_DRIVER_MAX
+}               xkblas_driver_type_t;
+
 typedef struct  xkblas_driver_t
 {
+    /* type */
+    xkblas_driver_type_t type;
+
     /* number of devices targeted, used in initialization */
     volatile std::atomic<int> ndevices_targeted;
 
@@ -55,7 +64,7 @@ typedef struct  xkblas_driver_t
     /* Memory registration of host memory */
     uint64_t (*f_host_register)(
         void * ptr, uint64_t sz,
-        xkblas_io_callback_func_t callback,
+        xkblas_stream_instruction_callback_t callback,
         void * arg0, void * arg1, void * arg2
     );
 
@@ -85,8 +94,8 @@ typedef struct  xkblas_driver_t
     ////////////////////////////////
     int (*f_stream_decode_io_instruction)(
         int device_id,
-        xkblas_io_stream_t * ios,
-        xkblas_io_instruction_t * instr
+        xkblas_stream_t * ios,
+        xkblas_stream_instruction_t * instr
     );
 
     ///////////////////////
@@ -115,7 +124,7 @@ typedef struct  xkblas_driver_t
     /* Memory unregistration of host memory: asynchronous version */
     uint64_t  (*f_host_unregister)(
         void * ptr, uint64_t sz,
-        xkblas_io_callback_func_t callback,
+        xkblas_stream_instruction_callback_t callback,
         void * arg0, void * arg1, void * arg2
     );
 
@@ -128,13 +137,6 @@ typedef struct  xkblas_driver_t
 }               xkblas_driver_t;
 
 void * xkblas_device_thread_main(void * a);
-
-typedef enum    xkblas_driver_type_t
-{
-    XKBLAS_DRIVER_HOST,
-    XKBLAS_DRIVER_CUDA,
-    XKBLAS_DRIVER_MAX
-}               xkblas_driver_type_t;
 
 /* one function per task per driver */
 static_assert(XKBLAS_DRIVER_MAX <= TASK_FORMAT_FUNC_MAX);
@@ -170,5 +172,11 @@ void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
+
+/* call the launch task kernel once accesses are all ready */
+void xkblas_device_task_fetched(xkblas_driver_t * driver, xkblas_device_t * device, Task * task);
+
+/* launch a kernel */
+int xkblas_kernel_launch(xkblas_driver_type_t type, task_kernel_param_t * param);
 
 #endif /* __DRIVER_H__ */

@@ -1,5 +1,4 @@
 # include "xkblas-context.h"
-# include "conf/conf.h"
 # include "device/device.h"
 # include "device/driver.h"
 # include "device/stream.hpp"
@@ -13,56 +12,6 @@
 # include <cerrno>
 
 # pragma message(TODO "Move these initializer into class member functions")
-
-void
-xkblas_device_stream_init(xkblas_device_t * device, Stream * stream, unsigned int capacity)
-{
-    # pragma message(TODO "wtf is this madness ? Lacking knowledge on the rest of the code, leaving stream initialization for now")
-
-    # if 0
-    unsigned int cnt = 0;
-    unsigned int prefix[XKBLAS_IO_STREAM_ALL+1];
-
-    prefix[XKBLAS_IO_STREAM_H2D] = 0;
-    cnt += (stream->count[XKBLAS_IO_STREAM_H2D]  = XKBLAS_CONF.cuda_conc_h2d);
-    prefix[XKBLAS_IO_STREAM_D2H] = cnt;
-    cnt += (stream->count[XKBLAS_IO_STREAM_D2H]  = XKBLAS_CONF.cuda_conc_d2h);
-    prefix[XKBLAS_IO_STREAM_D2D] = cnt;
-    cnt += (stream->count[XKBLAS_IO_STREAM_D2D]  = XKBLAS_CONF.cuda_conc_d2d);
-    prefix[XKBLAS_IO_STREAM_KERN] = cnt;
-    cnt += (stream->count[XKBLAS_IO_STREAM_KERN] = XKBLAS_CONF.cuda_conc_stream_kernel);
-    prefix[XKBLAS_IO_STREAM_KERN+1] = cnt;
-
-    stream->next[XKBLAS_IO_STREAM_D2H]  = 0;
-    stream->next[XKBLAS_IO_STREAM_H2D]  = 0;
-    stream->next[XKBLAS_IO_STREAM_D2D]  = 0;
-    stream->next[XKBLAS_IO_STREAM_KERN] = 0;
-
-    xkblas_io_stream_t** ios;
-    stream->ios = ios = (xkblas_io_stream_t **) malloc(sizeof(xkblas_io_stream_t*) * cnt );
-    assert( stream->ios[0]!= 0 );
-    stream->ios[XKBLAS_IO_STREAM_H2D]  = stream->ios[0]+prefix[XKBLAS_IO_STREAM_H2D];
-    stream->ios[XKBLAS_IO_STREAM_D2H]  = stream->ios[0]+prefix[XKBLAS_IO_STREAM_D2H];
-    stream->ios[XKBLAS_IO_STREAM_D2D]  = stream->ios[0]+prefix[XKBLAS_IO_STREAM_D2D];
-    stream->ios[XKBLAS_IO_STREAM_KERN] = stream->ios[0]+prefix[XKBLAS_IO_STREAM_KERN];
-
-    for (unsigned int i = 0; i < cnt; ++i)
-    {
-        xkblas_io_stream_type_t type =
-            i < prefix[XKBLAS_IO_STREAM_D2H] ? XKBLAS_IO_STREAM_H2D :
-            i < prefix[XKBLAS_IO_STREAM_D2D] ? XKBLAS_IO_STREAM_D2H :
-            i < prefix[XKBLAS_IO_STREAM_KERN] ? XKBLAS_IO_STREAM_D2D : XKBLAS_IO_STREAM_KERN
-            ;
-        ios[i]  = stream->f_stream_alloc( device, type, capacity );
-        ios[i]->sid = i;
-        assert( ios[i] != 0 );
-        ios[i]->stream = s;
-        //printf("%i:: init stream %i type: %s\n", device->ld->ldid, i, 
-        //    type == XKBLAS_IO_STREAM_H2D ? "H2D" : type == XKBLAS_IO_STREAM_KERN ? "kern": type == XKBLAS_IO_STREAM_D2H ? "D2H" : type == XKBLAS_IO_STREAM_D2D ? "D2D" : "<NOTYPE>" );
-        assert( 0 == _xkblas_offload_iostream_init( stream->ios[i], type, capacity )); 
-    }
-    # endif
-}
 
 static void
 xkblas_device_commit(
@@ -105,21 +54,7 @@ xkblas_device_init(
     device->cnt_push = 0;
     # endif
 
-    xkblas_context_t * ctx = xkblas_context_get();
-
     driver->f_device_init(device->driver_id);
-
-    int err;
-    err = pthread_mutex_init(&device->pipe_lock, 0);
-    assert(err == 0);
-
-    device->p_write   = 0;
-    device->p_ready   = 0;
-    device->p_finish  = 0;
-    device->pipe_size = ctx->conf.cuda_conc_kernel;
-    device->pipeline  = (Task **) malloc(sizeof(Task *) * device->pipe_size);
-    for (int i = 0; i < device->pipe_size; ++i)
-        device->pipeline[i] = nullptr;
 
     # if 0
     device->time_tasks = 0.0;
@@ -135,7 +70,8 @@ xkblas_device_init(
     device->cnt_exec = 0;
     # endif
 
-    xkblas_device_stream_init(device, &device->stream, XKBLAS_STREAM_CAPACITY);
+    xkblas_context_t * ctx = xkblas_context_get();
+    device->stream.init(&(ctx->conf.streams));
 
     # if 0
     assert(0 == pthread_mutex_lock(&device->lock));
@@ -188,35 +124,35 @@ xkblas_device_poll(xkblas_device_t * device)
     assert(ThreadWorker::get() == device->thread);
 
     # if 0
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2D);
+    err = device->stream.process_instruction(XKBLAS_STREAM_D2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_H2D);
+    err = device->stream.process_instruction(XKBLAS_STREAM_H2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2H);
+    err = device->stream.process_instruction(XKBLAS_STREAM_D2H);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_KERN);
+    err = device->stream.process_instruction(XKBLAS_STREAM_KERN);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_IO_STREAM_KERN);
+    err = device->stream.test(XKBLAS_STREAM_KERN);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_IO_STREAM_D2D);
+    err = device->stream.test(XKBLAS_STREAM_D2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_IO_STREAM_H2D);
+    err = device->stream.test(XKBLAS_STREAM_H2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_IO_STREAM_D2H);
+    err = device->stream.test(XKBLAS_STREAM_D2H);
     assert( (err == 0) || (err == EINPROGRESS));
 
     # else
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_ALL);
+    err = device->stream.process_instruction(XKBLAS_STREAM_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_IO_STREAM_ALL);
+    err = device->stream.test(XKBLAS_STREAM_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
     # endif
@@ -282,9 +218,27 @@ xkblas_device_progress(
 static inline int
 xkblas_device_accept_new_task(xkblas_device_t * device)
 {
-    xkblas_context_t * ctx = xkblas_context_get();
-    return (device && (device->p_write - device->p_finish) < device->pipe_size &&
-            (device->p_write - device->p_ready) < (1+ctx->conf.cuda_conc_kernel) / 2);
+    # pragma message(TODO "Add conditions here, like the number of kernel in-flight")
+    assert(device);
+    return 1;
+}
+
+/** call whenever the task kernel is ready to be executed on the driver's device */
+void
+xkblas_device_task_fetched(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+    Task * task
+) {
+    XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
+
+    /* create a new kernel instruction */
+    # pragma message(TODO "Impl. this once stream initialization is implemented")
+    xkblas_stream_instruction_t * instr = device->stream.io_instruction_new(XKBLAS_STREAM_KERN);
+    instr->kern.task = task;
+
+    /* defer instruction */
+    device->stream.process(instr);
 }
 
 static inline void
@@ -307,21 +261,17 @@ xkblas_device_prepare_task(
     while (!xkblas_device_accept_new_task(device))
     {
         xkblas_device_poll(device);
-        int err = device->stream.wait(XKBLAS_IO_STREAM_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
+        int err = device->stream.wait(XKBLAS_STREAM_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
         assert(err == 0);
         xkblas_device_poll(device);
     }
-
-    // 'kaapi_offload_device_prepare_execute_task'
-    uint64_t index = device->p_write;
-    device->pipeline[index % device->pipe_size] = task;
 
     /* retrieve the memory state */
     xkblas_context_t * ctx = xkblas_context_get();
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        XKBLAS_INFO("Task `%s` is ready for kernel execution (early)", task->label);
+        xkblas_device_task_fetched(driver, device, task);
     }
 }
 
@@ -345,7 +295,7 @@ xkblas_device_thread_main_loop(
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
         while ((task = thread->pop()) == NULL &&
-                device->stream.is_empty(XKBLAS_IO_STREAM_ALL) &&
+                device->stream.is_empty(XKBLAS_STREAM_ALL) &&
                 device->request.op == XKBLAS_DEVICEOP_NOP)
             device->thread->pause();
 
@@ -429,4 +379,23 @@ xkblas_device_thread_main(void * a)
 # endif
 
     return NULL;
+}
+
+int
+xkblas_kernel_launch(
+    xkblas_driver_type_t type,
+    task_kernel_param_t * param
+) {
+
+    // must be executed by the worker thread of the passed device
+
+    assert(param);
+    assert(type >= 0 && type <= XKBLAS_DRIVER_MAX);
+
+    task_format_t * format = task_format_get(param->task->fmtid);
+    assert(format);
+
+    format->f[type](param);
+
+    return 0;
 }

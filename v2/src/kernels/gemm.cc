@@ -5,7 +5,7 @@
 # include "device/thread-producer.hpp"
 # include "logger/todo.h"
 # include "logger/logger.h"
-# include "kernels/kernel_param.h"
+# include "kernels/kernel-param.h"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 # include "sync/cache-line-size.hpp"
@@ -317,7 +317,7 @@ xkblas_£gemm_async(
 static void
 body_cuda(void * vparam)
 {
-    task_format_kernel_param_t * param = (task_format_kernel_param_t *) vparam;
+    task_kernel_param_t * param = (task_kernel_param_t *) vparam;
     assert(param);
 
     void * handle = param->handle;

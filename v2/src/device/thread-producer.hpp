@@ -6,18 +6,13 @@
 # include "device/driver.h"
 # include "device/naive-queue.hpp"
 # include "device/task.hpp"
-# include "device/thread-worker.hpp"
+# include "device/thread.hpp"
 # include "sync/cache-line-size.hpp"
-
-// Maximum number of bytes allocated for tasks descriptor
-# ifndef THREAD_PRODUCER_MAX_MEMORY
-#  define THREAD_PRODUCER_MAX_MEMORY (64*1024*1024)
-# endif /* THREAD_PRODUCER_MAX_MEMORY */
 
 /**
  *  This class represents an xkblas user thread, that is producing tasks
  */
-class alignas(CACHE_LINE_SIZE) ThreadProducer
+class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
 {
     public:
 
@@ -39,12 +34,6 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
         ////////////////////////
         ThreadProducer();
         virtual ~ThreadProducer();
-
-        /* allocates memory */
-        uint8_t * allocate(uint64_t size);
-
-        /* free all allocated memory */
-        void deallocate_all(void);
 
         /**
          *  Commit the passed task
@@ -98,15 +87,6 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer
             fprintf(f, "}\n");
         }
         # endif /* NDEBUG */
-
-    private:
-
-        /* tasks stack */
-        alignas(CACHE_LINE_SIZE)
-            uint8_t memory_stack_bottom[THREAD_PRODUCER_MAX_MEMORY];
-
-        /* next free task pointer in the stack */
-        uint8_t * memory_stack_ptr;
 
         #ifndef NDEBUG
     public:

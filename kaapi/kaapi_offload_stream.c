@@ -264,22 +264,7 @@ static kaapi_io_stream_t* kaapi_offload_select_io_stream(
 )
 {
   kaapi_io_stream_t* retval;
-  kaapi_assert((stype == KAAPI_IO_STREAM_D2H)
-            || (stype == KAAPI_IO_STREAM_H2D)
-#if KAAPI_USE_STREAM_D2D
-            || (stype == KAAPI_IO_STREAM_D2D)
-#endif
-            || (stype == KAAPI_IO_STREAM_KERN));
-#if ROUND_ROBIN
-  /* increment the next stream to used */
-  int snext0 = KAAPI_ATOMIC_READ(&stream->next[stype]);
-  int snext = snext0;
-  if (stream->count[stype] >1)
-  {
-    snext0 = KAAPI_ATOMIC_INCR_ORIG(&stream->next[stype]);
-    snext = snext0 % stream->count[stype];
-  }
-#elif 1
+
   int count = stream->count[stype];
   int snext0 = KAAPI_ATOMIC_READ(&stream->next[stype]);
   int snext = snext0;
@@ -309,10 +294,6 @@ static kaapi_io_stream_t* kaapi_offload_select_io_stream(
         printf("Stream load #%i[min:%i, max:%i] -> %i\n", count, smin, smax, snext);
     }
   }
-#elif 0
-#warning
-  int snext = 0;
-#endif
   retval = stream->ios[stype][snext];
   kaapi_assert_debug( retval != 0 );
   return retval;
@@ -562,14 +543,6 @@ kaapi_io_instruction_t* kaapi_offload_stream_push(
     kaapi_io_stream_t** sios
 )
 {
-  if (stream ==0) return 0;
-  kaapi_assert((stype == KAAPI_IO_STREAM_D2H)
-            || (stype == KAAPI_IO_STREAM_H2D)
-#if KAAPI_USE_STREAM_D2D
-            || (stype == KAAPI_IO_STREAM_D2D)
-#endif
-            || (stype == KAAPI_IO_STREAM_KERN));
-
   KAAPI_OFFLOAD_TRACE_IN
 
   /* call it only once because it increment the next for stream */

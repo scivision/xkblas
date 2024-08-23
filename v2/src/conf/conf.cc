@@ -96,6 +96,27 @@ __parse_help(xkblas_conf_t * conf, char const * value)
 void
 xkblas_init_conf(xkblas_conf_t * conf)
 {
+    // set default conf
+    conf->stackblocsize = (uint64_t)-1;
+    conf->ngpus         = (uint8_t)-1;
+    conf->gpu_set       = (uint32_t) ~0;
+
+    conf->device.capacity = 64;
+
+    conf->device.streams[XKBLAS_STREAM_KERN].n = 2;
+    conf->device.streams[XKBLAS_STREAM_KERN].concurrency = 8;
+
+    conf->device.streams[XKBLAS_STREAM_D2D].n = 1;
+    conf->device.streams[XKBLAS_STREAM_D2D].concurrency = 0;
+
+    conf->device.streams[XKBLAS_STREAM_D2H].n = 1;
+    conf->device.streams[XKBLAS_STREAM_D2H].concurrency = 0;
+
+    conf->device.streams[XKBLAS_STREAM_H2D].n = 1;
+    conf->device.streams[XKBLAS_STREAM_H2D].concurrency = 0;
+
+    conf->cuda_cache_limit = 0.98f;
+
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)
     {

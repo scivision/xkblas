@@ -1,7 +1,7 @@
 #ifndef __MEMORY_H__
 # define __MEMORY_H__
 
-# include "device/io.h"
+# include "device/stream-instruction.h"
 # include "sync/mutex.h"
 
 ///////////////////////////
@@ -88,7 +88,7 @@ typedef struct  xkblas_device_memory_t
                     xkblas_pointer_t /*src*/,
                     const xkblas_memory_view_t* /*view_src*/,
                     int flags, /* 0, 1, 2 */
-                    xkblas_io_callback_func_t cbk,
+                    xkblas_stream_callback_func_t cbk,
                     void* arg0, void* arg1, void* arg2
     );
     int  (*f_memsync)(struct xkblas_device_memory_t*, int begend);

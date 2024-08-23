@@ -3,9 +3,8 @@
 
 # include "device/naive-queue.hpp"
 # include "device/task.hpp"
+# include "device/thread.hpp"
 # include "sync/cache-line-size.hpp"
-
-# include <stack>
 
 /* maximum number of workers */
 # define XKBLAS_WORKERS_MAX 8
@@ -13,7 +12,7 @@
 /**
  *  This class represents an xkblas user thread, that is producing tasks
  */
-class alignas(CACHE_LINE_SIZE) ThreadWorker
+class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
 {
     public:
 

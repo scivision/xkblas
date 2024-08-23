@@ -441,6 +441,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         "memory addresses - for now, just perform one data "    \
                         "transfer per block")
 
+
+                if (search.invalids.size() > 1)
+                    XKBLAS_IMPL("Several memory blocks are invalid for the same access");
+
                 /* initiate fetching of each invalid block for that access */
                 for (ReplicateFetch & fetch : search.invalids)
                 {
@@ -475,8 +479,13 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         /* a fetch completed */
                         if (task->fetched() == TASK_STATE_DATA_FETCHED)
                         {
-                            /* all data has been fetched, the task kernel is ready for execution */
-                            XKBLAS_INFO("Task `%s` is ready for kernel execution (late)", task->label);
+                            /* all data has been fetched */
+
+                            // TODO : ensure each 'ReplicateFetch' are continuous in memory, else free/reallocate/memmove accordingly
+                            // TODO : set 'access->device_view.addr' and 'access->device_view.LD'
+
+                            /* the task kernel is ready for execution */
+                            xkblas_device_task_fetched(driver, device, task);
                         }
                     }
                 }

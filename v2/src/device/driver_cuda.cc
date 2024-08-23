@@ -55,7 +55,7 @@ typedef struct  xkblas_device_cuda_t
    */
 typedef struct  xkblas_cuda_io_stream_t
 {
-    xkblas_io_stream_t inherited;
+    xkblas_stream_t inherited;
     cudaStream_t      stream;
     cudaStream_t      stream_low;
     cudaEvent_t       * end_events;   /* size: capacity */
@@ -325,7 +325,7 @@ static int cuda_copy(
     xkblas_pointer_t dest, const xkblas_memory_view_t * view_dest,
     xkblas_pointer_t src,  const xkblas_memory_view_t * view_src,
     int flags,
-    xkblas_io_callback_func_t callback,
+    xkblas_stream_instruction_callback_t callback,
     void* arg0, void* arg1, void* arg2
 )
 {
@@ -337,35 +337,35 @@ static int cuda_copy(
     assert( (dest.ptr != 0)
             &&  (src.ptr != 0) );
 
-    xkblas_io_type_t io_type = 0;
-    xkblas_io_stream_type_t tstream = 0;
-    xkblas_io_copy_priority_t priority = XKBLAS_IO_COPY_PRIORITY_NORMAL;
+    xkblas_stream_instruction_type_t io_type = 0;
+    xkblas_stream_type_t tstream = 0;
+    xkblas_io_copy_priority_t priority = XKBLAS_STREAM_INSTR_COPY_PRIORITY_NORMAL;
 
     if (flags == 0) /* low */
-        priority = XKBLAS_IO_COPY_PRIORITY_LOW;
+        priority = XKBLAS_STREAM_INSTR_COPY_PRIORITY_LOW;
     else if (flags == 2)
-        priority = XKBLAS_IO_COPY_PRIORITY_HIGH;
+        priority = XKBLAS_STREAM_INSTR_COPY_PRIORITY_HIGH;
     /* else == normal */
 
     if ( (xkblas_memory_asid_get_arch(src.asid) == XKBLAS_PROC_TYPE_HOST)
             && (xkblas_memory_asid_get_arch(dest.asid) != XKBLAS_PROC_TYPE_HOST) )
     {
-        io_type = XKBLAS_IO_COPY_H2D;
-        tstream = XKBLAS_IO_STREAM_H2D;
+        io_type = XKBLAS_STREAM_INSTR_COPY_H2D;
+        tstream = XKBLAS_STREAM_H2D;
         XKBLAS_CTXT_PERFREG_ADD(device->inherited.ctxt,XKBLAS_PERF_ID_CPYH2D_BYTES, xkblas_memory_view_size( view_dest ));
     }
     else if ( (xkblas_memory_asid_get_arch(src.asid) != XKBLAS_PROC_TYPE_HOST)
             && (xkblas_memory_asid_get_arch(dest.asid) == XKBLAS_PROC_TYPE_HOST) )
     {
-        io_type = XKBLAS_IO_COPY_D2H;
-        tstream = XKBLAS_IO_STREAM_D2H;
+        io_type = XKBLAS_STREAM_INSTR_COPY_D2H;
+        tstream = XKBLAS_STREAM_D2H;
         XKBLAS_CTXT_PERFREG_ADD(device->inherited.ctxt,XKBLAS_PERF_ID_CPYD2H_BYTES, xkblas_memory_view_size( view_dest ));
     }
     else if ( (xkblas_memory_asid_get_arch(src.asid) != XKBLAS_PROC_TYPE_HOST)
             && (xkblas_memory_asid_get_arch(dest.asid) != XKBLAS_PROC_TYPE_HOST) )
     {
-        io_type = XKBLAS_IO_COPY_D2D;
-        tstream = XKBLAS_IO_STREAM_D2D;
+        io_type = XKBLAS_STREAM_INSTR_COPY_D2D;
+        tstream = XKBLAS_STREAM_D2D;
         XKBLAS_CTXT_PERFREG_ADD(device->inherited.ctxt,XKBLAS_PERF_ID_CPYD2D_BYTES, xkblas_memory_view_size( view_dest ));
     }
 
@@ -447,7 +447,7 @@ static void xkblas_cuda_init_cuda_stream(
 #endif
 
   cudaError_t res;
-  res = cudaDeviceGetStreamPriorityRange ( &leastPriority, &greatestPriority );
+  res = cudaDeviceGetOffloaderPriorityRange ( &leastPriority, &greatestPriority );
   __check_error(res);
 
   res = cudaStreamCreateWithPriority (&cios->stream, cudaStreamNonBlocking, greatestPriority);
@@ -458,7 +458,7 @@ static void xkblas_cuda_init_cuda_stream(
 #if XKBLAS_USE_PERSTREAM_BLASHANDLE
   cios->handle = 0;
 #endif
-  if (type == XKBLAS_IO_STREAM_KERN)
+  if (type == XKBLAS_STREAM_KERN)
   {
     assert( thread_type == 0 );
 #if XKBLAS_USE_PERSTREAM_BLASHANDLE
@@ -466,15 +466,15 @@ static void xkblas_cuda_init_cuda_stream(
      */
     cublasStatus_t cres = cublasCreate(&cios->handle);
     assert(cres == CUBLAS_STATUS_SUCCESS);
-    cres = cublasSetStream( cios->handle, cios->stream);
+    cres = cublasSetOffloader( cios->handle, cios->stream);
     assert(cres == CUBLAS_STATUS_SUCCESS);
 #endif
   }
   else
   {
 #if XKBLAS_HAVE_IO_THREADS
-    assert( ((type == XKBLAS_IO_STREAM_H2D) && (thread_type == 1))
-                     || ((type == XKBLAS_IO_STREAM_D2H) && (thread_type == 2)) );
+    assert( ((type == XKBLAS_STREAM_H2D) && (thread_type == 1))
+                     || ((type == XKBLAS_STREAM_D2H) && (thread_type == 2)) );
 #endif
   }
 }
@@ -482,7 +482,7 @@ static void xkblas_cuda_init_cuda_stream(
 
 /*
  */
-static xkblas_io_stream_t* cuda_stream_alloc(
+static xkblas_stream_t* cuda_stream_alloc(
     xkblas_device_t* dev,
     int type,
     unsigned int capacity
@@ -513,7 +513,7 @@ static xkblas_io_stream_t* cuda_stream_alloc(
  */
 static void cuda_stream_free(
     xkblas_device_t* dev,
-    xkblas_io_stream_t* ios
+    xkblas_stream_t* ios
 )
 {
   xkblas_cuda_io_stream_t* cios = (xkblas_cuda_io_stream_t*)ios;
@@ -562,7 +562,7 @@ typedef struct host_register_request {
   pthread_cond_t             cond;
   void*                      ptr;
   size_t                     size;
-  xkblas_io_callback_func_t callback;
+  xkblas_stream_instruction_callback_t callback;
   void* arg0; void* arg1; void* arg2;
 } host_register_request_t;
 
@@ -687,8 +687,6 @@ void* xkblas_cuda_register_thread(void* dummy )
 
 static char* name_io[] = {
   "IO_NOP",
-  "IO_BEGIN",
-  "IO_END",
   "IO_COPY_H2H",
   "IO_COPY_H2D",
   "IO_COPY_D2H",
@@ -702,8 +700,8 @@ static char* name_io[] = {
  */
 static int cuda_stream_decode_ioinstruction(
     xkblas_device_t* dev,
-    xkblas_io_stream_t* ios,
-    xkblas_io_instruction_t* instr
+    xkblas_stream_t* ios,
+    xkblas_stream_instruction_t* instr
 )
 {
   xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
@@ -718,21 +716,19 @@ static int cuda_stream_decode_ioinstruction(
 
   switch (instr->type)
   {
-    case XKBLAS_IO_NOP:
-    case XKBLAS_IO_BEGIN:
-    case XKBLAS_IO_END:
+    case XKBLAS_STREAM_INSTR_NOP:
       return 0;
 
-    case XKBLAS_IO_COPY_H2H:
-    case XKBLAS_IO_COPY_H2D:
-    case XKBLAS_IO_COPY_D2H:
-    case XKBLAS_IO_COPY_D2D:
+    case XKBLAS_STREAM_INSTR_COPY_H2H:
+    case XKBLAS_STREAM_INSTR_COPY_H2D:
+    case XKBLAS_STREAM_INSTR_COPY_D2H:
+    case XKBLAS_STREAM_INSTR_COPY_D2D:
     {
 #if XKBLAS_HAVE_IO_THREADS
       assert( (thread_type == 1) || (thread_type == 2) );
 #endif
 
-      if (instr->type == XKBLAS_IO_COPY_D2D)
+      if (instr->type == XKBLAS_STREAM_INSTR_COPY_D2D)
         stream = &cios->stream_low;
       else
         stream = &cios->stream;
@@ -763,7 +759,7 @@ static int cuda_stream_decode_ioinstruction(
       {
         type = XKBLAS_MEMORY_VIEW_1D;
       }
-      assert( test || (instr->type != XKBLAS_IO_COPY_D2D) );
+      assert( test || (instr->type != XKBLAS_STREAM_INSTR_COPY_D2D) );
 
       void* src  = xkblas_memory_view2pointer((void*)op->src, op->view_src);
       void* dest = xkblas_memory_view2pointer((void*)op->dest, op->view_dest);
@@ -779,14 +775,14 @@ static int cuda_stream_decode_ioinstruction(
           //printf("%f: instr '%s' 1D data\n", xkblas_get_elapsedtime(), name_io[instr->type]);
           switch (instr->type)
           {
-            case XKBLAS_IO_COPY_H2H:
+            case XKBLAS_STREAM_INSTR_COPY_H2H:
               memcpy( dest, src, size );
               delay = xkblas_get_elapsedns()-delay;
               XKBLAS_EVENT_PUSH2( &xkblas_self_context()->kproc, XKBLAS_EVT_OFFLOAD_CPY,
                  2 /* end */, op->reserved, delay );
               res = 0;
             break;
-            case XKBLAS_IO_COPY_H2D:
+            case XKBLAS_STREAM_INSTR_COPY_H2D:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -798,7 +794,7 @@ _xkblas_unlock_print();
                                      cudaMemcpyHostToDevice,
                                      *stream);
             break;
-            case XKBLAS_IO_COPY_D2H:
+            case XKBLAS_STREAM_INSTR_COPY_D2H:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -811,7 +807,7 @@ _xkblas_unlock_print();
                                      *stream);
             break;
 
-            case XKBLAS_IO_COPY_D2D:
+            case XKBLAS_STREAM_INSTR_COPY_D2D:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -850,7 +846,7 @@ _xkblas_unlock_print();
 
           switch (instr->type)
           {
-            case XKBLAS_IO_COPY_H2H:
+            case XKBLAS_STREAM_INSTR_COPY_H2H:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -858,7 +854,7 @@ _xkblas_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
             break;
-            case XKBLAS_IO_COPY_H2D:
+            case XKBLAS_STREAM_INSTR_COPY_H2D:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -866,7 +862,7 @@ _xkblas_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
             break;
-            case XKBLAS_IO_COPY_D2H:
+            case XKBLAS_STREAM_INSTR_COPY_D2H:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -874,7 +870,7 @@ _xkblas_unlock_print();
 #endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
             break;
-            case XKBLAS_IO_COPY_D2D:
+            case XKBLAS_STREAM_INSTR_COPY_D2D:
 #if 0// XKBLAS_DEBUG
 _xkblas_lock_print();
 	      printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -904,7 +900,7 @@ _xkblas_unlock_print();
       );
     } break;
 
-    case XKBLAS_IO_BARRIER:
+    case XKBLAS_STREAM_INSTR_BARRIER:
       res = cudaStreamSynchronize( cios->stream );
       assert(res == cudaSuccess);
       res = cudaStreamSynchronize( cios->stream_low );
@@ -912,7 +908,7 @@ _xkblas_unlock_print();
       ++ios->ok_p;
       break;
 
-    case XKBLAS_IO_KERN:
+    case XKBLAS_STREAM_INSTR_KERN:
     {
 #if XKBLAS_HAVE_IO_THREADS
       assert( thread_type == 0 );
@@ -948,7 +944,7 @@ _xkblas_unlock_print();
  */
 static int cuda_stream_advance_pending(
     xkblas_device_t* dev,
-    xkblas_io_stream_t* ios,
+    xkblas_stream_t* ios,
     int blocking
 )
 {
@@ -976,13 +972,13 @@ static int cuda_stream_advance_pending(
 
 #if 0 // best
   int queue_max[4];
-  queue_max[XKBLAS_IO_STREAM_H2D]  = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_KERN] = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_D2H]  = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_IO_STREAM_D2D]  = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_STREAM_H2D]  = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_STREAM_KERN] = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_STREAM_D2H]  = ctx->conf.cuda_conc_kernel;
+  queue_max[XKBLAS_STREAM_D2D]  = ctx->conf.cuda_conc_kernel;
   if ((len_p >1) && (len_p>= queue_max[ios->type]))
   {
-    int shift = 0; //(ios->type == XKBLAS_IO_STREAM_KERN ? 0: len_p/2-1);
+    int shift = 0; //(ios->type == XKBLAS_STREAM_KERN ? 0: len_p/2-1);
     int idx = (ios->ok_p + shift)% ios->count;
     res = hipEventSynchronize(cios->end_events[idx]);
   }
@@ -995,15 +991,15 @@ static int cuda_stream_advance_pending(
   while (ios_okp < ios->pos_wp)
   {
     int idx = ios_okp % ios->count;
-    xkblas_io_instruction_t* op = &ios->pending[idx];
+    xkblas_stream_instruction_t* op = &ios->pending[idx];
     res = cudaSuccess;
     switch (op->type)
     {
-      case XKBLAS_IO_KERN:
-      case XKBLAS_IO_COPY_H2H:
-      case XKBLAS_IO_COPY_H2D:
-      case XKBLAS_IO_COPY_D2H:
-      case XKBLAS_IO_COPY_D2D:
+      case XKBLAS_STREAM_INSTR_KERN:
+      case XKBLAS_STREAM_INSTR_COPY_H2H:
+      case XKBLAS_STREAM_INSTR_COPY_H2D:
+      case XKBLAS_STREAM_INSTR_COPY_D2H:
+      case XKBLAS_STREAM_INSTR_COPY_D2D:
         for (int cnt=0; cnt<1; ++cnt)
         {
           res = cudaEventQuery( cios->end_events[idx] );
@@ -1020,7 +1016,7 @@ static int cuda_stream_advance_pending(
               delay = 0;
               assert(0);
             }
-            if (op->type != XKBLAS_IO_KERN)
+            if (op->type != XKBLAS_STREAM_INSTR_KERN)
             {
               XKBLAS_EVENT_PUSH2( &xkblas_self_context()->kproc, XKBLAS_EVT_OFFLOAD_CPY,
                  2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
@@ -1041,9 +1037,9 @@ static int cuda_stream_advance_pending(
         printf("%s:: instruction pos:%i, instr '%s' ok\n", __func__, ios_okp,  name_io[op->type]);
 #endif
 
-      case XKBLAS_IO_END:
-      case XKBLAS_IO_BARRIER:
-      case XKBLAS_IO_NOP:
+      case XKBLAS_STREAM_INSTR_END:
+      case XKBLAS_STREAM_INSTR_BARRIER:
+      case XKBLAS_STREAM_INSTR_NOP:
         ++ios_okp;
         break;
 
@@ -1103,7 +1099,7 @@ break_label:
  */
 static int cuda_stream_process_pending(
     xkblas_device_t* device,
-    xkblas_io_stream_t* ios,
+    xkblas_stream_t* ios,
     int blocking
 )
 {
@@ -1119,18 +1115,18 @@ static int cuda_stream_process_pending(
     for (uint64_t pos = ios->pos_rp; pos<ios->ok_p; ++pos)
     {
       int idx = pos % ios->count;
-      xkblas_io_instruction_t* op = &ios->pending[idx];
+      xkblas_stream_instruction_t* op = &ios->pending[idx];
       switch (op->type)
       {
-        case XKBLAS_IO_KERN:
-        case XKBLAS_IO_COPY_H2H:
-        case XKBLAS_IO_COPY_H2D:
-        case XKBLAS_IO_COPY_D2H:
-        case XKBLAS_IO_COPY_D2D:
-        case XKBLAS_IO_END:
-        case XKBLAS_IO_BARRIER:
+        case XKBLAS_STREAM_INSTR_KERN:
+        case XKBLAS_STREAM_INSTR_COPY_H2H:
+        case XKBLAS_STREAM_INSTR_COPY_H2D:
+        case XKBLAS_STREAM_INSTR_COPY_D2H:
+        case XKBLAS_STREAM_INSTR_COPY_D2D:
+        case XKBLAS_STREAM_INSTR_END:
+        case XKBLAS_STREAM_INSTR_BARRIER:
         {
-          if ((op->type >= XKBLAS_IO_COPY_H2H) && (op->type <= XKBLAS_IO_COPY_D2D))
+          if ((op->type >= XKBLAS_STREAM_INSTR_COPY_H2H) && (op->type <= XKBLAS_STREAM_INSTR_COPY_D2D))
           {
             status.bytes = xkblas_memory_view_size(op->inst.c_io.view_src);
           }
@@ -1139,10 +1135,10 @@ static int cuda_stream_process_pending(
           if (op->inst.callback.func)
             op->inst.callback.func(status, ios, op->inst.callback.arg[0], op->inst.callback.arg[1], op->inst.callback.arg[2]);
 
-          op->type = XKBLAS_IO_NOP;
+          op->type = XKBLAS_STREAM_INSTR_NOP;
         }
 
-        case XKBLAS_IO_NOP:
+        case XKBLAS_STREAM_INSTR_NOP:
           /* commit index for the next event */
           ++ios->pos_rp;
           //return 0;
@@ -1212,7 +1208,7 @@ static uint16_t cuda_get_source(
 
 
 #if XKBLAS_HAVE_IO_THREADS
-static int xkblas_cuda_io_thread( xkblas_device_cuda_t* device, xkblas_io_stream_type_t type )
+static int xkblas_cuda_io_thread( xkblas_device_cuda_t* device, xkblas_stream_type_t type )
 {
   cudaError_t res;
   res = cudaSetDevice(CUDA_DEVICE_ID[device->inherited.device_id]);
@@ -1245,7 +1241,7 @@ static void* xkblas_cuda_H2D_io_thread( void* arg )
   /* for debug */
   thread_type = 1;
 
-  xkblas_cuda_io_thread(device, XKBLAS_IO_STREAM_H2D);
+  xkblas_cuda_io_thread(device, XKBLAS_STREAM_H2D);
   return 0;
 }
 
@@ -1255,7 +1251,7 @@ static void* xkblas_cuda_D2H_io_thread( void* arg )
   /* for debug */
   thread_type = 2;
 
-  xkblas_cuda_io_thread(device, XKBLAS_IO_STREAM_D2H);
+  xkblas_cuda_io_thread(device, XKBLAS_STREAM_D2H);
   return 0;
 }
 #endif
@@ -1427,7 +1423,7 @@ XKBLAS_DRIVER_ENTRYPOINT(finalize)(void)
 static uint64_t post_request(
     host_register_request_op_t op,
     void* ptr, size_t size,
-    xkblas_io_callback_func_t callback,
+    xkblas_stream_instruction_callback_t callback,
     void* arg0, void* arg1, void* arg2
 )
 {
@@ -1461,7 +1457,7 @@ static uint64_t post_request(
 static
 uint64_t XKBLAS_DRIVER_ENTRYPOINT(host_register)(
     void* ptr, size_t size,
-    xkblas_io_callback_func_t callback,
+    xkblas_stream_instruction_callback_t callback,
     void* arg0, void* arg1, void* arg2
 )
 {
@@ -1474,7 +1470,7 @@ uint64_t XKBLAS_DRIVER_ENTRYPOINT(host_register)(
 static
 uint64_t XKBLAS_DRIVER_ENTRYPOINT(host_unregister)(
     void* ptr, size_t size,
-    xkblas_io_callback_func_t callback,
+    xkblas_stream_instruction_callback_t callback,
     void* arg0, void* arg1, void* arg2
 )
 {
@@ -1917,13 +1913,11 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
 int
 XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
     int device_id,
-    xkblas_io_stream_t * ios,
-    xkblas_io_instruction_t * instr
+    xkblas_stream_t * ios,
+    xkblas_stream_instruction_t * instr
 ) {
-    static char * name_io[] = {
+    static char const * name_io[] = {
         "IO_NOP",
-        "IO_BEGIN",
-        "IO_END",
         "IO_COPY_H2H",
         "IO_COPY_H2D",
         "IO_COPY_D2H",
@@ -1943,43 +1937,45 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 
     switch (instr->type)
     {
-        case (XKBLAS_IO_NOP):
-        case (XKBLAS_IO_BEGIN):
-        case (XKBLAS_IO_END):
+        case (XKBLAS_STREAM_INSTR_NOP):
         {
             return 0;
         }
 
-        case (XKBLAS_IO_COPY_H2D):
+        case (XKBLAS_STREAM_INSTR_COPY_H2D):
         {
             return 0;
         }
 
-        case (XKBLAS_IO_BARRIER):
+        case (XKBLAS_STREAM_INSTR_BARRIER):
         {
             cudaError_t res = cudaStreamSynchronize( cios->stream );
             assert(res == cudaSuccess);
             res = cudaStreamSynchronize( cios->stream_low );
             assert(res == cudaSuccess);
-            ++ios->ok_p;
             return 0;
         }
 
-        case (XKBLAS_IO_KERN):
+        case (XKBLAS_STREAM_INSTR_KERN):
         {
             cudaStream_t * stream = &cios->stream;
-            xkblas_io_kernel_t * op = &instr->inst.k_io;
+            xkblas_stream_instruction_kernel_t * op = &instr->kern;
 
-            // TODO : launch task kernel
+            task_kernel_param_t param = { .task = op->task, .handle = cios->handle };
+            xkblas_kernel_launch(XKBLAS_DRIVER_CUDA, &param);
 
+            # pragma message(TODO "Add support for end event records")
+
+            # if 0
             cudaError_t err = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream);
             assert(err == cudaSuccess);
+            # endif
 
-        } /* XKBLAS_IO_KERN */
+        } /* XKBLAS_STREAM_INSTR_KERN */
 
-        case (XKBLAS_IO_COPY_H2H):
-        case (XKBLAS_IO_COPY_D2H):
-        case (XKBLAS_IO_COPY_D2D):
+        case (XKBLAS_STREAM_INSTR_COPY_H2H):
+        case (XKBLAS_STREAM_INSTR_COPY_D2H):
+        case (XKBLAS_STREAM_INSTR_COPY_D2D):
         {
             XKBLAS_IMPL("Instruction `%s` not implemented", name_io[instr->type]);
             return ENOSYS;
@@ -1994,21 +1990,19 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 
 
             # if 0
-        case XKBLAS_IO_NOP:
-        case XKBLAS_IO_BEGIN:
-        case XKBLAS_IO_END:
+        case XKBLAS_STREAM_INSTR_NOP:
             return 0;
 
-        case XKBLAS_IO_COPY_H2H:
-        case XKBLAS_IO_COPY_H2D:
-        case XKBLAS_IO_COPY_D2H:
-        case XKBLAS_IO_COPY_D2D:
+        case XKBLAS_STREAM_INSTR_COPY_H2H:
+        case XKBLAS_STREAM_INSTR_COPY_H2D:
+        case XKBLAS_STREAM_INSTR_COPY_D2H:
+        case XKBLAS_STREAM_INSTR_COPY_D2D:
             {
 #if XKBLAS_HAVE_IO_THREADS
                 assert( (thread_type == 1) || (thread_type == 2) );
 #endif
 
-                if (instr->type == XKBLAS_IO_COPY_D2D)
+                if (instr->type == XKBLAS_STREAM_INSTR_COPY_D2D)
                     stream = &cios->stream_low;
                 else
                     stream = &cios->stream;
@@ -2039,7 +2033,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                 {
                     type = XKBLAS_MEMORY_VIEW_1D;
                 }
-                assert( test || (instr->type != XKBLAS_IO_COPY_D2D) );
+                assert( test || (instr->type != XKBLAS_STREAM_INSTR_COPY_D2D) );
 
                 void* src  = xkblas_memory_view2pointer((void*)op->src, op->view_src);
                 void* dest = xkblas_memory_view2pointer((void*)op->dest, op->view_dest);
@@ -2055,14 +2049,14 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                             //printf("%f: instr '%s' 1D data\n", xkblas_get_elapsedtime(), name_io[instr->type]);
                             switch (instr->type)
                             {
-                                case XKBLAS_IO_COPY_H2H:
+                                case XKBLAS_STREAM_INSTR_COPY_H2H:
                                     memcpy( dest, src, size );
                                     delay = xkblas_get_elapsedns()-delay;
                                     XKBLAS_EVENT_PUSH2( &xkblas_self_context()->kproc, XKBLAS_EVT_OFFLOAD_CPY,
                                             2 /* end */, op->reserved, delay );
                                     res = 0;
                                     break;
-                                case XKBLAS_IO_COPY_H2D:
+                                case XKBLAS_STREAM_INSTR_COPY_H2D:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -2074,7 +2068,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                                             cudaMemcpyHostToDevice,
                                             *stream);
                                     break;
-                                case XKBLAS_IO_COPY_D2H:
+                                case XKBLAS_STREAM_INSTR_COPY_D2H:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -2087,7 +2081,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                                             *stream);
                                     break;
 
-                                case XKBLAS_IO_COPY_D2D:
+                                case XKBLAS_STREAM_INSTR_COPY_D2D:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -2126,7 +2120,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 
                             switch (instr->type)
                             {
-                                case XKBLAS_IO_COPY_H2H:
+                                case XKBLAS_STREAM_INSTR_COPY_H2H:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
@@ -2134,7 +2128,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 #endif
                                     res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
                                     break;
-                                case XKBLAS_IO_COPY_H2D:
+                                case XKBLAS_STREAM_INSTR_COPY_H2D:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -2142,7 +2136,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 #endif
                                     res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
                                     break;
-                                case XKBLAS_IO_COPY_D2H:
+                                case XKBLAS_STREAM_INSTR_COPY_D2H:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -2150,7 +2144,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
 #endif
                                     res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
                                     break;
-                                case XKBLAS_IO_COPY_D2D:
+                                case XKBLAS_STREAM_INSTR_COPY_D2D:
 #if 0// XKBLAS_DEBUG
                                     _xkblas_lock_print();
                                     printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
@@ -2180,7 +2174,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
                         );
             } break;
 
-        case XKBLAS_IO_BARRIER:
+        case XKBLAS_STREAM_INSTR_BARRIER:
             res = cudaStreamSynchronize( cios->stream );
             assert(res == cudaSuccess);
             res = cudaStreamSynchronize( cios->stream_low );
@@ -2188,7 +2182,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_decode_io_instruction)(
             ++ios->ok_p;
             break;
 
-        case XKBLAS_IO_KERN:
+        case XKBLAS_STREAM_INSTR_KERN:
             {
 #if XKBLAS_HAVE_IO_THREADS
                 assert( thread_type == 0 );
