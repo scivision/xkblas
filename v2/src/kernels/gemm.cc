@@ -64,6 +64,7 @@ xkblas_£gemm_tile_async(
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
     uint8_t * mem  = thread->allocate(task_size + args_size);
+//    uint8_t * mem = (uint8_t *) malloc(task_size + args_size);
 
     Task    * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id);

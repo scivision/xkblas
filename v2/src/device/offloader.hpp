@@ -1,5 +1,5 @@
-#ifndef __STREAM_HPP__
-# define __STREAM_HPP__
+#ifndef __OFFLOADER_HPP__
+# define __OFFLOADER_HPP__
 
 # include "conf/conf.h"
 # include "device/stream.h"
@@ -23,11 +23,18 @@ class Offloader
     public:
 
         /* initialise the streams */
-        void init(xkblas_conf_stream_t * conf);
+        void init(
+                xkblas_conf_offloader_t * conf,
+                xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity)
+        );
 
         # pragma message(TODO "Use C++ abstract method and inheritance instead of 'C-style' abstract class")
         xkblas_stream_t* (*f_stream_alloc)(int device_id,  int type, unsigned int capacity);
         void (*f_stream_free)(int device_id, xkblas_stream_t * io_stream);
+
+    public:
+        int submit(xkblas_stream_instruction_t * instr);
+        xkblas_stream_instruction_t * instruction_new(xkblas_stream_instruction_type_t type);
 
         bool is_empty(xkblas_stream_type_t type) const;
         int process_instruction(xkblas_stream_type_t type);
@@ -56,8 +63,8 @@ class Offloader
         std::atomic<int> next[XKBLAS_STREAM_ALL];
 
         /* basic stream */
-        xkblas_stream_t streams[XKBLAS_STREAM_ALL];
+        xkblas_stream_t ** streams[XKBLAS_STREAM_ALL];
 
 };
 
-#endif /* __STREAM_HPP__ */
+#endif /* __OFFLOADER_HPP__ */

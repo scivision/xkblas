@@ -3,8 +3,8 @@
 #ifndef __STREAM_INSTRUCTION_H__
 # define __STREAM_INSTRUCTION_H__
 
-# include "logger/todo.h"
 # include "device/task.hpp"
+# include "logger/todo.h"
 # include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
 
@@ -60,7 +60,6 @@ typedef struct xkblas_stream_instruction_barrier_t
 typedef struct  xkblas_stream_instruction_kernel_t
 {
     Task * task;
-
 }               xkblas_stream_instruction_kernel_t;
 
 /* An XKBLAS I/O instruction */

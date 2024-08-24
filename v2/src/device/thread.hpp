@@ -3,6 +3,8 @@
 
 # include "sync/cache-line-size.hpp"
 
+# include <cstdint>
+
 # ifndef THREAD_MAX_MEMORY
 #  define THREAD_MAX_MEMORY (64*1024*1024)
 # endif /* THREAD_MAX_MEMORY */
@@ -11,8 +13,8 @@ class alignas(CACHE_LINE_SIZE) Thread
 {
     public:
 
-        Thread() {}
-        virtual ~Thread() {}
+        Thread();
+        virtual ~Thread();
 
     public:
 
@@ -25,7 +27,7 @@ class alignas(CACHE_LINE_SIZE) Thread
     private:
 
         /* tasks stack */
-        uint8_t memory_stack_bottom[THREAD_MAX_MEMORY];
+        uint8_t * memory_stack_bottom;
 
         /* next free task pointer in the stack */
         uint8_t * memory_stack_ptr;

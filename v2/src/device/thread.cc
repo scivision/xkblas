@@ -1,7 +1,24 @@
 # include "device/thread.hpp"
+# include "logger/logger.h"
+
+# include <cassert>
+# include <cstring>
+
+Thread::Thread()
+{
+    this->memory_stack_bottom   = (uint8_t *) malloc(THREAD_MAX_MEMORY);
+    this->memory_stack_ptr      = this->memory_stack_bottom;
+
+    assert(this->memory_stack_bottom);
+    memset(this->memory_stack_bottom, 0, THREAD_MAX_MEMORY);
+}
+
+Thread::~Thread()
+{
+}
 
 uint8_t *
-ThreadProducer::allocate(uint64_t size)
+Thread::allocate(uint64_t size)
 {
     #ifndef NDEBUG
     if (this->memory_stack_ptr >= this->memory_stack_bottom + THREAD_MAX_MEMORY)
@@ -13,7 +30,7 @@ ThreadProducer::allocate(uint64_t size)
 }
 
 void
-ThreadProducer::deallocate_all(void)
+Thread::deallocate_all(void)
 {
     this->memory_stack_ptr = this->memory_stack_bottom;
 }

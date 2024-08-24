@@ -29,18 +29,3 @@ ThreadProducer::get(void)
     assert(__TLS_PRODUCER);
     return __TLS_PRODUCER;
 }
-
-// non-static members
-
-ThreadProducer::ThreadProducer() :
-    memory_stack_bottom(),
-    memory_stack_ptr(memory_stack_bottom)
-{
-    // XKBLAS_DEBUG("New producer thread");
-    memset(this->memory_stack_bottom, 0, THREAD_PRODUCER_MAX_MEMORY);
-}
-
-ThreadProducer::~ThreadProducer()
-{
-    XKBLAS_DEBUG("Delete producer thread");
-}

@@ -1,7 +1,7 @@
 # include "xkblas-context.h"
 # include "device/device.h"
 # include "device/driver.h"
-# include "device/stream.hpp"
+# include "device/stream.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "device/thread-worker.hpp"
@@ -71,7 +71,7 @@ xkblas_device_init(
     # endif
 
     xkblas_context_t * ctx = xkblas_context_get();
-    device->stream.init(&(ctx->conf.streams));
+    device->offloader.init(&(ctx->conf.device.offloader), driver->f_stream_create);
 
     # if 0
     assert(0 == pthread_mutex_lock(&device->lock));
@@ -84,6 +84,8 @@ xkblas_device_init(
 
     assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
     device->state = XKBLAS_DEVICE_STATE_INIT;
+
+    sleep(1);
 }
 
 static xkblas_device_t *
@@ -124,35 +126,35 @@ xkblas_device_poll(xkblas_device_t * device)
     assert(ThreadWorker::get() == device->thread);
 
     # if 0
-    err = device->stream.process_instruction(XKBLAS_STREAM_D2D);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_D2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_STREAM_H2D);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_H2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_STREAM_D2H);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_D2H);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.process_instruction(XKBLAS_STREAM_KERN);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_KERN);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_STREAM_KERN);
+    err = device->offloader.test(XKBLAS_STREAM_TYPE_KERN);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_STREAM_D2D);
+    err = device->offloader.test(XKBLAS_STREAM_TYPE_D2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_STREAM_H2D);
+    err = device->offloader.test(XKBLAS_STREAM_TYPE_H2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_STREAM_D2H);
+    err = device->offloader.test(XKBLAS_STREAM_TYPE_D2H);
     assert( (err == 0) || (err == EINPROGRESS));
 
     # else
-    err = device->stream.process_instruction(XKBLAS_STREAM_ALL);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->stream.test(XKBLAS_STREAM_ALL);
+    err = device->offloader.test(XKBLAS_STREAM_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
     # endif
@@ -234,11 +236,11 @@ xkblas_device_task_fetched(
 
     /* create a new kernel instruction */
     # pragma message(TODO "Impl. this once stream initialization is implemented")
-    xkblas_stream_instruction_t * instr = device->stream.io_instruction_new(XKBLAS_STREAM_KERN);
+    xkblas_stream_instruction_t * instr = device->offloader.instruction_new(XKBLAS_STREAM_INSTR_KERN);
     instr->kern.task = task;
 
     /* defer instruction */
-    device->stream.process(instr);
+    device->offloader.submit(instr);
 }
 
 static inline void
@@ -261,7 +263,7 @@ xkblas_device_prepare_task(
     while (!xkblas_device_accept_new_task(device))
     {
         xkblas_device_poll(device);
-        int err = device->stream.wait(XKBLAS_STREAM_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
+        int err = device->offloader.wait(XKBLAS_STREAM_TYPE_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
         assert(err == 0);
         xkblas_device_poll(device);
     }
@@ -295,7 +297,7 @@ xkblas_device_thread_main_loop(
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
         while ((task = thread->pop()) == NULL &&
-                device->stream.is_empty(XKBLAS_STREAM_ALL) &&
+                device->offloader.is_empty(XKBLAS_STREAM_ALL) &&
                 device->request.op == XKBLAS_DEVICEOP_NOP)
             device->thread->pause();
 

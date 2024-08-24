@@ -3,12 +3,13 @@
 
 # include "device/stream-instruction.h"
 
+/* DONT CHANGE ORDER HERE !! Can have side effects (in the Offloader class for instance) */
 typedef enum    xkblas_stream_type_t
 {
-    XKBLAS_STREAM_H2D  = 0, /* from CPU to GPU */
-    XKBLAS_STREAM_D2H  = 1, /* from GPU to CPU */
-    XKBLAS_STREAM_D2D  = 2, /* from GPU to GPU */
-    XKBLAS_STREAM_KERN = 3,
+    XKBLAS_STREAM_TYPE_H2D  = 0, /* from CPU to GPU */
+    XKBLAS_STREAM_TYPE_D2H  = 1, /* from GPU to CPU */
+    XKBLAS_STREAM_TYPE_D2D  = 2, /* from GPU to GPU */
+    XKBLAS_STREAM_TYPE_KERN = 3,
     XKBLAS_STREAM_ALL       /* internal purpose */
 
 }               xkblas_stream_type_t;
@@ -38,5 +39,7 @@ typedef struct  xkblas_stream_t
     /* past the last position of pending notified instr in [pos_rp,pos_wp] */
     # endif
 }               xkblas_stream_t;
+
+void xkblas_stream_init(xkblas_stream_t * stream, xkblas_stream_type_t type);
 
 #endif /* __STREAM_HPP__ */

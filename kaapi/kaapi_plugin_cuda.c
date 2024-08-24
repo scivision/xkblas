@@ -782,25 +782,12 @@ static kaapi_io_stream_t* cuda_stream_alloc(
   if (cios ==0)
     return 0;
 
-#if CONFIG_USE_EVENT
   cios->end_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
-#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
-  cios->start_events = (cudaEvent_t*)malloc( capacity * sizeof(cudaEvent_t) );
-#  endif
   if (cios->end_events ==0)
   {
     free(cios);
     return 0;
   }
-#  if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
-  if (cios->start_events ==0)
-  {
-    free(cios->end_events);
-    free(cios);
-    return 0;
-  }
-#  endif
-#endif
 
   cios->stream = 0;
   cios->stream_low = 0;
@@ -811,6 +798,7 @@ static kaapi_io_stream_t* cuda_stream_alloc(
   kaapi_cuda_init_cuda_stream( cios, type, capacity );
   return &cios->inherited;
 }
+
 
 /*
  */

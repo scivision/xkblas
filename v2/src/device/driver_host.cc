@@ -114,6 +114,36 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
     return 0;
 }
 
+static xkblas_stream_t *
+XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
+    xkblas_stream_type_t type,
+    unsigned int capacity
+) {
+    xkblas_stream_t * istream = (xkblas_stream_t *) malloc(sizeof(xkblas_stream_t));
+    assert(istream);
+
+    xkblas_stream_init(istream, type);
+
+    return istream;
+}
+
+static void
+XKBLAS_DRIVER_ENTRYPOINT(stream_delete)(
+    xkblas_stream_t * istream
+) {
+    free(istream);
+}
+
+int
+XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
+    int device_id,
+    xkblas_stream_t * istream,
+    xkblas_stream_instruction_t * instr
+) {
+    return 0;
+}
+
+
 void
 XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t * driver)
 {
@@ -129,6 +159,10 @@ XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t * driver)
     EP(device_init);
     EP(device_attach);
     EP(device_commit);
+
+    EP(stream_create);
+    EP(stream_delete);
+    EP(stream_instruction_decode);
 
     #if 0
 

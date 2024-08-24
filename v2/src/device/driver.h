@@ -7,7 +7,6 @@
 # include <sched.h>     /* cpu_set_t */
 # include <stdint.h>    /* uint64_t */
 
-# include "device/address-space.h"
 # include "device/device.h"
 # include "device/stream.h"
 # include "device/consts.h"
@@ -60,14 +59,6 @@ typedef struct  xkblas_driver_t
     int (*f_init)(void);
     void (*f_finalize)(void);
 
-    /* driver specific functions for all devices managed by the driver */
-    /* Memory registration of host memory */
-    uint64_t (*f_host_register)(
-        void * ptr, uint64_t sz,
-        xkblas_stream_instruction_callback_t callback,
-        void * arg0, void * arg1, void * arg2
-    );
-
     /////////////////////////////////
     //  DRIVER DEVICES MANAGEMENT  //
     /////////////////////////////////
@@ -92,11 +83,15 @@ typedef struct  xkblas_driver_t
     ////////////////////////////////
     //  DRIVER STREAM MANAGEMENT  //
     ////////////////////////////////
-    int (*f_stream_decode_io_instruction)(
-        int device_id,
-        xkblas_stream_t * ios,
-        xkblas_stream_instruction_t * instr
-    );
+
+    /* alllocate and initialize a stream */
+    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity);
+
+    /* deallocate a stream */
+    void (*f_stream_delete)(xkblas_stream_t * istream);
+
+    /* decode a stream instruction */
+    int (*f_stream_instruction_decode)(int device_id, xkblas_stream_t * ios, xkblas_stream_instruction_t * instr);
 
     ///////////////////////
     //  UNUSED YET       //

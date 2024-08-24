@@ -32,8 +32,9 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         ////////////////////////
         // NON-STATIC MEMBERS //
         ////////////////////////
-        ThreadProducer();
-        virtual ~ThreadProducer();
+        ThreadProducer() : Thread() {}
+
+        ~ThreadProducer() {}
 
         /**
          *  Commit the passed task
