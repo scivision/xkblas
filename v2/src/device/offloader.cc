@@ -4,19 +4,6 @@ Offloader::Offloader() {}
 
 Offloader::~Offloader() {}
 
-int
-Offloader::submit(xkblas_stream_instruction_t * instruction)
-{
-    (void) instruction;
-    // TODO
-    return 0;
-}
-
-void
-lol(
-) {
-}
-
 void
 Offloader::init(
     xkblas_conf_offloader_t * conf,
@@ -33,7 +20,8 @@ Offloader::init(
     prefix[0] = 0;
     for (int stype = 0 ; stype < XKBLAS_STREAM_ALL ; ++stype)
     {
-        cnt += conf->streams[stype].n;
+        this->count[stype] = conf->streams[stype].n;
+        cnt += this->count[stype];
         prefix[stype+1] = cnt;
     }
 
@@ -77,12 +65,48 @@ Offloader::wait(xkblas_stream_type_t type)
     return 0;
 }
 
-xkblas_stream_instruction_t *
-Offloader::instruction_new(xkblas_stream_instruction_type_t type)
+xkblas_stream_t *
+Offloader::stream_next(xkblas_stream_type_t stype)
 {
-    xkblas_stream_instruction_t * instr = NULL;
+    /* find native stream to use */
+    int count = this->count[stype];
+    switch (count)
+    {
+        case (0):
+            XKBLAS_FATAL("No stream of type %d", stype);
+
+        case (1):
+            return this->streams[stype][0];
+
+        default:
+        {
+            /* TODO : could be relaxed ? and maybe even non atomic, as it is only call by the device thread */
+            int snext = this->next[stype].fetch_add(1, std::memory_order_seq_cst) % count;
+
+            // TODO : track pending instr here ?
+
+            return this->streams[stype][snext];
+        }
+    }
+}
+
+void
+Offloader::instruction_new(
+    xkblas_stream_type_t stype,             /* IN  */
+    xkblas_stream_t ** stream,              /* OUT */
+    xkblas_stream_instruction_type_t itype, /* IN  */
+    xkblas_stream_instruction_t ** instr    /* OUT */
+) {
+    assert(stream);
     assert(instr);
 
-    instr->type = type;
-    return instr;
+    /* retrieve native stream */
+    *stream = stream_next(stype);
+    assert(*stream);
+
+    /* allocate instruction */
+    *instr = (*stream)->instr.buffer + ((*stream)->pos_w % (*stream)->instr.capacity);
+    assert(*instr);
+
+    (*instr)->type = itype;
 }

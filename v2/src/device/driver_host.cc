@@ -122,7 +122,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_t * istream = (xkblas_stream_t *) malloc(sizeof(xkblas_stream_t));
     assert(istream);
 
-    xkblas_stream_init(istream, type);
+    xkblas_stream_init(istream, type, capacity);
 
     return istream;
 }

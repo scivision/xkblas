@@ -24,8 +24,8 @@ class Offloader
 
         /* initialise the streams */
         void init(
-                xkblas_conf_offloader_t * conf,
-                xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity)
+            xkblas_conf_offloader_t * conf,
+            xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity)
         );
 
         # pragma message(TODO "Use C++ abstract method and inheritance instead of 'C-style' abstract class")
@@ -34,8 +34,16 @@ class Offloader
 
     public:
         int submit(xkblas_stream_instruction_t * instr);
-        xkblas_stream_instruction_t * instruction_new(xkblas_stream_instruction_type_t type);
 
+        /* create a new instruction on the given stream type, and return the instruction and the assigned stream for execution */
+        void instruction_new(
+            xkblas_stream_type_t stype,             /* IN  */
+            xkblas_stream_t ** stream,              /* OUT */
+            xkblas_stream_instruction_type_t itype, /* IN  */
+            xkblas_stream_instruction_t ** instr    /* OUT */
+        );
+
+        /* TODO */
         bool is_empty(xkblas_stream_type_t type) const;
         int process_instruction(xkblas_stream_type_t type);
         int test(xkblas_stream_type_t type);
@@ -64,6 +72,12 @@ class Offloader
 
         /* basic stream */
         xkblas_stream_t ** streams[XKBLAS_STREAM_ALL];
+
+    private:
+
+        /* get next stream for the given type */
+        xkblas_stream_t * stream_next(xkblas_stream_type_t type);
+
 
 };
 

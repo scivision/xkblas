@@ -225,6 +225,27 @@ xkblas_device_accept_new_task(xkblas_device_t * device)
     return 1;
 }
 
+/* submit a kernel execution instruction on that device */
+static inline void
+xkblas_device_submit_kernel(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+    Task * task
+) {
+    /* create a new instruction and retrieve its offload stream */
+    xkblas_stream_t * stream = NULL;
+    xkblas_stream_instruction_t * instr = NULL;
+    device->offloader.instruction_new(XKBLAS_STREAM_TYPE_KERN, &stream, XKBLAS_STREAM_INSTR_KERN, &instr);
+    assert(stream);
+    assert(instr);
+
+    /* create a new kernel instruction */
+    instr->kern.task = task;
+
+    /* submit instruction to the stream */
+    stream->submit(instr);
+}
+
 /** call whenever the task kernel is ready to be executed on the driver's device */
 void
 xkblas_device_task_fetched(
@@ -233,14 +254,7 @@ xkblas_device_task_fetched(
     Task * task
 ) {
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
-
-    /* create a new kernel instruction */
-    # pragma message(TODO "Impl. this once stream initialization is implemented")
-    xkblas_stream_instruction_t * instr = device->offloader.instruction_new(XKBLAS_STREAM_INSTR_KERN);
-    instr->kern.task = task;
-
-    /* defer instruction */
-    device->offloader.submit(instr);
+    xkblas_device_submit_kernel(driver, device, task);
 }
 
 static inline void

@@ -1876,7 +1876,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     /*************************/
     /* init xkblas stream */
     /*************************/
-    xkblas_stream_init((xkblas_stream_t *) stream, type);
+    xkblas_stream_init((xkblas_stream_t *) stream, type, capacity);
 
     /*************************/
     /* do cuda specific init */

@@ -464,9 +464,11 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         //  void * addr = xkblas_memory_allocate(driver, device, size)
                     }
 
-                    // TODO : launch asynchronous fetch here
+                    // TODO : launch asynchronous fetch here, currently assume
+                    // data is always valid and run activation callback
+                    // straight-ahead
 
-                    // TODO : call this on fetch completion
+                    // TODO : call this code (aka activation) on fetch completion
                     {
                         /* update the valid and fetching bits in the memory tree */
                         search.prepare_validate(fetch.region);
