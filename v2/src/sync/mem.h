@@ -17,6 +17,8 @@ static inline void mem_barrier(void)
 #  if !defined(__MIC__)
   __asm__ __volatile__ ("mfence":::"memory");
 #  endif
+#elif defined(__arm__) || defined(__aarch64__)
+  __asm__ __volatile__ ("dmb ish":::"memory");
 #else
   OSMemoryBarrier();
 #endif
