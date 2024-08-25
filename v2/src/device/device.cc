@@ -137,6 +137,9 @@ xkblas_device_init(
 
     xkblas_device_stream_init(device, &device->stream, XKBLAS_STREAM_CAPACITY);
 
+    /* initialize device memory management */
+    XKBLAS_MUTEX_INIT( device->memdev.mem_lock );
+
     # if 0
     assert(0 == pthread_mutex_lock(&device->lock));
     assert(0 == pthread_cond_signal(&device->cond_sleep));
@@ -179,39 +182,6 @@ xkblas_device_create(
     assert(device->thread);
 
     return device;
-}
-
-static inline int
-xkblas_device_poll(xkblas_device_t * device)
-{
-    int err = 0;
-    assert(ThreadWorker::get() == device->thread);
-
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_H2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2H);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.process_instruction(XKBLAS_IO_STREAM_KERN);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.test(XKBLAS_IO_STREAM_KERN);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.test(XKBLAS_IO_STREAM_D2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.test(XKBLAS_IO_STREAM_H2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->stream.test(XKBLAS_IO_STREAM_D2H);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    return err;
 }
 
 static inline void

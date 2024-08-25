@@ -211,6 +211,7 @@ _xkblas_get_gpu_topo(void)
     }
 
 #if XKBLAS_DEBUG
+    xkblas_context_t* xkblas_context = xkblas_context_get(void)
     if (xkblas_context.conf.verbose)
     {
         char buffer[device_count+1];
@@ -263,13 +264,14 @@ uint64_t cuda_get_free_mem(int device_id)
     return device->free_mem;
 }
 
+/*
 static uintptr_t
 cuda_alloc(int device_id, size_t size, int * flag)
 {
     xkblas_device_cuda_t * device = __get_device_cuda(device_id);
 
     # pragma message(TODO "Cache system is always disabled, do we need this ?")
-    /* here we limit the size of allocated memory for the cache system */
+    // here we limit the size of allocated memory for the cache system
     if (((device->size_alloc - device->size_free) + size) > device->mem_limit)
     {
         if (flag)
@@ -295,7 +297,9 @@ cuda_alloc(int device_id, size_t size, int * flag)
     }
     return (uintptr_t)ptr;
 }
+*/
 
+/*
 static void
 cuda_free(int device_id, uintptr_t ptr, size_t size)
 {
@@ -312,6 +316,7 @@ cuda_free(int device_id, uintptr_t ptr, size_t size)
   fprintf(stdout, "cuda:%s: self:%p, tid:%i, free ptr=%p size=%ld\n", __FUNCTION__, pthread_self(), device->inherited.ctxt->tid, (void*)ptr, size);
 #endif
 }
+*/
 
 # pragma message(TODO "Finish cuda driver implementation")
 #if 0
@@ -1666,7 +1671,8 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
         unsigned int ndevices = XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)();
-        uint32_t gpuset = xkblas_context.conf.gpu_set;
+        xkblas_context_t* xkblas_context = xkblas_context_get();
+        uint32_t gpuset = xkblas_context->conf.gpu_set;
         for (int i = 0; i < ndevices ; ++i)
         {
             int idx = __builtin_ffs((unsigned int)gpuset);
@@ -1799,13 +1805,37 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->size_alloc = 0;
     device->size_free = 0;
     device->free_mem = 0;
-    device->mem_limit = (size_t)((double)xkblas_context.conf.cuda_cache_limit
+    xkblas_context_t* xkblas_context = xkblas_context_get();
+    device->mem_limit = (size_t)((double)xkblas_context->conf.cuda_cache_limit
             * (double)(device->free_mem-180UL*1024UL*1024UL));
+
+    { /* work memory allocation, maybe smarter to do it in xkblas_device_init */
+        size_t free;
+        size_t total;
+        res = cudaMemGetInfo(&free, &total);
+        __check_error(res);
+
+        /* allocate 90% of free memory, into a new chunk */
+        size_t target = free * 0.9;
+        xkblas_alloc_chunk_t* chunk0 = (xkblas_alloc_chunk_t*) malloc( sizeof(xkblas_alloc_chunk_t) );
+        res = cudaMalloc( (void**) &(chunk0->device_ptr), target );
+        __check_error(res);
+
+        chunk0->size = target;
+        chunk0->state = FREE_STATE;
+        chunk0->prev = NULL;
+        chunk0->next = NULL;
+        chunk0->freelink = NULL;
+        device->inherited.memdev.free_chunk_list = chunk0;
+    }
+
+
+
     if (getenv("XKBLAS_NO_GPUALLOCATOR"))
         XKBLAS_ERROR("XKBLAS_NO_GPUALLOCATOR but code do not compile for this option");
 
-    device->inherited.memdev.f_alloc = cuda_alloc;
-    device->inherited.memdev.f_free = cuda_free;
+    //device->inherited.memdev.f_alloc = cuda_alloc;
+    //device->inherited.memdev.f_free = cuda_free;
 
     # pragma message(TODO "Implement missing interfaces")
     # if 0

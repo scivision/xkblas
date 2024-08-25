@@ -93,6 +93,7 @@ typedef struct  xkblas_driver_t
     /* GPU blas support */
     void* (*f_get_gpublas_handle)(xkblas_device_t*);
 
+
 }               xkblas_driver_t;
 
 void * xkblas_device_thread_main(void * a);
@@ -135,5 +136,9 @@ void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
+
+void xkblas_driver_allocate_on_device( xkblas_driver_t* driver, xkblas_device_t* device, void** ptr, size_t size );
+void xkblas_driver_invalidate_caches( xkblas_driver_t* driver ); // TODO implement
+
 
 #endif /* __DRIVER_H__ */

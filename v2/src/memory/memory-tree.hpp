@@ -21,17 +21,17 @@ class KMemoryBlockReplicateFetch {
         const memory_block_view_t block_view;
 
         /* the replicate view */
-        const memory_block_replicate_view_t replicate_view;
+        memory_block_replicate_view_t replicate_view;
 
         /* devices on which the block is valid */
-        const memory_block_bitfield_t valid;
+        memory_block_bitfield_t valid;
 
     public:
 
         KMemoryBlockReplicateFetch(
             const memory_block_view_t & bview,
-            const memory_block_replicate_view_t & rview,
-            const memory_block_bitfield_t v
+            memory_block_replicate_view_t & rview,
+            memory_block_bitfield_t v
         ) :
             replicate_view(rview),
             block_view(bview),
@@ -39,6 +39,18 @@ class KMemoryBlockReplicateFetch {
         {}
 
         virtual ~KMemoryBlockReplicateFetch() {}
+
+        void
+        allocate_replicate_view_on_device( xkblas_driver_t* driver, xkblas_device_t* device )
+        {
+            int view_ld = this->block_view.bs_m; /* stored in a packed format */
+
+	    /* TODO : May need to handle sizeof(elem_t) somewhere */
+	    size_t size = ((size_t) this->block_view.bs_m) * this->block_view.bs_n;
+            xkblas_driver_allocate_on_device( driver, device, (void**) &this->replicate_view.addr, size);
+            // TODO : is there a flag to said that the view is allocated ?
+            this->valid |= (0x1) << device->global_id;
+        }
 
 }; /* KMemoryBlockReplicateFetch */
 
@@ -298,10 +310,16 @@ class KMemoryTree : public KIntervalBtree<K, DeviceInvalidKRegions<K>> {
                     //      - if wc reached 0, execute kernel
                     if (fetch.replicate_view.addr == 0)
                     {
-                        // TODO : allocate
+                        fetch.allocate_replicate_view_on_device( driver, device ); /* allocation is synchronous, it may wait for others tasks to finish */
+			// TODO : move the data to the device
+			// TODO : update the fetching bit
+			// TODO : update the valid bits (async ?)
                     }
 
-                    assert(fetch.valid & devbit == 0);
+		    // TODO : check which version is correct ?
+                    // assert(fetch.valid & devbit == 0); // old code
+                    assert((fetch.valid & devbit) != 0); //...
+                    assert((fetch.valid & devbit) != 0); // new code
                     // TODO : fetch
 
                     task->fetched();

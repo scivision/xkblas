@@ -105,4 +105,37 @@ typedef struct  xkblas_device_t
 
 }               xkblas_device_t;
 
+static inline int
+xkblas_device_poll(xkblas_device_t * device)
+{
+    int err = 0;
+    assert(ThreadWorker::get() == device->thread);
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_H2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2H);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_KERN);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_KERN);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_D2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_H2D);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_D2H);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    return err;
+}
+
 #endif /* __DEVICE_H__ */

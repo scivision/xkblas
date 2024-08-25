@@ -10,9 +10,10 @@
 typedef struct  memory_block_replicate_view_t
 {
     uintptr_t addr; // starting address of the block
+    int ld;
 
-    memory_block_replicate_view_t() : addr(0) {}
-    memory_block_replicate_view_t(const memory_block_replicate_view_t & src) : addr(src.addr) {}
+    memory_block_replicate_view_t() : addr(0), ld(0) {}
+    memory_block_replicate_view_t(const memory_block_replicate_view_t & src) : addr(src.addr), ld(src.ld) {}
     virtual ~memory_block_replicate_view_t() {}
 
 }               memory_block_replicate_view_t;

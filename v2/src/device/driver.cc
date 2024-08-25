@@ -181,3 +181,105 @@ xkblas_get_device_host(xkblas_drivers_t * drivers)
     assert(drivers->devices.n);
     return drivers->devices.list[0];
 }
+
+/**
+ * Allocate memory on device from list of free chunk
+ * It may fail and return NULL
+ */
+void* xkblas_try_allocate_on_device( xkblas_device_t* device, size_t size )
+{ /* adapted from kaapi_memory_alloc */
+    /* align data */
+    size = (size + 7UL) & ~7UL;
+
+    XKBLAS_MUTEX_LOCK( device->memdev.mem_lock );
+    // TODO : allocate 'main' chunk in init
+
+    xkblas_alloc_chunk* curr = device->memdev.free_chunk_list;
+    xkblas_alloc_chunk* prevfree = NULL;
+    size_t min_size = 0;
+    xkblas_alloc_chunk_t* min_size_curr = NULL;
+    xkblas_alloc_chunk_t* min_size_prevfree = NULL;
+    while( curr )
+    {
+        size_t curr_size = curr->size;
+        if(curr_size >= size)
+	{
+	// TODO : check original code, seems it does not check the min...
+	    min_size = curr_size;
+	    min_size_curr = curr;
+	    min_size_prevfree = prevfree;
+	}
+	prevfree = curr;
+	curr = curr->freelink;
+    }
+
+    curr = min_size_curr;
+    prevfree = min_size_prevfree;
+
+    /* split chunk */
+    if((curr != NULL) && (min_size - size >= 0.5*size))
+    {
+        size_t curr_size = curr->size;
+	xkblas_alloc_chunk_t* remainder = (xkblas_alloc_chunk_t*) malloc( sizeof(xkblas_alloc_chunk_t) );
+	remainder->device_ptr = size + curr->device_ptr;
+	remainder->size       = (curr_size - size);
+	remainder->state      = FREE_STATE;
+
+	/* link remainder segment after curr */
+        remainder->prev       = curr;
+	remainder->next       = curr->next;
+	if (curr->next) curr->next->prev = remainder;
+	curr->next            = remainder;
+	curr->size            = size;
+
+	/* link freelist */
+	remainder->freelink = curr->freelink;
+	curr->freelink = remainder;
+    }
+
+    if( curr != NULL )
+    {
+        if (prevfree) prevfree->freelink = curr->freelink;
+        else device->memdev.free_chunk_list = curr->freelink;
+        curr->state &= ~FREE_STATE;
+        curr->freelink = 0;
+    }
+
+    XKBLAS_MUTEX_UNLOCK( device->memdev.mem_lock );
+
+    return (curr != NULL) ? ((void*) curr->device_ptr) : NULL;
+}
+
+static size_t
+xkblas_evinct_memory_from_device( xkblas_device_t* device, size_t size )
+{ /* reference code: kaapi_memory_cache_evict_fromlist  */
+    // TODO implement eviction strategy
+    # pragma message(TODO "Implement xkblas_evinct_memory_from_device")
+    XKBLAS_ERROR( "Try to evinct data from global device %d, function not implemented - it may create an infite loop\n", device->global_id );
+    return ENOMEM;
+}
+
+void
+xkblas_driver_allocate_on_device( xkblas_driver_t* driver, xkblas_device_t* device, void** pptr, size_t size )
+{ // equivalent to _kaapi_dsm_allocate_replica
+    assert( *pptr == NULL );
+
+	//	*pptr = device->memdev->f_alloc( size_t size, int* flag );
+	*pptr = xkblas_try_allocate_on_device( device, size );
+	while( *pptr == NULL )
+	{ /* No memory found, we need to evinct something */
+		int err = xkblas_evinct_memory_from_device( device, size );
+		if( err == 0 ) /* evinction success, new space available */
+		{
+			*pptr = xkblas_try_allocate_on_device( device, size );
+		}
+		if( err == ENOMEM || *pptr == NULL )
+                {
+			/* Still not enought space ..., wait for some tasks to finish */
+			xkblas_device_poll( device );
+		}
+		// TODO what if the memory is never available ? infinit loop
+	}
+
+	// TODO set replica allocated ?
+}
