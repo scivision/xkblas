@@ -10,10 +10,11 @@
 typedef struct  memory_block_replicate_view_t
 {
     uintptr_t addr; // starting address of the block
-    int ld;
+    int LD;         // LD of this replicate view (may be different from
+                    // host'LD, as it is allocated compactly on the device)
 
-    memory_block_replicate_view_t() : addr(0), ld(0) {}
-    memory_block_replicate_view_t(const memory_block_replicate_view_t & src) : addr(src.addr), ld(src.ld) {}
+    memory_block_replicate_view_t() : addr(0), LD(0) {}
+    memory_block_replicate_view_t(const memory_block_replicate_view_t & src) : addr(src.addr), LD(src.LD) {}
     virtual ~memory_block_replicate_view_t() {}
 
 }               memory_block_replicate_view_t;
@@ -50,9 +51,10 @@ class MemoryBlock {
             valid(0),
             fetching(0)
         {
-            const int devid = 0;
-            this->valid = (1 << devid);
-            this->replicates[devid].addr = XKBLAS_MATRIX_TILE(tile.addr, tile.LD, tile.tm, tile.tn, tile.bs_m, tile.bs_m);
+            const int host_devid = 0;
+            this->valid = (1 << host_devid);
+            this->replicates[host_devid].addr = tile.begin_addr();
+            this->replicates[host_devid].LD = tile.LD;
         }
 
         MemoryBlock(

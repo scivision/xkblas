@@ -3,40 +3,38 @@
 
 # include "access-mode.h"
 # include "intervals.hpp"
+# include "matrix-tile.h"
 
 template<int K>
 class access_t
 {
+    using Region = Intervals<K>;
+
     public:
-        Intervals<K> region;
+        Region region;
         access_mode_t mode;
 
     public:
         access_t() :
-            mode(ACCESS_MODE_VOID),
-            region()
+            region(),
+            mode(ACCESS_MODE_VOID)
         {}
 
         access_t(const access_t & access) :
-            mode(access.mode),
-            region(access.region)
+            region(access.region),
+            mode(access.mode)
         {}
 
         access_t(const access_mode_t m, const Intervals<K> & r) :
-            mode(m),
-            region(r)
+            region(r),
+            mode(m)
         {}
 
         access_t(
-            const uintptr_t & P,
-            const int & LD,
-            const int & tm,
-            const int & tn,
-            const int & bs_m,
-            const int & bs_n,
+            const matrix_tile_t & t,
             const access_mode_t & m
         ) :
-            region(P, LD, tm, tn, bs_m, bs_n),
+            region(t),
             mode(m)
         {}
 

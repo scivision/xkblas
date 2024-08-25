@@ -111,6 +111,7 @@ xkblas_device_poll(xkblas_device_t * device)
     int err = 0;
     assert(ThreadWorker::get() == device->thread);
 
+    # if 0
     err = device->stream.process_instruction(XKBLAS_IO_STREAM_D2D);
     assert( (err == 0) || (err == EINPROGRESS));
 
@@ -134,6 +135,15 @@ xkblas_device_poll(xkblas_device_t * device)
 
     err = device->stream.test(XKBLAS_IO_STREAM_D2H);
     assert( (err == 0) || (err == EINPROGRESS));
+
+    # else
+    err = device->stream.process_instruction(XKBLAS_IO_STREAM_ALL);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    err = device->stream.test(XKBLAS_IO_STREAM_ALL);
+    assert( (err == 0) || (err == EINPROGRESS));
+
+    # endif
 
     return err;
 }

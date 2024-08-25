@@ -35,22 +35,31 @@ class Intervals {
         }
 
         // TODO : super-dirty stuff, to make xkblas code looks good
-        Intervals(
-            const uintptr_t & P,
-            const int & LD,
-            const int & tm, const int & tn,
-            const int & bs_m, const int & bs_n
-        ) {
+        Intervals(const matrix_tile_t & tile)
+        {
             if constexpr(K == 2)
             {
-                uintptr_t PP = XKBLAS_MATRIX_TILE(P, LD, tm, tn, bs_m, bs_n);
-                this->list[0].a = (uint64_t)(PP % LD);
-                this->list[0].b = this->list[0].a + bs_m;
-                this->list[1].a = (uint64_t)(PP / LD);
-                this->list[1].b = this->list[1].a + bs_n;
+# if 1
+                uintptr_t PP = tile.begin_addr();
+                this->list[0].a = (uint64_t)(PP / (tile.LD * tile.sizeof_type));
+                this->list[0].b = this->list[0].a + tile.bs_m;
+                this->list[1].a = (uint64_t)(PP % (tile.LD * tile.sizeof_type));
+                this->list[1].b = this->list[1].a + tile.bs_n * tile.sizeof_type;
+# else
+
+                uintptr_t PP = XKBLAS_MATRIX_TILE(P, LD, tm, tn, bs_m, bs_n, 1);
+
+                XKBLAS_MATRIX_TILE_COORDINATE(
+                    PP, LD, bs_m, bs_n, 1,
+                    this->list[1].a, this->list[0].a,
+                    this->list[1].b, this->list[0].b
+                );
+# endif
+
             }
             else
             {
+                assert(0);
             }
         }
 

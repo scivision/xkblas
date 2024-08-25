@@ -357,8 +357,8 @@ class KIntervalBtree {
                     else if (K == 2)
                     {
                         fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {",
-                            this->region[0].a, this->region[1].a,
-                            this->region[0].b, this->region[1].b
+                            this->region[1].a, this->region[0].a,
+                            this->region[1].b, this->region[0].b
                         );
                         this->dump_region_str(f);
                         fprintf(f, "};\n");
@@ -384,8 +384,8 @@ class KIntervalBtree {
 
         /* pseudo node to implement Day-Stout-Warren algorithm. Abstract
          * interfaces are not used, so just implemented them as 'no-op' */
-        class PseudoNode : public Node {
-
+        class PseudoNode : public Node
+        {
                 void
                 on_insert(T & t, const access_mode_t mode)
                 {

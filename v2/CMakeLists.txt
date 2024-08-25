@@ -52,6 +52,7 @@ add_library(xkblas SHARED
     src/device/stream.cc
     src/device/thread-producer.cc
     src/device/thread-worker.cc
+    src/kernels/bgemm.cc
     src/kernels/zgemm.cc
     src/logger/logger.cc
 )
