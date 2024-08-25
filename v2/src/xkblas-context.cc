@@ -78,6 +78,28 @@ xkblas_init(void)
 }
 
 extern "C" void
+xkblas_invalidate_caches(void)
+{
+    XKBLAS_INFO("Invalidate XKBlas caches");
+    xkblas_context_t * ctx = xkblas_context_get();
+    if( ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+    {
+        SPINLOCK_LOCK(ctx->state.spinlock);
+        if( ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+        {
+	    /*
+	    // TODO : add a driver count so we can stop earlier ...
+            for( int driver_id = 0; driver_id < MAX_DRIVER_COUNT; driver_id++ )
+	    {
+	        xkblas_driver_invalidate_caches( ctx->drivers.list + driver_id );
+	    }
+	    */
+        }
+        SPINLOCK_UNLOCK(ctx->state.spinlock); 
+    }
+}
+
+extern "C" void
 xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
