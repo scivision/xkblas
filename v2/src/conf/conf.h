@@ -20,7 +20,7 @@ typedef struct  xkblas_conf_stream_t
 
 typedef struct  xkblas_conf_offloader_t
 {
-    xkblas_conf_stream_t streams[XKBLAS_STREAM_ALL];
+    xkblas_conf_stream_t streams[XKBLAS_STREAM_TYPE_ALL];
     uint16_t capacity;
 
 }               xkblas_conf_offloader_t;

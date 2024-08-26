@@ -1,8 +1,5 @@
-# TODO - Discussions Pierre Etienne
-- maintenir MDI par region dans l'arbre, avec dupplicat
-- rechercher MDI à l'exécution en fonction du paramètre OCR
-    - associer un cudaevent à un MDI
-- utiliser wait sur events
+# LICENSE
+- Set header in all files, a CECILL
 
 # Impacts on previous applications
 - users must explicitly call `xkblas_thread_init` on any thread before making any other calls to xkblas on that thread

@@ -2216,10 +2216,10 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
                 assert(res == cudaSuccess);
 #  endif
                 xkblas_offload_device_execute_task(
-                        &device->inherited,
-                        op->task,
-                        stream->handle
-                        );
+                    &device->inherited,
+                    op->task,
+                    stream->handle
+                );
             }
     }
     # endif

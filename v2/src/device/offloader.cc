@@ -15,10 +15,10 @@ Offloader::init(
     memset(this->next, 0, sizeof(this->next));
 
     uint16_t cnt = 0;
-    uint16_t prefix[XKBLAS_STREAM_ALL+1];
+    uint16_t prefix[XKBLAS_STREAM_TYPE_ALL+1];
 
     prefix[0] = 0;
-    for (int stype = 0 ; stype < XKBLAS_STREAM_ALL ; ++stype)
+    for (int stype = 0 ; stype < XKBLAS_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = conf->streams[stype].n;
         cnt += this->count[stype];
@@ -48,9 +48,22 @@ Offloader::is_empty(xkblas_stream_type_t type) const
 }
 
 int
-Offloader::process_instruction(xkblas_stream_type_t type)
+Offloader::process_instruction(xkblas_stream_type_t stype)
 {
-    return 0;
+    int err = 0;
+
+    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    for (unsigned int s = bgn ; s < end ; ++s)
+    {
+        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+        {
+            err = this->streams[s][i]->process_instructions();
+            assert(err == 0 || err == EINPROGRESS);
+        }
+    }
+
+    return err;
 }
 
 int
@@ -93,20 +106,22 @@ Offloader::stream_next(xkblas_stream_type_t stype)
 void
 Offloader::instruction_new(
     xkblas_stream_type_t stype,             /* IN  */
-    xkblas_stream_t ** stream,              /* OUT */
+    xkblas_stream_t ** pstream,             /* OUT */
     xkblas_stream_instruction_type_t itype, /* IN  */
-    xkblas_stream_instruction_t ** instr    /* OUT */
+    xkblas_stream_instruction_t ** pinstr   /* OUT */
 ) {
-    assert(stream);
-    assert(instr);
+    assert(pstream);
+    assert(pinstr);
 
     /* retrieve native stream */
-    *stream = stream_next(stype);
-    assert(*stream);
+    xkblas_stream_t * stream = this->stream_next(stype);
 
-    /* allocate instruction */
-    *instr = (*stream)->instr.buffer + ((*stream)->pos_w % (*stream)->instr.capacity);
-    assert(*instr);
+    /* allocation instruction */
+    xkblas_stream_instruction_t * instr = stream->instruction_new(itype);
 
-    (*instr)->type = itype;
+    /* out */
+    assert(stream);
+    assert(instr);
+    *pstream = stream;
+    *pinstr  = instr;
 }

@@ -441,6 +441,13 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         "memory addresses - for now, just perform one data "    \
                         "transfer per block")
 
+                // TODO : also get the list of 'valid blocks' and always
+                //  - reallocate the access
+                //  - memcpy (local) valid blocks
+                //  - memcpy (remote) invalid blocks
+                //
+                //  But it raises an issue : if the block is valid, how not to
+                //  synchronize another concurrent consumer on the same device ?
 
                 if (search.invalids.size() > 1)
                     XKBLAS_IMPL("Several memory blocks are invalid for the same access");

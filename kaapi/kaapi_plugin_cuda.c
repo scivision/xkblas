@@ -1264,67 +1264,17 @@ _kaapi_unlock_print();
 
     case KAAPI_IO_KERN:
     {
-#if KAAPI_HAVE_IO_THREADS
-      kaapi_assert_debug( thread_type == 0 );
-#endif
       /* same as cublas */
       stream = &cios->stream;
       struct kaapi_io_kernel* op = &instr->inst.k_io;
-      KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' exec task:%p, stream: %p\n", __FUNCTION__,
-          name_io[instr->type],
-          op->task,
-          (void*)*stream
-      );
-      KAAPI_EVENT_PUSH1( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-         1 /* begin */, op->reserved );
-#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
-      instr->t1 = kaapi_get_elapsedtime();
-#  if CONFIG_USE_EVENT
-      res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
-      kaapi_assert(res == cudaSuccess);
-#  endif
-#endif
-#if KAAPI_USE_PERSTREAM_BLASHANDLE==0
-      /* the call + execute_task should be atomic */
-      cublasStatus_t cres = cublasSetStream(device->handle, *stream);
-      kaapi_assert(cres == CUBLAS_STATUS_SUCCESS);
-#endif
       kaapi_offload_device_execute_task(
         &device->inherited,
         op->task,
-#if KAAPI_USE_PERSTREAM_BLASHANDLE
         cios->handle
-#else
-        device->handle
-#endif
       );
 
-#if CONFIG_SYNCHRONOUS_KERNEL
-#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
       res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == cudaSuccess);
-#endif
-      res = cudaStreamSynchronize( *stream );
-      kaapi_assert(res == CUDA_SUCCESS);
-
-#if KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB
-      float gpu_delay;
-      res = cudaEventElapsedTime ( &gpu_delay, cios->start_events[ios->pos_wp % ios->count], cios->end_events[ios->pos_wp % ios->count] );
-      if (res != cudaSuccess) {
-         CudaCheckError(res);
-         kaapi_assert(0);
-      }
-      uint64_t delay = gpu_delay*1000.0; // convert to ns
-      KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-         2 /* end */, op->reserved, delay );
-#endif
-      ++ios->ok_p;
-#elif CONFIG_USE_EVENT 
-      res = cudaEventRecord(cios->end_events[ ios->pos_wp % ios->count ], *stream );
-      kaapi_assert(res == cudaSuccess);
-#else // no use event, no synchronous
-      #error "Unsupported configuration"
-#endif
     }
   }
 

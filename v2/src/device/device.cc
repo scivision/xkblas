@@ -151,10 +151,10 @@ xkblas_device_poll(xkblas_device_t * device)
     assert( (err == 0) || (err == EINPROGRESS));
 
     # else
-    err = device->offloader.process_instruction(XKBLAS_STREAM_ALL);
+    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->offloader.test(XKBLAS_STREAM_ALL);
+    err = device->offloader.test(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
     # endif
@@ -225,6 +225,20 @@ xkblas_device_accept_new_task(xkblas_device_t * device)
     return 1;
 }
 
+/* commit a stream instruction and wakeup thread */
+static inline void
+xkblas_device_submit(
+    xkblas_device_t * device,
+    xkblas_stream_t * stream,
+    xkblas_stream_instruction_t * instr
+) {
+    /* commit instruction to the stream */
+    stream->commit(instr);
+
+    /* wakeup device worker thread */
+    device->thread->wakeup();
+}
+
 /* submit a kernel execution instruction on that device */
 static inline void
 xkblas_device_submit_kernel(
@@ -233,9 +247,14 @@ xkblas_device_submit_kernel(
     Task * task
 ) {
     /* create a new instruction and retrieve its offload stream */
-    xkblas_stream_t * stream = NULL;
-    xkblas_stream_instruction_t * instr = NULL;
-    device->offloader.instruction_new(XKBLAS_STREAM_TYPE_KERN, &stream, XKBLAS_STREAM_INSTR_KERN, &instr);
+    xkblas_stream_t * stream;
+    xkblas_stream_instruction_t * instr;
+    device->offloader.instruction_new(
+        XKBLAS_STREAM_TYPE_KERN,    /* IN */
+        &stream,                    /* OUT */
+        XKBLAS_STREAM_INSTR_KERN,   /* IN */
+        &instr                      /* OUT */
+    );
     assert(stream);
     assert(instr);
 
@@ -243,7 +262,7 @@ xkblas_device_submit_kernel(
     instr->kern.task = task;
 
     /* submit instruction to the stream */
-    stream->submit(instr);
+    xkblas_device_submit(device, stream, instr);
 }
 
 /** call whenever the task kernel is ready to be executed on the driver's device */
@@ -311,7 +330,7 @@ xkblas_device_thread_main_loop(
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
         while ((task = thread->pop()) == NULL &&
-                device->offloader.is_empty(XKBLAS_STREAM_ALL) &&
+                device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
                 device->request.op == XKBLAS_DEVICEOP_NOP)
             device->thread->pause();
 
@@ -395,23 +414,4 @@ xkblas_device_thread_main(void * a)
 # endif
 
     return NULL;
-}
-
-int
-xkblas_kernel_launch(
-    xkblas_driver_type_t type,
-    task_kernel_param_t * param
-) {
-
-    // must be executed by the worker thread of the passed device
-
-    assert(param);
-    assert(type >= 0 && type <= XKBLAS_DRIVER_MAX);
-
-    task_format_t * format = task_format_get(param->task->fmtid);
-    assert(format);
-
-    format->f[type](param);
-
-    return 0;
 }

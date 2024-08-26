@@ -408,29 +408,8 @@ void kaapi_stream_insert_io_task_inst(
     void*                   arg2
 )
 { 
-  KAAPI_OFFLOAD_TRACE_IN
-  
-#if KAAPI_USE_PERFCOUNTER 
-  double t0 = kaapi_get_elapsedtime();
-#endif
   kaapi_io_stream_t* ios;
   kaapi_io_instruction_t* inst = kaapi_offload_stream_push( stream, stype, &ios );
-
-#if KAAPI_USE_TRACELIB==1
-  {
-    inst->inst.k_io.reserved = KAAPI_ATOMIC_INCR(&offload_ker_id);
-    kaapi_context_t* ctxt =kaapi_self_context();
-    kaapi_event_t* evt = KAAPI_EVENT_GET(&ctxt->kproc, KAAPI_EVT_OFFLOAD_KERN, 0 /*push*/ );
-    if (evt)
-    {
-      evt->u.s.d0.u = inst->inst.k_io.reserved;
-      evt->u.s.d1.p = task;
-      evt->u.s.d2.u = kaapi_task_getformat_ref(task)->fmtid;
-      evt->u.s.d3.i8[0] = ios->sid;
-      KAAPI_EVENT_PUSH(&kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN);
-    }
-  }
-#endif
 
 #if KAAPI_DEBUG
   kaapi_assert_debug( ios != 0 );
@@ -444,19 +423,9 @@ void kaapi_stream_insert_io_task_inst(
   inst->inst.l_io.arg[1]= arg1;
   inst->inst.l_io.arg[2]= arg2;
   inst->inst.k_io.task  = task;
-#if KAAPI_USE_PERFCOUNTER
-  inst->t0 = t0;
-  inst->t1 =0;
-  inst->t2 =0;
-  inst->t3 =0;
-#endif
 
   kaapi_offload_stream_commit( stream, stype, ios );
 
-#if KAAPI_DEBUG
-  kaapi_assert_debug( ios->mutex._owner != pthread_self() );
-#endif
-  KAAPI_OFFLOAD_TRACE_OUT
 }
 
 

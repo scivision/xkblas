@@ -2,6 +2,7 @@
 # define __STREAM_HPP__
 
 # include "device/stream-instruction.h"
+# include "sync/spinlock.h"
 
 /* DONT CHANGE ORDER HERE !! Can have side effects (in the Offloader class for instance) */
 typedef enum    xkblas_stream_type_t
@@ -10,41 +11,69 @@ typedef enum    xkblas_stream_type_t
     XKBLAS_STREAM_TYPE_D2H  = 1, /* from GPU to CPU */
     XKBLAS_STREAM_TYPE_D2D  = 2, /* from GPU to GPU */
     XKBLAS_STREAM_TYPE_KERN = 3,
-    XKBLAS_STREAM_ALL       /* internal purpose */
+    XKBLAS_STREAM_TYPE_ALL       /* internal purpose */
 
 }               xkblas_stream_type_t;
+
+typedef struct  xkblas_stream_instruction_queue_t
+{
+    /* attributes */
+    xkblas_stream_instruction_t * instr;    /* instructions buffer */
+    uint64_t capacity;                      /* buffer capacity */
+    struct {
+        volatile uint64_t r;            /* first instruction to process */
+        volatile uint64_t w;            /* next position for inserting instructions */
+    } pos;
+
+    /* methods */
+    int
+    is_full(void) const
+    {
+        return (this->pos.w - this->pos.r >= this->capacity);
+    }
+
+    int
+    is_empty(void) const
+    {
+        return (this->pos.r == this->pos.w);
+    }
+
+}               xkblas_stream_instruction_queue_t;
 
 # pragma message(TODO "make this a C++ class and use inheritance/pure virtual - currently hybrid of C struct C++ class :(")
 class xkblas_stream_t
 {
     public:
         xkblas_stream_type_t type;
-        xkblas_mutex_t               mutex;     /*  lock */
-        uint64_t                     smax;      /* maximal occupency of the stream */
-        uint64_t                     smax_p;    /* maximal occupency of pending requests in the stream */
-        uint64_t                     max_p;     /* ok_p..max_p should have been directly notified */
-        uint64_t                     pos_r;       /* first instruction to process */
-        uint64_t                     pos_w;       /* next position for writing instructions */
-        volatile uint64_t            pos_rp;    /* first pending instruction into the bloc */
-        volatile uint64_t            pos_wp;    /* next position for writing into the pending bloc */
-        struct {
-            uint64_t                       capacity;     /* the size of array instr and pending */
-            xkblas_stream_instruction_t *  buffer;       /* first instruction */
-            # if 0
-            xkblas_stream_instruction_t *  pending;   /* pending instructions, not yet completed */
-            # endif
+        spinlock_t spinlock;
 
-        } instr;
+        xkblas_stream_instruction_queue_t queue;
+        xkblas_stream_instruction_queue_t pending;
+
         volatile uint64_t            ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
         /* past the last position of pending notified instr in [pos_rp,pos_wp] */
-
 
     public:
         xkblas_stream_t() {}
         virtual ~xkblas_stream_t() {}
 
     public:
-        int submit(xkblas_stream_instruction_t * instruction);
+
+        /* allocate a new instruction to the stream (must then be commited via 'commit') */
+        xkblas_stream_instruction_t * instruction_new(xkblas_stream_instruction_type_t itype);
+
+        /* commit the instruction to the stream (must be allocated via 'instruction_new') */
+        int commit(xkblas_stream_instruction_t * instruction);
+
+        /* process instructions */
+        int process_instructions(void);
+
+        /* return true if the stream is full of instructions, false otherwise */
+        int is_full(void) const;
+
+        /* return true if the stream is empty, false otherwise */
+        int is_empty(void) const;
+
 
 };  /* xkblas_stream_t */
 

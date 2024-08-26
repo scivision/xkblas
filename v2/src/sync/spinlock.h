@@ -17,4 +17,6 @@ typedef volatile int spinlock_t;
         __sync_fetch_and_xor(&L, L);    \
     } while (0)
 
+# define SPINLOCK_ISLOCKED(L) (L)
+
 #endif /* __SPINLOCK_H__ */

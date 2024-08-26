@@ -65,13 +65,13 @@ class Offloader
     public:
 
         /* number of iostream per type */
-        int count[XKBLAS_STREAM_ALL];
+        int count[XKBLAS_STREAM_TYPE_ALL];
 
         /* next stream fifo */
-        std::atomic<int> next[XKBLAS_STREAM_ALL];
+        std::atomic<int> next[XKBLAS_STREAM_TYPE_ALL];
 
         /* basic stream */
-        xkblas_stream_t ** streams[XKBLAS_STREAM_ALL];
+        xkblas_stream_t ** streams[XKBLAS_STREAM_TYPE_ALL];
 
     private:
 

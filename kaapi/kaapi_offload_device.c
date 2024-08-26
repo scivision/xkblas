@@ -338,13 +338,7 @@ int kaapi_offload_device_execute_task(
   kaapi_context_t* ctxt = device->ctxt;
   kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
 
-#if KAAPI_DEBUG
-  kaapi_assert( task->device ==device );
-#endif
   kaapi_format_id_t fmtid = kaapi_task_getformat_ref(task)->fmtid;
-  KAAPI_EVENT_PUSH3( &kaapi_self_context()->kproc, KAAPI_EVT_TASK_EXEC,
-     2 /* begin */, task, fmtid, kaapi_task_getargs(task) );
-  
   /* handle comes form portability layer: for cuda its the gpublas hande */
   ctxt->pc = task;
   ((kaapi_task_bodyfnc_gpu_t)fmt->entrypoint[device->driver->f_get_type()])(

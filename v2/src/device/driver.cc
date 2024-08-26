@@ -179,3 +179,22 @@ xkblas_get_device_host(xkblas_drivers_t * drivers)
     assert(drivers->devices.n);
     return drivers->devices.list[0];
 }
+
+int
+xkblas_kernel_launch(
+    xkblas_driver_type_t type,
+    task_kernel_param_t * param
+) {
+
+    // must be executed by the worker thread of the passed device
+
+    assert(param);
+    assert(type >= 0 && type <= XKBLAS_DRIVER_MAX);
+
+    task_format_t * format = task_format_get(param->task->fmtid);
+    assert(format);
+
+    format->f[type](param);
+
+    return 0;
+}
