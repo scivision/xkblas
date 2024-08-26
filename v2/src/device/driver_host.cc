@@ -93,6 +93,8 @@ static void
 XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
 {
     assert(INITIALIZED);
+    xkblas_device_host_t* device = (xkblas_device_host_t *) DEVICES + device_id;
+    device->inherited.memdev.memory_allocated = 0; /* prevent usage of memdev on host device */
 }
 
 static int

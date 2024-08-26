@@ -1827,6 +1827,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
         chunk0->next = NULL;
         chunk0->freelink = NULL;
         device->inherited.memdev.free_chunk_list = chunk0;
+        device->inherited.memdev.memory_allocated = 1;
     }
 
 

@@ -84,6 +84,7 @@ typedef struct  xkblas_device_memory_t
     xkblas_address_space_id_t asid;
     // xkblas_device_t * device;
     xkblas_mutex_t mem_lock;                /* used */
+    int memory_allocated;                   /* used */
     xkblas_alloc_data_t * freelist_bloc;
     xkblas_alloc_data_t * freelist_metabloc;
     xkblas_alloc_chunk_t * free_chunk_list; /* used */

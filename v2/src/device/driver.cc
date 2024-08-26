@@ -192,7 +192,12 @@ void* xkblas_try_allocate_on_device( xkblas_device_t* device, size_t size )
     size = (size + 7UL) & ~7UL;
 
     XKBLAS_MUTEX_LOCK( device->memdev.mem_lock );
-    // TODO : allocate 'main' chunk in init
+    if( device->memdev.memory_allocated == 0 )
+    { /* Device is host, should be used only in debug mode */
+        XKBLAS_DEBUG("Allocate memory on host device (global id %d) - it may not be cleanned\n", device->global_id );
+        XKBLAS_MUTEX_UNLOCK( device->memdev.mem_lock );
+        return malloc( size );
+    }
 
     xkblas_alloc_chunk* curr = device->memdev.free_chunk_list;
     xkblas_alloc_chunk* prevfree = NULL;
