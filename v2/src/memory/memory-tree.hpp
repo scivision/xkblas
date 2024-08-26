@@ -29,18 +29,18 @@ class KMemoryBlockReplicateFetch {
         const memory_block_view_t block_view;
 
         /* the replicate view */
-        memory_block_replicate_view_t replicate_view;
+        const memory_block_replicate_view_t replicate_view;
 
         /* devices on which the block is valid */
-        memory_block_bitfield_t valid;
+        const memory_block_bitfield_t valid;
 
     public:
 
         KMemoryBlockReplicateFetch(
             const Region & r,
             const memory_block_view_t & bview,
-            memory_block_replicate_view_t & rview,
-            memory_block_bitfield_t v
+            const memory_block_replicate_view_t & rview,
+            const memory_block_bitfield_t v
         ) :
             region(r),
             replicate_view(rview),
@@ -49,16 +49,6 @@ class KMemoryBlockReplicateFetch {
         {}
 
         virtual ~KMemoryBlockReplicateFetch() {}
-
-        void
-        allocate_replicate_view_on_device( xkblas_driver_t* driver, xkblas_device_t* device )
-        {
-            int view_ld = this->block_view.bs_m; /* stored in a packed format */
-
-            xkblas_driver_allocate_on_device( driver, device, (void**) &this->replicate_view.addr, this->size() );
-            // TODO : is there a flag to said that the view is allocated ?
-            this->valid |= (0x1) << device->global_id;
-        }
 
         uint64_t
         size(void) const
@@ -408,23 +398,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     const bool require_allocation = (fetch.replicate_view.addr == 0);
                     if (require_allocation)
                     {
-                        fetch.allocate_replicate_view_on_device( driver, device ); /* allocation is synchronous, it may wait for others tasks to finish */
-			// TODO : move the data to the device
-			// TODO : update the fetching bit
-			// TODO : update the valid bits (async ?)
-
-                        # pragma message(TODO "PE: make allocator coherent with comment bellow" ) 
-                        # pragma message(TODO "allocator, P-E is working on it")
-                        // TODO : uncomment this
-                        //  uint64_t size = fetch.size()
-                        //  void * addr = xkblas_memory_allocate(driver, device, size)
+                        uint64_t size = fetch.size();
+                        void* addr = NULL;
+                        xkblas_memory_allocate(driver, device, &addr, size);
                     }
-
-		    // TODO : check which version is correct ?
-                    // assert(fetch.valid & devbit == 0); // old code
-                    assert((fetch.valid & devbit) != 0); // new code
-                    // TODO : fetch
-
 
                     // TODO : call this on fetch completion
                     {

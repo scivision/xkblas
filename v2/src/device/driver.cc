@@ -260,26 +260,25 @@ xkblas_evinct_memory_from_device( xkblas_device_t* device, size_t size )
 }
 
 void
-xkblas_driver_allocate_on_device( xkblas_driver_t* driver, xkblas_device_t* device, void** pptr, size_t size )
+xkblas_memory_allocate( xkblas_driver_t* driver, xkblas_device_t* device, void** pptr, size_t size )
 { // equivalent to _kaapi_dsm_allocate_replica
     assert( *pptr == NULL );
 
-	//	*pptr = device->memdev->f_alloc( size_t size, int* flag );
-	*pptr = xkblas_try_allocate_on_device( device, size );
-	while( *pptr == NULL )
-	{ /* No memory found, we need to evinct something */
-		int err = xkblas_evinct_memory_from_device( device, size );
-		if( err == 0 ) /* evinction success, new space available */
-		{
-			*pptr = xkblas_try_allocate_on_device( device, size );
-		}
-		if( err == ENOMEM || *pptr == NULL )
-                {
-			/* Still not enought space ..., wait for some tasks to finish */
-			xkblas_device_poll( device );
-		}
-		// TODO what if the memory is never available ? infinit loop
-	}
-
-	// TODO set replica allocated ?
+    //*pptr = device->memdev->f_alloc( size_t size, int* flag );
+    *pptr = xkblas_try_allocate_on_device( device, size );
+    while( *pptr == NULL )
+    { /* No memory found, we need to evinct something */
+        int err = xkblas_evinct_memory_from_device( device, size );
+        if( err == 0 ) /* evinction success, new space available */
+        {
+            *pptr = xkblas_try_allocate_on_device( device, size );
+        }
+        if( err == ENOMEM || *pptr == NULL )
+        {
+            /* Still not enought space ..., wait for some tasks to finish */
+            xkblas_device_poll( device );
+        }
+        // TODO what if the memory is never available ? infinit loop
+    }
+    // TODO set replica allocated ?
 }

@@ -137,7 +137,7 @@ void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
 
-void xkblas_driver_allocate_on_device( xkblas_driver_t* driver, xkblas_device_t* device, void** ptr, size_t size );
+void xkblas_memory_allocate( xkblas_driver_t* driver, xkblas_device_t* device, void** ptr, size_t size );
 void xkblas_driver_invalidate_caches( xkblas_driver_t* driver ); // TODO implement
 
 
