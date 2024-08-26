@@ -47,11 +47,11 @@ class xkblas_stream_t
         xkblas_stream_type_t type;
         spinlock_t spinlock;
 
-        xkblas_stream_instruction_queue_t queue;
+        xkblas_stream_instruction_queue_t ready;
         xkblas_stream_instruction_queue_t pending;
 
-        volatile uint64_t            ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
         /* past the last position of pending notified instr in [pos_rp,pos_wp] */
+        volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
     public:
         xkblas_stream_t() {}

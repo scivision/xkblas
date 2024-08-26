@@ -40,10 +40,18 @@ Offloader::init(
     }
 }
 
-
 bool
-Offloader::is_empty(xkblas_stream_type_t type) const
+Offloader::is_empty(xkblas_stream_type_t stype) const
 {
+    int err = 0;
+
+    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    for (unsigned int s = bgn ; s < end ; ++s)
+        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+            if (!this->streams[s][i]->is_empty())
+                return false;
+
     return true;
 }
 

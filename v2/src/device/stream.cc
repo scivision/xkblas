@@ -27,7 +27,7 @@ xkblas_stream_init(
     assert(mem);
 
     xkblas_stream_instruction_queue_init(
-        &stream->queue,
+        &stream->ready,
         mem,
         capacity
     );
@@ -45,9 +45,10 @@ void
 xkblas_stream_deinit(xkblas_stream_t * stream)
 {
     assert(stream);
-    assert(stream->queue.instr);
+    assert(stream->ready.instr);
     assert(stream->pending.instr);
-    free(stream->queue.instr);
+
+    free(stream->ready.instr);
 }
 
 # pragma message(TODO "do we really need to lock in 'new' and unlock in 'commit' - couldn't we already unlock in 'new' ?")
@@ -61,20 +62,20 @@ xkblas_stream_t::instruction_new(
      * operation, so the caller can initialize the instruction in-between */
     while (1)
     {
-        if (!this->queue.is_full())
+        if (!this->ready.is_full())
         {
             SPINLOCK_LOCK(this->spinlock);
             {
-                if (!this->queue.is_full())
+                if (!this->ready.is_full())
                 {
                     break ;
                 }
             }
+            SPINLOCK_UNLOCK(this->spinlock);
         }
-        SPINLOCK_UNLOCK(this->spinlock);
     }
 
-    xkblas_stream_instruction_t * instr = this->queue.instr + (this->queue.pos.w % this->queue.capacity);
+    xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
     instr->type = itype;
 
     return instr;
@@ -87,12 +88,12 @@ xkblas_stream_t::commit(
     XKBLAS_IMPL("commiting instruction of type %u", instr->type);
 
     assert(instr);
-    assert(instr == this->queue.instr + (this->queue.pos.w % this->queue.capacity));
+    assert(instr == this->ready.instr + (this->ready.pos.w % this->ready.capacity));
     assert(SPINLOCK_ISLOCKED(this->spinlock));
 
     /* assuming TSO, so writemen barrier is enough */
     writemem_barrier();
-    ++this->queue.pos.w;
+    ++this->ready.pos.w;
 
     SPINLOCK_UNLOCK(this->spinlock);
 
@@ -104,25 +105,25 @@ xkblas_stream_t::process_instructions(void)
 {
     int err = 0;
 
-    assert(this->queue.pos.r <= this->queue.pos.w);
+    assert(this->ready.pos.r <= this->ready.pos.w);
 
-    while (!this->queue.is_empty())
+    while (!this->ready.is_empty())
     {
         SPINLOCK_LOCK(this->spinlock);
         {
-            if (!this->queue.is_empty())
+            if (!this->ready.is_empty())
             {
-                int p = this->queue.pos.r % this->queue.capacity;
+                int p = this->ready.pos.r % this->ready.capacity;
                 // TODO : call this
                 // err = stream->f_stream_decode_ioinstruction(stream->device, ios, &ios->instr[p]);
                 assert(err == 0 || err == EINPROGRESS);
-                ++this->queue.pos.r;
+                ++this->ready.pos.r;
 
                 /* recopy op in pending op if still progressing */
                 if (err == EINPROGRESS)
                 {
                     int wp = this->pending.pos.w % this->pending.capacity;
-                    this->pending.instr[wp] = this->queue.instr[p];
+                    this->pending.instr[wp] = this->ready.instr[p];
                     ++this->pending.pos.w;
                 }
             }
@@ -131,4 +132,11 @@ xkblas_stream_t::process_instructions(void)
     }
 
     return err;
+}
+
+/* return true if the stream is empty, false otherwise */
+int
+xkblas_stream_t::is_empty(void) const
+{
+    return this->ready.is_empty() && this->pending.is_empty();
 }
