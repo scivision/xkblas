@@ -13,7 +13,6 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-
 // if greater than 16, then gotta increase the bitfield type
 static_assert(XKBLAS_DEVICES_MAX <= 16);
 typedef uint16_t memory_replicates_bitfield_t;
@@ -22,16 +21,16 @@ class MemoryBlock {
 
     public:
 
-        /* memory view of that block */
+        /* host memory view of that block */
         memory_view_t view;
 
         /* per device replicate info */
-        memory_replicate_view_t replicates[XKBLAS_DEVICES_MAX];
+        memory_replicate_t replicates[XKBLAS_DEVICES_MAX];
 
-        /* if i-th bit is set, the i-th device has a valid copy */
+        /* if i-th bit is set, the i-th device has a view with a valid copy */
         volatile memory_replicates_bitfield_t valid;
 
-        /* if i-th bit is set, the i-th device is fetching */
+        /* if i-th bit is set, the i-th device has a view that is fetching */
         volatile memory_replicates_bitfield_t fetching;
 
     public:
@@ -43,12 +42,16 @@ class MemoryBlock {
             valid(0),
             fetching(0)
         {
+            # pragma message(TODO "Reimplementfor each view of the replicate")
+            # if 0
             const int host_devid = 0;
             this->valid = (1 << host_devid);
             this->replicates[host_devid].addr = view.begin_addr();
             this->replicates[host_devid].LD = view.LD;
+            # endif
         }
 
+        /* a block from splitting an existing one */
         MemoryBlock(
             const MemoryBlock & block
         ) :
@@ -67,6 +70,7 @@ class MemoryBlock {
 template <int K>
 class KMemoryBlockReplicateFetch {
 
+    # if 0
     using Region = Intervals<K>;
 
     public:
@@ -105,6 +109,7 @@ class KMemoryBlockReplicateFetch {
             return this->block_view.bs_m * this->block_view.bs_n * this->block_view.sizeof_type;
         }
 
+        # endif
 }; /* KMemoryBlockReplicateFetch */
 
 
@@ -125,9 +130,9 @@ class KMemoryTreeNodeSearch {
 
         /* different search type */
         enum Type : uint8_t {
-            INSERTING_BLOCKS            = 0,
-            SEARCH_FOR_INVALID_BLOCKS   = 1,
-            VALIDATE_BLOCKS             = 2
+            INSERTING_BLOCKS    = 0,
+            SEARCH_FOR_BLOCKS   = 1,
+            VALIDATE_BLOCKS     = 2
         };
 
     public:
@@ -150,11 +155,11 @@ class KMemoryTreeNodeSearch {
         Access * access;
 
         ///////////////////////////////////////////////
-        // used if type == SEARCH_FOR_INVALID_BLOCKS //
+        // used if type == SEARCH_FOR_BLOCKS //
         ///////////////////////////////////////////////
 
         /* list of invalid replicate */
-        std::vector<KMemoryBlockReplicateFetch<K>> invalids;
+        std::vector<KMemoryBlockReplicateFetch<K>> blocks;
 
         /////////////////////////////////////
         // used if type == VALIDATE_BLOCKS //
@@ -163,7 +168,7 @@ class KMemoryTreeNodeSearch {
 
     public:
 
-        KMemoryTreeNodeSearch(uint8_t devid) : device_global_id(devid), access(nullptr), invalids(), region() {}
+        KMemoryTreeNodeSearch(uint8_t devid) : device_global_id(devid), access(nullptr), blocks(), region() {}
         virtual ~KMemoryTreeNodeSearch() {}
 
         void
@@ -174,10 +179,10 @@ class KMemoryTreeNodeSearch {
         }
 
         void
-        prepare_search_invalids(void)
+        prepare_search_blocks(void)
         {
-            this->type = SEARCH_FOR_INVALID_BLOCKS;
-            this->invalids.clear();
+            this->type = SEARCH_FOR_BLOCKS;
+            this->blocks.clear();
         }
 
         void
@@ -277,7 +282,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Region & region,
             const access_mode_t mode
         ) {
-            assert(this->region.intersects(region));
+            assert(region.includes(this->region));
             const int devbit = (1 << search.device_global_id);
 
             /* two intersection search possible : whether looking for invalid
@@ -285,24 +290,27 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
              * fetching) */
             switch (search.type)
             {
-                case (Search::Type::SEARCH_FOR_INVALID_BLOCKS):
+                case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
-                    /* the block is valid on that device, nothing to do */
-                    if (this->block.valid & devbit)
-                        return ;
-                    assert(!(this->block.valid & devbit));
+                    // this         == un noeud de l'arbre
+                    // this->block  == 'MemoryBlock' - representé par le noeud, avec
+                    //      - vue host
+                    //      - list des replicats
+                    // this->region == vue host 2D de 'this->block'
+                    //       region == vue host 2D de l'accès qu'on est en train de fetch
 
-                    /* check if the block is not already being fetched by another access */
+
+                    # if 0
                     if (this->block.fetching & devbit)
                     {
                         // TODO : this block is being fetched by another access
                         // need to notify the task performing 'access' when its done
                         return ;
                     }
+                    this->block.fetching |= devbit;
 
                     /* add this block to the fetching list */
-                    this->block.fetching |= devbit;
-                    search.invalids.push_back(
+                    search.blocks.push_back(
                         ReplicateFetch(
                             this->region.intersection(region),
                             this->block.view,
@@ -310,6 +318,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                             this->block.valid
                         )
                     );
+                    # endif
                     break ;
                 }
 
@@ -344,6 +353,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - LD=%d", this->block.view.bs_m, this->block.view.bs_n, this->block.view.LD);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.view.tm,   this->block.view.tn);
 
+            # pragma message(TODO "Reimplement with multiple view per replicate")
+            # if 0
             // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
@@ -356,6 +367,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 
                 );
             }
+            # endif
         }
 
 }; /* KMemoryTreeNode */
@@ -429,7 +441,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                 if (access->mode & ACCESS_MODE_R)
                 {
                     /* find invalid memory blocks on that device */
-                    search.prepare_search_invalids();
+                    search.prepare_search_blocks();
                     this->lock();
                     {
                         this->intersect(search, access->region, access->mode);
@@ -449,11 +461,28 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                 //  But it raises an issue : if the block is valid, how not to
                 //  synchronize another concurrent consumer on the same device ?
 
-                if (search.invalids.size() > 1)
+                if (search.blocks.size() > 1)
                     XKBLAS_IMPL("Several memory blocks are invalid for the same access");
 
+                // TODO : lock + intersect + unlock - to find all blocks that form the access->region
+                //      - mark fetching bit
+                //      - and find the 'source' device for fetching - calling the driver with the 'valid' bitmask
+                //          (and the driver can return 'source' == 'device' if valid on the current device)
+
+                // TODO : check that there exists a continuous allocation for that access
+                    // TODO : if no, do a new allocation - and lock + intersect + unlock again the tree, to add a new view to each block
+
+                // TODO : do fetches
+                    // TODO : once fetch completed - lock + intersect + unlock
+
+
+
+
+
+
+# if 0
                 /* initiate fetching of each invalid block for that access */
-                for (ReplicateFetch & fetch : search.invalids)
+                for (ReplicateFetch & fetch : search.blocks)
                 {
                     assert(!(fetch.valid & devbit));
 
@@ -498,6 +527,13 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         }
                     }
                 }
+                # endif
+
+
+
+
+
+
             }
 
             return task->fetched();
