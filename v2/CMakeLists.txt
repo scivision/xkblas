@@ -5,6 +5,8 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 # Project name
 project(xkblas)
 
+option(STRICT "Enable strict compilation mode" OFF)
+
 ###############
 # DEPENDENCES #
 ###############
@@ -67,8 +69,14 @@ endif()
 if (${CUDA_RT_FOUND})
     target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
+    if (${HWLOC_FOUND})
+        target_link_libraries(xkblas_driver_cuda PRIVATE ${HWLOC_LIBRARIES})
+    endif()
+    target_link_libraries(xkblas_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(xkblas PRIVATE xkblas_driver_cuda)
 endif()
+
+
 
 # Include directory
 include_directories(include/)
@@ -80,6 +88,14 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 
 # Flags
 add_compile_options("-DXKBLAS_DEBUG=1")
+
+if (STRICT)
+    target_compile_options(xkblas PRIVATE -Wfatal-errors)
+    if (${CUDA_RT_FOUND})
+        target_compile_options(xkblas_driver_cuda PRIVATE -Wfatal-errors)
+    endif()
+endif()
+
 
 ################
 # Sub projects #

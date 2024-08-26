@@ -52,7 +52,7 @@ static inline void mem_barrier()
 #  endif
 }
 
-#elif defined(__linux__)
+#elif defined(__linux__)    /* defined(__APPLE__) */
 static inline void writemem_barrier()
 {
 #  if defined(__x86_64) || defined(__i386__)
@@ -86,8 +86,10 @@ static inline void mem_barrier()
   __sync_synchronize();
 #  elif defined(__x86_64) || defined(__i386__)
   __asm__ __volatile__ ("mfence":::"memory");
+#elif defined(__arm__) || defined(__aarch64__)
+  __asm__ __volatile__ ("dmb ish":::"memory");
 #  else
-#  error "Compiler not supported"
+#   error "Compiler not supported"
 /* bultin ?? */
 #  endif
 }

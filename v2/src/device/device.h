@@ -107,4 +107,6 @@ typedef struct  xkblas_device_t
 
 }               xkblas_device_t;
 
+int xkblas_device_poll(xkblas_device_t * device);
+
 #endif /* __DEVICE_H__ */

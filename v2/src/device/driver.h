@@ -99,8 +99,6 @@ typedef struct  xkblas_driver_t
 
 
     # if 0
-
-
     /* test completion of asynchronous host_register operation.
        Argument is the handle returned by host_register (if != -1).
        If flag == 0, then the operation is a non blocking test that allows
@@ -127,7 +125,6 @@ typedef struct  xkblas_driver_t
     void* (*f_get_gpublas_handle)(xkblas_device_t*);
 
     # endif
-
 
 }               xkblas_driver_t;
 
@@ -173,5 +170,19 @@ void xkblas_device_task_fetched(xkblas_driver_t * driver, xkblas_device_t * devi
 
 /* launch a kernel */
 int xkblas_kernel_launch(xkblas_driver_type_t type, task_kernel_param_t * param);
+
+/* allocate memory on the passed device */
+void xkblas_memory_allocate(
+    xkblas_driver_t* driver,
+    xkblas_device_t* device,
+    void ** ptr,
+    size_t size
+);
+
+/* deallocate all memory allocated previously */
+void xkblas_driver_invalidate_caches(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device
+);
 
 #endif /* __DRIVER_H__ */

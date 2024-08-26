@@ -494,10 +494,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     const bool require_allocation = (fetch.replicate_view.addr == 0);
                     if (require_allocation)
                     {
-                        # pragma message(TODO "allocator, P-E is working on it")
-                        // TODO : uncomment this
-                        //  uint64_t size = fetch.size()
-                        //  void * addr = xkblas_memory_allocate(driver, device, size)
+                        uint64_t size = fetch.size();
+                        void* addr = NULL;
+                        xkblas_memory_allocate(driver, device, &addr, size);
                     }
 
                     // TODO : launch asynchronous fetch here, currently assume

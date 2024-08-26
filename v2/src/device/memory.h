@@ -13,9 +13,24 @@ typedef uint64_t xkblas_address_space_id_t;
 struct xkblas_alloc_data;
 typedef struct xkblas_alloc_data xkblas_alloc_data_t;
 
-# pragma message(TODO "What is a 'xkblas_alloc_chunk' struct ?")
-struct xkblas_alloc_chunk;
-typedef struct xkblas_alloc_chunk xkblas_alloc_chunk_t;
+
+/**
+ * Represent a segment of memory in device memory (used by custom allocator)
+ * It is placed in two chained list:
+ *  - the list of all chunk in device memory
+ *  - the list of free chunk in device memory
+*/
+typedef struct xkblas_alloc_chunk
+{
+    uintptr_t device_ptr;                 /* position of memory in device */
+    size_t size;                          /* size of the segment in byte */
+    int state;                            /* state of the chunk */
+    struct xkblas_alloc_chunk* prev;      /* previous chunk in double chained list */
+    struct xkblas_alloc_chunk* next;      /* next chunk in double chained list */
+    struct xkblas_alloc_chunk* freelink;  /* next freechunk in the chained list */
+} xkblas_alloc_chunk_t;
+#define MAIN_STATE 0x2
+#define FREE_STATE 0x1
 
 /** Type of pointer for all address spaces.
     The pointer encode both the pointer (field ptr) and the location of the address space
@@ -65,17 +80,20 @@ typedef struct xkblas_memory_view_t {
 
 typedef struct  xkblas_device_memory_t
 {
+    // TODO check what is used or not ...
     xkblas_address_space_id_t asid;
     // xkblas_device_t * device;
-    xkblas_mutex_t mem_lock;
+    xkblas_mutex_t mem_lock;                /* used */
+    int memory_allocated;                   /* used */
     xkblas_alloc_data_t * freelist_bloc;
     xkblas_alloc_data_t * freelist_metabloc;
-    xkblas_alloc_chunk_t * free_chunk_list;
+    xkblas_alloc_chunk_t * free_chunk_list; /* used */
     xkblas_alloc_chunk_t * main_chunk;
 
     /* Virtualization of alloc/free on the offload memory device */
-    uintptr_t (*f_alloc)(int device_id,  size_t size, int * flag);
-    void  (*f_free)(int device_id, uintptr_t ptr, size_t size);
+    //uintptr_t (*f_alloc)(int device_id,  size_t size, int * flag);
+    //void  (*f_free)(int device_id, uintptr_t ptr, size_t size);
+
 
     /* returns:
        0: success

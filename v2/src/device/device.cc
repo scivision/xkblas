@@ -73,6 +73,9 @@ xkblas_device_init(
     xkblas_context_t * ctx = xkblas_context_get();
     device->offloader.init(&(ctx->conf.device.offloader), driver->f_stream_create);
 
+    /* initialize device memory management */
+    XKBLAS_MUTEX_INIT( device->memdev.mem_lock );
+
     # if 0
     assert(0 == pthread_mutex_lock(&device->lock));
     assert(0 == pthread_cond_signal(&device->cond_sleep));
@@ -119,7 +122,7 @@ xkblas_device_create(
     return device;
 }
 
-static inline int
+int
 xkblas_device_poll(xkblas_device_t * device)
 {
     int err = 0;
