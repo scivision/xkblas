@@ -3,7 +3,7 @@
 
 # include "conf/conf.h"
 # include "device/driver.h"
-# include "memory/memory-tree.hpp"
+# include "device/memory-tree.hpp"
 # include "sync/spinlock.h"
 
 typedef enum    xkblas_context_state_t

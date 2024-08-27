@@ -6,6 +6,10 @@
 #ifndef __KINTERVAL_BTREE_H__
 # define __KINTERVAL_BTREE_H__
 
+# if defined(KINTERVAL_BTREE_REBALANCE) && !defined(KINTERVAL_BTREE_CUT)
+#  error "Defining 'KINTERVAL_BTREE_REBALANCE' but not 'KINTERVAL_BTREE_CUT' has no effects"
+# endif
+
 // tree assert, must be called within a member function
 # ifdef NDEBUG
 #  define tassert(ignore) ((void)0)
@@ -428,14 +432,22 @@ class KIntervalBtree {
         Node * root;
 
     private:
+
+# ifdef KINTERVAL_BTREE_CUT
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
+# endif /* KINTERVAL_BTREE_CUT */
 
         /* Buffer of nodes inserted by an insert() call */
         std::vector<Node *> outdated;
 
     public:
-        KIntervalBtree() : root(nullptr), limbs(), outdated() {}
+        KIntervalBtree() :
+            root(nullptr),
+# ifdef KINTERVAL_BTREE_CUT
+            limbs(),
+# endif /* KINTERVAL_BTREE_CUT */
+            outdated() {}
 
         inline void
         subtree_delete(Node * node)
@@ -452,6 +464,7 @@ class KIntervalBtree {
             delete node;
         }
 
+# ifdef KINTERVAL_BTREE_CUT
         inline void
         cut(Node * parent, int k, int dir)
         {
@@ -472,6 +485,13 @@ class KIntervalBtree {
             subtree_delete(this->root);
             this->garbage_collector_run();
         }
+
+# else /* KINTERVAL_BTREE_CUT */
+        virtual ~KIntervalBtree()
+        {
+            subtree_delete(this->root);
+        }
+# endif /* KINTERVAL_BTREE_CUT */
 
         ///////////
         // UTILS //
@@ -818,7 +838,7 @@ class KIntervalBtree {
             }
         }
 
-# ifdef REBALANCE
+# ifdef KINTERVAL_BTREE_REBALANCE
         static inline void
         compress(Node * root, int k, int m)
         {
@@ -970,7 +990,7 @@ class KIntervalBtree {
             return this->root && requires_rebalance(this->root);
         }
 
-# endif /* REBALANCE */
+# endif /* KINTERVAL_BTREE_REBALANCE */
 
         /* called to create a new node */
         virtual Node *
@@ -996,20 +1016,20 @@ class KIntervalBtree {
         {
             this->update();
 
-# ifdef REBALANCE
+# ifdef KINTERVAL_BTREE_REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
                 this->rebalance();
-# else /* REBALANCE */
-#  pragma message("Automatic rebalance disabled. Enable it with '-DREBALANCE'")
-# endif /* REBALANCE */
+# else /* KINTERVAL_BTREE_REBALANCE */
+#  pragma message("Automatic rebalance disabled. Enable it with '-DKINTERVAL_BTREE_REBALANCE'")
+# endif /* KINTERVAL_BTREE_REBALANCE */
 
 # ifndef NDEBUG
             this->coherency();
 # endif /* NDEBUG */
         }
 
-# ifdef CUT
+# ifdef KINTERVAL_BTREE_CUT
         inline void
         insert_from_cut(
             T & t,
@@ -1030,7 +1050,7 @@ class KIntervalBtree {
 
             this->outdate(parent);
         }
-# endif /* CUT */
+# endif /* KINTERVAL_BTREE_CUT */
 
         inline void
         insert_from(
@@ -1044,7 +1064,7 @@ class KIntervalBtree {
 
             while (k < K)
             {
-# ifdef CUT
+# ifdef KINTERVAL_BTREE_CUT
 #  pragma message("Tree cut enable")
                 // quick-way out, if the region includes all subregion with an
                 // 'out' access, we can discard all children
@@ -1062,8 +1082,8 @@ class KIntervalBtree {
                     }
                 }
 # else
-#  pragma message("Tree cut disabled. Enable it using '-DCUT'")
-# endif /* CUT */
+#  pragma message("Tree cut disabled. Enable it using '-DKINTERVAL_BTREE_CUT'")
+# endif /* KINTERVAL_BTREE_CUT */
 
                 // case (1)    J << I
                 if (region[k].b <= parent->region[k].a)
@@ -1383,7 +1403,7 @@ insert_from_case_3_equals:
         int
         coherency_black_height_k(Node * node, int k) const
         {
-#ifdef CUT
+#ifdef KINTERVAL_BTREE_CUT
             // when cut is enabled, black_height is not guaranteed
             return 1;
 #endif

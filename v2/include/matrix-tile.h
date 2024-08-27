@@ -78,6 +78,13 @@ typedef struct  matrix_tile_t
             (this->tm * this->bs_m * this->sizeof_type * this->LD);
     }
 
+    /* size in memory (in bytes) */
+    inline size_t
+    size(void) const
+    {
+        return this->bs_n * this->bs_m * this->sizeof_type;
+    }
+
 }               matrix_tile_t;
 
 #endif /* __MATRIX_TILE_H__ */

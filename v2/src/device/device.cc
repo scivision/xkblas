@@ -2,6 +2,7 @@
 # include "device/device.h"
 # include "device/driver.h"
 # include "device/stream.h"
+# include "device/stream-instruction-submit.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "device/thread-worker.hpp"
@@ -228,57 +229,6 @@ xkblas_device_accept_new_task(xkblas_device_t * device)
     return 1;
 }
 
-/* commit a stream instruction and wakeup thread */
-static inline void
-xkblas_device_submit(
-    xkblas_device_t * device,
-    xkblas_stream_t * stream,
-    xkblas_stream_instruction_t * instr
-) {
-    /* commit instruction to the stream */
-    stream->commit(instr);
-
-    /* wakeup device worker thread */
-    device->thread->wakeup();
-}
-
-/* submit a kernel execution instruction on that device */
-static inline void
-xkblas_device_submit_kernel(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device,
-    Task * task
-) {
-    /* create a new instruction and retrieve its offload stream */
-    xkblas_stream_t * stream;
-    xkblas_stream_instruction_t * instr;
-    device->offloader.instruction_new(
-        XKBLAS_STREAM_TYPE_KERN,    /* IN */
-        &stream,                    /* OUT */
-        XKBLAS_STREAM_INSTR_KERN,   /* IN */
-        &instr                      /* OUT */
-    );
-    assert(stream);
-    assert(instr);
-
-    /* create a new kernel instruction */
-    instr->kern.task = task;
-
-    /* submit instruction to the stream */
-    xkblas_device_submit(device, stream, instr);
-}
-
-/** call whenever the task kernel is ready to be executed on the driver's device */
-void
-xkblas_device_task_fetched(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device,
-    Task * task
-) {
-    XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
-    xkblas_device_submit_kernel(driver, device, task);
-}
-
 static inline void
 xkblas_device_prepare_task(
     xkblas_driver_t * driver,
@@ -309,7 +259,7 @@ xkblas_device_prepare_task(
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_device_task_fetched(driver, device, task);
+        xkblas_stream_instruction_submit_kernel(driver, device, task);
     }
 }
 

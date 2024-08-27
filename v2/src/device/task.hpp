@@ -10,7 +10,7 @@
 # include "device/task-format.h"
 # include "logger/logger.h"
 # include "logger/todo.h"
-# include "memory/memory-access.hpp"
+# include "device/memory-access.hpp"
 # include "sync/access.hpp"
 # include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"

@@ -1,5 +1,3 @@
-// TODO : clear this file formatting
-
 #ifndef __STREAM_INSTRUCTION_H__
 # define __STREAM_INSTRUCTION_H__
 

@@ -172,10 +172,9 @@ void xkblas_device_task_fetched(xkblas_driver_t * driver, xkblas_device_t * devi
 int xkblas_kernel_launch(xkblas_driver_type_t type, task_kernel_param_t * param);
 
 /* allocate memory on the passed device */
-void xkblas_memory_allocate(
-    xkblas_driver_t* driver,
-    xkblas_device_t* device,
-    void ** ptr,
+void * xkblas_memory_allocate(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
     size_t size
 );
 

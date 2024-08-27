@@ -1,7 +1,7 @@
 #ifndef __MEMORY_ACCESS_HPP__
 # define __MEMORY_ACCESS_HPP__
 
-# include "memory/memory-view.hpp"
+# include "device/memory-view.hpp"
 # include "sync/access.hpp"
 
 /* a memory access */
@@ -45,6 +45,12 @@ class KMemoryAccess : public access_t<K>
         {}
 
         virtual ~KMemoryAccess() {}
+
+        inline size_t
+        size(void) const
+        {
+            return host_view.size();
+        }
 
 }; /* KMemoryAccess */
 

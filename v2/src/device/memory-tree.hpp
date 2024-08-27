@@ -4,12 +4,20 @@
 # include "device/consts.h"
 # include "device/device.h"
 # include "device/driver.h"
+# include "device/stream-instruction-submit.h"
 # include "device/task.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/kinterval-btree.hpp"
-# include <cstdint>
 
+# include <cstdint>
+# include <functional>
+
+# pragma message(TODO "'fetch' implementation could be optimize")
+
+# pragma message(TODO "merge 'Replicate' on continuous "   \
+        "memory addresses - for now, just perform one data "    \
+        "transfer per block")
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
@@ -70,7 +78,6 @@ class MemoryBlock {
 template <int K>
 class KMemoryBlockReplicateFetch {
 
-    # if 0
     using Region = Intervals<K>;
 
     public:
@@ -78,27 +85,38 @@ class KMemoryBlockReplicateFetch {
         /* the memory-tree region view */
         const Region region;
 
-        /* a view of the memory block */
-        const memory_view_t block_view;
+        /* host view of the memory block */
+        const memory_view_t host_view;
 
-        /* the replicate view */
-        const memory_replicate_view_t replicate_view;
+        /* destination device */
+        uint8_t dst_device_global_id;
 
-        /* devices on which the block is valid */
-        const memory_replicates_bitfield_t valid;
+        /* the replicate */
+        const memory_replicate_t dst_replicate;
+
+        /* the replicate view to use for fetching (in [0 .. replicate.view.size()[) */
+        int dst_replicate_view_id;
+
+        /* source device */
+        uint8_t src_device_global_id;
+
+        /* source device replicate view */
+        memory_replicate_view_t src_device_view;
 
     public:
 
         KMemoryBlockReplicateFetch(
+            const uint8_t device_global_id,
             const Region & r,
-            const memory_view_t & bview,
-            const memory_replicate_view_t & rview,
-            const memory_replicates_bitfield_t v
+            const MemoryBlock & block
         ) :
             region(r),
-            replicate_view(rview),
-            block_view(bview),
-            valid(v)
+            host_view(block.view),
+            dst_device_global_id(device_global_id),
+            dst_replicate(block.replicates[device_global_id]),
+            dst_replicate_view_id(-1),
+            src_device_global_id(-1),
+            src_device_view()
         {}
 
         virtual ~KMemoryBlockReplicateFetch() {}
@@ -106,10 +124,9 @@ class KMemoryBlockReplicateFetch {
         uint64_t
         size(void) const
         {
-            return this->block_view.bs_m * this->block_view.bs_n * this->block_view.sizeof_type;
+            return this->host_view.bs_m * this->host_view.bs_n * this->host_view.sizeof_type;
         }
 
-        # endif
 }; /* KMemoryBlockReplicateFetch */
 
 
@@ -125,6 +142,7 @@ class KMemoryTreeNodeSearch {
 
     using Access = KMemoryAccess<K>;
     using Region = Intervals<K>;
+    using BlockReplicateFetch = KMemoryBlockReplicateFetch<K>;
 
     public:
 
@@ -132,7 +150,8 @@ class KMemoryTreeNodeSearch {
         enum Type : uint8_t {
             INSERTING_BLOCKS    = 0,
             SEARCH_FOR_BLOCKS   = 1,
-            VALIDATE_BLOCKS     = 2
+            INSERT_ALLOCATION   = 2,
+            VALIDATE_BLOCKS     = 3
         };
 
     public:
@@ -147,9 +166,9 @@ class KMemoryTreeNodeSearch {
         /* device global id, on which we are looking for invalid blocks or validating blocks */
         const uint8_t device_global_id;
 
-        //////////////////////////////////////
-        // used if type == INSERTING_BLOCKS //
-        //////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////
+        // used if type == INSERTING_BLOCKS  or type == INSERT_ALLOCATION //
+        ////////////////////////////////////////////////////////////////////
 
         /* the access being inserted / intersected */
         Access * access;
@@ -159,7 +178,12 @@ class KMemoryTreeNodeSearch {
         ///////////////////////////////////////////////
 
         /* list of invalid replicate */
-        std::vector<KMemoryBlockReplicateFetch<K>> blocks;
+        std::vector<BlockReplicateFetch> blocks;
+
+        ///////////////////////////////////////////////
+        // used if type == INSERT_ALLOCATION //
+        ///////////////////////////////////////////////
+        uintptr_t allocation;
 
         /////////////////////////////////////
         // used if type == VALIDATE_BLOCKS //
@@ -186,6 +210,14 @@ class KMemoryTreeNodeSearch {
         }
 
         void
+        prepare_insert_allocation(Access * access, uintptr_t ptr)
+        {
+            assert(this->access == access);
+            this->type = INSERT_ALLOCATION;
+            this->allocation = ptr;
+        }
+
+        void
         prepare_validate(const Region & r)
         {
             this->type = VALIDATE_BLOCKS;
@@ -198,7 +230,7 @@ class KMemoryTreeNodeSearch {
 template <int K>
 class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node {
 
-    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
+    using BlockReplicateFetch = KMemoryBlockReplicateFetch<K>;
     using Region = Intervals<K>;
     using Base = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Node = KMemoryTreeNode<K>;
@@ -292,33 +324,34 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             {
                 case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
-                    // this         == un noeud de l'arbre
-                    // this->block  == 'MemoryBlock' - representé par le noeud, avec
-                    //      - vue host
-                    //      - list des replicats
-                    // this->region == vue host 2D de 'this->block'
-                    //       region == vue host 2D de l'accès qu'on est en train de fetch
+                    // this         == a node in the tree
+                    // this->block  == the 'MemoryBlock' represented by the node with
+                    //      - the host view
+                    //      - the list of view on each devices replicate
+                    // this->region == a 2D host view of 'this->block'
+                    //       region == a 2D host view of the access we are intersecting against
 
-
-                    # if 0
-                    if (this->block.fetching & devbit)
-                    {
-                        // TODO : this block is being fetched by another access
-                        // need to notify the task performing 'access' when its done
-                        return ;
-                    }
+                    # pragma message(TODO "Manage case if another fetch is already going in parallel")
+                    assert(!(this->block.fetching & devbit));
                     this->block.fetching |= devbit;
 
-                    /* add this block to the fetching list */
                     search.blocks.push_back(
-                        ReplicateFetch(
-                            this->region.intersection(region),
-                            this->block.view,
-                            this->block.replicates[search.device_global_id],
-                            this->block.valid
+                        BlockReplicateFetch(
+                            search.device_global_id,
+                            this->region,
+                            this->block
                         )
                     );
-                    # endif
+
+                    break ;
+                }
+
+                case (Search::Type::INSERT_ALLOCATION):
+                {
+                    # pragma message(TODO "search.allocation is the allocation start, need to be somehow offset here as well")
+                    this->block.replicates[search.device_global_id].views.push_back(
+                        memory_replicate_view_t(search.allocation, search.access->host_view.bs_n)
+                    );
                     break ;
                 }
 
@@ -353,21 +386,16 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - LD=%d", this->block.view.bs_m, this->block.view.bs_n, this->block.view.LD);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.view.tm,   this->block.view.tn);
 
-            # pragma message(TODO "Reimplement with multiple view per replicate")
-            # if 0
             // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
-                fprintf(f, "\\\\ dev %d - addr=%zu - valid=%d - fetching=%d",
-                        device_global_id,
-                        this->block.replicates[device_global_id].addr,
-                        this->block.valid    & devbit ? 1 : 0,
-                        this->block.fetching & devbit ? 1 : 0
-
+                fprintf(f, "\\\\ dev %d - valid=%d - fetching=%d",
+                    device_global_id,
+                    this->block.valid    & devbit ? 1 : 0,
+                    this->block.fetching & devbit ? 1 : 0
                 );
             }
-            # endif
         }
 
 }; /* KMemoryTreeNode */
@@ -375,7 +403,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 template <int K>
 class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
-    using ReplicateFetch = KMemoryBlockReplicateFetch<K>;
+    using BlockReplicateFetch = KMemoryBlockReplicateFetch<K>;
     using Base = KIntervalBtree<K, KMemoryTreeNodeSearch<K>>;
     using Node = KMemoryTreeNode<K>;
     using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
@@ -429,13 +457,26 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             {
                 Access * access = task->accesses + i;
 
-                /* ensure it is represented in the memory tree */
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
+                // 1) Ensure the access is represented in the memory tree
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+                # pragma message(TODO "Step (1) and (2) could be merged to only lock/search once")
                 search.prepare_insert(access);
                 this->lock();
                 {
                     this->insert(search, access->region, access->mode);
                 }
                 this->unlock();
+
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
+                // 2) lock + intersect + unlock - to find all blocks that form the access->region
+                //      - mark fetching bit
+                //      - and find the 'source' device for fetching - calling the driver with the 'valid' bitmask
+                //          (and the driver can return 'source' == 'device' if valid on the current device)
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+                # pragma message(TODO "Step (1) and (2) could be merged to only lock/search once")
 
                 /* if the kernel reads that memory */
                 if (access->mode & ACCESS_MODE_R)
@@ -448,41 +489,107 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     }
                     this->unlock();
                 }
+                assert(search.blocks.size() >= 1);
 
-                # pragma message(TODO "merge 'ReplicateFetch' on continuous "   \
-                        "memory addresses - for now, just perform one data "    \
-                        "transfer per block")
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
+                // 3) TODO : check that there exists a continuous allocation for that access
+                //      TODO : if no, do a new allocation - and lock + intersect + unlock, to add a new view to each block
+                //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-                // TODO : also get the list of 'valid blocks' and always
-                //  - reallocate the access
-                //  - memcpy (local) valid blocks
-                //  - memcpy (remote) invalid blocks
-                //
-                //  But it raises an issue : if the block is valid, how not to
-                //  synchronize another concurrent consumer on the same device ?
-
+                // just to be warn whenver this occurs, as it is fairly unlikely
                 if (search.blocks.size() > 1)
-                    XKBLAS_IMPL("Several memory blocks are invalid for the same access");
+                    XKBLAS_WARN("Several memory blocks are invalid for the same access");
 
-                // TODO : lock + intersect + unlock - to find all blocks that form the access->region
-                //      - mark fetching bit
-                //      - and find the 'source' device for fetching - calling the driver with the 'valid' bitmask
-                //          (and the driver can return 'source' == 'device' if valid on the current device)
+                uintptr_t allocation = 0;
+                int j = 0;
+                int nviews = search.blocks[0].dst_replicate.views.size();
+                int nblocks = search.blocks.size();
 
-                // TODO : check that there exists a continuous allocation for that access
-                    // TODO : if no, do a new allocation - and lock + intersect + unlock again the tree, to add a new view to each block
+                /* for each view of the block 0 */
+                while (j < nviews)
+                {
+                    /* get the view allocation */
+                    allocation = search.blocks[0].dst_replicate.views[j].addr;
 
-                // TODO : do fetches
-                    // TODO : once fetch completed - lock + intersect + unlock
+                    /* for each other blocks */
+                    int i = 1;
+                    while (i < nblocks)
+                    {
+                        /* for each view of other blocks */
+                        int nviews = search.blocks[i].dst_replicate.views.size();
+                        for (int k = 0 ; k < nviews ; ++k)
+                        {
+                            /* this block has a view with the same allocation, check next block */
+                            if (allocation == search.blocks[i].dst_replicate.views[k].addr)
+                            {
+                                search.blocks[i].dst_replicate_view_id = k;
+                                goto next_block;
+                            }
+                        }
 
+                        /* this block has no view view the same allocation, restart from the next view of block 0 */
+                        goto next_view;
 
+                    next_block:
+                        ++i;
+                        continue ;
+                    }
 
+                    /* every blocks have a view with the allocation 'allocation' */
+                    break ;
 
+                next_view:
+                    ++j;
+                    continue ;
+                }
 
+                # pragma message(TODO "Allocation is always the start of a tile... need to offset it!!")
+
+                if (allocation == 0)
+                {
+                    XKBLAS_DEBUG("No continuous allocation found for the access, reallocating and creating a new view");
+                    allocation = (uintptr_t) xkblas_memory_allocate(driver, device, access->size());
+                    assert(allocation);
+
+                    XKBLAS_DEBUG("  allocated at %p", allocation);
+
+                    search.prepare_insert_allocation(access, allocation);
+                    this->lock();
+                    {
+                        this->intersect(search, access->region, access->mode);
+                    }
+                    this->unlock();
+                }
+
+                access->device_view.addr = allocation;
+                access->device_view.LD = access->host_view.bs_n;
+
+                /////////////////////////////////////////////////////////////////////////
+                // 4) TODO : do fetches
+                //     TODO : once fetch completed - lock + intersect + unlock
+                /////////////////////////////////////////////////////////////////////////
+
+                # pragma message(TODO "Maybe block is already valid, so no need to fetch it")
+                for (BlockReplicateFetch & fetch : search.blocks)
+                {
+                    std::function<void()> callback = []() {
+                        XKBLAS_DEBUG("  Completed a transfer!");
+                    };
+
+                    xkblas_stream_instruction_submit_copy(
+                        driver,
+                        fetch.host_view,
+                        fetch.dst_device_global_id,
+                        fetch.dst_replicate.views[fetch.dst_replicate_view_id],
+                        fetch.src_device_global_id,
+                        fetch.src_device_view,
+                        callback
+                    );
+                }
 
 # if 0
                 /* initiate fetching of each invalid block for that access */
-                for (ReplicateFetch & fetch : search.blocks)
+                for (Replicate & fetch : search.blocks)
                 {
                     assert(!(fetch.valid & devbit));
 
@@ -518,7 +625,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         {
                             /* all data has been fetched */
 
-                            // TODO : ensure each 'ReplicateFetch' are continuous in memory, else free/reallocate/memmove accordingly
+                            // TODO : ensure each 'Replicate' are continuous in memory, else free/reallocate/memmove accordingly
                             // TODO : set 'access->device_view.addr' and 'access->device_view.LD'
 
                             /* the task kernel is ready for execution */

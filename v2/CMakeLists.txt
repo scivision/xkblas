@@ -41,8 +41,6 @@ endif()
 ##########
 
 # Lib name
-add_compile_definitions(REBALANCE=1)
-add_compile_definitions(CUT=1)
 add_library(xkblas SHARED
     src/xkblas-context.cc
     src/conf/conf.cc
@@ -51,6 +49,7 @@ add_library(xkblas SHARED
     src/device/driver_host.cc
     src/device/offloader.cc
     src/device/stream.cc
+    src/device/stream-instruction-submit.cc
     src/device/task-format.cc
     src/device/thread.cc
     src/device/thread-producer.cc

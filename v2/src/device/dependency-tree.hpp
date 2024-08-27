@@ -2,7 +2,12 @@
 # define __DEPENDENCY_TREE_HPP__
 
 # include "device/task.hpp"
+
+# define KINTERVAL_BTREE_CUT
+# define KINTERVAL_BTREE_REBALANCE
 # include "sync/kinterval-btree.hpp"
+# undef KINTERVAL_BTREE_CUT
+# undef KINTERVAL_BTREE_REBALANCE
 
 template <int K>
 class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
