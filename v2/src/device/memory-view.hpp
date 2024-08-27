@@ -5,6 +5,8 @@
 
 # include <vector>
 
+# pragma message(TODO "These views are wrong, a block may not be tight to a matrix block as currently. One idea could be to add an 'offset-m' and 'offset-n' to each view - so when a tile is splitted, we keep the same 'matrix tile 'with a differnet offset")
+
 typedef struct  memory_replicate_view_t
 {
     uintptr_t addr; // address of the allocation containing this block on that device
