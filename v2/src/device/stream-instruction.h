@@ -1,10 +1,13 @@
 #ifndef __STREAM_INSTRUCTION_H__
 # define __STREAM_INSTRUCTION_H__
 
+# include "device/stream-callback.h"
 # include "device/task.hpp"
 # include "logger/todo.h"
 # include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
+
+# include <functional>
 
 typedef struct  xkblas_io_status_t
 {
@@ -13,18 +16,6 @@ typedef struct  xkblas_io_status_t
     float gpu_delay;    /* time of CPU between launch and completion (s)*/
     uint64_t bytes;     /* bytes transfered in case of memory copy */
 }               xkblas_io_status_t;
-
-typedef void (*xkblas_stream_callback_func_t)(
-    xkblas_io_status_t,
-    struct xkblas_io_stream_t *,
-    void *, void *, void *
-);
-
-typedef struct  xkblas_stream_callback_t
-{
-    xkblas_stream_callback_func_t func;
-    void * args[3];
-}               xkblas_stream_callback_t;
 
 typedef enum    xkblas_stream_instruction_type_t
 {
@@ -43,7 +34,10 @@ struct xkblas_memory_view_t;
 /* io instruction to move data between devices */
 typedef struct  xkblas_stream_instruction_copy_t
 {
-    // TODO
+    memory_view_t host_view;
+    memory_replicate_view_t dst_device_view;
+    memory_replicate_view_t src_device_view;
+
 }               xkblas_stream_instruction_copy_t;
 
 /* marker call back, acts as a full memory barrier : any write, read or kernel instructon
@@ -58,6 +52,7 @@ typedef struct xkblas_stream_instruction_barrier_t
 typedef struct  xkblas_stream_instruction_kernel_t
 {
     Task * task;
+
 }               xkblas_stream_instruction_kernel_t;
 
 /* An XKBLAS I/O instruction */
@@ -71,6 +66,7 @@ typedef struct  xkblas_stream_instruction_t
         xkblas_stream_instruction_kernel_t  kern;
         xkblas_stream_instruction_barrier_t barrier;
     };
+
 }               xkblas_stream_instruction_t;
 
 #endif /* __STREAM_INSTRUCTION_H__ */

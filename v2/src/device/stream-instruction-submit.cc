@@ -4,8 +4,6 @@
 # include "device/task.hpp"
 # include "logger/logger.h"
 
-# include <functional>
-
 /* commit a stream instruction and wakeup thread */
 static inline void
 xkblas_device_submit(
@@ -25,7 +23,8 @@ void
 xkblas_stream_instruction_submit_kernel(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
-    Task * task
+    Task * task,
+    const xkblas_stream_callback_t & callback
 ) {
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
 
@@ -33,10 +32,11 @@ xkblas_stream_instruction_submit_kernel(
     xkblas_stream_t * stream;
     xkblas_stream_instruction_t * instr;
     device->offloader.instruction_new(
-        XKBLAS_STREAM_TYPE_KERN,    /* IN */
-        &stream,                    /* OUT */
-        XKBLAS_STREAM_INSTR_TYPE_KERN,   /* IN */
-        &instr                      /* OUT */
+        XKBLAS_STREAM_TYPE_KERN,        /* IN */
+        &stream,                        /* OUT */
+        XKBLAS_STREAM_INSTR_TYPE_KERN,  /* IN */
+        &instr,                         /* OUT */
+        callback
     );
     assert(stream);
     assert(instr);
@@ -50,14 +50,14 @@ xkblas_stream_instruction_submit_kernel(
 
 void
 xkblas_stream_instruction_submit_copy(
-    const xkblas_driver_t         * driver,
-    xkblas_device_t               * device,
-    const memory_view_t           & host_view,
-    const uint8_t                   dst_device_global_id,
-    const memory_replicate_view_t & dst_device_view,
-    const uint8_t                   src_device_global_id,
-    const memory_replicate_view_t & src_device_view,
-    const std::function<void()> callback
+    const xkblas_driver_t          * driver,
+    xkblas_device_t                * device,
+    const memory_view_t            & host_view,
+    const uint8_t                    dst_device_global_id,
+    const memory_replicate_view_t  & dst_device_view,
+    const uint8_t                    src_device_global_id,
+    const memory_replicate_view_t  & src_device_view,
+    const xkblas_stream_callback_t & callback
 ) {
     assert(device->global_id == dst_device_global_id);
 
@@ -117,13 +117,16 @@ xkblas_stream_instruction_submit_copy(
         stype,      /* IN */
         &stream,    /* OUT */
         itype,      /* IN */
-        &instr      /* OUT */
+        &instr,     /* OUT */
+        callback
     );
     assert(stream);
     assert(instr);
 
     /* create a new copy instruction */
-    // TODO
+    instr->copy.host_view       = host_view;
+    instr->copy.dst_device_view = dst_device_view;
+    instr->copy.src_device_view = src_device_view;
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);

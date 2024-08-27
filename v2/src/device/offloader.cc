@@ -113,10 +113,11 @@ Offloader::stream_next(xkblas_stream_type_t stype)
 
 void
 Offloader::instruction_new(
-    xkblas_stream_type_t stype,             /* IN  */
-    xkblas_stream_t ** pstream,             /* OUT */
-    xkblas_stream_instruction_type_t itype, /* IN  */
-    xkblas_stream_instruction_t ** pinstr   /* OUT */
+    const xkblas_stream_type_t stype,               /* IN  */
+          xkblas_stream_t ** pstream,               /* OUT */
+    const xkblas_stream_instruction_type_t itype,   /* IN  */
+          xkblas_stream_instruction_t ** pinstr,    /* OUT */
+    const xkblas_stream_callback_t & callback       /* IN */
 ) {
     assert(pstream);
     assert(pinstr);
@@ -125,7 +126,7 @@ Offloader::instruction_new(
     xkblas_stream_t * stream = this->stream_next(stype);
 
     /* allocation instruction */
-    xkblas_stream_instruction_t * instr = stream->instruction_new(itype);
+    xkblas_stream_instruction_t * instr = stream->instruction_new(itype, callback);
 
     /* out */
     assert(stream);

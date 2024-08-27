@@ -259,7 +259,7 @@ xkblas_device_prepare_task(
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_stream_instruction_submit_kernel(driver, device, task);
+        xkblas_device_task_access_fetched(driver, device, task);
     }
 }
 

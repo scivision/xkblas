@@ -1,6 +1,7 @@
 # include "min-max.h"
 # include "device/device.h"
 # include "device/driver.h"
+# include "device/stream-instruction-submit.h"
 # include "logger/logger.h"
 # include "sync/spinlock.h"
 
@@ -324,3 +325,31 @@ xkblas_memory_allocate(
 
     return ptr;
 }
+
+
+/* callback after the task kernel executed */
+static void
+xkblas_device_task_kernel_executed(
+    void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
+) {
+    # pragma message(TODO "Task kernel completion continuation")
+    XKBLAS_DEBUG("A task kernel executed");
+}
+
+/* must be called once all task accessed were fetched, to queue the task kernel for execution */
+void
+xkblas_device_task_access_fetched(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+    Task * task
+) {
+    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
+
+    # pragma message(TODO "Task kernel completion continuation")
+    xkblas_stream_callback_t callback;
+    callback.func    = xkblas_device_task_kernel_executed;
+    callback.args[0] = NULL;
+
+    xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+}
+

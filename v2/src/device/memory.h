@@ -90,34 +90,6 @@ typedef struct  xkblas_device_memory_t
     xkblas_alloc_chunk_t * free_chunk_list; /* used */
     xkblas_alloc_chunk_t * main_chunk;
 
-    /* Virtualization of alloc/free on the offload memory device */
-    //uintptr_t (*f_alloc)(int device_id,  size_t size, int * flag);
-    //void  (*f_free)(int device_id, uintptr_t ptr, size_t size);
-
-
-    /* returns:
-       0: success
-       EINPROGRESS : pending operations on the device
-       else error
-    */
-    int   (*f_copy)(struct xkblas_device_memory_t*,
-                    xkblas_pointer_t /* dest*/,
-                    const xkblas_memory_view_t* /*view_dest*/,
-                    xkblas_pointer_t /*src*/,
-                    const xkblas_memory_view_t* /*view_src*/,
-                    int flags, /* 0, 1, 2 */
-                    xkblas_stream_callback_func_t cbk,
-                    void* arg0, void* arg1, void* arg2
-    );
-    int  (*f_memsync)(struct xkblas_device_memory_t*, int begend);
-
-    /* to help to manage cache */
-    size_t (*f_get_mem_info)(struct xkblas_device_memory_t*, size_t*, size_t*);
-    size_t (*f_get_free_mem)(struct xkblas_device_memory_t*);
-
-    /* return source lid to reach lid_dest knowing valid_bit and xfer_bit for the data */
-    uint16_t (*f_get_source)( struct xkblas_device_memory_t*, uint16_t, XKBLAS_MEMORY_VALUE_TYPE, XKBLAS_MEMORY_VALUE_TYPE );
-
 }               xkblas_device_memory_t;
 
 #endif /* __MEMORY_H__ */

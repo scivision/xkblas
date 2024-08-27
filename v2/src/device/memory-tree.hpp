@@ -400,6 +400,12 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 
 }; /* KMemoryTreeNode */
 
+static inline void
+fetch_callback(void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
+{
+    XKBLAS_DEBUG("  Completed a transfer!");
+}
+
 template <int K>
 class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
@@ -572,9 +578,13 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                 # pragma message(TODO "Maybe block is already valid, so no need to fetch it")
                 for (BlockReplicateFetch & fetch : search.blocks)
                 {
-                    std::function<void()> callback = []() {
-                        XKBLAS_DEBUG("  Completed a transfer!");
-                    };
+                    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
+                    xkblas_stream_callback_t callback;
+                    callback.func = fetch_callback;
+                    callback.args[0] = NULL;
+
+                    assert(fetch.dst_replicate_view_id >= 0);
+                    assert(fetch.dst_replicate_view_id < fetch.dst_replicate.views.size());
 
                     xkblas_stream_instruction_submit_copy(
                         driver,

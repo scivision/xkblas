@@ -55,7 +55,8 @@ xkblas_stream_deinit(xkblas_stream_t * stream)
 
 xkblas_stream_instruction_t *
 xkblas_stream_t::instruction_new(
-    xkblas_stream_instruction_type_t itype
+    const xkblas_stream_instruction_type_t itype,
+    const xkblas_stream_callback_t & callback
 ) {
 
     /* Lock the stream to add a new instruction.  Unlock in the commit
@@ -77,6 +78,7 @@ xkblas_stream_t::instruction_new(
 
     xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
     instr->type = itype;
+    instr->callback = callback;
 
     return instr;
 }
@@ -132,7 +134,7 @@ xkblas_stream_t::process_instructions(void)
                 if (err == EINPROGRESS)
                 {
                     int wp = this->pending.pos.w % this->pending.capacity;
-                    this->pending.instr[wp] = this->ready.instr[p];
+                    memcpy(this->pending.instr + wp, this->ready.instr + p, sizeof(xkblas_stream_instruction_t));
                     ++this->pending.pos.w;
                 }
             }

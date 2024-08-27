@@ -37,10 +37,11 @@ class Offloader
 
         /* create a new instruction on the given stream type, and return the instruction and the assigned stream for execution */
         void instruction_new(
-            xkblas_stream_type_t stype,             /* IN  */
-            xkblas_stream_t ** stream,              /* OUT */
-            xkblas_stream_instruction_type_t itype, /* IN  */
-            xkblas_stream_instruction_t ** instr    /* OUT */
+            const xkblas_stream_type_t stype,               /* IN  */
+                  xkblas_stream_t ** stream,                /* OUT */
+            const xkblas_stream_instruction_type_t itype,   /* IN  */
+                  xkblas_stream_instruction_t ** instr,     /* OUT */
+            const xkblas_stream_callback_t & callback       /* IN */
         );
 
         /* TODO */
