@@ -578,6 +578,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
                     xkblas_stream_instruction_submit_copy(
                         driver,
+                        device,
                         fetch.host_view,
                         fetch.dst_device_global_id,
                         fetch.dst_replicate.views[fetch.dst_replicate_view_id],

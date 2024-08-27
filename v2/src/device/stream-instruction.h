@@ -28,13 +28,13 @@ typedef struct  xkblas_stream_callback_t
 
 typedef enum    xkblas_stream_instruction_type_t
 {
-    XKBLAS_STREAM_INSTR_NOP      = 0,
-    XKBLAS_STREAM_INSTR_COPY_H2H = 1,
-    XKBLAS_STREAM_INSTR_COPY_H2D = 2,
-    XKBLAS_STREAM_INSTR_COPY_D2H = 3,
-    XKBLAS_STREAM_INSTR_COPY_D2D = 4,
-    XKBLAS_STREAM_INSTR_BARRIER  = 5,
-    XKBLAS_STREAM_INSTR_KERN     = 6
+    XKBLAS_STREAM_INSTR_TYPE_NOP      = 0,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_H2H = 1,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_H2D = 2,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_D2H = 3,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_D2D = 4,
+    XKBLAS_STREAM_INSTR_TYPE_BARRIER  = 5,
+    XKBLAS_STREAM_INSTR_TYPE_KERN     = 6
 }               xkblas_stream_instruction_type_t;
 
 # pragma message(TODO "Bad dependence on 'xkblas_memory_view_t' here")

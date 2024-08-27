@@ -35,7 +35,7 @@ xkblas_stream_instruction_submit_kernel(
     device->offloader.instruction_new(
         XKBLAS_STREAM_TYPE_KERN,    /* IN */
         &stream,                    /* OUT */
-        XKBLAS_STREAM_INSTR_KERN,   /* IN */
+        XKBLAS_STREAM_INSTR_TYPE_KERN,   /* IN */
         &instr                      /* OUT */
     );
     assert(stream);
@@ -51,6 +51,7 @@ xkblas_stream_instruction_submit_kernel(
 void
 xkblas_stream_instruction_submit_copy(
     const xkblas_driver_t         * driver,
+    xkblas_device_t               * device,
     const memory_view_t           & host_view,
     const uint8_t                   dst_device_global_id,
     const memory_replicate_view_t & dst_device_view,
@@ -58,5 +59,72 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t & src_device_view,
     const std::function<void()> callback
 ) {
-    XKBLAS_DEBUG("  Copy from %u to %u", src_device_global_id, dst_device_global_id);
+    assert(device->global_id == dst_device_global_id);
+
+    XKBLAS_DEBUG("  Copy from src=%u to dst=%u", src_device_global_id, dst_device_global_id);
+
+    /* find the type of copy instruction */
+    xkblas_stream_instruction_type_t itype;
+    if (src_device_global_id == 0)
+    {
+        if (dst_device_global_id == 0)
+            itype = XKBLAS_STREAM_INSTR_TYPE_COPY_H2H;
+        else
+            itype = XKBLAS_STREAM_INSTR_TYPE_COPY_H2D;
+    }
+    else
+    {
+        if (dst_device_global_id == 0)
+            itype = XKBLAS_STREAM_INSTR_TYPE_COPY_D2H;
+        else
+            itype = XKBLAS_STREAM_INSTR_TYPE_COPY_D2D;
+    }
+
+    /* find the type of stream to use */
+    xkblas_stream_type_t stype;
+    switch(itype)
+    {
+        case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
+        case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
+        {
+            stype = XKBLAS_STREAM_TYPE_H2D;
+            break ;
+        }
+
+        case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
+        {
+            stype = XKBLAS_STREAM_TYPE_D2H;
+            break ;
+        }
+
+        case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
+        {
+            stype = XKBLAS_STREAM_TYPE_D2D;
+            break ;
+        }
+
+        default:
+        {
+            XKBLAS_FATAL("Impossible occured");
+            break ;
+        }
+    }
+
+    /* create a new instruction and retrieve its offload stream */
+    xkblas_stream_t * stream;
+    xkblas_stream_instruction_t * instr;
+    device->offloader.instruction_new(
+        stype,      /* IN */
+        &stream,    /* OUT */
+        itype,      /* IN */
+        &instr      /* OUT */
+    );
+    assert(stream);
+    assert(instr);
+
+    /* create a new copy instruction */
+    // TODO
+
+    /* submit instruction to the stream */
+    xkblas_device_submit(device, stream, instr);
 }

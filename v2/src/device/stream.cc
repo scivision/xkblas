@@ -85,7 +85,16 @@ int
 xkblas_stream_t::commit(
     xkblas_stream_instruction_t * instr
 ) {
-    XKBLAS_IMPL("commiting instruction of type %u", instr->type);
+    static const char * NAMES[] = {
+        "NOP"     ,
+        "COPY_H2H",
+        "COPY_H2D",
+        "COPY_D2H",
+        "COPY_D2D",
+        "BARRIER" ,
+        "KERN"
+    };
+    XKBLAS_IMPL("commiting an instruction of type `%s`", NAMES[instr->type]);
 
     assert(instr);
     assert(instr == this->ready.instr + (this->ready.pos.w % this->ready.capacity));

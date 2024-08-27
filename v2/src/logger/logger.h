@@ -27,7 +27,7 @@ extern volatile double   XKBLAS_TIME_ELAPSED;
 extern volatile uint64_t XKBLAS_LAST_TIME;
 
 # define XKBLAS_PRINT_LINE() \
-    fprintf(stderr, "%s:%d (%s)", __FILE__, __LINE__, __func__);
+    fprintf(stderr, "%s:%d (%s)\n", __FILE__, __LINE__, __func__);
 
 # define XKBLAS_PRINT(LVL, ...)                                         \
     do {                                                                \
@@ -64,6 +64,7 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
             if (LVL == XKBLAS_PRINT_FATAL_ID)                           \
             {                                                           \
                 XKBLAS_PRINT_LINE();                                    \
+                fflush(stderr);                                         \
                 abort();                                                \
             }                                                           \
         }                                                               \

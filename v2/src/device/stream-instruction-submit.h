@@ -18,6 +18,7 @@ void xkblas_stream_instruction_submit_kernel(
 /* submit a memory copy */
 void xkblas_stream_instruction_submit_copy(
     const xkblas_driver_t         * driver,
+    xkblas_device_t               * device,
     const memory_view_t           & host_view,
     const uint8_t                   dst_device_global_id,
     const memory_replicate_view_t & dst_device_view,
