@@ -131,9 +131,9 @@ static char const * INSTRUCTIONS_NAME[] = {
 };
 
 int
-xkblas_stream_t::process_instructions(void)
+xkblas_stream_t::launch_ready_instructions(void)
 {
-    XKBLAS_DEBUG("Processing instructions of stream %p (%d ready, %d pending)",
+    XKBLAS_DEBUG("Lauching ready instructions of stream %p (%d ready, %d pending)",
             this, this->ready.size(), this->pending.size());
 
     assert(this->ready.pos.r <= this->ready.pos.w);
@@ -190,6 +190,17 @@ xkblas_stream_t::process_instructions(void)
         }
         SPINLOCK_UNLOCK(this->spinlock);
     }
+
+    return err;
+}
+
+int
+xkblas_stream_t::progress_pending_instructions(void)
+{
+    XKBLAS_DEBUG("Progressing ready instructions of stream %p (%d ready, %d pending)",
+            this, this->ready.size(), this->pending.size());
+
+    int err = 0;
 
     return err;
 }

@@ -46,9 +46,8 @@ class Offloader
 
         /* TODO */
         bool is_empty(xkblas_stream_type_t type) const;
-        int process_instructions(xkblas_stream_type_t type);
-        int test(xkblas_stream_type_t type);
-        int wait(xkblas_stream_type_t type);
+        int launch_ready_instructions(xkblas_stream_type_t type);
+        int progress_pending_instructions(xkblas_stream_type_t type, bool blocking);
 
         # if 0
         int (*f_stream_process_pending)(

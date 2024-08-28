@@ -56,8 +56,10 @@ Offloader::is_empty(xkblas_stream_type_t stype) const
 }
 
 int
-Offloader::process_instructions(xkblas_stream_type_t stype)
+Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
 {
+    # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
+
     int err = 0;
 
     unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
@@ -66,7 +68,7 @@ Offloader::process_instructions(xkblas_stream_type_t stype)
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            err = this->streams[s][i]->process_instructions();
+            err = this->streams[s][i]->launch_ready_instructions();
             assert(err == 0 || err == EINPROGRESS);
         }
     }
@@ -75,14 +77,22 @@ Offloader::process_instructions(xkblas_stream_type_t stype)
 }
 
 int
-Offloader::test(xkblas_stream_type_t type)
+Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocking)
 {
-    return 0;
-}
+    # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
+    int err = 0;
 
-int
-Offloader::wait(xkblas_stream_type_t type)
-{
+    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    for (unsigned int s = bgn ; s < end ; ++s)
+    {
+        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+        {
+            err = this->streams[s][i]->progress_pending_instructions();
+            assert(err == 0 || err == EINPROGRESS);
+        }
+    }
+
     return 0;
 }
 

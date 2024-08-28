@@ -129,10 +129,10 @@ xkblas_device_poll(xkblas_device_t * device)
     int err = 0;
     assert(ThreadWorker::get() == device->thread);
 
-    err = device->offloader.process_instructions(XKBLAS_STREAM_TYPE_ALL);
+    err = device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    err = device->offloader.test(XKBLAS_STREAM_TYPE_ALL);
+    err = device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, false);
     assert( (err == 0) || (err == EINPROGRESS));
 
     return err;
@@ -180,7 +180,7 @@ xkblas_device_prepare_task(
     {
         /* all data has been fetched, the task kernel is ready for execution */
         xkblas_device_task_access_fetched(driver, device, task);
-        device->offloader.process_instructions(XKBLAS_STREAM_TYPE_KERN);
+        device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
     }
 }
 
@@ -291,7 +291,7 @@ xkblas_device_progress(
             for (int i = 0 ; i < sizeof(stream_type_ordered) / sizeof(xkblas_stream_type_t) ; +i)
             {
                 xkblas_stream_type_t stype = stream_type_ordered[i];
-                err = device->offloader.process_instructions(stype);
+                err = device->offloader.launch_ready_instructions(stype);
                 if (err && err != EINPROGRESS)
                     goto memsync_out;
                 device->offloader.wait(stype);

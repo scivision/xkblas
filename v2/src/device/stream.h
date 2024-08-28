@@ -80,8 +80,11 @@ class xkblas_stream_t
         /* commit the instruction to the stream (must be allocated via 'instruction_new') */
         int commit(xkblas_stream_instruction_t * instruction);
 
-        /* process instructions */
-        int process_instructions(void);
+        /* launch instructions, and may generate pending instructions */
+        int launch_ready_instructions(void);
+
+        /* progress pending instructions */
+        int progress_pending_instructions(void);
 
         /* return true if the stream is full of instructions, false otherwise */
         int is_full(void) const;
