@@ -570,7 +570,7 @@ class KIntervalBtree {
             );
             r = system(filename);
             if (r)
-                fprintf(stderr, "pdflatex failed\n");
+                fprintf(stderr, "failed: `%s`\n", filename);
         }
 
         //////////////////

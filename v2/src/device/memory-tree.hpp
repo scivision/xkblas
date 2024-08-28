@@ -497,6 +497,7 @@ next_block:
                     }
 
                     /* every blocks have a view with the allocation 'allocation' */
+                    search.blocks_info[0].dst_allocation_id = j;
                     break ;
 
 next_view:
@@ -518,7 +519,7 @@ next_view:
                     uint64_t  size = access->host_view.bs_n * access->host_view.bs_m * access->host_view.sizeof_type;
                     uintptr_t addr = (uintptr_t) xkblas_memory_allocate(driver, device, size);
                     int         LD = access->host_view.bs_n;
-                    XKBLAS_DEBUG("  allocated at %p for size %zu", addr, size);
+                    XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
                     assert(addr);
 
                     allocation = new MemoryAllocation(addr, LD);

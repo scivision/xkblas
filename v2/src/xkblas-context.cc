@@ -1,11 +1,16 @@
 # include "xkblas-context.h"
 
 # include "conf/conf.h"
-# include "kernels/kernel-task-format-register.h"
 # include "logger/logger.h"
 # include "device/driver.h"
 # include "device/thread-producer.hpp"
 # include "sync/spinlock.h"
+
+# if __has_include("kernels/kernel-task-format-register.h")
+#  include "kernels/kernel-task-format-register.h"
+# else
+#  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
+# endif
 
 # include <atomic>
 # include <stdlib.h>

@@ -228,8 +228,6 @@ xkblas_£gemm_async(
                                 C, tm, tn, LDC
                         );
                     }
-                    // TODO : remove me, only generating 1 tile atm
-                    return 0;
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans
                 else
@@ -364,6 +362,8 @@ register_£gemm_format(void)
     task_format_t format;
     strcpy(format.label, "£gemm");
     format.f[XKBLAS_DRIVER_HOST] = body_host;
+# ifdef USE_CUDA
     format.f[XKBLAS_DRIVER_CUDA] = body_cuda;
+# endif /* USE_CUDA */
     task_format_create(&format);
 }
