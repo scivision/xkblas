@@ -1,11 +1,11 @@
+# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_HOST_ ## N
+
 # include "xkblas-context.h"
 # include "conf/conf.h"
 # include "device/device.h"
 # include "device/driver.h"
 # include "logger/logger.h"
 # include "sync/mutex.h"
-
-# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_HOST_ ## N
 
 # include <cassert>
 # include <cstdio>

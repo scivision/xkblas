@@ -1,11 +1,11 @@
+# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_CUDA_ ## N
+
 # include "xkblas-context.h"
 # include "conf/conf.h"
 # include "device/device.h"
 # include "device/driver.h"
 # include "logger/logger.h"
 # include "sync/mutex.h"
-
-# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_CUDA_ ## N
 
 # include <cuda_runtime.h>
 # include <cublas_v2.h>
@@ -1651,11 +1651,6 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
             return 0;
         }
 
-        case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
-        {
-            return ENOSYS;
-        }
-
         case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
         {
             cudaError_t res = cudaStreamSynchronize(stream->cu.handle);
@@ -1680,11 +1675,56 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
 
         } /* XKBLAS_STREAM_INSTR_TYPE_KERN */
 
+        case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
         {
-            return ENOSYS;
+            void * dst          = (void *) instr->copy.dst_device_view.addr;
+            size_t dpitch       = instr->copy.dst_device_view.LD * instr->copy.host_view.sizeof_type;
+            const void * src    = (const void *) instr->copy.src_device_view.addr;
+            size_t spitch       = instr->copy.src_device_view.LD * instr->copy.host_view.sizeof_type;
+            size_t width        = instr->copy.host_view.bs_n * instr->copy.host_view.sizeof_type;
+            size_t height       = instr->copy.host_view.bs_m;
+            cudaMemcpyKind kind;
+            cudaStream_t handle = stream->cu.handle;
+
+            switch (instr->type)
+            {
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
+                {
+                    kind = cudaMemcpyHostToDevice;
+                    break ;
+                }
+
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
+                    return ENOSYS;
+
+                default:
+                {
+                    XKBLAS_FATAL("instr->type got modified, something went really wrong");
+                    break ;
+                }
+            }
+
+            cudaError_t err = cudaMemcpy2DAsync(
+                dst,
+                dpitch,
+                src,
+                spitch,
+                width,
+                height,
+                kind,
+                handle
+            );
+            __check_error(err);
+
+            err = cudaEventRecord(stream->cu.events.end[istream->pending.pos.w % istream->pending.capacity], handle);
+            __check_error(err);
+
+            return EINPROGRESS;
         }
 
         default:
