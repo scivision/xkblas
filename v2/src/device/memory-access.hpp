@@ -46,11 +46,13 @@ class KMemoryAccess : public access_t<K>
 
         virtual ~KMemoryAccess() {}
 
+        # if 0
         inline size_t
         size(void) const
         {
             return host_view.size();
         }
+        # endif
 
 }; /* KMemoryAccess */
 

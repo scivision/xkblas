@@ -47,21 +47,6 @@ typedef struct  memory_replicate_view_t
 
 }               memory_replicate_view_t;
 
-typedef struct  memory_replicate_t
-{
-    /* List of views for this device replicate.  A device may have several
-     * views (and allocation) of the same 'host memory' - as it may
-     * asynchronously be read by different concurrent kernel requiring
-     * different memory alignment for BLAS operations)
-     */
-    std::vector<memory_replicate_view_t> views;
-
-    memory_replicate_t() : views() {}
-    memory_replicate_t(const memory_replicate_t & r) : views(r.views) {}
-    ~memory_replicate_t() {}
-
-}               memory_replicate_t;
-
 using memory_view_t = matrix_tile_t;
 
 #endif /* __MEMORY_VIEW_HPP__ */
