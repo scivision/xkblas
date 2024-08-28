@@ -17,10 +17,6 @@
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
 
-# define XKBLAS_DRIVER_PREFIX_NAME "XKBLAS_DRIVER_"
-# define XKBLAS_DRIVER_ENTRYPOINT_NAME( func_name ) XKBLAS_DRIVER_PREFIX_NAME #func_name
-# define XKBLAS_DRIVER_ENTRYPOINT( func_name ) XKBLAS_DRIVER_ ## func_name
-
 # pragma message(TODO "Replace 'xkblas_driver_t' with a C++ abstract class")
 # pragma message(TODO "Add metadata to each interface, for instance, whether its implementation if mandatory or optional")
 
@@ -89,9 +85,6 @@ typedef struct  xkblas_driver_t
 
     /* deallocate a stream */
     void (*f_stream_delete)(xkblas_stream_t * istream);
-
-    /* decode a stream instruction */
-    int (*f_stream_instruction_decode)(int device_id, xkblas_stream_t * ios, xkblas_stream_instruction_t * instr);
 
     ///////////////////////
     //  UNUSED YET       //

@@ -56,7 +56,7 @@ Offloader::is_empty(xkblas_stream_type_t stype) const
 }
 
 int
-Offloader::process_instruction(xkblas_stream_type_t stype)
+Offloader::process_instructions(xkblas_stream_type_t stype)
 {
     int err = 0;
 

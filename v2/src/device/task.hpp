@@ -176,7 +176,6 @@ class alignas(CACHE_LINE_SIZE) KTask
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
                 this->state.value = TASK_STATE_DATA_FETCHED;
-                // XKBLAS_DEBUG("Task `%s` is ready for kernel execution", this->label);
                 return TASK_STATE_DATA_FETCHED;
             }
             return TASK_STATE_DATA_FETCHING;

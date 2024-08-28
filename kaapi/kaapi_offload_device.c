@@ -881,19 +881,19 @@ out_device_writeback:
 
 out_device_memsync:
           kaapi_offload_requestreply( device, err );
-          kaapi_assert(err== 0);
+          kaapi_assert(err== 0);    // TODO : weird stuff
         } break;
 
         case KAAPI_DEVICEOP_INVALIDATE_CACHES:
         {
           LOGDEBUG(printf("DEVICEOP_INVALIDATE_CACHES\n"));
           err = kaapi_offload_poll_device( device );
-          if (err != 0) goto out_ic;
+          if (err != 0) goto out_ic;    // TODO : weird stuff
           kaapi_memory_invalidate_cache( device->memdev.asid );
           device->exec_count = device->spawn_count = device->ld->queue->push_count = device->ld->queue->pop_count = 0;
 out_ic:
           kaapi_offload_requestreply( device, err );
-          kaapi_assert(err== 0);
+          kaapi_assert(err== 0); // TODO : weird stuff
         } break;
 
         case KAAPI_DEVICEOP_REPLY:
@@ -903,7 +903,7 @@ out_ic:
           break;
       }
     }
-    else
+    else /* task is not null */
     {
 prepare_execute:
 //printf("Tidle time: %f\n", 1e-9*(double)(kaapi_get_elapsedns() - tidle_start));

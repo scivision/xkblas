@@ -125,11 +125,17 @@ class KMemoryTreeNodeSearch {
             /* memory block in the tree */
             MemoryBlock * block;
 
+            /* copy of the host view */
+            memory_view_t host_view;
+
             /* dst device */
             int8_t dst_device_global_id;
 
             /* dst allocation */
             int16_t dst_allocation_id;
+
+            /* copy of the replicate view */
+            MemoryAllocation * dst_allocation;
 
             /* source device */
             int8_t src_device_global_id;
@@ -137,14 +143,20 @@ class KMemoryTreeNodeSearch {
             /* src allocation */
             int16_t src_allocation_id;
 
+            /* copy of the replicate view */
+            MemoryAllocation * src_allocation;
+
         public:
 
             BlockInfo(MemoryBlock * b) :
                 block(b),
+                host_view(b->host_view),
                 dst_device_global_id(-1),
                 dst_allocation_id(-1),
+                dst_allocation(nullptr),
                 src_device_global_id(-1),
-                src_allocation_id(-1)
+                src_allocation_id(-1),
+                src_allocation(nullptr)
             {}
 
             virtual ~BlockInfo() {}
@@ -542,10 +554,24 @@ next_view:
                 {
                     for (BlockInfo & info : search.blocks_info)
                     {
-                        XKBLAS_DEBUG("set src=0 on block %p", info.block);
+                        /* parameters setup */
+
+                     // info.host_view = set already
+
                         info.dst_device_global_id = device->global_id;
-                        info.src_device_global_id = 0;  // TODO - find best device - only using host for now
-                        info.src_allocation_id = 0;     // TODO: currently always use the first allocation on that source device
+                     // info.dst_allocation_id = set already
+                        info.dst_allocation = info.block->replicates[info.dst_device_global_id].allocations[info.dst_allocation_id];
+
+                        info.src_device_global_id = 0; // TODO find best device - only using host for now
+                        info.src_allocation_id = 0; // TODO currently always use the first allocation on that source device
+                        info.src_allocation = info.block->replicates[info.src_device_global_id].allocations[info.src_allocation_id];
+
+                        /* assertion tests on parameters */
+                        assert(info.dst_allocation_id >= 0);
+                        assert(info.dst_allocation_id < info.block->replicates[info.dst_device_global_id].allocations.size());
+
+                        assert(info.src_allocation_id >= 0);
+                        assert(info.src_allocation_id < info.block->replicates[info.src_device_global_id].allocations.size());
                     }
                 }
 
@@ -569,24 +595,15 @@ next_view:
                     callback.args[1] = device;
                     callback.args[2] = task;
 
-                    /* parameters setup */
-                    assert(info.dst_allocation_id >= 0);
-                    assert(info.dst_allocation_id < info.block->replicates[info.dst_device_global_id].allocations.size());
-
-                    assert(info.src_allocation_id >= 0);
-                    assert(info.src_allocation_id < info.block->replicates[info.src_device_global_id].allocations.size());
-
-                    MemoryAllocation * dst = info.block->replicates[info.dst_device_global_id].allocations[info.dst_allocation_id];
-                    memory_replicate_view_t dst_view(dst->addr, dst->LD);
-
-                    MemoryAllocation * src = info.block->replicates[info.src_device_global_id].allocations[info.src_allocation_id];
-                    memory_replicate_view_t src_view(src->addr, src->LD);
+                    /* set parameters */
+                    memory_replicate_view_t dst_view(info.dst_allocation->addr, info.dst_allocation->LD);
+                    memory_replicate_view_t src_view(info.src_allocation->addr, info.src_allocation->LD);
 
                     /* launch asynchronous copy */
                     xkblas_stream_instruction_submit_copy(
                         driver,
                         device,
-                        info.block->host_view,
+                        info.host_view,
                         info.dst_device_global_id,
                         dst_view,
                         info.src_device_global_id,
@@ -618,10 +635,20 @@ next_view:
             for (int i = 0 ; i < task->naccesses ; ++i)
             {
                 Access * access = task->accesses + i;
+                task->fetching();
                 this->fetch_access(driver, device, task, access);
             }
 
             return task->fetched();
+        }
+
+        //////////////////
+        //  INVALIDATE  //
+        //////////////////
+        void
+        invalidate_caches(void)
+        {
+            # pragma message(TODO "Empty the memory tree")
         }
 
         //////////////

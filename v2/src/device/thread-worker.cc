@@ -64,7 +64,10 @@ ThreadWorker::pause(void)
     {
         this->sleep.sleeping = true;
         while (this->sleep.sleeping)
+        {
+            XKBLAS_DEBUG("Thread paused");
             pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
+        }
     }
     pthread_mutex_unlock(&this->sleep.lock);
 }
@@ -77,6 +80,7 @@ ThreadWorker::wakeup(void)
     {
         this->sleep.sleeping = false;
         pthread_cond_signal(&this->sleep.cond);
+        XKBLAS_DEBUG("Thread woke up");
     }
     pthread_mutex_unlock(&this->sleep.lock);
 }

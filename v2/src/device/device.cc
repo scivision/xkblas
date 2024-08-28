@@ -48,7 +48,7 @@ xkblas_device_init(
     assert(0 == pthread_cond_init(&device->cond, 0));
     assert(0 == pthread_cond_init(&device->cond_sleep, 0));
     device->issleeping = 0;
-    device->request.op = XKBLAS_DEVICEOP_NOP;
+    device->request.op = XKBLAS_DEVICE_REQUEST_TYPE_NOP;
     device->request.arg = 0;
     device->request.counter = 0;
 
@@ -88,8 +88,6 @@ xkblas_device_init(
 
     assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
     device->state = XKBLAS_DEVICE_STATE_INIT;
-
-    sleep(1);
 }
 
 static xkblas_device_t *
@@ -105,7 +103,7 @@ xkblas_device_create(
     xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
     assert(device);
 
-    device->request.op      = XKBLAS_DEVICEOP_NOP;
+    device->request.type    = XKBLAS_DEVICE_REQUEST_TYPE_NOP;
     device->request.arg     = 0;
     device->request.counter = NULL;
     device->request.err     = 0;
@@ -126,101 +124,21 @@ xkblas_device_create(
 int
 xkblas_device_poll(xkblas_device_t * device)
 {
+    XKBLAS_DEBUG("Polling");
+
     int err = 0;
     assert(ThreadWorker::get() == device->thread);
 
-    # if 0
-    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_D2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_H2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_D2H);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_KERN);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.test(XKBLAS_STREAM_TYPE_KERN);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.test(XKBLAS_STREAM_TYPE_D2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.test(XKBLAS_STREAM_TYPE_H2D);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    err = device->offloader.test(XKBLAS_STREAM_TYPE_D2H);
-    assert( (err == 0) || (err == EINPROGRESS));
-
-    # else
-    err = device->offloader.process_instruction(XKBLAS_STREAM_TYPE_ALL);
+    err = device->offloader.process_instructions(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
     err = device->offloader.test(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
 
-    # endif
-
     return err;
 }
 
-static inline void
-xkblas_device_progress(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device
-) {
-    // TODO : implement 'kaapi_sched_idle_offload' switch case
-
-    switch (device->request.op)
-    {
-        case (XKBLAS_DEVICEOP_NOP):
-        {
-            sched_yield();
-            xkblas_device_poll(device);
-            break ;
-        }
-
-        case (XKBLAS_DEVICEOP_REPLY):
-        {
-            break ;
-        }
-
-        case (XKBLAS_DEVICEOP_WRITEBACK):
-        {
-            // TODO
-            break ;
-        }
-
-        case (XKBLAS_DEVICEOP_WRITEBACK_WAIT):
-        {
-            // TODO
-            break ;
-        }
-
-        case (XKBLAS_DEVICEOP_MEMSYNC):
-        {
-            // TODO
-            break ;
-        }
-
-        case (XKBLAS_DEVICEOP_INVALIDATE_CACHES):
-        {
-            // TODO
-            break ;
-        }
-
-        default:
-        {
-            XKBLAS_FATAL("Invalid request op code");
-            break ;
-        }
-    }
-}
-
-/* Return 1 iff device may accept new runing offloaded task
- */
+/* Return 1 iff device may accept new runing offloaded task  */
 static inline int
 xkblas_device_accept_new_task(xkblas_device_t * device)
 {
@@ -239,11 +157,12 @@ xkblas_device_prepare_task(
     assert(task->state.value == TASK_STATE_READY);
 
     // TODO : implement this routine
-    XKBLAS_DEBUG("Scheduling task `%s` on device %d on driver `%s`",
-            task->label, device->driver_id, driver->f_get_name());
+    XKBLAS_DEBUG("Scheduling task `%s` on device %d - driver `%s`",
+            task->label, device->global_id, driver->f_get_name());
 
     // 'prepare_execute:' label
 
+# if 0
     // TODO : this part of the code had been changed quite a bit, check performances impact
     xkblas_device_poll(device);
     while (!xkblas_device_accept_new_task(device))
@@ -253,6 +172,7 @@ xkblas_device_prepare_task(
         assert(err == 0);
         xkblas_device_poll(device);
     }
+# endif
 
     /* retrieve the memory state */
     xkblas_context_t * ctx = xkblas_context_get();
@@ -260,9 +180,173 @@ xkblas_device_prepare_task(
     {
         /* all data has been fetched, the task kernel is ready for execution */
         xkblas_device_task_access_fetched(driver, device, task);
+        device->offloader.process_instructions(XKBLAS_STREAM_TYPE_KERN);
     }
 }
 
+static inline void
+xkblas_device_progress(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device
+) {
+    // TODO : implement 'kaapi_sched_idle_offload' switch case
+
+    # pragma message(TODO "Do we really need all that 'device request' stuff ? Just poll streams for now")
+
+    int err;
+    switch (device->request.type)
+    {
+        case (XKBLAS_DEVICE_REQUEST_TYPE_NOP):
+        {
+            err = xkblas_device_poll(device);
+            assert((err == 0) || (err == EINPROGRESS));
+            break ;
+        }
+
+        default:
+        {
+            XKBLAS_FATAL("Device request not supported %d", device->request.type);
+            break ;
+        }
+   }
+
+
+# if 0
+
+    int err = 0;
+    switch (device->request.op)
+    {
+        case (XKBLAS_DEVICE_REQUEST_TYPE_NOP):
+        {
+            sched_yield();
+            err = xkblas_device_poll(device);
+            assert((err == 0) || (err == EINPROGRESS));
+            break ;
+        }
+
+        case (XKBLAS_DEVICE_REQUEST_TYPE_REPLY):
+        {
+            break ;
+        }
+
+        case (XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK):
+        {
+
+        writeback_do:
+
+            /* writeback policy: if counter == 0, asynchronous call without any mean to view completion */
+            if (device->request.counter == 0)
+            {
+                kaapi_memory_writeback_all( &kaapi_the_dsm, device->memdev.asid, 0, 0, 0, 0 );
+                send_msg = 0;
+                kaapi_offload_requestreply( device, 0 );
+            }
+            else
+            {
+                /* asynchronous call, but reply to client when local completion */
+                send_msg = kaapi_memory_writeback_all( &kaapi_the_dsm, device->memdev.asid,
+                        callback_replyrequest_memsync, device, 0, 0 );
+                if (send_msg >0)
+                    KAAPI_ATOMIC_ADD64(device->request.counter, send_msg);
+                /* make progress of requests */
+                /* test completion of input back data */
+                err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2D );
+                if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
+                err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2D);
+                if (err) goto out_device_writeback;
+                /* test completion of input back data */
+                err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
+                if ((err != 0) && (err != EINPROGRESS)) goto out_device_writeback;
+                err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H);
+                if (err) goto out_device_writeback;
+                /* reply if decr contribution to this device */
+                if (KAAPI_ATOMIC_SUB64(device->request.counter, (1ULL<<32ULL)) ==0)
+                    kaapi_offload_requestreply( device, 0 );
+                device->request.op = KAAPI_DEVICEOP_WRITEBACK_WAIT;
+            }
+
+        writeback_out:
+            kaapi_offload_requestreply(device, err);
+            assert(err == 0);
+
+            break ;
+        }
+
+        case (XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK_WAIT):
+        {
+            // TODO
+            break ;
+        }
+
+        case (XKBLAS_DEVICE_REQUEST_TYPE_MEMSYNC):
+        {
+            /* synchronize all streams : order is important */
+            # pragma message(TODO "Romain: why order is important ?")
+            static xkblas_stream_type_t stream_type_ordered[] = {
+                XKBLAS_STREAM_TYPE_H2D,
+                KAAPI_IO_STREAM_KERN,
+                KAAPI_IO_STREAM_D2D,
+                KAAPI_IO_STREAM_D2H
+            };
+            for (int i = 0 ; i < sizeof(stream_type_ordered) / sizeof(xkblas_stream_type_t) ; +i)
+            {
+                xkblas_stream_type_t stype = stream_type_ordered[i];
+                err = device->offloader.process_instructions(stype);
+                if (err && err != EINPROGRESS)
+                    goto memsync_out;
+                device->offloader.wait(stype);
+            }
+
+            # pragma message(TODO "I retrieved xkblas/v1 logic here, but i feel like there is a race condition w/ task dependency graph discovery")
+            /* initiate write back only if streams are empty and there are no more tasks to execute */
+            ThreadWorker * thread = ThreadWorker::get();
+            Task * task = thread->pop();
+            if (task)
+            {
+                XKBLAS_ERROR("A task become ready while synchronizing memory : what to do ? Falling back to xkblas/v1 behavior");
+
+                xkblas_device_prepare_task(driver, device, task);
+                return ;
+            }
+
+            if (!device->offloader.is_empty())
+            {
+                XKBLAS_ERROR("An instruction got inserted concurrently after synchronizing with all threads... What is happening ? Not synchronizing");
+                return ;
+            }
+
+            device->request.op = XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK;
+            goto writeback_do;
+
+        memsync_out:
+            kaapi_offload_requestreply(device, err);
+            assert(err == 0);
+
+            break ;
+        }
+
+        case (XKBLAS_DEVICE_REQUEST_TYPE_INVALIDATE_CACHES):
+        {
+            int err = xkblas_device_poll(device);
+            if (err == 0)
+            {
+                xkblas_context_t * ctx = xkblas_context_get();
+                ctx->memtree.invalidate_caches();
+                xkblas_driver_invalidate_caches(driver, device);
+            }
+            kaapi_offload_requestreply(device, err);
+
+            break ;
+        }
+
+        default:
+        {
+            XKBLAS_FATAL("Invalid request op code");
+            break ;
+        }
+    }
+# endif
+}
 
 /* main loop for the thread responsible the passed device */
 static inline int
@@ -284,8 +368,11 @@ xkblas_device_thread_main_loop(
         Task * task;
         while ((task = thread->pop()) == NULL &&
                 device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
-                device->request.op == XKBLAS_DEVICEOP_NOP)
+                device->request.type == XKBLAS_DEVICE_REQUEST_TYPE_NOP)
             device->thread->pause();
+
+        XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
+                device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));
 
         if (task)
             xkblas_device_prepare_task(driver, device, task);
@@ -311,11 +398,12 @@ xkblas_device_thread_main(void * a)
     xkblas_driver_t * driver = drivers->list + driver_id;
     unsigned int cpu, node;
     getcpu(&cpu, &node);
-    XKBLAS_INFO("Starting thread for %s device (driver_device_id=%d) on cpu %d of node %d",
-            driver->f_get_name(), driver_device_id, cpu, node);
 
     xkblas_device_t * device = xkblas_device_create(drivers, driver_id, driver_device_id);
     xkblas_device_init(driver, device);
+
+    XKBLAS_INFO("Starting thread for %s device (device_driver_id=%d, device_global_id=%d) on cpu %d of node %d",
+            driver->f_get_name(), driver_device_id, device->global_id, cpu, node);
 
     // wait for all devices of that driver to be in the 'init' state
     ++driver->ndevices_inited;

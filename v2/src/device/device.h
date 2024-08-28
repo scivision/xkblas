@@ -23,37 +23,39 @@ typedef enum    xkblas_device_state_t : uint8_t
     XKBLAS_DEVICE_STATE_FINALIZED   = 7,
     XKBLAS_DEVICE_STATE_DESTROY     = 8,
     XKBLAS_DEVICE_STATE_DESTROYED   = 9,
+
 }               xkblas_device_state_t;
 
-typedef enum    xkblas_device_op_t
+typedef enum    xkblas_device_request_type_t
 {
-    XKBLAS_DEVICEOP_NOP                 = 0,
-    XKBLAS_DEVICEOP_REPLY               = 1,
-    XKBLAS_DEVICEOP_WRITEBACK           = 2,
-    XKBLAS_DEVICEOP_WRITEBACK_WAIT      = 3,
-    XKBLAS_DEVICEOP_MEMSYNC             = 4,
-    XKBLAS_DEVICEOP_INVALIDATE_CACHES   = 5
-}               xkblas_device_op_t;
+    XKBLAS_DEVICE_REQUEST_TYPE_NOP                 = 0,
+    XKBLAS_DEVICE_REQUEST_TYPE_REPLY               = 1,
+    XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK           = 2,
+    XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK_WAIT      = 3,
+    XKBLAS_DEVICE_REQUEST_TYPE_MEMSYNC             = 4,
+    XKBLAS_DEVICE_REQUEST_TYPE_INVALIDATE_CACHES   = 5
 
+}               xkblas_device_request_type_t;
+
+typedef struct  xkblas_device_request_t
+{
+    xkblas_device_request_type_t type;  /* request type */
+    uintptr_t arg;                      /* arg */
+    std::atomic<uint64_t> * counter;    /* for MEMSYNC or WRITEBACK request */
+    int err;                            /* error returned by the request */
+}               xkblas_device_request_t;
 
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource */
 typedef struct  xkblas_device_t
 {
-    xkblas_device_memory_t      memdev;             /* casted to xkblas_device */
-    Offloader                   offloader;          /* communication streams host<->device */
-    uint8_t                     driver_id;          /* driver device id in [0..ngpus_for_device] */
-    uint8_t                     global_id;          /* global device id in [0, XKBLAS_DEVICES_MAX[ */
-    std::atomic<uint8_t>        state;              /* True if driver is initialized */
-
-    ThreadWorker                * thread;           /* the device worker thread */
-
-    struct {
-        xkblas_device_op_t      op;                 /* op request for a device */
-        uintptr_t               arg;
-        std::atomic<uint64_t> * counter;            /* for MEMSYNC or WRITEBACK request */
-        int                     err;                /* error returned by the request */
-    } request;
+    xkblas_device_memory_t memdev;      /* casted to xkblas_device */
+    Offloader offloader;                /* communication streams host<->device */
+    uint8_t driver_id;                  /* driver device id in [0..ngpus_for_device] */
+    uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ */
+    std::atomic<uint8_t> state;         /* True if driver is initialized */
+    ThreadWorker * thread;              /* the device worker thread */
+    xkblas_device_request_t request;    /* current request */
 
     # if 0
     /* pipline: a way to enforce execution order of kernel to device */
@@ -90,7 +92,7 @@ typedef struct  xkblas_device_t
 
     int                         issleeping;        /* */
     struct {
-        xkblas_device_op_t      op;                   /* op request for a device */
+        xkblas_device_request_t      op;                   /* op request for a device */
         uintptr_t              arg;
         std::atomic<int64_t>   counter;              /* for MEMSYNC or WRITEBACK request */
         int                    err;                  /* error returned by the request */

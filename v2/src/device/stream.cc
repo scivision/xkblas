@@ -19,7 +19,8 @@ void
 xkblas_stream_init(
     xkblas_stream_t * stream,
     xkblas_stream_type_t type,
-    unsigned int capacity
+    unsigned int capacity,
+    int (*f_instruction_decode)(xkblas_stream_t *, xkblas_stream_instruction_t *)
 ) {
     stream->type = type;
 
@@ -38,7 +39,9 @@ xkblas_stream_init(
         capacity
     );
 
-    stream->ok_p = 0;
+    stream->f_instruction_decode = f_instruction_decode;
+
+    XKBLAS_DEBUG("Creating a stream %p with decode %p", f_instruction_decode);
 }
 
 void
@@ -59,10 +62,13 @@ xkblas_stream_t::instruction_new(
     const xkblas_stream_callback_t & callback
 ) {
 
-    /* Lock the stream to add a new instruction.  Unlock in the commit
-     * operation, so the caller can initialize the instruction in-between */
+    /* Lock the stream to add a new instruction. */
     while (1)
     {
+        // TODO : isn't it an infinite loop ? this is executed by the device
+        // thread that only him can empty the queue, and its not being emptied
+        // here. I believe these might be remains from an old multi-consumer
+        // scheme on instructions
         if (!this->ready.is_full())
         {
             SPINLOCK_LOCK(this->spinlock);
@@ -77,6 +83,9 @@ xkblas_stream_t::instruction_new(
     }
 
     xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
+    XKBLAS_DEBUG("Returning a new instruction at index %d on stream %p", this->ready.pos.w, this);
+
+    /* copy type / callback */
     instr->type = itype;
     instr->callback = callback;
 
@@ -87,6 +96,9 @@ int
 xkblas_stream_t::commit(
     xkblas_stream_instruction_t * instr
 ) {
+    assert(SPINLOCK_ISLOCKED(this->spinlock));
+    assert(instr);
+
     static const char * NAMES[] = {
         "NOP"     ,
         "COPY_H2H",
@@ -96,28 +108,38 @@ xkblas_stream_t::commit(
         "BARRIER" ,
         "KERN"
     };
-    XKBLAS_IMPL("commiting an instruction of type `%s`", NAMES[instr->type]);
 
-    assert(instr);
-    assert(instr == this->ready.instr + (this->ready.pos.w % this->ready.capacity));
-    assert(SPINLOCK_ISLOCKED(this->spinlock));
-
-    /* assuming TSO, so writemen barrier is enough */
     writemem_barrier();
     ++this->ready.pos.w;
+
+    XKBLAS_DEBUG("commiting an instruction of type `%s (%d ready, %d pending)`",
+            NAMES[instr->type], this->ready.size(), this->pending.size());
 
     SPINLOCK_UNLOCK(this->spinlock);
 
     return 0;
 }
 
+static char const * INSTRUCTIONS_NAME[] = {
+    "NOP",
+    "COPY_H2H",
+    "COPY_H2D",
+    "COPY_D2H",
+    "COPY_D2D",
+    "BARRIER",
+    "KERN"
+};
+
 int
 xkblas_stream_t::process_instructions(void)
 {
-    int err = 0;
+    XKBLAS_DEBUG("Processing instructions of stream %p (%d ready, %d pending)",
+            this, this->ready.size(), this->pending.size());
 
     assert(this->ready.pos.r <= this->ready.pos.w);
+    assert(this->f_instruction_decode);
 
+    int err = 0;
     while (!this->ready.is_empty())
     {
         SPINLOCK_LOCK(this->spinlock);
@@ -125,17 +147,44 @@ xkblas_stream_t::process_instructions(void)
             if (!this->ready.is_empty())
             {
                 int p = this->ready.pos.r % this->ready.capacity;
-                // TODO : call this
-                // err = stream->f_stream_decode_ioinstruction(stream->device, ios, &ios->instr[p]);
-                assert(err == 0 || err == EINPROGRESS);
+                xkblas_stream_instruction_t * instr = this->ready.instr + p;
+                assert(instr);
+
+                XKBLAS_DEBUG("Decoding instruction `%s` on stream %p (decoding via %p)",
+                        INSTRUCTIONS_NAME[instr->type], this, this->f_instruction_decode);
+
+                err = this->f_instruction_decode(this, instr);
                 ++this->ready.pos.r;
 
-                /* recopy op in pending op if still progressing */
-                if (err == EINPROGRESS)
+                switch (err)
                 {
-                    int wp = this->pending.pos.w % this->pending.capacity;
-                    memcpy(this->pending.instr + wp, this->ready.instr + p, sizeof(xkblas_stream_instruction_t));
-                    ++this->pending.pos.w;
+                    case (0):
+                    {
+                        /* no error */
+                        XKBLAS_DEBUG("Instruction completed");
+                        break ;
+                    }
+
+                    case (EINPROGRESS):
+                    {
+                        /* recopy op in pending op if still progressing */
+                        XKBLAS_DEBUG("Instruction in progress");
+                        int wp = this->pending.pos.w % this->pending.capacity;
+                        memcpy(this->pending.instr + wp, this->ready.instr + p, sizeof(xkblas_stream_instruction_t));
+                        ++this->pending.pos.w;
+                        break ;
+                    }
+
+                    case (ENOSYS):
+                    {
+                        XKBLAS_IMPL("Instruction `%s` not implemented", INSTRUCTIONS_NAME[instr->type]);
+                        break ;
+                    }
+
+                    default:
+                    {
+                        XKBLAS_FATAL("Unknown error after decoding instruction");
+                    }
                 }
             }
         }

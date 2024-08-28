@@ -46,7 +46,6 @@ add_library(xkblas SHARED
     src/conf/conf.cc
     src/device/device.cc
     src/device/driver.cc
-    src/device/driver_host.cc
     src/device/offloader.cc
     src/device/stream.cc
     src/device/stream-instruction-submit.cc
@@ -65,6 +64,11 @@ if (${HWLOC_FOUND})
     target_link_libraries(xkblas PRIVATE ${HWLOC_LIBRARIES})
 endif()
 
+# Host driver
+add_library(xkblas_driver_host SHARED src/device/driver_host.cc)
+target_link_libraries(xkblas PRIVATE xkblas_driver_host)
+
+# Cuda driver
 if (${CUDA_RT_FOUND})
     target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
@@ -74,8 +78,6 @@ if (${CUDA_RT_FOUND})
     target_link_libraries(xkblas_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(xkblas PRIVATE xkblas_driver_cuda)
 endif()
-
-
 
 # Include directory
 include_directories(include/)

@@ -38,6 +38,12 @@ typedef struct  xkblas_stream_instruction_queue_t
         return (this->pos.r == this->pos.w);
     }
 
+    int
+    size(void) const
+    {
+        return (this->pos.w - this->pos.r);
+    }
+
 }               xkblas_stream_instruction_queue_t;
 
 # pragma message(TODO "make this a C++ class and use inheritance/pure virtual - currently hybrid of C struct C++ class :(")
@@ -50,8 +56,14 @@ class xkblas_stream_t
         xkblas_stream_instruction_queue_t ready;
         xkblas_stream_instruction_queue_t pending;
 
+        /* decode a stream instruction */
+        int (*f_instruction_decode)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
+
+        # pragma message(TODO "What is the purpose of 'ok_p' ?")
+        # if 0
         /* past the last position of pending notified instr in [pos_rp,pos_wp] */
         volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+        # endif
 
     public:
         xkblas_stream_t() {}
@@ -80,7 +92,7 @@ class xkblas_stream_t
 
 };  /* xkblas_stream_t */
 
-void xkblas_stream_init(xkblas_stream_t * stream, xkblas_stream_type_t type, unsigned int capacity);
+void xkblas_stream_init(xkblas_stream_t * stream, xkblas_stream_type_t type, unsigned int capacity, int (*f_instruction_decode)(xkblas_stream_t *, xkblas_stream_instruction_t *));
 void xkblas_stream_deinit(xkblas_stream_t * stream);
 
 #endif /* __STREAM_HPP__ */

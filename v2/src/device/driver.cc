@@ -88,15 +88,12 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
-    extern void XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_ENTRYPOINT(get_host_driver);
+    extern void XKBLAS_DRIVER_HOST_get_driver(xkblas_driver_t *);
+    loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_HOST_get_driver;
 
 # if USE_CUDA
-    extern void XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver)(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_ENTRYPOINT(get_cuda_driver);
-    XKBLAS_DEBUG("using cuda");
-    # else
-    XKBLAS_DEBUG("not using cuda");
+    extern void XKBLAS_DRIVER_CUDA_get_driver(xkblas_driver_t *);
+    loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_CUDA_get_driver;
 # endif /* USE_CUDA */
 
     uint8_t i;
@@ -155,10 +152,15 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
     // targetted device and OCR failed, fallback to round robin
     if (device_id >= drivers->devices.n)
     {
-        do {
+        while (1)
+        {
             device_id = drivers->devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = (device_id + 1) % drivers->devices.n;
-        } while (drivers->devices.list[device_id] == nullptr);
+            device_id = device_id % drivers->devices.n;
+            if (device_id == 0) /* never enqueue onto the host */
+                continue ;
+            if (drivers->devices.list[device_id])
+                break ;
+        }
     }
 
     // we found the thread
@@ -170,7 +172,7 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
         return ;
     }
 
-    // XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
+    XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
     worker->push(task);
 }
 

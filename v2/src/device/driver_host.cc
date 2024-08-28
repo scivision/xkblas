@@ -5,6 +5,8 @@
 # include "logger/logger.h"
 # include "sync/mutex.h"
 
+# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_HOST_ ## N
+
 # include <cassert>
 # include <cstdio>
 # include <cstdint>
@@ -116,6 +118,15 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
     return 0;
 }
 
+int
+XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
+    xkblas_stream_t * istream,
+    xkblas_stream_instruction_t * instr
+) {
+    XKBLAS_FATAL("Tried to execute instructions on the host, not implemneted yet");
+    return 0;
+}
+
 static xkblas_stream_t *
 XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_type_t type,
@@ -124,8 +135,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_t * istream = (xkblas_stream_t *) malloc(sizeof(xkblas_stream_t));
     assert(istream);
 
-    xkblas_stream_init(istream, type, capacity);
-
+    xkblas_stream_init(istream, type, capacity, XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode));
     return istream;
 }
 
@@ -136,18 +146,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_delete)(
     free(istream);
 }
 
-int
-XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
-    int device_id,
-    xkblas_stream_t * istream,
-    xkblas_stream_instruction_t * instr
-) {
-    return 0;
-}
-
-
 void
-XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t * driver)
+XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
 {
     # define EP(func) driver->f_##func = XKBLAS_DRIVER_ENTRYPOINT(func)
 
@@ -164,7 +164,6 @@ XKBLAS_DRIVER_ENTRYPOINT(get_host_driver)(xkblas_driver_t * driver)
 
     EP(stream_create);
     EP(stream_delete);
-    EP(stream_instruction_decode);
 
     #if 0
 
