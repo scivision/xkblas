@@ -7,6 +7,7 @@ project(tests)
 set(CMAKE_BUILD_TYPE Debug)
 
 # Lib name
-add_executable(gemm gemm.cc)
-target_link_libraries(gemm xkblas)
+add_executable(tests tests.cc)
+target_link_libraries(tests xkblas)
 
+add_subdirectory(kernels/)

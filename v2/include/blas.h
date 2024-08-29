@@ -1,4 +1,4 @@
-#ifndef __BLAS_H__
+#if !defined(__BLAS_H__) && !defined(__MKL_CBLAS_H__)
 # define __BLAS_H__
 
 # include <stdlib.h>
