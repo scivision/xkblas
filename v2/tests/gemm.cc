@@ -29,14 +29,10 @@ main(void)
     TYPE alpha = 1.0;
     TYPE beta  = 1.0;
 
-    # if 1
-    uintptr_t Ap = (uintptr_t) malloc(sizeof(TYPE) * (LD * LD + LD));
-    uintptr_t Bp = (uintptr_t) malloc(sizeof(TYPE) * (LD * LD + LD));
-    uintptr_t Cp = (uintptr_t) malloc(sizeof(TYPE) * (LD * LD + LD));
-
-    Ap += (LD - (Ap % LD));
-    Bp += (LD - (Bp % LD));
-    Cp += (LD - (Cp % LD));
+    uintptr_t mem = (uintptr_t) malloc(sizeof(TYPE) * (LD * LD + LD));
+    uintptr_t Ap  = mem + (LD - (mem % LD)) + 0 * sizeof(TYPE) * (LD * LD);
+    uintptr_t Bp  = mem + (LD - (mem % LD)) + 1 * sizeof(TYPE) * (LD * LD);
+    uintptr_t Cp  = mem + (LD - (mem % LD)) + 2 * sizeof(TYPE) * (LD * LD);
 
     assert(Ap % LD == 0);
     assert(Bp % LD == 0);
@@ -46,13 +42,6 @@ main(void)
     const TYPE * B = (const TYPE *) Bp;
           TYPE * C = (      TYPE *) Cp;
 
-    # else
-    assert(M == N);
-    assert(N == K);
-    const TYPE * A = (const TYPE *) (      N * sizeof(TYPE)                   );
-    const TYPE * B = (const TYPE *) (LD * N * sizeof(TYPE)                   );
-          TYPE * C = (      TYPE *) (LD * N * sizeof(TYPE) + N * sizeof(TYPE));
-    # endif
     xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
     xkblas_sync();
 

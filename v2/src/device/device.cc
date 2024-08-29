@@ -124,8 +124,6 @@ xkblas_device_create(
 int
 xkblas_device_poll(xkblas_device_t * device)
 {
-    XKBLAS_DEBUG("Polling");
-
     int err = 0;
     assert(ThreadWorker::get() == device->thread);
 

@@ -194,8 +194,8 @@ class KIntervalBtree {
                  * access (this->region, mode) */
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
 
-                /* called whenever this node was shrinked */
-                virtual void on_shrink(void) = 0;
+                /* called whenever this node is being shrinked on dimension 'k' to 'interval' */
+                virtual void on_shrink(const Interval & interval, int k) = 0;
 
                 /* called to detect whether the access intersects with 'this' node */
                 virtual bool intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const = 0;
@@ -399,8 +399,10 @@ class KIntervalBtree {
                 }
 
                 void
-                on_shrink(void)
+                on_shrink(const Interval & interval, int k)
                 {
+                    (void) interval;
+                    (void) k;
                     assert(0);
                 }
 
@@ -813,12 +815,13 @@ class KIntervalBtree {
         inline void
         insert_fixup(
             T & t,
+            Region & region,
             const access_mode_t mode,
             Node * parent,
             int k,
-            Direction dir,
-            Node * node
+            Direction dir
         ) {
+            Node * node = this->new_node(t, region, k, RED);
             tassert(node);
 
             parent->st[k].children[dir] = node;
@@ -1058,8 +1061,7 @@ class KIntervalBtree {
             Region & region,
             const access_mode_t mode,
             Node * parent,
-            int k,
-            Node * node
+            int k
         ) {
 
             while (k < K)
@@ -1076,7 +1078,6 @@ class KIntervalBtree {
                     {
                         // TODO : what if 'node' is not null ?  probably want to
                         // return something to callee for the case (3)
-                        tassert(node == nullptr);
                         this->insert_from_cut(t, region, mode, parent);
                         break ;
                     }
@@ -1090,14 +1091,7 @@ class KIntervalBtree {
                 {
                     if (parent->st[k].left == nullptr)
                     {
-                        if (node == nullptr)
-                            node = this->new_node(t, region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        this->insert_fixup(t, mode, parent, k, LEFT, node);
+                        this->insert_fixup(t, region, mode, parent, k, LEFT);
                         break ;
                     }
                     else
@@ -1108,14 +1102,7 @@ class KIntervalBtree {
                 {
                     if (parent->st[k].right == nullptr)
                     {
-                        if (node == nullptr)
-                            node = this->new_node(t, region, k, RED);
-                        else
-                        {
-                            node->k = k;
-                            node->colors[k] = RED;
-                        }
-                        this->insert_fixup(t, mode, parent, k, RIGHT, node);
+                        this->insert_fixup(t, region, mode, parent, k, RIGHT);
                         break ;
                     }
                     else
@@ -1130,7 +1117,6 @@ class KIntervalBtree {
 insert_from_case_3_equals:
                         if (++k == K)
                         {
-                            tassert(node == nullptr);
                             parent->on_insert(t, mode);
                             this->outdate(parent);
                             break ;
@@ -1182,8 +1168,8 @@ insert_from_case_3_equals:
                             }
 
                             // shrink node
+                            node->on_shrink(region[k], k);
                             node->region[k] = region[k];
-                            node->on_shrink();
                         };
 
                         f(parent);
@@ -1193,10 +1179,7 @@ insert_from_case_3_equals:
 
                         // insert all side nodes
                         for (ReinsertRegion & rr : to_reinsert)
-                        {
-                            Node * node = this->new_node(t, rr.region, k, RED, rr.sibling);
-                            this->insert_from(t, node->region, ACCESS_MODE_VOID, this->root, 0, node);
-                        }
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0);
 
                         // continue inserting, the node
                         assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
@@ -1212,7 +1195,7 @@ insert_from_case_3_equals:
                     {
                         const int b = region[k].b;
                         region[k].b = parent->region[k].a;
-                        this->insert_from(t, region, mode, this->root, 0, node);
+                        this->insert_from(t, region, mode, this->root, 0);
                         region[k].b = b;
                     }
 
@@ -1220,7 +1203,7 @@ insert_from_case_3_equals:
                     if (parent->region[k].b < region[k].b)
                     {
                         region[k].a = parent->region[k].b;
-                        this->insert_from(t, region, mode, this->root, 0, node);
+                        this->insert_from(t, region, mode, this->root, 0);
                     }
 
                     // (3)
@@ -1248,7 +1231,7 @@ insert_from_case_3_equals:
             }
             else
             {
-                this->insert_from(t, region, mode, this->root, 0, nullptr);
+                this->insert_from(t, region, mode, this->root, 0);
             }
 
             this->post_insert();

@@ -1,4 +1,4 @@
-CXX=g++
+CXX=clang++
 CFLAGS=-Wall -Werror -Wextra
 CFLAGS+=-Wno-error=write-strings
 CFLAGS+=-g -O0

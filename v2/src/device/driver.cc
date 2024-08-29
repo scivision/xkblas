@@ -119,11 +119,14 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
         total_devices += driver->ndevices_targeted;
     }
 
+    /* remove the main 'host' device */
+    --total_devices;
+
     if (total_devices == 0)
         XKBLAS_FATAL("No devices found :-(");
 
     XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, ngpus);
-    assert(total_devices < ngpus);
+    assert(total_devices <= ngpus);
 }
 
 void

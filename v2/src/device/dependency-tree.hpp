@@ -89,9 +89,18 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
         }
 
         void
-        on_shrink(void)
+        on_shrink(const Interval & interval, int k)
         {
-            // nothing to do
+            (void) interval;
+            (void) k;
+            # if 0
+            XKBLAS_WARN("shrinked region (%dx%d) on dimension %d to %d - dependences may be wrong!",
+                this->region[0].length(),
+                this->region[1].length(),
+                k,
+                interval.length()
+            );
+            # endif
         }
 
         //////////////////

@@ -11,17 +11,23 @@ class Interval {
         Interval(int aa, int bb) : a(aa), b(bb) {}
         virtual ~Interval() {}
 
-    friend bool
-    operator==(const Interval & lhs, const Interval & rhs)
-    {
-        return lhs.a == rhs.a && lhs.b == rhs.b;
-    }
+        inline int
+        length(void) const
+        {
+            return this->b - this->a;
+        }
 
-    friend bool
-    operator!=(const Interval & lhs, const Interval & rhs)
-    {
-        return lhs.a != rhs.a || lhs.b != rhs.b;
-    }
+        friend bool
+        operator==(const Interval & lhs, const Interval & rhs)
+        {
+            return lhs.a == rhs.a && lhs.b == rhs.b;
+        }
+
+        friend bool
+        operator!=(const Interval & lhs, const Interval & rhs)
+        {
+            return lhs.a != rhs.a || lhs.b != rhs.b;
+        }
 
 };
 

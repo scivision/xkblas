@@ -59,7 +59,7 @@ class Intervals {
             }
             else
             {
-                assert(0);
+                // ERROR
             }
         }
 

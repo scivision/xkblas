@@ -6,7 +6,7 @@
 # include <cmath>
 # include <cstdlib>
 
-# define MAX_TASKS 100000
+# define MAX_TASKS 1000000
 
 static int NINSERT = 0;
 
@@ -66,7 +66,7 @@ insert(
     Interval intervals[K]
 ) {
     Intervals<K> region(intervals);
-    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "rw" : mode == ACCESS_MODE_R ? "r" : mode == ACCESS_MODE_W ? "w" :  "unk") << " " << region << std::endl;
+//    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "rw" : mode == ACCESS_MODE_R ? "r" : mode == ACCESS_MODE_W ? "w" :  "unk") << " " << region << std::endl;
     KTask<K> * task = task_new<K>();
     tree.intersect(task, region, mode);
     tree.insert(task, region, mode);
@@ -267,6 +267,8 @@ static void launch_tests(KDependencyTree<K> & tree)
     printf("    Inserted %d regions and %d elements\n", ntasks, nelements);
     printf("        Intervals/s. = %.2lf\n", ntasks / dt);
     printf("         Elements/s. = %.2lf\n", nelements / dt);
+    printf("     Inserted %d tasks\n", ntasks);
+    printf("        Tasks/s. = %.2lf\n", ntasks / dt);
     printf("    Set %d task edges\n", nedges);
     printf("        Edges/s. = %.2lf\n", nedges / dt);
     printf("\n");

@@ -304,13 +304,18 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             (void) search;
             (void) mode;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
+            XKBLAS_IMPL("inserted region %dx%d", this->region[0].length(), this->region[1].length());
         }
 
         void
-        on_shrink(void)
+        on_shrink(const Interval & interval, int k)
         {
-            // TODO : not implemented
-            assert(0);
+            XKBLAS_WARN("shrinked region (%dx%d) on dimension %d to %d",
+                this->region[0].length(),
+                this->region[1].length(),
+                k,
+                interval.length()
+            );
         }
 
         //////////////////

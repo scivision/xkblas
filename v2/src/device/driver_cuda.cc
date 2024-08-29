@@ -108,7 +108,7 @@ static hwloc_topology_t TOPOLOGY;
 static int
 __check_error(cudaError_t err)
 {
-    if (cudaSuccess != err)
+    if (err != cudaSuccess && err != cudaErrorNotReady)
     {
         const char * errstr = cudaGetErrorName(err);
         XKBLAS_ERROR("cuCheckError() error: %s (%i)", errstr, err);
@@ -294,10 +294,10 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
         }
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
-        unsigned int ndevices = XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)();
         xkblas_context_t * ctx = xkblas_context_get();
+        uint32_t ngpus = MIN(XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(), ctx->conf.ngpus);
         uint32_t gpuset = ctx->conf.gpu_set;
-        for (int i = 0; i < ndevices ; ++i)
+        for (int i = 0; i < ngpus ; ++i)
         {
             int idx = __builtin_ffs((unsigned int)gpuset);
             assert(idx != 0);
@@ -712,8 +712,8 @@ cuda_stream_instructions_progress(
                 for (int i = 0 ; i < 1 ; ++i)
                 {
                     res = cudaEventQuery(stream->cu.events.end[idx]);
-                    __check_error(res);
                     assert(res == cudaErrorNotReady || res == cudaSuccess);
+                    __check_error(res);
 
                     # pragma message(TODO "Why pthread_yield here ?")
                     if (res == cudaErrorNotReady)
@@ -761,7 +761,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     int blocking
 ) {
     int err = cuda_stream_instructions_progress(istream, blocking);
-    assert(err == 0);
+    assert(err == 0 || err == EINPROGRESS);
 
     // TODO : recheck, what is 'ok_p' ?
     for (int p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
