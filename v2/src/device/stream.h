@@ -15,6 +15,8 @@ typedef enum    xkblas_stream_type_t
 
 }               xkblas_stream_type_t;
 
+const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
+
 typedef struct  xkblas_stream_instruction_queue_t
 {
     /* attributes */

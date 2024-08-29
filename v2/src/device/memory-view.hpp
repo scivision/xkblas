@@ -43,7 +43,7 @@ typedef struct  memory_replicate_view_t
         fetching(0)
     {}
 
-    virtual ~memory_replicate_view_t() {}
+    ~memory_replicate_view_t() {}
 
 }               memory_replicate_view_t;
 

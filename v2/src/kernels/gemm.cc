@@ -314,7 +314,7 @@ exit_gemm:
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if USE_CUDA
-#  include "cuda-helper.h"
+#  include "device/cublas-helper.h"
 
 static void
 body_cuda(void * vparam)
@@ -334,6 +334,15 @@ body_cuda(void * vparam)
 
     # pragma message(TODO "Call cublas with allocated device accesses")
     # pragma message(TODO "Does alpha/beta host or device pointers ?")
+
+    XKBLAS_DEBUG("Calling cublasGemm(A=%p, B=%p, C=%p) - handle=%p",
+        (void *) A->device_view.addr,
+        (void *) B->device_view.addr,
+        (void *) C->device_view.addr,
+        handle
+    );
+
+    assert(handle);
 
     cublasStatus_t res = cublas££gemm(
         (cublasHandle_t) handle,

@@ -3,6 +3,50 @@
 
 # pragma message(TODO "Make 'init' and 'deinit' methods too ? They are used by drivers, idk if we want C++ drivers...")
 
+const char *
+xkblas_stream_type_to_str(xkblas_stream_type_t type)
+{
+    switch (type)
+    {
+        case (XKBLAS_STREAM_TYPE_H2D):
+            return "H2D";
+        case (XKBLAS_STREAM_TYPE_D2H):
+            return "D2H";
+        case (XKBLAS_STREAM_TYPE_D2D):
+            return "D2D";
+        case (XKBLAS_STREAM_TYPE_KERN):
+            return "KERN";
+        case (XKBLAS_STREAM_TYPE_ALL):
+            return "ALL";
+        default:
+          return NULL;
+    }
+}
+
+const char *
+xkblas_stream_instruction_type_to_str(xkblas_stream_instruction_type_t type)
+{
+     switch (type)
+     {
+         case (XKBLAS_STREAM_INSTR_TYPE_NOP):
+             return "NOP";
+         case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
+             return "COPY_H2H";
+         case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
+             return "COPY_H2D";
+         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
+             return "COPY_D2H";
+         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
+             return "COPY_D2D";
+         case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
+             return "BARRIER";
+         case (XKBLAS_STREAM_INSTR_TYPE_KERN):
+             return "KERN";
+        default:
+             return NULL;
+    }
+}
+
 static inline void
 xkblas_stream_instruction_queue_init(
     xkblas_stream_instruction_queue_t * queue,
@@ -85,7 +129,7 @@ xkblas_stream_t::instruction_new(
     }
 
     xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
-    XKBLAS_DEBUG("Returning a new instruction at index %d on stream %p", this->ready.pos.w, this);
+    XKBLAS_DEBUG("Returning a new instruction at index %lu on stream %p", this->ready.pos.w, this);
 
     /* copy type / callback */
     instr->type = itype;
@@ -101,36 +145,17 @@ xkblas_stream_t::commit(
     assert(SPINLOCK_ISLOCKED(this->spinlock));
     assert(instr);
 
-    static const char * NAMES[] = {
-        "NOP"     ,
-        "COPY_H2H",
-        "COPY_H2D",
-        "COPY_D2H",
-        "COPY_D2D",
-        "BARRIER" ,
-        "KERN"
-    };
-
     writemem_barrier();
     ++this->ready.pos.w;
 
-    XKBLAS_DEBUG("commiting an instruction of type `%s (%d ready, %d pending)`",
-            NAMES[instr->type], this->ready.size(), this->pending.size());
+    XKBLAS_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
+            xkblas_stream_instruction_type_to_str(instr->type),
+            this->ready.size(), this->pending.size());
 
     SPINLOCK_UNLOCK(this->spinlock);
 
     return 0;
 }
-
-static char const * INSTRUCTIONS_NAME[] = {
-    "NOP",
-    "COPY_H2H",
-    "COPY_H2D",
-    "COPY_D2H",
-    "COPY_D2D",
-    "BARRIER",
-    "KERN"
-};
 
 # pragma message(TODO "do we really need to lock in 'new' and unlock in 'commit' - couldn't we already unlock in 'new' ?")
 int
@@ -153,8 +178,12 @@ xkblas_stream_t::launch_ready_instructions(void)
                 xkblas_stream_instruction_t * instr = this->ready.instr + p;
                 assert(instr);
 
-                XKBLAS_DEBUG("Decoding instruction `%s` on stream %p (decoding via %p)",
-                        INSTRUCTIONS_NAME[instr->type], this, this->f_instruction_launch);
+                XKBLAS_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
+                        xkblas_stream_instruction_type_to_str(instr->type),
+                        this,
+                        xkblas_stream_type_to_str(this->type),
+                        this->f_instruction_launch
+                );
 
                 err = this->f_instruction_launch(this, instr);
                 ++this->ready.pos.r;
@@ -173,14 +202,19 @@ xkblas_stream_t::launch_ready_instructions(void)
                         /* recopy op in pending op if still progressing */
                         XKBLAS_DEBUG("Instruction in progress");
                         int wp = this->pending.pos.w % this->pending.capacity;
-                        memcpy(this->pending.instr + wp, this->ready.instr + p, sizeof(xkblas_stream_instruction_t));
+                        memcpy(
+                            this->pending.instr + wp,
+                            this->ready.instr + p,
+                            sizeof(xkblas_stream_instruction_t)
+                        );
                         ++this->pending.pos.w;
                         break ;
                     }
 
                     case (ENOSYS):
                     {
-                        XKBLAS_IMPL("Instruction `%s` not implemented", INSTRUCTIONS_NAME[instr->type]);
+                        XKBLAS_IMPL("Instruction `%s` not implemented",
+                                xkblas_stream_instruction_type_to_str(instr->type));
                         break ;
                     }
 
@@ -199,8 +233,8 @@ xkblas_stream_t::launch_ready_instructions(void)
 int
 xkblas_stream_t::progress_pending_instructions(int blocking)
 {
-    XKBLAS_DEBUG("Progressing pending instructions of stream %p (%d ready, %d pending)",
-            this, this->ready.size(), this->pending.size());
+    XKBLAS_DEBUG("Progressing pending instructions of stream %p of type `%s` (%d ready, %d pending)",
+            this, xkblas_stream_type_to_str(this->type), this->ready.size(), this->pending.size());
 
     assert(this->pending.pos.r <= this->pending.pos.w);
     assert(this->f_instructions_progress);

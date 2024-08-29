@@ -13,32 +13,34 @@ Offloader::init(
     assert(conf);
     assert(f_stream_create);
 
+    /* next stream to use (round robin) */
     memset(this->next, 0, sizeof(this->next));
 
+    /* count total number of stream */
     uint16_t cnt = 0;
-    uint16_t prefix[XKBLAS_STREAM_TYPE_ALL+1];
-
-    prefix[0] = 0;
     for (int stype = 0 ; stype < XKBLAS_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = conf->streams[stype].n;
-        cnt += this->count[stype];
-        prefix[stype+1] = cnt;
+        cnt += conf->streams[stype].n;
     }
 
+    /* allocate streams array */
     xkblas_stream_t ** all_streams = (xkblas_stream_t **) malloc(sizeof(xkblas_stream_t *) * cnt);
     assert(all_streams);
 
-    int stype = 0;
-    this->streams[stype] = all_streams;
-    for (int i = 0 ; i < cnt ; ++i)
+    /* retrieve stream offset per type */
+    uint16_t i = 0;
+    for (int stype = 0 ; stype < XKBLAS_STREAM_TYPE_ALL ; ++stype)
     {
-        all_streams[i] = f_stream_create(static_cast<xkblas_stream_type_t>(stype), conf->capacity);
-        assert(all_streams[i]);
-
-        if (i >= prefix[stype+1])
-            this->streams[++stype] = all_streams + i;
+        this->streams[stype] = all_streams + i;
+        for (int j = 0 ; j < conf->streams[stype].n ; ++j, ++i)
+        {
+            all_streams[i] = f_stream_create(static_cast<xkblas_stream_type_t>(stype), conf->capacity);
+            assert(all_streams[i]);
+        }
     }
+
+    assert(i == cnt);
 }
 
 bool
@@ -124,8 +126,12 @@ Offloader::stream_next(xkblas_stream_type_t stype)
 
         default:
         {
-            /* TODO : could be relaxed ? and maybe even non atomic, as it is only call by the device thread */
+            /* TODO : could be relaxed ? and maybe even non atomic, as it is
+             * only call by the device thread */
             int snext = this->next[stype].fetch_add(1, std::memory_order_seq_cst) % count;
+
+            XKBLAS_DEBUG("instruction_new on stream type %d - count is %d - returning %d",
+                    stype, count, snext);
 
             // TODO : track pending instr here ?
 
@@ -147,6 +153,7 @@ Offloader::instruction_new(
 
     /* retrieve native stream */
     xkblas_stream_t * stream = this->stream_next(stype);
+    assert(stream->type == stype);
 
     /* allocation instruction */
     xkblas_stream_instruction_t * instr = stream->instruction_new(itype, callback);

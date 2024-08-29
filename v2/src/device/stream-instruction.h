@@ -28,6 +28,8 @@ typedef enum    xkblas_stream_instruction_type_t
     XKBLAS_STREAM_INSTR_TYPE_KERN     = 6
 }               xkblas_stream_instruction_type_t;
 
+const char * xkblas_stream_instruction_type_to_str(xkblas_stream_instruction_type_t type);
+
 # pragma message(TODO "Bad dependence on 'xkblas_memory_view_t' here")
 struct xkblas_memory_view_t;
 

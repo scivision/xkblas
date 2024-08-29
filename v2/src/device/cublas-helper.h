@@ -1,6 +1,7 @@
-#ifndef __CUDA_HELPER_H__
-# define __CUDA_HELPER_H__
+#ifndef __CUBLAS_HELPER_H__
+# define __CUBLAS_HELPER_H__
 
+# include "blas.h"
 # include <cublas_v2.h>
 
 static inline cublasOperation_t
@@ -51,4 +52,4 @@ xkblas_cublas_status_check(cublasStatus_t status)
     XKBLAS_FATAL("cuBlas error `%s` occured - %s", name, descr);
 }
 
-#endif /* __CUDA_HELPER_H__ */
+#endif /* __CUBLAS_HELPER_H__ */
