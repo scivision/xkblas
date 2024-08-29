@@ -122,7 +122,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         ////////////////////////////////////
 
         /* this task precedes the passed task */
-        void
+        inline void
         precedes(KTask * succ, const Region & region)
         {
             assert(succ);
@@ -147,7 +147,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         /* Return 'true' if the task is ready to be queued, 'false' otherwise */
-        bool
+        inline bool
         commit(void)
         {
             assert(this->state.value == TASK_STATE_ALLOCATED);
@@ -159,7 +159,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             return false;
         }
 
-        void
+        inline void
         fetching(void)
         {
             if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
@@ -169,7 +169,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             }
         }
 
-        task_state_t
+        inline task_state_t
         fetched(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
@@ -181,7 +181,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             return TASK_STATE_DATA_FETCHING;
         }
 
-        void
+        inline void
         executed(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHED);
@@ -192,7 +192,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_UNLOCK(this->state.lock);
         }
 
-        void
+        inline void
         complete(void)
         {
             assert(this->state.value == TASK_STATE_EXECUTED);
@@ -203,12 +203,14 @@ class alignas(CACHE_LINE_SIZE) KTask
                 if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
                 {
                     edge.successor->state.value = TASK_STATE_READY;
-                    // TODO : queue 'succ'
+                    xkblas_task_ready(edge.successor);
                 }
             }
         }
 };
 
 using Task = KTask<2>;
+
+void xkblas_task_ready(Task * task);
 
 #endif /* __TASK_HPP__ */

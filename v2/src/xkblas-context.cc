@@ -141,17 +141,13 @@ xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
 
-    # if 0
-    XKBLAS_INFO("Exporting memory tree...");
     xkblas_context_t * ctx = xkblas_context_get();
-    ctx->memtree.export_pdf("memory");
-    XKBLAS_INFO("Done");
-    exit(0);
-    # endif
+    xkblas_drivers_wait(&(ctx->drivers));
 
-    XKBLAS_INFO("Infinite loop... CTRL+C to exit");
-    while (1)
-        sleep(1);
+    # if 1
+    XKBLAS_INFO("Exporting memory tree...");
+    ctx->memtree.export_pdf("memory");
+    # endif
 }
 
 extern "C"

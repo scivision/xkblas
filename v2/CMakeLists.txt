@@ -49,6 +49,7 @@ add_library(xkblas SHARED
     src/device/offloader.cc
     src/device/stream.cc
     src/device/stream-instruction-submit.cc
+    src/device/task.cc
     src/device/task-format.cc
     src/device/thread.cc
     src/device/thread-producer.cc

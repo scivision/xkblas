@@ -336,24 +336,54 @@ static void
 xkblas_device_task_kernel_executed(
     const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
 ) {
-    # pragma message(TODO "Task kernel completion continuation")
-    XKBLAS_DEBUG("A task kernel executed");
+    assert(args);
+
+    xkblas_driver_t  *  driver = (xkblas_driver_t *)  args[0];
+    xkblas_device_t  *  device = (xkblas_device_t *)  args[1];
+    Task             *    task =            (Task *)  args[2];
+
+    assert(driver);
+    assert(device);
+    assert(task);
+
+    XKBLAS_INFO("Task `%s` completed", task->label);
+
+    task->executed();
+    task->complete();
 }
 
 /* must be called once all task accessed were fetched, to queue the task kernel for execution */
 void
 xkblas_device_task_access_fetched(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device,
-    Task * task
+     xkblas_driver_t * driver,
+     xkblas_device_t * device,
+                Task * task
 ) {
     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
 
-    # pragma message(TODO "Task kernel completion continuation")
     xkblas_stream_callback_t callback;
     callback.func    = xkblas_device_task_kernel_executed;
-    callback.args[0] = NULL;
+    callback.args[0] = driver;
+    callback.args[1] = device;
+    callback.args[2] = task;
 
     xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
 }
 
+static inline void
+xkblas_device_wait(xkblas_device_t * device)
+{
+    XKBLAS_DEBUG("Waiting for device %d...", device->global_id);
+    device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, true);
+}
+
+/* wait for the completion of all previously submitted tasks */
+void
+xkblas_drivers_wait(xkblas_drivers_t * drivers)
+{
+    for (int device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
+    {
+        xkblas_device_t * device = drivers->devices.list[device_global_id];
+        xkblas_device_wait(device);
+    }
+}

@@ -174,7 +174,7 @@ xkblas_£gemm_async(
 
     xkblas_context_t * context = xkblas_context_get();
     // int BS = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
-    const int NTILES = 2;
+    const int NTILES = 4;
     const int BS = M / NTILES;
 
     assert(M % BS == 0);
@@ -228,8 +228,6 @@ xkblas_£gemm_async(
                                 C, tm, tn, LDC
                         );
                     }
-                    XKBLAS_WARN("Only creating 1st tile of the gemm");
-                    goto exit_gemm;
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans
                 else
@@ -295,7 +293,6 @@ xkblas_£gemm_async(
         }
     }
 
-exit_gemm:
 #ifndef NDEBUG
     XKBLAS_DEBUG("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::get();

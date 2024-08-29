@@ -132,6 +132,7 @@ typedef struct  xkblas_drivers_t
     xkblas_driver_t list[XKBLAS_DRIVER_MAX];
 
     struct {
+
         /* list of devices */
         xkblas_device_t * list[XKBLAS_DEVICES_MAX];
 
@@ -140,6 +141,7 @@ typedef struct  xkblas_drivers_t
 
         /* next worker to offload round robin mode */
         std::atomic<uint8_t> round_robin_device_id;
+
     } devices;
 
 }               xkblas_drivers_t;
@@ -154,6 +156,9 @@ typedef struct  xkblas_driver_device_thread_arg_t
 void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
 void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
 void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
+
+/* wait for the completion of all previously submitted tasks */
+void xkblas_drivers_wait(xkblas_drivers_t * drivers);
 
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
