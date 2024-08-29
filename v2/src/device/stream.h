@@ -65,8 +65,8 @@ class xkblas_stream_t
         /* queue for pending instructions to progress */
         xkblas_stream_instruction_queue_t pending;
 
-        /* ????? TODO ????? */
-        uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+        /* Romain: the first event in the pending queue before which all events are completed */
+        volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
         # pragma message(TODO "What is the purpose of 'ok_p' ?")
         # if 0

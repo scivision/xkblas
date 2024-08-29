@@ -61,6 +61,16 @@ class MemoryReplicate
 
 }; /* MemoryReplicate */
 
+/* see https://stackoverflow.com/questions/68795092/how-to-copy-a-built-in-array-via-copy-constructor */
+class MemoryReplicates
+{
+    public:
+        MemoryReplicate array[XKBLAS_DEVICES_MAX];
+
+        MemoryReplicates() {}
+        MemoryReplicates(MemoryReplicates const &) = default;
+};
+
 /* a memory block, one per tree node */
 class MemoryBlock {
 
@@ -70,7 +80,7 @@ class MemoryBlock {
         memory_view_t host_view;
 
         /* per device replicate info */
-        MemoryReplicate replicates[XKBLAS_DEVICES_MAX];
+        MemoryReplicates replicates;
 
         /* if i-th bit is set, the i-th device has a view with a valid copy */
         volatile memory_replicates_bitfield_t valid;
@@ -91,8 +101,8 @@ class MemoryBlock {
             # if 0
             const int host_devid = 0;
             this->valid = (1 << host_devid);
-            this->replicates[host_devid].addr = host_view.begin_addr();
-            this->replicates[host_devid].LD = host_view.LD;
+            this->replicates.array[host_devid].addr = host_view.begin_addr();
+            this->replicates.array[host_devid].LD = host_view.LD;
             # endif
         }
 
@@ -265,8 +275,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const memory_replicates_bitfield_t host_device_bitmask = (1 << host_device_id);
 
             MemoryAllocation * allocation = new MemoryAllocation(access->host_view.addr, access->host_view.LD);
-            assert(this->block.replicates[host_device_id].allocations.size() == 0);
-            this->block.replicates[host_device_id].allocations.push_back(allocation);
+            assert(this->block.replicates.array[host_device_id].allocations.size() == 0);
+            this->block.replicates.array[host_device_id].allocations.push_back(allocation);
 
             assert(this->block.valid == 0);
             this->block.valid |= host_device_bitmask;
@@ -475,25 +485,25 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
                 MemoryAllocation * allocation = nullptr;
                 int j = 0;
-                int nallocations = search.blocks_info[0].block->replicates[device->global_id].allocations.size();
+                int nallocations = search.blocks_info[0].block->replicates.array[device->global_id].allocations.size();
                 int nblocks = search.blocks_info.size();
 
                 /* for each view of the block 0 */
                 while (j < nallocations)
                 {
                     /* get the view allocation */
-                    allocation = search.blocks_info[0].block->replicates[device->global_id].allocations[j];
+                    allocation = search.blocks_info[0].block->replicates.array[device->global_id].allocations[j];
 
                     /* for each other blocks */
                     int i = 1;
                     while (i < nblocks)
                     {
                         /* for each view of other blocks */
-                        int nallocations = search.blocks_info[i].block->replicates[device->global_id].allocations.size();
+                        int nallocations = search.blocks_info[i].block->replicates.array[device->global_id].allocations.size();
                         for (int k = 0 ; k < nallocations ; ++k)
                         {
                             /* this block has a view with the same allocation, check next block */
-                            if (allocation == search.blocks_info[i].block->replicates[device->global_id].allocations[k])
+                            if (allocation == search.blocks_info[i].block->replicates.array[device->global_id].allocations[k])
                             {
                                 search.blocks_info[i].dst_allocation_id = k;
                                 goto next_block;
@@ -540,7 +550,7 @@ next_view:
                     /* add a view to it in tree memory blocks */
                     for (BlockInfo & info : search.blocks_info)
                     {
-                        std::vector<MemoryAllocation *> & allocations = info.block->replicates[device->global_id].allocations;
+                        std::vector<MemoryAllocation *> & allocations = info.block->replicates.array[device->global_id].allocations;
                         info.dst_allocation_id = allocations.size();
                         allocations.push_back(allocation);
                     }
@@ -560,18 +570,18 @@ next_view:
 
                         info.dst_device_global_id = device->global_id;
                      // info.dst_allocation_id = set already
-                        info.dst_allocation = info.block->replicates[info.dst_device_global_id].allocations[info.dst_allocation_id];
+                        info.dst_allocation = info.block->replicates.array[info.dst_device_global_id].allocations[info.dst_allocation_id];
 
                         info.src_device_global_id = 0; // TODO find best device - only using host for now
                         info.src_allocation_id = 0; // TODO currently always use the first allocation on that source device
-                        info.src_allocation = info.block->replicates[info.src_device_global_id].allocations[info.src_allocation_id];
+                        info.src_allocation = info.block->replicates.array[info.src_device_global_id].allocations[info.src_allocation_id];
 
                         /* assertion tests on parameters */
                         assert(info.dst_allocation_id >= 0);
-                        assert(info.dst_allocation_id < info.block->replicates[info.dst_device_global_id].allocations.size());
+                        assert(info.dst_allocation_id < info.block->replicates.array[info.dst_device_global_id].allocations.size());
 
                         assert(info.src_allocation_id >= 0);
-                        assert(info.src_allocation_id < info.block->replicates[info.src_device_global_id].allocations.size());
+                        assert(info.src_allocation_id < info.block->replicates.array[info.src_device_global_id].allocations.size());
                     }
                 }
 

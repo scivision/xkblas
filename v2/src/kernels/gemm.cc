@@ -228,6 +228,8 @@ xkblas_£gemm_async(
                                 C, tm, tn, LDC
                         );
                     }
+                    XKBLAS_WARN("Only creating 1st tile of the gemm");
+                    goto exit_gemm;
                 }
                 // A: CblasNoTrans / B: Cham[Conj]Trans
                 else
@@ -293,6 +295,7 @@ xkblas_£gemm_async(
         }
     }
 
+exit_gemm:
 #ifndef NDEBUG
     XKBLAS_DEBUG("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::get();
@@ -342,6 +345,7 @@ body_cuda(void * vparam)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, C->device_view.LD
     );
+    xkblas_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */

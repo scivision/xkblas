@@ -639,654 +639,6 @@ void* xkblas_cuda_register_thread(void* dummy )
   return 0;
 }
 
-
-
-/* The purpose of this function is to increase istream->ok_p
-   but whithout calling callback
- */
-static int cuda_stream_advance_pending(
-    xkblas_device_t* dev,
-    xkblas_stream_t* istream,
-    int blocking
-)
-{
-
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
-  cudaError_t res;
-  //cudaSetDevice(CUDA_DEVICE_ID[device->inherited.device_id]);
-
-  xkblas_stream_cuda_t* stream = (xkblas_stream_cuda_t*)istream;
-  if (xkblas_io_stream_emptypending(istream))
-    return 0;
-
-#if CONFIG_USE_EVENT
-  if (blocking)
-  {
-    res = cudaStreamSynchronize( stream->stream );
-    __check_error(res);
-    res = cudaStreamSynchronize( stream->stream_low );
-    __check_error(res);
-    istream->ok_p = istream->pos_wp;
-    return 0;
-  }
-
-  size_t len_p = xkblas_io_stream_sizepending(istream);
-
-#if 0 // best
-  int queue_max[4];
-  queue_max[XKBLAS_STREAM_TYPE_H2D]  = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_STREAM_TYPE_KERN] = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_STREAM_TYPE_D2H]  = ctx->conf.cuda_conc_kernel;
-  queue_max[XKBLAS_STREAM_TYPE_D2D]  = ctx->conf.cuda_conc_kernel;
-  if ((len_p >1) && (len_p>= queue_max[istream->type]))
-  {
-    int shift = 0; //(istream->type == XKBLAS_STREAM_TYPE_KERN ? 0: len_p/2-1);
-    int idx = (istream->ok_p + shift)% istream->count;
-    res = hipEventSynchronize(stream->end_events[idx]);
-  }
-#endif//if 0
-
-  /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
-  int cnt;
-  uint64_t istream_okp = istream->ok_p;
-  int prev_istreamokp = istream_okp-1;
-  while (istream_okp < istream->pos_wp)
-  {
-    int idx = istream_okp % istream->count;
-    xkblas_stream_instruction_t* op = &istream->pending[idx];
-    res = cudaSuccess;
-    switch (op->type)
-    {
-      case XKBLAS_STREAM_INSTR_TYPE_KERN:
-      case XKBLAS_STREAM_INSTR_TYPE_COPY_H2H:
-      case XKBLAS_STREAM_INSTR_TYPE_COPY_H2D:
-      case XKBLAS_STREAM_INSTR_TYPE_COPY_D2H:
-      case XKBLAS_STREAM_INSTR_TYPE_COPY_D2D:
-        for (int cnt=0; cnt<1; ++cnt)
-        {
-          res = cudaEventQuery( stream->end_events[idx] );
-          assert((res == cudaErrorNotReady)  || (res == cudaSuccess));
-          if (res == cudaErrorNotReady)
-            //goto break_label;
-            sched_yield();
-          else {
-#if XKBLAS_USE_TRACELIB==1
-            float delay; /* ms */
-            res = cudaEventElapsedTime ( &delay, stream->start_events[idx], stream->end_events[idx] );
-            if (res != cudaSuccess) {
-              printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
-              delay = 0;
-              assert(0);
-            }
-            if (op->type != XKBLAS_STREAM_INSTR_TYPE_KERN)
-            {
-              XKBLAS_EVENT_PUSH2( &xkblas_self_context()->kproc, XKBLAS_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*delay));
-            }
-            else
-            {
-              XKBLAS_EVENT_PUSH2( &xkblas_self_context()->kproc, XKBLAS_EVT_OFFLOAD_KERN,
-                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*delay));
-            }
-#endif
-            if (prev_istreamokp+1 == istream_okp) ++prev_istreamokp;
-          }
-        }
-
-#if LOG_DBG
-        printf("%s:: instruction pos:%i, instr '%s' ok\n", __func__, istream_okp,  name_io[op->type]);
-#endif
-
-      case XKBLAS_STREAM_INSTR_TYPE_END:
-      case XKBLAS_STREAM_INSTR_TYPE_BARRIER:
-      case XKBLAS_STREAM_INSTR_TYPE_NOP:
-        ++istream_okp;
-        break;
-
-      default:
-        fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->inherited.ld->idx, istream_okp);
-        assert(0);
-        break;
-    }
-  }
-break_label:
-  /* all events have been tested, test the prev_istreamokp has been incremented */
-  istream_okp = istream->ok_p;
-  if (prev_istreamokp != istream_okp-1)
-  {
-    istream->ok_p = prev_istreamokp+1;
-    return 0;
-  }
-  return EINPROGRESS;
-
-#elif CONFIG_SYNCHRONOUS_COPY && CONFIG_SYNCHRONOUS_KERNEL
-  /* if synchronous call then advance automatically at the end of the operation */
-  ;
-#else
-  /* if do not use event */
-  if (blocking)
-  {
-    res = cudaStreamSynchronize( stream->stream );
-    __check_error(res);
-    res = cudaStreamSynchronize( stream->stream_low );
-    __check_error(res);
-    istream->ok_p = istream->pos_wp;
-    return 0;
-  }
-  else
-  {
-    res = cudaStreamQuery( stream->stream );
-    if (res == cudaErrorNotReady)
-    {
-      return EINPROGRESS;
-    }
-    __check_error(res);
-    res = cudaStreamQuery( stream->stream_low );
-    if (res == cudaErrorNotReady)
-    {
-      return EINPROGRESS;
-    }
-    __check_error(res);
-
-    istream->ok_p = istream->pos_wp;
-  }
-#endif
-}
-
-
-
-/*
- */
-static int cuda_stream_process_pending(
-    xkblas_device_t* device,
-    xkblas_stream_t* istream,
-    int blocking
-)
-{
-  xkblas_stream_cuda_t* stream = (xkblas_stream_cuda_t*)istream;
-
-  do {
-    cuda_stream_advance_pending(device, istream, blocking );
-
-
-    xkblas_io_status_t status = {0,0};
-
-    /* call callback functions */
-    for (uint64_t pos = istream->pos_rp; pos<istream->ok_p; ++pos)
-    {
-      int idx = pos % istream->count;
-      xkblas_stream_instruction_t* op = &istream->pending[idx];
-      switch (op->type)
-      {
-        case XKBLAS_STREAM_INSTR_TYPE_KERN:
-        case XKBLAS_STREAM_INSTR_TYPE_COPY_H2H:
-        case XKBLAS_STREAM_INSTR_TYPE_COPY_H2D:
-        case XKBLAS_STREAM_INSTR_TYPE_COPY_D2H:
-        case XKBLAS_STREAM_INSTR_TYPE_COPY_D2D:
-        case XKBLAS_STREAM_INSTR_TYPE_END:
-        case XKBLAS_STREAM_INSTR_TYPE_BARRIER:
-        {
-          if ((op->type >= XKBLAS_STREAM_INSTR_TYPE_COPY_H2H) && (op->type <= XKBLAS_STREAM_INSTR_TYPE_COPY_D2D))
-          {
-            status.bytes = xkblas_memory_view_size(op->inst.c_io.view_src);
-          }
-
-
-          if (op->inst.callback.func)
-            op->inst.callback.func(status, istream, op->inst.callback.arg[0], op->inst.callback.arg[1], op->inst.callback.arg[2]);
-
-          op->type = XKBLAS_STREAM_INSTR_TYPE_NOP;
-        }
-
-        case XKBLAS_STREAM_INSTR_TYPE_NOP:
-          /* commit index for the next event */
-          ++istream->pos_rp;
-          //return 0;
-          break;
-
-        default:
-          fprintf(stderr, "%i:: bad instruction type at pos:%li\n", device->ld->idx, pos);
-          assert(0);
-          break;
-      }
-    }
-  } while (0);
-  return 0;
-}
-
-
-/* Return the source device to send data to device in the destination memory 'dev'.
- */
-static uint16_t cuda_get_source(
-    xkblas_device_memory_t* dev,
-    uint16_t lid0,
-    XKBLAS_MEMORY_VALUE_TYPE valid_bit,
-    XKBLAS_MEMORY_VALUE_TYPE xfer_bit
-)
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)device->inherited.device;
-  int device_id_dest = CUDA_DEVICE_ID[device->inherited.device->device_id];
-  uint16_t lid_dest = xkblas_memory_asid_get_lid(device->inherited.asid);
-  uint16_t lid_src;
-  assert((valid_bit !=0) || (xfer_bit !=0));
-
-  /* return the device with the higher affinity rank with lid_dest
-     - does not consider the last performance rank
-   */
-#if XKBLAS_USE_TOPO_D2D
-  for (int rank = 0; rank < cuda_count_perfrank-1; ++rank)
-  {
-    if (valid_bit !=0)
-      lid_src = XKBLAS_MEMORY_FFS( valid_bit & device->affinity[rank] );
-      //lid_src = _xkblas_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed);
-    else
-      lid_src = XKBLAS_MEMORY_FFS( xfer_bit & device->affinity[rank]);
-      //lid_src = _xkblas_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed);
-    if (lid_src !=0)
-    {
-      --lid_src;
-      assert(lid_src < XKBLAS_MEMORY_MAX_NODES);
-      return lid_src;
-    }
-  }
-#endif
-  /* first return a random valid data, else an xfer data */
-  if (valid_bit !=0)
-  {
-    uint16_t retval = _xkblas_get_random_bit1(valid_bit, &device->inherited.ctxt->seed)-1;
-    //printf("RndBit(%i).1=%i\n", valid_bit, retval );
-    return retval;
-  }
-  if (xfer_bit !=0)
-  {
-    uint16_t retval = _xkblas_get_random_bit1(xfer_bit, &device->inherited.ctxt->seed)-1;
-    //printf("RndBiti(%i).2=%i\n", xfer_bit, retval );
-    return retval;
-  }
-  return (uint16_t)-1;
-}
-
-
-#if XKBLAS_HAVE_IO_THREADS
-static int xkblas_cuda_io_thread( xkblas_device_cuda_t* device, xkblas_stream_type_t type )
-{
-  cudaError_t res;
-  res = cudaSetDevice(CUDA_DEVICE_ID[device->inherited.device_id]);
-  assert( res == cudaSuccess );
-
-  /* initialize all IO cuda stream within the current context */
-  xkblas_offload_stream_t* const stream = &device->inherited.stream;
-  for (unsigned int i=0; i< stream->count[type]; ++i)
-    xkblas_cuda_init_cuda_stream( (xkblas_stream_cuda_t*)stream->istream[type][i], type, stream->istream[type][i]->count );
-
-  /* infinite loop */
-  while (!device->inherited.finalize)
-  {
-    int count = 0;
-    xkblas_offload_stream_process_instruction( stream, type );
-    for (unsigned int i=0; i< stream->count[type]; ++i)
-    {
-      uint64_t old_ok_p = stream->istream[type][i]->ok_p;
-      cuda_stream_advance_pending( &device->inherited, stream->istream[type][i], 0 );
-      if (old_ok_p != stream->istream[type][i]->ok_p) ++count;
-    }
-    if (count ==0) sched_yield();
-  }
-}
-
-
-static void* xkblas_cuda_H2D_io_thread( void* arg )
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)arg;
-  /* for debug */
-  thread_type = 1;
-
-  xkblas_cuda_io_thread(device, XKBLAS_STREAM_TYPE_H2D);
-  return 0;
-}
-
-static void* xkblas_cuda_D2H_io_thread( void* arg )
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)arg;
-  /* for debug */
-  thread_type = 2;
-
-  xkblas_cuda_io_thread(device, XKBLAS_STREAM_TYPE_D2H);
-  return 0;
-}
-#endif
-
-
-/* Update pthread_attr_t with the CPUset to start the thread that manages the device
-   Return ENOTSUP is hwloc is not available or some internal error occurs.
-*/
-static int xkblas_set_cpuset(cpu_set_t* schedset, int device_id)
-{
-}
-
-
-
-/*
-*/
-static const char *
-XKBLAS_DRIVER_ENTRYPOINT(get_name)(void)
-{
-  return "cuda";
-}
-
-
-/*
-*/
-static unsigned int
-XKBLAS_DRIVER_ENTRYPOINT(get_flags)(void)
-{
-  return 0;
-}
-
-
-/*
-*/
-static unsigned int
-XKBLAS_DRIVER_ENTRYPOINT(get_type)(void)
-{
-  return XKBLAS_PROC_TYPE_CUDA;
-}
-
-
-/*
-*/
-static unsigned int
-XKBLAS_DRIVER_ENTRYPOINT(get_number)(void)
-{
-  assert(INITIALIZED == true);
-  return DEVICES_USED;
-}
-
-
-/*
-*/
-
-
-
-/*
-*/
-static int
-XKBLAS_DRIVER_ENTRYPOINT(init)(void)
-{
-  cudaError_t res;
-  xkblas_cuda_plugin_lock();
-  if(INITIALIZED == true){
-      xkblas_cuda_plugin_unlock();
-      return 0;
-  }
-
-  int device_count;
-  res = cudaGetDeviceCount(&device_count);
-  __check_error(res);
-
-  xkblas_device_list = (xkblas_device_cuda_t**)calloc( device_count, sizeof(xkblas_device_cuda_t) );
-  xkblas_context_t * ctx = xkblas_context_get();
-  ctx->conf.sys_ngpus = device_count;
-
-  if (ctx->conf.ngpus == (uint8_t)-1)
-  {
-    ctx->conf.ngpus = device_count;
-    ctx->conf.gpu_set = (1<<device_count)-1;
-  }
-
-  /* bad number of GPUS ? */
-  if (ctx->conf.ngpus > device_count)
-  {
-    printf("[%s] too many GPUs requested: %i. Use system default count: %i\n",__func__, ctx->conf.ngpus, device_count);
-    ctx->conf.ngpus = device_count;
-  }
-
-  DEVICES_USED = ctx->conf.ngpus;
-  CUDA_DEVICE_ID = (int*)malloc( ctx->conf.ngpus*sizeof(int) );
-  int gpuset = ctx->conf.gpu_set;
-  for (int i=0; i<ctx->conf.ngpus; ++i)
-  {
-    int idx = __builtin_ffs((unsigned int)gpuset);
-    assert( idx != 0);
-    --idx;
-    gpuset &= ~(1<<idx);
-    CUDA_DEVICE_ID[i] = idx;
-    //fprintf(stdout,"[%s] take GPU id:%2i= device_id:%i\n", __FUNCTION__, i, idx);
-  }
-
-  DEVICES_USED = ctx->conf.ngpus;
-  INITIALIZED = true;
-  xkblas_cuda_plugin_unlock();
-#if _DRIVER_DEBUG
-  fprintf(stdout, "cuda:%s: cuda init with %d devices\n", __FUNCTION__, DEVICES_USED);
-#endif
-
-#if XKBLAS_CUDA_USE_NVLINK_TOPO
-  _xkblas_get_gpu_topo();
-#endif
-
-  int nrrl = getenv("XKBLAS_RRL_SIZE") ? atoi(getenv("XKBLAS_RRL_SIZE")) : 1;
-  if (nrrl <=0) nrrl = 1;
-  if (nrrl >= ctx->conf.ngpus) nrrl = ctx->conf.ngpus;
-  //printf("*** NEW: #rrl=%i\n", nrrl);
-  all_rrl_size =nrrl;
-  all_rrl = (host_register_queue_t*)malloc(all_rrl_size* sizeof(host_register_queue_t));
-  for (int i=0; i<nrrl; ++i)
-  {
-    xkblas_cuda_init_reqreg_list(&all_rrl[i]);
-    int err = pthread_create(&all_rrl[i].thread, 0, xkblas_cuda_register_thread, (void*)(uintptr_t)i );
-    assert(err ==0);
-  }
-
-  return 0;
-}
-
-
-/*
-*/
-static void
-XKBLAS_DRIVER_ENTRYPOINT(finalize)(void)
-{
-  xkblas_cuda_plugin_lock();
-  if (INITIALIZED == true)
-  {
-    INITIALIZED = false;
-#if _DRIVER_DEBUG
-    fprintf(stdout, "cuda:%s: cuda finalize\n", __FUNCTION__);
-#endif
-  }
-  xkblas_cuda_plugin_unlock();
-
-  /* */
-  void* tmp;
-  for (int i=0; i<all_rrl_size; ++i)
-  {
-    assert(0 == pthread_cond_signal( &all_rrl[i].cond ));
-    assert(0 == pthread_join( all_rrl[i].thread, &tmp ));
-  }
-  free( all_rrl );
-  all_rrl_size = 0;
-  all_rrl = 0;
-
-  free(CUDA_DEVICE_ID);
-  CUDA_DEVICE_ID = 0;
-
-#if XKBLAS_USE_HWLOC
-  hwloc_topology_destroy(topology);
-#endif
-
-  free(  xkblas_device_list );
-  xkblas_device_list = 0;
-}
-
-
-static uint64_t post_request(
-    host_register_request_op_t op,
-    void* ptr, size_t size,
-    xkblas_stream_instruction_callback_t callback,
-    void* arg0, void* arg1, void* arg2
-)
-{
-  if (ptr ==0) return (uint64_t)-1;
-
-  /* Hash function from self_thread to get its request register list */
-  int hash = xkblas_hash_ulong( pthread_self() ) % all_rrl_size;
-  host_register_queue_t* rrl = &all_rrl[hash];
-  assert(0 == pthread_mutex_lock( &rrl->lock ));
-  while (rrl->posw - rrl->posr >= XKBLAS_MAX_REGLIST)
-    pthread_cond_wait( &rrl->cond_waitall, &rrl->lock );
-  uint64_t index = rrl->posw;
-  ++rrl->posw;
-  int idx = index % XKBLAS_MAX_REGLIST;
-  rrl->req[idx].op   = op;
-  rrl->req[idx].state= REQUEST_POST;
-  rrl->req[idx].size = size;
-  rrl->req[idx].callback  = callback;
-  rrl->req[idx].arg0 = arg0;
-  rrl->req[idx].arg1 = arg1;
-  rrl->req[idx].arg2 = arg2;
-  rrl->req[idx].ptr  = ptr;
-  /* signal daemon thread */
-  assert(0 == pthread_cond_signal( &rrl->cond ));
-  assert(0 == pthread_mutex_unlock( &rrl->lock ));
-  return index;
-}
-
-/*
-*/
-static
-uint64_t XKBLAS_DRIVER_ENTRYPOINT(host_register)(
-    void* ptr, size_t size,
-    xkblas_stream_instruction_callback_t callback,
-    void* arg0, void* arg1, void* arg2
-)
-{
-  if (ptr ==0) return (uint64_t)-1;
-  return post_request( DEVICE_REGISTER_REQUEST, ptr, size, callback, arg0, arg1, arg2 );
-}
-
-/*
-*/
-static
-uint64_t XKBLAS_DRIVER_ENTRYPOINT(host_unregister)(
-    void* ptr, size_t size,
-    xkblas_stream_instruction_callback_t callback,
-    void* arg0, void* arg1, void* arg2
-)
-{
-  if (ptr ==0) return (uint64_t)-1;
-  return post_request( DEVICE_UNREGISTER_REQUEST, ptr, size, callback, arg0, arg1, arg2 );
-}
-
-
-/*
-*/
-static
-int XKBLAS_DRIVER_ENTRYPOINT(host_register_testwait)(
-    uint64_t index,
-    int flag
-)
-{
-  /* Hash function from the thread id to request register list */
-  int hash = xkblas_hash_ulong( pthread_self() ) % all_rrl_size;
-  host_register_queue_t* rrl = &all_rrl[hash];
-
-  if ((flag != 2) && ((index == (uint64_t)-1) || (index >= rrl->posw)))
-    return EINVAL;
-
-  switch (flag)
-  {
-    case 0: /* test: do not lock if test is true, else may it is a false negative */
-      if (index <= rrl->posr) return 0;
-      return EINPROGRESS;
-
-    case 1: /* wait */
-      /*TODO: cannot compute the time between T0 of the post_request and now if the index < rrl->posr
-        because it means that requests have been proceed but we lost t0 stored in the request struct.
-        One solution: sum t0, sum twait here and at the end returns sum twait - sum t0 as the sum of the delay.
-        One case should be take into account: is post without corresponding wait=> each wait should account for all request between rrl->posr until the current index !.
-        Other solution: keep the list of waiting requests index increment on wait_request.
-      */
-      assert(0 == pthread_mutex_lock( &rrl->lock ));
-      if (index >= rrl->posr)
-      {
-        int idx = index % XKBLAS_MAX_REGLIST;
-        assert(0 == pthread_mutex_lock( &rrl->req[idx].lock ));
-        assert(0 == pthread_mutex_unlock( &rrl->lock ));
-        assert((rrl->req[idx].state == REQUEST_POST) || (rrl->req[idx].state == REQUEST_DONE));
-        if (rrl->req[idx].state == REQUEST_POST)
-        {
-          rrl->req[idx].state = REQUEST_WAIT;
-          assert(0 == pthread_cond_wait( &rrl->req[idx].cond, &rrl->req[idx].lock ));
-          assert( rrl->req[idx].state == REQUEST_DONE );
-          assert(0 == pthread_mutex_unlock( &rrl->req[idx].lock ));
-        }
-        return 0;
-      }
-      else {
-        assert(0 == pthread_mutex_unlock( &rrl->lock ));
-        return 0;
-      }
-
-    case 2: /* wait all */
-    {
-      assert(0 == pthread_mutex_lock( &rrl->lock ));
-      uint64_t pos = rrl->posw;
-      while (pos > rrl->posr)
-        assert(0 == pthread_cond_wait( &rrl->cond_waitall, &rrl->lock ));
-      assert(0 == pthread_mutex_unlock( &rrl->lock ));
-      return 0;
-    }
-    default:
-      return EINVAL;
-  }
-  return 0;
-}
-
-
-/*
-*/
-
-/*
-*/
-
-
-/*
-*/
-
-
-
-/*
-*/
-static const char* XKBLAS_DRIVER_ENTRYPOINT(device_info)(xkblas_device_t* dev)
-{
-  xkblas_device_cuda_t* device = (xkblas_device_cuda_t*)dev;
-  static char buffer[256];
-  static char buf1[16];
-  static char buf2[16];
-  static char buf3[16];
-  buf1[10] = 0;
-  buf2[10] = 0;
-  buf3[10] = 0;
-  _print_mask(buf1, 10, device->affinity[0]);
-  _print_mask(buf2, 10, device->affinity[1]);
-  _print_mask(buf3, 10, device->affinity[2]);
-  snprintf(buffer, 256, "%s, cuda device: %i, pci: %02x:%02x, %i async engine(s), %.2f (GB), cache limit %.2f (GB), affinity: %s,%s,%s",
-    device->prop.name,
-    device->inherited.device_id,
-    device->prop.pciBusID,
-    device->prop.pciDeviceID,
-    device->prop.async_engines,
-    ((double)device->inherited.mem_total)/1024.0/1024.0/1024.0,
-    ((double)device->inherited.mem_limit)/1024.0/1024.0/1024.0,
-    buf1, buf2, buf3
-  );
-  return buffer;
-}
-
-
 /*
 */
 static void
@@ -1757,6 +1109,7 @@ cuda_stream_instructions_progress(
         return 0;
     }
 
+    /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
     uint64_t     size = istream->pending.size();
     uint64_t      okp = istream->ok_p;
      int64_t prev_okp = okp - 1;
@@ -1765,18 +1118,10 @@ cuda_stream_instructions_progress(
     {
         int idx = okp % istream->pending.capacity;
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
-        assert(instr);
-
         cudaError_t res = cudaSuccess;
+
         switch (instr->type)
         {
-            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
-            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
-            {
-                ++okp;
-                return 0;
-            }
-
             case (XKBLAS_STREAM_INSTR_TYPE_KERN):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
@@ -1787,11 +1132,13 @@ cuda_stream_instructions_progress(
                 for (int i = 0 ; i < 1 ; ++i)
                 {
                     res = cudaEventQuery(stream->cu.events.end[idx]);
+                    __check_error(res);
                     assert(res == cudaErrorNotReady || res == cudaSuccess);
 
                     # pragma message(TODO "Why pthread_yield here ?")
                     if (res == cudaErrorNotReady)
                     {
+                        XKBLAS_DEBUG("Not ready, yielding");
                         pthread_yield();
                     }
                     else
@@ -1801,13 +1148,18 @@ cuda_stream_instructions_progress(
                             ++prev_okp;
                     }
                 }
-                return 0;
+            } /* intentionally fallthrough */
+
+            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
+            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
+            {
+                ++okp;
+                break ;
             }
 
             default:
             {
                 XKBLAS_FATAL("Wrong instruction");
-                return EINVAL;
             }
         }
     }
@@ -1860,17 +1212,19 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
             case (XKBLAS_STREAM_INSTR_TYPE_NOP):
             {
                 ++istream->pending.pos.r;
-                return 0;
+                break ;
             }
 
             default:
+            {
+                /* unreachable code */
+                XKBLAS_FATAL("Unreachable code - instr->type=%d", instr->type);
                 return EINVAL;
+            }
         }
-
     }
 
-    /* unreachable code */
-    XKBLAS_FATAL("Unreachable code");
+    return 0;
 }
 
 static xkblas_stream_t *

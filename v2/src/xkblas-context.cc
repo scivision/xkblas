@@ -140,7 +140,7 @@ void
 xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
-    sleep(1);
+    sleep(5);
 
     XKBLAS_INFO("Exporting memory tree...");
     xkblas_context_t * ctx = xkblas_context_get();
