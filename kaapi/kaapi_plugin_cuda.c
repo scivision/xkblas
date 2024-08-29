@@ -1315,20 +1315,6 @@ static int cuda_stream_advance_pending(
 
   size_t len_p = kaapi_io_stream_sizepending(ios);
 
-#if 0 // best
-  int queue_max[4];
-  queue_max[KAAPI_IO_STREAM_H2D]  = kaapi_default_param.cuda_conc_kernel;
-  queue_max[KAAPI_IO_STREAM_KERN] = kaapi_default_param.cuda_conc_kernel;
-  queue_max[KAAPI_IO_STREAM_D2H]  = kaapi_default_param.cuda_conc_kernel;
-  queue_max[KAAPI_IO_STREAM_D2D]  = kaapi_default_param.cuda_conc_kernel;
-  if ((len_p >1) && (len_p>= queue_max[ios->type]))
-  {
-    int shift = 0; //(ios->type == KAAPI_IO_STREAM_KERN ? 0: len_p/2-1);
-    int idx = (ios->ok_p + shift)% ios->count;
-    res = hipEventSynchronize(cios->end_events[idx]);
-  }
-#endif//if 0
-
   /* ios->ok_p is past the last ok pending request: test from ok_p to pos_wp */
   int cnt;
   uint64_t ios_okp = ios->ok_p; 
@@ -1353,39 +1339,9 @@ static int cuda_stream_advance_pending(
             //goto break_label;
             pthread_yield();
           else {
-#if KAAPI_USE_TRACELIB==1
-            float delay; /* ms */
-            res = cudaEventElapsedTime ( &delay, cios->start_events[idx], cios->end_events[idx] );
-            if (res != cudaSuccess) {
-              printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
-              delay = 0;
-              kaapi_assert(0);
-            }
-            if (op->type != KAAPI_IO_KERN)
-            {
-              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_CPY,
-                 2 /* end */, op->inst.c_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay CPY: %lu\n", (uint64_t)(1000000.0*delay));
-            }
-            else
-            {
-              KAAPI_EVENT_PUSH2( &kaapi_self_context()->kproc, KAAPI_EVT_OFFLOAD_KERN,
-                 2 /* end */, op->inst.k_io.reserved, (uint64_t)(1000000.0*delay));
-//printf("Delay KERNEL: %lu\n", (uint64_t)(1000000.0*delay));
-            }
-#endif
             if (prev_iosokp+1 == ios_okp) ++prev_iosokp;
           }
         }
-  
-#if KAAPI_USE_PERFCOUNTER
-        if (res == cudaSuccess)
-          op->t2 = kaapi_get_elapsedtime();
-#endif
-
-#if LOG_DBG
-        printf("%s:: instruction pos:%i, instr '%s' ok\n", __func__, ios_okp,  name_io[op->type]);
-#endif
 
       case KAAPI_IO_END:
       case KAAPI_IO_BARRIER:

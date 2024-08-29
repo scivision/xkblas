@@ -56,8 +56,11 @@ class xkblas_stream_t
         xkblas_stream_instruction_queue_t ready;
         xkblas_stream_instruction_queue_t pending;
 
-        /* decode a stream instruction */
-        int (*f_instruction_decode)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
+        /* launch a stream instruction */
+        int (*f_instruction_launch)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
+
+        /* progress a stream instruction */
+        int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking);
 
         # pragma message(TODO "What is the purpose of 'ok_p' ?")
         # if 0
@@ -84,7 +87,7 @@ class xkblas_stream_t
         int launch_ready_instructions(void);
 
         /* progress pending instructions */
-        int progress_pending_instructions(void);
+        int progress_pending_instructions(int blocking);
 
         /* return true if the stream is full of instructions, false otherwise */
         int is_full(void) const;
@@ -95,7 +98,14 @@ class xkblas_stream_t
 
 };  /* xkblas_stream_t */
 
-void xkblas_stream_init(xkblas_stream_t * stream, xkblas_stream_type_t type, unsigned int capacity, int (*f_instruction_decode)(xkblas_stream_t *, xkblas_stream_instruction_t *));
+void xkblas_stream_init(
+    xkblas_stream_t * stream,
+    xkblas_stream_type_t type,
+    unsigned int capacity,
+    int (*f_instruction_launch)(xkblas_stream_t *, xkblas_stream_instruction_t *),
+    int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking)
+);
+
 void xkblas_stream_deinit(xkblas_stream_t * stream);
 
 #endif /* __STREAM_HPP__ */

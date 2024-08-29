@@ -49,19 +49,6 @@ class Offloader
         int launch_ready_instructions(xkblas_stream_type_t type);
         int progress_pending_instructions(xkblas_stream_type_t type, bool blocking);
 
-        # if 0
-        int (*f_stream_process_pending)(
-                struct xkblas_device*,
-                struct xkblas_io_stream*,
-                int
-                );
-        int (*f_stream_decode_ioinstruction)(
-                struct xkblas_device*,
-                struct xkblas_io_stream*,
-                struct xkblas_io_instruction*
-                );
-        # endif
-
     public:
 
         /* number of iostream per type */

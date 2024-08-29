@@ -1,4 +1,5 @@
 # include "offloader.hpp"
+# include "xkblas-context.h"
 
 Offloader::Offloader() {}
 
@@ -68,7 +69,10 @@ Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            err = this->streams[s][i]->launch_ready_instructions();
+            xkblas_stream_t * stream = this->streams[s][i];
+            assert(stream);
+
+            err = stream->launch_ready_instructions();
             assert(err == 0 || err == EINPROGRESS);
         }
     }
@@ -80,6 +84,8 @@ int
 Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocking)
 {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
+
+    xkblas_context_t * ctx = xkblas_context_get();
     int err = 0;
 
     unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
@@ -88,7 +94,14 @@ Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocki
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            err = this->streams[s][i]->progress_pending_instructions();
+            xkblas_stream_t * stream = this->streams[s][i];
+            assert(stream);
+
+            int n;
+            do {
+                err = stream->progress_pending_instructions(blocking);
+                n = stream->pending.size();
+            } while (s == XKBLAS_STREAM_TYPE_KERN && n > ctx->conf.device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency);
             assert(err == 0 || err == EINPROGRESS);
         }
     }

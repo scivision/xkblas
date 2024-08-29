@@ -20,7 +20,8 @@ xkblas_stream_init(
     xkblas_stream_t * stream,
     xkblas_stream_type_t type,
     unsigned int capacity,
-    int (*f_instruction_decode)(xkblas_stream_t *, xkblas_stream_instruction_t *)
+    int (*f_instruction_launch)   (xkblas_stream_t *, xkblas_stream_instruction_t *),
+    int (*f_instructions_progress)(xkblas_stream_t *, int)
 ) {
     stream->type = type;
 
@@ -39,9 +40,8 @@ xkblas_stream_init(
         capacity
     );
 
-    stream->f_instruction_decode = f_instruction_decode;
-
-    XKBLAS_DEBUG("Creating a stream %p with decode %p", f_instruction_decode);
+    stream->f_instruction_launch    = f_instruction_launch;
+    stream->f_instructions_progress = f_instructions_progress;
 }
 
 void
@@ -130,6 +130,7 @@ static char const * INSTRUCTIONS_NAME[] = {
     "KERN"
 };
 
+# pragma message(TODO "do we really need to lock in 'new' and unlock in 'commit' - couldn't we already unlock in 'new' ?")
 int
 xkblas_stream_t::launch_ready_instructions(void)
 {
@@ -137,7 +138,7 @@ xkblas_stream_t::launch_ready_instructions(void)
             this, this->ready.size(), this->pending.size());
 
     assert(this->ready.pos.r <= this->ready.pos.w);
-    assert(this->f_instruction_decode);
+    assert(this->f_instruction_launch);
 
     int err = 0;
     while (!this->ready.is_empty())
@@ -151,9 +152,9 @@ xkblas_stream_t::launch_ready_instructions(void)
                 assert(instr);
 
                 XKBLAS_DEBUG("Decoding instruction `%s` on stream %p (decoding via %p)",
-                        INSTRUCTIONS_NAME[instr->type], this, this->f_instruction_decode);
+                        INSTRUCTIONS_NAME[instr->type], this, this->f_instruction_launch);
 
-                err = this->f_instruction_decode(this, instr);
+                err = this->f_instruction_launch(this, instr);
                 ++this->ready.pos.r;
 
                 switch (err)
@@ -190,17 +191,20 @@ xkblas_stream_t::launch_ready_instructions(void)
         }
         SPINLOCK_UNLOCK(this->spinlock);
     }
-
     return err;
 }
 
 int
-xkblas_stream_t::progress_pending_instructions(void)
+xkblas_stream_t::progress_pending_instructions(int blocking)
 {
-    XKBLAS_DEBUG("Progressing ready instructions of stream %p (%d ready, %d pending)",
+    XKBLAS_DEBUG("Progressing pending instructions of stream %p (%d ready, %d pending)",
             this, this->ready.size(), this->pending.size());
 
-    int err = 0;
+    assert(this->pending.pos.r <= this->pending.pos.w);
+    assert(this->f_instructions_progress);
+
+    int err = this->f_instructions_progress(this, blocking);
+    assert((err == 0) || (err == EINPROGRESS));
 
     return err;
 }

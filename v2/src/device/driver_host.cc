@@ -119,11 +119,20 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
 }
 
 int
-XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode)(
+XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkblas_stream_t * istream,
     xkblas_stream_instruction_t * instr
 ) {
-    XKBLAS_FATAL("Tried to execute instructions on the host, not implemneted yet");
+    XKBLAS_FATAL("Tried to launch instructions on the host, not implemneted yet");
+    return 0;
+}
+
+int
+XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
+    xkblas_stream_t * istream,
+    int blocking
+) {
+    XKBLAS_FATAL("Tried to progress instructions on the host, not implemneted yet");
     return 0;
 }
 
@@ -135,7 +144,13 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_t * istream = (xkblas_stream_t *) malloc(sizeof(xkblas_stream_t));
     assert(istream);
 
-    xkblas_stream_init(istream, type, capacity, XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_decode));
+    xkblas_stream_init(
+        istream,
+        type,
+        capacity,
+        XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch),
+        XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)
+    );
     return istream;
 }
 
