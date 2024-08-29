@@ -21,8 +21,8 @@ typedef struct  xkblas_stream_instruction_queue_t
     xkblas_stream_instruction_t * instr;    /* instructions buffer */
     uint64_t capacity;                      /* buffer capacity */
     struct {
-        volatile uint64_t r;            /* first instruction to process */
-        volatile uint64_t w;            /* next position for inserting instructions */
+        volatile uint64_t r;                /* first instruction to process */
+        volatile uint64_t w;                /* next position for inserting instructions */
     } pos;
 
     /* methods */
@@ -53,14 +53,20 @@ class xkblas_stream_t
         xkblas_stream_type_t type;
         spinlock_t spinlock;
 
-        xkblas_stream_instruction_queue_t ready;
-        xkblas_stream_instruction_queue_t pending;
-
         /* launch a stream instruction */
         int (*f_instruction_launch)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
 
         /* progress a stream instruction */
         int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking);
+
+        /* queue for ready instruction */
+        xkblas_stream_instruction_queue_t ready;
+
+        /* queue for pending instructions to progress */
+        xkblas_stream_instruction_queue_t pending;
+
+        /* ????? TODO ????? */
+        uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
         # pragma message(TODO "What is the purpose of 'ok_p' ?")
         # if 0

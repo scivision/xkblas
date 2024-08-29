@@ -1655,6 +1655,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         {
             cudaError_t res = cudaStreamSynchronize(stream->cu.handle);
             assert(res == cudaSuccess);
+            ++istream->ok_p;
             return 0;
         }
 
@@ -1735,11 +1736,91 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     XKBLAS_FATAL("Unreachable code");
 }
 
-static inline void
+/* increase ok_p without calling callback */
+static inline int
 cuda_stream_instructions_progress(
-    xkblas_stream_cuda_t * stream,
+    xkblas_stream_t * istream,
     int blocking
 ) {
+    assert(istream);
+
+    xkblas_stream_cuda_t * stream = (xkblas_stream_cuda_t *) istream;
+
+    if (istream->pending.size() == 0)
+        return 0;
+
+    if (blocking)
+    {
+        cudaError_t err = cudaStreamSynchronize(stream->cu.handle);
+        __check_error(err);
+        istream->ok_p = istream->pending.pos.w;
+        return 0;
+    }
+
+    uint64_t     size = istream->pending.size();
+    uint64_t      okp = istream->ok_p;
+     int64_t prev_okp = okp - 1;
+
+    while (okp < istream->pending.pos.w)
+    {
+        int idx = okp % istream->pending.capacity;
+        xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
+        assert(instr);
+
+        cudaError_t res = cudaSuccess;
+        switch (instr->type)
+        {
+            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
+            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
+            {
+                ++okp;
+                return 0;
+            }
+
+            case (XKBLAS_STREAM_INSTR_TYPE_KERN):
+            case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
+            case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
+            case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
+            case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
+            {
+                /* poll events */
+                for (int i = 0 ; i < 1 ; ++i)
+                {
+                    res = cudaEventQuery(stream->cu.events.end[idx]);
+                    assert(res == cudaErrorNotReady || res == cudaSuccess);
+
+                    # pragma message(TODO "Why pthread_yield here ?")
+                    if (res == cudaErrorNotReady)
+                    {
+                        pthread_yield();
+                    }
+                    else
+                    {
+                        assert(res == cudaSuccess);
+                        if (prev_okp + 1 == okp)
+                            ++prev_okp;
+                    }
+                }
+                return 0;
+            }
+
+            default:
+            {
+                XKBLAS_FATAL("Wrong instruction");
+                return EINVAL;
+            }
+        }
+    }
+
+    /* all events have been tested, test the prev_okp has been incremented */
+    okp = istream->ok_p;
+    if (prev_okp != okp - 1)
+    {
+        istream->ok_p = prev_okp + 1;
+        return 0;
+    }
+
+    return EINPROGRESS;
 }
 
 static int
@@ -1747,13 +1828,11 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     xkblas_stream_t * istream,
     int blocking
 ) {
-    xkblas_stream_cuda_t * stream = (xkblas_stream_cuda_t *) istream;
-    assert(stream);
-
-    cuda_stream_instructions_progress(stream, blocking);
+    int err = cuda_stream_instructions_progress(istream, blocking);
+    assert(err == 0);
 
     // TODO : recheck, what is 'ok_p' ?
-    for (int p = istream->pending.pos.r ; p < istream->pending.pos.w ; ++p)
+    for (int p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
     {
         int idx = p % istream->pending.capacity;
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
@@ -1761,20 +1840,27 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
 
         switch (instr->type)
         {
-            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
-            {
-                return 0;
-            }
-
-            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
-            case (XKBLAS_STREAM_INSTR_TYPE_KERN):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
             {
+                instr->type = XKBLAS_STREAM_INSTR_TYPE_NOP;
 
-                return ENOSYS;
+            } /* intentionally fallthrough the next case */
+
+            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
+            case (XKBLAS_STREAM_INSTR_TYPE_KERN):
+            {
+                if (instr->callback.func)
+                    instr->callback.func(instr->callback.args);
+
+            } /* intentionally fallthrough the next case */
+
+            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
+            {
+                ++istream->pending.pos.r;
+                return 0;
             }
 
             default:

@@ -5,7 +5,7 @@
 
 typedef struct  xkblas_stream_callback_t
 {
-    void (*func)(void * [XKBLAS_STREAM_CALLBACK_ARGS_MAX]);
+    void (*func)(const void * [XKBLAS_STREAM_CALLBACK_ARGS_MAX]);
     const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX];
 }               xkblas_stream_callback_t;
 

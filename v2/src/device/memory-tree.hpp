@@ -379,7 +379,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 }; /* KMemoryTreeNode */
 
 static inline void
-fetch_callback(void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
+fetch_callback(const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
 {
     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 3);
 

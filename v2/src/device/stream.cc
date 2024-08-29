@@ -25,6 +25,9 @@ xkblas_stream_init(
 ) {
     stream->type = type;
 
+    stream->f_instruction_launch    = f_instruction_launch;
+    stream->f_instructions_progress = f_instructions_progress;
+
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkblas_stream_instruction_t) * capacity * 2);
     assert(mem);
 
@@ -40,8 +43,7 @@ xkblas_stream_init(
         capacity
     );
 
-    stream->f_instruction_launch    = f_instruction_launch;
-    stream->f_instructions_progress = f_instructions_progress;
+    stream->ok_p = 0;
 }
 
 void

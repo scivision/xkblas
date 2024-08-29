@@ -332,7 +332,7 @@ xkblas_memory_allocate(
 /* callback after the task kernel executed */
 static void
 xkblas_device_task_kernel_executed(
-    void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
+    const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
 ) {
     # pragma message(TODO "Task kernel completion continuation")
     XKBLAS_DEBUG("A task kernel executed");
