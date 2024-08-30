@@ -1,8 +1,6 @@
 #ifndef __XKBLAS_H__
 # define __XKBLAS_H__
 
-# include "blas.h"
-
 extern "C" {
 
     /* initialize the runtime (must be called by the main thread) */
@@ -13,12 +11,6 @@ extern "C" {
 
     /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
-
-    /* initialize the thread (must be called by any threads) */
-    void xkblas_thread_init(void);
-
-    /* Wait for the completion of the current thread */
-    void xkblas_thread_sync(void);
 
     /* initialize the thread (must be called by any threads) */
     void xkblas_thread_deinit(void);

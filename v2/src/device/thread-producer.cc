@@ -26,6 +26,8 @@ ThreadProducer::deinit(void)
 ThreadProducer *
 ThreadProducer::get(void)
 {
+    if (__TLS_PRODUCER == NULL)
+        ThreadProducer::init();
     assert(__TLS_PRODUCER);
     return __TLS_PRODUCER;
 }

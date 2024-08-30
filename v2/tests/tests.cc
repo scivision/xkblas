@@ -3,6 +3,7 @@
 # include <assert.h>
 # include <stdlib.h>
 # include <stdint.h>
+# include <cblas.h>
 
 # if 1
 # include "xkblas-skernel.h"
@@ -18,7 +19,6 @@ int
 main(void)
 {
     xkblas_init();
-    xkblas_thread_init();
 
     int transA = CblasNoTrans;
     int transB = CblasNoTrans;
@@ -45,7 +45,6 @@ main(void)
     xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
     xkblas_sync();
 
-    xkblas_thread_deinit();
     xkblas_deinit();
 
     return 0;

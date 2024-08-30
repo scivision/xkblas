@@ -26,6 +26,9 @@ ThreadWorker::deinit(void)
 ThreadWorker *
 ThreadWorker::get(void)
 {
+    if (__TLS_WORKER == NULL)
+        ThreadWorker::init();
+    assert(__TLS_WORKER);
     return __TLS_WORKER;
 }
 

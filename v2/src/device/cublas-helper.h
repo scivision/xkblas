@@ -1,7 +1,7 @@
 #ifndef __CUBLAS_HELPER_H__
 # define __CUBLAS_HELPER_H__
 
-# include "blas.h"
+# include <cblas.h>
 # include <cublas_v2.h>
 
 static inline cublasOperation_t

@@ -1,16 +1,28 @@
-# include <stdio.h>
-# include <stdlib.h>
-# include <stdint.h>
-# include <string.h>
-# include <time.h>
+extern "C" {
 
-# include "blas.h"
-# include "common/s.h"
+    # include <stdio.h>
+    # include <stdlib.h>
+    # include <stdint.h>
+    # include <string.h>
+    # include <time.h>
+
+    # include <cblas.h>
+    # include "common/s.h"
+};
+
 # include "common/impl.hpp"
 
+//////////////////////////////
+//  TARGETED IMPLEMENTATION //
+//////////////////////////////
+
+# include "xkblas/impl.cc"
 static impl_t impl;
 
-uint64_t
+////////////
+//  UTILS //
+////////////
+static uint64_t
 get_nanotime(void)
 {
     struct timespec ts;
@@ -18,57 +30,106 @@ get_nanotime(void)
     return (uint64_t)(ts.tv_sec * 1000000000) + (uint64_t) ts.tv_nsec;
 }
 
-/**
- *  GEMM(M, N, D, L, U)
- */
+static inline const char
+cblas2blas_op(int trans)
+{
+    switch (trans)
+    {
+        case CblasNoTrans:
+            return 'N';
+        case CblasTrans:
+           return 'T';
+        case CblasConjTrans:
+           return 'C';
+    }
+    abort();
+}
+
+//////////////////////
+//  CLI TO RUN-TIME //
+//////////////////////
+
+// GEMM //
 static int
 main_gemm(char ** args)
 {
-    int transA = CblasNoTrans;
-    int transB = CblasNoTrans;
-    int M = atoi(args[0]);
-    int N = atoi(args[1]);
-    int K = atoi(args[2]);
-    int S1 = atoi(args[3]);
-    int S2 = atoi(args[4]);
+    /* parse arguments */
+    CBLAS_TRANSPOSE transA = CblasNoTrans;
+    CBLAS_TRANSPOSE transB = CblasNoTrans;
+    int m = atoi(args[0]);
+    int n = atoi(args[1]);
+    int k = atoi(args[2]);
+    int s1 = atoi(args[3]);
+    int s2 = atoi(args[4]);
     const TYPE alpha = (const TYPE) 1.0;
     const TYPE beta  = (const TYPE) 1.0;
-    int LD = M+N+K;
+    int ld = m+n+k;
 
-    uintptr_t mem = (uintptr_t) malloc(LD + 3 * sizeof(TYPE) * (LD * LD));
-    uintptr_t Ap  = mem + (LD - (mem % LD)) + 0 * sizeof(TYPE) * (LD * LD);
-    uintptr_t Bp  = mem + (LD - (mem % LD)) + 1 * sizeof(TYPE) * (LD * LD);
-    uintptr_t Cp  = mem + (LD - (mem % LD)) + 2 * sizeof(TYPE) * (LD * LD);
+    printf("Set (m, n, k) = (%d, %d, %d) with tile (%d, %d)\n", m, n, k, s1, s2);
 
-    assert(Ap % LD == 0);
-    assert(Bp % LD == 0);
-    assert(Cp % LD == 0);
+    /* allocate matrices */
+    uintptr_t mem = (uintptr_t) malloc(ld + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + (ld - (mem % ld)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + (ld - (mem % ld)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Cp     = mem + (ld - (mem % ld)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpRef  = mem + (ld - (mem % ld)) + 3 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpImpl = mem + (ld - (mem % ld)) + 4 * sizeof(TYPE) * (ld * ld);
 
-    printf("Set (M, N, K) = (%d, %d, %d) with tile (%d, %d)\n", M, N, K, S1, S2);
+    assert(Ap     % ld == 0);
+    assert(Bp     % ld == 0);
+    assert(Cp     % ld == 0);
+    assert(CpRef  % ld == 0);
+    assert(CpImpl % ld == 0);
 
-    uint64_t t0 = get_nanotime();
-    // TODO
-    uint64_t tf = get_nanotime();
+    const TYPE * A     = (const TYPE *) Ap;
+    const TYPE * B     = (const TYPE *) Bp;
+          TYPE * C     = (      TYPE *) Cp;
+          TYPE * CRef  = (      TYPE *) CpRef;
+          TYPE * CImpl = (      TYPE *) CpImpl;
 
-    printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    /* initialize matrices */
+
+    // TODO : generate A, B, and C ; and copy C to CRef and CImpl
+
+    /* run on impl */
+    printf("Running implementation...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, C, ld);
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    /* run native */
+    printf("Running native...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        native_gemm(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, CRef, ld);
+        uint64_t tf = get_nanotime();
+        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    /* check correctness */
+    double CRefNorm  = 0; // TODO
+    double CImplNorm = 0; // TODO
 
     return 0;
 }
 
-/**
- *  TRSM(M, N, D, L, S)
- */
 static int
 main_trsm(char ** args)
 {
+    assert(0);
+
     int M  = atoi(args[0]);
     int N  = atoi(args[1]);
-    int LD = N + M;
+    int ld = N + M;
     int S = atoi(args[2]);
 
-    if (LD < M || LD < N)
+    if (ld < M || ld < N)
     {
-        fprintf(stderr, "LD must be greated than M and N\n");
+        fprintf(stderr, "ld must be greated than M and N\n");
         return 1;
     }
     if (M % S || N % S)
@@ -78,9 +139,9 @@ main_trsm(char ** args)
     }
 
     int D = 0;
-    int L = LD * N;
+    int L = ld * N;
 
-    printf("Set (M, N, LD) = (%d, %d, %d) with tile (%d, %d)\n", M, N, LD, S, S);
+    printf("Set (M, N, ld) = (%d, %d, %d) with tile (%d, %d)\n", M, N, ld, S, S);
 
     uint64_t t0 = get_nanotime();
     // TODO
@@ -91,20 +152,19 @@ main_trsm(char ** args)
     return 0;
 }
 
-/**
- *  COPYSCALE(M, N, D, L, U)
- */
 static int
 main_copyscale(char ** args)
 {
+    assert(0);
+
     int M  = atoi(args[0]);
     int N  = atoi(args[1]);
-    int LD = N + M;
+    int ld = N + M;
     int S = atoi(args[2]);
 
-    if (LD < M || LD < N)
+    if (ld < M || ld < N)
     {
-        fprintf(stderr, "LD must be greated than M and N\n");
+        fprintf(stderr, "ld must be greated than M and N\n");
         return 1;
     }
     if (M % S || N % S)
@@ -114,10 +174,10 @@ main_copyscale(char ** args)
     }
 
     int D = 0;
-    int L = LD * N;
+    int L = ld * N;
     int U = N;
 
-    printf("Set (M, N, LD) = (%d, %d, %d) with tile (%d, %d)\n", M, N, LD, S, S);
+    printf("Set (M, N, ld) = (%d, %d, %d) with tile (%d, %d)\n", M, N, ld, S, S);
 
     uint64_t t0 = get_nanotime();
     // TODO
@@ -128,14 +188,11 @@ main_copyscale(char ** args)
     return 0;
 }
 
-/**
- *  TRSM(_, N, M, LD, LD)
- *  COPYSCALE(M, N, LD, LD, LD, 1)
- *  GEMM(_, _, M, M, N, LD, LD, LD)
- */
 static int
 main_trsm_copyscale_gemm(char ** args)
 {
+    assert(0);
+
     int N_ITER  = atoi(args[0]);
     int MODE    = atoi(args[1]);
     int M       = atoi(args[2]);
@@ -158,17 +215,17 @@ main_trsm_copyscale_gemm(char ** args)
         return 1;
     }
 
-    int LD = N + M;
-    printf("Set (M, N, LD) = (%d, %d, %d) with tiles (S, trsm, copyscale, gemm)=(%d, %d, %d, %d)\n", M, N, LD, S, S_trsm, S_copyscale, S_gemm);
+    int ld = N + M;
+    printf("Set (M, N, ld) = (%d, %d, %d) with tiles (S, trsm, copyscale, gemm)=(%d, %d, %d, %d)\n", M, N, ld, S, S_trsm, S_copyscale, S_gemm);
 
     uint64_t dt = 0;
 
     for (int i = 0 ; i < N_ITER ; ++i)
     {
-        int D = (MODE == 0) ? 0 : i * LD*(M+N);
-        int L = D + LD*N;
+        int D = (MODE == 0) ? 0 : i * ld*(M+N);
+        int L = D + ld*N;
         int U = D + N;
-        int G = D + LD*N + N;
+        int G = D + ld*N + N;
 
         uint64_t t0 = get_nanotime();
         // TODO
@@ -244,7 +301,7 @@ error_usage(const char * label, func_t * func)
 {
     if (func == NULL)
     {
-        fprintf(stderr, "usage : %s [FUNC] [...]\n", label);
+        fprintf(stderr, "usage : %s [PRECISION] [FUNC] [...]\n", label);
         fprintf(stderr, "  - [FUNC] is one of");
         for (unsigned int i = 0 ; i < N_FUNCS ; ++i)
             fprintf(stderr, " %s", funcs[i].name);
@@ -267,6 +324,7 @@ main(int argc, char ** argv)
     {
         int    nargs = argc - 1;
         char ** args = argv + 1;
+
         for (unsigned int i = 0 ; i < N_FUNCS ; ++i)
         {
             func_t * func = funcs + i;

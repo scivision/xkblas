@@ -144,7 +144,7 @@ xkblas_sync(void)
     xkblas_context_t * ctx = xkblas_context_get();
     xkblas_drivers_wait(&(ctx->drivers));
 
-    # if 1
+    # if 0
     XKBLAS_INFO("Exporting memory tree...");
     ctx->memtree.export_pdf("memory");
     # endif

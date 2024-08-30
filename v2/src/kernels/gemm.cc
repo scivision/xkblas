@@ -1,4 +1,5 @@
-# include "blas.h"
+# include <cblas.h>
+
 # include "min-max.h"
 # include "xkblas-context.h"
 
