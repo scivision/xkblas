@@ -70,11 +70,13 @@ class alignas(CACHE_LINE_SIZE) KTask
         Access accesses[TASK_MAX_ACCESSES];
         uint8_t naccesses;
 
-        /* OCR parameter index, or -1 if none */
+        /* execute on the device that owns a copy of the access at accesses[ocr_access_index]
+         * If 'TASK_MAX_ACCESSES', leave the decision to the scheduler */
         uint8_t ocr_access_index;
 
-        /* worker id on where to schedule once ready */
-        uint8_t targetted_device_id;
+        /* worker id on where to schedule once ready (or XKBLAS_DEVICES_MAX if
+         * leaving the decision to the scheduler) */
+        uint8_t targeted_device_id;
 
         /* wait counter - the task may be scheduled once it reached 0 */
         # pragma message(TODO "Memory accesses ordering this atomic")
@@ -95,13 +97,15 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         KTask() : KTask(TASK_FORMAT_NULL) {}
 
-        KTask(task_format_id_t f) :
+        KTask(task_format_id_t f) : KTask(f, TASK_MAX_ACCESSES, XKBLAS_DEVICES_MAX) {}
+
+        KTask(task_format_id_t f, uint8_t ocr_access_index_p, uint8_t targeted_device_id_p) :
             fmtid(f),
             edges(),
             accesses(),
             naccesses(0),
-            ocr_access_index(XKBLAS_DEVICES_MAX),
-            targetted_device_id(XKBLAS_DEVICES_MAX),
+            ocr_access_index(ocr_access_index_p),
+            targeted_device_id(targeted_device_id_p),
             wc(1),
             state({.lock=0, .value=TASK_STATE_ALLOCATED})
         {

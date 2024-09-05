@@ -142,17 +142,16 @@ xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
     assert(task->state.value == TASK_STATE_READY);
 
     // Find the worker to offload the task
-    uint8_t device_id = task->targetted_device_id;
+    uint8_t device_id = task->targeted_device_id;
 
     // if an ocr parameter is set, retrieve the device accordingly
-    if (task->ocr_access_index < drivers->devices.n)
+    if (task->ocr_access_index < TASK_MAX_ACCESSES)
     {
         assert(task->ocr_access_index >= 0);
-        XKBLAS_WARN("OCR feature is not implemented");
-        // TODO
+        XKBLAS_IMPL("in `xkblas_drivers_enqueue` - OCR feature is not implemented");
     }
 
-    // targetted device and OCR failed, fallback to round robin
+    // targeted device and OCR failed, fallback to round robin
     if (device_id >= drivers->devices.n)
     {
         while (1)
@@ -198,9 +197,11 @@ xkblas_kernel_launch(
     assert(param);
     assert(param->handle);
     assert(param->task);
+    assert(param->task->fmtid);
 
     task_format_t * format = task_format_get(param->task->fmtid);
     assert(format);
+    assert(format->f[type]);
 
     format->f[type](param);
 
@@ -370,7 +371,11 @@ xkblas_device_task_access_fetched(
     callback.args[1] = device;
     callback.args[2] = task;
 
-    xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+    /* running an empty task */
+    if (task->fmtid == TASK_FORMAT_NULL)
+        xkblas_device_task_kernel_executed(callback.args);
+    else
+        xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
 }
 
 static inline void

@@ -1,6 +1,9 @@
 #ifndef __XKBLAS_H__
 # define __XKBLAS_H__
 
+/**
+ *  XKBLAS LEGACY INTERFACES - implemented on top of xkblas/v2
+ */
 extern "C" {
 
     /* initialize the runtime (must be called by the main thread) */
@@ -12,8 +15,14 @@ extern "C" {
     /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
 
-    /* initialize the thread (must be called by any threads) */
-    void xkblas_thread_deinit(void);
+    /* Fetch memory from device to host with respect to previous device accesses */
+    void xkblas_memory_coherent_async(
+        int uplo, int memflag,
+        int m, int n,
+        void * ptr, int ld,
+        unsigned int sizeof_type
+    );
+
 };
 
 #endif /* __XKBLAS_H__ */

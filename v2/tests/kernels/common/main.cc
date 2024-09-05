@@ -6,30 +6,24 @@ extern "C" {
     # include <string.h>
     # include <time.h>
 
-    # include <cblas.h>
-    # include "common/s.h"
+    # include "common/blas.h"
+    # include "common/blas-version.h"
 };
 
 # include "common/impl.hpp"
+# include "common/time.cc"
 
 //////////////////////////////
 //  TARGETED IMPLEMENTATION //
 //////////////////////////////
 
 # include "xkblas/impl.cc"
+# include "common/check.cc"
 static impl_t impl;
 
 ////////////
 //  UTILS //
 ////////////
-static uint64_t
-get_nanotime(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)(ts.tv_sec * 1000000000) + (uint64_t) ts.tv_nsec;
-}
-
 static inline const char
 cblas2blas_op(int trans)
 {
@@ -61,8 +55,8 @@ main_gemm(char ** args)
     int k = atoi(args[2]);
     int s1 = atoi(args[3]);
     int s2 = atoi(args[4]);
-    const TYPE alpha = (const TYPE) 1.0;
-    const TYPE beta  = (const TYPE) 1.0;
+    TYPE alpha = (const TYPE) 0.0;
+    TYPE beta  = (const TYPE) 0.0;
     int ld = m+n+k;
 
     printf("Set (m, n, k) = (%d, %d, %d) with tile (%d, %d)\n", m, n, k, s1, s2);
@@ -81,15 +75,20 @@ main_gemm(char ** args)
     assert(CpRef  % ld == 0);
     assert(CpImpl % ld == 0);
 
-    const TYPE * A     = (const TYPE *) Ap;
-    const TYPE * B     = (const TYPE *) Bp;
-          TYPE * C     = (      TYPE *) Cp;
-          TYPE * CRef  = (      TYPE *) CpRef;
-          TYPE * CImpl = (      TYPE *) CpImpl;
+    TYPE * A     = (TYPE *) Ap;
+    TYPE * B     = (TYPE *) Bp;
+    TYPE * C     = (TYPE *) Cp;
+    TYPE * CRef  = (TYPE *) CpRef;
+    TYPE * CImpl = (TYPE *) CpImpl;
 
     /* initialize matrices */
-
-    // TODO : generate A, B, and C ; and copy C to CRef and CImpl
+    FILL(A, ld * ld);
+    FILL(B, ld * ld);
+    FILL(C, ld * ld);
+    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
 
     /* run on impl */
     printf("Running implementation...\n");
@@ -101,18 +100,12 @@ main_gemm(char ** args)
         printf("Took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
-    /* run native */
-    printf("Running native...\n");
-    {
-        uint64_t t0 = get_nanotime();
-        native_gemm(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, CRef, ld);
-        uint64_t tf = get_nanotime();
-        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
-    }
-
     /* check correctness */
-    double CRefNorm  = 0; // TODO
-    double CImplNorm = 0; // TODO
+    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
+    if (r == 0)
+        puts("Result is CORRECT");
+    else
+        puts("Result is INCORRECT !!");
 
     return 0;
 }
@@ -335,7 +328,6 @@ main(int argc, char ** argv)
                 if (nargs < func->nargs)
                     return error_usage(argv[0], func);
 
-                // TODO
                 printf("Init '%s'\n", impl.name());
                 impl.init();
                 printf("Running '%s'\n", func->name);

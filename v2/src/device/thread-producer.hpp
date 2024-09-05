@@ -48,26 +48,16 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         {
             task->naccesses = N;
 
-            // set edges with previously inserted tasks
+            // set edges with previously inserted tasks, and then register
+            // accesses for linking with future tasks
             for (int i = 0 ; i < N ; ++i)
-            {
-                Access * access = task->accesses + i;
-                this->deptree.intersect(task, access->region, access->mode);
-            }
-
-            // register accesses for linking with future tasks
+                this->deptree.intersect(task, task->accesses[i].region, task->accesses[i].mode);
             for (int i = 0 ; i < N ; ++i)
-            {
-                Access * access = task->accesses + i;
-                this->deptree.insert(task, access->region, access->mode);
-            }
+                this->deptree.insert(task, task->accesses[i].region, task->accesses[i].mode);
 
-            // commit the task
+            // commit the task - and enqueue it if now ready
             if (task->commit())
-            {
-                // defer the task to consumer threads
                 xkblas_drivers_enqueue(drivers, task);
-            }
 
             # ifndef NDEBUG
             tasks.push_back(task);

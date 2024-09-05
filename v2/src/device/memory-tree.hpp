@@ -379,7 +379,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - LD=%d", this->block.host_view.bs_m, this->block.host_view.bs_n, this->block.host_view.LD);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.tm,   this->block.host_view.tn);
 
-            // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
+         // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
@@ -409,6 +409,8 @@ fetch_callback(const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
     {
         /* the task kernel is ready for execution */
         xkblas_device_task_access_fetched(driver, device, task);
+
+        # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to here ?")
     }
 }
 

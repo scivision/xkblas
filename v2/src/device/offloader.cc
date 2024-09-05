@@ -75,7 +75,25 @@ Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
             assert(stream);
 
             err = stream->launch_ready_instructions();
-            assert(err == 0 || err == EINPROGRESS);
+            switch (err)
+            {
+                case (0):
+                case (EINPROGRESS):
+                    break ;
+
+                case (ENOSYS):
+                {
+                    XKBLAS_FATAL("Not implemented");
+                    break ;
+                }
+
+                default:
+                {
+                    XKBLAS_FATAL("Driver implementation of `stream_instruction_launch` returned an unknown error code");
+                    break ;
+                }
+
+            }
         }
     }
 

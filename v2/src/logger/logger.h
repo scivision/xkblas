@@ -12,9 +12,9 @@
 extern volatile int XKBLAS_PRINT_MTX;
 
 # define XKBLAS_PRINT_FATAL_ID      0
-# define XKBLAS_PRINT_INFO_ID       1
-# define XKBLAS_PRINT_ERROR_ID      2
-# define XKBLAS_PRINT_WARN_ID       3
+# define XKBLAS_PRINT_ERROR_ID      1
+# define XKBLAS_PRINT_WARN_ID       2
+# define XKBLAS_PRINT_INFO_ID       3
 # define XKBLAS_PRINT_IMPL_ID       4
 # define XKBLAS_PRINT_DEBUG_ID      5
 

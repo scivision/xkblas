@@ -4,6 +4,7 @@
 # include "logger/logger.h"
 # include "device/driver.h"
 # include "device/thread-producer.hpp"
+# include "sync/alignedas.h"
 # include "sync/spinlock.h"
 
 # if __has_include("kernels/kernel-task-format-register.h")
@@ -155,4 +156,46 @@ void
 xkblas_thread_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas thread");
+}
+
+//////////////////////
+// Memory coherency //
+//////////////////////
+
+extern "C"
+void
+xkblas_memory_coherent_async(
+    int uplo, int memflag,
+    int m, int n,
+    void * ptr, int ld,
+    unsigned int sizeof_type
+) {
+    XKBLAS_IMPL("in `xkblas_memory_coherent_async` - uplo and memflag parameters not supported");
+
+    xkblas_context_t * ctx = xkblas_context_get();
+    assert(ctx);
+
+    xkblas_drivers_t * drivers = &(ctx->drivers);
+
+    /* create a task with a null body that reads the data, and force its scheduling onto the host */
+
+    // TODO : allocate instead on ctx->drivers.devices.list[0].thread ?
+    // creates a concurrency issue in the allocator though
+    ThreadProducer * thread = ThreadProducer::get();
+    assert(thread);
+
+    const uint64_t task_size = sizeof(Task);
+    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
+    uint8_t * mem  = thread->allocate(task_size);
+    assert(mem);
+
+    Task * task = reinterpret_cast<Task *>(mem);
+    new(task) Task(TASK_FORMAT_NULL, TASK_MAX_ACCESSES, 0);
+    new(task->accesses + 0) Access(ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+
+    #ifndef NDEBUG
+    strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
+    #endif /* NDEBUG */
+
+    thread->commit<1>(drivers, task);
 }

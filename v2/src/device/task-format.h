@@ -49,9 +49,8 @@ typedef struct  task_format_t
 
 /* maximum number of task format */
 typedef uint8_t task_format_id_t;
-# define TASK_FORMAT_MAX ((1 << (sizeof(task_format_id_t) * 8)) - 1)
-extern task_format_t task_formats[TASK_FORMAT_MAX];
 
+# define TASK_FORMAT_MAX ((1 << (sizeof(task_format_id_t) * 8)) - 1)
 # define TASK_FORMAT_NULL 0
 
 task_format_id_t task_format_create(task_format_t * format);
