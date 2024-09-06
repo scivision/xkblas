@@ -46,7 +46,7 @@ static task_format_id_t format_id;
 
 int
 xkblas_£gemm_tile_async(
-    xkblas_drivers_t * drivers,
+    xkblas_context_t * context,
     int transA, int transB,
     int bs_m, int bs_n, int bs_k,
     const TYPE * alpha,
@@ -96,7 +96,7 @@ xkblas_£gemm_tile_async(
     new(task->accesses + 0) Access(A, LDA, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 1) Access(B, LDB, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 2) Access(C, LDC, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
-    thread->commit<NACCESSES>(drivers, task);
+    thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
 
     return 0;
@@ -202,8 +202,6 @@ xkblas_£gemm_async(
 
     int bs_mm, bs_nn, bs_kn, bs_km;
 
-    xkblas_drivers_t * drivers = &(context->drivers);
-
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
     {
@@ -222,7 +220,7 @@ xkblas_£gemm_async(
                         bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                drivers,
+                                context,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -241,7 +239,7 @@ xkblas_£gemm_async(
                         bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                drivers,
+                                context,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -263,7 +261,7 @@ xkblas_£gemm_async(
                         bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                drivers,
+                                context,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -282,7 +280,7 @@ xkblas_£gemm_async(
                         bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
-                                drivers,
+                                context,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,

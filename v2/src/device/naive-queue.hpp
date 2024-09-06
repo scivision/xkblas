@@ -55,6 +55,12 @@ class NaiveQueue : IQueue<T>
             return nullptr;
         }
 
+        bool
+        is_empty(void) const
+        {
+            return this->stack.empty();
+        }
+
     private:
         std::stack<T> stack;
         spinlock_t lock;

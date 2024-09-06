@@ -364,7 +364,7 @@ xkblas_device_thread_main_loop(
     {
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
-        while ((task = thread->pop()) == NULL &&
+        while ((task = thread->queue.pop()) == NULL &&
                 device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
                 device->request.type == XKBLAS_DEVICE_REQUEST_TYPE_NOP)
             device->thread->pause();

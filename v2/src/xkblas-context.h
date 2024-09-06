@@ -37,4 +37,7 @@ typedef struct  xkblas_context_t
 // track of
 xkblas_context_t * xkblas_context_get(void);
 
+/* submit a ready task */
+void xkblas_context_submit_task(xkblas_context_t * context, Task * task);
+
 #endif /* __XKBLAS_CONTEXT_H__ */

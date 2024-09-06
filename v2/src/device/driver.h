@@ -44,7 +44,6 @@ typedef struct  xkblas_driver_t
     ///////////////////////
     //  DRIVER META DATA //
     ///////////////////////
-
     const char   *(*f_get_name)(void);          /* name of the driver (human-readable) */
     unsigned int (*f_get_flags)(void);          /* flags: not really used */
     unsigned int (*f_get_ndevices_max)(void);   /* return the number of devices available to the driver */
@@ -142,7 +141,13 @@ typedef struct  xkblas_drivers_t
         /* next worker to offload round robin mode */
         std::atomic<uint8_t> round_robin_device_id;
 
+        /* connectivity performances to find which link to use when moving data between devices */
+        int connectivity[XKBLAS_DEVICES_MAX+1][XKBLAS_DEVICES_MAX+1];
+
     } devices;
+
+    /* number of uncompleted tasks (used for xkblas_sync) */
+    std::atomic<uint32_t> uncompleted_tasks;
 
 }               xkblas_drivers_t;
 

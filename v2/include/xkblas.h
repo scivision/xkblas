@@ -15,7 +15,8 @@ extern "C" {
     /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
 
-    /* Fetch memory from device to host with respect to previous device accesses */
+    /* Fetch memory from device to host with respect to previous device
+     * accesses - the address space passed must be included in a previous xkblas call */
     void xkblas_memory_coherent_async(
         int uplo, int memflag,
         int m, int n,

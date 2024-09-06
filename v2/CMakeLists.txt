@@ -19,6 +19,12 @@ if (USE_HWLOC)
     message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 endif()
 
+# HOST DRIVER
+option(USE_HOST "Whether to build the HOST driver." ON)
+if (USE_HOST)
+    add_compile_definitions(USE_HOST=1)
+endif()
+
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU plugin." ON)
 if (USE_CUDA)
@@ -43,6 +49,7 @@ endif()
 # Lib name
 add_library(xkblas SHARED
     src/xkblas-context.cc
+    src/xkblas-context-task-submit.cc
     src/conf/conf.cc
     src/device/device.cc
     src/device/driver.cc

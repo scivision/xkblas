@@ -7,5 +7,5 @@ void
 xkblas_task_ready(Task * task)
 {
     xkblas_context_t * context = xkblas_context_get();
-    xkblas_drivers_enqueue(&(context->drivers), task);
+    xkblas_context_submit_task(context, task);
 }

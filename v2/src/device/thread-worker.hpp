@@ -36,16 +36,6 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         virtual ~ThreadWorker();
 
         /**
-         *  Register a task for later execution
-         */
-        void push(Task * task);
-
-        /**
-         *  Pop the next task to execute by this worker
-         */
-        Task * pop(void);
-
-        /**
          *  Sleep the thread until signaled
          */
         void pause(void);
@@ -55,11 +45,13 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
          */
         void wakeup(void);
 
-    private:
+    public:
 
         /* per-thread queue */
         // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
         NaiveQueue<Task *> queue;
+
+    private:
 
         /* lock and condition to sleep the mutex */
         struct {

@@ -175,8 +175,6 @@ xkblas_memory_coherent_async(
     xkblas_context_t * ctx = xkblas_context_get();
     assert(ctx);
 
-    xkblas_drivers_t * drivers = &(ctx->drivers);
-
     /* create a task with a null body that reads the data, and force its scheduling onto the host */
 
     // TODO : allocate instead on ctx->drivers.devices.list[0].thread ?
@@ -189,13 +187,14 @@ xkblas_memory_coherent_async(
     uint8_t * mem  = thread->allocate(task_size);
     assert(mem);
 
+    // TODO : use task format writeback instead
     Task * task = reinterpret_cast<Task *>(mem);
-    new(task) Task(TASK_FORMAT_NULL, TASK_MAX_ACCESSES, 0);
+    new(task) Task(TASK_FORMAT_NULL, TASK_MAX_ACCESSES, HOST_GLOBAL_DEVICE_ID);
     new(task->accesses + 0) Access(ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
     #ifndef NDEBUG
     strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
     #endif /* NDEBUG */
 
-    thread->commit<1>(drivers, task);
+    thread->commit<1>(ctx, task);
 }

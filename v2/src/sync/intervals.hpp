@@ -172,6 +172,15 @@ class Intervals {
             return false;
         }
 
+        inline uint64_t
+        size(void)
+        {
+            uint64_t s = this->list[0].length();
+            for (int i = 1 ; i < K ; ++i)
+                s *= this->list[i].length();
+            return s;
+        }
+
         friend std::ostream &
         operator<<(std::ostream & os, const Intervals & intervals)
         {

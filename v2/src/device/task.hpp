@@ -97,7 +97,7 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         KTask() : KTask(TASK_FORMAT_NULL) {}
 
-        KTask(task_format_id_t f) : KTask(f, TASK_MAX_ACCESSES, XKBLAS_DEVICES_MAX) {}
+        KTask(task_format_id_t f) : KTask(f, TASK_MAX_ACCESSES, UNSPECIFIED_GLOBAL_DEVICE_ID) {}
 
         KTask(task_format_id_t f, uint8_t ocr_access_index_p, uint8_t targeted_device_id_p) :
             fmtid(f),

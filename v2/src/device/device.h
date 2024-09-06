@@ -52,7 +52,7 @@ typedef struct  xkblas_device_t
     xkblas_device_memory_t memdev;      /* casted to xkblas_device */
     Offloader offloader;                /* communication streams host<->device */
     uint8_t driver_id;                  /* driver device id in [0..ngpus_for_device] */
-    uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ */
+    uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ - host is a virtual device of id 'XKBLAS_DEVICES_MAX'*/
     std::atomic<uint8_t> state;         /* True if driver is initialized */
     ThreadWorker * thread;              /* the device worker thread */
     xkblas_device_request_t request;    /* current request */

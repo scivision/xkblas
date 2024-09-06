@@ -1,6 +1,7 @@
 #ifndef __THREAD_PRODUCER_HPP__
 # define __THREAD_PRODUCER_HPP__
 
+# include "xkblas-context.h"
 # include "logger/todo.h"
 # include "device/dependency-tree.hpp"
 # include "device/driver.h"
@@ -44,7 +45,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
          *  The task may be scheduled before this function returns
          */
         template<int N>
-        void commit(xkblas_drivers_t * drivers, Task * task)
+        void commit(xkblas_context_t * context, Task * task)
         {
             task->naccesses = N;
 
@@ -57,7 +58,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
 
             // commit the task - and enqueue it if now ready
             if (task->commit())
-                xkblas_drivers_enqueue(drivers, task);
+                xkblas_context_submit_task(context, task);
 
             # ifndef NDEBUG
             tasks.push_back(task);

@@ -8,6 +8,7 @@
 # include <cassert>
 # include <cstring>
 # include <cerrno>
+# include <climits>
 
 # pragma message(TODO "Implement host driver ?")
 
@@ -85,11 +86,25 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
+    // SET MEMBERS
+    memset(drivers->list, 0, sizeof(drivers->list));
+    memset(drivers->devices.list, 0, sizeof(drivers->devices.list));
+    drivers->devices.n = 0;
+    drivers->devices.round_robin_device_id = 0;
+    memset(drivers->devices.connectivity, 0, sizeof(drivers->devices.connectivity));
+    for (int i = 0 ; i < XKBLAS_DEVICES_MAX + 1 ; ++i)
+        drivers->devices.connectivity[i][i] = UINT_MAX;
+
+    // LOAD DRIVERS
     void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
+# if USE_HOST
     extern void XKBLAS_DRIVER_HOST_get_driver(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_HOST_get_driver;
+# else
+#  error "`USE_HOST` is mandatory currently, as some logic (i.e. memory coherency) must be executed on the host thread"
+# endif /* USE_HOST */
 
 # if USE_CUDA
     extern void XKBLAS_DRIVER_CUDA_get_driver(xkblas_driver_t *);
@@ -109,7 +124,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
         }
     }
 
-    /* wait all threads for each devices of each driver */
+    /* wait each thread of each device of each driver to start */
     int total_devices = 0;
     for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
     {
@@ -119,9 +134,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
         total_devices += driver->ndevices_targeted;
     }
 
-    /* remove the main 'host' device */
-    --total_devices;
-
+    // DEBUG OUTPUT
     if (total_devices == 0)
         XKBLAS_FATAL("No devices found :-(");
 
@@ -133,49 +146,6 @@ void
 xkblas_drivers_deinit(xkblas_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
-}
-
-// Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
-void
-xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task)
-{
-    assert(task->state.value == TASK_STATE_READY);
-
-    // Find the worker to offload the task
-    uint8_t device_id = task->targeted_device_id;
-
-    // if an ocr parameter is set, retrieve the device accordingly
-    if (task->ocr_access_index < TASK_MAX_ACCESSES)
-    {
-        assert(task->ocr_access_index >= 0);
-        XKBLAS_IMPL("in `xkblas_drivers_enqueue` - OCR feature is not implemented");
-    }
-
-    // targeted device and OCR failed, fallback to round robin
-    if (device_id >= drivers->devices.n)
-    {
-        while (1)
-        {
-            device_id = drivers->devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = device_id % drivers->devices.n;
-            if (device_id == 0) /* never enqueue onto the host */
-                continue ;
-            if (drivers->devices.list[device_id])
-                break ;
-        }
-    }
-
-    // we found the thread
-    assert(device_id >= 0 && device_id < drivers->devices.n);
-    ThreadWorker * worker = drivers->devices.list[device_id]->thread;
-    if (worker == NULL)
-    {
-        XKBLAS_FATAL("Trying to enqueue a task to an uninitialized worker %d", device_id);
-        return ;
-    }
-
-    XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
-    worker->push(task);
 }
 
 xkblas_device_t *
@@ -389,9 +359,26 @@ xkblas_device_wait(xkblas_device_t * device)
 void
 xkblas_drivers_wait(xkblas_drivers_t * drivers)
 {
-    for (int device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
+    ThreadWorker * worker = ThreadWorker::get();
+    assert(worker);
+
+    const int n = drivers->devices.n;
+    while (1)
     {
-        xkblas_device_t * device = drivers->devices.list[device_global_id];
-        xkblas_device_wait(device);
+        int completed = 0;
+        for (int i = 0 ; i < n ; ++i)
+        {
+            xkblas_device_t * device = drivers->devices.list[i];
+            if (device->thread->queue.is_empty() && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
+                ++completed;
+        }
+
+        if (worker->queue.is_empty())
+            ++completed;
+
+        if (completed == n + 1)
+            break ;
+
+        mem_pause();
     }
 }

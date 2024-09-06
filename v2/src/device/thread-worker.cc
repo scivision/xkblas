@@ -48,19 +48,6 @@ ThreadWorker::~ThreadWorker()
 }
 
 void
-ThreadWorker::push(Task * task)
-{
-    this->queue.push(task);
-    this->wakeup();
-}
-
-Task *
-ThreadWorker::pop(void)
-{
-    return this->queue.pop();
-}
-
-void
 ThreadWorker::pause(void)
 {
     pthread_mutex_lock(&this->sleep.lock);
