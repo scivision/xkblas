@@ -50,14 +50,14 @@ xkblas_£gemm_tile_async(
     int transA, int transB,
     int bs_m, int bs_n, int bs_k,
     const TYPE * alpha,
-    const TYPE * A, int Atm, int Atn, int LDA,
-    const TYPE * B, int Btm, int Btn, int LDB,
+    const TYPE * A, int Atm, int Atn, int lda,
+    const TYPE * B, int Btm, int Btn, int ldb,
     const TYPE * beta,
-          TYPE * C, int Ctm, int Ctn, int LDC
+          TYPE * C, int Ctm, int Ctn, int ldc
 ) {
-    assert((uintptr_t)A % LDA == 0);
-    assert((uintptr_t)B % LDB == 0);
-    assert((uintptr_t)C % LDC == 0);
+    assert((uintptr_t)A % lda == 0);
+    assert((uintptr_t)B % ldb == 0);
+    assert((uintptr_t)C % ldc == 0);
 
     ThreadProducer * thread = ThreadProducer::get();
 
@@ -79,7 +79,7 @@ xkblas_£gemm_tile_async(
     snprintf(task->label, sizeof(task->label), "gemm(%d, %d, %d)", Atm, Atn, Btn);
     # endif /* NDEBUG */
 
-    # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'LDC' ?")
+    # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'ldc' ?")
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
     new(args) args_t(transA, transB, bs_m, bs_n, bs_k, *alpha, *beta);
 
@@ -93,9 +93,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(A, LDA, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(B, LDB, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(C, LDC, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(A, lda, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(B, ldb, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
 
@@ -107,10 +107,10 @@ xkblas_£gemm_async(
     int transA, int transB,
     int M, int N, int K,
     const TYPE * alpha,
-    const TYPE * A, int LDA,
-    const TYPE * B, int LDB,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
     const TYPE * beta,
-          TYPE * C, int LDC
+          TYPE * C, int ldc
 ) {
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans))
@@ -158,16 +158,16 @@ xkblas_£gemm_async(
         Bm = N; Bn = K;
     }
 
-    if (LDA < MAX(1, Am)) {
-        XKBLAS_FATAL("illegal value of LDA");
+    if (lda < MAX(1, Am)) {
+        XKBLAS_FATAL("illegal value of lda");
         return -8;
     }
-    if (LDB < MAX(1, Bm)) {
-        XKBLAS_FATAL("illegal value of LDB");
+    if (ldb < MAX(1, Bm)) {
+        XKBLAS_FATAL("illegal value of ldb");
         return -10;
     }
-    if (LDC < MAX(1, M)) {
-        XKBLAS_FATAL("illegal value of LDC");
+    if (ldc < MAX(1, M)) {
+        XKBLAS_FATAL("illegal value of ldc");
         return -13;
     }
 
@@ -224,10 +224,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm, tk, LDA,
-                                B, tk, tn, LDB,
+                                A, tm, tk, lda,
+                                B, tk, tn, ldb,
                                 &zbeta,
-                                C, tm, tn, LDC
+                                C, tm, tn, ldc
                         );
                     }
                 }
@@ -243,10 +243,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm, tk, LDA,
-                                B, tn, tk, LDB,
+                                A, tm, tk, lda,
+                                B, tn, tk, ldb,
                                 &zbeta,
-                                C, tm, tn, LDC
+                                C, tm, tn, ldc
                         );
                     }
                 }
@@ -265,10 +265,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tk, tm, LDA,
-                                B, tk, tn, LDB,
+                                A, tk, tm, lda,
+                                B, tk, tn, ldb,
                                 &zbeta,
-                                C, tm, tn, LDC
+                                C, tm, tn, ldc
                         );
                     }
                 }
@@ -284,10 +284,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tk, tm, LDA,
-                                B, tn, tk, LDB,
+                                A, tk, tm, lda,
+                                B, tn, tk, ldb,
                                 &zbeta,
-                                C, tm, tn, LDC
+                                C, tm, tn, ldc
                         );
                     }
                 }
@@ -348,10 +348,10 @@ body_cuda(void * vparam)
         cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
         args->m, args->n, args->k,
         (const CU_TYPE *) &args->alpha,
-        (const CU_TYPE *) A->device_view.addr, A->device_view.LD,
-        (const CU_TYPE *) B->device_view.addr, B->device_view.LD,
+        (const CU_TYPE *) A->device_view.addr, A->device_view.ld,
+        (const CU_TYPE *) B->device_view.addr, B->device_view.ld,
         (const CU_TYPE *) &args->beta,
-        (      CU_TYPE *) C->device_view.addr, C->device_view.LD
+        (      CU_TYPE *) C->device_view.addr, C->device_view.ld
     );
     xkblas_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);

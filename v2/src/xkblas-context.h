@@ -23,6 +23,9 @@ typedef struct  xkblas_context_t
     /* user conf */
     xkblas_conf_t conf;
 
+    /* worker thread to copy data asynchronously */
+    ThreadWorker * memory_coherent_worker_thread;
+
     /* driver list */
     xkblas_drivers_t drivers;
 
@@ -39,5 +42,14 @@ xkblas_context_t * xkblas_context_get(void);
 
 /* submit a ready task */
 void xkblas_context_submit_task(xkblas_context_t * context, Task * task);
+
+/* memory async thread management */
+void xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context);
+void xkblas_memory_coherent_async_impl(
+    int uplo, int memflag,
+    int m, int n,
+    void * ptr, int ld,
+    unsigned int sizeof_type
+);
 
 #endif /* __XKBLAS_CONTEXT_H__ */

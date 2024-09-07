@@ -35,23 +35,33 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         ThreadWorker();
         virtual ~ThreadWorker();
 
-        /**
-         *  Sleep the thread until signaled
-         */
+        /* Sleep the thread until signaled */
         void pause(void);
 
-        /**
-         *  Wake up the thread
-         */
+        /* Wake up the thread */
         void wakeup(void);
 
-    public:
+        /* push a task */
+        void push(Task * const & task);
+
+        /* pop a task */
+        Task * pop(void);
+
+        /* the passed task completed execution on the thread */
+        void complete(Task * task);
+
+        /* return false if there is any uncompleted tasks */
+        bool completed(void) const;
+
+    private:
 
         /* per-thread queue */
         // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
         NaiveQueue<Task *> queue;
 
-    private:
+        /* number of uncompleted tasks */
+        volatile uint32_t uncompleted;
+
 
         /* lock and condition to sleep the mutex */
         struct {

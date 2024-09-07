@@ -35,10 +35,10 @@ class MemoryAllocation {
         const uintptr_t addr;
 
         /* leading dimension */
-        const int LD;
+        const int ld;
 
     public:
-        MemoryAllocation(uintptr_t addr, int LD) : addr(addr), LD(LD) {}
+        MemoryAllocation(uintptr_t addr, int ld) : addr(addr), ld(ld) {}
         virtual ~MemoryAllocation() {}
 
 }; /* MemoryAllocation */
@@ -85,26 +85,14 @@ class MemoryBlock {
         /* if i-th bit is set, the i-th device has a view with a valid copy */
         volatile memory_replicates_bitfield_t valid;
 
-        /* if i-th bit is set, the i-th device has a view that is fetching */
-        volatile memory_replicates_bitfield_t fetching;
-
     public:
 
         /* a new memory block, assume it is valid on the host */
         MemoryBlock(const memory_view_t & v) :
             host_view(v),
             replicates(),
-            valid(0),
-            fetching(0)
-        {
-            # pragma message(TODO "Reimplementfor each view of the replicate")
-            # if 0
-            const int host_devid = HOST_GLOBAL_DEVICE_ID;
-            this->valid = (1 << host_devid);
-            this->replicates.array[host_devid].addr = host_view.begin_addr();
-            this->replicates.array[host_devid].LD = host_view.LD;
-            # endif
-        }
+            valid(0)
+        {}
 
         /* a block from splitting an existing one */
         MemoryBlock(
@@ -112,8 +100,7 @@ class MemoryBlock {
         ) :
             host_view(block.host_view),
             replicates(block.replicates),
-            valid(block.valid),
-            fetching(block.fetching)
+            valid(block.valid)
         {}
 
         virtual ~MemoryBlock() {}
@@ -147,11 +134,17 @@ class KMemoryTreeNodeSearch {
             /* copy of the replicate view */
             MemoryAllocation * dst_allocation;
 
+            /* dst memory view */
+            memory_replicate_view_t dst_view;
+
             /* source device */
             int8_t src_device_global_id;
 
             /* src allocation */
             int16_t src_allocation_id;
+
+            /* src memory view */
+            memory_replicate_view_t src_view;
 
             /* copy of the replicate view */
             MemoryAllocation * src_allocation;
@@ -164,9 +157,11 @@ class KMemoryTreeNodeSearch {
                 dst_device_global_id(-1),
                 dst_allocation_id(-1),
                 dst_allocation(nullptr),
+                dst_view(),
                 src_device_global_id(-1),
                 src_allocation_id(-1),
-                src_allocation(nullptr)
+                src_allocation(nullptr),
+                src_view()
             {}
 
             virtual ~BlockInfo() {}
@@ -286,17 +281,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             // TODO : is access->region != r ; then the access resulted in
             // several insertion nodes, which i snot s upported yet
             assert(access->region.equals(r));
-
-            /* initialize with host allocation */
-            const int host_device_id = 0;
-            const memory_replicates_bitfield_t host_device_bitmask = (1 << host_device_id);
-
-            MemoryAllocation * allocation = new MemoryAllocation(access->host_view.addr, access->host_view.LD);
-            assert(this->block.replicates.array[host_device_id].allocations.size() == 0);
-            this->block.replicates.array[host_device_id].allocations.push_back(allocation);
-
-            assert(this->block.valid == 0);
-            this->block.valid |= host_device_bitmask;
         }
 
         /* the region was accessed before, create a new node and inherit from 'src' state */
@@ -364,9 +348,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         ) {
             assert(region.includes(this->region));
 
-            /* two intersection search possible : whether looking for invalid
-             * blocks to initiate fetches, whether setting them valid (after
-             * fetching) */
             switch (search.type)
             {
                 case (Search::Type::SEARCH_FOR_BLOCKS):
@@ -405,17 +386,16 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         {
             // KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_region_str(f);
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
-            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - LD=%d", this->block.host_view.bs_m, this->block.host_view.bs_n, this->block.host_view.LD);
+            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.bs_m, this->block.host_view.bs_n, this->block.host_view.ld);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.tm,   this->block.host_view.tn);
 
          // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX+1 ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
-                fprintf(f, "\\\\ dev %d - valid=%d - fetching=%d",
+                fprintf(f, "\\\\ dev %d - valid=%d",
                     device_global_id,
-                    this->block.valid    & devbit ? 1 : 0,
-                    this->block.fetching & devbit ? 1 : 0
+                    this->block.valid    & devbit ? 1 : 0
                 );
             }
         }
@@ -474,6 +454,135 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             SPINLOCK_UNLOCK(this->spinlock);
         }
 
+        ////////////////////////
+        //  FETCH ON THE HOST //
+        ////////////////////////
+        inline void
+        fetch_on_host_access(
+            Task * task,
+            Access * access
+        ) {
+            assert(access->mode & ACCESS_MODE_R);
+
+            # if !USE_CUDA
+            XKBLAS_FATAL("Only supporting CUDA driver for D2H transfers");
+            # endif
+
+            # pragma message(TODO "Instead, get the driver or the func associated to the 'src' device")
+            xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
+            assert(driver);
+
+            Search search(HOST_DEVICE_GLOBAL_ID);
+            this->lock();
+            {
+                /* find all blocks that intersects with that access */
+                search.prepare_search_blocks();
+                this->intersect(search, access->region, access->mode);
+                assert(search.blocks_info.size() >= 1);
+
+                /* launch fetch on each device */
+                for (BlockInfo & info : search.blocks_info)
+                {
+                    MemoryBlock * block = info.block;
+
+                    /* not valid on any device, then assume valid on the host */
+                    if (block->valid == 0)
+                        continue ;
+
+                    /* need to transfer D2H */
+                    task->fetching();
+
+                    /* copy to host */
+                    info.dst_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                    info.dst_view.addr          = access->host_view.addr;
+                    info.dst_view.ld            = access->host_view.ld;
+
+                    /* copy from a random device */
+                    info.src_device_global_id   = 0; // TODO
+                    info.src_view.addr          = 0; // TODO
+                    info.src_view.ld            = 0; // TODO
+
+                    /* get the device */
+                    xkblas_device_t * device = xkblas_device_get(info.src_device_global_id);
+                    assert(device);
+
+                    /* callback setup */
+                    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 3);
+                    xkblas_stream_callback_t callback;
+                    callback.func = fetch_callback;
+                    callback.args[0] = driver;
+                    callback.args[1] = device;
+                    callback.args[2] = task;
+
+                    // TODO : the current thread is the memory async copy thread, NOT THE DEVICE THREAD !!
+                    // So it creates concurrency on instruction allocation/submission to streams : HANDLE IT !!
+                    # if 0
+                    /* launch asynchronous copy */
+                    xkblas_stream_instruction_submit_copy(
+                        driver,
+                        device,
+                        info.host_view,
+                        info.dst_device_global_id,
+                        info.dst_view,
+                        info.src_device_global_id,
+                        info.src_view,
+                        callback
+                    );
+                    # endif
+                }
+            }
+            this->unlock();
+        }
+
+        task_state_t
+        fetch_on_host(Task * task)
+        {
+            assert(ThreadWorker::get() == xkblas_context_get()->memory_coherent_worker_thread);
+
+            XKBLAS_DEBUG("Launching async fetch of access %p", access);
+            task->fetching();
+
+            /* for each access */
+            assert(task->naccesses <= TASK_MAX_ACCESSES);
+            for (int i = 0 ; i < task->naccesses ; ++i)
+            {
+                task->fetching();
+                this->fetch_on_host_access(task, task->accesses + i);
+            }
+
+            return task->fetched();
+        }
+
+        ////////////////////////
+        //  FETCH ON A DEVICE //
+        ////////////////////////
+
+        static inline void
+        fetch_access_find_source(
+            xkblas_driver_t * driver,
+            xkblas_device_t * device,
+            Task * task,
+            Access * access,
+            BlockInfo & info
+        ) {
+            const MemoryBlock * block = info.block;
+
+            /* not valid on any device, use host to copy */
+            if (block->valid == 0)
+            {
+                XKBLAS_DEBUG("No valid block... assuming host is valid");
+                info.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                info.src_allocation_id      = 0;
+                info.src_allocation         = NULL;
+            }
+            else
+            {
+                XKBLAS_FATAL("Not implemented");
+                // TODO
+                info.src_allocation = info.block->replicates.array[info.src_device_global_id].allocations[info.src_allocation_id];
+            }
+        }
+
         void
         fetch_access(
             xkblas_driver_t * driver,
@@ -481,10 +590,11 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             Task * task,
             Access * access
         ) {
+            // do not use this function to fetch onto the host
+            assert(device->global_id != HOST_DEVICE_GLOBAL_ID);
+
             /* list of invalid blocks on that device */
             Search search(device->global_id);
-            const int devbit = (1 << device->global_id);
-
             this->lock();
             {
                 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -497,13 +607,11 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
                 //////////////////////////////////////////////////////////////////////////////////////////////////////
                 // 2) intersect - to find all nodes that form the access->region
-                //      - mark fetching bit
                 //      - TODO and find the 'source' device for fetching - calling the driver with the 'valid' bitmask
                 //          (and the driver can return 'source' == 'device' if valid on the current device)
                 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
                 # pragma message(TODO "Step (1) and (2) could be merged to only lock/search once")
-                /* find invalid memory blocks for that access on that device */
                 search.prepare_search_blocks();
                 this->intersect(search, access->region, access->mode);
                 assert(search.blocks_info.size() >= 1);
@@ -575,11 +683,11 @@ next_view:
                     /* allocate continuous memory for that access */
                     uint64_t  size = access->host_view.bs_n * access->host_view.bs_m * access->host_view.sizeof_type;
                     uintptr_t addr = (uintptr_t) xkblas_memory_allocate(driver, device, size);
-                    int         LD = access->host_view.bs_n;
+                    int         ld = access->host_view.bs_n;
                     XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
                     assert(addr);
 
-                    allocation = new MemoryAllocation(addr, LD);
+                    allocation = new MemoryAllocation(addr, ld);
                     assert(allocation);
 
                     /* add a view to it in tree memory blocks */
@@ -592,7 +700,7 @@ next_view:
                 }
 
                 access->device_view.addr = allocation->addr;
-                access->device_view.LD   = allocation->LD;
+                access->device_view.ld   = allocation->ld;
 
                 /* set the copy infos if reading */
                 if (access->mode & ACCESS_MODE_R)
@@ -601,23 +709,40 @@ next_view:
                     {
                         /* parameters setup */
 
-                     // info.host_view = set already
+                        /* host_view set already */
 
-                        info.dst_device_global_id = device->global_id;
-                     // info.dst_allocation_id = set already
-                        info.dst_allocation = info.block->replicates.array[info.dst_device_global_id].allocations[info.dst_allocation_id];
+                        /* create dst view */
+                        {
+                            info.dst_device_global_id = device->global_id;
+                         // info.dst_allocation_id = set already
+                            assert(info.dst_allocation_id >= 0);
+                            assert(info.dst_allocation_id < info.block->replicates.array[info.dst_device_global_id].allocations.size());
 
-                        info.src_device_global_id = 0;
-                        info.src_allocation_id = 0; // TODO currently always use the first allocation on that source device ;
-                                                    // instead, should find the source in step (2)
-                        info.src_allocation = info.block->replicates.array[info.src_device_global_id].allocations[info.src_allocation_id];
+                            MemoryAllocation * dst_allocation = info.block->replicates.array[info.dst_device_global_id].allocations[info.dst_allocation_id];
+                            assert(dst_allocation);
+                            info.dst_view.addr = dst_allocation->addr;
+                            info.dst_view.ld   = dst_allocation->ld;
+                        }
 
-                        /* assertion tests on parameters */
-                        assert(info.dst_allocation_id >= 0);
-                        assert(info.dst_allocation_id < info.block->replicates.array[info.dst_device_global_id].allocations.size());
+                        /* create src view */
+                        {
+                            this->fetch_access_find_source(driver, device, task, access, info);
+                            if (info.src_device_global_id == HOST_DEVICE_GLOBAL_ID)
+                            {
+                                info.src_view.addr = access->host_view.addr;
+                                info.src_view.ld   = access->host_view.ld;
+                            }
+                            else
+                            {
+                                assert(info.src_allocation_id >= 0);
+                                assert(info.src_allocation_id < info.block->replicates.array[info.src_device_global_id].allocations.size());
 
-                        assert(info.src_allocation_id >= 0);
-                        assert(info.src_allocation_id < info.block->replicates.array[info.src_device_global_id].allocations.size());
+                                MemoryAllocation * src_allocation = info.block->replicates.array[info.dst_device_global_id].allocations[info.dst_allocation_id];
+                                assert(src_allocation);
+                                info.src_view.addr = info.src_allocation->addr;
+                                info.src_view.ld   = info.src_allocation->ld;
+                            }
+                        }
                     }
                 }
 
@@ -635,11 +760,14 @@ next_view:
                 {
                     if (info.dst_device_global_id == info.src_device_global_id &&
                         info.dst_allocation->addr == info.src_allocation->addr &&
-                        info.dst_allocation->LD == info.src_allocation->LD
+                        info.dst_allocation->ld == info.src_allocation->ld
                     ) {
-                        XKBLAS_DEBUG("Not copying a block that is already valid");
+                        XKBLAS_DEBUG("Tried to copy the same block from/to the same device %u", info.dst_device_global_id);
                         continue ;
                     }
+
+                    /* increment fetch counter */
+                    task->fetching();
 
                     /* callback setup */
                     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 3);
@@ -649,19 +777,15 @@ next_view:
                     callback.args[1] = device;
                     callback.args[2] = task;
 
-                    /* set parameters */
-                    memory_replicate_view_t dst_view(info.dst_allocation->addr, info.dst_allocation->LD);
-                    memory_replicate_view_t src_view(info.src_allocation->addr, info.src_allocation->LD);
-
                     /* launch asynchronous copy */
                     xkblas_stream_instruction_submit_copy(
                         driver,
                         device,
                         info.host_view,
                         info.dst_device_global_id,
-                        dst_view,
+                        info.dst_view,
                         info.src_device_global_id,
-                        src_view,
+                        info.src_view,
                         callback
                     );
                 }
@@ -675,6 +799,8 @@ next_view:
             xkblas_device_t * device,
             Task * task
         ) {
+            assert(driver);
+            assert(device);
 
             # pragma message(TODO "continuous blocks on the same device "       \
                     "could be detected here and fetched with a single request")
@@ -687,11 +813,7 @@ next_view:
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
-            {
-                Access * access = task->accesses + i;
-                task->fetching();
-                this->fetch_access(driver, device, task, access);
-            }
+                this->fetch_access(driver, device, task, task->accesses + i);
 
             return task->fetched();
         }

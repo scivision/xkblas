@@ -5,7 +5,7 @@
 # define XKBLAS_DEVICES_MAX (16)
 
 /* an ID representing a pure virtual host device */
-# define HOST_GLOBAL_DEVICE_ID (0)
+# define HOST_DEVICE_GLOBAL_ID (XKBLAS_DEVICES_MAX)
 
 /* an ID representing an unspecified device */
 # define UNSPECIFIED_GLOBAL_DEVICE_ID (XKBLAS_DEVICES_MAX+1)

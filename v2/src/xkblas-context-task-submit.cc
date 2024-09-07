@@ -21,29 +21,34 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         XKBLAS_FATAL("in `xkblas_drivers_enqueue` - OCR feature is not fully implemented yet");
     }
 
-    // targeted device and OCR failed, fallback to round robin
-    if (device_id >= context->drivers.devices.n)
+    if (device_id == HOST_DEVICE_GLOBAL_ID)
     {
-        while (1)
+        worker = context->memory_coherent_worker_thread;
+        assert(worker);
+    }
+    else
+    {
+        // targeted device and OCR failed, fallback to round robin
+        if (device_id >= context->drivers.devices.n)
         {
-            device_id = context->drivers.devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = device_id % context->drivers.devices.n;
-            if (device_id == 0) /* never enqueue onto the host */
-                continue ;
-            if (context->drivers.devices.list[device_id])
-                break ;
+            while (1)
+            {
+                device_id = context->drivers.devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
+                device_id = device_id % context->drivers.devices.n;
+                if (context->drivers.devices.list[device_id])
+                    break ;
+            }
         }
+
+        // we found the thread
+        assert(device_id >= 0 && device_id < context->drivers.devices.n);
+        worker = context->drivers.devices.list[device_id]->thread;
     }
 
     XKBLAS_DEBUG("Enqueuing task %p to device %d", task, device_id);
 
-    // we found the thread
-    assert(device_id >= 0 && device_id < context->drivers.devices.n);
-    worker = context->drivers.devices.list[device_id]->thread;
-
     if (worker == NULL)
         XKBLAS_FATAL("Trying to enqueue a task to an uninitialized worker %d", device_id);
 
-    worker->queue.push(task);
-    worker->wakeup();
+    worker->push(task);
 }

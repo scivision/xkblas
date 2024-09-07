@@ -20,11 +20,11 @@
 # pragma message(TODO "Replace 'xkblas_driver_t' with a C++ abstract class")
 # pragma message(TODO "Add metadata to each interface, for instance, whether its implementation if mandatory or optional")
 
-typedef enum    xkblas_driver_type_t
+typedef enum    xkblas_driver_type_t : uint8_t
 {
-    XKBLAS_DRIVER_HOST,
-    XKBLAS_DRIVER_CUDA,
-    XKBLAS_DRIVER_MAX
+    XKBLAS_DRIVER_HOST = 0,
+    XKBLAS_DRIVER_CUDA = 1,
+    XKBLAS_DRIVER_MAX  = 2
 }               xkblas_driver_type_t;
 
 typedef struct  xkblas_driver_t
@@ -162,9 +162,6 @@ void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
 void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
 void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
-/* wait for the completion of all previously submitted tasks */
-void xkblas_drivers_wait(xkblas_drivers_t * drivers);
-
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
 
@@ -193,5 +190,8 @@ void xkblas_device_task_access_fetched(
     xkblas_device_t * device,
     Task * task
 );
+
+xkblas_driver_t * xkblas_driver_get(xkblas_driver_type_t type);
+xkblas_device_t * xkblas_device_get(int device_global_id);
 
 #endif /* __DRIVER_H__ */

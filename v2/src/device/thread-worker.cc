@@ -34,7 +34,7 @@ ThreadWorker::get(void)
 
 // non-static members
 
-ThreadWorker::ThreadWorker() : queue()
+ThreadWorker::ThreadWorker() : queue(), uncompleted(0)
 {
     // XKBLAS_DEBUG("New worker thread");
     pthread_mutex_init(&this->sleep.lock, 0);
@@ -48,8 +48,42 @@ ThreadWorker::~ThreadWorker()
 }
 
 void
+ThreadWorker::push(Task * const & task)
+{
+    ++this->uncompleted;
+    this->queue.push(task);
+    this->wakeup();
+}
+
+Task *
+ThreadWorker::pop(void)
+{
+    /* this is true as we only have 1 worker per device currently */
+    assert(ThreadWorker::get() == this);
+    return this->queue.pop();
+}
+
+void
+ThreadWorker::complete(Task * task)
+{
+    /* this is true as we only have 1 worker per device currently */
+    assert(ThreadWorker::get() == this);
+
+    --this->uncompleted;
+    task->executed();
+    task->complete();
+}
+
+bool
+ThreadWorker::completed(void) const
+{
+    return this->uncompleted == 0;
+}
+
+void
 ThreadWorker::pause(void)
 {
+    assert(ThreadWorker::get() == this);
     pthread_mutex_lock(&this->sleep.lock);
     {
         this->sleep.sleeping = true;

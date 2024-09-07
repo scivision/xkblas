@@ -1,4 +1,4 @@
-# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_HOST_ ## N
+# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_CPU_ ## N
 
 # include "xkblas-context.h"
 # include "conf/conf.h"
@@ -19,8 +19,8 @@ typedef struct  xkblas_device_host_t
 }               xkblas_device_host_t;
 
 /* the host devices (should be '1' - using >1 for debug purposes when no cuda/gpu available :-) */
-# define N_HOST_DEVICE 1
-static xkblas_device_host_t DEVICES[N_HOST_DEVICE];
+# define N_CPU_DEVICES 1
+static xkblas_device_host_t DEVICES[N_CPU_DEVICES];
 
 /* initialization synchronization */
 static bool INITIALIZED = false;
@@ -29,7 +29,7 @@ static xkblas_mutex_t DRIVER_MUTEX = XKBLAS_MUTEX_INITIALIZER;
 static unsigned int
 XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
-    return N_HOST_DEVICE;
+    return N_CPU_DEVICES;
 }
 
 static int

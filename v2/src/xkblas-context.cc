@@ -27,7 +27,7 @@ xkblas_context_get(void)
 {
     # pragma message(TODO "Optimize this default conf")
 
-    static xkblas_context_t ctx = {
+    static xkblas_context_t context = {
         .state = {
             .spinlock = 0,
             .current = XKBLAS_CONTEXT_DEINITIALIZED,
@@ -36,100 +36,81 @@ xkblas_context_get(void)
         .drivers = {},
     };
 
-    return &ctx;
+    return &context;
 }
 
 static inline void
 xkblas_task_format_register(void)
 {
-    # pragma message(TODO "Register task format")
-    // TODO : what does this do ?
-    // xkblas_register_task_format();
-    // kaapi_register_format_writeback();
-    // kaapi_register_format_invalidate();
-    // kaapi_register_format_distribute();
-
-    // TODO : and this ?
-    // KAAPI_REGISTER_BASICTYPEFORMAT(kaapi_schar_format, signed char, "%hhi")
-    // [...]
-
     # include "kernels/kernel-task-format-register.cc"
 }
 
-extern "C" void
+extern "C"
+void
 xkblas_init(void)
 {
     XKBLAS_INFO("Initializing Xkblas");
 
-    xkblas_context_t * ctx = xkblas_context_get();
-    if (ctx->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
+    xkblas_context_t * context = xkblas_context_get();
+    if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
     {
-        SPINLOCK_LOCK(ctx->state.spinlock);
+        SPINLOCK_LOCK(context->state.spinlock);
         {
-            if (ctx->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
+            if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
             {
                 // load
-                xkblas_init_conf(&(ctx->conf));
+                xkblas_init_conf(&(context->conf));
                 xkblas_task_format_register();
-                xkblas_drivers_init(&(ctx->drivers), ctx->conf.ngpus);
-                ctx->state.current = XKBLAS_CONTEXT_INITIALIZED;
+                xkblas_memory_coherent_async_worker_thread_init(context);
+                xkblas_drivers_init(&(context->drivers), context->conf.ngpus);
+                context->state.current = XKBLAS_CONTEXT_INITIALIZED;
             }
         }
-        SPINLOCK_UNLOCK(ctx->state.spinlock);
+        SPINLOCK_UNLOCK(context->state.spinlock);
     }
 }
 
-extern "C" void
+extern "C"
+void
 xkblas_invalidate_caches(void)
 {
     XKBLAS_INFO("Invalidate XKBlas caches");
-    xkblas_context_t * ctx = xkblas_context_get();
-    if( ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+    xkblas_context_t * context = xkblas_context_get();
+    if( context->state.current == XKBLAS_CONTEXT_INITIALIZED)
     {
-        SPINLOCK_LOCK(ctx->state.spinlock);
-        if( ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+        SPINLOCK_LOCK(context->state.spinlock);
+        if( context->state.current == XKBLAS_CONTEXT_INITIALIZED)
         {
 	    /*
 	    // TODO : add a driver count so we can stop earlier ...
             for( int driver_id = 0; driver_id < MAX_DRIVER_COUNT; driver_id++ )
 	    {
-	        xkblas_driver_invalidate_caches( ctx->drivers.list + driver_id );
+	        xkblas_driver_invalidate_caches( context->drivers.list + driver_id );
 	    }
 	    */
         }
-        SPINLOCK_UNLOCK(ctx->state.spinlock); 
+        SPINLOCK_UNLOCK(context->state.spinlock);
     }
 }
 
-extern "C" void
+extern "C"
+void
 xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
 
-    xkblas_context_t * ctx = xkblas_context_get();
-    if (ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+    xkblas_context_t * context = xkblas_context_get();
+    if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
     {
-        SPINLOCK_LOCK(ctx->state.spinlock);
+        SPINLOCK_LOCK(context->state.spinlock);
         {
-            if (ctx->state.current == XKBLAS_CONTEXT_INITIALIZED)
+            if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
             {
-                xkblas_drivers_deinit(&ctx->drivers);
+                xkblas_drivers_deinit(&context->drivers);
             }
         }
-        SPINLOCK_UNLOCK(ctx->state.spinlock);
+        SPINLOCK_UNLOCK(context->state.spinlock);
     }
-}
-
-extern "C" void
-xkblas_thread_init(void)
-{
-    ThreadProducer::init();
-}
-
-extern "C" void
-xkblas_thread_deinit(void)
-{
-    ThreadProducer::deinit();
 }
 
 //////////////////////////////
@@ -142,20 +123,46 @@ xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
 
-    xkblas_context_t * ctx = xkblas_context_get();
-    xkblas_drivers_wait(&(ctx->drivers));
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    /* other threads */
+    ThreadWorker * workers[] = {
+        context->memory_coherent_worker_thread
+    };
+    const int nworkers = sizeof(workers) / sizeof(ThreadWorker *);
+
+    /* wait for all threads */
+    const int ndevices = context->drivers.devices.n;
+    while (1)
+    {
+        /* wait for all devices thread */
+        int completed = 0;
+        for (int i = 0 ; i < ndevices ; ++i)
+        {
+            xkblas_device_t * device = context->drivers.devices.list[i];
+            if (device->thread->completed() && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
+                ++completed;
+        }
+
+        /* wait for all other threads */
+        for (ThreadWorker * & thread : workers)
+            if (thread->completed())
+                ++completed;
+
+        /* all threads completed :-) */
+        if (completed == ndevices + nworkers)
+            break ;
+
+        mem_pause();
+    }
+
+    XKBLAS_INFO("Synchronized Xkblas");
 
     # if 0
     XKBLAS_INFO("Exporting memory tree...");
-    ctx->memtree.export_pdf("memory");
+    context->memtree.export_pdf("memory");
     # endif
-}
-
-extern "C"
-void
-xkblas_thread_sync(void)
-{
-    XKBLAS_INFO("Synchronizing Xkblas thread");
 }
 
 //////////////////////
@@ -170,31 +177,5 @@ xkblas_memory_coherent_async(
     void * ptr, int ld,
     unsigned int sizeof_type
 ) {
-    XKBLAS_IMPL("in `xkblas_memory_coherent_async` - uplo and memflag parameters not supported");
-
-    xkblas_context_t * ctx = xkblas_context_get();
-    assert(ctx);
-
-    /* create a task with a null body that reads the data, and force its scheduling onto the host */
-
-    // TODO : allocate instead on ctx->drivers.devices.list[0].thread ?
-    // creates a concurrency issue in the allocator though
-    ThreadProducer * thread = ThreadProducer::get();
-    assert(thread);
-
-    const uint64_t task_size = sizeof(Task);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    uint8_t * mem  = thread->allocate(task_size);
-    assert(mem);
-
-    // TODO : use task format writeback instead
-    Task * task = reinterpret_cast<Task *>(mem);
-    new(task) Task(TASK_FORMAT_NULL, TASK_MAX_ACCESSES, HOST_GLOBAL_DEVICE_ID);
-    new(task->accesses + 0) Access(ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
-
-    #ifndef NDEBUG
-    strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
-    #endif /* NDEBUG */
-
-    thread->commit<1>(ctx, task);
+    xkblas_memory_coherent_async_impl(uplo, memflag, m, n, ptr, ld, sizeof_type);
 }

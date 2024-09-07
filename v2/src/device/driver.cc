@@ -1,3 +1,4 @@
+# include "xkblas-context.h" // TODO : remove me
 # include "min-max.h"
 # include "device/device.h"
 # include "device/driver.h"
@@ -99,12 +100,10 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
-# if USE_HOST
-    extern void XKBLAS_DRIVER_HOST_get_driver(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_HOST] = XKBLAS_DRIVER_HOST_get_driver;
-# else
-#  error "`USE_HOST` is mandatory currently, as some logic (i.e. memory coherency) must be executed on the host thread"
-# endif /* USE_HOST */
+# if USE_CPU
+    extern void XKBLAS_DRIVER_CPU_get_driver(xkblas_driver_t *);
+    loaders[XKBLAS_DRIVER_CPU] = XKBLAS_DRIVER_CPU_get_driver;
+# endif /* USE_CPU */
 
 # if USE_CUDA
     extern void XKBLAS_DRIVER_CUDA_get_driver(xkblas_driver_t *);
@@ -279,9 +278,9 @@ xkblas_memory_allocate(
     xkblas_device_t * device,
     size_t size
 ) {
-    void * ptr = NULL;
+    void * ptr = xkblas_try_allocate_on_device(device, size);
 
-    ptr = xkblas_try_allocate_on_device(device, size);
+    // TODO : memory eviction
     while (ptr == NULL)
     {
         /* No memory found, we need to evict */
@@ -289,15 +288,11 @@ xkblas_memory_allocate(
 
         /* eviction success, new space available */
         if (err == 0)
-        {
             ptr = xkblas_try_allocate_on_device(device, size);
-        }
-        /* eviction failed */
+        /* eviction failed ..., wait for some tasks to finish */
         else if (err == ENOMEM || ptr == NULL)
-        {
-            /* Still not enought space ..., wait for some tasks to finish */
             xkblas_device_poll(device);
-        }
+
         // TODO what if the memory is never available ? infinit loop
     }
 
@@ -312,18 +307,15 @@ xkblas_device_task_kernel_executed(
 ) {
     assert(args);
 
-    xkblas_driver_t  *  driver = (xkblas_driver_t *)  args[0];
-    xkblas_device_t  *  device = (xkblas_device_t *)  args[1];
-    Task             *    task =            (Task *)  args[2];
+    ThreadWorker * thread = (ThreadWorker *) args[0];
+    assert(thread);
 
-    assert(driver);
-    assert(device);
+    Task * task = (Task *) args[1];
     assert(task);
 
     XKBLAS_INFO("Task `%s` completed", task->label);
 
-    task->executed();
-    task->complete();
+    thread->complete(task);
 }
 
 /* must be called once all task accessed were fetched, to queue the task kernel for execution */
@@ -335,11 +327,13 @@ xkblas_device_task_access_fetched(
 ) {
     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
 
+    ThreadWorker * thread = ThreadWorker::get();
+    assert(thread);
+
     xkblas_stream_callback_t callback;
     callback.func    = xkblas_device_task_kernel_executed;
-    callback.args[0] = driver;
-    callback.args[1] = device;
-    callback.args[2] = task;
+    callback.args[0] = thread;
+    callback.args[1] = task;
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
@@ -355,30 +349,17 @@ xkblas_device_wait(xkblas_device_t * device)
     device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, true);
 }
 
-/* wait for the completion of all previously submitted tasks */
-void
-xkblas_drivers_wait(xkblas_drivers_t * drivers)
+xkblas_driver_t *
+xkblas_driver_get(xkblas_driver_type_t type)
 {
-    ThreadWorker * worker = ThreadWorker::get();
-    assert(worker);
-
-    const int n = drivers->devices.n;
-    while (1)
-    {
-        int completed = 0;
-        for (int i = 0 ; i < n ; ++i)
-        {
-            xkblas_device_t * device = drivers->devices.list[i];
-            if (device->thread->queue.is_empty() && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
-                ++completed;
-        }
-
-        if (worker->queue.is_empty())
-            ++completed;
-
-        if (completed == n + 1)
-            break ;
-
-        mem_pause();
-    }
+    xkblas_context_t * ctx = xkblas_context_get();
+    return ctx->drivers.list + XKBLAS_DRIVER_CUDA;
 }
+
+xkblas_device_t *
+xkblas_device_get(int device_global_id)
+{
+    xkblas_context_t * ctx = xkblas_context_get();
+    return ctx->drivers.devices.list[device_global_id];
+}
+

@@ -10,8 +10,8 @@
 typedef struct  memory_replicate_view_t
 {
     uintptr_t addr; // address of the allocation containing this block on that device
-    int LD;         // LD of this replicate view (may be different from
-                    // host'LD, as it is allocated compactly on the device)
+    int ld;         // ld of this replicate view (may be different from
+                    // host'ld, as it is allocated compactly on the device)
 
     int valid;      // '1' if the view is valid
     int fetching;   // '1' is the view is being fetched
@@ -19,17 +19,17 @@ typedef struct  memory_replicate_view_t
     memory_replicate_view_t(
     ) :
         addr(0),
-        LD(0),
+        ld(0),
         valid(0),
         fetching(0)
     {}
 
     memory_replicate_view_t(
         uintptr_t addr,
-        int LD
+        int ld
     ) :
         addr(addr),
-        LD(LD),
+        ld(ld),
         valid(0),
         fetching(0)
     {}
@@ -38,7 +38,7 @@ typedef struct  memory_replicate_view_t
         const memory_replicate_view_t & src
     ) :
         addr(src.addr),
-        LD(src.LD),
+        ld(src.ld),
         valid(0),
         fetching(0)
     {}

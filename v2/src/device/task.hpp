@@ -199,7 +199,11 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         complete(void)
         {
-            assert(this->state.value == TASK_STATE_EXECUTED);
+            assert(
+                this->state.value == TASK_STATE_EXECUTED ||
+                (this->state.value == TASK_STATE_DATA_FETCHED && this->fmtid == TASK_FORMAT_NULL)
+            );
+
             this->state.value = TASK_STATE_COMPLETED;
 
             for (Edge & edge : this->edges)

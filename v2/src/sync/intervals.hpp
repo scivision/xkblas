@@ -41,16 +41,16 @@ class Intervals {
             {
 # if 1
                 uintptr_t PP = tile.begin_addr();
-                this->list[0].a = (uint64_t)(PP / (tile.LD * tile.sizeof_type));
+                this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
                 this->list[0].b = this->list[0].a + tile.bs_m;
-                this->list[1].a = (uint64_t)(PP % (tile.LD * tile.sizeof_type));
+                this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
                 this->list[1].b = this->list[1].a + tile.bs_n * tile.sizeof_type;
 # else
 
-                uintptr_t PP = XKBLAS_MATRIX_TILE(P, LD, tm, tn, bs_m, bs_n, 1);
+                uintptr_t PP = XKBLAS_MATRIX_TILE(P, ld, tm, tn, bs_m, bs_n, 1);
 
                 XKBLAS_MATRIX_TILE_COORDINATE(
-                    PP, LD, bs_m, bs_n, 1,
+                    PP, ld, bs_m, bs_n, 1,
                     this->list[1].a, this->list[0].a,
                     this->list[1].b, this->list[0].b
                 );

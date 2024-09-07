@@ -65,16 +65,16 @@ xkblas_stream_instruction_submit_copy(
 
     /* find the type of copy instruction */
     xkblas_stream_instruction_type_t itype;
-    if (src_device_global_id == 0)
+    if (src_device_global_id == HOST_DEVICE_GLOBAL_ID)
     {
-        if (dst_device_global_id == 0)
+        if (dst_device_global_id == HOST_DEVICE_GLOBAL_ID)
             itype = XKBLAS_STREAM_INSTR_TYPE_COPY_H2H;
         else
             itype = XKBLAS_STREAM_INSTR_TYPE_COPY_H2D;
     }
     else
     {
-        if (dst_device_global_id == 0)
+        if (dst_device_global_id == HOST_DEVICE_GLOBAL_ID)
             itype = XKBLAS_STREAM_INSTR_TYPE_COPY_D2H;
         else
             itype = XKBLAS_STREAM_INSTR_TYPE_COPY_D2D;

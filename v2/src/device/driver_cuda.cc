@@ -614,9 +614,9 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
         {
             void * dst          = (void *) instr->copy.dst_device_view.addr;
-            size_t dpitch       = instr->copy.dst_device_view.LD * instr->copy.host_view.sizeof_type;
+            size_t dpitch       = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
             const void * src    = (const void *) instr->copy.src_device_view.addr;
-            size_t spitch       = instr->copy.src_device_view.LD * instr->copy.host_view.sizeof_type;
+            size_t spitch       = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
             size_t width        = instr->copy.host_view.bs_n * instr->copy.host_view.sizeof_type;
             size_t height       = instr->copy.host_view.bs_m;
             cudaMemcpyKind kind;

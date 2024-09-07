@@ -10,8 +10,8 @@ typedef struct  matrix_tile_t
     /* matrix address (passed to the BLAS kernel) */
     uintptr_t addr;
 
-    /* matrix LD */
-    int LD;
+    /* matrix ld */
+    int ld;
 
     /* tile accessed (in [0..ntiles[) */
     int tm;
@@ -29,19 +29,19 @@ typedef struct  matrix_tile_t
 
     matrix_tile_t(
         const void * & addr,
-        const int & LD,
+        const int & ld,
         const int & tm,
         const int & tn,
         const int & bs_m,
         const int & bs_n,
         const int & sizeof_type
     ) :
-        matrix_tile_t((uintptr_t)addr, LD, tm, tn, bs_m, bs_n, sizeof_type)
+        matrix_tile_t((uintptr_t)addr, ld, tm, tn, bs_m, bs_n, sizeof_type)
     {}
 
     matrix_tile_t(
         const uintptr_t & addr,
-        const int & LD,
+        const int & ld,
         const int & tm,
         const int & tn,
         const int & bs_m,
@@ -49,7 +49,7 @@ typedef struct  matrix_tile_t
         const int & sizeof_type
     ) :
         addr(addr),
-        LD(LD),
+        ld(ld),
         tm(tm),
         tn(tn),
         bs_m(bs_m),
@@ -59,7 +59,7 @@ typedef struct  matrix_tile_t
 
     matrix_tile_t(const matrix_tile_t & src) :
         addr(src.addr),
-        LD(src.LD),
+        ld(src.ld),
         tm(src.tm),
         tn(src.tn),
         bs_m(src.bs_m),
@@ -75,7 +75,7 @@ typedef struct  matrix_tile_t
     {
         return this->addr +
             (this->tn * this->bs_n * this->sizeof_type) +
-            (this->tm * this->bs_m * this->sizeof_type * this->LD);
+            (this->tm * this->bs_m * this->sizeof_type * this->ld);
     }
 
     # if 0

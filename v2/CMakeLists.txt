@@ -20,9 +20,9 @@ if (USE_HWLOC)
 endif()
 
 # HOST DRIVER
-option(USE_HOST "Whether to build the HOST driver." ON)
-if (USE_HOST)
-    add_compile_definitions(USE_HOST=1)
+option(USE_CPU "Whether to build the CPU driver." OFF)
+if (USE_CPU)
+    add_compile_definitions(USE_CPU=1)
 endif()
 
 # CUDA
@@ -50,6 +50,7 @@ endif()
 add_library(xkblas SHARED
     src/xkblas-context.cc
     src/xkblas-context-task-submit.cc
+    src/memory-coherent-async.cc
     src/conf/conf.cc
     src/device/device.cc
     src/device/driver.cc
@@ -73,8 +74,8 @@ if (${HWLOC_FOUND})
 endif()
 
 # Host driver
-add_library(xkblas_driver_host SHARED src/device/driver_host.cc)
-target_link_libraries(xkblas PRIVATE xkblas_driver_host)
+add_library(xkblas_driver_cpu SHARED src/device/driver_cpu.cc)
+target_link_libraries(xkblas PRIVATE xkblas_driver_cpu)
 
 # Cuda driver
 if (${CUDA_RT_FOUND})

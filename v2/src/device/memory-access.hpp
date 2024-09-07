@@ -15,7 +15,7 @@ class KMemoryAccess : public access_t<K>
         /* host view of the access */
         memory_view_t host_view;
 
-        /* device view of the access */
+        /* device view of the access - set after fetching the data */
         memory_replicate_view_t device_view;
 
     public:
