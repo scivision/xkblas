@@ -22,9 +22,9 @@
 
 typedef enum    xkblas_driver_type_t : uint8_t
 {
-    XKBLAS_DRIVER_HOST = 0,
-    XKBLAS_DRIVER_CUDA = 1,
-    XKBLAS_DRIVER_MAX  = 2
+    XKBLAS_DRIVER_TYPE_CPU = 0,
+    XKBLAS_DRIVER_TYPE_CUDA = 1,
+    XKBLAS_DRIVER_TYPE_MAX  = 2
 }               xkblas_driver_type_t;
 
 typedef struct  xkblas_driver_t
@@ -123,12 +123,12 @@ typedef struct  xkblas_driver_t
 void * xkblas_device_thread_main(void * a);
 
 /* one function per task per driver */
-static_assert(XKBLAS_DRIVER_MAX <= TASK_FORMAT_FUNC_MAX);
+static_assert(XKBLAS_DRIVER_TYPE_MAX <= TASK_FORMAT_FUNC_MAX);
 
 typedef struct  xkblas_drivers_t
 {
     /* list of drivers */
-    xkblas_driver_t list[XKBLAS_DRIVER_MAX];
+    xkblas_driver_t list[XKBLAS_DRIVER_TYPE_MAX];
 
     struct {
 

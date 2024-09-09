@@ -25,7 +25,7 @@ def cmd(s):
 
 for f in files:
     for mode in modes:
-        cmd("cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/CU_TYPE/{}/g' | sed 's/TYPE/{}/g' > {}{}".format(
+        cmd("cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}{}".format(
                 f,
                 mode[0].upper(),
                 mode[0],

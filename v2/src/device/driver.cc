@@ -97,7 +97,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
         drivers->devices.connectivity[i][i] = UINT_MAX;
 
     // LOAD DRIVERS
-    void (*loaders[XKBLAS_DRIVER_MAX])(xkblas_driver_t *);
+    void (*loaders[XKBLAS_DRIVER_TYPE_MAX])(xkblas_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
 # if USE_CPU
@@ -106,12 +106,12 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 # endif /* USE_CPU */
 
 # if USE_CUDA
-    extern void XKBLAS_DRIVER_CUDA_get_driver(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_CUDA] = XKBLAS_DRIVER_CUDA_get_driver;
+    extern void XKBLAS_DRIVER_TYPE_CUDA_get_driver(xkblas_driver_t *);
+    loaders[XKBLAS_DRIVER_TYPE_CUDA] = XKBLAS_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
 
     uint8_t i;
-    for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
+    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
     {
         void (*loader)(xkblas_driver_t *) = loaders[i];
         if (loader)
@@ -125,7 +125,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 
     /* wait each thread of each device of each driver to start */
     int total_devices = 0;
-    for (i = 0 ; i < XKBLAS_DRIVER_MAX ; ++i)
+    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
     {
         xkblas_driver_t * driver = drivers->list + i;
         while (driver->ndevices_commited < driver->ndevices_targeted)
@@ -161,7 +161,7 @@ xkblas_kernel_launch(
 ) {
     // must be executed by the worker thread of the passed device
 
-    assert(type >= 0 && type <= XKBLAS_DRIVER_MAX);
+    assert(type >= 0 && type <= XKBLAS_DRIVER_TYPE_MAX);
 
     assert(param);
     assert(param->handle);
@@ -353,7 +353,7 @@ xkblas_driver_t *
 xkblas_driver_get(xkblas_driver_type_t type)
 {
     xkblas_context_t * ctx = xkblas_context_get();
-    return ctx->drivers.list + XKBLAS_DRIVER_CUDA;
+    return ctx->drivers.list + XKBLAS_DRIVER_TYPE_CUDA;
 }
 
 xkblas_device_t *

@@ -497,10 +497,23 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     info.dst_view.addr          = access->host_view.addr;
                     info.dst_view.ld            = access->host_view.ld;
 
-                    /* copy from a random device */
-                    info.src_device_global_id   = 0; // TODO
-                    info.src_view.addr          = 0; // TODO
-                    info.src_view.ld            = 0; // TODO
+                    /* copy from device */
+
+                    // TODO : take the device with the smallest id, instead,
+                    // maybe try to balance the workload between GPU
+                    int src = __builtin_ffs(block->valid) - 1;
+                    assert(src >= 0);
+
+                    // TODO : currently always taking the first allocation
+                    int allocation_id = 0;
+
+                    /* set 'from' device info */
+                    MemoryAllocation * allocation = block->replicates.array[src].allocations[allocation_id];
+                    info.src_device_global_id   = src;
+                    info.src_view.addr          = allocation->addr;
+                    info.src_view.ld            = allocation->ld;
+
+                    XKBLAS_FATAL("-- Copying from %d to %d --", info.src_device_global_id, info.dst_device_global_id);
 
                     /* get the device */
                     xkblas_device_t * device = xkblas_device_get(info.src_device_global_id);
@@ -513,6 +526,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     callback.args[0] = driver;
                     callback.args[1] = device;
                     callback.args[2] = task;
+
+                    task->fetched();
 
                     // TODO : the current thread is the memory async copy thread, NOT THE DEVICE THREAD !!
                     // So it creates concurrency on instruction allocation/submission to streams : HANDLE IT !!
@@ -537,7 +552,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
         task_state_t
         fetch_on_host(Task * task)
         {
-            assert(ThreadWorker::get() == xkblas_context_get()->memory_coherent_worker_thread);
+            // assert(ThreadWorker::get() == xkblas_context_get()->memory_coherent_worker_thread);
 
             XKBLAS_DEBUG("Launching async fetch of access %p", access);
             task->fetching();
@@ -545,10 +560,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
-            {
-                task->fetching();
                 this->fetch_on_host_access(task, task->accesses + i);
-            }
 
             return task->fetched();
         }

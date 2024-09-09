@@ -373,9 +373,9 @@ register_£gemm_format(void)
 {
     task_format_t format;
     strcpy(format.label, "£gemm");
-    format.f[XKBLAS_DRIVER_HOST] = body_host;
+    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_host;
 # ifdef USE_CUDA
-    format.f[XKBLAS_DRIVER_CUDA] = body_cuda;
+    format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     task_format_create(&format);
 }

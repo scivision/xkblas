@@ -1,4 +1,4 @@
-# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_CUDA_ ## N
+# define XKBLAS_DRIVER_ENTRYPOINT(N) XKBLAS_DRIVER_TYPE_CUDA_ ## N
 
 # include "xkblas-context.h"
 # include "conf/conf.h"
@@ -596,7 +596,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             xkblas_stream_instruction_kernel_t * op = &instr->kern;
             task_kernel_param_t param = { .task = op->task, .handle = stream->cu.blas.handle };
-            xkblas_kernel_launch(XKBLAS_DRIVER_CUDA, &param);
+            xkblas_kernel_launch(XKBLAS_DRIVER_TYPE_CUDA, &param);
 
             # pragma message(TODO "Add support for end event records")
 
