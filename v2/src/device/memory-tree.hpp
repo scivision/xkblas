@@ -302,10 +302,11 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             Search & search,
             const access_mode_t mode
         ) {
-            (void) search;
-            (void) mode;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
             XKBLAS_IMPL("inserted region %dx%d", this->region[0].length(), this->region[1].length());
+
+            if (mode & ACCESS_MODE_W)
+                this->block.valid = (1 << search.device_global_id);
         }
 
         void
@@ -454,6 +455,51 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             SPINLOCK_UNLOCK(this->spinlock);
         }
 
+        //////////////////////////////////////
+        //  DECIDE SRC DEVICE WHEN FETCHING //
+        //////////////////////////////////////
+
+        static inline void
+        fetch_access_find_source(
+            Access * access,
+            BlockInfo & info
+        ) {
+            const MemoryBlock * block = info.block;
+
+            /* not valid on any device, use host to copy */
+            if (block->valid == 0)
+            {
+                XKBLAS_DEBUG("No valid block... assuming host is valid");
+                info.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                info.src_allocation_id      = -1;
+                info.src_allocation         = NULL;
+                info.src_view.addr          = access->host_view.addr;
+                info.src_view.ld            = access->host_view.ld;
+            }
+            else
+            {
+                // TODO : take the device with the smallest id, instead,
+                // maybe try to balance the workload between GPU
+                int src = __builtin_ffs(block->valid) - 1;
+                assert(src >= 0);
+
+                // TODO : currently always taking the first allocation
+                int allocation_id = 0;
+                MemoryAllocation * allocation = block->replicates.array[src].allocations[allocation_id];
+                assert(allocation);
+
+                /* set 'src' device info */
+                info.src_device_global_id   = src;
+                info.src_allocation_id      = allocation_id;
+                info.src_allocation         = allocation;
+                info.src_view.addr          = allocation->addr;
+                info.src_view.ld            = allocation->ld;
+
+                assert(info.src_allocation_id >= 0);
+                assert(info.src_allocation_id < block->replicates.array[info.src_device_global_id].allocations.size());
+            }
+        }
+
         ////////////////////////
         //  FETCH ON THE HOST //
         ////////////////////////
@@ -498,24 +544,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     info.dst_view.ld            = access->host_view.ld;
 
                     /* copy from device */
-
-                    // TODO : take the device with the smallest id, instead,
-                    // maybe try to balance the workload between GPU
-                    int src = __builtin_ffs(block->valid) - 1;
-                    assert(src >= 0);
-
-                    // TODO : currently always taking the first allocation
-                    int allocation_id = 0;
-
-                    /* set 'from' device info */
-                    MemoryAllocation * allocation = block->replicates.array[src].allocations[allocation_id];
-                    info.src_device_global_id   = src;
-                    info.src_view.addr          = allocation->addr;
-                    info.src_view.ld            = allocation->ld;
+                    this->fetch_access_find_source(access, info);
 
                     XKBLAS_FATAL("-- Copying from %d to %d --", info.src_device_global_id, info.dst_device_global_id);
 
-                    /* get the device */
                     xkblas_device_t * device = xkblas_device_get(info.src_device_global_id);
                     assert(device);
 
@@ -568,32 +600,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
         ////////////////////////
         //  FETCH ON A DEVICE //
         ////////////////////////
-
-        static inline void
-        fetch_access_find_source(
-            xkblas_driver_t * driver,
-            xkblas_device_t * device,
-            Task * task,
-            Access * access,
-            BlockInfo & info
-        ) {
-            const MemoryBlock * block = info.block;
-
-            /* not valid on any device, use host to copy */
-            if (block->valid == 0)
-            {
-                XKBLAS_DEBUG("No valid block... assuming host is valid");
-                info.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
-                info.src_allocation_id      = 0;
-                info.src_allocation         = NULL;
-            }
-            else
-            {
-                XKBLAS_FATAL("Not implemented");
-                // TODO
-                info.src_allocation = info.block->replicates.array[info.src_device_global_id].allocations[info.src_allocation_id];
-            }
-        }
 
         void
         fetch_access(
@@ -738,22 +744,7 @@ next_view:
 
                         /* create src view */
                         {
-                            this->fetch_access_find_source(driver, device, task, access, info);
-                            if (info.src_device_global_id == HOST_DEVICE_GLOBAL_ID)
-                            {
-                                info.src_view.addr = access->host_view.addr;
-                                info.src_view.ld   = access->host_view.ld;
-                            }
-                            else
-                            {
-                                assert(info.src_allocation_id >= 0);
-                                assert(info.src_allocation_id < info.block->replicates.array[info.src_device_global_id].allocations.size());
-
-                                MemoryAllocation * src_allocation = info.block->replicates.array[info.dst_device_global_id].allocations[info.dst_allocation_id];
-                                assert(src_allocation);
-                                info.src_view.addr = info.src_allocation->addr;
-                                info.src_view.ld   = info.src_allocation->ld;
-                            }
+                            this->fetch_access_find_source(access, info);
                         }
                     }
                 }
@@ -771,8 +762,7 @@ next_view:
                 for (BlockInfo & info : search.blocks_info)
                 {
                     if (info.dst_device_global_id == info.src_device_global_id &&
-                        info.dst_allocation->addr == info.src_allocation->addr &&
-                        info.dst_allocation->ld == info.src_allocation->ld
+                        info.dst_allocation_id == info.src_allocation_id
                     ) {
                         XKBLAS_DEBUG("Tried to copy the same block from/to the same device %u", info.dst_device_global_id);
                         continue ;
