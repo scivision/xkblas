@@ -12,6 +12,7 @@ extern "C" {
 
 # include "common/impl.hpp"
 # include "common/time.cc"
+# include "common/utils.cc"
 
 //////////////////////////////
 //  TARGETED IMPLEMENTATION //
@@ -20,24 +21,6 @@ extern "C" {
 # include "xkblas/impl.cc"
 # include "common/check.cc"
 static impl_t impl;
-
-////////////
-//  UTILS //
-////////////
-static inline const char
-cblas2blas_op(int trans)
-{
-    switch (trans)
-    {
-        case CblasNoTrans:
-            return 'N';
-        case CblasTrans:
-           return 'T';
-        case CblasConjTrans:
-           return 'C';
-    }
-    abort();
-}
 
 //////////////////////
 //  CLI TO RUN-TIME //
@@ -57,7 +40,15 @@ main_gemm(char ** args)
     int s2 = atoi(args[4]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
+
+    /* currently only support this */
+    # if 1
+    assert(m == n);
+    assert(n == k);
+    int ld = m;
+    # else
     int ld = m+n+k;
+    # endif
 
     printf("Set (m, n, k) = (%d, %d, %d) with tile (%d, %d)\n", m, n, k, s1, s2);
 

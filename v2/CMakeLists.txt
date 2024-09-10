@@ -62,6 +62,7 @@ add_library(xkblas SHARED
     src/device/thread.cc
     src/device/thread-producer.cc
     src/device/thread-worker.cc
+    src/kernels/auto-tile.cc
     src/kernels/sgemm.cc
     src/kernels/cgemm.cc
     src/kernels/dgemm.cc

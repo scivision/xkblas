@@ -7,6 +7,8 @@
 # include "logger/todo.h"
 # include "logger/logger.h"
 # include "kernels/kernel-param.h"
+# include "kernels/auto-tile.h"
+# include "kernels/kernel-type.h"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 # include "sync/cache-line-size.hpp"
@@ -176,10 +178,12 @@ xkblas_£gemm_async(
       ((*alpha == 0.0 || K == 0) && *beta == 1.0))
         return 0;
 
-    xkblas_context_t * context = xkblas_context_get();
-    // int BS = xkblas_auto_tilesize(xkctxt, KERN_GEMM, M, N, K);
-    const int NTILES = 2;
-    const int BS = M / NTILES;
+    /* currently only support 1 size */
+    int args[3] = {M, N, K};
+    int tile[2] = {0, 0};
+    xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
+    assert(tile[0] == tile[1]);
+    const int BS = tile[0];
 
     assert(M % BS == 0);
     assert(N % BS == 0);
@@ -200,6 +204,7 @@ xkblas_£gemm_async(
     int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
     int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
 
+    xkblas_context_t * context = xkblas_context_get();
     int bs_mm, bs_nn, bs_kn, bs_km;
 
     // iterator on tiles
@@ -377,5 +382,5 @@ register_£gemm_format(void)
 # ifdef USE_CUDA
     format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
-    task_format_create(&format);
+    format_id = task_format_create(&format);
 }

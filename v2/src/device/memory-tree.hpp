@@ -323,9 +323,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         ) {
             assert(search.type == Search::Type::INSERTING_BLOCKS);
             XKBLAS_IMPL("inserted region %dx%d", this->region[0].length(), this->region[1].length());
-
-            if (mode & ACCESS_MODE_W)
-                this->block.valid = (1 << search.device_global_id);
         }
 
         void
@@ -807,16 +804,20 @@ next_view:
                         info.block->valid = (1 << device->global_id);
 
                         /* release all other allocation block that are now invalid! */
-                        XKBLAS_WARN("Releasing allocations from a block...");
                         MemoryReplicate & replicate = info.block->replicates.array[device->global_id];
-                        MemoryAllocation * allocation = replicate.allocations[info.dst_allocation_id];
-                        assert(allocation);
+                        if (replicate.allocations.size() > 1)
+                        {
+                            XKBLAS_WARN("Releasing allocations from a block...");
+                            MemoryAllocation * allocation = replicate.allocations[info.dst_allocation_id];
+                            assert(allocation);
 
-                        # pragma message(TODO "Memory leak on the device here ! need to free each allocation once supported by the allocator")
-                        replicate.allocations.clear();
-                        replicate.allocations.push_back(allocation);
+                            # pragma message(TODO "Memory leak on the device here ! need to free each allocation once supported by the allocator")
+                            replicate.allocations.clear();
+                            replicate.allocations.push_back(allocation);
+                        }
 
-                        // USE 'info.dst_allocation_id' AT YOUR OWN RISK !!
+                        // USE 'info.dst_allocation_id' AT YOUR OWN RISK NOW !!
+
                     }
                 }
 
@@ -835,7 +836,7 @@ next_view:
                     if (info.dst_device_global_id == info.src_device_global_id &&
                         info.dst_allocation_id == info.src_allocation_id
                     ) {
-                        XKBLAS_DEBUG("Tried to copy the same block from/to the same device %u", info.dst_device_global_id);
+                        XKBLAS_WARN("Tried to copy the same block from/to the same device %u", info.dst_device_global_id);
                         continue ;
                     }
 

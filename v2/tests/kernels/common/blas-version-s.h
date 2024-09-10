@@ -3,6 +3,7 @@
 
 # define PRECISION_s 1
 # define TYPE float
+# define BLAS_INT long long int
 # define native_gemm(...) cblas_sgemm(CblasRowMajor, __VA_ARGS__)
 
 int IONE       = 1;

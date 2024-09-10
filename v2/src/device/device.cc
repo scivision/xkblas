@@ -157,8 +157,8 @@ xkblas_device_prepare_task(
     assert(task->state.value == TASK_STATE_READY);
 
     // TODO : implement this routine
-    XKBLAS_DEBUG("Scheduling task `%s` on device %d - driver `%s`",
-            task->label, device->global_id, driver->f_get_name());
+    XKBLAS_DEBUG("Scheduling task `%s` of format `%d` on device %d - driver `%s`",
+            task->label, task->fmtid, device->global_id, driver->f_get_name());
 
     // 'prepare_execute:' label
 

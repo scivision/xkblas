@@ -2,7 +2,6 @@
 
 # include <math.h>
 # include <sys/param.h>
-
 # include "common/blas.h"
 
 /**
@@ -14,15 +13,14 @@
 int
 gemm_cmp(
     CBLAS_TRANSPOSE transA, CBLAS_TRANSPOSE transB,
-    int m, int n, int k,
+    const BLAS_INT m, const BLAS_INT n, const BLAS_INT k,
     const TYPE alpha,
-    const TYPE * A, int lda,
-    const TYPE * B, int ldb,
+    const TYPE * A, const BLAS_INT lda,
+    const TYPE * B, const BLAS_INT ldb,
     const TYPE beta,
-    const TYPE * C, TYPE * CRef, const TYPE * CImpl, int ldc
+    const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc
 ) {
-    TYPE * work = (TYPE *) malloc(MAX(k,MAX(m, n))* sizeof(TYPE));
-
+    /* check result */
     int Am, An, Bm, Bn;
     if (transA == CblasNoTrans) {
         Am = m; An = k;
@@ -35,30 +33,36 @@ gemm_cmp(
         Bm = n; Bn = k;
     }
 
-    /* run native */
-    printf("Running native...\n");
-    {
-        uint64_t t0 = get_nanotime();
-        native_gemm(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
-        uint64_t tf = get_nanotime();
-        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
-    }
+    TYPE * work = (TYPE *) malloc(MAX(k,MAX(m, n)) * sizeof(TYPE));
 
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);
     double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, C,     ldc, work);
     double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CImpl, ldc, work);
+
+    /* run native */
+    printf("Running native...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        // native_gemm(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        const char transA_char = cblas2blas_op(transA);
+        const char transB_char = cblas2blas_op(transB);
+        sgemm(&transA_char, &transB_char, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
+        uint64_t tf = get_nanotime();
+        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);
 
     TYPE beta_const = (TYPE) -1.0;
-    cblas_zaxpy(ldc * n, &beta_const, CImpl, 1, CRef, 1);
+    cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
 
     double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, CRef, ldc, work);
 
+    double eps = LAPACKE_dlamch_work('e');
+
     printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
             Rnorm, Anorm, Bnorm, CNorm, CImplNorm, CRefNorm);
-
-    double eps = LAPACKE_dlamch_work('e');
 
     if (CNorm == CImplNorm)
         printf("!! CNorm == CImplNorm !! Have you forgoten to compute or move the data back ?\n");
