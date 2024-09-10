@@ -47,7 +47,7 @@ gemm_cmp(
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);
     double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, C,     ldc, work);
-    double CImplnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CImpl, ldc, work);
+    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CImpl, ldc, work);
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);
 
     TYPE beta_const = (TYPE) -1.0;
@@ -55,10 +55,13 @@ gemm_cmp(
 
     double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, CRef, ldc, work);
 
-    printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplnorm %e, CRefNorm %e\n",
-            Rnorm, Anorm, Bnorm, CNorm, CImplnorm, CRefNorm);
+    printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
+            Rnorm, Anorm, Bnorm, CNorm, CImplNorm, CRefNorm);
 
     double eps = LAPACKE_dlamch_work('e');
+
+    if (CNorm == CImplNorm)
+        printf("!! CNorm == CImplNorm !! Have you forgoten to compute or move the data back ?\n");
 
     //TG Takes plasma-openmp test:
     // |R - R_ref|_p < gamma_{k+2} * |alpha| * |A|_p * |B|_p +

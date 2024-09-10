@@ -94,7 +94,7 @@ main_gemm(char ** args)
     printf("Running implementation...\n");
     {
         uint64_t t0 = get_nanotime();
-        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, C, ld);
+        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
         impl.wait();
         uint64_t tf = get_nanotime();
         printf("Took %lf s.\n", (tf - t0) / (double)1e9);
