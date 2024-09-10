@@ -20,7 +20,7 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
         assert(task->wc == 0);
         assert(task->state.value == TASK_STATE_READY);
 
-        if (context->memtree.fetch_on_host(task) == TASK_STATE_DATA_FETCHED)
+        if (context->memtree.fetch_on_host(thread, task) == TASK_STATE_DATA_FETCHED)
             thread->complete(task);
     }
 }

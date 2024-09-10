@@ -318,21 +318,25 @@ xkblas_device_task_kernel_executed(
     thread->complete(task);
 }
 
-/* must be called once all task accessed were fetched, to queue the task kernel for execution */
+/**
+ * Must be called once all task accessed were fetched, to queue the task kernel for execution
+ *  - worker - the thread that scheduled this task (to decrement thread->uncompleted counter)
+ *  - driver - the driver to use for executing the kernel
+ *  - device - the device to use for executing the kernel
+ *  - task   - the task
+ */
 void
 xkblas_device_task_access_fetched(
-     xkblas_driver_t * driver,
-     xkblas_device_t * device,
-                Task * task
+    ThreadWorker    * worker,
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+               Task * task
 ) {
     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
 
-    ThreadWorker * thread = ThreadWorker::get();
-    assert(thread);
-
     xkblas_stream_callback_t callback;
     callback.func    = xkblas_device_task_kernel_executed;
-    callback.args[0] = thread;
+    callback.args[0] = worker;
     callback.args[1] = task;
 
     /* running an empty task */

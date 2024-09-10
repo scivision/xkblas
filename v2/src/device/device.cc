@@ -147,10 +147,12 @@ xkblas_device_accept_new_task(xkblas_device_t * device)
 
 static inline void
 xkblas_device_prepare_task(
+    ThreadWorker    * worker,
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task
 ) {
+    assert(worker == ThreadWorker::get());
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
 
@@ -177,7 +179,7 @@ xkblas_device_prepare_task(
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_device_task_access_fetched(driver, device, task);
+        xkblas_device_task_access_fetched(worker, driver, device, task);
         device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
     }
 }
@@ -352,28 +354,28 @@ xkblas_device_thread_main_loop(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
-    // thread ready for execution
+    assert(ThreadWorker::get() == device->thread);
     assert(device->state == XKBLAS_DEVICE_STATE_COMMIT);
     device->state = XKBLAS_DEVICE_STATE_RUNNING;
 
     # pragma message(TODO "do we really need this mem_barrier here?")
     mem_barrier();
 
-    ThreadWorker * thread = ThreadWorker::get();
+    ThreadWorker * worker = ThreadWorker::get();
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
-        while ((task = thread->pop()) == NULL &&
+        while ((task = worker->pop()) == NULL &&
                 device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
                 device->request.type == XKBLAS_DEVICE_REQUEST_TYPE_NOP)
-            device->thread->pause();
+            worker->pause();    // TODO : bad design, 'worker' must be 'ThreadWorker::get()' !!
 
         XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
                 device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));
 
         if (task)
-            xkblas_device_prepare_task(driver, device, task);
+            xkblas_device_prepare_task(worker, driver, device, task);
         else
             xkblas_device_progress(driver, device);
     }

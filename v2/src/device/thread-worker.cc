@@ -66,9 +66,6 @@ ThreadWorker::pop(void)
 void
 ThreadWorker::complete(Task * task)
 {
-    /* this is true as we only have 1 worker per device currently */
-    assert(ThreadWorker::get() == this);
-
     --this->uncompleted;
     task->executed();
     task->complete();

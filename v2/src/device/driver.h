@@ -186,6 +186,7 @@ void xkblas_driver_invalidate_caches(
 
 /* must be call once task accesses were all fetched */
 void xkblas_device_task_access_fetched(
+    ThreadWorker    * worker,
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task

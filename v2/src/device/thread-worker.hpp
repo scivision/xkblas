@@ -62,7 +62,6 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         /* number of uncompleted tasks */
         volatile uint32_t uncompleted;
 
-
         /* lock and condition to sleep the mutex */
         struct {
             pthread_mutex_t lock;
