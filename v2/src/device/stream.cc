@@ -111,10 +111,10 @@ xkblas_stream_t::instruction_new(
     /* Lock the stream to add a new instruction. */
     while (1)
     {
-        // TODO : isn't it an infinite loop ? this is executed by the device
-        // thread that only him can empty the queue, and its not being emptied
-        // here. I believe these might be remains from an old multi-consumer
-        // scheme on instructions
+        // TODO : isn't it an infinite loop ? if executed by the device thread
+        // that only him can empty the queue, and its not being emptied here. I
+        // believe these might be remains from an old multi-consumer scheme on
+        // instructions
         if (!this->ready.is_full())
         {
             SPINLOCK_LOCK(this->spinlock);

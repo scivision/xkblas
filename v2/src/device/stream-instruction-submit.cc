@@ -59,9 +59,9 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t  & src_device_view,
     const xkblas_stream_callback_t & callback
 ) {
-    assert(device->global_id == dst_device_global_id);
+    assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
-    XKBLAS_DEBUG("  Copy from src=%u to dst=%u", src_device_global_id, dst_device_global_id);
+    XKBLAS_INFO("  Copy from src=%u to dst=%u", src_device_global_id, dst_device_global_id);
 
     /* find the type of copy instruction */
     xkblas_stream_instruction_type_t itype;
@@ -84,15 +84,18 @@ xkblas_stream_instruction_submit_copy(
     xkblas_stream_type_t stype;
     switch(itype)
     {
+        # pragma message(TODO "No H2H streams, do we want one ? Currently using H2D stream for H2H copies, mimicing original xkblas")
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
         {
+            assert(device->global_id == dst_device_global_id);
             stype = XKBLAS_STREAM_TYPE_H2D;
             break ;
         }
 
         case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
         {
+            assert(device->global_id == src_device_global_id);
             stype = XKBLAS_STREAM_TYPE_D2H;
             break ;
         }

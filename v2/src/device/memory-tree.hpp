@@ -47,10 +47,25 @@ class MemoryAllocation {
 class MemoryReplicate
 {
     public:
-        /* List of views for this device replicate.  A device may have several
-         * views (and allocation) of the same 'host memory' - as it may
-         * asynchronously be read by different concurrent kernel requiring
-         * different memory alignment for BLAS operations)
+        /* List of views for this device replicate.
+         * A device may have several views (and allocation) of the same 'host memory'
+         * For instance, in the following case scenario where blocks are read in order
+         *  ._______________________.
+         *  |           |           |
+         *  |    (1)    |    (2)    |
+         *  |___________|___________|
+         *  |           |           |
+         *  |    (3)    |    (4)    |
+         *  .___________|___________.
+         *
+         *  - (1)           - read a tile               (allocation 1)
+         *  - (2)           - read a tile               (allocation 2)
+         *  - (3)           - read a tile               (allocation 3)
+         *  - (4)           - read a tile               (allocation 4)
+         *  - (1,2,3,4)     - read all tiles at once    (no continuous allocation...)
+         *
+         *  As BLAS requires a single continuous allocation per matrix, we are
+         *  fucked and have to reallocate on the 5-th access
          */
         std::vector<MemoryAllocation *> allocations;
 
@@ -119,8 +134,11 @@ class KMemoryTreeNodeSearch {
 
         public:
 
-            /* memory block in the tree */
+            /* memory block in the tree (WARNING : this is mutable outside a 'lock' section) */
             MemoryBlock * block;
+
+            /* The region of this block (intersectoin of the access with the tree node) */
+            Region region;
 
             /* copy of the host view */
             memory_view_t host_view;
@@ -151,8 +169,9 @@ class KMemoryTreeNodeSearch {
 
         public:
 
-            BlockInfo(MemoryBlock * b) :
+            BlockInfo(MemoryBlock * b, Region & r) :
                 block(b),
+                region(r),
                 host_view(b->host_view),
                 dst_device_global_id(-1),
                 dst_allocation_id(-1),
@@ -176,6 +195,7 @@ class KMemoryTreeNodeSearch {
            INSERTING_BLOCKS     = 0,
            SEARCH_FOR_BLOCKS    = 1,
            SEARCH_OWNER         = 2,
+           SET_VALID            = 3,
        };
 
    public:
@@ -246,6 +266,11 @@ class KMemoryTreeNodeSearch {
        {
            this->access = a;
            this->type = SEARCH_OWNER;
+       }
+
+       void prepare_set_valid(void)
+       {
+           this->type = SET_VALID;
        }
 
 }; /* KMemoryTreeNodeSearch */
@@ -347,6 +372,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Region & region,
             const access_mode_t mode
         ) {
+            /* intersecting against 'region' that had been inserted previously,
+             * so 'this' is a sub-block of 'region' */
             assert(region.includes(this->region));
 
             switch (search.type)
@@ -354,7 +381,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
                     # pragma message(TODO "Manage case if another fetch is already going in parallel")
-                    search.blocks_info.push_back(BlockInfo(&(this->block)));
+                    search.blocks_info.push_back(BlockInfo(&(this->block), this->region));
                     break ;
                 }
 
@@ -362,9 +389,17 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 {
                     # pragma message(TODO "use the actual number of devices instead of 'XKBLAS_DEVICES_MAX'")
                     static_assert (XKBLAS_DEVICES_MAX <= 64);
-                    for (int global_device_id = 0 ; global_device_id < XKBLAS_DEVICES_MAX ; ++global_device_id)
-                        if (this->block.valid & (1 << global_device_id))
-                            search.owns[global_device_id] += this->region.size();
+                    for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+                        if (this->block.valid & (1 << device_global_id))
+                            search.owns[device_global_id] += this->region.size();
+                    break ;
+                }
+
+                case (Search::Type::SET_VALID):
+                {
+                    /* currently not cleaning-up the tree, so 'this->region' is
+                     * always included in 'region' */
+                    this->block.valid |= (1 << search.device_global_id);
                     break ;
                 }
 
@@ -403,27 +438,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 
 }; /* KMemoryTreeNode */
 
-static inline void
-fetch_callback(const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
-{
-    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 3);
-
-    XKBLAS_DEBUG("  Completed a transfer!");
-
-    xkblas_driver_t * driver = (xkblas_driver_t *) args[0];
-    xkblas_device_t * device = (xkblas_device_t *) args[1];
-    Task            * task   =            (Task *) args[2];
-
-    /* a fetch completed */
-    if (task->fetched() == TASK_STATE_DATA_FETCHED)
-    {
-        /* the task kernel is ready for execution */
-        xkblas_device_task_access_fetched(driver, device, task);
-
-        # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to here ?")
-    }
-}
-
 template <int K>
 class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
@@ -436,6 +450,18 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
     using Search = KMemoryTreeNodeSearch<K>;
     using Task = KTask<K>;
 
+    private:
+
+        typedef struct  FetchInfo
+        {
+            KMemoryTree * memtree;
+            Region region;
+            int device_global_id;
+
+            FetchInfo(KMemoryTree * t, Region & r, int devid) : memtree(t), region(r), device_global_id(devid) {}
+            ~FetchInfo() {}
+        }              FetchInfo;
+
     public:
 
         /* lock for accessing the tree structure */
@@ -443,6 +469,36 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
 
     public:
 
+        //////////////////////////
+        //  STATIC FUNCTIONS    //
+        //////////////////////////
+        static void
+        fetch_callback(const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
+        {
+            assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 5);
+
+            XKBLAS_DEBUG("  Completed a transfer!");
+
+            xkblas_driver_t * driver  = (xkblas_driver_t *) args[0];
+            xkblas_device_t * device  = (xkblas_device_t *) args[1];
+            Task            * task    =            (Task *) args[2];
+            FetchInfo       * fetch   =       (FetchInfo *) args[3];
+
+            /* a fetch completed */
+            if (task->fetched() == TASK_STATE_DATA_FETCHED)
+            {
+                /* the task kernel is ready for execution */
+                xkblas_device_task_access_fetched(driver, device, task);
+                # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
+            }
+
+            /* set validity in the memory tree for that device */
+            fetch->memtree->set_valid(fetch->region, fetch->device_global_id);
+        }
+
+        //////////////
+        //  METHODS //
+        //////////////
         void
         lock(void)
         {
@@ -453,6 +509,24 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
         unlock(void)
         {
             SPINLOCK_UNLOCK(this->spinlock);
+        }
+
+        ///////////////////////////////////////////////
+        //  Set a block validity bits after fetching //
+        ///////////////////////////////////////////////
+        void set_valid(
+            Region & region,
+            int device_global_id
+        ) {
+            # pragma message(TODO "we also want to invalidate other allocations!! an allocation with the wrong version may be picked")
+
+            Search search(device_global_id);
+            search.prepare_set_valid();
+            this->lock();
+            {
+                this->intersect(search, region, ACCESS_MODE_VOID);
+            }
+            this->unlock();
         }
 
         //////////////////////////////////////
@@ -546,7 +620,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     /* copy from device */
                     this->fetch_access_find_source(access, info);
 
-                    XKBLAS_FATAL("-- Copying from %d to %d --", info.src_device_global_id, info.dst_device_global_id);
 
                     xkblas_device_t * device = xkblas_device_get(info.src_device_global_id);
                     assert(device);
@@ -558,13 +631,13 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                     callback.args[0] = driver;
                     callback.args[1] = device;
                     callback.args[2] = task;
+                    callback.args[3] = new FetchInfo(this, info.region, device->global_id);
 
-                    task->fetched();
+                    // the current thread is the memory async copy thread, NOT THE DEVICE THREAD !!
+                    // So it creates concurrency on stream instructions allocation/submission
 
-                    // TODO : the current thread is the memory async copy thread, NOT THE DEVICE THREAD !!
-                    // So it creates concurrency on instruction allocation/submission to streams : HANDLE IT !!
-                    # if 0
                     /* launch asynchronous copy */
+                    # if 0
                     xkblas_stream_instruction_submit_copy(
                         driver,
                         device,
@@ -575,6 +648,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
                         info.src_view,
                         callback
                     );
+                    # else
+                    task->fetched();
                     # endif
                 }
             }
@@ -772,14 +847,25 @@ next_view:
                     task->fetching();
 
                     /* callback setup */
-                    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 3);
+                    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 4);
                     xkblas_stream_callback_t callback;
                     callback.func = fetch_callback;
                     callback.args[0] = driver;
                     callback.args[1] = device;
                     callback.args[2] = task;
+                    callback.args[3] = new FetchInfo(this, info.region, device->global_id);
 
                     /* launch asynchronous copy */
+                    XKBLAS_INFO(
+                        "-- Copying from %d to %d --",
+                        info.src_device_global_id, info.dst_device_global_id
+                    );
+                    // TODO : currently always forcing H2D transfers
+                    // remove these 3 lines to enable D2D transfers
+                    info.src_device_global_id = HOST_DEVICE_GLOBAL_ID;
+                    info.src_view.addr = info.host_view.addr;
+                    info.src_view.ld   = info.host_view.ld;
+
                     xkblas_stream_instruction_submit_copy(
                         driver,
                         device,

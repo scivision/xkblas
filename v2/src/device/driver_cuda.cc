@@ -630,8 +630,13 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     break ;
                 }
 
-                case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
                 case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
+                {
+                    kind = cudaMemcpyDeviceToHost;
+                    break ;
+                }
+
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
                 case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
                     return ENOSYS;
 
