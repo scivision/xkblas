@@ -829,8 +829,10 @@ next_view:
                         // create src view
                         this->fetch_access_find_source(access, info);
 
+                        XKBLAS_FATAL("Fix me !! see comments in code");
+                        // TODO : this is WRONG !!! the host may have an invalid version of the data
                         # pragma message(TODO "currently always forcing H2D transfers, remove these 3 lines to enable D2D transfers")
-                        info.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                        info.src_device_global_id  = HOST_DEVICE_GLOBAL_ID;
                         info.src_replicate         = NULL;
                     }
                 }
