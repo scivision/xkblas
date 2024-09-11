@@ -532,7 +532,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>> {
             callback.args[3] = task;
 
             /* host replicate view if no allocation were found */
-            memory_replicate_view_t host_replicate_view(info.block->host_view.begin_addr(), info.block->host_view.ld);
+            memory_replicate_view_t host_replicate_view(info.host_view.begin_addr(), info.host_view.ld);
 
             /* launch asynchronous copy */
             xkblas_stream_instruction_submit_copy(
