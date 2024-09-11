@@ -52,19 +52,21 @@ main_gemm(char ** args)
 
     printf("Set (m, n, k) = (%d, %d, %d) with tile (%d, %d)\n", m, n, k, s1, s2);
 
-    /* allocate matrices */
-    uintptr_t mem = (uintptr_t) malloc(ld + 5 * sizeof(TYPE) * (ld * ld));
-    uintptr_t Ap     = mem + (ld - (mem % ld)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Bp     = mem + (ld - (mem % ld)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Cp     = mem + (ld - (mem % ld)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpRef  = mem + (ld - (mem % ld)) + 3 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpImpl = mem + (ld - (mem % ld)) + 4 * sizeof(TYPE) * (ld * ld);
+    uintptr_t alignon = sizeof(TYPE) * ld;
 
-    assert(Ap     % ld == 0);
-    assert(Bp     % ld == 0);
-    assert(Cp     % ld == 0);
-    assert(CpRef  % ld == 0);
-    assert(CpImpl % ld == 0);
+    /* allocate matrices */
+    uintptr_t mem = (uintptr_t) malloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
+
+    assert(Ap     % alignon == 0);
+    assert(Bp     % alignon == 0);
+    assert(Cp     % alignon == 0);
+    assert(CpRef  % alignon == 0);
+    assert(CpImpl % alignon == 0);
 
     TYPE * A     = (TYPE *) Ap;
     TYPE * B     = (TYPE *) Bp;
@@ -88,7 +90,7 @@ main_gemm(char ** args)
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
         impl.wait();
         uint64_t tf = get_nanotime();
-        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
     /* check correctness */

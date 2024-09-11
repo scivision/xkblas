@@ -1215,10 +1215,11 @@ insert_from_case_3_equals:
             }
         }
 
+        /* TODO: determine where to use a reference on 'region' */
         inline void
         insert(
             T & t,
-            Region & region,
+            Region region,
             const access_mode_t mode
         ) {
             tassert(!region.is_empty());

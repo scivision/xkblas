@@ -49,8 +49,10 @@ gemm_cmp(
         const char transB_char = cblas2blas_op(transB);
         sgemm(&transA_char, &transB_char, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
         uint64_t tf = get_nanotime();
-        printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+        printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
+
+    // TODO : change slange, saxpy, slamch, etc... with defines based on type
 
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);
 
@@ -59,7 +61,7 @@ gemm_cmp(
 
     double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, CRef, ldc, work);
 
-    double eps = LAPACKE_dlamch_work('e');
+    double eps = LAPACKE_slamch_work('e');
 
     printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
             Rnorm, Anorm, Bnorm, CNorm, CImplNorm, CRefNorm);

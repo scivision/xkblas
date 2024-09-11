@@ -40,6 +40,8 @@ class Intervals {
             if constexpr(K == 2)
             {
 # if 1
+                /* (y, x) <=> (list[0], list[1]) <=> (m, n) <=> (line, col) */
+
                 uintptr_t PP = tile.begin_addr();
                 this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
                 this->list[0].b = this->list[0].a + tile.bs_m;

@@ -3,6 +3,20 @@
 # include "sync/alignedas.h"
 
 static void
+xkblas_memory_coherent_async_worker_thread_work(
+    xkblas_context_t * context,
+    ThreadWorker * thread,
+    Task * task
+) {
+    assert(task);
+    assert(task->wc == 0);
+    assert(task->state.value == TASK_STATE_READY);
+
+    if (context->memtree.fetch_on_host(thread, task) == TASK_STATE_DATA_FETCHED)
+        thread->complete(task);
+}
+
+static void
 xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
 {
     ThreadWorker * thread = ThreadWorker::get();
@@ -16,12 +30,7 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
         while ((task = thread->pop()) == NULL)
             thread->pause();
 
-        assert(task);
-        assert(task->wc == 0);
-        assert(task->state.value == TASK_STATE_READY);
-
-        if (context->memtree.fetch_on_host(thread, task) == TASK_STATE_DATA_FETCHED)
-            thread->complete(task);
+        xkblas_memory_coherent_async_worker_thread_work(context, thread, task);
     }
 }
 
