@@ -34,6 +34,15 @@ typedef struct  memory_replicate_view_t
 
     ~memory_replicate_view_t() {}
 
+    // user-defined copy assignment (non copy-and-swap idiom)
+    // note: copy-and-swap would always reallocate resources
+    memory_replicate_view_t & operator=(const memory_replicate_view_t & other)
+    {
+        this->addr = other.addr;
+        this->ld   = other.ld;
+        return *this;
+    }
+
 }               memory_replicate_view_t;
 
 using memory_view_t = matrix_tile_t;
