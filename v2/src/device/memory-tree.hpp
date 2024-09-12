@@ -690,6 +690,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             /* host replicate view if no allocation were found */
             memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
 
+            /* increment task fetch counter */
+            task->fetching();
+
             /* launch asynchronous copy */
             xkblas_stream_instruction_submit_copy(
                 driver,
