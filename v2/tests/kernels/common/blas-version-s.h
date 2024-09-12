@@ -1,6 +1,8 @@
 #ifndef __BLAS_VERSION_S_H__
 # define __BLAS_VERSION_S_H__
 
+# include <lapacke.h>
+
 # define PRECISION_s 1
 # define TYPE float
 # define BLAS_INT long long int

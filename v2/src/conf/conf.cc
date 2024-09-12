@@ -13,6 +13,30 @@ __parse_verbose(xkblas_conf_t * conf, char const * value)
 }
 
 static void
+__parse_tile_size(xkblas_conf_t * conf, char const * value)
+{
+    if (value)
+    {
+        char kernel[32];
+        int m, n;
+        int r = sscanf(value, "%31[^()]%*c%d,%d", kernel, &m, &n);
+        if (r != 3)
+            XKBLAS_FATAL("Invalid `XKBLAS_TILE_SIZE` - parsed %s(%d,%d)", kernel, m, n);
+
+        XKBLAS_DEBUG("Setting default tile size for `%s` to `(%d, %d)`", kernel, m, n);
+        if (strcmp(kernel, "gemm") == 0)
+        {
+            conf->kernels.gemm.tile[0] = m;
+            conf->kernels.gemm.tile[1] = n;
+        }
+        else
+        {
+            XKBLAS_FATAL("Unknown kernel `%s` set in `XKBLAS_TILE_SIZE`", kernel);
+        }
+    }
+}
+
+static void
 __parse_ngpus(xkblas_conf_t * conf, char const * value)
 {
     if (value)
@@ -71,7 +95,7 @@ typedef struct  xkblas_conf_parse_t
 static xkblas_conf_parse_t CONF_PARSE[] = {
     {"XKBLAS_HELP",         __parse_help,       "Show this helper"},
     {"XKBLAS_VERBOSE",      __parse_verbose,    "Verbosity level (the higher the most)"},
-    {"XKBLAS_TILE_SIZE",    NULL,               NULL},
+    {"XKBLAS_TILE_SIZE",    __parse_tile_size,  "Tile size parameter - format is `kernel(m,n)` - example: gemm(16,16)"},
     {"XKBLAS_PRECISION",    NULL,               NULL},
     {"XKBLAS_NGPUS",        __parse_ngpus,      "Number of GPUs to use"},
     {"XKBLAS_GPUSET",       __parse_gpuset,     "A bitmask representing GPUs to use"},
@@ -97,10 +121,14 @@ void
 xkblas_init_conf(xkblas_conf_t * conf)
 {
     // set default conf
-    conf->stackblocsize = (uint64_t)-1;
-    conf->ngpus         = (uint8_t)-1;
-    conf->gpu_set       = (uint32_t) ~0;
+    conf->stackblocsize     = (uint64_t)-1;
+    conf->ngpus             = (uint8_t)-1;
+    conf->gpu_set           = (uint32_t) ~0;
+    conf->cuda_cache_limit  = 0.98f;
 
+    //////////////////
+    //  KERNEL CONF //
+    //////////////////
     conf->device.offloader.capacity = 64;
 
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = 2;
@@ -115,7 +143,11 @@ xkblas_init_conf(xkblas_conf_t * conf)
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_H2D].n = 1;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_H2D].concurrency = 0;
 
-    conf->cuda_cache_limit = 0.98f;
+    //////////////////
+    //  DEVICE CONF //
+    //////////////////
+    conf->kernels.gemm.tile[0] = 0;
+    conf->kernels.gemm.tile[1] = 0;
 
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)

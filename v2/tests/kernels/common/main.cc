@@ -5,11 +5,10 @@ extern "C" {
     # include <stdint.h>
     # include <string.h>
     # include <time.h>
-
-    # include "common/blas.h"
-    # include "common/blas-version.h"
 };
 
+# include "common/blas.h"
+# include "common/blas-version.h"
 # include "common/impl.hpp"
 # include "common/time.cc"
 # include "common/utils.cc"
@@ -36,21 +35,15 @@ main_gemm(char ** args)
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int k = atoi(args[2]);
-    int s1 = atoi(args[3]);
-    int s2 = atoi(args[4]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
 
     /* currently only support this */
-    # if 1
     assert(m == n);
     assert(n == k);
     int ld = m;
-    # else
-    int ld = m+n+k;
-    # endif
 
-    printf("Set (m, n, k) = (%d, %d, %d) with tile (%d, %d)\n", m, n, k, s1, s2);
+    printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 
     uintptr_t alignon = sizeof(TYPE) * ld;
 
@@ -260,14 +253,12 @@ static func_t funcs[] = {
     {
         .name = "GEMM",
         .f = main_gemm,
-        .nargs = 5,
+        .nargs = 3,
         .descr = "C := A.B + C",
-        .usage =    "M N K S1 S2\n"
+        .usage =    "M N K\n"
                     "  - M      : n° of rows of A and C\n"
                     "  - N      : n° of cols of B and C\n"
                     "  - K      : n° of cols of A, rows of B\n"
-                    "  - S1     : n° of rows per tile\n"
-                    "  - S2     : n° of cols per tile\n"
     },
 
     {

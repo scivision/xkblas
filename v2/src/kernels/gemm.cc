@@ -178,10 +178,13 @@ xkblas_£gemm_async(
       ((*alpha == 0.0 || K == 0) && *beta == 1.0))
         return 0;
 
+    xkblas_context_t * context = xkblas_context_get();
+
     /* currently only support 1 size */
     int args[3] = {M, N, K};
-    int tile[2] = {0, 0};
-    xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
+    int * tile = context->conf.kernels.gemm.tile;
+    if (tile[0] == 0 || tile[1] == 0)
+        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
     assert(tile[0] == tile[1]);
     const int BS = tile[0];
 
@@ -204,7 +207,6 @@ xkblas_£gemm_async(
     int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
     int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
 
-    xkblas_context_t * context = xkblas_context_get();
     int bs_mm, bs_nn, bs_kn, bs_km;
 
     // iterator on tiles

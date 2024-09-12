@@ -129,7 +129,6 @@ xkblas_stream_t::instruction_new(
     }
 
     xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
-    XKBLAS_DEBUG("Returning a new instruction at index %lu on stream %p", this->ready.pos.w, this);
 
     /* copy type / callback */
     instr->type = itype;

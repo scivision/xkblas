@@ -8,6 +8,10 @@
 
 # pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 
+//////////////////
+//  DEVICE CONF //
+//////////////////
+
 typedef struct  xkblas_conf_stream_t
 {
     /* number of stream per operation (<=> cuda stream) */
@@ -31,14 +35,34 @@ typedef struct  xkblas_conf_device_t
 
 }               xkblas_conf_device_t;
 
+//////////////////
+//  KERNEL CONF //
+//////////////////
+
+typedef struct  xkblas_conf_kernels_kernel_t
+{
+    int tile[2];
+
+}               xkblas_conf_kernels_kernel_t;
+
+typedef struct  xkblas_conf_kernels_t
+{
+    xkblas_conf_kernels_kernel_t gemm;
+
+}               xkblas_conf_kernels_t;
+
+
+//////////////////////////////////////////////////////////////////
+
 typedef struct  xkblas_conf_s
 {
     uint64_t    stackblocsize;      /* default stack bloc size */
     uint8_t     ngpus;              /* number of GPU for this node */
     uint32_t    gpu_set;            /* GPU to use */
+    float cuda_cache_limit;
 
     xkblas_conf_device_t device;    /* device conf */
-    float cuda_cache_limit;
+    xkblas_conf_kernels_t kernels;  /* kernels conf */
 
 }               xkblas_conf_t;
 

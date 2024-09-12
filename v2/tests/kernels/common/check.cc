@@ -2,7 +2,18 @@
 
 # include <math.h>
 # include <sys/param.h>
+# include <lapacke.h>
 # include "common/blas.h"
+
+extern "C" {
+extern int sgemm_(char *transa, char *transb,
+  const BLAS_INT *m, const BLAS_INT *n, const BLAS_INT *k,
+  const TYPE *alpha,
+  const TYPE *a, const BLAS_INT *lda,
+  const TYPE *b, const BLAS_INT *ldb,
+  const TYPE *beta,
+        TYPE *c, const BLAS_INT *ldc);
+}
 
 /**
  *  Verify the solution of the gemm 'CImpl' result.
@@ -44,10 +55,9 @@ gemm_cmp(
     printf("Running native...\n");
     {
         uint64_t t0 = get_nanotime();
-        // native_gemm(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
-        const char transA_char = cblas2blas_op(transA);
-        const char transB_char = cblas2blas_op(transB);
-        sgemm(&transA_char, &transB_char, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
+        char transA_char = cblas2blas_op(transA);
+        char transB_char = cblas2blas_op(transB);
+        sgemm_(&transA_char, &transB_char, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }

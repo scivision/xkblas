@@ -30,10 +30,11 @@ xkblas_context_get(void)
     static xkblas_context_t context = {
         .state = {
             .spinlock = 0,
-            .current = XKBLAS_CONTEXT_DEINITIALIZED,
+            .current = { XKBLAS_CONTEXT_DEINITIALIZED }
         },
         .conf = {},
-        .drivers = {},
+        .memory_coherent_worker_thread = nullptr,
+        .drivers = {}
     };
 
     return &context;

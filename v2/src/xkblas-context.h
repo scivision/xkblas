@@ -6,7 +6,7 @@
 # include "device/memory-tree.hpp"
 # include "sync/spinlock.h"
 
-typedef enum    xkblas_context_state_t
+typedef enum    xkblas_context_state_t : uint8_t
 {
     XKBLAS_CONTEXT_DEINITIALIZED = 0,
     XKBLAS_CONTEXT_INITIALIZED,
