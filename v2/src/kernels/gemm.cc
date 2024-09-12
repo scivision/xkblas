@@ -302,6 +302,8 @@ xkblas_£gemm_async(
         }
     }
 
+    XKBLAS_INFO("GEMM dependency graph submitted");
+
 #ifndef NDEBUG
     XKBLAS_INFO("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::get();

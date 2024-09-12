@@ -166,7 +166,6 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         fetching(void)
         {
-            XKBLAS_DEBUG("FETCHING!");
             if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
             {
                 assert(this->state.value == TASK_STATE_READY);
@@ -177,7 +176,6 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline task_state_t
         fetched(void)
         {
-            XKBLAS_DEBUG("FETCHED!");
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {

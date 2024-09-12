@@ -615,38 +615,28 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         //////////////////////////////////////
 
         static inline void
-        fetch_access_find_source(
+        fetch_access_find_src(
             Access * access,
             Partite & partite
         ) {
-            /* not valid on any device, use host to copy */
-            if (partite.block->valid == 0)
-            {
-                XKBLAS_DEBUG("No valid block... assuming host is valid");
-                partite.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
-                partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
-            }
-            /* valid on some devices */
-            else
-            {
-                // TODO : take the device with the smallest id,
-                // instead, maybe try to balance the workload between GPU
-                int src = __builtin_ffs(partite.block->valid) - 1;
-                assert(src >= 0);
+            assert(partite.block->valid);
 
-                // TODO : currently always taking the first allocation
-                assert(partite.block->replicates[src].nallocations > 0);
-                int allocation_id = 0;
+            // TODO : currently taking source as the device with the smallest id,
+            // instead, maybe try to balance the workload between GPU and use devices with the best bandwidth
+            int src = __builtin_ffs(partite.block->valid) - 1;
+            assert(src >= 0);
 
-                // retrieve replicate infos
-                MemoryReplicate & replicate = partite.block->replicates[src];
-                MemoryReplicateAllocationView * r = replicate.allocations[allocation_id];
+            // Get the first valid allocation on that device
+            MemoryReplicate & replicate = partite.block->replicates[src];
+            assert(replicate.nallocations > 0);
+            assert(replicate.valid != 0);
+            int allocation_view_id = __builtin_ffs(replicate.valid) - 1;
 
-                // set 'src' info
-                partite.src_device_global_id   = src;
-                partite.src_allocation_view_id = allocation_id;
-                partite.src_view               = r->view;
-            }
+            // retrieve and set src view infos
+            MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
+            partite.src_device_global_id   = src;
+            partite.src_allocation_view_id = allocation_view_id;
+            partite.src_view               = r->view;
         }
 
         inline void
@@ -678,7 +668,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 // else,
                 //  the task is in some awaiting lists
                 .allocation = allocation ? allocation : 0,
-                .task            = allocation ?            NULL : task
+                .task       = allocation ?            NULL : task
             };
 
             /* callback setup */
@@ -746,12 +736,18 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                     }
                     partite.must_fetch = true;
 
-                    /* copy to host */
+                    ////////////////////////
+                    // DST - COPY TO HOST //
+                    ////////////////////////
                     partite.dst_device_global_id   = HOST_DEVICE_GLOBAL_ID;
                     partite.dst_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
 
+                    /////////////////////////
+                    // SRC - FIND BEST SRC //
+                    /////////////////////////
+
                     /* copy from device */
-                    this->fetch_access_find_source(access, partite);
+                    this->fetch_access_find_src(access, partite);
                 }
             }
             this->unlock();
@@ -766,7 +762,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 xkblas_device_t * device = xkblas_device_get(partite.src_device_global_id);
                 assert(device);
 
-                fetch_access_copy_partite(driver, device, task, worker, partite, NULL);
+                fetch_access_copy_partite(driver, device, task, worker, partite, 0);
             }
         }
 
@@ -850,14 +846,14 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 const uintptr_t begin_addr = addr + d[0]*ld + d[1];
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                const int allocation_id = replicate.nallocations++;
-                if (allocation_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
+                const int allocation_view_id = replicate.nallocations++;
+                if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     XKBLAS_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile XKBLAS");
 
                 /* allocate the view of that block in the allocation */
                 MemoryReplicateAllocationView * r = new MemoryReplicateAllocationView(addr, begin_addr, ld);
-                replicate.allocations[allocation_id] = r;
-                partite.dst_allocation_view_id = allocation_id;
+                replicate.allocations[allocation_view_id] = r;
+                partite.dst_allocation_view_id = allocation_view_id;
             }
 
             return addr;
@@ -976,14 +972,19 @@ next_view:
                 // for each block of that access
                 for (Partite & partite : search.partition)
                 {
-                    // 'allocation_id' corresponds to 'allocation' : the lastly inserted allocation
-                    // of that block replicate
-                    MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                    const int allocation_id = replicate.nallocations - 1;
+                    ///////////////
+                    // SETUP DST //
+                    ///////////////
 
-                    // check if this block is already being fetched concurrently
-                    const memory_replicates_bitfield_t allocbit = (1 << allocation_id);
-                    if (replicate.fetching & allocbit)
+                    // destinary allocation view id
+                    const int allocation_view_id = partite.dst_allocation_view_id;
+                    assert(allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
+                    const memory_replicates_bitfield_t allocbit = (1 << allocation_view_id);
+
+                    // check if this partite is not already being fetched
+                    // concurrently on the same allocation view
+                    MemoryReplicate & replicate = partite.block->replicates[device->global_id];
+                    if (replicate.fetching & allocbit || replicate.valid & allocbit)
                     {
                         partite.must_fetch = false;
                         continue ;
@@ -992,20 +993,36 @@ next_view:
                     partite.must_fetch = true;
 
                     // add the task to the awaiting list of that block
-                    MemoryReplicateAllocationView * r = replicate.allocations[allocation_id];
+                    MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
                     r->awaiting.push_back(task);
 
                     // create dst view
-                    assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
                     partite.dst_device_global_id = device->global_id;
                     partite.dst_view = r->view;
 
-                    // create src view
-                    this->fetch_access_find_source(access, partite);
+                    ///////////////
+                    // SETUP SRC //
+                    ///////////////
 
-                    // assertions
+                    // not valid on any devices, using the host as the source
+                    if (partite.block->valid == 0)
+                    {
+                        XKBLAS_DEBUG("No valid block... assuming host is valid");
+                        partite.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                        partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
+                    }
+                    // valid on some devices
+                    else
+                    {
+                        this->fetch_access_find_src(access, partite);
+                    }
+
+                    //////////////////////////////
+                    // ASSERTION ON SRC AND DST //
+                    //////////////////////////////
+
                     assert(partite.dst_device_global_id   != partite.src_device_global_id ||
-                            partite.dst_allocation_view_id != partite.src_allocation_view_id);
+                           partite.dst_allocation_view_id != partite.src_allocation_view_id);
                 }
             }
         }
@@ -1027,17 +1044,8 @@ next_view:
 
                 for (Partite & partite : search.partition)
                 {
-                    /* set valid bits (even though the data is not copied
-                     * yet, as we are writing, there is no other task
-                     * accessing that block until its copy + kernel
-                     * completed.... so thats ok) */
-                    partite.block->valid = devbit;
-
+                    // release all other allocation on that block, as they are invalid now
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                    replicate.valid    = 0;
-                    replicate.fetching = devbit;
-
-                    /* release all other allocation block that are now invalid! */
                     XKBLAS_WARN("Releasing allocations from a block...");
                     # pragma message(TODO "Free each allocation")
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
@@ -1049,9 +1057,20 @@ next_view:
                         }
                     }
 
+                    // update the allocations id
+                    const int allocation_view_id = 0;
                     replicate.nallocations = 1;
                     replicate.allocations[0] = replicate.allocations[partite.dst_allocation_view_id];
-                    partite.dst_allocation_view_id = 0;
+                    partite.dst_allocation_view_id = allocation_view_id;
+
+                    // set valid bits - even though the data is not copied yet,
+                    // aswe are writing, there are no other tasks accessing on
+                    // that block until its copy + kernel completed
+                    const memory_replicates_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
+
+                    partite.block->valid = devbit;
+                    replicate.valid      = allocbit;
+                    replicate.fetching   = allocbit;
                 }
             }
         }
@@ -1096,11 +1115,11 @@ next_view:
             // Debugging (WIP) - steps
             //  - (1) - OK
             //  - (2) - OK
-            //  - (3) - ?
+            //  - (3) - OK
             //  - (4) - OK
             //  - (5) - ?
             //  - (6) - ?
-            //  - (7) - ?
+            //  - (7) - OK
 
             Search search(device->global_id);
             uintptr_t allocation = 0;
