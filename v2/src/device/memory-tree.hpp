@@ -829,11 +829,13 @@ next_view:
                         // create src view
                         this->fetch_access_find_source(access, info);
 
+                        # if 0
                         XKBLAS_FATAL("Fix me !! see comments in code");
                         // TODO : this is WRONG !!! the host may have an invalid version of the data
                         # pragma message(TODO "currently always forcing H2D transfers, remove these 3 lines to enable D2D transfers")
                         info.src_device_global_id  = HOST_DEVICE_GLOBAL_ID;
                         info.src_replicate         = NULL;
+                        # endif
                     }
                 }
 
@@ -875,7 +877,7 @@ next_view:
                     if (info.dst_device_global_id == info.src_device_global_id &&
                         info.dst_replicate == info.src_replicate
                     ) {
-                        XKBLAS_WARN("Tried to copy the same block from/to the same device %u", info.dst_device_global_id);
+                        XKBLAS_WARN("Tried to Copy the same block from/to the same device %u", info.dst_device_global_id);
                         continue ;
                     }
 

@@ -61,8 +61,6 @@ xkblas_stream_instruction_submit_copy(
 ) {
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
-    XKBLAS_INFO("  Copy from src=%u to dst=%u", src_device_global_id, dst_device_global_id);
-
     /* find the type of copy instruction */
     xkblas_stream_instruction_type_t itype;
     if (src_device_global_id == HOST_DEVICE_GLOBAL_ID)

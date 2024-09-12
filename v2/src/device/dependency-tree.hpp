@@ -162,15 +162,11 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
         void
         dump_region_str(FILE * f) const
         {
-            KIntervalBtree<K, KTask<K> *>::Node::dump_region_str(f);
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write ? 1 : 0);
-            if (this->last_reads.size())
-            {
-                fprintf(f, "\\\\ reads = [ ");
-                for (const KTask<K> * task : this->last_reads)
-                    fprintf(f, "%zu ", ((uintptr_t)task) % 131072);
-                fprintf(f, "]");
-            }
+
+            KIntervalBtree<K, KTask<K> *>::Node::dump_region_str(f);
+
+            fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
         }
 };
 

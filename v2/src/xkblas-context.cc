@@ -159,7 +159,7 @@ xkblas_sync(void)
 
     XKBLAS_INFO("Synchronized Xkblas");
 
-    # if 0
+    # if 1
     XKBLAS_INFO("Exporting memory tree...");
     context->memtree.export_pdf("memory");
     # endif
