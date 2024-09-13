@@ -143,6 +143,6 @@ xkblas_stream_instruction_submit_copy(
 
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->transfers.launched;
+    ++stats->transfers[stype].launched;
     # endif /* USE_STATS */
 }

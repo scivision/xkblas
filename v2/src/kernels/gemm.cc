@@ -330,7 +330,8 @@ body_cuda(void * vparam)
     task_kernel_param_t * param = (task_kernel_param_t *) vparam;
     assert(param);
 
-    void * handle = param->handle;
+    cublasStatus_t res;
+    cublasHandle_t handle = (cublasHandle_t) param->handle;
 
     const Access * A = param->task->accesses + 0;
     const Access * B = param->task->accesses + 1;
@@ -338,22 +339,19 @@ body_cuda(void * vparam)
 
     args_t * args = (args_t *) (param->task + 1);
 
-    // TODO : cublasSetMathMode ???
-
-    # pragma message(TODO "Call cublas with allocated device accesses")
-    # pragma message(TODO "Does alpha/beta host or device pointers ?")
-
-    XKBLAS_DEBUG("Calling cublasGemm(A=%p, B=%p, C=%p) - handle=%p",
+    XKBLAS_INFO("Calling cublasGemm(A=%p, B=%p, C=%p) - task=`%s`",
         (void *) A->device_view.addr,
         (void *) B->device_view.addr,
         (void *) C->device_view.addr,
-        handle
+        param->task->label
     );
 
     assert(handle);
+    res = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+    assert(res == CUBLAS_STATUS_SUCCESS);
 
-    cublasStatus_t res = cublas££gemm(
-        (cublasHandle_t) handle,
+    res = cublas££gemm(
+        handle,
         cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
         args->m, args->n, args->k,
         (const CU_TYPE *) &args->alpha,

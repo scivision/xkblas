@@ -71,10 +71,24 @@ main_gemm(char ** args)
     FILL(A, ld * ld);
     FILL(B, ld * ld);
     FILL(C, ld * ld);
-    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
     FILL(&alpha, 1);
     FILL(&beta, 1);
+
+    # if 1
+    for (int i = 0 ; i < (ld * ld) ; ++i)
+    {
+        A[i] = (TYPE) 1.0;
+        B[i] = (TYPE) 1.0;
+        C[i] = (TYPE) 1.0;
+    }
+    alpha = (TYPE) 1.0;
+    beta  = (TYPE) 1.0;
+    # endif
+
+
+    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
 
     /* run on impl */
     printf("Running implementation...\n");
@@ -92,6 +106,12 @@ main_gemm(char ** args)
         puts("Result is CORRECT");
     else
         puts("Result is INCORRECT !!");
+
+    # if 1
+    for (int i = 0 ; i < ld ; ++i)
+        for (int j = 0 ; j < ld ; ++j)
+            printf("%2.0f%c", CImpl[i*ld+j], (j == ld-1) ? '\n' : ' ');
+    # endif
 
     return 0;
 }

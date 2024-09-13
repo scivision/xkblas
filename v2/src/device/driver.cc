@@ -315,6 +315,14 @@ xkblas_device_task_kernel_executed(
 
     XKBLAS_INFO("Task `%s` completed", task->label);
 
+    # if USE_STATS
+    if (task->fmtid != TASK_FORMAT_NULL)
+    {
+        xkblas_stats_t * stats = xkblas_stats_get();
+        ++stats->kernels.completed;
+    }
+    # endif /* USE_STATS */
+
     thread->complete(task);
 }
 

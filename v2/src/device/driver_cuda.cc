@@ -647,20 +647,14 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 }
             }
 
-            cudaError_t err = cudaMemcpy2DAsync(
-                dst,
-                dpitch,
-                src,
-                spitch,
-                width,
-                height,
-                kind,
-                handle
-            );
+            cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle);
             __check_error(err);
-
             err = cudaEventRecord(stream->cu.events.end[istream->pending.pos.w % istream->pending.capacity], handle);
             __check_error(err);
+
+            # if 0
+            cudaStreamSynchronize(stream->cu.handle);
+            # endif
 
             return EINPROGRESS;
         }
