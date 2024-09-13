@@ -85,7 +85,6 @@ main_gemm(char ** args)
     beta  = (TYPE) 1.0;
     # endif
 
-
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 

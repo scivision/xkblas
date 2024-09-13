@@ -319,7 +319,7 @@ body_cuda(void * vparam)
 
     args_t * args = (args_t *) (param->task + 1);
 
-    XKBLAS_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+    XKBLAS_WARN("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
         args->m, args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,

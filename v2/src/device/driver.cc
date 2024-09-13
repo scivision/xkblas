@@ -318,7 +318,7 @@ xkblas_device_task_executed(
     ++stats->kernels.completed;
     # endif /* USE_STATS */
 
-    XKBLAS_INFO("Task `%s` completed", task->label);
+    XKBLAS_WARN("Task `%s` completed", task->label);
     thread->complete(task);
 }
 

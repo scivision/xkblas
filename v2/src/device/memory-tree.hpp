@@ -115,7 +115,7 @@ class MemoryReplicate
          *  The 'MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX' controls how many
          *  allocations of the same data may exists at most
          */
-        # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (16)
+        # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
         # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
         volatile uint8_t nallocations;
@@ -554,6 +554,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             /* logical region */
             Region region;
 
+            /* dst view (DEBUG PURPOSES, REMOVE ME */
+            memory_replicate_view_t dst_view;
+
             /* the allocation being fetched (or null if fetching to host) */
             const uintptr_t allocation;
 
@@ -565,6 +568,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         static inline void
         fetch_callback_task(fetch_info_t * f, Task * task)
         {
+            XKBLAS_WARN("Completed transfer to `dst=%p` required by task `%s`", f->dst_view.addr, task->label);
+
             /* a fetch completed */
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
@@ -582,10 +587,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             fetch_info_t * f = (fetch_info_t *) args[0];
             assert(f);
 
-            XKBLAS_DEBUG("Completed a transfer on region [%d..%d]x[%d..%d]",
-                    f->region.list[0].a, f->region.list[0].b, f->region.list[1].a, f->region.list[1].b);
-
             // TODO : do 2 different callbacks for H2D/D2D and D2H transfers
+
+            if (f->task)
+                fetch_callback_task(f, f->task);
 
             if (f->allocation)
             {
@@ -600,11 +605,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 XKBLAS_DEBUG("  with %d tasks awaiting", search.awaiting.size());
                 for (Task * & task : search.awaiting)
                     fetch_callback_task(f, task);
-            }
-            else
-            {
-                assert(f->task);
-                fetch_callback_task(f, f->task);
             }
 
             delete f;
@@ -654,6 +654,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE ||
                    partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
 
+            /* host replicate view if no allocation were found */
+            memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
+
             /* allocate fetch info for the callback argument */
             fetch_info_t * f = new fetch_info_t{
                 .tree = this,
@@ -661,14 +664,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 .driver = driver,
                 .device = device,
                 .region{partite.region},
-
-                // if allocation is null,
-                //  then we are fetching to the host, the task is not in any
-                //  awaiting list, so pass it as parameter
-                // else,
-                //  the task is in some awaiting lists
-                .allocation = allocation ? allocation : 0,
-                .task       = allocation ?            NULL : task
+                .dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view,
+                .allocation = allocation,
+                .task       = task
             };
 
             /* callback setup */
@@ -676,12 +674,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             xkblas_stream_callback_t callback;
             callback.func = fetch_callback;
             callback.args[0] = f;
-
-            /* host replicate view if no allocation were found */
-            memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
-
-            /* increment task fetch counter */
-            task->fetching();
 
             /* launch asynchronous copy */
             xkblas_stream_instruction_submit_copy(
@@ -733,6 +725,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                         partite.must_fetch = false;
                         continue ;
                     }
+
+                    task->fetching();
                     partite.must_fetch = true;
 
                     ////////////////////////
@@ -980,20 +974,32 @@ next_view:
                     assert(allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
                     const memory_replicates_bitfield_t allocbit = (1 << allocation_view_id);
 
-                    // check if this partite is not already being fetched
-                    // concurrently on the same allocation view
+                    // partite is already valid on that device
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                    if (replicate.fetching & allocbit || replicate.valid & allocbit)
+                    if (replicate.valid & allocbit)
                     {
                         partite.must_fetch = false;
                         continue ;
                     }
+
+                    MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
+
+                    /* increment task fetch counter */
+                    task->fetching();
+
+                    // partite is already being fetched on that device
+                    if (replicate.fetching & allocbit)
+                    {
+                        partite.must_fetch = false;
+
+                        // add the task to the awaiting list of that block
+                        r->awaiting.push_back(task);
+                        continue ;
+                    }
+
+                    // this task must perform the fetch
                     replicate.fetching |= allocbit;
                     partite.must_fetch = true;
-
-                    // add the task to the awaiting list of that block
-                    MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
-                    r->awaiting.push_back(task);
 
                     // create dst view
                     partite.dst_device_global_id = device->global_id;
@@ -1045,7 +1051,7 @@ next_view:
                 {
                     // release all other allocation on that block, as they are invalid now
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                    XKBLAS_WARN("Releasing allocations from a block...");
+                    XKBLAS_IMPL("Releasing allocations from a block...");
                     # pragma message(TODO "Free each allocation")
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
