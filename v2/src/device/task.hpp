@@ -15,7 +15,8 @@
 # include "sync/cache-line-size.hpp"
 # include "sync/spinlock.h"
 
-# define TASK_MAX_ACCESSES 3
+# define TASK_MAX_ACCESSES          3
+# define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
 
 typedef enum    task_state_t : uint8_t
 {
@@ -71,7 +72,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         uint8_t naccesses;
 
         /* execute on the device that owns a copy of the access at accesses[ocr_access_index]
-         * If 'TASK_MAX_ACCESSES', leave the decision to the scheduler */
+         * If 'UNSPECIFIED_TASK_ACCESS', leave the decision to the scheduler */
         uint8_t ocr_access_index;
 
         /* worker id on where to schedule once ready (or XKBLAS_DEVICES_MAX if
@@ -97,7 +98,7 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         KTask() : KTask(TASK_FORMAT_NULL) {}
 
-        KTask(task_format_id_t f) : KTask(f, TASK_MAX_ACCESSES, UNSPECIFIED_GLOBAL_DEVICE_ID) {}
+        KTask(task_format_id_t f) : KTask(f, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_GLOBAL_DEVICE_ID) {}
 
         KTask(task_format_id_t f, uint8_t ocr_access_index_p, uint8_t targeted_device_id_p) :
             fmtid(f),
@@ -177,7 +178,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         fetched(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
-            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
                 this->state.value = TASK_STATE_DATA_FETCHED;
                 return TASK_STATE_DATA_FETCHED;
@@ -199,21 +200,16 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         complete(void)
         {
-            assert(
-                this->state.value == TASK_STATE_EXECUTED ||
-                (this->state.value == TASK_STATE_DATA_FETCHED && this->fmtid == TASK_FORMAT_NULL)
-            );
-
-            this->state.value = TASK_STATE_COMPLETED;
-
+            assert(this->state.value == TASK_STATE_EXECUTED);
             for (Edge & edge : this->edges)
             {
-                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
                 {
                     edge.successor->state.value = TASK_STATE_READY;
                     xkblas_task_ready(edge.successor);
                 }
             }
+            this->state.value = TASK_STATE_COMPLETED;
         }
 };
 

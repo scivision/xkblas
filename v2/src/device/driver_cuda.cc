@@ -762,7 +762,6 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     int err = cuda_stream_instructions_progress(istream, blocking);
     assert(err == 0 || err == EINPROGRESS);
 
-    // TODO : recheck, what is 'ok_p' ?
     for (int p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
     {
         int idx = p % istream->pending.capacity;
@@ -775,11 +774,6 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
-            {
-                instr->type = XKBLAS_STREAM_INSTR_TYPE_NOP;
-
-            } /* intentionally fallthrough the next case */
-
             case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
             case (XKBLAS_STREAM_INSTR_TYPE_KERN):
             {

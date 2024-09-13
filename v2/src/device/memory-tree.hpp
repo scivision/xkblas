@@ -118,7 +118,7 @@ class MemoryReplicate
         # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (16)
         # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
-        uint8_t nallocations;
+        volatile uint8_t nallocations;
 
         static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX);
 
@@ -721,7 +721,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 /* find all blocks that intersects with that access */
                 search.prepare_search_blocks();
                 this->intersect(search, access->region, access->mode);
-                assert(search.partition.size() >= 1);
 
                 /* launch fetch on each device */
                 for (Partite & partite : search.partition)
@@ -1125,7 +1124,7 @@ next_view:
             uintptr_t allocation = 0;
             this->lock();
             {
-                # pragma message(TODO "Step (1) and (2) could be merged to only lock/search once")
+                # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);

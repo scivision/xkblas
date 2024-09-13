@@ -50,11 +50,6 @@ xkblas_stream_instruction_submit_kernel(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
-
-    # if USE_STATS
-    xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->kernels.launched;
-    # endif /* USE_STATS */
 }
 
 void

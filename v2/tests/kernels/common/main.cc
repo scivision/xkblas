@@ -101,16 +101,17 @@ main_gemm(char ** args)
     }
 
     /* check correctness */
-    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
+   int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
     if (r == 0)
         puts("Result is CORRECT");
     else
         puts("Result is INCORRECT !!");
 
     # if 1
-    for (int i = 0 ; i < ld ; ++i)
-        for (int j = 0 ; j < ld ; ++j)
-            printf("%2.0f%c", CImpl[i*ld+j], (j == ld-1) ? '\n' : ' ');
+    if (ld <= 32)
+        for (int i = 0 ; i < ld ; ++i)
+            for (int j = 0 ; j < ld ; ++j)
+                printf("%4.1f%c", CImpl[i*ld+j], (j == ld-1) ? '\n' : ' ');
     # endif
 
     return 0;

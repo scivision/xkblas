@@ -66,9 +66,9 @@ ThreadWorker::pop(void)
 void
 ThreadWorker::complete(Task * task)
 {
-    --this->uncompleted;
     task->executed();
     task->complete();
+    --this->uncompleted;
 }
 
 bool

@@ -302,7 +302,7 @@ xkblas_memory_allocate(
 
 /* callback after the task kernel executed */
 static void
-xkblas_device_task_kernel_executed(
+xkblas_device_task_executed(
     const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
 ) {
     assert(args);
@@ -313,16 +313,12 @@ xkblas_device_task_kernel_executed(
     Task * task = (Task *) args[1];
     assert(task);
 
-    XKBLAS_INFO("Task `%s` completed", task->label);
-
     # if USE_STATS
-    if (task->fmtid != TASK_FORMAT_NULL)
-    {
-        xkblas_stats_t * stats = xkblas_stats_get();
-        ++stats->kernels.completed;
-    }
+    xkblas_stats_t * stats = xkblas_stats_get();
+    ++stats->kernels.completed;
     # endif /* USE_STATS */
 
+    XKBLAS_INFO("Task `%s` completed", task->label);
     thread->complete(task);
 }
 
@@ -343,13 +339,18 @@ xkblas_device_task_access_fetched(
     assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
 
     xkblas_stream_callback_t callback;
-    callback.func    = xkblas_device_task_kernel_executed;
+    callback.func    = xkblas_device_task_executed;
     callback.args[0] = worker;
     callback.args[1] = task;
 
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    ++stats->kernels.launched;
+    # endif /* USE_STATS */
+
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
-        xkblas_device_task_kernel_executed(callback.args);
+        callback.func(callback.args);
     else
         xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
 }

@@ -68,6 +68,7 @@ xkblas_stream_init(
     int (*f_instructions_progress)(xkblas_stream_t *, int)
 ) {
     stream->type = type;
+    stream->spinlock = 0;
 
     stream->f_instruction_launch    = f_instruction_launch;
     stream->f_instructions_progress = f_instructions_progress;

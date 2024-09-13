@@ -63,22 +63,20 @@ xkblas_£gemm_tile_async(
 
     ThreadProducer * thread = ThreadProducer::get();
 
-    // const uint64_t task_size = alignedas(sizeof(Task), CACHE_LINE_SIZE);
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
     uint8_t * mem  = thread->allocate(task_size + args_size);
-//    uint8_t * mem = (uint8_t *) malloc(task_size + args_size);
 
-    Task    * task = reinterpret_cast<Task *>  (mem + 0);
+    Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id);
 
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);
     assert(transB == CblasNoTrans);
-    snprintf(task->label, sizeof(task->label), "gemm(%d, %d, %d)", Atm, Atn, Btn);
+    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", Atm, Atn, Btm, Btn, Ctm, Ctn);
     # endif /* NDEBUG */
 
     # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'ldc' ?")
@@ -114,6 +112,7 @@ xkblas_£gemm_async(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
+
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans))
     {
@@ -145,42 +144,38 @@ xkblas_£gemm_async(
         return -5;
     }
 
-    int Am, An, Bm, Bn;
+    const int Am = (transA == CblasNoTrans) ? M : K;
+    const int An = (transA == CblasNoTrans) ? K : M;
+    const int Bm = (transB == CblasNoTrans) ? K : N;
+    const int Bn = (transB == CblasNoTrans) ? N : K;
     const int Cm = M;
     const int Cn = N;
 
-    if ( transA == CblasNoTrans ) {
-        Am = M; An = K;
-    } else {
-        Am = K; An = M;
-    }
-    if ( transB == CblasNoTrans ) {
-        Bm = K; Bn = N;
-    } else {
-        Bm = N; Bn = K;
-    }
-
-    if (lda < MAX(1, Am)) {
+    if (lda < MAX(1, Am))
+    {
         XKBLAS_FATAL("illegal value of lda");
         return -8;
     }
-    if (ldb < MAX(1, Bm)) {
+
+    if (ldb < MAX(1, Bm))
+    {
         XKBLAS_FATAL("illegal value of ldb");
         return -10;
     }
-    if (ldc < MAX(1, M)) {
+
+    if (ldc < MAX(1, M))
+    {
         XKBLAS_FATAL("illegal value of ldc");
         return -13;
     }
 
     /* Quick return */
     if (M == 0 || N == 0 ||
-      ((*alpha == 0.0 || K == 0) && *beta == 1.0))
+            ((*alpha == 0.0 || K == 0) && *beta == 1.0))
         return 0;
 
-    xkblas_context_t * context = xkblas_context_get();
-
     /* currently only support 1 size */
+    xkblas_context_t * context = xkblas_context_get();
     int args[3] = {M, N, K};
     int * tile = context->conf.kernels.gemm.tile;
     if (tile[0] == 0 || tile[1] == 0)
@@ -192,7 +187,7 @@ xkblas_£gemm_async(
     assert(N % BS == 0);
     assert(K % BS == 0);
 
-    // TODO : set tiling parameters
+    /* set tiling parameters */
     int Amb = BS;
     int Anb = BS;
     int Bmb = BS;
@@ -207,16 +202,13 @@ xkblas_£gemm_async(
     int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
     int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
 
-    int bs_mm, bs_nn, bs_kn, bs_km;
-
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
     {
         int bs_mm = (tm == Cmt-1) ? (M-tm*Cmb) : Cmb;
         for (int tn = 0; tn < Cnt; tn++)
         {
-            bs_nn = (tn == Cnt-1) ? (N-tn*Cnb) : Cnb;
-
+            int bs_nn = (tn == Cnt-1) ? (N-tn*Cnb) : Cnb;
             // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
             {
@@ -224,7 +216,7 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
                                 context,
@@ -243,7 +235,7 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
                                 context,
@@ -265,12 +257,12 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
-                                bs_mm, bs_nn, bs_kn,
+                                bs_mm, bs_nn, bs_km,
                                 alpha,
                                 A, tk, tm, lda,
                                 B, tk, tn, ldb,
@@ -284,12 +276,12 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : 1.0;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
-                                bs_mm, bs_nn, bs_kn,
+                                bs_mm, bs_nn, bs_km,
                                 alpha,
                                 A, tk, tm, lda,
                                 B, tn, tk, ldb,
@@ -303,18 +295,6 @@ xkblas_£gemm_async(
     }
 
     XKBLAS_INFO("GEMM dependency graph submitted");
-
-#if 0
-    XKBLAS_INFO("Exporting Dependency Tree...");
-    ThreadProducer * thread = ThreadProducer::get();
-    FILE * f = fopen("gemm.dot", "w");
-    thread->dump_tasks(f);
-    fclose(f);
-    system("dot -Tpdf gemm.dot > gemm.pdf");
-
-    thread->deptree.export_pdf("dependency");
-    XKBLAS_DEBUG("Done");
-# endif /* NDEBUG */
 
     return 0;
 }
@@ -339,10 +319,14 @@ body_cuda(void * vparam)
 
     args_t * args = (args_t *) (param->task + 1);
 
-    XKBLAS_INFO("Calling cublasGemm(A=%p, B=%p, C=%p) - task=`%s`",
+    XKBLAS_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+        args->m, args->n, args->k,
         (void *) A->device_view.addr,
+        A->device_view.ld,
         (void *) B->device_view.addr,
+        B->device_view.ld,
         (void *) C->device_view.addr,
+        C->device_view.ld,
         param->task->label
     );
 

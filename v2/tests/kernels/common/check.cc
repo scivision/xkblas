@@ -38,20 +38,12 @@ gemm_cmp(
     const TYPE beta,
     const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc
 ) {
-    /* check result */
-    int Am, An, Bm, Bn;
-    if (transA == CblasNoTrans) {
-        Am = m; An = k;
-    } else {
-        Am = k; An = m;
-    }
-    if (transB == CblasNoTrans) {
-        Bm = k; Bn = n;
-    } else {
-        Bm = n; Bn = k;
-    }
-
     TYPE * work = (TYPE *) malloc(MAX(k,MAX(m, n)) * sizeof(TYPE));
+
+    const int Am = (transA == CblasNoTrans) ? m : k;
+    const int An = (transA == CblasNoTrans) ? k : m;
+    const int Bm = (transA == CblasNoTrans) ? k : n;
+    const int Bn = (transA == CblasNoTrans) ? n : k;
 
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);

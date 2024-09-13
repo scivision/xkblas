@@ -163,10 +163,21 @@ xkblas_sync(void)
 
     xkblas_stats_report(&(context->stats));
 
-    # if 0
+# if 1
     XKBLAS_INFO("Exporting memory tree...");
     context->memtree.export_pdf("memory");
-    # endif
+
+    XKBLAS_INFO("Exporting Dependency Tree...");
+    ThreadProducer * thread = ThreadProducer::get();
+    FILE * f = fopen("tasks.dot", "w");
+    thread->dump_tasks(f);
+    fclose(f);
+    system("dot -Tpdf tasks.dot > tasks.pdf");
+
+    thread->deptree.export_pdf("dependency");
+    XKBLAS_DEBUG("Done");
+# endif
+
 }
 
 //////////////////////
