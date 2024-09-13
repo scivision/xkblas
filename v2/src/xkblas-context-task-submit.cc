@@ -53,6 +53,10 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
     }
 
     assert(worker);
+
+    # ifndef NDEBUG
     XKBLAS_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);
+    # endif /* NDEBUG */
+
     worker->push(task);
 }

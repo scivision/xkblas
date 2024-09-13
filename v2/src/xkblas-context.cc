@@ -163,7 +163,7 @@ xkblas_sync(void)
 
     xkblas_stats_report(&(context->stats));
 
-# if 1
+# if 0
     XKBLAS_INFO("Exporting memory tree...");
     context->memtree.export_pdf("memory");
 

@@ -30,7 +30,9 @@ xkblas_stream_instruction_submit_kernel(
     Task * task,
     const xkblas_stream_callback_t & callback
 ) {
+    # ifndef NDEBUG
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
+    # endif /* NDEBUG */
 
     /* create a new instruction and retrieve its offload stream */
     xkblas_stream_t * stream;

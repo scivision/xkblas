@@ -568,7 +568,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         static inline void
         fetch_callback_task(fetch_info_t * f, Task * task)
         {
+            # ifndef NDEBUG
             XKBLAS_WARN("Completed transfer to `dst=%p` required by task `%s`", f->dst_view.addr, task->label);
+            # endif /* NDEBUG */
 
             /* a fetch completed */
             if (task->fetched() == TASK_STATE_DATA_FETCHED)

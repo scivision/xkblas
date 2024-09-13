@@ -319,6 +319,7 @@ body_cuda(void * vparam)
 
     args_t * args = (args_t *) (param->task + 1);
 
+    # ifndef NDEBUG
     XKBLAS_WARN("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
         args->m, args->n, args->k,
         (void *) A->device_view.addr,
@@ -329,6 +330,7 @@ body_cuda(void * vparam)
         C->device_view.ld,
         param->task->label
     );
+    #endif /* NDEBUG */
 
     assert(handle);
     res = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
