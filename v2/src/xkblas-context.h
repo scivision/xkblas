@@ -4,6 +4,7 @@
 # include "conf/conf.h"
 # include "device/driver.h"
 # include "device/memory-tree.hpp"
+# include "stats/stats.h"
 # include "sync/spinlock.h"
 
 typedef enum    xkblas_context_state_t : uint8_t
@@ -31,6 +32,9 @@ typedef struct  xkblas_context_t
 
     /* memory state on each device */
     MemoryTree memtree;
+
+    /* stats for debugging */
+    xkblas_stats_t stats;
 
 }               xkblas_context_t;
 

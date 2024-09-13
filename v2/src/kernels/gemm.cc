@@ -304,7 +304,7 @@ xkblas_£gemm_async(
 
     XKBLAS_INFO("GEMM dependency graph submitted");
 
-#ifndef NDEBUG
+#if 0
     XKBLAS_INFO("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::get();
     FILE * f = fopen("gemm.dot", "w");

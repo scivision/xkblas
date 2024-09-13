@@ -1,7 +1,9 @@
 #ifndef __BLAS_VERSION_S_H__
 # define __BLAS_VERSION_S_H__
 
+#if USE_OPENBLAS
 # include <lapacke.h>
+#endif
 
 # define PRECISION_s 1
 # define TYPE float

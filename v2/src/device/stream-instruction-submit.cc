@@ -4,6 +4,10 @@
 # include "device/task.hpp"
 # include "logger/logger.h"
 
+# if USE_STATS
+#  include "stats/stats.h"
+# endif /* USE_STATS */
+
 /* commit a stream instruction and wakeup thread */
 static inline void
 xkblas_device_submit(
@@ -46,6 +50,11 @@ xkblas_stream_instruction_submit_kernel(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
+
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    ++stats->kernels.launched;
+    # endif /* USE_STATS */
 }
 
 void
@@ -131,4 +140,9 @@ xkblas_stream_instruction_submit_copy(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
+
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    ++stats->transfers.launched;
+    # endif /* USE_STATS */
 }

@@ -61,6 +61,7 @@ xkblas_init(void)
             {
                 // load
                 xkblas_init_conf(&(context->conf));
+                xkblas_stats_init(&(context->stats));
                 xkblas_task_format_register();
                 xkblas_memory_coherent_async_worker_thread_init(context);
                 xkblas_drivers_init(&(context->drivers), context->conf.ngpus);
@@ -160,7 +161,9 @@ xkblas_sync(void)
 
     XKBLAS_INFO("Synchronized Xkblas");
 
-    # if 1
+    xkblas_stats_report(&(context->stats));
+
+    # if 0
     XKBLAS_INFO("Exporting memory tree...");
     context->memtree.export_pdf("memory");
     # endif

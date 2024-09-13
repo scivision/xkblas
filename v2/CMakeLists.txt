@@ -5,7 +5,40 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 # Project name
 project(xkblas)
 
+SET(SOURCE_FILES
+    src/xkblas-context.cc
+    src/xkblas-context-task-submit.cc
+    src/memory-coherent-async.cc
+    src/conf/conf.cc
+    src/device/device.cc
+    src/device/driver.cc
+    src/device/offloader.cc
+    src/device/stream.cc
+    src/device/stream-instruction-submit.cc
+    src/device/task.cc
+    src/device/task-format.cc
+    src/device/thread.cc
+    src/device/thread-producer.cc
+    src/device/thread-worker.cc
+    src/kernels/auto-tile.cc
+    src/kernels/sgemm.cc
+    src/kernels/cgemm.cc
+    src/kernels/dgemm.cc
+    src/kernels/zgemm.cc
+    src/logger/logger.cc
+)
+
 option(STRICT "Enable strict compilation mode" OFF)
+
+################
+# STATS SYSTEM #
+################
+option(USE_STATS "Whether to compile the built-in stat system." OFF)
+if (USE_STATS)
+    LIST(APPEND SOURCE_FILES src/stats/stats.cc)
+    add_compile_definitions(USE_STATS=1)
+    message(STATUS "Using built-in stats system")
+endif()
 
 ###############
 # DEPENDENCES #
@@ -47,28 +80,7 @@ endif()
 ##########
 
 # Lib name
-add_library(xkblas SHARED
-    src/xkblas-context.cc
-    src/xkblas-context-task-submit.cc
-    src/memory-coherent-async.cc
-    src/conf/conf.cc
-    src/device/device.cc
-    src/device/driver.cc
-    src/device/offloader.cc
-    src/device/stream.cc
-    src/device/stream-instruction-submit.cc
-    src/device/task.cc
-    src/device/task-format.cc
-    src/device/thread.cc
-    src/device/thread-producer.cc
-    src/device/thread-worker.cc
-    src/kernels/auto-tile.cc
-    src/kernels/sgemm.cc
-    src/kernels/cgemm.cc
-    src/kernels/dgemm.cc
-    src/kernels/zgemm.cc
-    src/logger/logger.cc
-)
+add_library(xkblas SHARED ${SOURCE_FILES})
 
 if (${HWLOC_FOUND})
     target_link_libraries(xkblas PRIVATE ${HWLOC_LIBRARIES})

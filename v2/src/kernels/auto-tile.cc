@@ -16,7 +16,7 @@ xkblas_kernel_auto_tile(
             int k = args[2];
 
             /* just one big tile */
-            # if 1
+            # if 0
             bs[0] = m / 2;
             bs[1] = n / 2;
             # else
