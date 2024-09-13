@@ -1092,8 +1092,6 @@ next_view:
             std::vector<Partite> & partition,
             const uintptr_t allocation
         ) {
-            assert(!this->is_locked());
-
             if (access->mode & ACCESS_MODE_R)
             {
                 for (Partite & partite : partition)
