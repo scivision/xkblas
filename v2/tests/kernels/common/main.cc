@@ -105,16 +105,6 @@ main_gemm(char ** args)
     else
         puts("Result is INCORRECT !!");
 
-    # if 1
-    if (ld <= 32)
-    {
-        puts("---- Impl ----");
-        for (int i = 0 ; i < ld ; ++i)
-            for (int j = 0 ; j < ld ; ++j)
-                printf("%4.1f%c", CImpl[i*ld+j], (j == ld-1) ? '\n' : ' ');
-    }
-    # endif
-
     return 0;
 }
 

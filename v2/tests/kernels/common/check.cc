@@ -21,6 +21,21 @@ extern int sgemm_(char *transa, char *transb,
         sgemm(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc)
 #endif
 
+static void
+dump_matrix(
+    const char * label,
+    const TYPE * M,
+    const BLAS_INT ld
+) {
+    if (ld <= 32)
+    {
+        printf("---- %s ----\n", label);
+        for (int i = 0 ; i < ld ; ++i)
+            for (int j = 0 ; j < ld ; ++j)
+                printf("%4.2f%c", M[i*ld+j], (j == ld-1) ? '\n' : ' ');
+
+    }
+}
 
 /**
  *  Verify the solution of the gemm 'CImpl' result.
@@ -61,17 +76,12 @@ gemm_cmp(
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
-    # if 1
-    if (ldc <= 32)
-    {
-        puts("---- Ref  ----");
-        for (int i = 0 ; i < ldc ; ++i)
-            for (int j = 0 ; j < ldc ; ++j)
-                printf("%4.1f%c", CRef[i*ldc+j], (j == ldc-1) ? '\n' : ' ');
-
-    }
-    # endif
-
+    printf("alpha=%lf, beta=%lf\n", alpha, beta);
+    dump_matrix("A",     A,     lda);
+    dump_matrix("B",     B,     ldb);
+    dump_matrix("C",     C,     ldc);
+    dump_matrix("CRef",  CRef,  ldc);
+    dump_matrix("CImpl", CImpl, ldc);
 
     // TODO : change slange, saxpy, slamch, etc... with defines based on type
 

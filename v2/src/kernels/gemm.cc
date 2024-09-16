@@ -98,7 +98,6 @@ xkblas_£gemm_tile_async(
     new(task->accesses + 2) Access(C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
-
     return 0;
 }
 

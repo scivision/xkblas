@@ -17,7 +17,7 @@ typedef enum    xkblas_stream_type_t
 
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
-class xkblas_stream_instruction_queue_t : public Lockable
+class xkblas_stream_instruction_queue_t
 {
     public:
 
