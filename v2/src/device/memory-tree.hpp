@@ -1004,7 +1004,6 @@ next_view:
 
                 for (Partite & partite : search.partition)
                 {
-
                     # pragma message(TODO "Manage validity in a more lazy way")
                     for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
                     {
@@ -1034,11 +1033,10 @@ next_view:
                     partite.dst_allocation_view_id = allocation_view_id;
                     # endif
 
-                    // set valid bits - even though the data is not copied yet,
-                    // aswe are writing, there are no other tasks accessing on
-                    // that block until its copy + kernel completed
+                    // set valid bits
+                    // Even though the data is not written, as we are writing,
+                    // there are no other tasks accessing concurrently
                     const memory_replicates_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
-
                     partite.block->valid = devbit;
                     replicate.valid      = allocbit;
                     replicate.fetching   = allocbit;
