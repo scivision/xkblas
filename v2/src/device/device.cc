@@ -169,7 +169,7 @@ xkblas_device_prepare_task(
     while (!xkblas_device_accept_new_task(device))
     {
         xkblas_device_poll(device);
-        int err = device->offloader.wait(XKBLAS_STREAM_TYPE_D2D);   // Romain: why wait on D2D ? (inherited from kaapi)
+        int err = device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_D2D, true);   // Romain: why wait on D2D ? (inherited from kaapi)
         assert(err == 0);
         xkblas_device_poll(device);
     }
@@ -365,6 +365,7 @@ xkblas_device_thread_main_loop(
     ThreadWorker * worker = ThreadWorker::get();
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
+        # if 1
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
         while ((task = worker->pop()) == NULL &&
@@ -374,6 +375,9 @@ xkblas_device_thread_main_loop(
 
         XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
                 device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));
+        # else
+        Task * task = worker->pop();
+        # endif
 
         if (task)
             xkblas_device_prepare_task(worker, driver, device, task);

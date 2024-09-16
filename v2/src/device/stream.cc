@@ -101,41 +101,27 @@ xkblas_stream_deinit(xkblas_stream_t * stream)
     free(stream->ready.instr);
 }
 
-# pragma message(TODO "do we really need to lock in 'new' and unlock in 'commit' - couldn't we already unlock in 'new' ?")
-
 xkblas_stream_instruction_t *
 xkblas_stream_t::instruction_new(
     const xkblas_stream_instruction_type_t itype,
     const xkblas_stream_callback_t & callback
 ) {
+    if (this->ready.is_full())
+        return NULL;
 
-    /* Lock the stream to add a new instruction. */
-    while (1)
+    /* Lock the stream to add a new instruction and until it is commited. */
+    SPINLOCK_LOCK(this->spinlock);
     {
-        // TODO : isn't it an infinite loop ? if executed by the device thread
-        // that only him can empty the queue, and its not being emptied here. I
-        // believe these might be remains from an old multi-consumer scheme on
-        // instructions
         if (!this->ready.is_full())
         {
-            SPINLOCK_LOCK(this->spinlock);
-            {
-                if (!this->ready.is_full())
-                {
-                    break ;
-                }
-            }
-            SPINLOCK_UNLOCK(this->spinlock);
+            xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
+            instr->type = itype;
+            instr->callback = callback;
+            return instr;
         }
     }
-
-    xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
-
-    /* copy type / callback */
-    instr->type = itype;
-    instr->callback = callback;
-
-    return instr;
+    SPINLOCK_UNLOCK(this->spinlock);
+    return NULL;
 }
 
 int
@@ -161,8 +147,10 @@ xkblas_stream_t::commit(
 int
 xkblas_stream_t::launch_ready_instructions(void)
 {
-    XKBLAS_DEBUG("Lauching ready instructions of stream %p (%d ready, %d pending)",
+    # if 0
+    XKBLAS_DEBUG("Launching ready instructions of stream %p (%d ready, %d pending)",
             this, this->ready.size(), this->pending.size());
+    # endif
 
     assert(this->ready.pos.r <= this->ready.pos.w);
     assert(this->f_instruction_launch);

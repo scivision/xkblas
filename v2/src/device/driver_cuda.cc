@@ -26,7 +26,11 @@ typedef struct  xkblas_stream_cuda_t
     xkblas_stream_t super;
 
     struct {
-        cudaStream_t handle;
+
+        struct {
+            cudaStream_t high;
+            cudaStream_t low;
+        } handle;
 
         struct {
             cudaEvent_t * end;
@@ -51,6 +55,7 @@ typedef struct  xkblas_device_cuda_t
     size_t size_alloc;
     size_t size_free;
 
+    uint64_t * affinity;
 
     /* device properties (from NVIDIA website) */
     struct
@@ -117,143 +122,6 @@ __check_error(cudaError_t err)
     return 0;
 }
 
-// NVLINK TOPOLOGY
-
-/* cuda_perf_topo[device1,device2] returns the perfRank of the communication link between
-   device.
-   cuda_perf_device[d][i] for i=0,..,cuda_count_perfrank-1 is the mask of device
-   for which the device d has link with performance i.
-*/
-
-static int cuda_device_count = 0;
-static int* cuda_perf_topo = 0;
-static int cuda_count_perfrank = 0;
-static uint64_t* cuda_perf_device = 0;
-static int* cuda_routing_table = 0;
-
-/* buffer must be at least device_count */
-static void _print_mask( char* buffer, ssize_t sz, uint64_t v )
-{
-  int device_count;
-  for (int i=0; i<sz; ++i)
-  {
-     if ( v & (1ULL<<i)) buffer[sz-1-i]='1';
-     else buffer[sz-1-i]='0';
-  }
-}
-
-static void
-_xkblas_get_gpu_topo(void)
-{
-    cudaError_t res;
-    int min_perf= 0; /* min_perf >= max_perf */
-    int max_perf= 0;
-    int device_count;
-    __check_error(cudaGetDeviceCount(&device_count));
-
-    if (device_count ==0) return;
-    cuda_device_count = device_count;
-    cuda_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
-
-    // Enumerates Device <-> Device links and store perfRank
-    for (int device1 = 0; device1 < device_count; device1++)
-    {
-        for (int device2 = 0; device2 < device_count; device2++)
-        {
-            if (device1 == device2)
-                cuda_perf_topo[device1*device_count+device2] = 0;
-            else
-            {
-                int perfRank = 0;
-                int accessSupported = 0;
-
-                __check_error(
-                        cudaDeviceGetP2PAttribute(&accessSupported, cudaDevP2PAttrAccessSupported,
-                            device1, device2));
-                if (accessSupported)
-                {
-                    __check_error(
-                            cudaDeviceGetP2PAttribute(&perfRank, cudaDevP2PAttrPerformanceRank,
-                                device1, device2));
-                    /* max perf if 0 with cudaDevP2PAttrPerformanceRank */
-                    if (perfRank < max_perf)
-                        max_perf= perfRank;
-                    if (perfRank > min_perf)
-                        min_perf= perfRank;
-                    cuda_perf_topo[device1*device_count+device2] = 1+perfRank;
-                }
-                else
-                    cuda_perf_topo[device1*device_count+device2] = -1; /* should be higher than previous value: computed after */
-            }
-        }
-    }
-
-    /* number of performance links: max_perf-min_perf+3
-       - max_perf-min_perf+1 if GPUs peer access is enable
-       - +1 if GPU peer access is not enable
-       - +1 for local inter access
-       */
-    min_perf++;
-    cuda_count_perfrank= min_perf-max_perf+2;
-    int perfrank_nolink= min_perf-max_perf+1;
-    int rank;
-    for (int device = 0; device < device_count*device_count; device++)
-        if (cuda_perf_topo[device] == -1) cuda_perf_topo[device] = min_perf+1;
-    size_t size = device_count*cuda_count_perfrank*sizeof(uint64_t);
-    cuda_perf_device = (uint64_t *) malloc( size );
-    for (int i=0; i<device_count*cuda_count_perfrank; ++i)
-        cuda_perf_device[i] = 0;
-    /* GCC bug in warning about memset: memset(cuda_perf_device, 0, size ); */
-    for (int device1 = 0; device1 < device_count; device1++)
-    {
-        for (int device2 = 0; device2 < device_count; device2++)
-        {
-            rank = cuda_perf_topo[device1*device_count+device2];
-            assert( 0<= device1*device_count+ rank );
-            assert( device1*cuda_count_perfrank+ rank <= device_count*cuda_count_perfrank);
-            cuda_perf_device[device1*cuda_count_perfrank+ rank] |= (1UL<<device2);
-        }
-    }
-
-#if XKBLAS_DEBUG
-    xkblas_context_t * ctx = xkblas_context_get();
-    if (ctx->conf.verbose)
-    {
-        char buffer[device_count+1];
-        buffer[device_count] = 0;
-        printf("Connection between GPU, #perf rank: %i.\nLowest values means best performance interconnection.\n", cuda_count_perfrank );
-        printf("Local performance rank:0, Link perf. perf rank from %i (max perf) to %i (perf)\n", max_perf+1, min_perf+1);
-        printf("%10s:", "src\\dest");
-        for (int device1 = 0; device1 < device_count; device1++)
-            printf("      GPU%i", device1);
-        printf("\n");
-
-        for (int device1 = 0; device1 < device_count; device1++)
-        {
-            printf("      GPU%i:", device1 );
-            for (int device2 = 0; device2 < device_count; device2++)
-                printf("%10i", cuda_perf_topo[device1*device_count+device2]);
-            printf("\n");
-        }
-
-        /* mask */
-        printf("\nDevice performance rank mask\n");
-        if (1)
-            for (int device1 = 0; device1 < device_count; device1++)
-            {
-                printf("GPU%i: ", device1);
-                for (int rank = 0; rank < cuda_count_perfrank; ++rank)
-                {
-                    _print_mask( buffer, device_count, cuda_perf_device[device1*cuda_count_perfrank+ rank] );
-                    printf("%s",buffer);
-                    if (rank != cuda_count_perfrank-1) printf(", ");
-                }
-                printf("\n");
-            }
-    }
-#endif
-}
-
 static
 uint64_t cuda_get_free_mem(int device_id)
 {
@@ -275,6 +143,112 @@ XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
     int device_count = 0;
     __check_error(cudaGetDeviceCount(&device_count));
     return (unsigned int)device_count;
+}
+
+// NVLINK TOPOLOGY
+
+/* cuda_perf_topo[i,j] returns the perfRank of the communication link between
+   device.
+   cuda_perf_device[d][i] for i=0,..,cuda_count_perfrank-1 is the mask of device
+   for which the device d has link with performance i.
+*/
+
+static int cuda_device_count;
+static int cuda_perf_topo[XKBLAS_DEVICES_MAX][XKBLAS_DEVICES_MAX];
+static int cuda_count_perfrank;
+static uint64_t * cuda_perf_device;
+static int* cuda_routing_table;
+
+static void
+__get_gpu_topo(void)
+{
+    __check_error(cudaGetDeviceCount(&cuda_device_count));
+    if (cuda_device_count == 0)
+        return;
+
+    int min_perf = 0;
+    int max_perf = 0;
+
+    // Enumerates Device <-> Device links and store perfRank
+    for (int i = 0; i < cuda_device_count; i++)
+    {
+        for (int j = 0; j < cuda_device_count; j++)
+        {
+            if (i == j)
+            {
+                cuda_perf_topo[i][j] = 0;
+                continue ;
+            }
+            else
+            {
+                int perfRank = 0;
+                int accessSupported = 0;
+
+                cudaError_t res = cudaDeviceGetP2PAttribute(
+                                    &accessSupported,
+                                    cudaDevP2PAttrAccessSupported,
+                                    i,
+                                    j
+                );
+                __check_error(res);
+                if (accessSupported)
+                {
+                    res = cudaDeviceGetP2PAttribute(
+                            &perfRank,
+                            cudaDevP2PAttrPerformanceRank,
+                            i,
+                            j
+                    );
+                    __check_error(res);
+                    cuda_perf_topo[i][j] = 1 + perfRank;
+
+                    if (perfRank < max_perf)
+                        max_perf = perfRank;
+                    if (perfRank > min_perf)
+                        min_perf = perfRank;
+                }
+                else
+                {
+                    /* should be higher than previous value: computed after */
+                    cuda_perf_topo[i][j] = -1;
+                }
+            }
+        }
+    }
+
+    #pragma message(TODO "Not sure to get all the logic here")
+
+    /* if there is no link, set to the minmum perf */
+    ++min_perf;
+    for (int i = 0 ; i < cuda_device_count ; ++i)
+    {
+        for (int j = 0 ; j < cuda_device_count ; ++j)
+        {
+            if (cuda_perf_topo[i][j] == -1)
+            {
+                cuda_perf_topo[i][j] = min_perf + 1;    // TODO : this +1 is suspicious to me
+                XKBLAS_INFO("Cuda GPU : no peer access from %d to %d", i, j);
+            }
+        }
+    }
+
+    cuda_count_perfrank = min_perf - max_perf + 2;
+    size_t size = cuda_device_count * cuda_count_perfrank * sizeof(uint64_t);
+    cuda_perf_device = (uint64_t *) malloc( size );
+    assert(cuda_perf_device);
+    memset(cuda_perf_device, 0, size);
+
+    for (int i = 0 ; i < cuda_device_count ; ++i)
+    {
+        for (int j = 0 ; j < cuda_device_count ; ++j)
+        {
+            int rank = cuda_perf_topo[i][j];
+            assert(0 <= i * cuda_device_count + rank );
+            assert(i * cuda_count_perfrank + rank <= cuda_device_count * cuda_count_perfrank);
+            cuda_perf_device[i * cuda_count_perfrank + rank] |= (1UL << j);
+            XKBLAS_INFO("Cuda GPU %d -> %d with perf = %d", i, j, rank);
+        }
+    }
 }
 
 static int
@@ -312,10 +286,7 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
 
     hwloc_topology_init(&TOPOLOGY);
     hwloc_topology_load(TOPOLOGY);
-
-#if XKBLAS_CUDA_USE_NVLINK_TOPO
-    _xkblas_get_gpu_topo();
-#endif
+    __get_gpu_topo();
 
     # pragma message(TODO "What is RRL ? Register memory (for pinning)")
     # if 0
@@ -515,53 +486,71 @@ XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_id)
 static int
 XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
 {
-    /* all other devices 'peer' context have been initialized, enable peer */
+# ifndef NDEBUG
+    int cu_devid = -1;
+    cudaGetDevice(&cu_devid);
+    assert(cu_devid == __get_device_cuda_id(device_id));
+# endif /* NDEBUG */
+
     xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+    assert(device);
 
-    for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
+    const uint64_t perfrank = cuda_count_perfrank - 1;
+    const uint64_t size = sizeof(uint64_t) * perfrank;
+    device->affinity = (uint64_t *) malloc(sizeof(uint64_t) * perfrank);
+    memset(device->affinity, 0, size);
+
+    /* all other devices have been initialized, enable peer */
+    int i = __get_device_cuda_id(device_id);
+    for (int dev = 0 ; dev < XKBLAS_DEVICES_MAX ; ++dev)
     {
-        if (i != device_id)
-        {
-            xkblas_device_cuda_t * odevice = __get_device_cuda(i);
-            if (odevice->inherited.state != XKBLAS_DEVICE_STATE_INIT)
-                continue ;
+        int j = __get_device_cuda_id(dev);
 
-            int device1 = __get_device_cuda_id(device_id);
-            int device2 = __get_device_cuda_id(i);
-
-            int access;
-            cudaError_t res;
-            res = cudaDeviceCanAccessPeer(&access, device1, device2);
-            __check_error(res);
-
-            if (access)
-            {
-                res = cudaDeviceEnablePeerAccess(device2, 0);
-                if ((res == cudaSuccess) || (res ==cudaErrorPeerAccessAlreadyEnabled))
-                {
-                    # pragma message(TODO "Do we still need devices affinity ? -> Yes, to move closest data replicate")
-                    # if 0
-                    int rank = cuda_perf_topo[device1*cuda_device_count+device2];
-                    assert(rank !=0);
-                    if (cuda_perf_device[ device1*cuda_count_perfrank+ rank] & (1<<device2))
-                    {
-                        device->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-                        ld->affinity[rank-1] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-                    }
-                    # endif
-                }
-            }
-        }
         /* add device with itself */
-        else
+        if (i == j)
         {
-            # pragma message(TODO "Do we still need devices affinity ? -> Yes, to move closest data replicate")
             # if 0
             device->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
             ld->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
             # endif
         }
+        else
+        {
+            xkblas_device_cuda_t * odevice = __get_device_cuda(j);
+            if (odevice->inherited.state != XKBLAS_DEVICE_STATE_INIT)
+                continue ;
+
+            int access;
+            cudaError_t res;
+            res = cudaDeviceCanAccessPeer(&access, i, j);
+            __check_error(res);
+
+            if (access)
+            {
+                res = cudaDeviceEnablePeerAccess(j, 0);
+                if ((res == cudaSuccess) || (res == cudaErrorPeerAccessAlreadyEnabled))
+                {
+                    int rank = cuda_perf_topo[i][j];
+                    assert(rank);
+                    if (cuda_perf_device[i * cuda_count_perfrank + rank] & (1 << j))
+                    {
+                        # if 0
+                        device->affinity[rank-1] |= (1UL <<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
+                        # endif
+                    }
+                }
+                else
+                {
+                    XKBLAS_WARN("Could not enable peer from %d to %d", i, j);
+                }
+            }
+            else
+            {
+                XKBLAS_WARN("GPU peer from %d to %d is not possible", i, j);
+            }
+        }
     }
+
     return 0;
 }
 
@@ -582,7 +571,10 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
         case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
         {
-            cudaError_t res = cudaStreamSynchronize(stream->cu.handle);
+            cudaError_t res;
+            res = cudaStreamSynchronize(stream->cu.handle.high);
+            assert(res == cudaSuccess);
+            res = cudaStreamSynchronize(stream->cu.handle.low);
             assert(res == cudaSuccess);
             ++istream->ok_p;
             return 0;
@@ -591,7 +583,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKBLAS_STREAM_INSTR_TYPE_KERN):
         {
             assert(istream->type == XKBLAS_STREAM_TYPE_KERN);
-            assert(stream->cu.handle);
+            assert(stream->cu.handle.high);
             assert(stream->cu.blas.handle);
 
             xkblas_stream_instruction_kernel_t * op = &instr->kern;
@@ -601,7 +593,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             # pragma message(TODO "Add support for end event records")
 
             int wp = istream->pending.pos.w % istream->pending.capacity;
-            cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle);
+            cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle.high);
             assert(err == cudaSuccess);
 
             return EINPROGRESS;
@@ -620,24 +612,32 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             size_t width        = instr->copy.host_view.bs_n * instr->copy.host_view.sizeof_type;
             size_t height       = instr->copy.host_view.bs_m;
             cudaMemcpyKind kind;
-            cudaStream_t handle = stream->cu.handle;
+            cudaStream_t handle;
 
             switch (instr->type)
             {
                 case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
                 {
                     kind = cudaMemcpyHostToDevice;
+                    handle = stream->cu.handle.high;
                     break ;
                 }
 
                 case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
                 {
                     kind = cudaMemcpyDeviceToHost;
+                    handle = stream->cu.handle.high;
+                    break ;
+                }
+
+                case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
+                {
+                    kind = cudaMemcpyDeviceToDevice;
+                    handle = stream->cu.handle.low;
                     break ;
                 }
 
                 case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
-                case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
                     return ENOSYS;
 
                 default:
@@ -647,15 +647,11 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 }
             }
 
-            XKBLAS_WARN("cudaMemcpy2DAsync(dst=%p, dpitch=%d, src=%p, spitch=%d, width=%d, height=%d", dst, dpitch, src, spitch, width, height);
+            XKBLAS_WARN("cudaMemcpy2DAsync(dst=%p, dpitch=%d, src=%p, spitch=%d, width=%d, height=%d, kind=%s", dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
             cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle);
             __check_error(err);
             err = cudaEventRecord(stream->cu.events.end[istream->pending.pos.w % istream->pending.capacity], handle);
             __check_error(err);
-
-            # if 0
-            cudaStreamSynchronize(stream->cu.handle);
-            # endif
 
             return EINPROGRESS;
         }
@@ -683,7 +679,10 @@ cuda_stream_instructions_progress(
 
     if (blocking)
     {
-        cudaError_t err = cudaStreamSynchronize(stream->cu.handle);
+        cudaError_t err;
+        err = cudaStreamSynchronize(stream->cu.handle.high);
+        __check_error(err);
+        err = cudaStreamSynchronize(stream->cu.handle.low);
         __check_error(err);
         istream->ok_p = istream->pending.pos.w;
         return 0;
@@ -845,7 +844,10 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     err = cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
     __check_error(err);
 
-    err = cudaStreamCreateWithPriority(&stream->cu.handle, cudaStreamNonBlocking, greatestPriority);
+    err = cudaStreamCreateWithPriority(&stream->cu.handle.high, cudaStreamNonBlocking, greatestPriority);
+    __check_error(err);
+
+    err = cudaStreamCreateWithPriority(&stream->cu.handle.low, cudaStreamNonBlocking, leastPriority);
     __check_error(err);
 
     if (type == XKBLAS_STREAM_TYPE_KERN)
@@ -854,7 +856,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
         xkblas_cublas_status_check(cres);
         assert(cres == CUBLAS_STATUS_SUCCESS);
 
-        cres = cublasSetStream(stream->cu.blas.handle, stream->cu.handle);
+        cres = cublasSetStream(stream->cu.blas.handle, stream->cu.handle.high);
         xkblas_cublas_status_check(cres);
         assert(cres == CUBLAS_STATUS_SUCCESS);
     }
@@ -873,7 +875,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_delete)(
     xkblas_stream_cuda_t * stream = (xkblas_stream_cuda_t *) istream;
     if (stream->cu.blas.handle)
         cublasDestroy(stream->cu.blas.handle);
-    cudaStreamDestroy(stream->cu.handle);
+    cudaStreamDestroy(stream->cu.handle.high);
+    cudaStreamDestroy(stream->cu.handle.low);
     free(stream);
 }
 

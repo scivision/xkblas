@@ -2154,6 +2154,12 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
     { /* add device with itself */
       device->affinity[0] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
       ld->affinity[0] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+
+      printf("j=%d ; lid=%d ; asid=%d\n",
+              j,
+              kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid),
+              kaapi_device_list[j]->inherited.memdev.asid
+      );
     }
   }
 #endif // CONFIG_USE_P2P

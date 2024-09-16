@@ -20,11 +20,15 @@ Thread::~Thread()
 uint8_t *
 Thread::allocate(uint64_t size)
 {
+    # if 0
     if (this->memory_stack_ptr >= this->memory_stack_bottom + THREAD_MAX_MEMORY)
         XKBLAS_FATAL("Stack overflow ! Increase `THREAD_MAX_MEMORY` and recompile");
     uint8_t * memory = this->memory_stack_ptr;
     this->memory_stack_ptr += size;
     return memory;
+    # else
+    return (uint8_t *) malloc(size);
+    # endif
 }
 
 void

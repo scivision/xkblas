@@ -60,6 +60,7 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
                                 XKBLAS_PRINT_HEADERS[LVL]);             \
             fprintf(stdout, __VA_ARGS__);                               \
             fprintf(stdout, "\n");                                      \
+            fflush(stdout);                                             \
             SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                          \
             if (LVL == XKBLAS_PRINT_FATAL_ID)                           \
             {                                                           \

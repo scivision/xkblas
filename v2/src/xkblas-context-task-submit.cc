@@ -22,7 +22,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         // TODO
         //  - find in the memtree where the 'task->ocr_access_index' access is valid
         //  - get a random valid device
-        device_id = context->memtree.who_owns(task->accesses + task->ocr_access_index);
+        // device_id = context->memtree.who_owns(task->accesses + task->ocr_access_index);
     }
 
     // if a target device is set

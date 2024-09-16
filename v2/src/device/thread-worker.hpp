@@ -60,7 +60,7 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         NaiveQueue<Task *> queue;
 
         /* number of uncompleted tasks */
-        volatile uint32_t uncompleted;
+        volatile std::atomic<uint32_t> uncompleted;
 
         /* lock and condition to sleep the mutex */
         struct {

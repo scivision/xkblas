@@ -246,8 +246,7 @@ class KMemoryTreeNodeSearch {
        enum Type : uint8_t {
            INSERTING_BLOCKS     = 0,
            SEARCH_FOR_BLOCKS    = 1,
-           SEARCH_OWNER         = 2,
-           SEARCH_AWAITING      = 3
+           SEARCH_AWAITING      = 2
        };
 
    public:
@@ -263,7 +262,7 @@ class KMemoryTreeNodeSearch {
        const uint8_t device_global_id;
 
        //////////////////////////////////////////////////////
-       // used if type == INSERTING_BLOCKS or SEARCH_OWNER //
+       // used if type == INSERTING_BLOCKS //
        //////////////////////////////////////////////////////
 
        /* the access being inserted / intersected */
@@ -278,13 +277,6 @@ class KMemoryTreeNodeSearch {
         * The set { b.region / b in partition } is a partition of the space represented by access->region
         */
        std::vector<Partite> partition;
-
-       ///////////////////////////////////
-       // used if type == SEARCH_OWNER  //
-       ///////////////////////////////////
-
-       /* the memory resident size valid per device */
-        uint64_t owns[XKBLAS_DEVICES_MAX];
 
         ///////////////////////////////////////////
         // used if type == SEARCH_AWAITING //
@@ -303,7 +295,6 @@ class KMemoryTreeNodeSearch {
            device_global_id(devid),
            access(nullptr),
            partition(),
-           owns(),
            dst_allocation(0),
            awaiting()
        {}
@@ -323,13 +314,6 @@ class KMemoryTreeNodeSearch {
            assert(this->partition.size() == 0);
            this->partition.clear();
            this->type = SEARCH_FOR_BLOCKS;
-       }
-
-       void
-       prepare_who_owns(Access * a)
-       {
-           this->access = a;
-           this->type = SEARCH_OWNER;
        }
 
        void
@@ -394,7 +378,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const access_mode_t mode
         ) {
             assert(search.type == Search::Type::INSERTING_BLOCKS);
-            XKBLAS_IMPL("inserted region %dx%d", this->region[0].length(), this->region[1].length());
         }
 
         void
@@ -448,21 +431,12 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                     break ;
                 }
 
-                case (Search::Type::SEARCH_OWNER):
-                {
-                    # pragma message(TODO "use the actual number of devices instead of 'XKBLAS_DEVICES_MAX'")
-                    static_assert (XKBLAS_DEVICES_MAX <= 64);
-                    for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
-                        if (this->block.valid & (1 << device_global_id))
-                            search.owns[device_global_id] += this->region.size();
-                    break ;
-                }
-
                 /* search for tasks awaiting on that region for a given allocation */
                 case (Search::Type::SEARCH_AWAITING):
                 {
                     MemoryReplicate & replicate = this->block.replicates[search.device_global_id];
                     const memory_replicates_bitfield_t devbit = (1 << search.device_global_id);
+                    this->block.valid |= devbit;
 
                     /* for each allocation of that block */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
@@ -480,8 +454,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                             /* this replicate just got fetched and is now valid */
                             replicate.valid    |=  allocbit;
                             replicate.fetching &= ~allocbit;
-
-                            this->block.valid |= devbit;
                         }
                     }
 
@@ -589,8 +561,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             fetch_info_t * f = (fetch_info_t *) args[0];
             assert(f);
 
-            // TODO : do 2 different callbacks for H2D/D2D and D2H transfers
-
             if (f->task)
                 fetch_callback_task(f, f->task);
 
@@ -604,7 +574,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 }
                 f->tree->unlock();
 
-                XKBLAS_DEBUG("  with %d tasks awaiting", search.awaiting.size());
                 for (Task * & task : search.awaiting)
                     fetch_callback_task(f, task);
             }
@@ -1051,8 +1020,18 @@ next_view:
 
                 for (Partite & partite : search.partition)
                 {
-                    // release all other allocation on that block, as they are invalid now
+
+                    # pragma message(TODO "Manage validity in a more lazy way")
+                    for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
+                    {
+                        MemoryReplicate & replicate = partite.block->replicates[i];
+                        replicate.valid = 0;
+                    }
+
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
+
+                    # if 0
+                    // release allocation that are no longer required, as we are rewritting that block.
                     XKBLAS_IMPL("Releasing allocations from a block...");
                     # pragma message(TODO "Free each allocation")
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
@@ -1069,6 +1048,7 @@ next_view:
                     replicate.nallocations = 1;
                     replicate.allocations[0] = replicate.allocations[partite.dst_allocation_view_id];
                     partite.dst_allocation_view_id = allocation_view_id;
+                    # endif
 
                     // set valid bits - even though the data is not copied yet,
                     // aswe are writing, there are no other tasks accessing on
@@ -1184,34 +1164,6 @@ next_view:
                 this->fetch_access(driver, device, task, task->accesses + i);
 
             return task->fetched();
-        }
-
-        //////////////////////////////////////////////////////////
-        //  FIND THE DEVICE THAT OWNS MOST OF THE PASSED ACCESS //
-        //////////////////////////////////////////////////////////
-        uint32_t
-        who_owns(Access * access)
-        {
-            Search search;
-            search.prepare_who_owns(access);
-
-            this->lock();
-            {
-                this->intersect(search, access->region, access->mode);
-            }
-            this->unlock();
-
-            /* retrieve the device id that owns the most memory bytes */
-            # pragma message(TODO "maybe use the actual number of devices instead of 'XKBLAS_DEVICES_MAX'")
-            uint32_t device_id = 0;
-            for (int i = 1 ; i < XKBLAS_DEVICES_MAX ; ++i)
-            {
-                if (search.owns[device_id] < search.owns[i])
-                    device_id = i;
-            }
-            XKBLAS_DEBUG("memory-tree.who_owns() returned %d", device_id);
-
-            return device_id;
         }
 
         //////////////////
