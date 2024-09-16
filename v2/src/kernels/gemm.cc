@@ -317,6 +317,8 @@ body_cuda(void * vparam)
     const Access * C = param->task->accesses + 2;
 
     args_t * args = (args_t *) (param->task + 1);
+    assert(args->transA == CblasNoTrans);
+    assert(args->transB == CblasNoTrans);
 
     # ifndef NDEBUG
     XKBLAS_WARN("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",

@@ -12,6 +12,12 @@ xkblas_memory_register_replicate(host_view, device, device_view);
 ```
 So a replicate continuous in memory is allocated all at once on the device
 
+# PERFORMANCE IDEA 2
+Merge fetch operation if they are continuous in memory
+
+# PERFORMANCE IDEA 3
+Memory coherency currently insert 1 big task with all the region; meaning no data will start moving until the entire region had been computed (even though some parts may be ready early)
+
 # LICENSE
 - Set header in all files, a CECILL
 

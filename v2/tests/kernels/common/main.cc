@@ -68,13 +68,15 @@ main_gemm(char ** args)
     TYPE * CImpl = (TYPE *) CpImpl;
 
     /* initialize matrices */
-    FILL(A, ld * ld);
-    FILL(B, ld * ld);
-    FILL(C, ld * ld);
+
+    # if 1
+
+    FILL(A, 3*ld*ld); // fill A, B and C
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    # if 0
+    # else
+
     for (int i = 0 ; i < (ld * ld) ; ++i)
     {
         A[i] = (TYPE) 1.0;
@@ -83,6 +85,7 @@ main_gemm(char ** args)
     }
     alpha = (TYPE) 1.0;
     beta  = (TYPE) 1.0;
+
     # endif
 
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
@@ -99,7 +102,7 @@ main_gemm(char ** args)
     }
 
     /* check correctness */
-   int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
+    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
     if (r == 0)
         puts("Result is CORRECT");
     else

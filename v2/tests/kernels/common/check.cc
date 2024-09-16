@@ -4,9 +4,8 @@
 # include <sys/param.h>
 # include "common/blas.h"
 
-#if USE_OPENBLAS
 extern "C" {
-extern int sgemm_(char *transa, char *transb,
+int sgemm_(char *transa, char *transb,
   const BLAS_INT *m, const BLAS_INT *n, const BLAS_INT *k,
   const TYPE *alpha,
   const TYPE *a, const BLAS_INT *lda,
@@ -14,12 +13,6 @@ extern int sgemm_(char *transa, char *transb,
   const TYPE *beta,
         TYPE *c, const BLAS_INT *ldc);
 }
-# define GEMM(ta, tb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc) \
-        sgemm_(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc)
-#elif USE_MKL
-# define GEMM(ta, tb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc) \
-        sgemm(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc)
-#endif
 
 static void
 dump_matrix(
@@ -32,7 +25,7 @@ dump_matrix(
         printf("---- %s ----\n", label);
         for (int i = 0 ; i < ld ; ++i)
             for (int j = 0 ; j < ld ; ++j)
-                printf("%4.2f%c", M[i*ld+j], (j == ld-1) ? '\n' : ' ');
+                printf("%4.4f%c", M[i*ld+j], (j == ld-1) ? '\n' : ' ');
 
     }
 }
@@ -57,8 +50,8 @@ gemm_cmp(
 
     const int Am = (transA == CblasNoTrans) ? m : k;
     const int An = (transA == CblasNoTrans) ? k : m;
-    const int Bm = (transA == CblasNoTrans) ? k : n;
-    const int Bn = (transA == CblasNoTrans) ? n : k;
+    const int Bm = (transB == CblasNoTrans) ? k : n;
+    const int Bn = (transB == CblasNoTrans) ? n : k;
 
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);
@@ -69,9 +62,13 @@ gemm_cmp(
     printf("Running native...\n");
     {
         uint64_t t0 = get_nanotime();
+        # if 1
         char ta = cblas2blas_op(transA);
         char tb = cblas2blas_op(transB);
-        GEMM(ta, tb, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        sgemm_(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
+        # else
+        cblas_sgemm(CblasRowMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        # endif
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
