@@ -10,6 +10,7 @@
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/kinterval-btree.hpp"
+# include "sync/lockable.hpp"
 
 # include <cstdint>
 # include <functional>
@@ -25,37 +26,6 @@
 
 typedef uint16_t memory_replicates_bitfield_t;
 static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= XKBLAS_DEVICES_MAX);
-
-/* an abstract object that can be locked */
-class Lockable {
-
-    private:
-        spinlock_t spinlock;
-
-    public:
-        Lockable() : spinlock{0} {}
-        ~Lockable() {}
-
-    public:
-
-        void
-        lock(void)
-        {
-            SPINLOCK_LOCK(this->spinlock);
-        }
-
-        void
-        unlock(void)
-        {
-            SPINLOCK_UNLOCK(this->spinlock);
-        }
-
-        bool
-        is_locked(void) const
-        {
-            return SPINLOCK_ISLOCKED(this->spinlock);
-        }
-};
 
 /* a memory allocation */
 class MemoryReplicateAllocationView {
@@ -662,7 +632,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         ////////////////////////
         //  FETCH ON THE HOST //
         ////////////////////////
-        inline void
+
+        void
         fetch_on_host_access(
             ThreadWorker * worker,
             Task * task,
@@ -721,19 +692,23 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             {
                 if (!partite.must_fetch)
                     continue ;
+
                 assert(partite.src_device_global_id != partite.dst_device_global_id);
 
                 xkblas_device_t * device = xkblas_device_get(partite.src_device_global_id);
                 assert(device);
+
 
                 fetch_access_copy_partite(driver, device, task, worker, partite, 0);
             }
         }
 
         task_state_t
-        fetch_on_host(ThreadWorker * worker, Task * task)
-        {
-            assert(ThreadWorker::get() == worker);
+        fetch_on_host(
+            ThreadWorker * worker,
+            Task * task
+        ) {
+            assert(ThreadWorker::self() == worker);
 
             XKBLAS_DEBUG("Launching async fetch of access %p", access);
             task->fetching();
@@ -1083,7 +1058,7 @@ next_view:
                     }
 
                     // TODO : bad design
-                    ThreadWorker * worker = ThreadWorker::get();
+                    ThreadWorker * worker = ThreadWorker::self();
                     this->fetch_access_copy_partite(driver, device, task, worker, partite, allocation);
                 }
             }

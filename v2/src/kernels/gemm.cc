@@ -61,7 +61,7 @@ xkblas_£gemm_tile_async(
     assert((uintptr_t)B % ldb == 0);
     assert((uintptr_t)C % ldc == 0);
 
-    ThreadProducer * thread = ThreadProducer::get();
+    ThreadProducer * thread = ThreadProducer::self();
 
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);

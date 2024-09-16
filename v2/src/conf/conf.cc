@@ -79,6 +79,16 @@ __parse_gpuset(xkblas_conf_t * conf, char const * value)
     }
 }
 
+static void
+__parse_offloader_capacity(xkblas_conf_t * conf, char const * value)
+{
+    if (value)
+    {
+        conf->device.offloader.capacity = atoi(value);
+        XKBLAS_INFO("Set offloader capacity to %d", conf->device.offloader.capacity);
+    }
+}
+
 void __parse_help(xkblas_conf_t * conf, char const * value);
 
 extern char ** environ;
@@ -93,17 +103,18 @@ typedef struct  xkblas_conf_parse_t
 
 // variables are parsed in-order
 static xkblas_conf_parse_t CONF_PARSE[] = {
-    {"XKBLAS_HELP",         __parse_help,       "Show this helper"},
-    {"XKBLAS_VERBOSE",      __parse_verbose,    "Verbosity level (the higher the most)"},
-    {"XKBLAS_TILE_SIZE",    __parse_tile_size,  "Tile size parameter - format is `kernel(m,n)` - example: gemm(16,16)"},
-    {"XKBLAS_PRECISION",    NULL,               NULL},
-    {"XKBLAS_NGPUS",        __parse_ngpus,      "Number of GPUs to use"},
-    {"XKBLAS_GPUSET",       __parse_gpuset,     "A bitmask representing GPUs to use"},
-    {"XKBLAS_NSTREAMS",     NULL,               NULL},
-    {"XKBLAS_NKERNELS",     NULL,               NULL},
-    {"XKBLAS_CACHE_LIMIT",  NULL,               NULL},
-    {"XKBLAS_DEFAULT_MATH", NULL,               NULL},
-    {NULL,                  NULL,               NULL}
+    {"XKBLAS_HELP",                 __parse_help,               "Show this helper"},
+    {"XKBLAS_VERBOSE",              __parse_verbose,            "Verbosity level (the higher the most)"},
+    {"XKBLAS_TILE_SIZE",            __parse_tile_size,          "Tile size parameter - format is `kernel(m,n)` - example: gemm(16,16)"},
+    {"XKBLAS_PRECISION",            NULL,                       NULL},
+    {"XKBLAS_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
+    {"XKBLAS_GPUSET",               __parse_gpuset,             "A bitmask representing GPUs to use"},
+    {"XKBLAS_NSTREAMS",             NULL,                       NULL},
+    {"XKBLAS_NKERNELS",             NULL,                       NULL},
+    {"XKBLAS_CACHE_LIMIT",          NULL,                       NULL},
+    {"XKBLAS_OFFLOADER_CAPACITY",   __parse_offloader_capacity, "Maximum number of pending instructions per stream"},
+    {"XKBLAS_DEFAULT_MATH",         NULL,                       NULL},
+    {NULL,                          NULL,                       NULL}
 };
 
 void
@@ -129,7 +140,7 @@ xkblas_init_conf(xkblas_conf_t * conf)
     //////////////////
     //  KERNEL CONF //
     //////////////////
-    conf->device.offloader.capacity = 64;
+    conf->device.offloader.capacity = 512;
 
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = 2;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = 8;

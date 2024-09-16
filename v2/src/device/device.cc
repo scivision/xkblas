@@ -115,7 +115,7 @@ xkblas_device_create(
 
     // register worker thread, using a nasty global variable here :-(
     ThreadWorker::init();
-    device->thread = ThreadWorker::get();
+    device->thread = ThreadWorker::self();
     assert(device->thread);
 
     return device;
@@ -125,7 +125,7 @@ int
 xkblas_device_poll(xkblas_device_t * device)
 {
     int err = 0;
-    assert(ThreadWorker::get() == device->thread);
+    assert(ThreadWorker::self() == device->thread);
 
     err = device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_ALL);
     assert( (err == 0) || (err == EINPROGRESS));
@@ -152,7 +152,7 @@ xkblas_device_prepare_task(
     xkblas_device_t * device,
     Task * task
 ) {
-    assert(worker == ThreadWorker::get());
+    assert(worker == ThreadWorker::self());
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
 
@@ -300,7 +300,7 @@ xkblas_device_progress(
 
             # pragma message(TODO "I retrieved xkblas/v1 logic here, but i feel like there is a race condition w/ task dependency graph discovery")
             /* initiate write back only if streams are empty and there are no more tasks to execute */
-            ThreadWorker * thread = ThreadWorker::get();
+            ThreadWorker * thread = ThreadWorker::self();
             Task * task = thread->pop();
             if (task)
             {
@@ -355,23 +355,24 @@ xkblas_device_thread_main_loop(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
-    assert(ThreadWorker::get() == device->thread);
+    assert(ThreadWorker::self() == device->thread);
     assert(device->state == XKBLAS_DEVICE_STATE_COMMIT);
     device->state = XKBLAS_DEVICE_STATE_RUNNING;
 
     # pragma message(TODO "do we really need this mem_barrier here?")
     mem_barrier();
 
-    ThreadWorker * worker = ThreadWorker::get();
+    ThreadWorker * worker = ThreadWorker::self();
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
         # if 1
+        # pragma message(TODO "'device->offloader.is_empty' is called with no lock, while inner lists are modifed under locks, is this a problem ?")
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
         while ((task = worker->pop()) == NULL &&
                 device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
                 device->request.type == XKBLAS_DEVICE_REQUEST_TYPE_NOP)
-            worker->pause();    // TODO : bad design, 'worker' must be 'ThreadWorker::get()' !!
+            worker->pause();    // TODO : bad design, 'worker' must be 'ThreadWorker::self()' !!
 
         XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
                 device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));

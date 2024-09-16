@@ -2,7 +2,7 @@
 # define __STREAM_HPP__
 
 # include "device/stream-instruction.h"
-# include "sync/spinlock.h"
+# include "sync/lockable.hpp"
 
 /* DONT CHANGE ORDER HERE !! Can have side effects (in the Offloader class for instance) */
 typedef enum    xkblas_stream_type_t
@@ -17,43 +17,44 @@ typedef enum    xkblas_stream_type_t
 
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
-typedef struct  xkblas_stream_instruction_queue_t
+class xkblas_stream_instruction_queue_t
 {
-    /* attributes */
-    xkblas_stream_instruction_t * instr;    /* instructions buffer */
-    uint64_t capacity;                      /* buffer capacity */
-    struct {
-        volatile uint64_t r;                /* first instruction to process */
-        volatile uint64_t w;                /* next position for inserting instructions */
-    } pos;
+    public:
 
-    /* methods */
-    int
-    is_full(void) const
-    {
-        return (this->pos.w - this->pos.r >= this->capacity);
-    }
+        xkblas_stream_instruction_t * instr;    /* instructions buffer */
+        uint64_t capacity;                      /* buffer capacity */
+        struct {
+            volatile uint64_t r;                /* first instruction to process */
+            volatile uint64_t w;                /* next position for inserting instructions */
+        } pos;
 
-    int
-    is_empty(void) const
-    {
-        return (this->pos.r == this->pos.w);
-    }
+    public:
 
-    int
-    size(void) const
-    {
-        return (this->pos.w - this->pos.r);
-    }
+        /* methods */
+        int
+        is_full(void) const
+        {
+            return (this->pos.w - this->pos.r >= this->capacity);
+        }
 
-}               xkblas_stream_instruction_queue_t;
+        int
+        is_empty(void) const
+        {
+            return (this->pos.r == this->pos.w);
+        }
+
+        int
+        size(void) const
+        {
+            return (this->pos.w - this->pos.r);
+        }
+};
 
 # pragma message(TODO "make this a C++ class and use inheritance/pure virtual - currently hybrid of C struct C++ class :(")
 class xkblas_stream_t
 {
     public:
         xkblas_stream_type_t type;
-        spinlock_t spinlock;
 
         /* launch a stream instruction */
         int (*f_instruction_launch)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
@@ -67,18 +68,8 @@ class xkblas_stream_t
         /* queue for pending instructions to progress */
         xkblas_stream_instruction_queue_t pending;
 
-        /* Romain: the first event in the pending queue before which all events are completed */
+        /* the first event in the pending queue before which all events are completed */
         volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
-
-        # pragma message(TODO "What is the purpose of 'ok_p' ?")
-        # if 0
-        /* past the last position of pending notified instr in [pos_rp,pos_wp] */
-        volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
-        # endif
-
-    public:
-        xkblas_stream_t() {}
-        virtual ~xkblas_stream_t() {}
 
     public:
 

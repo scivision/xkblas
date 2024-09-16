@@ -28,7 +28,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         static void deinit(void);
 
         /* retrieve the tls */
-        static ThreadProducer * get(void);
+        static ThreadProducer * self(void);
 
         ////////////////////////
         // NON-STATIC MEMBERS //

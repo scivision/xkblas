@@ -177,8 +177,9 @@ Offloader::instruction_new(
     assert(stream->type == stype);
 
     /* allocate the instruction */
+    xkblas_stream_instruction_t * instr;
 try_instruction_new:
-    xkblas_stream_instruction_t * instr = stream->instruction_new(itype, callback);
+    instr = stream->instruction_new(itype, callback);
     if (instr == NULL)
     {
         # pragma message(TODO "If instruction allocation fail, it means the ring buffer is full on that stream. We currently progress every other streams : do we want to only progress the failing stream ?")

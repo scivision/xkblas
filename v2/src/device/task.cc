@@ -1,5 +1,6 @@
 # include "xkblas-context.h"
 # include "device/task.hpp"
+# include "sync/mem.h"
 
 /* to be called once a task become ready, very dirty, but good enough as long
  * as we have the 'xkblas_context_t' global variable :-( */

@@ -59,6 +59,7 @@ xkblas_stream_instruction_queue_init(
     queue->pos.w = 0;
 }
 
+# pragma message(TODO "Implement and use constructors instead of this routine")
 void
 xkblas_stream_init(
     xkblas_stream_t * stream,
@@ -68,7 +69,6 @@ xkblas_stream_init(
     int (*f_instructions_progress)(xkblas_stream_t *, int)
 ) {
     stream->type = type;
-    stream->spinlock = 0;
 
     stream->f_instruction_launch    = f_instruction_launch;
     stream->f_instructions_progress = f_instructions_progress;
@@ -110,110 +110,97 @@ xkblas_stream_t::instruction_new(
         return NULL;
 
     /* Lock the stream to add a new instruction and until it is commited. */
-    SPINLOCK_LOCK(this->spinlock);
-    {
-        if (!this->ready.is_full())
-        {
-            xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
-            instr->type = itype;
-            instr->callback = callback;
-            return instr;
-        }
-    }
-    SPINLOCK_UNLOCK(this->spinlock);
-    return NULL;
+    xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
+    instr->type = itype;
+    instr->callback = callback;
+    return instr;
 }
 
 int
 xkblas_stream_t::commit(
     xkblas_stream_instruction_t * instr
 ) {
-    assert(SPINLOCK_ISLOCKED(this->spinlock));
     assert(instr);
 
-    writemem_barrier();
     ++this->ready.pos.w;
+    writemem_barrier();
 
     XKBLAS_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
             xkblas_stream_instruction_type_to_str(instr->type),
             this->ready.size(), this->pending.size());
 
-    SPINLOCK_UNLOCK(this->spinlock);
-
     return 0;
 }
 
-# pragma message(TODO "do we really need to lock in 'new' and unlock in 'commit' - couldn't we already unlock in 'new' ?")
 int
 xkblas_stream_t::launch_ready_instructions(void)
 {
-    # if 0
-    XKBLAS_DEBUG("Launching ready instructions of stream %p (%d ready, %d pending)",
-            this, this->ready.size(), this->pending.size());
-    # endif
-
+    XKBLAS_DEBUG("Launching ready instructions of stream %p of type `%s` (%d ready)",
+            this, xkblas_stream_type_to_str(this->type), this->ready.size());
     assert(this->ready.pos.r <= this->ready.pos.w);
-    assert(this->f_instruction_launch);
 
+    /* launch every ready instructions */
     int err = 0;
     while (!this->ready.is_empty())
     {
-        SPINLOCK_LOCK(this->spinlock);
-        {
-            if (!this->ready.is_empty())
-            {
-                int p = this->ready.pos.r % this->ready.capacity;
-                xkblas_stream_instruction_t * instr = this->ready.instr + p;
-                assert(instr);
+        /* retrieve the next instruction to launch at index 'p' */
+        uint64_t p = this->ready.pos.r % this->ready.capacity;
+        ++this->ready.pos.r;
+        writemem_barrier();
 
-                XKBLAS_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
-                        xkblas_stream_instruction_type_to_str(instr->type),
-                        this,
-                        xkblas_stream_type_to_str(this->type),
-                        this->f_instruction_launch
+        xkblas_stream_instruction_t * instr = this->ready.instr + p;
+        assert(instr);
+
+        XKBLAS_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
+            xkblas_stream_instruction_type_to_str(instr->type),
+            this,
+            xkblas_stream_type_to_str(this->type),
+            this->f_instruction_launch
+        );
+
+        assert(this->f_instruction_launch);
+        err = this->f_instruction_launch(this, instr);
+
+        switch (err)
+        {
+            case (0):
+            {
+                /* no error */
+                XKBLAS_DEBUG("Instruction completed");
+                break ;
+            }
+
+            case (EINPROGRESS):
+            {
+                /* recopy op in pending op if still progressing */
+
+                /* the pending queue must not be full */
+                assert(!this->pending.is_full());
+                uint64_t wp = this->pending.pos.w % this->pending.capacity;
+                ++this->pending.pos.w;
+                writemem_barrier();
+
+                memcpy(
+                    this->pending.instr + wp,
+                    this->ready.instr + p,
+                    sizeof(xkblas_stream_instruction_t)
                 );
 
-                err = this->f_instruction_launch(this, instr);
-                ++this->ready.pos.r;
+                break ;
+            }
 
-                switch (err)
-                {
-                    case (0):
-                    {
-                        /* no error */
-                        XKBLAS_DEBUG("Instruction completed");
-                        break ;
-                    }
+            case (ENOSYS):
+            {
+                XKBLAS_IMPL("Instruction `%s` not implemented",
+                        xkblas_stream_instruction_type_to_str(instr->type));
+                break ;
+            }
 
-                    case (EINPROGRESS):
-                    {
-                        /* recopy op in pending op if still progressing */
-                        XKBLAS_DEBUG("Instruction in progress");
-                        int wp = this->pending.pos.w % this->pending.capacity;
-                        memcpy(
-                            this->pending.instr + wp,
-                            this->ready.instr + p,
-                            sizeof(xkblas_stream_instruction_t)
-                        );
-                        ++this->pending.pos.w;
-                        break ;
-                    }
-
-                    case (ENOSYS):
-                    {
-                        XKBLAS_IMPL("Instruction `%s` not implemented",
-                                xkblas_stream_instruction_type_to_str(instr->type));
-                        break ;
-                    }
-
-                    default:
-                    {
-                        XKBLAS_FATAL("Unknown error after decoding instruction");
-                    }
-                }
+            default:
+            {
+                XKBLAS_FATAL("Unknown error after decoding instruction");
             }
         }
-        SPINLOCK_UNLOCK(this->spinlock);
     }
     return err;
 }
@@ -221,9 +208,8 @@ xkblas_stream_t::launch_ready_instructions(void)
 int
 xkblas_stream_t::progress_pending_instructions(int blocking)
 {
-    XKBLAS_DEBUG("Progressing pending instructions of stream %p of type `%s` (%d ready, %d pending)",
-            this, xkblas_stream_type_to_str(this->type), this->ready.size(), this->pending.size());
-
+    XKBLAS_DEBUG("Progressing pending instructions of stream %p of type `%s` (%d pending)",
+            this, xkblas_stream_type_to_str(this->type), this->pending.size());
     assert(this->pending.pos.r <= this->pending.pos.w);
     assert(this->f_instructions_progress);
 
@@ -237,5 +223,5 @@ xkblas_stream_t::progress_pending_instructions(int blocking)
 int
 xkblas_stream_t::is_empty(void) const
 {
-    return this->ready.is_empty() && this->pending.is_empty();
+    return (this->ready.is_empty() && this->pending.is_empty());
 }

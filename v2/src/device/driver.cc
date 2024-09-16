@@ -40,6 +40,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         pthread_attr_t attr;
         pthread_attr_init(&attr);
 
+        // move the current thread to the device cpu set
         cpu_set_t schedset;
         assert(driver->f_device_set_cpuset);
         int err = driver->f_device_set_cpuset(&schedset, i);
@@ -49,7 +50,6 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         }
         else
         {
-            // move the current thread to the device cpu set
             err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
             if (err)
             {
@@ -80,6 +80,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 
     // move back the current thread to its initial cpu set
     pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
+    for (int i=0; i<10; ++i) sched_yield();
 }
 
 void
@@ -92,9 +93,6 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     memset(drivers->devices.list, 0, sizeof(drivers->devices.list));
     drivers->devices.n = 0;
     drivers->devices.round_robin_device_id = 0;
-    memset(drivers->devices.connectivity, 0, sizeof(drivers->devices.connectivity));
-    for (int i = 0 ; i < XKBLAS_DEVICES_MAX + 1 ; ++i)
-        drivers->devices.connectivity[i][i] = UINT_MAX;
 
     // LOAD DRIVERS
     void (*loaders[XKBLAS_DRIVER_TYPE_MAX])(xkblas_driver_t *);
@@ -353,7 +351,7 @@ xkblas_device_task_access_fetched(
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
-        callback.func(callback.args);
+        xkblas_device_task_executed(callback.args);
     else
         xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
 }

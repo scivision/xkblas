@@ -592,7 +592,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             # pragma message(TODO "Add support for end event records")
 
-            int wp = istream->pending.pos.w % istream->pending.capacity;
+            uint32_t wp = istream->pending.pos.w % istream->pending.capacity;
+            assert(stream->cu.events.capacity == istream->pending.capacity);
             cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle.high);
             assert(err == cudaSuccess);
 
@@ -674,7 +675,8 @@ cuda_stream_instructions_progress(
 
     xkblas_stream_cuda_t * stream = (xkblas_stream_cuda_t *) istream;
 
-    if (istream->pending.size() == 0)
+    /* no pending instructions */
+    if (istream->pending.pos.r == istream->pending.pos.w)
         return 0;
 
     if (blocking)
@@ -689,7 +691,7 @@ cuda_stream_instructions_progress(
     }
 
     /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
-    uint64_t     size = istream->pending.size();
+    uint64_t     size = istream->pending.pos.w - istream->pending.pos.r;
     uint64_t      okp = istream->ok_p;
      int64_t prev_okp = okp - 1;
 

@@ -24,7 +24,7 @@ ThreadProducer::deinit(void)
 }
 
 ThreadProducer *
-ThreadProducer::get(void)
+ThreadProducer::self(void)
 {
     if (__TLS_PRODUCER == NULL)
         ThreadProducer::init();

@@ -141,9 +141,6 @@ typedef struct  xkblas_drivers_t
         /* next worker to offload round robin mode */
         std::atomic<uint8_t> round_robin_device_id;
 
-        /* connectivity performances to find which link to use when moving data between devices */
-        int connectivity[XKBLAS_DEVICES_MAX+1][XKBLAS_DEVICES_MAX+1];
-
     } devices;
 
     /* number of uncompleted tasks (used for xkblas_sync) */

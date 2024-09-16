@@ -24,7 +24,7 @@ ThreadWorker::deinit(void)
 }
 
 ThreadWorker *
-ThreadWorker::get(void)
+ThreadWorker::self(void)
 {
     if (__TLS_WORKER == NULL)
         ThreadWorker::init();
@@ -51,6 +51,7 @@ void
 ThreadWorker::push(Task * const & task)
 {
     ++this->uncompleted;
+    writemem_barrier();
     this->queue.push(task);
     this->wakeup();
 }
@@ -59,7 +60,7 @@ Task *
 ThreadWorker::pop(void)
 {
     /* this is true as we only have 1 worker per device currently */
-    assert(ThreadWorker::get() == this);
+    assert(ThreadWorker::self() == this);
     return this->queue.pop();
 }
 
@@ -68,6 +69,7 @@ ThreadWorker::complete(Task * task)
 {
     task->executed();
     task->complete();
+    writemem_barrier();
     --this->uncompleted;
 }
 
@@ -80,7 +82,7 @@ ThreadWorker::completed(void) const
 void
 ThreadWorker::pause(void)
 {
-    assert(ThreadWorker::get() == this);
+    assert(ThreadWorker::self() == this);
     pthread_mutex_lock(&this->sleep.lock);
     {
         this->sleep.sleeping = true;

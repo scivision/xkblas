@@ -12,6 +12,7 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
 
+    // delegate execution of that task to the device's thread that owns the data
     if (context->memtree.fetch_on_host(thread, task) == TASK_STATE_DATA_FETCHED)
         thread->complete(task);
 }
@@ -19,7 +20,7 @@ xkblas_memory_coherent_async_worker_thread_work(
 static void
 xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
 {
-    ThreadWorker * thread = ThreadWorker::get();
+    ThreadWorker * thread = ThreadWorker::self();
     assert(thread == context->memory_coherent_worker_thread);
 
     // TODO : instead, while context->running
@@ -40,7 +41,7 @@ xkblas_memory_coherent_async_worker_thread_main(void * arg)
     xkblas_context_t * context = (xkblas_context_t *) arg;
     assert(context);
 
-    context->memory_coherent_worker_thread = ThreadWorker::get();
+    context->memory_coherent_worker_thread = ThreadWorker::self();
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
@@ -82,7 +83,7 @@ xkblas_memory_coherent_async_impl(
     /* create a task with a null body that reads the data, and force its scheduling onto the host */
 
     // TODO : allocate instead on the worker thread ? creates a concurrency issue in the allocator though
-    ThreadProducer * thread = ThreadProducer::get();
+    ThreadProducer * thread = ThreadProducer::self();
     assert(thread);
 
     const uint64_t task_size = sizeof(Task);

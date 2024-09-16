@@ -27,7 +27,7 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         static void deinit(void);
 
         /* retrieve the tls */
-        static ThreadWorker * get(void);
+        static ThreadWorker * self(void);
 
         ////////////////////////
         // NON-STATIC MEMBERS //
@@ -47,10 +47,10 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         /* pop a task */
         Task * pop(void);
 
-        /* the passed task completed execution on the thread */
+        /* move the wait counter */
         void complete(Task * task);
 
-        /* return false if there is any uncompleted tasks */
+        /* return true if the wait counter is '0' */
         bool completed(void) const;
 
     private:
@@ -60,7 +60,7 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         NaiveQueue<Task *> queue;
 
         /* number of uncompleted tasks */
-        volatile std::atomic<uint32_t> uncompleted;
+        volatile std::atomic<int32_t> uncompleted;
 
         /* lock and condition to sleep the mutex */
         struct {
