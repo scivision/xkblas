@@ -74,7 +74,7 @@ main_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    # if 1
+    # if 0
     for (int i = 0 ; i < (ld * ld) ; ++i)
     {
         A[i] = (TYPE) 1.0;
@@ -87,7 +87,6 @@ main_gemm(char ** args)
 
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
-
 
     /* run on impl */
     printf("Running implementation...\n");
@@ -108,9 +107,12 @@ main_gemm(char ** args)
 
     # if 1
     if (ld <= 32)
+    {
+        puts("---- Impl ----");
         for (int i = 0 ; i < ld ; ++i)
             for (int j = 0 ; j < ld ; ++j)
                 printf("%4.1f%c", CImpl[i*ld+j], (j == ld-1) ? '\n' : ' ');
+    }
     # endif
 
     return 0;

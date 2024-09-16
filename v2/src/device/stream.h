@@ -17,15 +17,15 @@ typedef enum    xkblas_stream_type_t
 
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
-class xkblas_stream_instruction_queue_t
+class xkblas_stream_instruction_queue_t : public Lockable
 {
     public:
 
         xkblas_stream_instruction_t * instr;    /* instructions buffer */
-        uint64_t capacity;                      /* buffer capacity */
+        uint32_t capacity;                      /* buffer capacity */
         struct {
-            volatile uint64_t r;                /* first instruction to process */
-            volatile uint64_t w;                /* next position for inserting instructions */
+            volatile std::atomic<uint32_t> r;   /* first instruction to process */
+            volatile std::atomic<uint32_t> w;   /* next position for inserting instructions */
         } pos;
 
     public:

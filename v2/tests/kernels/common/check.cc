@@ -61,6 +61,18 @@ gemm_cmp(
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
+    # if 1
+    if (ldc <= 32)
+    {
+        puts("---- Ref  ----");
+        for (int i = 0 ; i < ldc ; ++i)
+            for (int j = 0 ; j < ldc ; ++j)
+                printf("%4.1f%c", CRef[i*ldc+j], (j == ldc-1) ? '\n' : ' ');
+
+    }
+    # endif
+
+
     // TODO : change slange, saxpy, slamch, etc... with defines based on type
 
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);

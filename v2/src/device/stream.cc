@@ -53,6 +53,7 @@ xkblas_stream_instruction_queue_init(
     uint8_t * buffer,
     unsigned int capacity
 ) {
+    queue->spinlock = 0;
     queue->instr = (xkblas_stream_instruction_t *) buffer;
     queue->capacity = capacity;
     queue->pos.r = 0;
@@ -109,10 +110,21 @@ xkblas_stream_t::instruction_new(
     if (this->ready.is_full())
         return NULL;
 
-    /* Lock the stream to add a new instruction and until it is commited. */
-    xkblas_stream_instruction_t * instr = this->ready.instr + (this->ready.pos.w % this->ready.capacity);
+    this->ready.lock();
+    {
+        if (this->ready.is_full())
+        {
+            this->ready.unlock();
+            return NULL;
+        }
+    } /* unlocked in the commit routine */
+
+    readmem_barrier();
+    const int32_t w = this->ready.pos.w.load(std::memory_order_seq_cst) % this->ready.capacity;
+    xkblas_stream_instruction_t * instr = this->ready.instr + w;
     instr->type = itype;
     instr->callback = callback;
+
     return instr;
 }
 
@@ -122,12 +134,16 @@ xkblas_stream_t::commit(
 ) {
     assert(instr);
 
-    ++this->ready.pos.w;
-    writemem_barrier();
-
     XKBLAS_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
             xkblas_stream_instruction_type_to_str(instr->type),
             this->ready.size(), this->pending.size());
+
+    /* locked from the new_instruction routine */
+    {
+        this->ready.pos.w.fetch_add(1, std::memory_order_seq_cst);
+        writemem_barrier();
+    }
+    this->ready.unlock();
 
     return 0;
 }
