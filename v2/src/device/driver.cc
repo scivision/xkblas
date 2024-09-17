@@ -153,24 +153,18 @@ xkblas_get_device_host(xkblas_drivers_t * drivers)
 }
 
 int
-xkblas_kernel_launch(
-    xkblas_driver_type_t type,
-    task_kernel_param_t * param
-) {
-    // must be executed by the worker thread of the passed device
+xkblas_task_launch(task_launcher_t * launcher)
+{
+    assert(launcher);
+    assert(launcher->task);
+    assert(launcher->task->fmtid);
+    assert(launcher->target >= 0 && launcher->target <= XKBLAS_DRIVER_TYPE_MAX);
 
-    assert(type >= 0 && type <= XKBLAS_DRIVER_TYPE_MAX);
-
-    assert(param);
-    assert(param->handle);
-    assert(param->task);
-    assert(param->task->fmtid);
-
-    task_format_t * format = task_format_get(param->task->fmtid);
+    task_format_t * format = task_format_get(launcher->task->fmtid);
     assert(format);
-    assert(format->f[type]);
+    assert(format->f[launcher->target]);
 
-    format->f[type](param);
+    format->f[launcher->target](launcher);
 
     return 0;
 }
@@ -299,16 +293,10 @@ xkblas_memory_allocate(
 
 
 /* callback after the task kernel executed */
-static void
+static inline void
 xkblas_device_task_executed(
-    const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
+    Task * task
 ) {
-    assert(args);
-
-    ThreadWorker * thread = ThreadWorker::self();
-    assert(thread);
-
-    Task * task = (Task *) args[0];
     assert(task);
 
     # if USE_STATS
@@ -322,7 +310,18 @@ xkblas_device_task_executed(
     XKBLAS_WARN("Task `%s` completed", task->label);
     # endif /* NDEBUG */
 
+    ThreadWorker * thread = ThreadWorker::self();
+    assert(thread);
+
     thread->complete(task);
+}
+
+static void
+xkblas_device_task_executed_callback(
+    const void * args[XKBLAS_CALLBACK_ARGS_MAX]
+) {
+    assert(args[0]);
+    xkblas_device_task_executed((Task *) args[0]);
 }
 
 /**
@@ -332,16 +331,12 @@ xkblas_device_task_executed(
  *  - task   - the task
  */
 void
-xkblas_device_task_access_fetched(
+xkblas_device_task_execute(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
                Task * task
 ) {
-    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
-
-    xkblas_stream_callback_t callback;
-    callback.func    = xkblas_device_task_executed;
-    callback.args[0] = task;
+    assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
 
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
@@ -352,9 +347,42 @@ xkblas_device_task_access_fetched(
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
-        xkblas_device_task_executed(callback.args);
+    {
+        xkblas_device_task_executed(task);
+    }
     else
-        xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+    {
+        /* retrieve task format */
+        task_format_t * format = task_format_get(task->fmtid);
+        assert(format);
+
+        /* running a host task */
+        if (format->target == TASK_FORMAT_TARGET_HOST)
+        {
+            task_launcher_t launcher = {
+                .task   = task,
+                .handle = NULL
+            };
+            xkblas_task_launch(&launcher);
+            xkblas_device_task_executed(task);
+        }
+        /* running a device task */
+        else
+        {
+            assert(format->target == TASK_FORMAT_TARGET_DRIVER);
+
+            xkblas_callback_t callback;
+            callback.func    = xkblas_device_task_executed_callback;
+            callback.args[0] = task;
+
+            xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+            device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
+
+            /* launch will be called asynchronously in the driver */
+
+            /* the 'executed' callback will be called asynchronously in the driver on kernel completion test success */
+        }
+    }
 }
 
 static inline void

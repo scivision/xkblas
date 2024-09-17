@@ -1,7 +1,7 @@
 #ifndef __STREAM_INSTRUCTION_H__
 # define __STREAM_INSTRUCTION_H__
 
-# include "device/stream-callback.h"
+# include "xkblas-callback.h"
 # include "device/task.hpp"
 # include "logger/todo.h"
 # include "sync/cache-line-size.hpp"
@@ -61,7 +61,7 @@ typedef struct  xkblas_stream_instruction_kernel_t
 typedef struct  xkblas_stream_instruction_t
 {
     xkblas_stream_instruction_type_t type;
-    xkblas_stream_callback_t callback;
+    xkblas_callback_t callback;
     union
     {
         xkblas_stream_instruction_copy_t    copy;

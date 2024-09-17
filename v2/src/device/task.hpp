@@ -96,11 +96,11 @@ class alignas(CACHE_LINE_SIZE) KTask
 
     public:
 
-        KTask() : KTask(TASK_FORMAT_NULL) {}
-
-        KTask(task_format_id_t f) : KTask(f, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_GLOBAL_DEVICE_ID) {}
-
-        KTask(task_format_id_t f, uint8_t ocr_access_index_p, uint8_t targeted_device_id_p) :
+        KTask(
+            task_format_id_t f,             // task format to use
+            uint8_t ocr_access_index_p,     // the ocr access to use
+            uint8_t targeted_device_id_p    // targeted device
+        ) :
             fmtid(f),
             edges(),
             accesses(),
@@ -189,7 +189,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         executed(void)
         {
-            assert(this->state.value == TASK_STATE_DATA_FETCHED);
+            assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_EXECUTED;

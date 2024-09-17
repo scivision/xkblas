@@ -43,8 +43,8 @@ xkblas_context_get(void)
 static inline void
 xkblas_task_format_register(void)
 {
-    # include "kernels/kernel-task-format-register.cc"
     xkblas_memory_coherent_async_register_format();
+    # include "kernels/kernel-task-format-register.cc"
 }
 
 extern "C"

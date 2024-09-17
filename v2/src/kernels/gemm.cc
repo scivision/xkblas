@@ -3,10 +3,10 @@
 # include "min-max.h"
 # include "xkblas-context.h"
 
+# include "device/task-launcher.h"
 # include "device/thread-producer.hpp"
 # include "logger/todo.h"
 # include "logger/logger.h"
-# include "kernels/kernel-param.h"
 # include "kernels/auto-tile.h"
 # include "kernels/kernel-type.h"
 # include "sync/access.hpp"
@@ -72,7 +72,7 @@ xkblas_£gemm_tile_async(
     assert(mem);
 
     Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(format_id);
+    new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);
@@ -188,7 +188,7 @@ xkblas_£gemm_async(
     assert(N % BS == 0);
     assert(K % BS == 0);
 
-    /* set tiling parameters */
+    /* set tiling launchereters */
     int Amb = BS;
     int Anb = BS;
     int Bmb = BS;
@@ -306,19 +306,19 @@ xkblas_£gemm_async(
 #  include "device/cublas-helper.h"
 
 static void
-body_cuda(void * vparam)
+body_cuda(void * vlauncher)
 {
-    task_kernel_param_t * param = (task_kernel_param_t *) vparam;
-    assert(param);
+    task_launcher_t * launcher = (task_launcher_t *) vlauncher;
+    assert(launcher);
 
     cublasStatus_t res;
-    cublasHandle_t handle = (cublasHandle_t) param->handle;
+    cublasHandle_t handle = (cublasHandle_t) launcher->handle;
 
-    const Access * A = param->task->accesses + 0;
-    const Access * B = param->task->accesses + 1;
-    const Access * C = param->task->accesses + 2;
+    const Access * A = launcher->task->accesses + 0;
+    const Access * B = launcher->task->accesses + 1;
+    const Access * C = launcher->task->accesses + 2;
 
-    args_t * args = (args_t *) (param->task + 1);
+    args_t * args = (args_t *) (launcher->task + 1);
     assert(args->transA == CblasNoTrans);
     assert(args->transB == CblasNoTrans);
 
@@ -331,7 +331,7 @@ body_cuda(void * vparam)
         B->device_view.ld,
         (void *) C->device_view.addr,
         C->device_view.ld,
-        param->task->label
+        launcher->task->label
     );
     #endif /* NDEBUG */
 
@@ -370,12 +370,15 @@ void
 register_£gemm_format(void)
 {
     task_format_t format;
-    snprintf(format.label, sizeof(format.label), "£gemm");
+    memset(&format, 0, sizeof(task_format_t));
+
 # ifdef USE_CPU
     format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
     format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
+    snprintf(format.label, sizeof(format.label), "£gemm");
+    format.target = TASK_FORMAT_TARGET_DRIVER;
     format_id = task_format_create(&format);
 }

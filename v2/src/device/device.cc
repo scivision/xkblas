@@ -71,8 +71,8 @@ xkblas_device_init(
     device->cnt_exec = 0;
     # endif
 
-    xkblas_context_t * ctx = xkblas_context_get();
-    device->offloader.init(&(ctx->conf.device.offloader), driver->f_stream_create);
+    xkblas_context_t * context = xkblas_context_get();
+    device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
 
     /* initialize device memory management */
     XKBLAS_MUTEX_INIT( device->memdev.mem_lock );
@@ -147,12 +147,10 @@ xkblas_device_accept_new_task(xkblas_device_t * device)
 
 static inline void
 xkblas_device_prepare_task(
-    ThreadWorker    * worker,
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task
 ) {
-    assert(worker == ThreadWorker::self());
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
 
@@ -160,6 +158,8 @@ xkblas_device_prepare_task(
     XKBLAS_INFO("Scheduling task `%s` of format `%d` on device %d - driver `%s`",
             task->label, task->fmtid, device->global_id, driver->f_get_name());
     # endif /* NDEBUG */
+
+    xkblas_context_t * context = xkblas_context_get();
 
     // 'prepare_execute:' label
 
@@ -175,13 +175,15 @@ xkblas_device_prepare_task(
     }
 # endif
 
-    /* retrieve the memory state */
-    xkblas_context_t * ctx = xkblas_context_get();
-    if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
+    /* fetch, return 'TASK_STATE_DATA_FETCHED' if the data got fetched early */
+    if (context->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_device_task_access_fetched(driver, device, task);
-        device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
+        xkblas_device_task_execute(driver, device, task);
+    }
+    else
+    {
+        /* task will be launched in a callback while all accesses were fetched */
     }
 }
 
@@ -331,8 +333,8 @@ xkblas_device_progress(
             int err = xkblas_device_poll(device);
             if (err == 0)
             {
-                xkblas_context_t * ctx = xkblas_context_get();
-                ctx->memtree.invalidate_caches();
+                xkblas_context_t * context = xkblas_context_get();
+                context->memtree.invalidate_caches();
                 xkblas_driver_invalidate_caches(driver, device);
             }
             kaapi_offload_requestreply(device, err);
@@ -365,7 +367,6 @@ xkblas_device_thread_main_loop(
     ThreadWorker * worker = ThreadWorker::self();
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
-        # if 1
         # pragma message(TODO "'device->offloader.is_empty' is called with no lock, while inner lists are modifed under locks, is this a problem ?")
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
@@ -376,12 +377,9 @@ xkblas_device_thread_main_loop(
 
         XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
                 device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));
-        # else
-        Task * task = worker->pop();
-        # endif
 
         if (task)
-            xkblas_device_prepare_task(worker, driver, device, task);
+            xkblas_device_prepare_task(driver, device, task);
         else
             xkblas_device_progress(driver, device);
     }

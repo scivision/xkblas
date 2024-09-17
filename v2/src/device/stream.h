@@ -76,7 +76,7 @@ class xkblas_stream_t
         /* allocate a new instruction to the stream (must then be commited via 'commit') */
         xkblas_stream_instruction_t * instruction_new(
             const xkblas_stream_instruction_type_t itype,
-            const xkblas_stream_callback_t & callback
+            const xkblas_callback_t & callback
         );
 
         /* commit the instruction to the stream (must be allocated via 'instruction_new') */

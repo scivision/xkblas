@@ -104,7 +104,7 @@ xkblas_stream_deinit(xkblas_stream_t * stream)
 xkblas_stream_instruction_t *
 xkblas_stream_t::instruction_new(
     const xkblas_stream_instruction_type_t itype,
-    const xkblas_stream_callback_t & callback
+    const xkblas_callback_t & callback
 ) {
     if (this->ready.is_full())
         return NULL;

@@ -17,25 +17,80 @@ static task_format_id_t TASK_FORMAT_COHERENT_ASYNC;
 static task_format_id_t TASK_FORMAT_COHERENT_ASYNC_FETCH;
 
 // args for 'TASK_FORMAT_COHERENT_ASYNC_FETCH'
-typedef struct  args_t
+typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
-    // TODO
-}               args_t;
+    /* the memory coherent async thread that scheduled the 'parent' task */
+    ThreadWorker * worker;
+
+    /* the parent task that launched the fetches on each devices */
+    Task * parent;
+
+    /* the fetch to perform */
+    fetch_t * fetch;
+
+    args_t(ThreadWorker * w, Task * p, fetch_t * f) : worker(w), parent(p), fetch(f) {}
+    ~args_t() {}
+
+}                                       args_t;
+
+static void
+body_memory_coherent_async_fetch_callback(
+    const void * args[XKBLAS_CALLBACK_ARGS_MAX]
+) {
+
+}
+
+static void
+body_memory_coherent_async_fetch(void * vlauncher)
+{
+    // unpack stuff
+    const task_launcher_t * launcher = (task_launcher_t *) vlauncher;
+    assert(launcher);
+
+    const args_t * args = (args_t *) (launcher->task + 1);
+    assert(args);
+
+    const ThreadWorker * worker = args->worker;
+    assert(worker);
+
+    const Task * parent = args->parent;
+    assert(parent);
+
+    const fetch_t * fetch = args->fetch;
+    assert(fetch);
+
+    const Task * task = launcher->task;
+    assert(task);
+
+    // worker is the memory async thread, self is the device thread
+    assert(worker != ThreadWorker::self());
+
+    // TODO : submit fetch - with a callback doing parent->fetched() on completion
+    xkblas_callback_t callback;
+    callback.func    = body_memory_coherent_async_fetch_callback;
+    callback.args[0] = worker;
+    callback.args[1] = parent;
+    callback.args[2] = task;
+}
 
 void
 xkblas_memory_coherent_async_register_format(void)
 {
     {
         task_format_t format;
-        snprintf(format.label, sizeof(format.label), "xkblas_memory_coherent_async");
+        memset(format.f, 0, sizeof(format.f));
+        snprintf(format.label, sizeof(format.label), "coherent");
         // no body, body is implicit, see the main loop
+        format.target = TASK_FORMAT_TARGET_HOST;
         TASK_FORMAT_COHERENT_ASYNC = task_format_create(&format);
     }
 
     {
         task_format_t format;
-        snprintf(format.label, sizeof(format.label), "xkblas_memory_coherent_async_fetch");
-        // TODO : add a body - as this is executed by a device thread
+        memset(format.f, 0, sizeof(format.f));
+        format.f[XKBLAS_DRIVER_TYPE_CPU] = body_memory_coherent_async_fetch;
+        snprintf(format.label, sizeof(format.label), "coherent_fetch");
+        format.target = TASK_FORMAT_TARGET_HOST;
         TASK_FORMAT_COHERENT_ASYNC_FETCH = task_format_create(&format);
     }
 }
@@ -43,30 +98,6 @@ xkblas_memory_coherent_async_register_format(void)
 /////////////////////////////
 // HELPER THREAD MAIN LOOP //
 /////////////////////////////
-
-static void
-xkblas_memory_coherent_async_worker_thread_body(
-        const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX]
-) {
-    ThreadWorker * worker = (ThreadWorker *) args[0];
-    assert(worker);
-
-    // worker is the memory async thread, self is the device thread
-    assert(worker != ThreadWorker::self());
-
-    Task * current = (Task *) args[1];
-    assert(current);
-
-    fetch_t * fetch = (fetch_t *) args[2];
-    assert(fetch);
-
-    // TODO : have the fetch task executed
-    // xkblas_device_task_executed(
-    // TODO : submit fetch
-
-    if (current->fetched() == TASK_STATE_DATA_FETCHED)
-        worker->complete(current);
-}
 
 static void
 xkblas_memory_coherent_async_worker_thread_work(
@@ -116,10 +147,10 @@ xkblas_memory_coherent_async_worker_thread_work(
         assert(mem);
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);
-        new(task) Task(TASK_FORMAT_COHERENT_ASYNC_FETCH);
+        new(task) Task(TASK_FORMAT_COHERENT_ASYNC_FETCH, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
         args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
-        // TODO : new(args) args_t(thread, current, fetch);
+        new(args) args_t(thread, current, fetch);
 
         #ifndef NDEBUG
         snprintf(task->label, sizeof(task->label), "xkblas_memory_coherent_async(%p)", fetch);
@@ -127,6 +158,7 @@ xkblas_memory_coherent_async_worker_thread_work(
 
         producer->commit<0>(context, task);
 
+        // TODO : remove this fetched, and add it on actual fetch completion
         current->fetched();
     }
 
@@ -152,6 +184,7 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
             thread->pause();
         }
 
+        assert(task->fmtid == TASK_FORMAT_COHERENT_ASYNC);
         xkblas_memory_coherent_async_worker_thread_work(context, thread, task);
     }
 }
@@ -203,8 +236,8 @@ xkblas_memory_coherent_async(
 ) {
     XKBLAS_IMPL("in `xkblas_memory_coherent_async` - uplo and memflag parameters not supported");
 
-    xkblas_context_t * ctx = xkblas_context_get();
-    assert(ctx);
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
 
     /* create a task with a null body that reads the data, and force its scheduling onto the host */
 
@@ -225,5 +258,5 @@ xkblas_memory_coherent_async(
     strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
     #endif /* NDEBUG */
 
-    thread->commit<1>(ctx, task);
+    thread->commit<1>(context, task);
 }

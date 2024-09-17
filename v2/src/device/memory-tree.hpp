@@ -537,15 +537,15 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
                 /* the task kernel is ready for execution */
-                xkblas_device_task_access_fetched(f->driver, f->device, task);
+                xkblas_device_task_execute(f->driver, f->device, task);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
         }
 
         static void
-        fetch_callback(const void * args[XKBLAS_STREAM_CALLBACK_ARGS_MAX])
+        fetch_callback(const void * args[XKBLAS_CALLBACK_ARGS_MAX])
         {
-            assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
+            assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
 
             fetch_t * f = (fetch_t *) args[0];
             assert(f);
@@ -639,8 +639,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             };
 
             /* callback setup */
-            assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
-            xkblas_stream_callback_t callback;
+            assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
+            xkblas_callback_t callback;
             callback.func = fetch_callback;
             callback.args[0] = f;
 
