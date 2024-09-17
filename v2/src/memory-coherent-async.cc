@@ -86,13 +86,28 @@ body_memory_coherent_async_fetch(void * vlauncher)
     assert(worker != ThreadWorker::self());
 
     // TODO : submit fetch - with a callback doing parent->fetched() on completion
+    static_assert(XKBLAS_CALLBACK_ARGS_MAX >= 4);
     xkblas_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
     callback.args[0] = worker;
     callback.args[1] = parent;
     callback.args[2] = task;
+    callback.args[3] = fetch;
 
-    # if 0
+    # if !USE_CUDA
+    XKBLAS_FATAL("Only supporting CUDA driver for D2H transfers");
+    # endif
+
+    # pragma message(TODO "Instead, get the driver or the func associated to the 'src' device")
+    xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
+    assert(driver);
+
+    xkblas_device_t * device = xkblas_device_get(fetch->src_device_global_id);
+    assert(device);
+
+    // the current task must be executing on the device's thread for that fetch
+    assert(device->thread == ThreadWorker::self());
+
     /* launch asynchronous copy */
     memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
     xkblas_stream_instruction_submit_copy(
@@ -100,14 +115,11 @@ body_memory_coherent_async_fetch(void * vlauncher)
         device,
         fetch->host_view,
         HOST_DEVICE_GLOBAL_ID,
-        fetch->host_view,
+        host_replicate_view,
         fetch->src_device_global_id,
         fetch->src_view,
         callback
     );
-    # endif
-
-    XKBLAS_ERROR("TODO : implement me, add fetch here");
 }
 
 void
