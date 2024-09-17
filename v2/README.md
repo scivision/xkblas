@@ -26,4 +26,8 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 
 # To improve
 - Tasks descriptor is allocated in the producer thread memory... while it will be heavily accessed and modified by consumers
-- Tasks are currently never deleted, as they may be referenced in the memory tree
+- Tasks are currently never deleted (?)
+- Merge continuous memory block to a single transfer
+- memory ordering on atomic
+- Task descriptor size
+- Automatically run `python3 generate.py` in `src/kernels` if `src/kernels/gemm.cc` got modified

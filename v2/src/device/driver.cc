@@ -305,15 +305,17 @@ xkblas_device_task_executed(
 ) {
     assert(args);
 
-    ThreadWorker * thread = (ThreadWorker *) args[0];
+    ThreadWorker * thread = ThreadWorker::self();
     assert(thread);
 
-    Task * task = (Task *) args[1];
+    Task * task = (Task *) args[0];
     assert(task);
 
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->kernels.completed;
+    ++stats->tasks.completed;
+    if (task->fmtid != TASK_FORMAT_NULL)
+        ++stats->kernels.completed;
     # endif /* USE_STATS */
 
     # ifndef NDEBUG
@@ -325,28 +327,27 @@ xkblas_device_task_executed(
 
 /**
  * Must be called once all task accessed were fetched, to queue the task kernel for execution
- *  - worker - the thread that scheduled this task (to decrement thread->uncompleted counter)
  *  - driver - the driver to use for executing the kernel
  *  - device - the device to use for executing the kernel
  *  - task   - the task
  */
 void
 xkblas_device_task_access_fetched(
-    ThreadWorker    * worker,
     xkblas_driver_t * driver,
     xkblas_device_t * device,
                Task * task
 ) {
-    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 0);
+    assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
 
     xkblas_stream_callback_t callback;
     callback.func    = xkblas_device_task_executed;
-    callback.args[0] = worker;
-    callback.args[1] = task;
+    callback.args[0] = task;
 
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->kernels.launched;
+    ++stats->tasks.launched;
+    if (task->fmtid != TASK_FORMAT_NULL)
+        ++stats->kernels.launched;
     # endif /* USE_STATS */
 
     /* running an empty task */

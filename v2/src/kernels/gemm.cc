@@ -69,6 +69,7 @@ xkblas_£gemm_tile_async(
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
     uint8_t * mem  = thread->allocate(task_size + args_size);
+    assert(mem);
 
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id);
@@ -98,6 +99,7 @@ xkblas_£gemm_tile_async(
     new(task->accesses + 2) Access(C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
+
     return 0;
 }
 
@@ -352,11 +354,13 @@ body_cuda(void * vparam)
 }
 # endif /* USE_CUDA */
 
+# ifdef USE_CPU
 static void
-body_host(void * args)
+body_cpu(void * args)
 {
-    XKBLAS_DEBUG("Executing a gemm on host");
+    XKBLAS_DEBUG("Executing a gemm on cpu");
 }
+# endif /* USE_CPU */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -366,8 +370,10 @@ void
 register_£gemm_format(void)
 {
     task_format_t format;
-    strcpy(format.label, "£gemm");
-    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_host;
+    snprintf(format.label, sizeof(format.label), "£gemm");
+# ifdef USE_CPU
+    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
+# endif /* USE_CPU */
 # ifdef USE_CUDA
     format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */

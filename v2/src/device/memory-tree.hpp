@@ -479,13 +479,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
     public:
 
-        typedef struct  fetch_info_t
+        typedef struct  fetch_t
         {
             /* the memory tree */
             KMemoryTree * tree;
-
-            /* worker thread that requested the fetch (and scheduled the associated task) */
-            ThreadWorker * worker;
 
             /* driver of the device */
             xkblas_driver_t * driver;
@@ -499,16 +496,38 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             /* dst view (DEBUG PURPOSES, REMOVE ME */
             memory_replicate_view_t dst_view;
 
-            /* the allocation being fetched (or null if fetching to host) */
-            const uintptr_t allocation;
+            /* mark 'fetched' all the tasks awaiting on that allocation */
+            uintptr_t allocation;
 
-            /* the task that initiated the fetch (or null if fetching to a device) */
+            /* mark 'fetched' this task */
             Task * task;
 
-        }               fetch_info_t;
+            /* the next fetch in the list */
+            fetch_t * next;
+
+        }               fetch_t;
+
+        typedef struct  fetch_list_t
+        {
+            /* list of fetches to submit */
+            fetch_t * fetches;
+
+            /* number of pending fetches */
+            volatile std::atomic<int32_t> pending;
+
+            /* the list can be deleted if this returns '0' */
+            int32_t
+            fetched(void)
+            {
+                const int32_t p = pending.fetch_sub(1, std::memory_order_relaxed);
+                assert(p >= 0);
+                return p;
+            }
+
+        }               fetch_list_t;
 
         static inline void
-        fetch_callback_task(fetch_info_t * f, Task * task)
+        fetch_callback_task(fetch_t * f, Task * task)
         {
             # ifndef NDEBUG
             XKBLAS_WARN("Completed transfer to `dst=%p` required by task `%s`", f->dst_view.addr, task->label);
@@ -518,7 +537,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
                 /* the task kernel is ready for execution */
-                xkblas_device_task_access_fetched(f->worker, f->driver, f->device, task);
+                xkblas_device_task_access_fetched(f->driver, f->device, task);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
         }
@@ -528,7 +547,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         {
             assert(XKBLAS_STREAM_CALLBACK_ARGS_MAX >= 1);
 
-            fetch_info_t * f = (fetch_info_t *) args[0];
+            fetch_t * f = (fetch_t *) args[0];
             assert(f);
 
             if (f->task)
@@ -595,7 +614,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             xkblas_driver_t * driver,
             xkblas_device_t * device,
             Task * task,
-            ThreadWorker * worker,
             Partite & partite,
             uintptr_t allocation
         ) {
@@ -609,15 +627,15 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
 
             /* allocate fetch info for the callback argument */
-            fetch_info_t * f = new fetch_info_t{
+            fetch_t * f = new fetch_t{
                 .tree = this,
-                .worker = worker,
                 .driver = driver,
                 .device = device,
                 .region{partite.region},
                 .dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view,
                 .allocation = allocation,
-                .task       = task
+                .task       = task,
+                .next       = NULL
             };
 
             /* callback setup */
@@ -639,6 +657,97 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             );
         }
 
+        ////////////////////////////////////////////////////////////
+        // Create a list of fetch requests for the given accesses //
+        ////////////////////////////////////////////////////////////
+        inline void
+        create_fetch_list_for_host_access(
+            ThreadWorker * thread,
+            Access * access,
+            fetch_list_t * list
+        ) {
+            assert(access);
+            assert(access->mode & ACCESS_MODE_R);
+
+            Search search(HOST_DEVICE_GLOBAL_ID);
+            search.prepare_search_blocks();
+            this->lock();
+            {
+                /* find all blocks that intersects with that access */
+                this->intersect(search, access->region, access->mode);
+
+                /* launch fetch on each device */
+                for (Partite & partite : search.partition)
+                {
+                    MemoryBlock * block = partite.block;
+
+                    /* not valid on any device, then assume valid on the host */
+                    if (block->valid == 0)
+                    {
+                        partite.must_fetch = false;
+                        continue ;
+                    }
+                    partite.must_fetch = true;
+
+                    // TODO what is concurrent read happens on the host ?
+
+                    /////////////////////////
+                    // SRC - FIND BEST SRC //
+                    /////////////////////////
+                    // TODO : interface is dog poop, improve that
+                    partite.dst_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                    partite.dst_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
+                    this->fetch_access_find_src(access, partite);
+                    assert(partite.src_device_global_id   != partite.dst_device_global_id);
+                    assert(partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
+                }
+            }
+            this->unlock();
+
+            /* launch fetch on each device */
+            for (Partite & partite : search.partition)
+            {
+                if (!partite.must_fetch)
+                    continue ;
+
+                // create fetch list now
+                xkblas_device_t * device = xkblas_device_get(partite.src_device_global_id);
+                assert(device);
+
+                /* host replicate view if no allocation were found */
+                memory_replicate_view_t host_view(partite.host_view.begin_addr(), partite.host_view.ld);
+
+                /* allocate fetch info for the callback argument */
+                fetch_t * f = (fetch_t *) thread->allocate(sizeof(fetch_t));
+                f->tree       = this;
+                f->driver     = NULL;
+                f->device     = device;
+                f->region     = partite.region;
+                f->dst_view   = host_view;
+                f->allocation = 0;
+                f->task       = NULL;
+                f->next       = list->fetches;
+
+                list->fetches = f;
+            }
+        }
+
+        void
+        create_fetch_list_for_host(
+            ThreadWorker * thread,
+            Access * accesses,
+            int naccesses,
+            fetch_list_t * list
+        ) {
+            assert(naccesses > 0);
+            assert(accesses);
+
+            list->fetches = NULL;
+            for (int i = 0 ; i < naccesses ; ++i)
+                create_fetch_list_for_host_access(thread, accesses + i, list);
+        }
+
+        # if 0
         ////////////////////////
         //  FETCH ON THE HOST //
         ////////////////////////
@@ -729,6 +838,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
             return task->fetched();
         }
+        # endif
 
         ////////////////////////
         //  FETCH ON A DEVICE //
@@ -1064,9 +1174,7 @@ next_view:
                         continue ;
                     }
 
-                    // TODO : bad design
-                    ThreadWorker * worker = ThreadWorker::self();
-                    this->fetch_access_copy_partite(driver, device, task, worker, partite, allocation);
+                    this->fetch_access_copy_partite(driver, device, task, partite, allocation);
                 }
             }
         }

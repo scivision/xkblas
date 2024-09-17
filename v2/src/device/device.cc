@@ -180,7 +180,7 @@ xkblas_device_prepare_task(
     if (ctx->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_device_task_access_fetched(worker, driver, device, task);
+        xkblas_device_task_access_fetched(driver, device, task);
         device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
     }
 }

@@ -24,8 +24,8 @@ class xkblas_stream_instruction_queue_t
         xkblas_stream_instruction_t * instr;    /* instructions buffer */
         uint32_t capacity;                      /* buffer capacity */
         struct {
-            volatile std::atomic<uint32_t> r;   /* first instruction to process */
-            volatile std::atomic<uint32_t> w;   /* next position for inserting instructions */
+            uint32_t r;   /* first instruction to process */
+            uint32_t w;   /* next position for inserting instructions */
         } pos;
 
     public:
