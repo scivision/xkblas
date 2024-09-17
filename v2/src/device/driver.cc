@@ -306,10 +306,6 @@ xkblas_device_task_executed(
         ++stats->kernels.completed;
     # endif /* USE_STATS */
 
-    # ifndef NDEBUG
-    XKBLAS_WARN("Task `%s` completed", task->label);
-    # endif /* NDEBUG */
-
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread);
 

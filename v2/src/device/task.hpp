@@ -180,6 +180,10 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
+                # ifndef NDEBUG
+                XKBLAS_INFO("Task `%s` fetched", this->label);
+                # endif /* NDEBUG */
+
                 this->state.value = TASK_STATE_DATA_FETCHED;
                 return TASK_STATE_DATA_FETCHED;
             }
@@ -189,6 +193,10 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         executed(void)
         {
+            # ifndef NDEBUG
+            XKBLAS_INFO("Task `%s` executed", this->label);
+            # endif /* NDEBUG */
+
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
@@ -200,6 +208,10 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         complete(void)
         {
+            # ifndef NDEBUG
+            XKBLAS_INFO("Task `%s` completed", this->label);
+            # endif /* NDEBUG */
+
             assert(this->state.value == TASK_STATE_EXECUTED);
             for (Edge & edge : this->edges)
             {

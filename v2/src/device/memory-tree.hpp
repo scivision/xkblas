@@ -493,14 +493,18 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             /* logical region */
             Region region;
 
-            /* dst view (DEBUG PURPOSES, REMOVE ME */
-            memory_replicate_view_t dst_view;
-
             /* mark 'fetched' all the tasks awaiting on that allocation */
             uintptr_t allocation;
 
             /* mark 'fetched' this task */
             Task * task;
+
+            /* dst = host view */
+            memory_view_t host_view;
+
+            /* src view */
+            memory_replicate_view_t src_view;
+            xkblas_device_global_id_t src_device_global_id;
 
             /* the next fetch in the list */
             fetch_t * next;
@@ -529,10 +533,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         static inline void
         fetch_callback_task(fetch_t * f, Task * task)
         {
-            # ifndef NDEBUG
-            XKBLAS_WARN("Completed transfer to `dst=%p` required by task `%s`", f->dst_view.addr, task->label);
-            # endif /* NDEBUG */
-
             /* a fetch completed */
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
@@ -632,10 +632,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 .driver = driver,
                 .device = device,
                 .region{partite.region},
-                .dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view,
                 .allocation = allocation,
-                .task       = task,
-                .next       = NULL
+                .task       = task
             };
 
             /* callback setup */
@@ -723,7 +721,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 f->driver     = NULL;
                 f->device     = device;
                 f->region     = partite.region;
-                f->dst_view   = host_view;
                 f->allocation = 0;
                 f->task       = NULL;
                 f->next       = list->fetches;

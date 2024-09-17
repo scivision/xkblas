@@ -37,6 +37,26 @@ static void
 body_memory_coherent_async_fetch_callback(
     const void * args[XKBLAS_CALLBACK_ARGS_MAX]
 ) {
+    // self
+    ThreadWorker * self = ThreadWorker::self();
+    assert(self);
+
+    // unpack stuff
+    ThreadWorker * worker = (ThreadWorker *) args[0];
+    assert(worker);
+
+    // self is a device thread, worker is the asynchronous coherent copy thread
+    assert(self != worker);
+
+    Task * parent = (Task *) args[1];
+    assert(parent);
+
+    Task * child = (Task *) args[2];
+    assert(child);
+
+   // one fetched completed, notify the parent
+    if (parent->fetched() == TASK_STATE_DATA_FETCHED)
+        worker->complete(parent);
 
 }
 
@@ -71,6 +91,23 @@ body_memory_coherent_async_fetch(void * vlauncher)
     callback.args[0] = worker;
     callback.args[1] = parent;
     callback.args[2] = task;
+
+    # if 0
+    /* launch asynchronous copy */
+    memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
+    xkblas_stream_instruction_submit_copy(
+        driver,
+        device,
+        fetch->host_view,
+        HOST_DEVICE_GLOBAL_ID,
+        fetch->host_view,
+        fetch->src_device_global_id,
+        fetch->src_view,
+        callback
+    );
+    # endif
+
+    XKBLAS_ERROR("TODO : implement me, add fetch here");
 }
 
 void
@@ -153,13 +190,10 @@ xkblas_memory_coherent_async_worker_thread_work(
         new(args) args_t(thread, current, fetch);
 
         #ifndef NDEBUG
-        snprintf(task->label, sizeof(task->label), "xkblas_memory_coherent_async(%p)", fetch);
+        snprintf(task->label, sizeof(task->label), "coherent_fetch(%p)", fetch);
         #endif /* NDEBUG */
 
         producer->commit<0>(context, task);
-
-        // TODO : remove this fetched, and add it on actual fetch completion
-        current->fetched();
     }
 
     // completion
