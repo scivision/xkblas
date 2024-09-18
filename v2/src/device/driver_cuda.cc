@@ -482,6 +482,51 @@ XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_id)
     return 0;
 }
 
+static int
+XKBLAS_DRIVER_ENTRYPOINT(get_source)(int dst_global_id, int bitmask)
+{
+    int dst_driver_id = -1;
+    for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
+    {
+         xkblas_device_cuda_t* pdev = DEVICES + driver_dev_id;
+         if( pdev->inherited.state == XKBLAS_DEVICE_STATE_CREATE )
+             continue;
+         if( pdev->inherited.global_id == dst_global_id )
+         {
+             dst_driver_id = pdev->inherited.driver_id;
+             break;
+         }
+    }
+    if( dst_driver_id == -1 )
+    { // Can't found dst in the driver devices...
+        return -1;
+    }
+
+    int src = -1;
+    int src_rank = INT_MAX;
+    for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
+    {
+         xkblas_device_cuda_t* pdev = DEVICES + driver_dev_id;
+
+         // 1 - check if the device exist/is initialized ?
+         if( !(pdev->inherited.state == XKBLAS_DEVICE_STATE_COMMIT || pdev->inherited.state == XKBLAS_DEVICE_STATE_RUNNING) )
+             continue; // Device is not is a valid state
+
+         // 2 - check if the data is valid here
+         if( ((1 << pdev->inherited.global_id) & bitmask) == 0 )
+             continue; // Data is not valid on this device
+
+         // 3 - check the rank
+         int rank = cuda_perf_topo[dst_driver_id][driver_dev_id];
+         if( rank < src_rank )
+         {
+             src = pdev->inherited.global_id;
+             src_rank = rank;
+         }
+    }
+    return src_rank;
+}
+
 /* Called on all devices of the driver after they have been initialized */
 static int
 XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
@@ -904,6 +949,8 @@ XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
 
     EP(stream_create);
     EP(stream_delete);
+
+    EP(get_source);
 
     #if 0
 

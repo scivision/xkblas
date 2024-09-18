@@ -553,24 +553,17 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
         static inline void
         fetch_access_find_src(
+            xkblas_driver_t * driver,
             Access * access,
             Partite & partite
         ) {
             assert(partite.block->valid);
 
-            // TODO : currently taking source as the device with the smallest id,
-            // instead, maybe try to balance the workload between GPU and use
-            // devices with the best bandwidth
-            int src = __builtin_ffs(partite.block->valid) - 1;
-
-            // TODO
-            //  partite - is a sub-block of the 'access'
-            //  partite.block->valid - is a bitset mapping devices global id to partite validity
-            //  partite.dst_device_global_id - is where we are sending the data
-            //
-            //  int dst = partite.dst_device_global_id;
-            //  int valid = partite.block->valid;
-            //  int src = driver_cuda_toto(dst, valid);
+            int dst = partite.dst_device_global_id;
+            int valid = partite.block->valid;
+            int src = driver->f_get_source(dst, valid);
+            if( src == -1 ) // Driver failed to found a valid source
+                src = __builtin_ffs(partite.block->valid) - 1;
             assert(src >= 0);
 
             // Get the first valid allocation on that device
@@ -1085,7 +1078,7 @@ next_view:
                     // valid on some devices
                     else
                     {
-                        this->fetch_access_find_src(access, partite);
+                        this->fetch_access_find_src(driver, access, partite);
                     }
 
                     //////////////////////////////
