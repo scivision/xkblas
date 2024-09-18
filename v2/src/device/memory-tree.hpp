@@ -504,6 +504,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         static inline void
         fetch_callback_task(internal_fetch_t * f, Task * task)
         {
+            XKBLAS_DEBUG("Notified task `%s` for allocation `%p` fetched", task->label, f->allocation);
+
             /* a fetch completed */
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
@@ -520,6 +522,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
             internal_fetch_t * f = (internal_fetch_t *) args[0];
             assert(f);
+
+            XKBLAS_DEBUG("Fetch completed for allocation `%p`", f->allocation);
 
             if (f->task)
                 fetch_callback_task(f, f->task);

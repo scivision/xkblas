@@ -94,9 +94,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(A, lda, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(B, ldb, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
 

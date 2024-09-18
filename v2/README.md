@@ -30,3 +30,4 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 - Merge continuous memory block to a single transfer
 - memory ordering on atomic
 - Task descriptor size
+- xkblas (and cuda) assume col major accesses... can we manage row major too ?

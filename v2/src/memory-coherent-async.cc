@@ -272,6 +272,8 @@ xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 // Memory coherency //
 //////////////////////
 
+# pragma message(TODO "'xkblas_memory_coherent_async' should take a row/col major parameter")
+
 extern "C"
 void
 xkblas_memory_coherent_async(
@@ -298,7 +300,7 @@ xkblas_memory_coherent_async(
 
     Task * task = reinterpret_cast<Task *>(mem);
     new(task) Task(TASK_FORMAT_COHERENT_ASYNC, TASK_MAX_ACCESSES, HOST_DEVICE_GLOBAL_ID);
-    new(task->accesses + 0) Access(ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
     #ifndef NDEBUG
     strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));

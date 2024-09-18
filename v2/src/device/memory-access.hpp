@@ -23,6 +23,7 @@ class KMemoryAccess : public access_t<K>
         KMemoryAccess() {}
 
         KMemoryAccess(
+            const matrix_order_t & order,
             const void * addr,
             const int & LD,
             const int & tm,
@@ -32,7 +33,7 @@ class KMemoryAccess : public access_t<K>
             const uint32_t & sizeof_type,
             const access_mode_t & m
         ) :
-            KMemoryAccess(memory_view_t(addr, LD, tm, tn, bm, bn, sizeof_type), m)
+            KMemoryAccess(memory_view_t(order, addr, LD, tm, tn, bm, bn, sizeof_type), m)
         {}
 
         KMemoryAccess(
@@ -45,14 +46,6 @@ class KMemoryAccess : public access_t<K>
         {}
 
         virtual ~KMemoryAccess() {}
-
-        # if 0
-        inline size_t
-        size(void) const
-        {
-            return host_view.size();
-        }
-        # endif
 
 }; /* KMemoryAccess */
 

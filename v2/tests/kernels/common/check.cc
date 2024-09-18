@@ -23,9 +23,9 @@ dump_matrix(
     if (ld <= 32)
     {
         printf("---- %s ----\n", label);
-        for (int i = 0 ; i < ld ; ++i)
-            for (int j = 0 ; j < ld ; ++j)
-                printf("%4.4f%c", M[i*ld+j], (j == ld-1) ? '\n' : ' ');
+        for (int j = 0 ; j < ld ; ++j)
+            for (int i = 0 ; i < ld ; ++i)
+                printf("%4.4f%c", M[i*ld+j], (i == ld-1) ? '\n' : ' ');
 
     }
 }
