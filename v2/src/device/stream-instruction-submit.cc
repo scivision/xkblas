@@ -58,7 +58,7 @@ xkblas_stream_instruction_submit_kernel(
     xkblas_device_submit(device, stream, instr);
 }
 
-# pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, bs_n, bs_m) i believe")
+# pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
 void
 xkblas_stream_instruction_submit_copy(
     const xkblas_driver_t          * driver,

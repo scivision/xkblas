@@ -46,16 +46,18 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
 static task_format_id_t format_id;
 
+/* m, n, k are matrix sizes
+ * Am, An, ..., Cn are index of the tile begining */
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
     int transA, int transB,
-    int bs_m, int bs_n, int bs_k,
+    int m, int n, int k,
     const TYPE * alpha,
-    const TYPE * A, int Atm, int Atn, int lda,
-    const TYPE * B, int Btm, int Btn, int ldb,
+    const TYPE * A, int Am, int An, int lda,
+    const TYPE * B, int Bm, int Bn, int ldb,
     const TYPE * beta,
-          TYPE * C, int Ctm, int Ctn, int ldc
+          TYPE * C, int Cm, int Cn, int ldc
 ) {
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)B % ldb == 0);
@@ -77,26 +79,24 @@ xkblas_£gemm_tile_async(
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);
     assert(transB == CblasNoTrans);
-    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", Atm, Atn, Btm, Btn, Ctm, Ctn);
+    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", Am, An, Bm, Bn, Cm, Cn);
     # endif /* NDEBUG */
 
     # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'ldc' ?")
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
-    new(args) args_t(transA, transB, bs_m, bs_n, bs_k, *alpha, *beta);
+    new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
 
     # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
 
     // block size
-    const int BS = bs_m;
-    assert(bs_m == bs_n);
-    assert(bs_m == bs_k);
+    XKBLAS_DEBUG("Inserting (%d, %d) x (%d, %d)", m, k, k, n);
 
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, Atm, Atn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, Btm, Btn, BS, BS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Ctm, Ctn, BS, BS, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, Am, An, m, k, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, Bm, Bn, k, n, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Cm, Cn, m, n, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
     return 0;
@@ -181,19 +181,14 @@ xkblas_£gemm_async(
     if (tile[0] == 0 || tile[1] == 0)
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
     assert(tile[0] == tile[1]);
-    const int BS = tile[0];
 
-    assert(M % BS == 0);
-    assert(N % BS == 0);
-    assert(K % BS == 0);
-
-    /* set tiling launchereters */
-    int Amb = BS;
-    int Anb = BS;
-    int Bmb = BS;
-    int Bnb = BS;
-    int Cmb = BS;
-    int Cnb = BS;
+    /* set tiling parameters */
+    int Amb = tile[0];
+    int Anb = tile[0];
+    int Bmb = tile[0];
+    int Bnb = tile[0];
+    int Cmb = tile[0];
+    int Cnb = tile[0];
 
     int Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
     int Ant = XKBLAS_NUM_OF_TILES(An, Anb);
@@ -201,6 +196,8 @@ xkblas_£gemm_async(
     int Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
     int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
     int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+
+    # pragma message(TODO "Double check tiling offset in presence of transposed matrix")
 
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
@@ -223,10 +220,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm, tk, lda,
-                                B, tk, tn, ldb,
+                                A, tm*Amb, tk*Anb, lda,
+                                B, tk*Bmb, tn*Bnb, ldb,
                                 &zbeta,
-                                C, tm, tn, ldc
+                                C, tm*Cmb, tn*Cnb, ldc
                         );
                     }
                 }
@@ -242,10 +239,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm, tk, lda,
-                                B, tn, tk, ldb,
+                                A, tm*Amb, tk*Anb, lda,
+                                B, tn*Bmb, tk*Bnb, ldb,
                                 &zbeta,
-                                C, tm, tn, ldc
+                                C, tm*Cmb, tn*Cnb, ldc
                         );
                     }
                 }
@@ -264,10 +261,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,
-                                A, tk, tm, lda,
-                                B, tk, tn, ldb,
+                                A, tk*Amb, tm*Anb, lda,
+                                B, tk*Bmb, tn*Bnb, ldb,
                                 &zbeta,
-                                C, tm, tn, ldc
+                                C, tm*Cmb, tn*Cnb, ldc
                         );
                     }
                 }
@@ -283,10 +280,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,
-                                A, tk, tm, lda,
-                                B, tn, tk, ldb,
+                                A, tk*Amb, tm*Anb, lda,
+                                B, tn*Bmb, tk*Bnb, ldb,
                                 &zbeta,
-                                C, tm, tn, ldc
+                                C, tm*Cmb, tn*Cnb, ldc
                         );
                     }
                 }

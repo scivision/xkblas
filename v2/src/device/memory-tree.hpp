@@ -90,13 +90,13 @@ class MemoryReplicate
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
         volatile uint8_t nallocations;
 
-        static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX);
-
         /* valid allocations */
         volatile memory_replicates_bitfield_t valid;
 
         /* fetching allocations */
         volatile memory_replicates_bitfield_t fetching;
+
+        static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX);
 
     public:
         MemoryReplicate() : allocations(), nallocations(0), valid(0), fetching(0) {}
@@ -325,7 +325,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         {
             // TODO : is access->region != r ; then the access resulted in
             // several insertion nodes, which i snot s upported yet
-            assert(access->region.equals(r));
         }
 
         /* the region was accessed before, create a new node and inherit from 'src' state */
@@ -451,8 +450,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         {
             // KIntervalBtree<K, DeviceInvalidRegions>::Node::dump_region_str(f);
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
-            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.bs_m, this->block.host_view.bs_n, this->block.host_view.ld);
-            fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.tm,   this->block.host_view.tn);
+            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
+            fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
 
          // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX+1 ; ++device_global_id)
@@ -786,9 +785,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             // shit over again once memory got allocated
 
             /* allocate continuous memory for that access */
-            uint64_t  size = access->host_view.bs_n * access->host_view.bs_m * access->host_view.sizeof_type;
+            uint64_t  size = access->host_view.n * access->host_view.m * access->host_view.sizeof_type;
             uintptr_t addr = (uintptr_t) xkblas_memory_allocate(driver, device, size);
-            int         ld = access->host_view.bs_n;
+            int         ld = access->host_view.n;
             XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
             assert(addr);
 
@@ -1112,6 +1111,8 @@ next_view:
             this->lock();
             {
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
+
+                XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.m);
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);

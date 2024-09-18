@@ -34,13 +34,13 @@ typedef struct  matrix_tile_t
     /* matrix ld */
     int ld;
 
-    /* tile accessed (in [0..ntiles[) */
-    int tm; // row
-    int tn; // col
+    /* beginning of the tile accessed */
+    int offset_m; // offset begin row
+    int offset_n; // offset begin col
 
     /* tile size (number of element per row/col) */
-    int bs_m;   // row
-    int bs_n;   // col
+    int m;   // size row
+    int n;   // size col
 
     /* size of type in bytes (eg float == 4, double == 8) */
     int sizeof_type;
@@ -52,32 +52,32 @@ typedef struct  matrix_tile_t
         const matrix_order_t & order,
         const void * & addr,
         const int & ld,
-        const int & tm,
-        const int & tn,
-        const int & bs_m,
-        const int & bs_n,
+        const int & offset_m,
+        const int & offset_n,
+        const int & m,
+        const int & n,
         const int & sizeof_type
     ) :
-        matrix_tile_t(order, (uintptr_t)addr, ld, tm, tn, bs_m, bs_n, sizeof_type)
+        matrix_tile_t(order, (uintptr_t)addr, ld, offset_m, offset_n, m, n, sizeof_type)
     {}
 
     matrix_tile_t(
         const matrix_order_t & order,
         const uintptr_t & addr,
         const int & ld,
-        const int & tm,
-        const int & tn,
-        const int & bs_m,
-        const int & bs_n,
+        const int & offset_m,
+        const int & offset_n,
+        const int & m,
+        const int & n,
         const int & sizeof_type
     ) :
         order(order),
         addr(addr),
         ld(ld),
-        tm(tm),
-        tn(tn),
-        bs_m(bs_m),
-        bs_n(bs_n),
+        offset_m(offset_m),
+        offset_n(offset_n),
+        m(m),
+        n(n),
         sizeof_type(sizeof_type)
     {}
 
@@ -85,10 +85,10 @@ typedef struct  matrix_tile_t
         order(src.order),
         addr(src.addr),
         ld(src.ld),
-        tm(src.tm),
-        tn(src.tn),
-        bs_m(src.bs_m),
-        bs_n(src.bs_n),
+        offset_m(src.offset_m),
+        offset_n(src.offset_n),
+        m(src.m),
+        n(src.n),
         sizeof_type(src.sizeof_type)
     {}
 
@@ -104,26 +104,16 @@ typedef struct  matrix_tile_t
         {
             case (MATRIX_ROWMAJOR):
                 return this->addr +
-                    (this->tn * this->bs_n * this->sizeof_type) +
-                    (this->tm * this->bs_m * this->sizeof_type * this->ld);
+                    (this->offset_n * this->sizeof_type) +
+                    (this->offset_m * this->sizeof_type * this->ld);
 
             case (MATRIX_COLMAJOR):
                 return this->addr +
-                    (this->tn * this->bs_n * this->sizeof_type * this->ld) +
-                    (this->tm * this->bs_m * this->sizeof_type);
+                    (this->offset_n * this->sizeof_type * this->ld) +
+                    (this->offset_m * this->sizeof_type);
         }
         abort();
     }
-
-    # if 0
-    /* size in memory (in bytes) */
-    inline size_t
-    size(void) const
-    {
-        return this->bs_n * this->bs_m * this->sizeof_type;
-    }
-    # endif
-
 }               matrix_tile_t;
 
 #endif /* __MATRIX_TILE_H__ */

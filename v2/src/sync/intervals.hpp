@@ -39,28 +39,37 @@ class Intervals {
         {
             if constexpr(K == 2)
             {
-# if 1
                 /* (y, x) <=> (list[0], list[1]) <=> (m, n) <=> (line, col) */
-
                 uintptr_t PP = tile.begin_addr();
-                this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
-                this->list[0].b = this->list[0].a + tile.bs_m;
-                this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
-                this->list[1].b = this->list[1].a + tile.bs_n * tile.sizeof_type;
-# else
+                switch (tile.order)
+                {
+                    case (MATRIX_COLMAJOR):
+                    {
+                        this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
+                        this->list[0].b = this->list[0].a + tile.m;
+                        this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
+                        this->list[1].b = this->list[1].a + tile.n * tile.sizeof_type;
+                        break ;
+                    }
 
-                uintptr_t PP = XKBLAS_MATRIX_TILE(P, ld, tm, tn, bs_m, bs_n, 1);
+                    case (MATRIX_ROWMAJOR):
+                    {
+                        this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
+                        this->list[0].b = this->list[0].a + tile.n;
+                        this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
+                        this->list[1].b = this->list[1].a + tile.m * tile.sizeof_type;
+                        break ;
+                    }
 
-                XKBLAS_MATRIX_TILE_COORDINATE(
-                    PP, ld, bs_m, bs_n, 1,
-                    this->list[1].a, this->list[0].a,
-                    this->list[1].b, this->list[0].b
-                );
-# endif
-
+                    default:
+                    {
+                        assert(0 && "Not supported");
+                    }
+                }
             }
             else
             {
+                assert(0 && "Not supported");
                 // ERROR
             }
         }
