@@ -85,6 +85,9 @@ typedef struct  xkblas_driver_t
     /* deallocate a stream */
     void (*f_stream_delete)(xkblas_stream_t * istream);
 
+		/* get best source for data movement, return global_id */
+    int (*f_get_source)(int dst_global_id, int bitmask);
+
     ///////////////////////
     //  UNUSED YET       //
     ///////////////////////
