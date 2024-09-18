@@ -15,6 +15,8 @@ xkblas_device_submit(
     xkblas_stream_t * stream,
     xkblas_stream_instruction_t * instr
 ) {
+    assert(device->thread == ThreadWorker::self());
+
     /* commit instruction to the stream */
     stream->commit(instr);
 

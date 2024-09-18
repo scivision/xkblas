@@ -57,7 +57,6 @@ body_memory_coherent_async_fetch_callback(
    // one fetched completed, notify the parent
     if (parent->fetched() == TASK_STATE_DATA_FETCHED)
         worker->complete(parent);
-
 }
 
 static void
@@ -104,6 +103,7 @@ body_memory_coherent_async_fetch(void * vlauncher)
 
     xkblas_device_t * device = xkblas_device_get(fetch->src_device_global_id);
     assert(device);
+    assert(fetch->src_device_global_id == device->global_id);
 
     // the current task must be executing on the device's thread for that fetch
     assert(device->thread == ThreadWorker::self());
@@ -196,7 +196,7 @@ xkblas_memory_coherent_async_worker_thread_work(
         assert(mem);
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);
-        new(task) Task(TASK_FORMAT_COHERENT_ASYNC_FETCH, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+        new(task) Task(TASK_FORMAT_COHERENT_ASYNC_FETCH, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
 
         args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
         new(args) args_t(thread, current, fetch);
@@ -208,7 +208,7 @@ xkblas_memory_coherent_async_worker_thread_work(
         producer->commit<0>(context, task);
     }
 
-    // completion
+    // if early-completion happened
     if (current->fetched() == TASK_STATE_DATA_FETCHED)
         thread->complete(current);
 }
