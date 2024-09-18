@@ -116,7 +116,7 @@ __check_error(cudaError_t err)
     if (err != cudaSuccess && err != cudaErrorNotReady)
     {
         const char * errstr = cudaGetErrorName(err);
-        XKBLAS_ERROR("cuCheckError() error: %s (%i)", errstr, err);
+        XKBLAS_FATAL("cuCheckError() error: %s (%i)", errstr, err);
         return 1;
     }
     return 0;
@@ -665,8 +665,12 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             size_t dpitch       = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
             const void * src    = (const void *) instr->copy.src_device_view.addr;
             size_t spitch       = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
-            size_t width        = instr->copy.host_view.n * instr->copy.host_view.sizeof_type;
-            size_t height       = instr->copy.host_view.m;
+
+            // assume col major for cuda - if not, need to do some shit here
+            assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
+            size_t width        = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
+            size_t height       = instr->copy.host_view.n;
+
             cudaMemcpyKind kind;
             cudaStream_t handle;
 
