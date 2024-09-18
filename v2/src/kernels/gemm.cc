@@ -182,12 +182,11 @@ xkblas_£gemm_async(
     int * tile = context->conf.kernels.gemm.tile;
     if (tile[0] == 0 || tile[1] == 0)
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
-    assert(tile[0] == tile[1]);
 
     /* set tiling parameters */
     int Amb = tile[0];
-    int Anb = tile[0];
-    int Bmb = tile[0];
+    int Anb = tile[1];
+    int Bmb = tile[1];
     int Bnb = tile[0];
     int Cmb = tile[0];
     int Cnb = tile[0];
