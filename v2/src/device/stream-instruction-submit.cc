@@ -36,6 +36,8 @@ xkblas_stream_instruction_submit_kernel(
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
     # endif /* NDEBUG */
 
+    assert(ThreadWorker::self() == device->thread);
+
     /* create a new instruction and retrieve its offload stream */
     xkblas_stream_t * stream;
     xkblas_stream_instruction_t * instr;
@@ -68,6 +70,7 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t  & src_device_view,
     const xkblas_callback_t & callback
 ) {
+    assert(ThreadWorker::self() == device->thread);
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
     /* find the type of copy instruction */

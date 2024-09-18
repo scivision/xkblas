@@ -51,7 +51,7 @@ void
 ThreadWorker::push(Task * const & task)
 {
     ++this->uncompleted;
-    writemem_barrier();
+    XKBLAS_DEBUG("this->uncompleted = %u", this->uncompleted);
     this->queue.push(task);
     this->wakeup();
 }
@@ -69,14 +69,15 @@ ThreadWorker::complete(Task * task)
 {
     task->executed();
     task->complete();
-    writemem_barrier();
     --this->uncompleted;
+    XKBLAS_DEBUG("this->uncompleted = %u", this->uncompleted);
 }
 
 bool
 ThreadWorker::completed(void) const
 {
-    return this->uncompleted == 0;
+    assert(ThreadWorker::self() != this);
+    return ((volatile uint32_t)this->uncompleted) == 0;
 }
 
 void

@@ -323,7 +323,7 @@ body_cuda(void * vlauncher)
     assert(args->transB == CblasNoTrans);
 
     # ifndef NDEBUG
-    XKBLAS_WARN("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+    XKBLAS_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
         args->m, args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,
