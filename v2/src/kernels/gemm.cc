@@ -63,6 +63,8 @@ xkblas_£gemm_tile_async(
     assert((uintptr_t)B % ldb == 0);
     assert((uintptr_t)C % ldc == 0);
 
+    XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", Cm, Cn, m, n);
+
     ThreadProducer * thread = ThreadProducer::self();
 
     const uint64_t task_size = sizeof(Task);

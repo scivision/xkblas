@@ -39,9 +39,7 @@ main_gemm(char ** args)
     TYPE beta  = (const TYPE) 0.0;
 
     /* currently only support this */
-    assert(m == n);
-    assert(n == k);
-    int ld = m;
+    int ld = MAX(MAX(m, n), k);
 
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 

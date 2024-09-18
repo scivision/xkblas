@@ -18,14 +18,15 @@ static void
 dump_matrix(
     const char * label,
     const TYPE * M,
-    const BLAS_INT ld
+    const BLAS_INT m,
+    const BLAS_INT n
 ) {
-    if (ld <= 32)
+    if (m <= 32 && n <= 32)
     {
         printf("---- %s ----\n", label);
-        for (int j = 0 ; j < ld ; ++j)
-            for (int i = 0 ; i < ld ; ++i)
-                printf("%4.4f%c", M[i*ld+j], (i == ld-1) ? '\n' : ' ');
+        for (int j = 0 ; j < m ; ++j)
+            for (int i = 0 ; i < n ; ++i)
+                printf("%4.4f%c", M[i*m+j], (i == n-1) ? '\n' : ' ');
 
     }
 }
@@ -52,6 +53,10 @@ gemm_cmp(
     const int An = (transA == CblasNoTrans) ? k : m;
     const int Bm = (transB == CblasNoTrans) ? k : n;
     const int Bn = (transB == CblasNoTrans) ? n : k;
+    const int Cm = Am;
+    const int Cn = Bn;
+
+    assert(An == Bm);
 
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);
@@ -74,11 +79,11 @@ gemm_cmp(
     }
 
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
-    dump_matrix("A",     A,     lda);
-    dump_matrix("B",     B,     ldb);
-    dump_matrix("C",     C,     ldc);
-    dump_matrix("CRef",  CRef,  ldc);
-    dump_matrix("CImpl", CImpl, ldc);
+    dump_matrix("A",     A,     Am, An);
+    dump_matrix("B",     B,     Bm, Bn);
+    dump_matrix("C",     C,     Cm, Cn);
+    dump_matrix("CRef",  CRef,  Cm, Cn);
+    dump_matrix("CImpl", CImpl, Cm, Cn);
 
     // TODO : change slange, saxpy, slamch, etc... with defines based on type
 

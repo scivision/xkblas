@@ -85,7 +85,7 @@ class MemoryReplicate
          *  The 'MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX' controls how many
          *  allocations of the same data may exists at most
          */
-        # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
+        # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
         # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
         volatile uint8_t nallocations;
@@ -762,10 +762,12 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             // to release the memory-tree lock, and restart all that
             // shit over again once memory got allocated
 
+            # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
+
             /* allocate continuous memory for that access */
             uint64_t  size = access->host_view.n * access->host_view.m * access->host_view.sizeof_type;
             uintptr_t addr = (uintptr_t) xkblas_memory_allocate(driver, device, size);
-            int         ld = access->host_view.n;
+            int         ld = access->host_view.m;   // cuda is col major
             XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
             assert(addr);
 
