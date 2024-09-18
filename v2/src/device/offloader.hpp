@@ -41,7 +41,7 @@ class Offloader
                   xkblas_stream_t ** stream,                /* OUT */
             const xkblas_stream_instruction_type_t itype,   /* IN  */
                   xkblas_stream_instruction_t ** instr,     /* OUT */
-            const xkblas_stream_callback_t & callback       /* IN */
+            const xkblas_callback_t & callback       /* IN */
         );
 
         /* TODO */

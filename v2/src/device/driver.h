@@ -7,12 +7,12 @@
 # include <sched.h>     /* cpu_set_t */
 # include <stdint.h>    /* uint64_t */
 
+# include "device/consts.h"
 # include "device/device.h"
 # include "device/stream.h"
-# include "device/consts.h"
 # include "device/task.hpp"
+# include "device/task-launcher.h"
 # include "logger/todo.h"
-# include "kernels/kernel-param.h"
 # include "sync/mutex.h"
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
@@ -162,11 +162,8 @@ void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
 
-/* call the launch task kernel once accesses are all ready */
-void xkblas_device_task_fetched(xkblas_driver_t * driver, xkblas_device_t * device, Task * task);
-
 /* launch a kernel */
-int xkblas_kernel_launch(xkblas_driver_type_t type, task_kernel_param_t * param);
+int xkblas_task_launch(task_launcher_t * launcher);
 
 /* allocate memory on the passed device */
 void * xkblas_memory_allocate(
@@ -182,8 +179,7 @@ void xkblas_driver_invalidate_caches(
 );
 
 /* must be call once task accesses were all fetched */
-void xkblas_device_task_access_fetched(
-    ThreadWorker    * worker,
+void xkblas_device_task_execute(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task

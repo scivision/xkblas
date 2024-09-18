@@ -167,7 +167,7 @@ Offloader::instruction_new(
           xkblas_stream_t ** pstream,               /* OUT */
     const xkblas_stream_instruction_type_t itype,   /* IN  */
           xkblas_stream_instruction_t ** pinstr,    /* OUT */
-    const xkblas_stream_callback_t & callback       /* IN */
+    const xkblas_callback_t & callback       /* IN */
 ) {
     assert(pstream);
     assert(pinstr);

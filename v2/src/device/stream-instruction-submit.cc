@@ -15,6 +15,8 @@ xkblas_device_submit(
     xkblas_stream_t * stream,
     xkblas_stream_instruction_t * instr
 ) {
+    assert(device->thread == ThreadWorker::self());
+
     /* commit instruction to the stream */
     stream->commit(instr);
 
@@ -28,7 +30,7 @@ xkblas_stream_instruction_submit_kernel(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task,
-    const xkblas_stream_callback_t & callback
+    const xkblas_callback_t & callback
 ) {
     # ifndef NDEBUG
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
@@ -54,6 +56,7 @@ xkblas_stream_instruction_submit_kernel(
     xkblas_device_submit(device, stream, instr);
 }
 
+# pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, bs_n, bs_m) i believe")
 void
 xkblas_stream_instruction_submit_copy(
     const xkblas_driver_t          * driver,
@@ -63,7 +66,7 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t  & dst_device_view,
     const uint8_t                    src_device_global_id,
     const memory_replicate_view_t  & src_device_view,
-    const xkblas_stream_callback_t & callback
+    const xkblas_callback_t & callback
 ) {
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 

@@ -31,16 +31,22 @@ enum task_kern_precision_t : uint8_t
 /* maximum number of function version per task */
 # define TASK_FORMAT_FUNC_MAX 4
 
+typedef enum    task_format_target_t : uint8_t
+{
+    TASK_FORMAT_TARGET_DRIVER  = 0,
+    TASK_FORMAT_TARGET_HOST    = 1,
+}               task_format_target_t;
+
 typedef struct  task_format_t
 {
-    # if 0
-    /* kernel infos */
-    task_kern_t kern;
-    task_kern_precision_t precision;
-    # endif
-
     /* kernel launch */
     void (*f[TASK_FORMAT_FUNC_MAX])(void * args);
+
+    /* the target of that task format :
+     * - DRIVER - means the func must be executed as part of an I/O instructions on a device
+     * - HOST   - means the func must be executed in the host-thread directly
+     */
+    task_format_target_t target;
 
     /* a label */
     char label[16];
@@ -56,4 +62,4 @@ typedef uint8_t task_format_id_t;
 task_format_id_t task_format_create(task_format_t * format);
 task_format_t * task_format_get(task_format_id_t id);
 
-#endif /* __TASK_FORMAT_H__ */
+#endif /* __TASK_TARGET_H__ */

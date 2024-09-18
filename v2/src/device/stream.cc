@@ -104,12 +104,12 @@ xkblas_stream_deinit(xkblas_stream_t * stream)
 xkblas_stream_instruction_t *
 xkblas_stream_t::instruction_new(
     const xkblas_stream_instruction_type_t itype,
-    const xkblas_stream_callback_t & callback
+    const xkblas_callback_t & callback
 ) {
     if (this->ready.is_full())
         return NULL;
 
-    const int32_t w = this->ready.pos.w.load(std::memory_order_seq_cst) % this->ready.capacity;
+    const int32_t w = this->ready.pos.w % this->ready.capacity;
     xkblas_stream_instruction_t * instr = this->ready.instr + w;
     instr->type = itype;
     instr->callback = callback;
@@ -127,9 +127,7 @@ xkblas_stream_t::commit(
             xkblas_stream_instruction_type_to_str(instr->type),
             this->ready.size(), this->pending.size());
 
-    /* locked from the new_instruction routine */
-    this->ready.pos.w.fetch_add(1, std::memory_order_seq_cst);
-    writemem_barrier();
+    ++this->ready.pos.w;
 
     return 0;
 }
@@ -148,7 +146,6 @@ xkblas_stream_t::launch_ready_instructions(void)
         /* retrieve the next instruction to launch at index 'p' */
         uint64_t p = this->ready.pos.r % this->ready.capacity;
         ++this->ready.pos.r;
-        writemem_barrier();
 
         xkblas_stream_instruction_t * instr = this->ready.instr + p;
         assert(instr);
@@ -178,7 +175,7 @@ xkblas_stream_t::launch_ready_instructions(void)
 
                 /* the pending queue must not be full */
                 assert(!this->pending.is_full());
-                uint64_t wp = this->pending.pos.w % this->pending.capacity;
+                uint32_t wp = this->pending.pos.w % this->pending.capacity;
                 ++this->pending.pos.w;
                 writemem_barrier();
 

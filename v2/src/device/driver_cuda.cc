@@ -587,8 +587,12 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             assert(stream->cu.blas.handle);
 
             xkblas_stream_instruction_kernel_t * op = &instr->kern;
-            task_kernel_param_t param = { .task = op->task, .handle = stream->cu.blas.handle };
-            xkblas_kernel_launch(XKBLAS_DRIVER_TYPE_CUDA, &param);
+            task_launcher_t launcher = {
+                .task   = op->task,
+                .target = XKBLAS_DRIVER_TYPE_CUDA,
+                .handle = stream->cu.blas.handle
+            };
+            xkblas_task_launch(&launcher);
 
             # pragma message(TODO "Add support for end event records")
 

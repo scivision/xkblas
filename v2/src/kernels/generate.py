@@ -1,6 +1,16 @@
 #!/bin/python
 
 import os
+import sys
+
+if len(sys.argv) != 3:
+    print("usage: {} [SRC-DIR] [INC-DIR]".format(sys.argv[0]))
+    sys.exit(0)
+
+srcdir=sys.argv[1]
+incdir=sys.argv[2]
+
+print("srcdir={}, dstdir={}".format(srcdir, incdir))
 
 kernels=[
     "gemm"
@@ -25,12 +35,14 @@ def cmd(s):
 
 for f in files:
     for mode in modes:
-        cmd("cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}{}".format(
+        cmd("cat {}/{} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}/{}{}".format(
+                srcdir,
                 f,
                 mode[0].upper(),
                 mode[0],
                 mode[2],
                 mode[1],
+                srcdir,
                 mode[0],
                 f
             )
@@ -38,13 +50,13 @@ for f in files:
 
 # move header files
 for mode in modes:
-    cmd("mv {}kernel.h ../../include/xkblas-{}kernel.h".format(mode[0], mode[0]))
+    cmd("mv {}/{}kernel.h {}/xkblas-{}kernel.h".format(mode[0], srcdir, mode[0], incdir))
 
 # task format register
 f = "kernel-task-format-register"
-cmd("echo -n '' > {}.cc".format(f))
-cmd("echo -n '' > {}.h".format(f))
+cmd("echo -n '' > {}/{}.cc".format(srcdir, f))
+cmd("echo -n '' > {}/{}.h".format(srcdir, f))
 for kernel in kernels:
     for mode in modes:
-        cmd("echo 'register_{}{}_format();' >> {}.cc".format(mode[0], kernel, f))
-        cmd("echo 'void register_{}{}_format(void);' >> {}.h".format(mode[0], kernel, f))
+        cmd("echo 'register_{}{}_format();' >> {}/{}.cc".format(mode[0], kernel, srcdir, f))
+        cmd("echo 'void register_{}{}_format(void);' >> {}/{}.h".format(mode[0], kernel, srcdir,f))

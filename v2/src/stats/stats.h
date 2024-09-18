@@ -11,6 +11,11 @@ typedef struct  xkblas_stats_t
     struct {
         std::atomic<uint32_t> launched;
         std::atomic<uint32_t> completed;
+    } tasks;
+
+    struct {
+        std::atomic<uint32_t> launched;
+        std::atomic<uint32_t> completed;
     } kernels;
 
     struct {

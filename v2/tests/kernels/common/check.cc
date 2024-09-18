@@ -23,9 +23,9 @@ dump_matrix(
     if (ld <= 32)
     {
         printf("---- %s ----\n", label);
-        for (int i = 0 ; i < ld ; ++i)
-            for (int j = 0 ; j < ld ; ++j)
-                printf("%4.4f%c", M[i*ld+j], (j == ld-1) ? '\n' : ' ');
+        for (int j = 0 ; j < ld ; ++j)
+            for (int i = 0 ; i < ld ; ++i)
+                printf("%4.4f%c", M[i*ld+j], (i == ld-1) ? '\n' : ' ');
 
     }
 }
@@ -67,7 +67,7 @@ gemm_cmp(
         char tb = cblas2blas_op(transB);
         sgemm_(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
         # else
-        cblas_sgemm(CblasRowMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
         # endif
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);

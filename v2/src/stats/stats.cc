@@ -8,6 +8,9 @@ void
 xkblas_stats_report(xkblas_stats_t * stats)
 {
     XKBLAS_INFO("----------------- STATS -----------------");
+    XKBLAS_INFO("tasks:");
+    XKBLAS_INFO("  launched: %u", stats->tasks.launched.load());
+    XKBLAS_INFO("  completed: %u", stats->tasks.completed.load());
     XKBLAS_INFO("kernels:");
     XKBLAS_INFO("  launched: %u", stats->kernels.launched.load());
     XKBLAS_INFO("  completed: %u", stats->kernels.completed.load());

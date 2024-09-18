@@ -43,6 +43,7 @@ xkblas_context_get(void)
 static inline void
 xkblas_task_format_register(void)
 {
+    xkblas_memory_coherent_async_register_format();
     # include "kernels/kernel-task-format-register.cc"
 }
 
@@ -180,19 +181,4 @@ xkblas_sync(void)
     XKBLAS_DEBUG("Done");
 # endif
 
-}
-
-//////////////////////
-// Memory coherency //
-//////////////////////
-
-extern "C"
-void
-xkblas_memory_coherent_async(
-    int uplo, int memflag,
-    int m, int n,
-    void * ptr, int ld,
-    unsigned int sizeof_type
-) {
-    xkblas_memory_coherent_async_impl(uplo, memflag, m, n, ptr, ld, sizeof_type);
 }

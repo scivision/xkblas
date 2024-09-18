@@ -8,11 +8,11 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
 
     // whether ocr, whether target device id, not both !
     assert((task->ocr_access_index != UNSPECIFIED_TASK_ACCESS) +
-            (task->targeted_device_id != UNSPECIFIED_GLOBAL_DEVICE_ID) <= 1);
+            (task->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID) <= 1);
 
     // Find the worker to offload the task
     ThreadWorker * worker = nullptr;
-    uint8_t device_id = UNSPECIFIED_GLOBAL_DEVICE_ID;
+    uint8_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
 
     // if an ocr parameter is set, retrieve the device accordingly
     if (task->ocr_access_index != UNSPECIFIED_TASK_ACCESS)
@@ -26,16 +26,14 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
     }
 
     // if a target device is set
-    if (task->targeted_device_id  != UNSPECIFIED_GLOBAL_DEVICE_ID)
+    else if (task->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID)
     {
         assert(task->ocr_access_index == UNSPECIFIED_TASK_ACCESS);
         device_id = task->targeted_device_id;
-        worker = context->memory_coherent_worker_thread;
-        assert(worker);
     }
 
     // fallback to round robin if no devices found
-    if (device_id == UNSPECIFIED_GLOBAL_DEVICE_ID)
+    if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID)
     {
         while (1)
         {
@@ -48,8 +46,11 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
 
     if (worker == nullptr)
     {
-        assert(device_id >= 0 && device_id < context->drivers.devices.n);
-        worker = context->drivers.devices.list[device_id]->thread;
+        assert((device_id >= 0 && device_id < context->drivers.devices.n) || device_id == HOST_DEVICE_GLOBAL_ID);
+        if (device_id == HOST_DEVICE_GLOBAL_ID)
+            worker = context->memory_coherent_worker_thread;
+        else
+            worker = context->drivers.devices.list[device_id]->thread;
     }
 
     assert(worker);
