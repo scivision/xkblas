@@ -1106,7 +1106,7 @@ next_view:
             {
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
-                XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.m);
+                XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.n);
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);

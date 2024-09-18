@@ -41,31 +41,10 @@ class Intervals {
             {
                 /* (y, x) <=> (list[0], list[1]) <=> (m, n) <=> (line, col) */
                 uintptr_t PP = tile.begin_addr();
-                switch (tile.order)
-                {
-                    case (MATRIX_COLMAJOR):
-                    {
-                        this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
-                        this->list[0].b = this->list[0].a + tile.m;
-                        this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
-                        this->list[1].b = this->list[1].a + tile.n * tile.sizeof_type;
-                        break ;
-                    }
-
-                    case (MATRIX_ROWMAJOR):
-                    {
-                        this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
-                        this->list[0].b = this->list[0].a + tile.n;
-                        this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
-                        this->list[1].b = this->list[1].a + tile.m * tile.sizeof_type;
-                        break ;
-                    }
-
-                    default:
-                    {
-                        assert(0 && "Not supported");
-                    }
-                }
+                this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
+                this->list[0].b = this->list[0].a + tile.n;
+                this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
+                this->list[1].b = this->list[1].a + tile.m * tile.sizeof_type;
             }
             else
             {
