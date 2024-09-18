@@ -424,6 +424,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                             /* this replicate just got fetched and is now valid */
                             replicate.valid    |=  allocbit;
                             replicate.fetching &= ~allocbit;
+
+                            break ;
                         }
                     }
 
@@ -458,7 +460,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 const int devbit = (1 << device_global_id);
                 fprintf(f, "\\\\ dev %d - valid=%d",
                     device_global_id,
-                    this->block.valid    & devbit ? 1 : 0
+                    this->block.valid & devbit ? 1 : 0
                 );
             }
         }
@@ -505,7 +507,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         fetch_callback_task(internal_fetch_t * f, Task * task)
         {
             # ifndef NDEBUG
-            XKBLAS_DEBUG("Notified task `%s` for allocation `%p` fetched", task->label, f->allocation);
+            XKBLAS_DEBUG("Notified task `%s` for allocation `%p` fetched (wc is now `%d`)", task->label, f->allocation, task->wc - 1);
             # endif
 
             /* a fetch completed */
@@ -720,7 +722,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                     MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
 
                     // allocate fetch info for the callback argument
-                    fetch_t * fetch = (fetch_t *) thread->allocate(sizeof(fetch_t));
+                    // fetch_t * fetch = (fetch_t *) thread->allocate(sizeof(fetch_t));
+                    fetch_t * fetch = (fetch_t *) malloc(sizeof(fetch_t));
                     fetch->host_view            = partite.host_view;
                     fetch->src_device_global_id = src;
                     fetch->src_view             = r->view;
@@ -747,99 +750,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             for (int i = 0 ; i < naccesses ; ++i)
                 create_fetch_list_for_host_access(thread, accesses + i, list);
         }
-
-        # if 0
-        ////////////////////////
-        //  FETCH ON THE HOST //
-        ////////////////////////
-
-        void
-        fetch_on_host_access(
-            ThreadWorker * worker,
-            Task * task,
-            Access * access
-        ) {
-            assert(access->mode & ACCESS_MODE_R);
-
-            # if !USE_CUDA
-            XKBLAS_FATAL("Only supporting CUDA driver for D2H transfers");
-            # endif
-
-            # pragma message(TODO "Instead, get the driver or the func associated to the 'src' device")
-            xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
-            assert(driver);
-
-            Search search(HOST_DEVICE_GLOBAL_ID);
-            this->lock();
-            {
-                /* find all blocks that intersects with that access */
-                search.prepare_search_blocks();
-                this->intersect(search, access->region, access->mode);
-
-                /* launch fetch on each device */
-                for (Partite & partite : search.partition)
-                {
-                    MemoryBlock * block = partite.block;
-
-                    /* not valid on any device, then assume valid on the host */
-                    if (block->valid == 0)
-                    {
-                        partite.must_fetch = false;
-                        continue ;
-                    }
-
-                    task->fetching();
-                    partite.must_fetch = true;
-
-                    ////////////////////////
-                    // DST - COPY TO HOST //
-                    ////////////////////////
-                    partite.dst_device_global_id   = HOST_DEVICE_GLOBAL_ID;
-                    partite.dst_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
-
-                    /////////////////////////
-                    // SRC - FIND BEST SRC //
-                    /////////////////////////
-
-                    /* copy from device */
-                    this->fetch_access_find_src(access, partite);
-                }
-            }
-            this->unlock();
-
-            /* launch fetch on each device */
-            for (Partite & partite : search.partition)
-            {
-                if (!partite.must_fetch)
-                    continue ;
-
-                assert(partite.src_device_global_id != partite.dst_device_global_id);
-
-                xkblas_device_t * device = xkblas_device_get(partite.src_device_global_id);
-                assert(device);
-
-                fetch_access_copy_partite(driver, device, task, worker, partite, 0);
-            }
-        }
-
-        task_state_t
-        fetch_on_host(
-            ThreadWorker * worker,
-            Task * task
-        ) {
-            assert(ThreadWorker::self() == worker);
-
-            XKBLAS_DEBUG("Launching async fetch of access %p", access);
-            task->fetching();
-
-            /* for each access */
-            assert(task->naccesses <= TASK_MAX_ACCESSES);
-            for (int i = 0 ; i < task->naccesses ; ++i)
-                this->fetch_on_host_access(worker, task, task->accesses + i);
-
-            return task->fetched();
-        }
-        # endif
 
         ////////////////////////
         //  FETCH ON A DEVICE //
@@ -1060,12 +970,17 @@ next_view:
 
                         // add the task to the awaiting list of that block
                         r->awaiting.push_back(task);
+
+                        # ifndef NDEBUG
+                        XKBLAS_DEBUG("Task `%s` is awaiting on allocation `%p`", task->label, r->view.addr);
+                        # endif /* NDEBUG */
+
                         continue ;
                     }
 
                     // this task must perform the fetch
-                    replicate.fetching |= allocbit;
                     partite.must_fetch = true;
+                    replicate.fetching |= allocbit;
 
                     // create dst view
                     partite.dst_device_global_id = device->global_id;

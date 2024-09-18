@@ -159,7 +159,8 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(current->state.value == TASK_STATE_READY);
 
     // find all the fetches to do
-    fetch_list_t * list = (fetch_list_t *) thread->allocate(sizeof(fetch_list_t));
+    // fetch_list_t * list = (fetch_list_t *) thread->allocate(sizeof(fetch_list_t));
+    fetch_list_t * list = (fetch_list_t *) malloc(sizeof(fetch_list_t));
     assert(list);
 
     context->memtree.create_fetch_list_for_host(
@@ -192,7 +193,8 @@ xkblas_memory_coherent_async_worker_thread_work(
         assert(is_alignedas(task_size, CACHE_LINE_SIZE));
         assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
-        uint8_t * mem  = thread->allocate(task_size + args_size);
+        // uint8_t * mem  = thread->allocate(task_size + args_size);
+        uint8_t * mem  = (uint8_t *) malloc(task_size + args_size);
         assert(mem);
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);
@@ -222,13 +224,9 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
     // TODO : instead, while context->running
     while (1)
     {
-        // If there is no tasks and streams are empty, sleep the thread
-        Task * task;
-        while ((task = thread->pop()) == NULL)
-        {
-            thread->deallocate_all();
-            thread->pause();
-        }
+        Task * task = thread->pop();
+        if (task == NULL)
+            continue ;
 
         assert(task->fmtid == TASK_FORMAT_COHERENT_ASYNC);
         xkblas_memory_coherent_async_worker_thread_work(context, thread, task);
@@ -295,7 +293,8 @@ xkblas_memory_coherent_async(
 
     const uint64_t task_size = sizeof(Task);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    uint8_t * mem = thread->allocate(task_size);
+    // uint8_t * mem = thread->allocate(task_size);
+    uint8_t * mem = (uint8_t *) malloc(task_size);
     assert(mem);
 
     Task * task = reinterpret_cast<Task *>(mem);
