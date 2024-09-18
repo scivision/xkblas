@@ -133,35 +133,34 @@ xkblas_sync(void)
 
     /* other threads */
     ThreadWorker * workers[] = {
+        ThreadWorker::self(),
         context->memory_coherent_worker_thread
     };
     const int nworkers = sizeof(workers) / sizeof(ThreadWorker *);
 
     /* wait for all threads */
     const int ndevices = context->drivers.devices.n;
-    while (1)
+
+retry:
+    /* wait for all devices thread */
+    int32_t wc_global = 0;
+    for (int i = 0 ; i < ndevices ; ++i)
     {
-        /* wait for all devices thread */
-        int completed = 0;
-        for (int i = 0 ; i < ndevices ; ++i)
-        {
-            xkblas_device_t * device = context->drivers.devices.list[i];
-            if (device->thread->completed() && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
-                ++completed;
-        }
-
-        /* wait for all other threads */
-        for (ThreadWorker * & thread : workers)
-            if (thread->completed())
-                ++completed;
-
-        /* all threads completed :-) */
-        if (completed == ndevices + nworkers)
-            break ;
-
-        mem_pause();
+        xkblas_device_t * device = context->drivers.devices.list[i];
+        if (!device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
+            goto retry;
+        wc_global += device->thread->wc;
     }
 
+    /* wait for all other threads */
+    for (ThreadWorker * & thread : workers)
+        wc_global += thread->wc;
+
+    /* if there is still work on-going */
+    if (wc_global)
+        goto retry;
+
+    /* all threads completed :-) */
     XKBLAS_INFO("Synchronized Xkblas");
 #if USE_STATS == 1
     xkblas_stats_report(&(context->stats));

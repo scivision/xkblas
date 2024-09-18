@@ -135,8 +135,9 @@ xkblas_stream_t::commit(
 int
 xkblas_stream_t::launch_ready_instructions(void)
 {
-    XKBLAS_DEBUG("Launching ready instructions of stream %p of type `%s` (%d ready)",
-            this, xkblas_stream_type_to_str(this->type), this->ready.size());
+//    XKBLAS_DEBUG("Launching ready instructions of stream %p of type `%s` (%d ready)",
+//            this, xkblas_stream_type_to_str(this->type), this->ready.size());
+
     assert(this->ready.pos.r <= this->ready.pos.w);
 
     /* launch every ready instructions */

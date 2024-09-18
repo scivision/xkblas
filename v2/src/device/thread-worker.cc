@@ -34,7 +34,7 @@ ThreadWorker::self(void)
 
 // non-static members
 
-ThreadWorker::ThreadWorker() : queue(), uncompleted(0)
+ThreadWorker::ThreadWorker() : queue(), wc(0)
 {
     // XKBLAS_DEBUG("New worker thread");
     pthread_mutex_init(&this->sleep.lock, 0);
@@ -50,8 +50,7 @@ ThreadWorker::~ThreadWorker()
 void
 ThreadWorker::push(Task * const & task)
 {
-    ++this->uncompleted;
-    writemem_barrier();
+    ThreadWorker::move_wc(1);
     this->queue.push(task);
     this->wakeup();
 }
@@ -69,14 +68,7 @@ ThreadWorker::complete(Task * task)
 {
     task->executed();
     task->complete();
-    writemem_barrier();
-    --this->uncompleted;
-}
-
-bool
-ThreadWorker::completed(void) const
-{
-    return this->uncompleted == 0;
+    ThreadWorker::move_wc(-1);
 }
 
 void

@@ -53,14 +53,22 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         /* return true if the wait counter is '0' */
         bool completed(void) const;
 
+        static inline void
+        move_wc(int32_t offset)
+        {
+            ThreadWorker::self()->wc += offset;
+        }
+
+    public:
+
+        /* number of uncompleted tasks */
+        int32_t wc;
+
     private:
 
         /* per-thread queue */
         // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
         NaiveQueue<Task *> queue;
-
-        /* number of uncompleted tasks */
-        volatile std::atomic<int32_t> uncompleted;
 
         /* lock and condition to sleep the mutex */
         struct {

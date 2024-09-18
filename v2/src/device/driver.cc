@@ -401,4 +401,3 @@ xkblas_device_get(int device_global_id)
     xkblas_context_t * ctx = xkblas_context_get();
     return ctx->drivers.devices.list[device_global_id];
 }
-

@@ -140,7 +140,7 @@ xkblas_init_conf(xkblas_conf_t * conf)
     //////////////////
     //  KERNEL CONF //
     //////////////////
-    conf->device.offloader.capacity = 64;
+    conf->device.offloader.capacity = 512;
 
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = 2;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = 8;

@@ -26,25 +26,6 @@ typedef enum    xkblas_device_state_t : uint8_t
 
 }               xkblas_device_state_t;
 
-typedef enum    xkblas_device_request_type_t
-{
-    XKBLAS_DEVICE_REQUEST_TYPE_NOP                 = 0,
-    XKBLAS_DEVICE_REQUEST_TYPE_REPLY               = 1,
-    XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK           = 2,
-    XKBLAS_DEVICE_REQUEST_TYPE_WRITEBACK_WAIT      = 3,
-    XKBLAS_DEVICE_REQUEST_TYPE_MEMSYNC             = 4,
-    XKBLAS_DEVICE_REQUEST_TYPE_INVALIDATE_CACHES   = 5
-
-}               xkblas_device_request_type_t;
-
-typedef struct  xkblas_device_request_t
-{
-    xkblas_device_request_type_t type;  /* request type */
-    uintptr_t arg;                      /* arg */
-    std::atomic<uint64_t> * counter;    /* for MEMSYNC or WRITEBACK request */
-    int err;                            /* error returned by the request */
-}               xkblas_device_request_t;
-
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource */
 typedef struct  xkblas_device_t
@@ -55,7 +36,6 @@ typedef struct  xkblas_device_t
     uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ - host is a virtual device of id 'XKBLAS_DEVICES_MAX'*/
     std::atomic<uint8_t> state;         /* True if driver is initialized */
     ThreadWorker * thread;              /* the device worker thread */
-    xkblas_device_request_t request;    /* current request */
 
     # if 0
     /* pipline: a way to enforce execution order of kernel to device */
@@ -110,5 +90,6 @@ typedef struct  xkblas_device_t
 }               xkblas_device_t;
 
 int xkblas_device_poll(xkblas_device_t * device);
+bool xkblas_device_completed(void);
 
 #endif /* __DEVICE_H__ */

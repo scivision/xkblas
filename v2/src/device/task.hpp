@@ -158,6 +158,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
+                XKBLAS_DEBUG("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
                 return true;
             }
@@ -169,6 +170,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         {
             if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
             {
+                XKBLAS_DEBUG("State of task `%s` changed to fetching", this->label);
                 assert(this->state.value == TASK_STATE_READY);
                 this->state.value = TASK_STATE_DATA_FETCHING;
             }
@@ -180,10 +182,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
-                # ifndef NDEBUG
-                XKBLAS_INFO("Task `%s` fetched", this->label);
-                # endif /* NDEBUG */
-
+                XKBLAS_DEBUG("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
                 return TASK_STATE_DATA_FETCHED;
             }
@@ -193,14 +192,11 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         executed(void)
         {
-            # ifndef NDEBUG
-            XKBLAS_INFO("Task `%s` executed", this->label);
-            # endif /* NDEBUG */
-
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_EXECUTED;
+                XKBLAS_DEBUG("State of task `%s` changed to executed", this->label);
             }
             SPINLOCK_UNLOCK(this->state.lock);
         }
@@ -208,10 +204,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         complete(void)
         {
-            # ifndef NDEBUG
-            XKBLAS_INFO("Task `%s` completed", this->label);
-            # endif /* NDEBUG */
-
+            XKBLAS_DEBUG("State of task `%s` changed to completed", this->label);
             assert(this->state.value == TASK_STATE_EXECUTED);
             for (Edge & edge : this->edges)
             {
