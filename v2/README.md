@@ -31,3 +31,4 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 - memory ordering on atomic
 - Task descriptor size
 - xkblas (and cuda) assume col major accesses... can we manage row major too ?
+- task descriptor allocation - currently spamming 'new' and 'malloc' - use the ThreadWorker / ThreadProducer stack allocation() and deallocate-all() instead

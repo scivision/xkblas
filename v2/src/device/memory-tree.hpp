@@ -506,11 +506,8 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         static inline void
         fetch_callback_task(internal_fetch_t * f, Task * task)
         {
-            # ifndef NDEBUG
-            XKBLAS_DEBUG("Notified task `%s` for allocation `%p` fetched (wc is now `%d`)", task->label, f->allocation, task->wc - 1);
-            # endif
-
             /* a fetch completed */
+            XKBLAS_DEBUG("Task `%s` fetched `%p`", task->label, f->allocation);
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
                 /* the task kernel is ready for execution */
@@ -962,6 +959,7 @@ next_view:
 
                     /* increment task fetch counter */
                     task->fetching();
+                    XKBLAS_DEBUG("Task `%s` fetching one by `%s` on `%p`", task->label, (replicate.fetching & allocbit) ? "awaiting" : "launching", r->view.addr);
 
                     // partite is already being fetched on that device
                     if (replicate.fetching & allocbit)
@@ -970,10 +968,6 @@ next_view:
 
                         // add the task to the awaiting list of that block
                         r->awaiting.push_back(task);
-
-                        # ifndef NDEBUG
-                        XKBLAS_DEBUG("Task `%s` is awaiting on allocation `%p`", task->label, r->view.addr);
-                        # endif /* NDEBUG */
 
                         continue ;
                     }
@@ -1035,6 +1029,7 @@ next_view:
                     {
                         MemoryReplicate & replicate = partite.block->replicates[i];
                         replicate.valid = 0;
+                        replicate.fetching = 0;
                     }
 
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
@@ -1163,12 +1158,14 @@ next_view:
              * (eg before we processed all accesses bellow)
              */
             task->fetching();
+            XKBLAS_DEBUG("Task `%s` fetching one (avoid early launch)", task->label);
 
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
                 this->fetch_access(driver, device, task, task->accesses + i);
 
+            XKBLAS_DEBUG("Task `%s` fetched one (avoid early launch)", task->label);
             return task->fetched();
         }
 

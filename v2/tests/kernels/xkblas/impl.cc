@@ -51,9 +51,7 @@ impl_t::gemm(
         C, ldc
     );
 
-    # if 1
     int uplo = 0;
     int memflag = 0;
     xkblas_memory_coherent_async(uplo, memflag, m, n, C, ldc, sizeof(TYPE));
-    # endif
 }
