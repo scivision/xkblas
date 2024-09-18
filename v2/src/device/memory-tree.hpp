@@ -549,32 +549,17 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         //  DECIDE SRC DEVICE WHEN FETCHING //
         //////////////////////////////////////
 
-        static inline void
+        static inline int
         fetch_access_find_src(
             xkblas_driver_t * driver,
-            Access * access,
-            Partite & partite
+            int dst_device_global_id,
+            int valid
         ) {
-            assert(partite.block->valid);
-
-            int dst = partite.dst_device_global_id;
-            int valid = partite.block->valid;
-            int src = driver->f_get_source(dst, valid);
-            if( src == -1 ) // Driver failed to found a valid source
-                src = __builtin_ffs(partite.block->valid) - 1;
+            int src = driver->f_get_source(dst_device_global_id, valid);
+            if (src == -1) // Driver failed to find a valid source
+                src = __builtin_ffs(valid) - 1;
             assert(src >= 0);
-
-            // Get the first valid allocation on that device
-            MemoryReplicate & replicate = partite.block->replicates[src];
-            assert(replicate.nallocations > 0);
-            assert(replicate.valid != 0);
-            int allocation_view_id = __builtin_ffs(replicate.valid) - 1;
-
-            // retrieve and set src view infos
-            MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
-            partite.src_device_global_id   = src;
-            partite.src_allocation_view_id = allocation_view_id;
-            partite.src_view               = r->view;
+            return src;
         }
 
         inline void
@@ -986,7 +971,21 @@ next_view:
                     // valid on some devices
                     else
                     {
-                        this->fetch_access_find_src(driver, access, partite);
+                        // find source
+                        int src = __builtin_ffs(partite.block->valid) - 1;
+                        // int src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
+
+                        // Get the first valid allocation on that device
+                        MemoryReplicate & replicate = partite.block->replicates[src];
+                        assert(replicate.nallocations > 0);
+                        assert(replicate.valid != 0);
+                        int allocation_view_id = __builtin_ffs(replicate.valid) - 1;
+
+                        // retrieve and set src view infos
+                        MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
+                        partite.src_device_global_id   = src;
+                        partite.src_allocation_view_id = allocation_view_id;
+                        partite.src_view               = r->view;
                     }
 
                     //////////////////////////////
@@ -1135,6 +1134,7 @@ next_view:
             this->fetch_access_launch_copies(driver, device, task, access, search.partition, allocation);
         }
 
+        # pragma message(TODO "Driver and device shouldn't be passed as a parameter here... use device_global_id instead - the memory tree should abstract all that shit")
         /** initiate memory transfer to ensure coherency */
         task_state_t
         fetch(

@@ -485,6 +485,9 @@ XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_id)
 static int
 XKBLAS_DRIVER_ENTRYPOINT(get_source)(int dst_global_id, int bitmask)
 {
+    # pragma message(TODO "Converting device 'global' to 'driver' id here - maybe create a mapping at initialization, instead of doing it everytime")
+
+    // retrieve the 'driver' id of the 'dst_global_id' passed
     int dst_driver_id = -1;
     for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
     {
@@ -502,6 +505,9 @@ XKBLAS_DRIVER_ENTRYPOINT(get_source)(int dst_global_id, int bitmask)
         return -1;
     }
 
+
+    # pragma message(TODO "This loop implementation is O(n) with 'n' the number of devices - it can be O(m) with 'm' the number of distinct performances using the 'cuda_perf_device' array - maybe reimplement it using 'cuda_perf_device'")
+    // get the valid device with the best connectivity
     int src = -1;
     int src_rank = INT_MAX;
     for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
