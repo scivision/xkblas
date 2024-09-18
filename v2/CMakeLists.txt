@@ -28,6 +28,19 @@ SET(SOURCE_FILES
     src/logger/logger.cc
 )
 
+add_custom_command(
+    OUTPUT
+        ${CMAKE_SOURCE_DIR}/src/kernels/sgemm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/dgemm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/cgemm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/zgemm.cc
+    COMMAND
+        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
+        ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
+)
+
 option(STRICT "Enable strict compilation mode" OFF)
 
 ################

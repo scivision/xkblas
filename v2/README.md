@@ -30,4 +30,3 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 - Merge continuous memory block to a single transfer
 - memory ordering on atomic
 - Task descriptor size
-- Automatically run `python3 generate.py` in `src/kernels` if `src/kernels/gemm.cc` got modified
