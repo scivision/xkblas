@@ -16,14 +16,20 @@ xkblas_kernel_auto_tile(
             int k = args[2];
 
             /* just one big tile */
-            # if 0
-            bs[0] = m / 2;
-            bs[1] = n / 2;
-            # else
             bs[0] = m;
             bs[1] = n;
-            # endif
 
+            break ;
+        }
+
+        case (XKBLAS_KERNEL_TYPE_TRSM):
+        {
+            int m = args[0];
+            int n = args[1];
+
+            /* just one big tile */
+            bs[0] = m;
+            bs[1] = n;
             break ;
         }
 

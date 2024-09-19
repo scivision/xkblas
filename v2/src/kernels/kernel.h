@@ -4,38 +4,27 @@
 int
 xkblas_£gemm_async(
     int transA, int transB,
-    int M, int N, int K,
+    int m, int n, int k,
     const TYPE *alpha,
-    const TYPE *A, int LDA,
-    const TYPE *B, int LDB,
+    const TYPE *A, int lda,
+    const TYPE *B, int ldb,
     const TYPE *beta,
-    TYPE *C, int LDC
-);
-
-int
-xkblas_£gemm_tile_async(
-    int transA, int transB,
-    int M, int N, int K,
-    const TYPE *alpha,
-    const TYPE *A, int LDA,
-    const TYPE *B, int LDB,
-    const TYPE *beta,
-    TYPE *C, int LDC
+    TYPE *C, int ldc
 );
 
 int
 xkblas_£trsm_async(
     int side, int uplo,
     int transA, int diag,
-    int N, int NRHS,
+    int m, int n,
     const TYPE *alpha,
-    const TYPE *A, int LDA,
-    TYPE *B, int LDB
+    const TYPE *A, int lda,
+    TYPE *B, int ldb
 );
 
 int
 xkblas_£copyscale_async(
-    int M, int N,
+    int m, int n,
     int should_copy, int *IW,
     TYPE *D, int ldd,
     TYPE *L, int ldl,

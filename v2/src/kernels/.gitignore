@@ -1,11 +1,15 @@
-kernel-task-format-register.h
-kernel-task-format-register.cc
 bgemm.cc
 cgemm.cc
 ckernel.h
+ctrsm.cc
 dgemm.cc
 dkernel.h
+dtrsm.cc
+kernel-task-format-register.cc
+kernel-task-format-register.h
 sgemm.cc
 skernel.h
+strsm.cc
 zgemm.cc
 zkernel.h
+ztrsm.cc

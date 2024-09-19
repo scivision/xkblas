@@ -84,14 +84,8 @@ xkblas_£gemm_tile_async(
     snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", Am, An, Bm, Bn, Cm, Cn);
     # endif /* NDEBUG */
 
-    # pragma message(TODO "Can we call and could it improve performance simply calling a 'memcpy' from 'transA' to 'ldc' ?")
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
     new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
-
-    # pragma message(TODO "If (A == C) or (B == C) or (beta == 0), then it can be optimized with only 2 accesses")
-
-    // block size
-    XKBLAS_DEBUG("Inserting (%d, %d) x (%d, %d)", m, k, k, n);
 
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);

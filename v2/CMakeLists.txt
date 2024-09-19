@@ -5,6 +5,8 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 # Project name
 project(xkblas)
 
+message(STATUS "TODO: automate kernel files in the build")
+
 SET(SOURCE_FILES
     src/xkblas-context.cc
     src/xkblas-context-task-submit.cc
@@ -25,6 +27,10 @@ SET(SOURCE_FILES
     src/kernels/cgemm.cc
     src/kernels/dgemm.cc
     src/kernels/zgemm.cc
+    src/kernels/strsm.cc
+    src/kernels/ctrsm.cc
+    src/kernels/dtrsm.cc
+    src/kernels/ztrsm.cc
     src/logger/logger.cc
 )
 
@@ -34,11 +40,16 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/src/kernels/dgemm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/cgemm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/zgemm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/strsm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/dtrsm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/ctrsm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/ztrsm.cc
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS
         ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
         ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
 )
 
 option(STRICT "Enable strict compilation mode" OFF)

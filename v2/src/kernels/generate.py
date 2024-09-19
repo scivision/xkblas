@@ -13,7 +13,8 @@ incdir=sys.argv[2]
 print("srcdir={}, dstdir={}".format(srcdir, incdir))
 
 kernels=[
-    "gemm"
+    "gemm",
+    "trsm"
 ]
 
 # sed files

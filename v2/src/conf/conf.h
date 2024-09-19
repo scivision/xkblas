@@ -48,6 +48,7 @@ typedef struct  xkblas_conf_kernels_kernel_t
 typedef struct  xkblas_conf_kernels_t
 {
     xkblas_conf_kernels_kernel_t gemm;
+    xkblas_conf_kernels_kernel_t trsm;
 
 }               xkblas_conf_kernels_t;
 

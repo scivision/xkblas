@@ -11,11 +11,7 @@ ColumnLimit: 100
 
 AlignEscapedNewlines: true
 AlignOperands: Align
-AlignTrailingComments:
-  Kind: Always
-  OverEmptyLines: 2
 AllowAllParametersOfDeclarationOnNextLine: False
-AllowBreakBeforeNoexceptSpecifier: Never
 AllowShortBlocksOnASingleLine: Never
 AllowShortFunctionsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: Never

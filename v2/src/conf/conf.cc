@@ -160,6 +160,9 @@ xkblas_init_conf(xkblas_conf_t * conf)
     conf->kernels.gemm.tile[0] = 0;
     conf->kernels.gemm.tile[1] = 0;
 
+    conf->kernels.trsm.tile[0] = 0;
+    conf->kernels.trsm.tile[1] = 0;
+
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)
     {
