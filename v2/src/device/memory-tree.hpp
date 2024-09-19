@@ -358,7 +358,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 k,
                 interval.length()
             );
-            XKBLAS_FATAL("Shrink not supported yet");
+            //XKBLAS_FATAL("Shrink not supported yet");
         }
 
         //////////////////
@@ -570,8 +570,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             Partite & partite,
             uintptr_t allocation
         ) {
-            XKBLAS_INFO("-- Copying from %d to %d --", partite.src_device_global_id, partite.dst_device_global_id);
-
             /* one replicate must be non-null (a null replicate means to use the host view) */
             assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE ||
                    partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
@@ -786,9 +784,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                     assert(d[k] >= 0);
                 }
 
-                // TODO : offset the allocation address
+                // TODO : the allocation is assumed col major, cuda
                 static_assert(K == 2);
-                const uintptr_t begin_addr = addr + d[0]*ld + d[1];
+                const uintptr_t begin_addr = addr + d[0]*ld*access->host_view.sizeof_type + d[1];
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
                 const int allocation_view_id = replicate.nallocations++;
@@ -1177,6 +1175,7 @@ next_view:
         //////////////
         //  INSERT  //
         //////////////
+
         Node *
         new_node(
             Search & search,
@@ -1194,10 +1193,10 @@ next_view:
             const Region & region,
             const int k,
             const Color color,
-            const NodeBase * nodebase
+            const NodeBase * inherit
         ) const {
             assert(search.type == Search::Type::INSERTING_BLOCKS);
-            return new Node(search.access, region, k, color, reinterpret_cast<const Node *>(nodebase));
+            return new Node(search.access, region, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };
 

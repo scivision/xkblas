@@ -18,6 +18,9 @@
 # define TASK_MAX_ACCESSES          3
 # define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
 
+// # define XKBLAS_DEBUG_TASK(...) XKBLAS_DEBUG(__VA_ARGS__)
+# define XKBLAS_DEBUG_TASK(...)
+
 typedef enum    task_state_t : uint8_t
 {
     TASK_STATE_ALLOCATED        = 0,    // Task is allocated
@@ -158,7 +161,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
-                XKBLAS_DEBUG("State of task `%s` changed to ready", this->label);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
                 return true;
             }
@@ -170,7 +173,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         {
             if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
             {
-                XKBLAS_DEBUG("State of task `%s` changed to fetching", this->label);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 assert(this->state.value == TASK_STATE_READY);
                 this->state.value = TASK_STATE_DATA_FETCHING;
             }
@@ -182,7 +185,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
-                XKBLAS_DEBUG("State of task `%s` changed to fetched", this->label);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
                 return TASK_STATE_DATA_FETCHED;
             }
@@ -196,7 +199,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_EXECUTED;
-                XKBLAS_DEBUG("State of task `%s` changed to executed", this->label);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to executed", this->label);
             }
             SPINLOCK_UNLOCK(this->state.lock);
         }
@@ -204,7 +207,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         inline void
         complete(void)
         {
-            XKBLAS_DEBUG("State of task `%s` changed to completed", this->label);
+            XKBLAS_DEBUG_TASK("State of task `%s` changed to completed", this->label);
             assert(this->state.value == TASK_STATE_EXECUTED);
             for (Edge & edge : this->edges)
             {

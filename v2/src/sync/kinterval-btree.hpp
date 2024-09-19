@@ -811,9 +811,14 @@ class KIntervalBtree {
             const access_mode_t mode,
             Node * parent,
             int k,
-            Direction dir
+            Direction dir,
+            Node * inherit
         ) {
-            Node * node = this->new_node(t, region, k, RED);
+            Node * node;
+            if (inherit)
+                node = this->new_node(t, region, k, RED, inherit);
+            else
+                node = this->new_node(t, region, k, RED);
             tassert(node);
 
             parent->st[k].children[dir] = node;
@@ -987,7 +992,7 @@ class KIntervalBtree {
 
 # endif /* KINTERVAL_BTREE_REBALANCE */
 
-        /* called to create a new node */
+        /* called to create a new node with a region that never appeared before. */
         virtual Node *
         new_node(
             T & t,
@@ -996,14 +1001,15 @@ class KIntervalBtree {
             const Color color
         ) const = 0;
 
-        /* called to create a new node from a split of 'src */
+        /* called to create a new node, that intersect with a previously insert
+         * node 'inherit' */
         virtual Node *
         new_node(
             T & t,
             const Region & region,
             const int k,
             const Color color,
-            const Node * src
+            const Node * inherit
         ) const = 0;
 
         void
@@ -1053,7 +1059,8 @@ class KIntervalBtree {
             Region & region,
             const access_mode_t mode,
             Node * parent,
-            int k
+            int k,
+            Node * inherit
         ) {
 
             while (k < K)
@@ -1083,7 +1090,7 @@ class KIntervalBtree {
                 {
                     if (parent->st[k].left == nullptr)
                     {
-                        this->insert_fixup(t, region, mode, parent, k, LEFT);
+                        this->insert_fixup(t, region, mode, parent, k, LEFT, inherit);
                         break ;
                     }
                     else
@@ -1094,7 +1101,7 @@ class KIntervalBtree {
                 {
                     if (parent->st[k].right == nullptr)
                     {
-                        this->insert_fixup(t, region, mode, parent, k, RIGHT);
+                        this->insert_fixup(t, region, mode, parent, k, RIGHT, inherit);
                         break ;
                     }
                     else
@@ -1146,7 +1153,7 @@ insert_from_case_3_equals:
                         int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
 
                         std::vector<ReinsertRegion> to_reinsert;
-                        std::function<void(Node *)> f = [&x, &to_reinsert, &region, &k](Node * node)
+                        std::function<void(Node *)> f = [&x, &to_reinsert, &region, &k, &inherit](Node * node)
                         {
                             // generate side nodes region
                             for (int i = 0 ; i < 2 ; ++i)
@@ -1170,8 +1177,10 @@ insert_from_case_3_equals:
                             this->template foreach_k_child<Node>(parent, k+1, f);
 
                         // insert all side nodes
+                        assert(inherit == nullptr);
+                        inherit = parent;
                         for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0);
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, inherit);
 
                         // continue inserting, the node
                         assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
@@ -1187,7 +1196,7 @@ insert_from_case_3_equals:
                     {
                         const int b = region[k].b;
                         region[k].b = parent->region[k].a;
-                        this->insert_from(t, region, mode, this->root, 0);
+                        this->insert_from(t, region, mode, this->root, 0, inherit);
                         region[k].b = b;
                     }
 
@@ -1195,7 +1204,7 @@ insert_from_case_3_equals:
                     if (parent->region[k].b < region[k].b)
                     {
                         region[k].a = parent->region[k].b;
-                        this->insert_from(t, region, mode, this->root, 0);
+                        this->insert_from(t, region, mode, this->root, 0, inherit);
                     }
 
                     // (3)
@@ -1224,7 +1233,7 @@ insert_from_case_3_equals:
             }
             else
             {
-                this->insert_from(t, region, mode, this->root, 0);
+                this->insert_from(t, region, mode, this->root, 0, nullptr);
             }
 
             this->post_insert();

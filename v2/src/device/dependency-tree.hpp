@@ -46,20 +46,24 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             const Region & r,
             const int k,
             const Color color,
-            const Node * src
+            const Node * inherit
         ) :
             Base(r, k, color),
             last_reads(),
-            last_write(src->last_write),
+            last_write(),
             nwrites(0)
         {
-            if (!src->last_reads.empty())
+            if (inherit)
             {
-                this->last_reads.insert(
-                    this->last_reads.end(),
-                    std::make_move_iterator(src->last_reads.begin()),
-                    std::make_move_iterator(src->last_reads.end())
-                );
+                this->last_write = inherit->last_write;
+                if (!inherit->last_reads.empty())
+                {
+                    this->last_reads.insert(
+                        this->last_reads.end(),
+                        std::make_move_iterator(inherit->last_reads.begin()),
+                        std::make_move_iterator(inherit->last_reads.end())
+                    );
+                }
             }
         }
 
@@ -184,6 +188,7 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
         //////////////
         //  INSERT  //
         //////////////
+
         Node *
         new_node(
             Task * & task,
@@ -201,10 +206,10 @@ class KDependencyTree : public KIntervalBtree<K, KTask<K> *> {
             const Region & region,
             const int k,
             const Color color,
-            const NodeBase * nodebase
+            const NodeBase * inherit
         ) const {
             (void) task;
-            return new Node(region, k, color, reinterpret_cast<const Node *>(nodebase));
+            return new Node(region, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };
 
