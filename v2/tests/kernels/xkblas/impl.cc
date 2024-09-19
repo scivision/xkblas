@@ -3,6 +3,7 @@
 # include "common/impl.hpp"
 # include "xkblas.h"
 # include "xkblas-kernel.h"
+# include "xkblas-context.h"
 
 /* Implementation name */
 const char *
@@ -50,10 +51,6 @@ impl_t::gemm(
         beta,
         C, ldc
     );
-
-    int uplo = 0;
-    int memflag = 0;
-    xkblas_memory_coherent_async(uplo, memflag, m, n, C, ldc, sizeof(TYPE));
 }
 
 void
@@ -73,7 +70,31 @@ impl_t::trsm(
         A, lda,
         B, ldb
     );
-
-    int memflag = 0;
-    xkblas_memory_coherent_async(uplo, memflag, m, n, B, ldb, sizeof(TYPE));
 }
+
+void
+impl_t::coherent(
+    TYPE * M,
+    int m, int n,
+    int ld
+) {
+    int memflag = 0;
+    int uplo = 0;
+    xkblas_memory_coherent_async(uplo, memflag, m, n, M, ld, sizeof(TYPE));
+}
+
+
+void
+impl_t::set_tile(
+    int m, int n
+) {
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    for (int i = 0 ; i < XKBLAS_KERNEL_TYPE_MAX ; ++i)
+    {
+        context->conf.kernels[i].tile[0] = m;
+        context->conf.kernels[i].tile[1] = n;
+    }
+}
+

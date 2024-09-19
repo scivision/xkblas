@@ -101,13 +101,16 @@ xkblas_£gemm_tile_async(
 int
 xkblas_£gemm_async(
     int transA, int transB,
-    int M, int N, int K,
+    int m, int n, int k,
     const TYPE * alpha,
     const TYPE * A, int lda,
     const TYPE * B, int ldb,
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
+    if (m == 0 || n == 0 ||
+            ((*alpha == 0.0 || k == 0) && *beta == 1.0))
+        return 0;
 
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans))
@@ -122,30 +125,30 @@ xkblas_£gemm_async(
         return -2;
     }
 
-    if (M < 0)
+    if (m < 0)
     {
-        XKBLAS_FATAL( "illegal value of M");
+        XKBLAS_FATAL( "illegal value of m");
         return -3;
     }
 
-    if (N < 0)
+    if (n < 0)
     {
-        XKBLAS_FATAL("illegal value of N");
+        XKBLAS_FATAL("illegal value of n");
         return -4;
     }
 
-    if (K < 0)
+    if (k < 0)
     {
-        XKBLAS_FATAL("illegal value of N");
+        XKBLAS_FATAL("illegal value of k");
         return -5;
     }
 
-    const int Am = (transA == CblasNoTrans) ? M : K;
-    const int An = (transA == CblasNoTrans) ? K : M;
-    const int Bm = (transB == CblasNoTrans) ? K : N;
-    const int Bn = (transB == CblasNoTrans) ? N : K;
-    const int Cm = M;
-    const int Cn = N;
+    const int Am = (transA == CblasNoTrans) ? m : k;
+    const int An = (transA == CblasNoTrans) ? k : m;
+    const int Bm = (transB == CblasNoTrans) ? k : n;
+    const int Bn = (transB == CblasNoTrans) ? n : k;
+    const int Cm = m;
+    const int Cn = n;
 
     if (lda < MAX(1, Am))
     {
@@ -159,23 +162,20 @@ xkblas_£gemm_async(
         return -10;
     }
 
-    if (ldc < MAX(1, M))
+    if (ldc < MAX(1, Cm))
     {
         XKBLAS_FATAL("illegal value of ldc");
         return -13;
     }
 
-    /* Quick return */
-    if (M == 0 || N == 0 ||
-            ((*alpha == 0.0 || K == 0) && *beta == 1.0))
-        return 0;
-
-    /* currently only support 1 size */
     xkblas_context_t * context = xkblas_context_get();
-    int args[3] = {M, N, K};
-    int * tile = context->conf.kernels.gemm.tile;
+
+    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_GEMM].tile;
     if (tile[0] == 0 || tile[1] == 0)
+    {
+        int args[2] = {m, n};
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, tile);
+    }
 
     /* set tiling parameters */
     int Amb = tile[0];
@@ -197,10 +197,10 @@ xkblas_£gemm_async(
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
     {
-        int bs_mm = (tm == Cmt-1) ? (M-tm*Cmb) : Cmb;
+        int bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
         for (int tn = 0; tn < Cnt; tn++)
         {
-            int bs_nn = (tn == Cnt-1) ? (N-tn*Cnb) : Cnb;
+            int bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
             // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
             {

@@ -37,13 +37,15 @@ gemm_cmp(
     const TYPE * A, const BLAS_INT lda,
     const TYPE * B, const BLAS_INT ldb,
     const TYPE beta,
-    const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc
+    const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc,
+    int repeat
 ) {
     /* run native */
     printf("Running native...\n");
     {
         uint64_t t0 = get_nanotime();
-        cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        for (int i = 0 ; i < repeat ; ++i)
+            cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }

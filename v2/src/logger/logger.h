@@ -1,5 +1,5 @@
-#ifndef __XKBLAS_PRINT_H__
-# define __XKBLAS_PRINT_H__
+#ifndef __LOGGER_H__
+# define __LOGGER_H__
 
 # include "sync/spinlock.h"
 
@@ -88,5 +88,5 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
 # endif
 # define XKBLAS_FATAL(...) XKBLAS_PRINT(XKBLAS_PRINT_FATAL_ID, __VA_ARGS__)
 
-#endif /* __XKBLAS_PRINT_H__*/
+#endif /* __LOGGER_H__*/
 

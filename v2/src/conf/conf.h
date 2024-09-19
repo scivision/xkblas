@@ -5,6 +5,7 @@
 
 # include "logger/todo.h"
 # include "device/stream.h"
+# include "kernels/kernel-type.h"
 
 # pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 
@@ -39,19 +40,11 @@ typedef struct  xkblas_conf_device_t
 //  KERNEL CONF //
 //////////////////
 
-typedef struct  xkblas_conf_kernels_kernel_t
+typedef struct  xkblas_conf_kernel_t
 {
     int tile[2];
 
-}               xkblas_conf_kernels_kernel_t;
-
-typedef struct  xkblas_conf_kernels_t
-{
-    xkblas_conf_kernels_kernel_t gemm;
-    xkblas_conf_kernels_kernel_t trsm;
-
-}               xkblas_conf_kernels_t;
-
+}               xkblas_conf_kernel_t;
 
 //////////////////////////////////////////////////////////////////
 
@@ -62,8 +55,8 @@ typedef struct  xkblas_conf_s
     uint32_t    gpu_set;            /* GPU to use */
     float cuda_cache_limit;
 
-    xkblas_conf_device_t device;    /* device conf */
-    xkblas_conf_kernels_t kernels;  /* kernels conf */
+    xkblas_conf_device_t device;                            /* device conf */
+    xkblas_conf_kernel_t kernels[XKBLAS_KERNEL_TYPE_MAX];   /* kernels conf */
 
 }               xkblas_conf_t;
 

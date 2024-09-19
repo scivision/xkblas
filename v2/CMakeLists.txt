@@ -133,9 +133,6 @@ include_directories(src/)
 install(TARGETS xkblas LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
-# Flags
-add_compile_options("-DXKBLAS_DEBUG=1")
-
 if (STRICT)
     target_compile_options(xkblas PRIVATE -Wfatal-errors)
     if (${CUDA_RT_FOUND})

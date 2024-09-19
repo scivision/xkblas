@@ -39,6 +39,16 @@ class impl_t
                   TYPE * B, const BLAS_INT ldb
         );
 
+        void
+        coherent(
+            TYPE * M,
+            int m, int n,
+            int ld
+        );
+
+        void
+        set_tile(int m, int n);
+
         /* wait for the completion of previously sent operations */
         void wait(void);
 

@@ -30,6 +30,81 @@ static impl_t impl;
 //  CLI TO RUN-TIME //
 //////////////////////
 
+// GEMM - GEMM //
+static int
+main_gemm_gemm(char ** args)
+{
+    /* parse arguments */
+    CBLAS_TRANSPOSE transA = CblasNoTrans;
+    CBLAS_TRANSPOSE transB = CblasNoTrans;
+    int m     = atoi(args[0]);
+    int n     = atoi(args[1]);
+    int k     = atoi(args[2]);
+    int bs1_m = atoi(args[3]);
+    int bs1_n = atoi(args[4]);
+    int bs2_m = atoi(args[5]);
+    int bs2_n = atoi(args[6]);
+
+    TYPE alpha = (const TYPE) 0.0;
+    TYPE beta  = (const TYPE) 0.0;
+
+    /* currently only support this */
+    printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
+    int ld = MAX(MAX(m, n), k);
+    uintptr_t alignon = sizeof(TYPE) * ld;
+
+    /* allocate matrices */
+    uintptr_t mem = (uintptr_t) malloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
+
+    assert(Ap     % alignon == 0);
+    assert(Bp     % alignon == 0);
+    assert(Cp     % alignon == 0);
+    assert(CpRef  % alignon == 0);
+    assert(CpImpl % alignon == 0);
+
+    TYPE * A     = (TYPE *) Ap;
+    TYPE * B     = (TYPE *) Bp;
+    TYPE * C     = (TYPE *) Cp;
+    TYPE * CRef  = (TYPE *) CpRef;
+    TYPE * CImpl = (TYPE *) CpImpl;
+
+    /* initialize matrices */
+    FILL(A, 3*ld*ld); // fill A, B and C
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
+
+    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+    /* run on impl */
+    const int repeat = 2;
+    printf("Running implementation...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        for (int i = 0 ; i < repeat ; ++i)
+            impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+        impl.coherent(CImpl, m, n, ld);
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    /* check correctness */
+    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, repeat);
+    if (r == 0)
+        puts("Result is CORRECT");
+    else
+        puts("Result is INCORRECT !!");
+
+    return 0;
+}
+
+
 // GEMM //
 static int
 main_gemm(char ** args)
@@ -71,25 +146,9 @@ main_gemm(char ** args)
     TYPE * CImpl = (TYPE *) CpImpl;
 
     /* initialize matrices */
-
-    # if 1
-
     FILL(A, 3*ld*ld); // fill A, B and C
     FILL(&alpha, 1);
     FILL(&beta, 1);
-
-    # else
-
-    for (int i = 0 ; i < (ld * ld) ; ++i)
-    {
-        A[i] = (TYPE) 1.0;
-        B[i] = (TYPE) 1.0;
-        C[i] = (TYPE) 1.0;
-    }
-    alpha = (TYPE) 1.0;
-    beta  = (TYPE) 1.0;
-
-    # endif
 
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -99,13 +158,14 @@ main_gemm(char ** args)
     {
         uint64_t t0 = get_nanotime();
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+        impl.coherent(CImpl, m, n, ld);
         impl.wait();
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
     /* check correctness */
-    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld);
+    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
     if (r == 0)
         puts("Result is CORRECT");
     else
@@ -171,6 +231,7 @@ main_trsm(char ** args)
     {
         uint64_t t0 = get_nanotime();
         impl.trsm(side, uplo, transA, diag, m, n, &alpha, A, ld, BImpl, ld);
+        impl.coherent(BImpl, m, n, ld);
         impl.wait();
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
@@ -186,6 +247,7 @@ main_trsm(char ** args)
     return 0;
 }
 
+# if 0
 static int
 main_copyscale(char ** args)
 {
@@ -273,6 +335,8 @@ main_trsm_copyscale_gemm(char ** args)
     return 0;
 }
 
+# endif
+
 typedef struct  func_t
 {
     const char * name;
@@ -283,6 +347,7 @@ typedef struct  func_t
 }               func_t;
 
 static func_t funcs[] = {
+# if 0
     {
         .name = "TRSM-COPYSCALE-GEMM",
         .f = main_trsm_copyscale_gemm,
@@ -304,7 +369,7 @@ static func_t funcs[] = {
                     "  - N      : number of rows of matrices D and U, cols of matrices D and L\n"
                     "  - S      : number of rows and cols per tile\n"
     },
-
+# endif
     {
         .name = "GEMM",
         .f = main_gemm,
@@ -325,6 +390,23 @@ static func_t funcs[] = {
                     "  - M      : number of rows of matrices L\n"
                     "  - N      : number of rows of matrices D, cols of matrices D and L\n",
     },
+
+    {
+        .name = "GEMM-GEMM",
+        .f = main_gemm_gemm,
+        .nargs = 7,
+        .descr = "C := a.A.B + b.C - repeat twice with two block sizes",
+        .usage =    "M N K\n"
+                    "  - M      : n° of rows of A and C\n"
+                    "  - N      : n° of cols of B and C\n"
+                    "  - K      : n° of cols of A, rows of B\n"
+                    "  - BS1_M  : 1st gemm block size\n"
+                    "  - BS1_N  : 1st gemm block size\n"
+                    "  - BS2_M  : 2nd gemm block size\n"
+                    "  - BS2_N  : 2nd gemm block size\n"
+    },
+
+
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
 

@@ -181,12 +181,13 @@ xkblas_£trsm_async(
         return -10;
     }
 
-    /* currently only support 1 size */
     xkblas_context_t * context = xkblas_context_get();
-    int args[2] = {m, n};
-    int * tile = context->conf.kernels.trsm.tile;
+    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_TRSM].tile;
     if (tile[0] == 0 || tile[1] == 0)
+    {
+        int args[2] = {m, n};
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_TRSM, args, tile);
+    }
 
     XKBLAS_IMPL("TODO: trsm tiling");
     assert(tile[0] == tile[1]);

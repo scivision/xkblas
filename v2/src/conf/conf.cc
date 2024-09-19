@@ -23,16 +23,16 @@ __parse_tile_size(xkblas_conf_t * conf, char const * value)
         if (r != 3)
             XKBLAS_FATAL("Invalid `XKBLAS_TILE_SIZE` - parsed %s(%d,%d)", kernel, m, n);
 
-        XKBLAS_DEBUG("Setting default tile size for `%s` to `(%d, %d)`", kernel, m, n);
+        XKBLAS_DEBUG("Setting tile size for `%s` to `(%d, %d)`", kernel, m, n);
         if (strcmp(kernel, "gemm") == 0)
         {
-            conf->kernels.gemm.tile[0] = m;
-            conf->kernels.gemm.tile[1] = n;
+            conf->kernels[XKBLAS_KERNEL_TYPE_GEMM].tile[0] = m;
+            conf->kernels[XKBLAS_KERNEL_TYPE_GEMM].tile[1] = n;
         }
         else if (strcmp(kernel, "trsm") == 0)
         {
-            conf->kernels.gemm.tile[0] = m;
-            conf->kernels.gemm.tile[1] = n;
+            conf->kernels[XKBLAS_KERNEL_TYPE_TRSM].tile[0] = m;
+            conf->kernels[XKBLAS_KERNEL_TYPE_TRSM].tile[1] = n;
         }
         else
         {
@@ -162,11 +162,11 @@ xkblas_init_conf(xkblas_conf_t * conf)
     //////////////////
     //  DEVICE CONF //
     //////////////////
-    conf->kernels.gemm.tile[0] = 0;
-    conf->kernels.gemm.tile[1] = 0;
-
-    conf->kernels.trsm.tile[0] = 0;
-    conf->kernels.trsm.tile[1] = 0;
+    for (int i = 0 ; i < XKBLAS_KERNEL_TYPE_MAX ; ++i)
+    {
+        conf->kernels[i].tile[0] = 0;
+        conf->kernels[i].tile[1] = 0;
+    }
 
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)
