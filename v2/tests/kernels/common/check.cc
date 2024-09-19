@@ -148,5 +148,29 @@ trsm_cmp(
     dump_matrix("BRef",  BRef,  Bm, Bn);
     dump_matrix("BImpl", BImpl, Bm, Bn);
 
-    return 1;
+    TYPE * work = (TYPE *)malloc(MAX(m, n)* sizeof(TYPE));
+    assert(work);
+    double Anorm        = LAPACKE_slantr_work(LAPACK_COL_MAJOR, 'I', uplo, diag, Am, An, A, lda, work);
+    double Bnorm        = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+    double BImplnorm    = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BImpl, ldb, work);
+    double BRefnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+    cblas_saxpy(ldb * n, -1.0, BImpl, 1, BRef, 1);
+    double Rnorm        = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+
+    printf("Rnorm %e, Anorm %e, Bnorm %e, BImplnorm %e, BRefnorm %e\n",
+           Rnorm, Anorm, Bnorm, BImplnorm, BRefnorm);
+
+    double eps = LAPACKE_slamch_work('e');
+    double result = Rnorm / ((Anorm + BRefnorm) * MAX(m,n) * eps);
+
+    printf("============\n");
+    printf("Checking the norm of the difference against reference TRSM \n");
+    printf("-- ||BImpl - BRef||_oo/((||A||_oo+||B||_oo).N.eps) = %e \n", result);
+
+    int suspicious = 0;
+    if (isinf(BRefnorm) || isinf(BImplnorm) || isnan(result) || isinf(result) || (result > 10.0))
+        suspicious = 1;
+    free(work);
+
+    return suspicious;
 }
