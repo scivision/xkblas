@@ -82,20 +82,26 @@ main_gemm_gemm(char ** args)
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
     /* run on impl */
-    const int repeat = 2;
     printf("Running implementation...\n");
     {
         uint64_t t0 = get_nanotime();
-        for (int i = 0 ; i < repeat ; ++i)
-            impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+
+        impl.set_tile(bs1_m, bs1_n);
+        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+
+        impl.set_tile(bs2_m, bs2_n);
+        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+
         impl.coherent(CImpl, m, n, ld);
+
         impl.wait();
+
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
     /* check correctness */
-    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, repeat);
+    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
     if (r == 0)
         puts("Result is CORRECT");
     else
