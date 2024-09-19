@@ -35,3 +35,6 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 
 # Question for XKBLAS/v1
 - Why is it not deadlocking when stream queues are full ???
+
+# Remark for XKBLAS/V1
+- Device thread 'requests' mechanism got removed - use tasks instead (as per memory-coherent-async tasks)

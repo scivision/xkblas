@@ -1177,12 +1177,10 @@ insert_from_case_3_equals:
                             this->template foreach_k_child<Node>(parent, k+1, f);
 
                         // insert all side nodes
-                        assert(inherit == nullptr);
-                        inherit = parent;
                         for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, inherit);
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, parent);
 
-                        // continue inserting, the node
+                        // continue inserting the node
                         assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
                         goto insert_from_case_3_equals;
 

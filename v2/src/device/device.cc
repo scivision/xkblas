@@ -213,14 +213,12 @@ xkblas_device_thread_main_loop(
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
         # pragma message(TODO "Per-device thread currently actively polling, the pause/resume mechanism is suspicious")
-        # if 0
+        # if 1
         # pragma message(TODO "'device->offloader.is_empty' is called with no lock, while inner lists are modifed under locks, is this a problem ?")
         // If there is no tasks and streams are empty, sleep the thread
         Task * task;
-        while ((task = worker->pop()) == NULL &&
-                device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL) &&
-                device->request.type == XKBLAS_DEVICE_REQUEST_TYPE_NOP)
-            worker->pause();    // TODO : bad design, 'worker' must be 'ThreadWorker::self()' !!
+        while ((task = worker->pop()) == NULL && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
+            worker->pause();
 
         XKBLAS_DEBUG("Thread of device %d of driver %s is working, task=%p, offloader.is_empty()=%d",
                 device->global_id, driver->f_get_name(), task, device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL));
@@ -228,10 +226,9 @@ xkblas_device_thread_main_loop(
         Task * task = worker->pop();
         # endif
 
+        xkblas_device_progress(driver, device);
         if (task)
             xkblas_device_prepare_task(driver, device, task);
-        else
-            xkblas_device_progress(driver, device);
     }
 
     return EINTR;

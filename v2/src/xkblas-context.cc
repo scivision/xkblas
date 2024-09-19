@@ -128,6 +128,16 @@ xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
 
+    #if 0
+    // task dependency graph
+    XKBLAS_INFO("Exporting Dependency Tree...");
+    ThreadProducer * thread = ThreadProducer::self();
+    FILE * f = fopen("tasks.dot", "w");
+    thread->dump_tasks(f);
+    fclose(f);
+    system("dot -Tpdf tasks.dot > tasks.pdf");
+    # endif
+
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
@@ -167,17 +177,11 @@ retry:
 #endif // USE_STATS == 1
 # if 0
     XKBLAS_INFO("Exporting memory tree...");
+
+    // memory kinterval btree
     context->memtree.export_pdf("memory");
 
-    XKBLAS_INFO("Exporting Dependency Tree...");
-    ThreadProducer * thread = ThreadProducer::get();
-    FILE * f = fopen("tasks.dot", "w");
-    thread->dump_tasks(f);
-    fclose(f);
-    system("dot -Tpdf tasks.dot > tasks.pdf");
-
+    // dependency kinterval btree
     thread->deptree.export_pdf("dependency");
-    XKBLAS_DEBUG("Done");
 # endif
-
 }

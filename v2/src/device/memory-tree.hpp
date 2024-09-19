@@ -1015,7 +1015,7 @@ next_view:
 
                 for (Partite & partite : search.partition)
                 {
-                    # pragma message(TODO "Manage validity in a more lazy way")
+                    # pragma message(TODO "Can validity be managed in a more lazy way ?")
                     for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
                     {
                         MemoryReplicate & replicate = partite.block->replicates[i];
@@ -1025,10 +1025,10 @@ next_view:
 
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
 
+                    # pragma message(TODO "Free each allocation")
                     # if 0
                     // release allocation that are no longer required, as we are rewritting that block.
                     XKBLAS_IMPL("Releasing allocations from a block...");
-                    # pragma message(TODO "Free each allocation")
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         if (i != partite.dst_allocation_view_id)
@@ -1088,15 +1088,6 @@ next_view:
             Task * task,
             Access * access
         ) {
-
-            // Debugging (WIP) - steps
-            //  - (1) - OK
-            //  - (2) - OK
-            //  - (3) - OK
-            //  - (4) - OK
-            //  - (5) - ?
-            //  - (6) - ?
-            //  - (7) - OK
 
             Search search(device->global_id);
             uintptr_t allocation = 0;
