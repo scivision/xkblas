@@ -55,3 +55,25 @@ impl_t::gemm(
     int memflag = 0;
     xkblas_memory_coherent_async(uplo, memflag, m, n, C, ldc, sizeof(TYPE));
 }
+
+void
+impl_t::trsm(
+    int side, int uplo,
+    CBLAS_TRANSPOSE transA, int diag,
+    const BLAS_INT m, const BLAS_INT n,
+    const TYPE * alpha,
+    const TYPE * A, const BLAS_INT lda,
+          TYPE * B, const BLAS_INT ldb
+) {
+    xkblas_strsm_async(
+        side, uplo,
+        transA, diag,
+        m, n,
+        alpha,
+        A, lda,
+        B, ldb
+    );
+
+    int memflag = 0;
+    xkblas_memory_coherent_async(uplo, memflag, m, n, B, ldb, sizeof(TYPE));
+}

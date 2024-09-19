@@ -29,6 +29,16 @@ class impl_t
                   TYPE * C, int ldc
         );
 
+        void
+        trsm(
+            int side, int uplo,
+            CBLAS_TRANSPOSE transA, int diag,
+            const BLAS_INT m, const BLAS_INT n,
+            const TYPE * alpha,
+            const TYPE * A, const BLAS_INT lda,
+                  TYPE * B, const BLAS_INT ldb
+        );
+
         /* wait for the completion of previously sent operations */
         void wait(void);
 

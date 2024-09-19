@@ -4,15 +4,7 @@
 # include <sys/param.h>
 # include "common/blas.h"
 
-extern "C" {
-int sgemm_(char *transa, char *transb,
-  const BLAS_INT *m, const BLAS_INT *n, const BLAS_INT *k,
-  const TYPE *alpha,
-  const TYPE *a, const BLAS_INT *lda,
-  const TYPE *b, const BLAS_INT *ldb,
-  const TYPE *beta,
-        TYPE *c, const BLAS_INT *ldc);
-}
+// TODO : change slange, saxpy, slamch, etc... with defines based on type
 
 static void
 dump_matrix(
@@ -47,6 +39,15 @@ gemm_cmp(
     const TYPE beta,
     const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc
 ) {
+    /* run native */
+    printf("Running native...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+        uint64_t tf = get_nanotime();
+        printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
     TYPE * work = (TYPE *) malloc(MAX(k,MAX(m, n)) * sizeof(TYPE));
 
     const int Am = (transA == CblasNoTrans) ? m : k;
@@ -63,21 +64,6 @@ gemm_cmp(
     double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, C,     ldc, work);
     double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CImpl, ldc, work);
 
-    /* run native */
-    printf("Running native...\n");
-    {
-        uint64_t t0 = get_nanotime();
-        # if 1
-        char ta = cblas2blas_op(transA);
-        char tb = cblas2blas_op(transB);
-        sgemm_(&ta, &tb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, CRef, &ldc);
-        # else
-        cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
-        # endif
-        uint64_t tf = get_nanotime();
-        printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
-    }
-
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
     dump_matrix("A",     A,     Am, An);
     dump_matrix("B",     B,     Bm, Bn);
@@ -85,15 +71,10 @@ gemm_cmp(
     dump_matrix("CRef",  CRef,  Cm, Cn);
     dump_matrix("CImpl", CImpl, Cm, Cn);
 
-    // TODO : change slange, saxpy, slamch, etc... with defines based on type
-
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);
-
     TYPE beta_const = (TYPE) -1.0;
     cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
-
     double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, CRef, ldc, work);
-
     double eps = LAPACKE_slamch_work('e');
 
     printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
@@ -136,4 +117,36 @@ gemm_cmp(
     free(work);
 
     return suspicious;
+}
+
+int
+trsm_cmp(
+    CBLAS_SIDE side, CBLAS_UPLO uplo,
+    CBLAS_TRANSPOSE transA, CBLAS_DIAG diag,
+    const BLAS_INT m, const BLAS_INT n,
+    const TYPE alpha,
+    const TYPE * A, const BLAS_INT lda,
+    const TYPE * B, TYPE * BRef, const TYPE * BImpl, const BLAS_INT ldb
+) {
+    const int Am = (side == CblasLeft) ? m : n;
+    const int An = Am;
+    const int Bm = m;
+    const int Bn = n;
+
+    /* run native */
+    printf("Running native...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        cblas_strsm(CblasColMajor, side, uplo, transA, diag, m, n, alpha, A, lda, BRef, ldb);
+        uint64_t tf = get_nanotime();
+        printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    printf("alpha=%lf\n", alpha);
+    dump_matrix("A",     A,     Am, An);
+    dump_matrix("B",     B,     Bm, Bn);
+    dump_matrix("BRef",  BRef,  Bm, Bn);
+    dump_matrix("BImpl", BImpl, Bm, Bn);
+
+    return 1;
 }

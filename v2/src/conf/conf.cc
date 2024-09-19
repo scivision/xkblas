@@ -29,6 +29,11 @@ __parse_tile_size(xkblas_conf_t * conf, char const * value)
             conf->kernels.gemm.tile[0] = m;
             conf->kernels.gemm.tile[1] = n;
         }
+        else if (strcmp(kernel, "trsm") == 0)
+        {
+            conf->kernels.gemm.tile[0] = m;
+            conf->kernels.gemm.tile[1] = n;
+        }
         else
         {
             XKBLAS_FATAL("Unknown kernel `%s` set in `XKBLAS_TILE_SIZE`", kernel);

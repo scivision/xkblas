@@ -1,3 +1,8 @@
+
+
+// TODO : Add tests for each parameter combination possible (e.g.
+// CblasTrans/CblansNoTrans, CblasLeft/CblasRight, etc...
+
 extern "C" {
 
     # include <stdio.h>
@@ -112,34 +117,71 @@ main_gemm(char ** args)
 static int
 main_trsm(char ** args)
 {
-    assert(0);
+    /* parse arguments */
+    CBLAS_SIDE side = CblasLeft;
+    CBLAS_UPLO uplo = CblasUpper;
+    CBLAS_DIAG diag = CblasNonUnit;
+    CBLAS_TRANSPOSE transA = CblasNoTrans;
 
-    int M  = atoi(args[0]);
-    int N  = atoi(args[1]);
-    int ld = N + M;
-    int S = atoi(args[2]);
+    int m = atoi(args[0]);
+    int n = atoi(args[1]);
+    TYPE alpha = (const TYPE) 0.0;
 
-    if (ld < M || ld < N)
+    /* currently only support this */
+    int ld = MAX(m, n);
+
+    printf("Set (m, n) = (%d, %d)\n", m, n);
+
+    uintptr_t alignon = sizeof(TYPE) * ld;
+
+    /* allocate matrices */
+    uintptr_t mem = (uintptr_t) malloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+
+    assert(Ap     % alignon == 0);
+    assert(Bp     % alignon == 0);
+    assert(BpRef  % alignon == 0);
+    assert(BpImpl % alignon == 0);
+
+    TYPE * A     = (TYPE *) Ap;
+    TYPE * B     = (TYPE *) Bp;
+    TYPE * BRef  = (TYPE *) BpRef;
+    TYPE * BImpl = (TYPE *) BpImpl;
+
+    /* initialize matrices */
+    FILL(A, ld*ld);
+    FILL(B, ld*ld);
+    FILL(&alpha, 1);
+
+    // diagonal dominante
+    TYPE invmax = 1.0 / (TYPE) MAX(m,n);
+    for (int i = 0; i < ld*ld ; ++i)
+        A[i] *= invmax;
+    for(int i = 0 ; i < ld ; ++i)
+        A[ld*i+i] = 1.0;
+
+    memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
+    memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
+
+    /* run on impl */
+    printf("Running implementation...\n");
     {
-        fprintf(stderr, "ld must be greated than M and N\n");
-        return 1;
-    }
-    if (M % S || N % S)
-    {
-        fprintf(stderr, "Tile sizes must divide matrix sizes");
-        return 1;
+        uint64_t t0 = get_nanotime();
+        impl.trsm(side, uplo, transA, diag, m, n, &alpha, A, ld, BImpl, ld);
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
     }
 
-    int D = 0;
-    int L = ld * N;
-
-    printf("Set (M, N, ld) = (%d, %d, %d) with tile (%d, %d)\n", M, N, ld, S, S);
-
-    uint64_t t0 = get_nanotime();
-    // TODO
-    uint64_t tf = get_nanotime();
-
-    printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    /* check correctness */
+    int r = trsm_cmp(side, uplo, transA, diag, m, n, alpha, A, ld, B, BRef, BImpl, ld);
+    if (r == 0)
+        puts("Result is CORRECT");
+    else
+        puts("Result is INCORRECT !!");
 
     return 0;
 }
@@ -277,11 +319,11 @@ static func_t funcs[] = {
     {
         .name = "TRSM",
         .f = main_trsm,
-        .nargs = 3,
+        .nargs = 2,
+        .descr = "A.X = B",
         .usage =    "M N S\n"
                     "  - M      : number of rows of matrices L\n"
-                    "  - N      : number of rows of matrices D, cols of matrices D and L\n"
-                    "  - S      : number of rows and cols per tile\n"
+                    "  - N      : number of rows of matrices D, cols of matrices D and L\n",
     },
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
