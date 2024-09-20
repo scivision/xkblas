@@ -1177,13 +1177,11 @@ insert_from_case_3_equals:
                         if (k < K - 1)
                             this->template foreach_k_child<Node>(parent, k+1, f);
 
-                        if (inherit == nullptr)
-                            inherit = parent;
-
                         // reinsert all side nodes from the split, that
                         // inherits from the original node
+                        assert(inherit == nullptr);
                         for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, parent, k, inherit);
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, parent, k, rr.sibling);
 
                         // continue inserting the node, that nows equals the
                         // shrinked parent node
@@ -1195,10 +1193,12 @@ insert_from_case_3_equals:
                 // case (4)     I n J != o is (1) + (2) + (3)
                 else
                 {
+                    const int a = region[k].a;
+                    const int b = region[k].b;
+
                     // (1)
                     if (region[k].a < parent->region[k].a)
                     {
-                        const int b = region[k].b;
                         region[k].b = parent->region[k].a;
                         this->insert_from(t, region, mode, this->root, 0, inherit);
                         region[k].b = b;
@@ -1209,13 +1209,19 @@ insert_from_case_3_equals:
                     {
                         region[k].a = parent->region[k].b;
                         this->insert_from(t, region, mode, this->root, 0, inherit);
+                        region[k].a = a;
                     }
 
                     // (3)
-                    region[k].a = parent->region[k].a;
-                    region[k].b = parent->region[k].b;
-                    assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
-                    goto insert_from_case_3_equals;
+                    {
+                        region[k].a = parent->region[k].a;
+                        region[k].b = parent->region[k].b;
+                        this->insert_from(t, region, mode, this->root, 0, inherit);
+                        region[k].a = a;
+                        region[k].b = b;
+                    }
+
+                    break ;
                 }
             }
         }

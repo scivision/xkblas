@@ -226,9 +226,31 @@ static void launch_tests(KDependencyTree<K> & tree)
         static_assert(K == 2);
 
         Interval intervals[] = {
-            Interval( 0, 16), Interval( 0, 16),
-            Interval( 4, 12), Interval(16, 24),
+            Interval(0,16),  Interval(0,16),
+            Interval(16,32), Interval(0,16),
+            Interval(0,16),  Interval(16,32),
+            Interval(16,32), Interval(16,32),
+
+            Interval(0,20),  Interval(0,20),
         };
+
+        # if 0
+        int min = intervals[0].a;
+        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
+        {
+            if (intervals[i].a < min)
+                min = intervals[0].a;
+        }
+
+        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
+        {
+            intervals[i].a -= min;
+            intervals[i].b -= min;
+            intervals[i+1].a /= sizeof(float);
+            intervals[i+1].b /= sizeof(float);
+        }
+        # endif
+
 
         for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
         {
