@@ -152,7 +152,7 @@ class KMemoryBlock {
             // const uintptr_t begin_addr = addr + d[0]*ld*block.host_view.sizeof_type + d[1];
 
             // replicates(block.replicates),
-            // XKBLAS_FATAL("Not implemented");
+            XKBLAS_FATAL("Not implemented");
         }
 
         ~KMemoryBlock() {}
@@ -360,7 +360,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Color color,
             const Node * src
         ) :
-            Base(src->region, k, color),
+            Base(r, k, color),
             block(r, src->block, src->region)
         {}
 
@@ -415,6 +415,8 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 else
                     this->block.host_view.n        -= offset;
             }
+
+            XKBLAS_FATAL("Shrink not supported yet");
 
             # if 0
             XKBLAS_WARN("shrinked region (%dx%d) on dimension %d to %d",
