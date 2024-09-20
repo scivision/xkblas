@@ -2,7 +2,7 @@
 # define __CONSTS_H__
 
 /* maximum number of devices in total */
-# define XKBLAS_DEVICES_MAX (16)
+# define XKBLAS_DEVICES_MAX (4)
 
 static_assert(XKBLAS_DEVICES_MAX <= 8*sizeof(uint16_t));
 typedef uint16_t xkblas_device_global_id_t;

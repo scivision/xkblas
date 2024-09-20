@@ -668,8 +668,10 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             // assume col major for cuda - if not, need to do some shit here
             assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
-            size_t width        = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            size_t height       = instr->copy.host_view.n;
+            int width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
+            int height = instr->copy.host_view.n;
+            assert(width >= 0);
+            assert(height >= 0);
 
             cudaMemcpyKind kind;
             cudaStream_t handle;
@@ -769,7 +771,7 @@ cuda_stream_instructions_progress(
             case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
             {
                 /* poll events */
-                for (int i = 0 ; i < 1 ; ++i)
+                for (int i = 0 ; i < 16 ; ++i)
                 {
                     res = cudaEventQuery(stream->cu.events.end[idx]);
                     assert(res == cudaErrorNotReady || res == cudaSuccess);
@@ -778,7 +780,7 @@ cuda_stream_instructions_progress(
                     # pragma message(TODO "Why pthread_yield here ?")
                     if (res == cudaErrorNotReady)
                     {
-                        XKBLAS_DEBUG("Not ready, yielding");
+                        // XKBLAS_DEBUG("Not ready, yielding");
                         pthread_yield();
                     }
                     else
@@ -786,6 +788,7 @@ cuda_stream_instructions_progress(
                         assert(res == cudaSuccess);
                         if (prev_okp + 1 == okp)
                             ++prev_okp;
+                        break ;
                     }
                 }
             } /* intentionally fallthrough */

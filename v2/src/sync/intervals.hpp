@@ -172,14 +172,16 @@ class Intervals {
             return s;
         }
 
-        /* return the distance between 'left-top' corners for each dimensions of the region */
-        inline void
+        /* return the distance | y - x | between 'left-top' corners of each
+         * dimensions of the interval */
+        static inline void
         distance_manhattan(
-            const Intervals & other,
+            const Intervals & x,
+            const Intervals & y,
             int d[K]
-        ) const {
+        ) {
             for (int k = 0 ; k < K ; ++k)
-                d[k] = this->list[k].a - other.list[k].a;
+                d[k] = y.list[k].a - x.list[k].a;
         }
 
         friend std::ostream &

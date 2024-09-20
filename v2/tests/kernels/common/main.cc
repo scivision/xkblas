@@ -61,6 +61,8 @@ main_gemm_gemm(char ** args)
     uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
     uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
 
+    printf("Ap = %lu\n", Ap);
+
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(Cp     % alignon == 0);
@@ -80,6 +82,8 @@ main_gemm_gemm(char ** args)
 
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+
 
     /* run on impl */
     printf("Running implementation...\n");
