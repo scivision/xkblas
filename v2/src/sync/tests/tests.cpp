@@ -222,16 +222,12 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 0
+        # if 1
         static_assert(K == 2);
 
         Interval intervals[] = {
-            Interval( 0, 16), Interval( 4,  8),
-            Interval( 0, 16), Interval( 8, 12),
-            Interval( 0, 16), Interval(12, 16),
-
-            Interval( 2, 14), Interval( 0,  4),
-            Interval( 0, 16), Interval( 0,  4),
+            Interval( 0, 16), Interval( 0, 16),
+            Interval( 4, 12), Interval(16, 24),
         };
 
         for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)

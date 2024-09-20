@@ -109,7 +109,10 @@ class MemoryReplicate
 }; /* MemoryReplicate */
 
 /* a memory block, one per tree node */
-class MemoryBlock {
+template <int K>
+class KMemoryBlock {
+
+    using Region = Intervals<K>;
 
     public:
 
@@ -125,30 +128,43 @@ class MemoryBlock {
     public:
 
         /* a new memory block, assume it is valid on the host */
-        MemoryBlock(const memory_view_t & v) :
+        KMemoryBlock(const memory_view_t & v) :
             host_view(v),
             replicates(),
             valid(0)
         {}
 
         /* a block from splitting an existing one */
-        MemoryBlock(
-            const MemoryBlock & block
-        ) {
+        KMemoryBlock(
+            const Region & block_region,
+            const KMemoryBlock & inheriting,
+            const Region & inheriting_region
+        ) :
+            host_view(inheriting.host_view),
+            valid(inheriting.valid)
+        {
+            // compute distance between blocks
+            int d[K];
+            block_region.distance_manhattan(inheriting_region, d);
+
+            // TODO : the allocation is assumed col major, cuda
+            static_assert(K == 2);
+            // const uintptr_t begin_addr = addr + d[0]*ld*block.host_view.sizeof_type + d[1];
 
             // replicates(block.replicates),
-            XKBLAS_FATAL("Not implemented");
+            // XKBLAS_FATAL("Not implemented");
         }
 
-        virtual ~MemoryBlock() {}
+        ~KMemoryBlock() {}
 
-}; /* MemoryBlock */
+}; /* KMemoryBlock */
 
 /* storage passed when searchingi n the tree */
 template <int K>
 class KMemoryTreeNodeSearch {
 
     using Access = KMemoryAccess<K>;
+    using MemoryBlock = KMemoryBlock<K>;
     using Region = Intervals<K>;
 
     public:
@@ -301,8 +317,9 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 
     using Access = KMemoryAccess<K>;
     using Base = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
-    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
+    using MemoryBlock = KMemoryBlock<K>;
     using Node = KMemoryTreeNode<K>;
+    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
     using Region = Intervals<K>;
     using Search = KMemoryTreeNodeSearch<K>;
 
@@ -322,12 +339,20 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         ) :
             Base(r, k, color),
             block(access->host_view)
-        {
-            // TODO : is access->region != r ; then the access resulted in
-            // several insertion nodes, which i snot s upported yet
-        }
+        {}
 
-        /* the region was accessed before, create a new node and inherit from 'src' state */
+        /**
+         * A new node is being created from a split, make it inherit its original node 'src'
+         *  - access - the access
+         *  - r - ??
+         *  - k - the dimension that got splitted
+         *  - color - the node color
+         *  - src - the node that got split
+         *
+         * We have:
+         *  U (src->region, r) == the node region before being shrinked
+         *  n (src->region, r) = {} - empty intersection
+         */
         KMemoryTreeNode<K>(
             const Access * access,
             const Region & r,
@@ -336,7 +361,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Node * src
         ) :
             Base(src->region, k, color),
-            block(src->block)
+            block(r, src->block, src->region)
         {}
 
     public:
@@ -349,16 +374,58 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
 
+        /* shrinking on dimension 'k' from 'this->region[k]' to 'interval' */
         void
-        on_shrink(const Interval & interval, int k)
-        {
+        on_shrink(
+            const Interval & interval,
+            int k
+        ) {
+            static_assert(K == 2);
+
+            assert(this->region[k].includes(interval));
+            assert(interval.a == this->region[k].a || interval.b == this->region[k].b);
+
+            // shrink left
+            if (interval.a != this->region[k].a)
+            {
+                assert(this->region[k].a  < interval.a);
+                assert(this->region[k].b == interval.b);
+
+                uintptr_t offset = interval.a - this->region[k].a;
+                if (k == 0)
+                {
+                    this->block.host_view.offset_m += offset;
+                    this->block.host_view.m        -= offset;
+                }
+                else
+                {
+                    this->block.host_view.offset_n += offset;
+                    this->block.host_view.n        -= offset;
+                }
+            }
+            // shrink right
+            else
+            {
+                assert(this->region[k].a == interval.a);
+                assert(this->region[k].b  > interval.b);
+
+                uintptr_t offset = this->region[k].b - interval.b;
+                if (k == 0)
+                    this->block.host_view.m        -= offset;
+                else
+                    this->block.host_view.n        -= offset;
+            }
+
+            # if 0
             XKBLAS_WARN("shrinked region (%dx%d) on dimension %d to %d",
                 this->region[0].length(),
                 this->region[1].length(),
                 k,
                 interval.length()
             );
-            //XKBLAS_FATAL("Shrink not supported yet");
+
+            XKBLAS_FATAL("Shrink not supported yet");
+            # endif
         }
 
         //////////////////
@@ -471,9 +538,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
     using Access = KMemoryAccess<K>;
     using Base = KIntervalBtree<K, KMemoryTreeNodeSearch<K>>;
-    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
+    using MemoryBlock = KMemoryBlock<K>;
     using Node = KMemoryTreeNode<K>;
     using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
     using Region = Intervals<K>;
     using Search = KMemoryTreeNodeSearch<K>;
     using Task = KTask<K>;
@@ -778,11 +846,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             {
                 /* compute distance from corner */
                 int d[K];
-                for (int k = 0 ; k < K ; ++k)
-                {
-                    d[k] = partite.region[k].a - corner.region[k].a;
-                    assert(d[k] >= 0);
-                }
+                partite.region.distance_manhattan(corner.region, d);
 
                 // TODO : the allocation is assumed col major, cuda
                 static_assert(K == 2);
@@ -1187,6 +1251,7 @@ next_view:
             const NodeBase * inherit
         ) const {
             assert(search.type == Search::Type::INSERTING_BLOCKS);
+            assert(!region.intersects(inherit->region));
             return new Node(search.access, region, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };

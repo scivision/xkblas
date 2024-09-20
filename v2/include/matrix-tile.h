@@ -3,6 +3,7 @@
 
 # define XKBLAS_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
 
+# include <assert.h>
 # include <stdint.h>
 
 typedef enum    matrix_order_t

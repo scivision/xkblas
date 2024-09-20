@@ -17,6 +17,12 @@ class Interval {
             return this->b - this->a;
         }
 
+        inline bool
+        includes(const Interval & interval) const
+        {
+            return (this->a <= interval.a && interval.b <= this->b);
+        }
+
         friend bool
         operator==(const Interval & lhs, const Interval & rhs)
         {

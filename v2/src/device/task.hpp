@@ -99,6 +99,8 @@ class alignas(CACHE_LINE_SIZE) KTask
 
     public:
 
+        KTask() : KTask(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID) {}
+
         KTask(
             task_format_id_t f,             // task format to use
             uint8_t ocr_access_index_p,     // the ocr access to use

@@ -1167,6 +1167,7 @@ insert_from_case_3_equals:
                             }
 
                             // shrink node
+                            assert(node->region[k].includes(region[k]));
                             node->on_shrink(region[k], k);
                             node->region[k] = region[k];
                         };
@@ -1176,11 +1177,16 @@ insert_from_case_3_equals:
                         if (k < K - 1)
                             this->template foreach_k_child<Node>(parent, k+1, f);
 
-                        // insert all side nodes
-                        for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, parent);
+                        if (inherit == nullptr)
+                            inherit = parent;
 
-                        // continue inserting the node
+                        // reinsert all side nodes from the split, that
+                        // inherits from the original node
+                        for (ReinsertRegion & rr : to_reinsert)
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, parent, k, inherit);
+
+                        // continue inserting the node, that nows equals the
+                        // shrinked parent node
                         assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
                         goto insert_from_case_3_equals;
 

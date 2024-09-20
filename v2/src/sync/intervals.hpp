@@ -5,6 +5,7 @@
 # include "min-max.h"
 # include "interval.hpp"
 
+# include <cassert>
 # include <cstdlib>
 # include <ostream>
 # include <iostream>
@@ -140,7 +141,7 @@ class Intervals {
         {
             for ( ; k < K ; ++k)
             {
-                if (this->list[k].a <= intervals.list[k].a && intervals.list[k].b <= this->list[k].b)
+                if (this->list[k].includes(intervals.list[k]))
                     continue ;
                 return false;
             }
@@ -169,6 +170,16 @@ class Intervals {
             for (int i = 1 ; i < K ; ++i)
                 s *= this->list[i].length();
             return s;
+        }
+
+        /* return the distance between 'left-top' corners for each dimensions of the region */
+        inline void
+        distance_manhattan(
+            const Intervals & other,
+            int d[K]
+        ) const {
+            for (int k = 0 ; k < K ; ++k)
+                d[k] = this->list[k].a - other.list[k].a;
         }
 
         friend std::ostream &
