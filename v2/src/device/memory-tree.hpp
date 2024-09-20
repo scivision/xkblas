@@ -175,8 +175,6 @@ class KMemoryBlock {
                 const int n                 = block_region[0].length();
 
                 new(&(this->host_view)) memory_view_t(order, addr, ld, offset_m, offset_n, m, n, sizeof_type);
-
-                XKBLAS_DEBUG("(2) HOST_VIEW STARTS AT %p", this->host_view.begin_addr());
             }
             # endif
 
@@ -202,7 +200,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const uintptr_t offset      = d[0] + (d[1] / sizeof_type) * inheriting_allocation->view.ld * sizeof_type;
+                    const uintptr_t offset      = d[0] * inheriting_allocation->view.ld * sizeof_type + d[1];
                     const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
 
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->allocation, begin_addr, inheriting_allocation->view.ld);
