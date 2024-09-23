@@ -943,7 +943,7 @@ class KIntervalBtree {
             rebalance_fixup(nullptr, new_root, k, 0, height);
 
 # ifndef NDEBUG
-            this->coherency();
+            this->coherency(root->includes.region);
 # endif /* NDEBUG */
         }
 
@@ -1122,7 +1122,6 @@ class KIntervalBtree {
                     // I == J
                     if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)
                     {
-insert_from_case_3_equals:
                         if (++k == K)
                         {
                             parent->on_insert(t, mode);
@@ -1156,7 +1155,7 @@ insert_from_case_3_equals:
                             Interval(        region[k].a,         region[k].b),
                             Interval(        region[k].b, parent->region[k].b)
                         };
-                        std::function<void(Node *, int)> f = [&f, &intervals, &k, &to_reinsert](Node * node, int kk)
+                        std::function<void(Node *)> f = [&f, &intervals, &k, &to_reinsert](Node * node)
                         {
                             assert(node->region[k].includes(intervals[1]));
 
@@ -1171,17 +1170,17 @@ insert_from_case_3_equals:
                             node->region[k] = intervals[1];
 
                             // shrink all child
-                            for (int childk = k+1; childk < K ; ++childk)
+                            for (int kk = k+1; kk < K ; ++kk)
                             {
-                                FOREACH_K_CHILD_BEGIN(node, child, childk, dir)
+                                FOREACH_K_CHILD_BEGIN(node, child, kk, dir)
                                 {
-                                    f(child, childk);
+                                    f(child);
                                 }
-                                FOREACH_K_CHILD_END(node, child, childk, dir);
+                                FOREACH_K_CHILD_END(node, child, kk, dir);
                             }
                         };
 
-                        f(parent, k);
+                        f(parent);
 
                         assert(inherit == nullptr);
                         for (ReinsertRegion & rr : to_reinsert)
@@ -1222,8 +1221,8 @@ insert_from_case_3_equals:
 
                     // (3)
                     {
-                        region[k].a = parent->region[k].a;
-                        region[k].b = parent->region[k].b;
+                        region[k].a = MAX(a, parent->region[k].a);
+                        region[k].b = MIN(b, parent->region[k].b);
                         this->insert_from(t, region, mode, this->root, 0, inherit);
                         region[k].a = a;
                         region[k].b = b;
