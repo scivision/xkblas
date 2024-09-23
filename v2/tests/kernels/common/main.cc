@@ -81,8 +81,6 @@ main_gemm_gemm(char ** args)
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-
-
     /* run on impl */
     printf("Running implementation...\n");
     {
@@ -123,6 +121,8 @@ main_gemm(char ** args)
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int k = atoi(args[2]);
+    int bs_m = atoi(args[3]);
+    int bs_n = atoi(args[4]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
 
@@ -165,6 +165,7 @@ main_gemm(char ** args)
     printf("Running implementation...\n");
     {
         uint64_t t0 = get_nanotime();
+        impl.set_tile(bs_m, bs_n);
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
         impl.coherent(CImpl, m, n, ld);
         impl.wait();
@@ -381,12 +382,14 @@ static func_t funcs[] = {
     {
         .name = "GEMM",
         .f = main_gemm,
-        .nargs = 3,
+        .nargs = 5,
         .descr = "C := A.B + C",
-        .usage =    "M N K\n"
+        .usage =    "M N K BS_M BS_N\n"
                     "  - M      : n° of rows of A and C\n"
                     "  - N      : n° of cols of B and C\n"
                     "  - K      : n° of cols of A, rows of B\n"
+                    "  - BS_M   : n° of (cols, row) per tile of (A, B)\n"
+                    "  - BS_N   : n° of (row, cols) per tile of (A, B)\n"
     },
 
     {
@@ -454,7 +457,7 @@ main(int argc, char ** argv)
             {
                 --nargs;
                 ++args;
-                if (nargs < func->nargs)
+                if (nargs != func->nargs)
                     return error_usage(argv[0], func);
 
                 printf("Init '%s'\n", impl.name());
