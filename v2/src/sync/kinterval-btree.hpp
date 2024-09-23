@@ -1140,12 +1140,7 @@ insert_from_case_3_equals:
                                 Region region;
                                 Node * inherit;
                             public:
-                                ReinsertRegion(
-                                    const Region & r,
-                                    const Interval & interval,
-                                    int k,
-                                    Node * i
-                                ) :
+                                ReinsertRegion(const Region & r, const Interval & interval, int k, Node * i) :
                                     region(r),
                                     inherit(i)
                                 {
@@ -1163,10 +1158,12 @@ insert_from_case_3_equals:
                         };
                         std::function<void(Node *, int)> f = [&f, &intervals, &k, &to_reinsert](Node * node, int kk)
                         {
+                            assert(node->region[k].includes(intervals[1]));
+
                             // reinsert sides
                             if (!intervals[0].is_empty())
                                 to_reinsert.push_back(ReinsertRegion(node->region, intervals[0], k, node));
-                            if (!intervals[1].is_empty())
+                            if (!intervals[2].is_empty())
                                 to_reinsert.push_back(ReinsertRegion(node->region, intervals[2], k, node));
 
                             // shrink node
@@ -1174,13 +1171,13 @@ insert_from_case_3_equals:
                             node->region[k] = intervals[1];
 
                             // shrink all child
-                            for ( ; kk < K - 1 ; ++kk)
+                            for (int childk = k+1; childk < K ; ++childk)
                             {
-                                FOREACH_K_CHILD_BEGIN(node, child, kk, dir)
+                                FOREACH_K_CHILD_BEGIN(node, child, childk, dir)
                                 {
-                                    f(child, kk+1);
+                                    f(child, childk);
                                 }
-                                FOREACH_K_CHILD_END(node, child, kk, dir);
+                                FOREACH_K_CHILD_END(node, child, childk, dir);
                             }
                         };
 

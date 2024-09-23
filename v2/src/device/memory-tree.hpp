@@ -448,7 +448,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             static_assert(K == 2);
 
             assert(this->region[k].includes(interval));
-            assert(interval.a == this->region[k].a || interval.b == this->region[k].b);
 
             // offset for device pointers
             uintptr_t offset_for_device_allocations = 0;
@@ -460,15 +459,13 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const int ld = this->block.host_view.ld;
             const int sizeof_type = this->block.host_view.sizeof_type;
 
+            // TODO : double check that the device offset is properly computed
+
             // shrink left
             // offset device allocations start address
             if (interval.a != this->region[k].a)
             {
-                assert(this->region[k].a  < interval.a);
-                assert(this->region[k].b == interval.b);
-
-                // TODO : double check that the device offset is properly computed
-
+                assert(this->region[k].a < interval.a);
                 const uintptr_t offset = interval.a - this->region[k].a;
                 if (k == 0)
                 {
@@ -484,13 +481,12 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                     offset_for_device_allocations   = offset;
                 }
             }
-            // shrink right
-            // no need to offset device allocations
-            else
-            {
-                assert(this->region[k].a == interval.a);
-                assert(this->region[k].b  > interval.b);
 
+            // shrink right
+            // no need to offset device allocations - but size must be reduced
+            if (interval.b != this->region[k].b)
+            {
+                assert(this->region[k].b > interval.b);
                 uintptr_t offset = this->region[k].b - interval.b;
                 if (k == 0)
                     this->block.host_view.n -= offset;
