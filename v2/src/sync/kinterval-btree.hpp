@@ -79,18 +79,27 @@ twopow(int n)
 # include "color.h"
 # include "direction.h"
 
+# define FOREACH_K_CHILD_BEGIN(N, C, I, D)                              \
+do {                                                                    \
+    for (int D = LEFT ; D < DIRECTION_MAX ; ++D)                        \
+    {                                                                   \
+        Node * C = reinterpret_cast<Node *>(N->st[I].children[D]);      \
+        if (C)                                                          \
+        {
+# define FOREACH_K_CHILD_END(N, C, I, D)                                \
+        }                                                               \
+    }                                                                   \
+} while (0)
+
 # define FOREACH_CHILD_BEGIN(N, C, I, D)                                \
 do {                                                                    \
     for (int I = 0 ; I < K ; ++I)                                       \
     {                                                                   \
-        for (int D = LEFT ; D < DIRECTION_MAX ; ++D)                    \
-        {                                                               \
-            Node * C = reinterpret_cast<Node *>(N->st[I].children[D]);  \
-            if (C)                                                      \
-            {
+        FOREACH_K_CHILD_BEGIN(N, C, I, D)                               \
+        {
 # define FOREACH_CHILD_END(N, C, I, D)                                  \
-            }                                                           \
         }                                                               \
+        FOREACH_K_CHILD_END(N, C, I, D);                                \
     }                                                                   \
 } while (0)
 
@@ -807,7 +816,7 @@ class KIntervalBtree {
         inline void
         insert_fixup(
             T & t,
-            Region & region,
+            Region region,
             const access_mode_t mode,
             Node * parent,
             int k,
@@ -1034,7 +1043,7 @@ class KIntervalBtree {
         inline void
         insert_from_cut(
             T & t,
-            Region & region,
+            const Region & region,
             const access_mode_t mode,
             Node * parent
         ) {
@@ -1124,75 +1133,77 @@ insert_from_case_3_equals:
                     // J c I
                     else
                     {
-                        // prerequisities here:
-                        //  - all dimensions k' < k is equal some parent node
-                        //  - dimension k is included in the parent node
-                        //  - we don't know about dimensions k" > k
-                        // how we insert
-                        //  - shrink dimension 'k' of the current node and all its (k+1) subtree
-                        //  - dupplicate shrinked nodes and reinsert them
-
-                        // TODO : we can probably do better than above performance-wide, by
-                        //  - dupplicating the subtree
-                        //  - rewritting its included information
-                        //  - connecting it to 'parent'
-
-                        // TODO only tested for K \in {1, 2} - it should work
-                        // for higher dimensions as well, but needs to be verified
                         assert(K == 1 || K == 2);
 
                         class ReinsertRegion {
                             public:
-                                Node * sibling;
                                 Region region;
+                                Node * inherit;
                             public:
-                                ReinsertRegion(Node * s, Region & r) : sibling(s), region(r) {}
-                                virtual ~ReinsertRegion() {}
-                        };
+                                ReinsertRegion(
+                                    const Region & r,
+                                    const Interval & interval,
+                                    int k,
+                                    Node * i
+                                ) :
+                                    region(r),
+                                    inherit(i)
+                                {
+                                    region[k] = interval;
+                                }
 
-                        int x[4] = { parent->region[k].a, region[k].a, region[k].b, parent->region[k].b };
+                                ~ReinsertRegion() {}
+                        };
 
                         std::vector<ReinsertRegion> to_reinsert;
-                        std::function<void(Node *)> f = [&x, &to_reinsert, &region, &k, &inherit](Node * node)
+                        const Interval intervals[] = {
+                            Interval(parent->region[k].a,         region[k].a),
+                            Interval(        region[k].a,         region[k].b),
+                            Interval(        region[k].b, parent->region[k].b)
+                        };
+                        std::function<void(Node *, int)> f = [&f, &intervals, &k, &to_reinsert](Node * node, int kk)
                         {
-                            // generate side nodes region
-                            for (int i = 0 ; i < 2 ; ++i)
-                            {
-                                if (x[2*i+0] == x[2*i+1])
-                                    continue ;
-                                ReinsertRegion rr(node, node->region);
-                                rr.region[k].a = x[2*i+0];
-                                rr.region[k].b = x[2*i+1];
-                                to_reinsert.push_back(rr);
-                            }
+                            // reinsert sides
+                            if (!intervals[0].is_empty())
+                                to_reinsert.push_back(ReinsertRegion(node->region, intervals[0], k, node));
+                            if (!intervals[1].is_empty())
+                                to_reinsert.push_back(ReinsertRegion(node->region, intervals[2], k, node));
 
                             // shrink node
-                            assert(node->region[k].includes(region[k]));
-                            node->on_shrink(region[k], k);
-                            node->region[k] = region[k];
+                            node->on_shrink(intervals[1], k);
+                            node->region[k] = intervals[1];
+
+                            // shrink all child
+                            for ( ; kk < K - 1 ; ++kk)
+                            {
+                                FOREACH_K_CHILD_BEGIN(node, child, kk, dir)
+                                {
+                                    f(child, kk+1);
+                                }
+                                FOREACH_K_CHILD_END(node, child, kk, dir);
+                            }
                         };
 
-                        f(parent);
+                        f(parent, k);
 
-                        if (k < K - 1)
-                            this->template foreach_k_child<Node>(parent, k+1, f);
-
-                        // reinsert all side nodes from the split, that
-                        // inherits from the original node
                         assert(inherit == nullptr);
                         for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, root, 0, rr.sibling);
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, rr.inherit);
 
-                        // continue inserting the node, that nows equals the
-                        // shrinked parent node
-                        assert(region[k].a == parent->region[k].a && region[k].b == parent->region[k].b);
-                        goto insert_from_case_3_equals;
+                        return this->insert_from(t, region, mode, this->root, 0, nullptr);
 
                     } /* I == J ||  J c I */
                 }
                 // case (4)     I n J != o is (1) + (2) + (3)
                 else
                 {
+                    //  [           I           ]
+                    //          [           J             ]
+                    //
+                    //          or
+                    //
+                    //  [           J           ]
+                    //          [           I             ]
                     const int a = region[k].a;
                     const int b = region[k].b;
 

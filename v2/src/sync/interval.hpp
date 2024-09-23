@@ -11,6 +11,13 @@ class Interval {
         Interval(int aa, int bb) : a(aa), b(bb) {}
         virtual ~Interval() {}
 
+        inline bool
+        is_empty(void) const
+        {
+            assert(this->a <= this->b);
+            return this->a == this->b;
+        }
+
         inline int
         length(void) const
         {

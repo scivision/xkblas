@@ -1239,6 +1239,10 @@ next_view:
             }
         }
 
+        void func(void)
+        {
+        }
+
         void
         fetch_access(
             xkblas_driver_t * driver,
@@ -1253,11 +1257,26 @@ next_view:
             {
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
-                XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.n);
+                // XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.n);
+
+                XKBLAS_WARN("insert Interval(%4d,%4d), Interval(%4d,%4d),",
+                        access->region[0].a,
+                        access->region[0].b,
+                        access->region[1].a,
+                        access->region[1].b);
+
+                if (access->region[0].a == 94356 && access->region[0].b == 94359 && access->region[1].a == 0 && access->region[1].b == 28)
+                    this->func();
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
                 this->insert(search, access->region, access->mode);
+
+                XKBLAS_WARN("intersect Interval(%4d,%4d), Interval(%4d,%4d),",
+                        access->region[0].a,
+                        access->region[0].b,
+                        access->region[1].a,
+                        access->region[1].b);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_blocks();

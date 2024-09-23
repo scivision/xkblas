@@ -54,16 +54,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             for (int i = 0 ; i < N ; ++i)
                 this->deptree.intersect(task, task->accesses[i].region, task->accesses[i].mode);
             for (int i = 0 ; i < N ; ++i)
-            {
-                # if 0
-                XKBLAS_WARN("Interval(%4d,%4d), Interval(%4d,%4d),",
-                        task->accesses[i].region[0].a,
-                        task->accesses[i].region[0].b,
-                        task->accesses[i].region[1].a,
-                        task->accesses[i].region[1].b);
-                # endif
                 this->deptree.insert(task, task->accesses[i].region, task->accesses[i].mode);
-            }
 
             // commit the task - and enqueue it if now ready
             if (task->commit())
