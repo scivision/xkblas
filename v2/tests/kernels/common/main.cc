@@ -93,7 +93,6 @@ main_gemm_gemm(char ** args)
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
         impl.coherent(CImpl, m, n, ld);
-
         impl.wait();
 
         uint64_t tf = get_nanotime();

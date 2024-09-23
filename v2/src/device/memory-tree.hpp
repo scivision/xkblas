@@ -447,6 +447,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         ) {
             static_assert(K == 2);
 
+            assert(k < K);
             assert(this->region[k].includes(interval));
 
             // offset for device pointers
@@ -1233,10 +1234,6 @@ next_view:
                     this->fetch_access_copy_partite(driver, device, task, partite, allocation);
                 }
             }
-        }
-
-        void func(void)
-        {
         }
 
         void
