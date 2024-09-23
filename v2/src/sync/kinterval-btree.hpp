@@ -1022,7 +1022,7 @@ class KIntervalBtree {
         ) const = 0;
 
         void
-        post_insert(void)
+        post_insert(const Region & region)
         {
             this->update();
 
@@ -1035,7 +1035,7 @@ class KIntervalBtree {
 # endif /* KINTERVAL_BTREE_REBALANCE */
 
 # ifndef NDEBUG
-            this->coherency();
+            this->coherency(region);
 # endif /* NDEBUG */
         }
 
@@ -1254,7 +1254,7 @@ insert_from_case_3_equals:
                 this->insert_from(t, region, mode, this->root, 0, nullptr);
             }
 
-            this->post_insert();
+            this->post_insert(region);
         }
 
         // Dump the tree to the given file
@@ -1509,8 +1509,24 @@ insert_from_case_3_equals:
             coherency_k_hierarchy(root);
         }
 
+        void
+        coherency_region_represented_check(Node * node, void * args) const
+        {
+            const Region * region = (const Region *) args;
+            tassert(region->includes(node->region) || !region->intersects(node->region));
+        }
+
+        // TODO : this test is incomplete, should test that all nodes union
+        // also forms the region
+        void
+        coherency_region_represented(Region region)
+        {
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_represented_check, this, _1, _2);
+            foreach_node(this->root, f, &region);
+        }
+
         int
-        coherency(void)
+        coherency(const Region & region)
         {
             if (this->root)
             {
@@ -1520,6 +1536,9 @@ insert_from_case_3_equals:
 
                 /* per-node checks */
                 this->coherency_from(this->root);
+
+                /* ensure the region is represented in the tree */
+                this->coherency_region_represented(region);
 
                 /* 7. check balance */
                 this->coherency_balance();
