@@ -1181,7 +1181,7 @@ insert_from_case_3_equals:
                         // inherits from the original node
                         assert(inherit == nullptr);
                         for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, parent, k, rr.sibling);
+                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, root, 0, rr.sibling);
 
                         // continue inserting the node, that nows equals the
                         // shrinked parent node

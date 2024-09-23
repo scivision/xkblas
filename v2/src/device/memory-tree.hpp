@@ -162,7 +162,6 @@ class KMemoryBlock {
                 this->host_view.n         = block_region[0].length();
                 this->host_view.offset_m += (d[1] / sizeof_type);
                 this->host_view.m         = block_region[1].length() / sizeof_type;
-                XKBLAS_DEBUG("(1) HOST_VIEW STARTS AT %p", this->host_view.begin_addr());
             }
             # else
             {
@@ -551,7 +550,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const access_mode_t mode
         ) {
             /* intersecting against 'region' that had been inserted previously,
-             * so 'this' is a sub-block of 'region' */
+             * so 'this' must be a sub-block of 'region' */
             assert(region.includes(this->region));
 
             switch (search.type)
