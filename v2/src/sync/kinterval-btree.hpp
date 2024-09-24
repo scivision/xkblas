@@ -2,7 +2,6 @@
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
 //  - check loop unrolling
 
-
 #ifndef __KINTERVAL_BTREE_H__
 # define __KINTERVAL_BTREE_H__
 
@@ -14,7 +13,7 @@
 # ifdef NDEBUG
 #  define tassert(ignore) ((void)0)
 # else /* NDEBUG */
-#  pragma message("NDEBUG unset, use -DNDEBUG for max performance")
+#  pragma message("Define `NDEBUG` for max performance")
 #  define tassert(expr)                                                         \
     do {                                                                        \
         if (!(expr))                                                            \
@@ -26,6 +25,11 @@
         }                                                                       \
     } while (0)
 # endif /* NDEBUG */
+
+// coherency checks
+# ifndef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
+#  pragma message("Define `KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS` for max performance")
+# endif
 
 # include <cassert>
 # include <cstdio>
@@ -1527,6 +1531,10 @@ class KIntervalBtree {
         int
         coherency(const Region & region)
         {
+            # ifdef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
+            return 1;
+            # endif
+
             if (this->root)
             {
                 /* 1. The root of the this is always black */

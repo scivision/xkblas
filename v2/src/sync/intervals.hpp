@@ -40,12 +40,19 @@ class Intervals {
         {
             if constexpr(K == 2)
             {
-                /* (y, x) <=> (list[0], list[1]) <=> (m, n) <=> (line, col) */
-                uintptr_t PP = tile.begin_addr();
-                this->list[0].a = (uint64_t)(PP / (tile.ld * tile.sizeof_type));
-                this->list[0].b = this->list[0].a + tile.n;
-                this->list[1].a = (uint64_t)(PP % (tile.ld * tile.sizeof_type));
-                this->list[1].b = this->list[1].a + tile.m * tile.sizeof_type;
+                // not sure about this if other ordering
+                assert(tile.order == MATRIX_COLMAJOR);
+
+                const uintptr_t PP = tile.begin_addr();
+                const int x0 = PP / (tile.ld * tile.sizeof_type);
+                const int x1 = x0 + tile.m;
+                const int y0 = PP % (tile.ld * tile.sizeof_type);
+                const int y1 = y0 + tile.n * tile.sizeof_type;
+
+                this->list[0].a = y0;
+                this->list[0].b = y1;
+                this->list[1].a = x0;
+                this->list[1].b = x1;
             }
             else
             {

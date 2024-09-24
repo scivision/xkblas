@@ -141,7 +141,6 @@ class KMemoryBlock {
             const Region & inheriting_region,
             const int k
         ) {
-
             static_assert(K == 2);
 
             /////////////////////////////////
@@ -151,31 +150,14 @@ class KMemoryBlock {
             int d[K];
             Region::distance_manhattan(inheriting_region, block_region, d);
 
-            const matrix_order_t order  = inheriting_block.host_view.order;
-            assert(order == MATRIX_COLMAJOR);
-            const int sizeof_type       = inheriting_block.host_view.sizeof_type;
+            assert(inheriting_block.host_view.order == MATRIX_COLMAJOR);
+            const int sizeof_type = inheriting_block.host_view.sizeof_type;
 
-            # if 1
-            {
-                this->host_view = inheriting_block.host_view;
-                this->host_view.offset_n += d[0];
-                this->host_view.n         = block_region[0].length();
-                this->host_view.offset_m += (d[1] / sizeof_type);
-                this->host_view.m         = block_region[1].length() / sizeof_type;
-            }
-            # else
-            {
-                const int ld                = inheriting_block.host_view.ld;
-                const uintptr_t offset      = d[0] + (d[1] / sizeof_type) * ld * sizeof_type;
-                const uintptr_t addr        = inheriting_block.host_view.begin_addr() + offset;
-                const int offset_m          = 0;
-                const int offset_n          = 0;
-                const int m                 = block_region[1].length() / sizeof_type;
-                const int n                 = block_region[0].length();
-
-                new(&(this->host_view)) memory_view_t(order, addr, ld, offset_m, offset_n, m, n, sizeof_type);
-            }
-            # endif
+            this->host_view = inheriting_block.host_view;
+            this->host_view.offset_m += d[0] / sizeof_type;
+            this->host_view.m         = block_region[0].length() / sizeof_type;
+            this->host_view.offset_n += d[1];
+            this->host_view.n         = block_region[1].length();
 
             assert(this->host_view.offset_m >= 0);
             assert(this->host_view.offset_n >= 0);
@@ -450,49 +432,49 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             assert(k < K);
             assert(this->region[k].includes(interval));
 
-            // offset for device pointers
-            uintptr_t offset_for_device_allocations = 0;
+            // if k == 0, we are shrinking rows    (m)
+            // if k == 1, we are shrinking columns (n)
 
             ///////////////////////
             //  SHRINK HOST VIEW //
             ///////////////////////
 
-            const int ld = this->block.host_view.ld;
             const int sizeof_type = this->block.host_view.sizeof_type;
 
-            // TODO : double check that the device offset is properly computed
+            assert(this->region[k].a <= interval.a);
+            const int da = interval.a - this->region[k].a;
+
+            assert(this->region[k].b >= interval.b);
+            const int db = this->region[k].b - interval.b;
+
+            if (k == 0)
+            {
+                assert(da % sizeof_type == 0);
+                assert(db % sizeof_type == 0);
+            }
 
             // shrink left
-            // offset device allocations start address
-            if (interval.a != this->region[k].a)
+            if (da)
             {
-                assert(this->region[k].a < interval.a);
-                const uintptr_t offset = interval.a - this->region[k].a;
                 if (k == 0)
                 {
-                    this->block.host_view.offset_n += offset;
-                    this->block.host_view.n        -= offset;
-                    offset_for_device_allocations   = offset * ld * sizeof_type;
+                    this->block.host_view.offset_m += (da / sizeof_type);
+                    this->block.host_view.m        -= (da / sizeof_type);
                 }
                 else
                 {
-                    assert(offset % sizeof_type == 0);
-                    this->block.host_view.offset_m += (offset / sizeof_type);
-                    this->block.host_view.m        -= (offset / sizeof_type);
-                    offset_for_device_allocations   = offset;
+                    this->block.host_view.offset_n += da;
+                    this->block.host_view.n        -= da;
                 }
             }
 
             // shrink right
-            // no need to offset device allocations - but size must be reduced
-            if (interval.b != this->region[k].b)
+            if (db)
             {
-                assert(this->region[k].b > interval.b);
-                uintptr_t offset = this->region[k].b - interval.b;
                 if (k == 0)
-                    this->block.host_view.n -= offset;
+                    this->block.host_view.m -= (db / sizeof_type);
                 else
-                    this->block.host_view.m -= (offset / sizeof_type);
+                    this->block.host_view.n -= db;
             }
 
             assert(this->block.host_view.offset_m >= 0);
@@ -504,19 +486,21 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             //  SHRINK REPLICATES //
             ////////////////////////
 
-            if (offset_for_device_allocations)
+            if (da)
             {
                 for (MemoryReplicate & replicate : this->block.replicates)
                 {
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
-                        replicate.allocations[i]->view.addr += offset_for_device_allocations;
-                        assert(replicate.allocations[i]->view.addr >= replicate.allocations[i]->allocation);
+                        MemoryReplicateAllocationView * r = replicate.allocations[i];
+                        const int offset = (k == 0) ? (da * r->view.ld * sizeof_type) : da;
+                        XKBLAS_DEBUG("Shrink not supported yet - k=%d, da=%d, db=%d, offset=%d",
+                                k, da, db, offset);
+                        r->view.addr += offset;
+                        assert(r->view.addr >= r->allocation);
                     }
                 }
             }
-
-            // XKBLAS_FATAL("Shrink not supported yet");
         }
 
         //////////////////
@@ -922,9 +906,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
 
             /* allocate continuous memory for that access */
-            uint64_t  size = access->host_view.n * access->host_view.m * access->host_view.sizeof_type;
-            uintptr_t addr = (uintptr_t) xkblas_memory_allocate(driver, device, size);
-            int         ld = access->host_view.m;   // cuda is col major
+            const int          ld = access->host_view.m;            // cuda is col major
+            const int sizeof_type = access->host_view.sizeof_type;
+            uint64_t  size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
+            uintptr_t addr        = (uintptr_t) xkblas_memory_allocate(driver, device, size);
             XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
             assert(addr);
 
@@ -941,7 +926,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
                 // TODO : the allocation is assumed col major, cuda
                 static_assert(K == 2);
-                const uintptr_t begin_addr = addr + d[0]*ld*access->host_view.sizeof_type + d[1];
+                const uintptr_t begin_addr = addr + d[0] + d[1]*ld*access->host_view.sizeof_type;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
                 const int allocation_view_id = replicate.nallocations++;
