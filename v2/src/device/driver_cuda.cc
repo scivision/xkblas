@@ -709,7 +709,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 }
             }
 
-            XKBLAS_INFO("cudaMemcpy2DAsync(dst=%p, dpitch=%d, src=%p, spitch=%d, width=%d, height=%d, kind=%s", dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
+            XKBLAS_INFO("cudaMemcpy2DAsync(dst=%p, dpitch=%d, src=%p, spitch=%d, width=%d, height=%d, kind=%s",
+                    dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
             cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle);
             __check_error(err);
             err = cudaEventRecord(stream->cu.events.end[istream->pending.pos.w % istream->pending.capacity], handle);
@@ -773,8 +774,8 @@ cuda_stream_instructions_progress(
                 /* poll events */
                 for (int i = 0 ; i < 16 ; ++i)
                 {
-                    XKBLAS_DEBUG("before");
                     __check_error(cudaGetLastError());
+
                     res = cudaEventQuery(stream->cu.events.end[idx]);
                     assert(res == cudaErrorNotReady || res == cudaSuccess);
                     __check_error(res);

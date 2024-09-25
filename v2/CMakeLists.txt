@@ -54,7 +54,7 @@ add_custom_command(
 
 option(STRICT "Enable strict compilation mode" OFF)
 
-# TODO : remove me to debug kinterval tree
+# TODO : comment to enable kinterval tree heavy debug
 #add_compile_definitions(KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS=1)
 
 ################

@@ -462,54 +462,38 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                 assert(db % sizeof_type == 0);
             }
 
-            // shrink left
+            // shrinked-left, gotta offset the views
             if (da)
             {
+                // HOST VIEW
                 if (k == 0)
-                {
                     this->block.host_view.offset_m += (da / sizeof_type);
-                    this->block.host_view.m        -= (da / sizeof_type);
-                }
                 else
-                {
                     this->block.host_view.offset_n += da;
-                    this->block.host_view.n        -= da;
-                }
-            }
 
-            // shrink right
-            if (db)
-            {
-                if (k == 0)
-                    this->block.host_view.m -= (db / sizeof_type);
-                else
-                    this->block.host_view.n -= db;
-            }
-
-            assert(this->block.host_view.offset_m >= 0);
-            assert(this->block.host_view.offset_n >= 0);
-            assert(this->block.host_view.m > 0);
-            assert(this->block.host_view.n > 0);
-
-            ////////////////////////
-            //  SHRINK REPLICATES //
-            ////////////////////////
-
-            if (da)
-            {
+                // REPLICATES VIEW
                 for (MemoryReplicate & replicate : this->block.replicates)
                 {
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * r = replicate.allocations[i];
                         const int offset = (k == 0) ? da : (da * r->view.ld * sizeof_type);
-                        XKBLAS_DEBUG("Shrink not supported yet - k=%d, da=%d, db=%d, offset=%d",
-                                k, da, db, offset);
                         r->view.addr += offset;
                         assert(r->view.addr >= r->allocation);
                     }
                 }
             }
+
+            // resize the views
+            if (k == 0)
+                this->block.host_view.m = interval.length() / sizeof_type;
+            else
+                this->block.host_view.n = interval.length();
+
+            assert(this->block.host_view.offset_m >= 0);
+            assert(this->block.host_view.offset_n >= 0);
+            assert(this->block.host_view.m > 0);
+            assert(this->block.host_view.n > 0);
         }
 
         //////////////////
@@ -915,7 +899,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
 
             /* allocate continuous memory for that access */
-            const int          ld = access->host_view.n;            // cuda is col major
+            const int          ld = access->host_view.m;            // cuda is col major
             const int sizeof_type = access->host_view.sizeof_type;
             uint64_t  size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
             uintptr_t addr        = (uintptr_t) xkblas_memory_allocate(driver, device, size);

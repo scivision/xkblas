@@ -6,11 +6,11 @@
 
 # include <atomic>
 # include <assert.h>
-# include <stack>
+# include <list>
 
 /**
- *  A naive queue implementation with a lock, to be used for debugging purposes
- *  of the lock-free queue
+ *  A naive list implementation with a lock, to be used for debugging purposes
+ *  of the lock-free list
  */
 
 template<typename T>
@@ -18,7 +18,7 @@ class NaiveQueue : IQueue<T>
 {
     public:
 
-        NaiveQueue() : stack(), lock(0) {}
+        NaiveQueue() : list(), lock(0) {}
         ~NaiveQueue() {}
 
         void
@@ -26,7 +26,7 @@ class NaiveQueue : IQueue<T>
         {
             SPINLOCK_LOCK(this->lock);
             {
-                this->stack.push(t);
+                this->list.push_back(t);
             }
             SPINLOCK_UNLOCK(this->lock);
         }
@@ -34,12 +34,18 @@ class NaiveQueue : IQueue<T>
         T
         pop(void)
         {
-            if (!this->stack.empty())
+            if (!this->list.empty())
             {
                 SPINLOCK_LOCK(this->lock);
 
-                    T t = this->stack.top();
-                    this->stack.pop();
+                # if 1
+                T t = this->list.front();
+                this->list.pop_front();
+                # else
+                T t = this->list.back();
+                this->list.pop_back();
+                # endif
+
 
                 SPINLOCK_UNLOCK(this->lock);
 
@@ -58,11 +64,11 @@ class NaiveQueue : IQueue<T>
         bool
         is_empty(void) const
         {
-            return this->stack.empty();
+            return this->list.empty();
         }
 
     private:
-        std::stack<T> stack;
+        std::list<T> list;
         spinlock_t lock;
 };
 

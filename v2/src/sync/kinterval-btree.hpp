@@ -27,6 +27,7 @@
 # endif /* NDEBUG */
 
 // coherency checks
+# undef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
 # ifndef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
 #  pragma message("Define `KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS` for max performance")
 # endif
