@@ -38,3 +38,7 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 
 # Remark for XKBLAS/V1
 - Device thread 'requests' mechanism got removed - use tasks instead (as per memory-coherent-async tasks)
+
+# I DONT UNDERSTAND WHY
+- Having LIFO ThreadWorker queue makes computation incorrect (against LIFO that is correct!)
+- Inverting 2-interval-btree coordinates (and associated memory-tree.hpp usage) makes computation incorrect

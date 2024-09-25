@@ -45,14 +45,16 @@ class Intervals {
 
                 const uintptr_t PP = tile.begin_addr();
                 const int x0 = PP / (tile.ld * tile.sizeof_type);
-                const int x1 = x0 + tile.m;
+                const int x1 = x0 + tile.n;
                 const int y0 = PP % (tile.ld * tile.sizeof_type);
-                const int y1 = y0 + tile.n * tile.sizeof_type;
+                const int y1 = y0 + tile.m * tile.sizeof_type;
 
-                this->list[0].a = y0;
-                this->list[0].b = y1;
-                this->list[1].a = x0;
-                this->list[1].b = x1;
+                assert(y1 <= tile.ld * tile.sizeof_type);
+
+                this->list[0].a = x0;
+                this->list[0].b = x1;
+                this->list[1].a = y0;
+                this->list[1].b = y1;
             }
             else
             {

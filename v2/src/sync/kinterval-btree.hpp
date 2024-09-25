@@ -1160,19 +1160,19 @@ class KIntervalBtree {
                             Interval(        region[k].a,         region[k].b),
                             Interval(        region[k].b, parent->region[k].b)
                         };
-                        std::function<void(Node *)> f = [&f, &intervals, &k, &to_reinsert](Node * node)
+                        std::function<void(Node *)> f = [&f, &region, &intervals, &k, &to_reinsert](Node * node)
                         {
                             assert(node->region[k].includes(intervals[1]));
+
+                            // shrink node
+                            node->on_shrink(intervals[1], k);
+                            node->region[k] = intervals[1];
 
                             // reinsert sides
                             if (!intervals[0].is_empty())
                                 to_reinsert.push_back(ReinsertRegion(node->region, intervals[0], k, node));
                             if (!intervals[2].is_empty())
                                 to_reinsert.push_back(ReinsertRegion(node->region, intervals[2], k, node));
-
-                            // shrink node
-                            node->on_shrink(intervals[1], k);
-                            node->region[k] = intervals[1];
 
                             // shrink all child
                             for (int kk = k+1; kk < K ; ++kk)

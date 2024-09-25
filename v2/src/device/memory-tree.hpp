@@ -151,10 +151,10 @@ class KMemoryBlock {
             const int sizeof_type = inheriting_block.host_view.sizeof_type;
 
             this->host_view = inheriting_block.host_view;
-            this->host_view.offset_m += d[0] / sizeof_type;
-            this->host_view.m         = block_region[0].length() / sizeof_type;
-            this->host_view.offset_n += d[1];
-            this->host_view.n         = block_region[1].length();
+            this->host_view.offset_m += d[1] / sizeof_type;
+            this->host_view.m         = block_region[1].length() / sizeof_type;
+            this->host_view.offset_n += d[0];
+            this->host_view.n         = block_region[0].length();
 
             assert(this->host_view.offset_m >= 0);
             assert(this->host_view.offset_n >= 0);
@@ -178,7 +178,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const uintptr_t offset      = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
+                    const uintptr_t offset      = d[1] + d[0] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
 
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->allocation, begin_addr, inheriting_allocation->view.ld);
@@ -441,9 +441,6 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             assert(k < K);
             assert(this->region[k].includes(interval));
 
-            // if k == 0, we are shrinking rows    (m)
-            // if k == 1, we are shrinking columns (n)
-
             ///////////////////////
             //  SHRINK HOST VIEW //
             ///////////////////////
@@ -456,7 +453,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             assert(this->region[k].b >= interval.b);
             const int db = this->region[k].b - interval.b;
 
-            if (k == 0)
+            if (k == 1)
             {
                 assert(da % sizeof_type == 0);
                 assert(db % sizeof_type == 0);
@@ -466,7 +463,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             if (da)
             {
                 // HOST VIEW
-                if (k == 0)
+                if (k == 1)
                     this->block.host_view.offset_m += (da / sizeof_type);
                 else
                     this->block.host_view.offset_n += da;
@@ -477,7 +474,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * r = replicate.allocations[i];
-                        const int offset = (k == 0) ? da : (da * r->view.ld * sizeof_type);
+                        const int offset = (k == 1) ? da : (da * r->view.ld * sizeof_type);
                         r->view.addr += offset;
                         assert(r->view.addr >= r->allocation);
                     }
@@ -485,7 +482,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             }
 
             // resize the views
-            if (k == 0)
+            if (k == 1)
                 this->block.host_view.m = interval.length() / sizeof_type;
             else
                 this->block.host_view.n = interval.length();
@@ -919,7 +916,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
                 // TODO : the allocation is assumed col major, cuda
                 static_assert(K == 2);
-                const uintptr_t begin_addr = addr + d[0] + d[1]*ld*access->host_view.sizeof_type;
+                const uintptr_t begin_addr = addr + d[1] + d[0]*ld*access->host_view.sizeof_type;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
                 const int allocation_view_id = replicate.nallocations++;
@@ -1229,6 +1226,8 @@ next_view:
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
                 // XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.n);
+                // XKBLAS_DEBUG("Inserting region (%d,%d)x(%d,%d)",
+                //         access->region[0].a, access->region[0].b, access->region[1].a, access->region[1].b);
 
                /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
