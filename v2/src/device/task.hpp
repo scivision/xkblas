@@ -27,9 +27,8 @@ typedef enum    task_state_t : uint8_t
     TASK_STATE_READY            = 1,    // Task data can be fetched
     TASK_STATE_DATA_FETCHING    = 2,    // Task data is being fetched
     TASK_STATE_DATA_FETCHED     = 3,    // Task data is fetched, kernel can be executed
-    TASK_STATE_EXECUTED         = 4,    // Task kernel executed
-    TASK_STATE_COMPLETED        = 5,    // Task completed, dependences can be resolved
-    TASK_STATE_DEALLOCATED      = 6,    // Task is deallocated (virtual state, never set)
+    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved (data moved, kernel executed)
+    TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
 }               task_state_t;
 
 template <int K>
@@ -140,12 +139,12 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(succ->state.value >= TASK_STATE_ALLOCATED);
             assert(!region.is_empty());
 
-            if (this->state.value < TASK_STATE_EXECUTED)
+            if (this->state.value < TASK_STATE_COMPLETED)
             {
                 Edge edge(succ, region);
                 SPINLOCK_LOCK(this->state.lock);
                 {
-                    if (this->state.value < TASK_STATE_EXECUTED)
+                    if (this->state.value < TASK_STATE_COMPLETED)
                     {
                         succ->wc.fetch_add(1, std::memory_order_seq_cst);
                         this->edges.push_back(edge);
@@ -194,22 +193,16 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         inline void
-        executed(void)
+        complete(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
-                this->state.value = TASK_STATE_EXECUTED;
+                this->state.value = TASK_STATE_COMPLETED;
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to executed", this->label);
             }
             SPINLOCK_UNLOCK(this->state.lock);
-        }
 
-        inline void
-        complete(void)
-        {
-            XKBLAS_DEBUG_TASK("State of task `%s` changed to completed", this->label);
-            assert(this->state.value == TASK_STATE_EXECUTED);
             for (Edge & edge : this->edges)
             {
                 if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
@@ -218,7 +211,6 @@ class alignas(CACHE_LINE_SIZE) KTask
                     xkblas_task_ready(edge.successor);
                 }
             }
-            this->state.value = TASK_STATE_COMPLETED;
         }
 };
 

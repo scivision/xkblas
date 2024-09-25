@@ -66,7 +66,6 @@ ThreadWorker::pop(void)
 void
 ThreadWorker::complete(Task * task)
 {
-    task->executed();
     task->complete();
     ThreadWorker::move_wc(-1);
 }
