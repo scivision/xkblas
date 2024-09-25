@@ -773,6 +773,8 @@ cuda_stream_instructions_progress(
                 /* poll events */
                 for (int i = 0 ; i < 16 ; ++i)
                 {
+                    XKBLAS_DEBUG("before");
+                    __check_error(cudaGetLastError());
                     res = cudaEventQuery(stream->cu.events.end[idx]);
                     assert(res == cudaErrorNotReady || res == cudaSuccess);
                     __check_error(res);

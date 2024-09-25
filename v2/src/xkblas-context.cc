@@ -128,7 +128,7 @@ xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
 
-    #if 0
+    #if 1
     // task dependency graph
     XKBLAS_INFO("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::self();

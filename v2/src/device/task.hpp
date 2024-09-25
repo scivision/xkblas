@@ -140,10 +140,9 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(succ->state.value >= TASK_STATE_ALLOCATED);
             assert(!region.is_empty());
 
-            if (this->state.value < TASK_STATE_COMPLETED)
+            if (this->state.value < TASK_STATE_EXECUTED)
             {
                 Edge edge(succ, region);
-
                 SPINLOCK_LOCK(this->state.lock);
                 {
                     if (this->state.value < TASK_STATE_EXECUTED)

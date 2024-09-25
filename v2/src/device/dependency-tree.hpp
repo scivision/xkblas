@@ -53,18 +53,12 @@ class KDependencyTreeNode : public KIntervalBtree<K, KTask<K> *>::Node {
             last_write(),
             nwrites(0)
         {
-            if (inherit)
-            {
-                this->last_write = inherit->last_write;
-                if (!inherit->last_reads.empty())
-                {
-                    this->last_reads.insert(
-                        this->last_reads.end(),
-                        std::make_move_iterator(inherit->last_reads.begin()),
-                        std::make_move_iterator(inherit->last_reads.end())
-                    );
-                }
-            }
+            this->last_write = inherit->last_write;
+            this->last_reads.insert(
+                this->last_reads.end(),
+                inherit->last_reads.begin(),
+                inherit->last_reads.end()
+            );
         }
 
         ////////////////////////////////

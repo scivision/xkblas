@@ -134,19 +134,16 @@ class KMemoryBlock {
             valid(0)
         {}
 
-        /* a block from splitting an existing one */
-        KMemoryBlock(
+        void
+        memory_block_init(
             const Region & block_region,
             const KMemoryBlock & inheriting_block,
             const Region & inheriting_region,
             const int k
         ) {
-            static_assert(K == 2);
-
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
             /////////////////////////////////
-
             int d[K];
             Region::distance_manhattan(inheriting_region, block_region, d);
 
@@ -181,7 +178,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const uintptr_t offset      = d[0] * inheriting_allocation->view.ld * sizeof_type + d[1];
+                    const uintptr_t offset      = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
 
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->allocation, begin_addr, inheriting_allocation->view.ld);
@@ -202,6 +199,18 @@ class KMemoryBlock {
 
         }
 
+
+
+        /* a block from splitting an existing one */
+        KMemoryBlock(
+            const Region & block_region,
+            const KMemoryBlock & inheriting_block,
+            const Region & inheriting_region,
+            const int k
+        ) {
+            static_assert(K == 2);
+            this->memory_block_init(block_region, inheriting_block, inheriting_region, k);
+        }
         ~KMemoryBlock() {}
 
 }; /* KMemoryBlock */
@@ -493,7 +502,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * r = replicate.allocations[i];
-                        const int offset = (k == 0) ? (da * r->view.ld * sizeof_type) : da;
+                        const int offset = (k == 0) ? da : (da * r->view.ld * sizeof_type);
                         XKBLAS_DEBUG("Shrink not supported yet - k=%d, da=%d, db=%d, offset=%d",
                                 k, da, db, offset);
                         r->view.addr += offset;
@@ -906,7 +915,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
 
             /* allocate continuous memory for that access */
-            const int          ld = access->host_view.m;            // cuda is col major
+            const int          ld = access->host_view.n;            // cuda is col major
             const int sizeof_type = access->host_view.sizeof_type;
             uint64_t  size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
             uintptr_t addr        = (uintptr_t) xkblas_memory_allocate(driver, device, size);

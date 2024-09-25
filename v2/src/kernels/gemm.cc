@@ -309,6 +309,10 @@ body_cuda(void * vlauncher)
     const Access * B = launcher->task->accesses + 1;
     const Access * C = launcher->task->accesses + 2;
 
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(B->device_view.addr % B->host_view.sizeof_type == 0);
+    assert(C->device_view.addr % C->host_view.sizeof_type == 0);
+
     args_t * args = (args_t *) (launcher->task + 1);
     assert(args->transA == CblasNoTrans);
     assert(args->transB == CblasNoTrans);

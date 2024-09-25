@@ -227,9 +227,9 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
     // TODO : instead, while context->running
     while (1)
     {
-        Task * task = thread->pop();
-        if (task == NULL)
-            continue ;
+        Task * task;
+        while ((task = thread->pop()) == NULL)
+            thread->pause();
 
         assert(task->fmtid == TASK_FORMAT_COHERENT_ASYNC);
         xkblas_memory_coherent_async_worker_thread_work(context, thread, task);
