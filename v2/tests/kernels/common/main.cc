@@ -93,10 +93,11 @@ main_gemm_gemm(char ** args)
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
         impl.coherent(CImpl, m, n, ld);
-        impl.wait();
 
+        uint64_t tt = get_nanotime();
+        impl.wait();
         uint64_t tf = get_nanotime();
-        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
+        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
     }
 
     /* check correctness */
@@ -167,9 +168,10 @@ main_gemm(char ** args)
         impl.set_tile(bs_m, bs_n);
         impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
         impl.coherent(CImpl, m, n, ld);
+        uint64_t tt = get_nanotime();
         impl.wait();
         uint64_t tf = get_nanotime();
-        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
+        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
     }
 
     /* check correctness */

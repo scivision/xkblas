@@ -247,36 +247,39 @@ xkblas_£trsm_async(
                     }
                 }
             }
-
-    # if 0 // REMOVE ME WHEN SUPPORING OTHER CONF
             /*
              *  CblasLeft / CblasUpper / Cblas[Conj]Trans
              */
             else {
-                for (k = 0; k < Bmt; k++) {
-                    bs_km = k == Bmt-1 ? Bm-k*Bmb : Bmb;
-                    lda = lda;
-                    ldb = ldb;
-                    lalpha = k == 0 ? *alpha : zone;
-                    for (n = 0; n < Bnt; n++) {
-                        bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                        INSERT_TASK_ztrsm(
-                            side, uplo, transA, diag,
+                for (tk = 0; tk < Bmt; ++tk) {
+                    bs_km  = (tk == Bmt-1) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    lalpha = (tk == 0)     ? *alpha : zone;
+                    for (tn = 0; tn < Bnt; ++tn) {
+                        bs_nn = (tn == Bnt-1) ? Bn-tn*Bnb : Bnb;
+                        xkblas_£trsm_tile_async(
+                            context,
+                            side, uplo,
+                            transA, diag,
                             bs_km, bs_nn,
-                            lalpha, A(k, k), lda,
-                                    B(k, n), ldb);
+                            &lalpha,
+                            A, tk*Amb, tk*Anb, lda,
+                            B, tk*Bmb, tn*Bnb, ldb
+                        );
                     }
-                    for (m = k+1; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        for (n = 0; n < Bnt; n++) {
+                    for (tm = tk+1; tm < Bmt; tm++) {
+                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        for (tn = 0; tn < Bnt; ++tn) {
                             bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                            xkblas_£trsm_tile_async(
+                            xkblas_£gemm_tile_async(
+                                context,
                                 transA, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                mzone,  A(k, m), lda,
-                                        B(k, n), ldb,
-                                lalpha, B(m, n), ldbm);
+                                &mzone,
+                                A, tk*Amb, tm*Anb, lda,
+                                B, tk*Bmb, tn*Bnb, ldb,
+                                &lalpha,
+                                B, tm*Bmb, tn*Bnb, ldb
+                            );
                         }
                     }
                 }
@@ -287,31 +290,35 @@ xkblas_£trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (k = 0; k < Bmt; k++) {
-                    bs_km = k == Bmt-1 ? Bm-k*Bmb : Bmb;
-                    lda = lda;
-                    ldb = ldb;
-                    lalpha = k == 0 ? *alpha : zone;
-                    for (n = 0; n < Bnt; n++) {
-                        bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                        INSERT_TASK_ztrsm(
-                            side, uplo, transA, diag,
+                for (tk = 0; tk < Bmt; ++tk) {
+                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    lalpha = (tk == 0) ? *alpha : zone;
+                    for (tn = 0; tn < Bnt; ++tn) {
+                        bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                        xkblas_£trsm_tile_async(
+                            context,
+                            side, uplo,
+                            transA, diag,
                             bs_km, bs_nn,
-                            lalpha, A(k, k), lda,
-                                    B(k, n), ldb);
+                            &lalpha,
+                            A, tk*Amb, tk*Anb, lda,
+                            B, tk*Bmb, n*Bnb, ldb
+                        );
                     }
-                    for (m = k+1; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        lda = lda;
-                        ldbm = ldb;
-                        for (n = 0; n < Bnt; n++) {
-                            bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                            xkblas_£trsm_tile_async(
+                    for (tm = tk+1; tm < Bmt; ++tm) {
+                        bs_mm = tm == Bmt-1 ? Bm-m*Bmb : Bmb;
+                        for (tn = 0; tn < Bnt; ++tn) {
+                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                            xkblas_£gemm_tile_async(
+                                context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                mzone,  A(m, k), lda,
-                                        B(k, n), ldb,
-                                lalpha, B(m, n), ldbm);
+                                &mzone,
+                                A, tm*Amb, tk*Anb, lda,
+                                B, tk*Bmb, tn*Bnb, ldb,
+                                &lalpha,
+                                B, tm*Bmb, tn*Bnb, ldb
+                            );
                         }
                     }
                 }
@@ -320,29 +327,33 @@ xkblas_£trsm_async(
              *  CblasLeft / CblasLower / Cblas[Conj]Trans
              */
             else {
-                for (k = 0; k < Bmt; k++) {
-                    bs_km = k == 0 ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lda = lda;
-                    ldb = ldb;
-                    lalpha = k == 0 ? *alpha : zone;
-                    for (n = 0; n < Bnt; n++) {
-                        bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                        INSERT_TASK_ztrsm(
+                for (tk = 0; tk < Bmt; ++tk) {
+                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    lalpha = (tk == 0) ? *alpha : zone;
+                    for (tn = 0; tn < Bnt; ++tn) {
+                        bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                        xkblas_£trsm_tile_async(
+                            context,
                             side, uplo, transA, diag,
                             bs_km, bs_nn,
-                            lalpha, A(Bmt-1-k, Bmt-1-k), lda,
-                                    B(Bmt-1-k,        n), ldb);
+                            &lalpha,
+                            A, (Bmt-1-tk)*Amb, (Bmt-1-tk)*Anb, lda,
+                            B, (Bmt-1-tk)*Bmb,          n*Bnb, ldb
+                        );
                     }
-                    for (m = k+1; m < Bmt; m++) {
-                        ldbm = ldb;
-                        for (n = 0; n < Bnt; n++) {
-                            bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                            xkblas_£trsm_tile_async(
+                    for (tm = tk+1; tm < Bmt; ++tm) {
+                        for (tn = 0; tn < Bnt; ++tn) {
+                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                            xkblas_£gemm_tile_async(
+                                context,
                                 transA, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
-                                mzone,  A(Bmt-1-k, Bmt-1-m), lda,
-                                        B(Bmt-1-k, n       ), ldb,
-                                lalpha, B(Bmt-1-m, n       ), ldbm);
+                                &mzone,
+                                A, (Bmt-1-tk)*Amb, (Bmt-1-tm)*Anb, lda,
+                                B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb,
+                                &lalpha,
+                                B, (Bmt-1-tm)*Bmb,         tn*Bnb, ldb
+                            );
                         }
                     }
                 }
@@ -355,30 +366,34 @@ xkblas_£trsm_async(
     else {
         if (uplo == CblasUpper) {
             if (transA == CblasNoTrans) {
-                for (k = 0; k < Bnt; k++) {
-                    bs_kn = k == Bnt-1 ? Bn-k*Bnb : Bnb;
-                    lda = lda;
-                    lalpha = k == 0 ? *alpha : zone;
-                    for (m = 0; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        INSERT_TASK_ztrsm(
+                for (tk = 0; tk < Bnt; ++tk) {
+                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    lalpha = (tk == 0) ? *alpha : zone;
+                    for (tm = 0; tm < Bmt; ++tm) {
+                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        xkblas_£trsm_tile_async(
+                            context,
                             side, uplo, transA, diag,
                             bs_mm, bs_kn,
-                            lalpha, A(k, k), lda,  /* lda * bs_kn */
-                                    B(m, k), ldbm); /* ldb * bs_kn */
+                            &lalpha,
+                            A, tk*Amb, tk*Anb, lda,
+                            B, tm*Bnb, tk*Bnb, ldb
+                        );
                     }
-                    for (m = 0; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        for (n = k+1; n < Bnt; n++) {
-                            bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                            xkblas_£trsm_tile_async(
+                    for (tm = 0; tm < Bmt; ++tm) {
+                        bs_mm = m == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        for (tn = tk+1; tn < Bnt; ++tn) {
+                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                            xkblas_£gemm_tile_async(
+                                context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                mzone,  B(m, k), ldbm,  /* ldb * Bmb   */
-                                        A(k, n), lda,  /* lda * bs_nn */
-                                lalpha, B(m, n), ldbm); /* ldb * bs_nn */
+                                &mzone,
+                                B, tm*Bmb, tk*Bnb, ldb,
+                                A, tk*Amb, tn*Anb, lda,
+                                &lalpha,
+                                B, tm*Bmb, tn*Bnb, ldb
+                            );
                         }
                     }
                 }
@@ -387,26 +402,31 @@ xkblas_£trsm_async(
              *  CblasRight / CblasUpper / Cblas[Conj]Trans
              */
             else {
-                for (k = 0; k < Bnt; k++) {
-                    bs_kn = k == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    lda = lda;
-                    for (m = 0; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        INSERT_TASK_ztrsm(
-                            side, uplo, transA, diag,
+                for (tk = 0; tk < Bnt; ++tk) {
+                    bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+                    for (tm = 0; tm < Bmt; ++tm) {
+                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        xkblas_£trsm_tile_async(
+                            context,
+                            side, uplo,
+                            transA, diag,
                             bs_mm, bs_kn,
-                            *alpha, A(Bnt-1-k, Bnt-1-k), lda,  /* lda * bs_kn */
-                                   B(       m, Bnt-1-k), ldbm); /* ldb * bs_kn */
+                            alpha,
+                            A, (Bnt-1-tk)*Amb, (Bnt-1-tk)*Anb, lda,
+                            B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
+                        );
 
-                        for (n = k+1; n < Bnt; n++) {
-                            lda = lda;
-                            xkblas_£trsm_tile_async(
+                        for (tn = tk+1; tn < Bnt; ++tn) {
+                            xkblas_£gemm_tile_async(
+                                context,
                                 CblasNoTrans, transA,
                                 bs_mm, Bnb, bs_kn,
-                                minvalpha, B(m,       Bnt-1-k), ldbm,  /* ldb  * bs_kn */
-                                           A(Bnt-1-n, Bnt-1-k), lda, /* Amb * bs_kn (Never last row) */
-                                zone,      B(m,       Bnt-1-n), ldbm); /* ldb  * Bnb   */
+                                &minvalpha,
+                                B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb,
+                                A, (Bnt-1-tn)*Amb, (Bnt-1-tk)*Anb, lda,
+                                &zone,
+                                B,         tm*Bmb, (Bnt-1-tn)*Bnb, ldb
+                            );
                         }
                     }
                 }
@@ -417,57 +437,67 @@ xkblas_£trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (k = 0; k < Bnt; k++) {
-                    bs_kn = k == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    lda = lda;
-                    lalpha = k == 0 ? *alpha : zone;
-                    for (m = 0; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        INSERT_TASK_ztrsm(
-                            side, uplo, transA, diag,
+                for (tk = 0; tk < Bnt; ++tk) {
+                    bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+                    lalpha = tk == 0 ? *alpha : zone;
+                    for (tm = 0; tm < Bmt; ++tm) {
+                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        xkblas_£trsm_tile_async(
+                            context,
+                            side, uplo,
+                            transA, diag,
                             bs_mm, bs_kn,
-                            lalpha, A(Bnt-1-k, Bnt-1-k), lda,  /* lda * bs_kn */
-                                    B(      m, Bnt-1-k), ldbm); /* ldb * bs_kn */
+                            &lalpha,
+                            A, (Bnt-1-tk)*Amb, (Bnt-1-tk)*Anb, lda,
+                            B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
+                        );
 
-                        for (n = k+1; n < Bnt; n++) {
-                            xkblas_£trsm_tile_async(
+                        for (tn = tk+1; tn < Bnt; ++tn) {
+                            xkblas_£gemm_tile_async(
+                                context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
-                                mzone,  B(m,       Bnt-1-k), ldbm,  /* ldb * bs_kn */
-                                        A(Bnt-1-k, Bnt-1-n), lda,  /* lda * Bnb   */
-                                lalpha, B(m,       Bnt-1-n), ldbm); /* ldb * Bnb   */
+                                &mzone,
+                                B, tm*Bmb,         (Bnt-1-tk)*Bnb, ldb,
+                                A, (Bnt-1-tk)*Amb, (Bnt-1-tn)*Anb, lda,
+                                &lalpha,
+                                B, tm*Bmb,         (Bnt-1-tn)*Bnb, ldb
+                            );
                         }
                     }
                 }
             }
             else {
-                for (k = 0; k < Bnt; k++) {
-                    bs_kn = k == Bnt-1 ? Bn-k*Bnb : Bnb;
-                    lda = lda;
-                    for (m = 0; m < Bmt; m++) {
-                        bs_mm = m == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        ldbm = ldb;
-                        INSERT_TASK_ztrsm(
-                            side, uplo, transA, diag,
+                for (tk = 0; tk < Bnt; ++tk) {
+                    bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
+                    for (tm = 0; tm < Bmt; ++tm) {
+                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        xkblas_£trsm_tile_async(
+                            context,
+                            side, uplo,
+                            transA, diag,
                             bs_mm, bs_kn,
-                            *alpha, A(k, k), lda,  /* lda * bs_kn */
-                                    B(m, k), ldbm); /* ldb * bs_kn */
+                            alpha,
+                            A, tk*Amb, tk*Anb, lda,
+                            B, tm*Bmb, tk*Bnb, ldb
+                        );
 
-                        for (n = k+1; n < Bnt; n++) {
-                            bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
-                            lda = lda;
-                            xkblas_£trsm_tile_async(
+                        for (tn = tk+1; tn < Bnt; ++tn) {
+                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                            xkblas_£gemm_tile_async(
+                                context,
                                 CblasNoTrans, transA,
                                 bs_mm, bs_nn, Bmb,
-                                minvalpha, B(m, k), ldbm,  /* ldb  * bs_kn */
-                                           A(n, k), lda, /* lda * bs_kn */
-                                zone,      B(m, n), ldbm); /* ldb  * bs_nn */
+                                &minvalpha,
+                                B, tm*Bmb, tk*Bnb, ldb,
+                                A, tn*Amb, tk*Anb, lda,
+                                &zone,
+                                B, tm*Bmb, tn*Bnb, ldb
+                            );
                         }
                     }
                 }
             }
-    # endif
         }
     }
 

@@ -1131,7 +1131,7 @@ next_view:
                     else
                     {
                         // find source
-                        int src = __builtin_ffs(partite.block->valid) - 1;
+                        int src = (partite.block->valid & (1 << device->global_id)) ? device->global_id : __builtin_ffs(partite.block->valid) - 1;
                         // int src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
 
                         // Get the first valid allocation on that device

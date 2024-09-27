@@ -128,16 +128,6 @@ xkblas_sync(void)
 {
     XKBLAS_INFO("Synchronizing Xkblas");
 
-    #if 1 && !defined(NDEBUG)
-    // task dependency graph
-    XKBLAS_INFO("Exporting Dependency Tree...");
-    ThreadProducer * thread = ThreadProducer::self();
-    FILE * f = fopen("tasks.dot", "w");
-    thread->dump_tasks(f);
-    fclose(f);
-    system("dot -Tpdf tasks.dot > tasks.pdf");
-    # endif
-
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
@@ -147,8 +137,6 @@ xkblas_sync(void)
         context->memory_coherent_worker_thread
     };
     const int nworkers = sizeof(workers) / sizeof(ThreadWorker *);
-
-    /* wait for all threads */
     const int ndevices = context->drivers.devices.n;
 
 retry:
@@ -168,13 +156,31 @@ retry:
 
     /* if there is still work on-going */
     if (wc_global)
+    {
+        usleep(500);    // TODO : pthread cond instead ? or maybe workstealing
         goto retry;
+    }
 
     /* all threads completed :-) */
     XKBLAS_INFO("Synchronized Xkblas");
+
+
 #if USE_STATS == 1
     xkblas_stats_report(&(context->stats));
 #endif // USE_STATS == 1
+
+    #if 0 && !defined(NDEBUG)
+    // task dependency graph
+    XKBLAS_INFO("Exporting Dependency Tree...");
+    ThreadProducer * thread = ThreadProducer::self();
+    FILE * f = fopen("tasks.dot", "w");
+    thread->dump_tasks(f);
+    fclose(f);
+    system("dot -Tpdf tasks.dot > tasks.pdf");
+    # endif
+
+
+
 # if 0
     XKBLAS_INFO("Exporting memory tree...");
 
