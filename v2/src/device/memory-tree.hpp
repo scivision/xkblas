@@ -27,6 +27,12 @@
 typedef uint16_t memory_replicates_bitfield_t;
 static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= XKBLAS_DEVICES_MAX);
 
+// if this assertion, many bitwise operation in the runtime will be wrong as
+// they are implicitly done on int32 : (1 << device_global_id) will be an int -
+// should update the runtime with (1UL << device_global_id) - maybe use a macro
+// for 'one' depending on that size
+static_assert(sizeof(memory_replicates_bitfield_t) * 8 <= 32);
+
 /* a memory allocation */
 class MemoryReplicateAllocationView {
 
@@ -288,7 +294,8 @@ class KMemoryTreeNodeSearch {
        enum Type : uint8_t {
            INSERTING_BLOCKS     = 0,
            SEARCH_FOR_BLOCKS    = 1,
-           SEARCH_AWAITING      = 2
+           SEARCH_AWAITING      = 2,
+           SEARCH_OWNERS        = 3
        };
 
    public:
@@ -323,9 +330,13 @@ class KMemoryTreeNodeSearch {
         ///////////////////////////////////////////
         // used if type == SEARCH_AWAITING //
         ///////////////////////////////////////////
-
         uintptr_t dst_allocation;
         std::vector<Task *> awaiting;
+
+        ///////////////////////////////////
+        // used if type == SEARCH_OWNERS //
+        ///////////////////////////////////
+        size_t bytes_owned[XKBLAS_DEVICES_MAX];
 
    public:
        KMemoryTreeNodeSearch() : KMemoryTreeNodeSearch(0) {}
@@ -363,6 +374,13 @@ class KMemoryTreeNodeSearch {
        {
            this->dst_allocation = alloc_addr;
            this->type = SEARCH_AWAITING;
+       }
+
+       void
+       prepare_search_owners(void)
+       {
+           memset(this->bytes_owned, 0, sizeof(this->bytes_owned));
+           this->type = SEARCH_OWNERS;
        }
 
 }; /* KMemoryTreeNodeSearch */
@@ -560,6 +578,16 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                         }
                     }
 
+                    break ;
+                }
+
+                /* search for owners of the access */
+                case (Search::Type::SEARCH_OWNERS):
+                {
+                    const size_t bytes = region.size();
+                    for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+                        if (this->block.valid & (1 << device_global_id))
+                            search.bytes_owned[device_global_id] += bytes;
                     break ;
                 }
 
@@ -1072,6 +1100,7 @@ next_view:
                     if (replicate.fetching & allocbit)
                     {
                         partite.must_fetch = false;
+                        XKBLAS_DEBUG("Skipping fetch of a block already being fetched (concurrent read)");
 
                         // add the task to the awaiting list of that block
                         r->awaiting.push_back(task);
@@ -1201,10 +1230,7 @@ next_view:
                 for (Partite & partite : partition)
                 {
                     if (!partite.must_fetch)
-                    {
-                        XKBLAS_DEBUG("Skipping fetch of a block already being fetched (concurrent read ?)");
                         continue ;
-                    }
 
                     this->fetch_access_copy_partite(driver, device, task, partite, allocation);
                 }
@@ -1293,6 +1319,41 @@ next_view:
         invalidate_caches(void)
         {
             # pragma message(TODO "Empty the memory tree")
+        }
+
+        //////////////
+        //  OCR     //
+        //////////////
+
+        memory_replicates_bitfield_t
+        who_owns(
+            Access * access
+        ) {
+            // find how much bytes are owned per device
+            Search search;
+            search.prepare_search_owners();
+            this->lock();
+            {
+                this->intersect(search, access->region, access->mode);
+            }
+            this->unlock();
+
+            // find devices which owns the most bytes
+            memory_replicates_bitfield_t owners = 0;
+            size_t bytes_owned_max = 0;
+            for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            {
+                const int bytes_owned = search.bytes_owned[device_global_id];
+                if (bytes_owned_max < bytes_owned)
+                {
+                    bytes_owned_max = bytes_owned;
+                    owners = (1 << device_global_id);
+                }
+                else if (bytes_owned_max && bytes_owned_max == bytes_owned)
+                    owners |= (1 << device_global_id);
+            }
+
+            return owners;
         }
 
         //////////////

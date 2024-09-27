@@ -173,7 +173,7 @@ class Intervals {
         }
 
         inline uint64_t
-        size(void)
+        size(void) const
         {
             uint64_t s = this->list[0].length();
             for (int i = 1 ; i < K ; ++i)

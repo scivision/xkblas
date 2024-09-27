@@ -46,7 +46,6 @@ class NaiveQueue : IQueue<T>
                 this->list.pop_back();
                 # endif
 
-
                 SPINLOCK_UNLOCK(this->lock);
 
                 return t;

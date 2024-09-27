@@ -65,18 +65,19 @@ xkblas_£gemm_tile_async(
 
     XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", Cm, Cn, m, n);
 
-    ThreadProducer * thread = ThreadProducer::self();
-
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
-    uint8_t * mem  = thread->allocate(task_size + args_size);
+    ThreadProducer * thread = ThreadProducer::self();
+    uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
+    // const int ocr_access = UNSPECIFIED_TASK_ACCESS;
+    const int ocr_access = 2;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
     assert(transA == CblasNoTrans);
@@ -95,6 +96,7 @@ xkblas_£gemm_tile_async(
     new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Cm, Cn, m, n, sizeof(TYPE), Cmode        );
     thread->commit<NACCESSES>(context, task);
     # undef NACCESSES
+
     return 0;
 }
 

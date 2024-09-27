@@ -205,7 +205,7 @@ class alignas(CACHE_LINE_SIZE) KTask
 
             for (Edge & edge : this->edges)
             {
-                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
+                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
                 {
                     edge.successor->state.value = TASK_STATE_READY;
                     xkblas_task_ready(edge.successor);
