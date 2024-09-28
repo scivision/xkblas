@@ -33,6 +33,17 @@ xkblas_kernel_auto_tile(
             break ;
         }
 
+        case (XKBLAS_KERNEL_TYPE_COPYSCALE):
+        {
+            int m = args[0];
+            int n = args[1];
+
+            /* just one big tile */
+            bs[0] = m;
+            bs[1] = n;
+            break ;
+        }
+
         default:
         {
             XKBLAS_FATAL("Tile for kernel type %d is not implemented", kernel);

@@ -13,3 +13,11 @@ strsm.cc
 zgemm.cc
 zkernel.h
 ztrsm.cc
+ccopyscale.cc
+ccopyscale.cu
+dcopyscale.cc
+dcopyscale.cu
+scopyscale.cc
+scopyscale.cu
+zcopyscale.cc
+zcopyscale.cu

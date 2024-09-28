@@ -31,7 +31,18 @@ SET(SOURCE_FILES
     src/kernels/ctrsm.cc
     src/kernels/dtrsm.cc
     src/kernels/ztrsm.cc
+    src/kernels/scopyscale.cc
+    src/kernels/ccopyscale.cc
+    src/kernels/dcopyscale.cc
+    src/kernels/zcopyscale.cc
     src/logger/logger.cc
+)
+
+set(CUDA_SOURCE_FILES
+    src/kernels/scopyscale.cu
+    src/kernels/ccopyscale.cu
+    src/kernels/dcopyscale.cu
+    src/kernels/zcopyscale.cu
 )
 
 add_custom_command(
@@ -44,12 +55,18 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/src/kernels/dtrsm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/ctrsm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/ztrsm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/scopyscale.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/dcopyscale.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/ccopyscale.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/zcopyscale.cc
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS
         ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
         ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -117,15 +134,25 @@ endif()
 add_library(xkblas_driver_cpu SHARED src/device/driver_cpu.cc)
 target_link_libraries(xkblas PRIVATE xkblas_driver_cpu)
 
-# Cuda driver
+# IF USING CUDA
 if (${CUDA_RT_FOUND})
+
+    # Cuda driver
     target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    add_library(xkblas_driver_cuda SHARED src/device/driver_cuda.cc)
+    add_library(xkblas_cuda_driver SHARED src/device/driver_cuda.cc)
     if (${HWLOC_FOUND})
-        target_link_libraries(xkblas_driver_cuda PRIVATE ${HWLOC_LIBRARIES})
+        target_link_libraries(xkblas_cuda_driver PRIVATE ${HWLOC_LIBRARIES})
     endif()
-    target_link_libraries(xkblas_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    target_link_libraries(xkblas PRIVATE xkblas_driver_cuda)
+    target_link_libraries(xkblas PRIVATE xkblas_cuda_driver)
+
+    # Cuda kernels
+    set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
+    cuda_add_library(xkblas_cuda_kernels SHARED ${CUDA_SOURCE_FILES})
+    target_link_libraries(xkblas PRIVATE xkblas_cuda_kernels)
+
+    # Cuda Cublas
+    target_link_libraries(xkblas_cuda_driver PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+
 endif()
 
 # Include directory
@@ -139,10 +166,10 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 if (STRICT)
     target_compile_options(xkblas PRIVATE -Wfatal-errors)
     if (${CUDA_RT_FOUND})
-        target_compile_options(xkblas_driver_cuda PRIVATE -Wfatal-errors)
+        target_compile_options(xkblas_cuda_driver PRIVATE -Wfatal-errors)
+        target_compile_options(xkblas_cuda_kernels PRIVATE -Wfatal-errors)
     endif()
 endif()
-
 
 ################
 # Sub projects #

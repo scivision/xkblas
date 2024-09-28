@@ -14,12 +14,14 @@ print("srcdir={}, dstdir={}".format(srcdir, incdir))
 
 kernels=[
     "gemm",
-    "trsm"
+    "trsm",
+    "copyscale"
 ]
 
 # sed files
 files=[
-    "kernel.h"
+    "kernel.h",
+    "copyscale.cu"
 ]
 files += ["{}.cc".format(kernel) for kernel in kernels]
 

@@ -8,6 +8,6 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # Lib name
 add_executable(tests tests.cc)
-target_link_libraries(tests xkblas)
+target_link_libraries(tests xkblas xkblas_cuda_kernels)
 
 add_subdirectory(kernels/)
