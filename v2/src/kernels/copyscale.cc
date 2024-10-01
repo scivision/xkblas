@@ -67,8 +67,6 @@ xkblas_£copyscale_tile_async(
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    assert(transA == CblasNoTrans);
-    assert(transB == CblasNoTrans);
     snprintf(task->label, sizeof(task->label), "copyscale(D=(%d,%d) ; L=(%d,%d) ; U=(%d,%d))", Dm, Dn, Lm, Ln, Um, Un);
     # endif /* NDEBUG */
 
@@ -125,6 +123,16 @@ xkblas_£copyscale_async(
         int args[2] = {m, n};
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_COPYSCALE, args, tile);
     }
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
+    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
 
     /* set tiling parameters */
     const int Dmb = tile[1];
@@ -227,12 +235,10 @@ body_cuda(void * vlauncher)
 
 # endif /* USE_CUDA */
 
-# ifdef USE_CPU
-
 /* CPU driver */
 extern "C"
 int
-xkblas_zcopyscale_native(
+xkblas_£copyscale_native(
     int m, int n,
     bool should_copy,
     int * IW,
@@ -266,6 +272,8 @@ xkblas_zcopyscale_native(
 
     return 0;
 }
+
+# ifdef USE_CPU
 
 static void
 body_cpu(void * args)

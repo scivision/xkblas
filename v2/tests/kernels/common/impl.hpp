@@ -40,6 +40,15 @@ class impl_t
         );
 
         void
+        copyscale(
+            const BLAS_INT m, const BLAS_INT n,
+            bool should_copy, int * IW,
+            const TYPE * D, const int ldd,
+                  TYPE * L, const int ldl,
+                  TYPE * U, const int ldu
+        );
+
+        void
         coherent(
             TYPE * M,
             int m, int n,

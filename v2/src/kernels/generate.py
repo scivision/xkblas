@@ -53,7 +53,7 @@ for f in files:
 
 # move header files
 for mode in modes:
-    cmd("mv {}/{}kernel.h {}/xkblas-{}kernel.h".format(mode[0], srcdir, mode[0], incdir))
+    cmd("mv {}/{}kernel.h {}/xkblas-{}kernel.h".format(srcdir, mode[0], incdir, mode[0]))
 
 # task format register
 f = "kernel-task-format-register"

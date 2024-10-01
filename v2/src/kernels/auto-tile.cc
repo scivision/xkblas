@@ -41,6 +41,7 @@ xkblas_kernel_auto_tile(
             /* just one big tile */
             bs[0] = m;
             bs[1] = n;
+
             break ;
         }
 

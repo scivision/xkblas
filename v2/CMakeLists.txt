@@ -67,6 +67,7 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
+        ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
 )
 
 option(STRICT "Enable strict compilation mode" OFF)

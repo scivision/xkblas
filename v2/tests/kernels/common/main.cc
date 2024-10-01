@@ -195,6 +195,8 @@ main_trsm(char ** args)
 
     int m = atoi(args[0]);
     int n = atoi(args[1]);
+    int bs_m = atoi(args[2]);
+    int bs_n = atoi(args[3]);
     TYPE alpha = (const TYPE) 0.0;
 
     /* currently only support this */
@@ -240,6 +242,7 @@ main_trsm(char ** args)
     printf("Running implementation...\n");
     {
         uint64_t t0 = get_nanotime();
+        impl.set_tile(bs_m, bs_n);
         impl.trsm(side, uplo, transA, diag, m, n, &alpha, A, ld, BImpl, ld);
         impl.coherent(BImpl, m, n, ld);
         impl.wait();
@@ -253,6 +256,56 @@ main_trsm(char ** args)
         puts("Result is CORRECT");
     else
         puts("Result is INCORRECT !!");
+
+    return 0;
+}
+
+static int
+main_copyscale(char ** args)
+{
+    int m    = atoi(args[0]);
+    int n    = atoi(args[1]);
+    int bs_m = atoi(args[2]);
+    int bs_n = atoi(args[3]);
+
+    /* currently only support this */
+    int ld = MAX(m, n);
+    printf("Set (m, n) = (%d, %d)\n", m, n);
+    uintptr_t alignon = sizeof(TYPE) * ld;
+
+    /* allocate matrices */
+    uintptr_t mem = (uintptr_t) malloc(alignon + 3 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Dp  = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Lp  = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Up  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+
+    assert(Dp % alignon == 0);
+    assert(Lp % alignon == 0);
+    assert(Up % alignon == 0);
+
+    TYPE * D = (TYPE *) Dp;
+    TYPE * L = (TYPE *) Lp;
+    TYPE * U = (TYPE *) Up;
+
+    /* initialize matrices */
+    FILL(D, 3*ld*ld);
+
+    /* run on impl */
+    printf("Running implementation...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        bool should_copy = true;
+        int * IW = NULL;
+        impl.set_tile(bs_m, bs_n);
+        impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+        impl.coherent(L, m, n, ld);
+        impl.coherent(U, n, m, ld);
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    puts("Correctness check not implemented");
 
     return 0;
 }
@@ -369,17 +422,18 @@ static func_t funcs[] = {
                     "  - N      : number of rows of matrices D and U, cols of matrices D and L\n"
                     "  - S      : number of rows and cols per tile\n"
     },
-
+# endif
     {
         .name = "COPYSCALE",
         .f = main_copyscale,
-        .nargs = 3,
-        .usage =    "M N S\n"
+        .nargs = 4,
+        .descr = "???",
+        .usage =    "M N BS_M BS_N\n"
                     "  - M      : number of rows of matrices L, and number of cols of U\n"
                     "  - N      : number of rows of matrices D and U, cols of matrices D and L\n"
-                    "  - S      : number of rows and cols per tile\n"
+                    "  - BS_M   : n° of (cols, rows) per tile of (L, U)\n"
+                    "  - BS_N   : n° of (rows, cols) per tile of (L, U)\n"
     },
-# endif
     {
         .name = "GEMM",
         .f = main_gemm,
@@ -389,18 +443,20 @@ static func_t funcs[] = {
                     "  - M      : n° of rows of A and C\n"
                     "  - N      : n° of cols of B and C\n"
                     "  - K      : n° of cols of A, rows of B\n"
-                    "  - BS_M   : n° of (cols, row) per tile of (A, B)\n"
-                    "  - BS_N   : n° of (row, cols) per tile of (A, B)\n"
+                    "  - BS_M   : n° of (cols, rows) per tile of (A, B)\n"
+                    "  - BS_N   : n° of (rows, cols) per tile of (A, B)\n"
     },
 
     {
         .name = "TRSM",
         .f = main_trsm,
-        .nargs = 2,
+        .nargs = 4,
         .descr = "A.X = B",
         .usage =    "M N S\n"
                     "  - M      : number of rows of matrices L\n"
-                    "  - N      : number of rows of matrices D, cols of matrices D and L\n",
+                    "  - N      : number of rows of matrices D, cols of matrices D and L\n"
+                    "  - BS_M   : n° of (cols, rows) per tile of (D, L)\n"
+                    "  - BS_N   : n° of (rows, cols) per tile of (L, D)\n"
     },
 
     {

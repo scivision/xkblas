@@ -73,6 +73,17 @@ impl_t::trsm(
 }
 
 void
+impl_t::copyscale(
+    const BLAS_INT m, const BLAS_INT n,
+    bool should_copy, int * IW,
+    const TYPE * D, const int ldd,
+          TYPE * L, const int ldl,
+          TYPE * U, const int ldu
+) {
+    xkblas_scopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+}
+
+void
 impl_t::coherent(
     TYPE * M,
     int m, int n,
@@ -82,7 +93,6 @@ impl_t::coherent(
     int uplo = 0;
     xkblas_memory_coherent_async(uplo, memflag, m, n, M, ld, sizeof(TYPE));
 }
-
 
 void
 impl_t::set_tile(
