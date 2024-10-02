@@ -115,16 +115,17 @@ class Intervals {
             return true;
         }
 
-        inline Intervals
-        intersection(const Intervals & intervals) const
-        {
-            Interval inter[K];
+        static inline void
+        intersection(
+            Intervals * dst,
+            const Intervals & x,
+            const Intervals & y
+        ) {
             for (int k = 0 ; k < K ; ++k)
             {
-                inter[k].a = MAX(this->list[k].a, intervals.list[k].a);
-                inter[k].b = MIN(this->list[k].b, intervals.list[k].b);
+                dst->list[k].a = MAX(x.list[k].a, y.list[k].a);
+                dst->list[k].b = MIN(x.list[k].b, y.list[k].b);
             }
-            return Intervals(inter);
         }
 
         inline bool

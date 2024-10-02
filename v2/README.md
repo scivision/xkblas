@@ -25,6 +25,9 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 - users must explicitly call `xkblas_thread_init` on any thread before making any other calls to xkblas on that thread
 
 # To improve
+- If OCR is set on a successor task, when the predecessor writter completes
+  - the successor device is known: set it already
+  - if reader predecessor completes and the device is known, transfer can be initiated without waiting for all predecessors to complete
 - Tasks descriptor is allocated in the producer thread memory... while it will be heavily accessed and modified by consumers
 - Tasks are currently never deleted (?)
 - Merge continuous memory block to a single transfer

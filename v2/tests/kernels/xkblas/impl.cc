@@ -25,6 +25,13 @@ impl_t::deinit(void)
     xkblas_deinit();
 }
 
+/* allocate host memory */
+uintptr_t
+impl_t::alloc(size_t size)
+{
+    return (uintptr_t) xkblas_malloc(size);
+}
+
 /* wait for kernels completion */
 void
 impl_t::wait(void)

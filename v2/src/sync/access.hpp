@@ -8,7 +8,8 @@
 template<int K>
 class access_t
 {
-    using Region = Intervals<K>;
+    public:
+        using Region = Intervals<K>;
 
     public:
         Region region;

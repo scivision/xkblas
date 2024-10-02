@@ -809,21 +809,25 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
 
         }               fetch_list_t;
 
-        inline void
-        create_fetch_list_for_host_access(
+        void
+        create_fetch_list_for_host(
             ThreadWorker * thread,
-            Access * access,
+            const Region & region,
             fetch_list_t * list
         ) {
-            assert(access);
-            assert(access->mode & ACCESS_MODE_R);
+            assert(thread);
+            assert(!region.is_empty());
+            assert(list);
+
+            list->tree = this;
+            list->fetches = NULL;
 
             Search search(HOST_DEVICE_GLOBAL_ID);
             search.prepare_search_blocks();
             this->lock();
             {
                 /* find all blocks that intersects with that access */
-                this->intersect(search, access->region, access->mode);
+                this->intersect(search, region, ACCESS_MODE_R);
 
                 /* launch fetch on each device */
                 for (Partite & partite : search.partition)
@@ -866,22 +870,6 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 }
             }
             this->unlock();
-        }
-
-        void
-        create_fetch_list_for_host(
-            ThreadWorker * thread,
-            Access * accesses,
-            int naccesses,
-            fetch_list_t * list
-        ) {
-            assert(naccesses > 0);
-            assert(accesses);
-
-            list->tree = this;
-            list->fetches = NULL;
-            for (int i = 0 ; i < naccesses ; ++i)
-                create_fetch_list_for_host_access(thread, accesses + i, list);
         }
 
         ////////////////////////

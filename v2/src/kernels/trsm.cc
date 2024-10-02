@@ -94,8 +94,10 @@ xkblas_£trsm_tile_async(
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_RW);
-    thread->commit<NACCESSES>(context, task);
+    thread->resolve<NACCESSES>(task);
     # undef NACCESSES
+
+    thread->commit(context, task);
 
     return 0;
 }

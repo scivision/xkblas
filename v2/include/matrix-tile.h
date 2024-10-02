@@ -115,6 +115,28 @@ typedef struct  matrix_tile_t
         }
         abort();
     }
+
+    /* return end address */
+    inline uintptr_t
+    end_addr(void) const
+    {
+        assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
+
+        switch (this->order)
+        {
+            case (MATRIX_ROWMAJOR):
+                return this->addr +
+                    ((this->offset_n + this->n) * this->sizeof_type) +
+                    ((this->offset_m + this->m) * this->sizeof_type * this->ld);
+
+            case (MATRIX_COLMAJOR):
+                return this->addr +
+                    ((this->offset_n + this->n) * this->sizeof_type * this->ld) +
+                    ((this->offset_m + this->m) * this->sizeof_type);
+        }
+        abort();
+    }
+
 }               matrix_tile_t;
 
 #endif /* __MATRIX_TILE_H__ */

@@ -18,6 +18,8 @@ class impl_t
         void init(void);
         void deinit(void);
 
+        uintptr_t alloc(size_t size);
+
         /* kernels (async) */
         void gemm(
             int transa, int transb,

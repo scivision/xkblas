@@ -1,6 +1,8 @@
 #ifndef __XKBLAS_H__
 # define __XKBLAS_H__
 
+# include <stddef.h>
+
 /**
  *  XKBLAS LEGACY INTERFACES - implemented on top of xkblas/v2
  */
@@ -24,6 +26,8 @@ extern "C" {
         unsigned int sizeof_type
     );
 
+    void * xkblas_malloc(size_t size);
+    void xkblas_free(void * ptr, size_t size);
 };
 
 #endif /* __XKBLAS_H__ */

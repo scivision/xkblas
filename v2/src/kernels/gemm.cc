@@ -94,8 +94,10 @@ xkblas_£gemm_tile_async(
     new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, Am, An, m, k, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, Bm, Bn, k, n, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Cm, Cn, m, n, sizeof(TYPE), Cmode        );
-    thread->commit<NACCESSES>(context, task);
+    thread->resolve<NACCESSES>(task);
     # undef NACCESSES
+
+    thread->commit(context, task);
 
     return 0;
 }

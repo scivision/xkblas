@@ -78,8 +78,10 @@ xkblas_£copyscale_tile_async(
     new(task->accesses + 0) Access(MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R);
     new(task->accesses + 1) Access(MATRIX_COLMAJOR, L, ldl, Lm, Ln, m, n, sizeof(TYPE), ACCESS_MODE_RW);
     new(task->accesses + 2) Access(MATRIX_COLMAJOR, U, ldu, Um, Un, n, m, sizeof(TYPE), ACCESS_MODE_W);
-    thread->commit<NACCESSES>(context, task);
+    thread->resolve<NACCESSES>(task);
     # undef NACCESSES
+
+    thread->commit(context, task);
 
     return 0;
 }

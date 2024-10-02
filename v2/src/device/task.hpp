@@ -37,23 +37,16 @@ class alignas(CACHE_LINE_SIZE) KTask
     /* only supporting dimension K == 2 */
     static_assert(K == 2);
     using Access = KMemoryAccess<K>;
-    using Region = Intervals<K>;
 
     public:
 
-        /**
-         *  An edge between two tasks.
-         *      successor - the successor task
-         *      region - accessed by both tasks, with at least one writing
-         */
         class Edge {
 
             public:
                 KTask * successor;
-                const Region region;
 
             public:
-                Edge(KTask * s, const Region & r) : successor(s), region(r) {}
+                Edge(KTask * s) : successor(s) {}
                 virtual ~Edge() {}
 
         }; /* Edge */
@@ -132,16 +125,15 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         /* this task precedes the passed task */
         inline void
-        precedes(KTask * succ, const Region & region)
+        precedes(KTask * succ)
         {
             assert(succ);
             assert(this->state.value >= TASK_STATE_ALLOCATED);
             assert(succ->state.value >= TASK_STATE_ALLOCATED);
-            assert(!region.is_empty());
 
             if (this->state.value < TASK_STATE_COMPLETED)
             {
-                Edge edge(succ, region);
+                Edge edge(succ);
                 SPINLOCK_LOCK(this->state.lock);
                 {
                     if (this->state.value < TASK_STATE_COMPLETED)

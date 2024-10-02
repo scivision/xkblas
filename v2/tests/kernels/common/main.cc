@@ -25,6 +25,7 @@ extern "C" {
 # include "xkblas/impl.cc"
 # include "common/check.cc"
 static impl_t impl;
+static bool SKIP_CHECK;
 
 //////////////////////
 //  CLI TO RUN-TIME //
@@ -54,7 +55,7 @@ main_gemm_gemm(char ** args)
     uintptr_t alignon = sizeof(TYPE) * ld;
 
     /* allocate matrices */
-    uintptr_t mem = (uintptr_t) malloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t mem    = impl.alloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
@@ -73,13 +74,16 @@ main_gemm_gemm(char ** args)
     TYPE * CRef  = (TYPE *) CpRef;
     TYPE * CImpl = (TYPE *) CpImpl;
 
-    /* initialize matrices */
-    FILL(A, 3*ld*ld); // fill A, B and C
-    FILL(&alpha, 1);
-    FILL(&beta, 1);
+    if (!SKIP_CHECK)
+    {
+        /* initialize matrices */
+        FILL(A, 3*ld*ld); // fill A, B and C
+        FILL(&alpha, 1);
+        FILL(&beta, 1);
 
-    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+        memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+        memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+    }
 
     /* run on impl */
     printf("Running implementation...\n");
@@ -100,12 +104,15 @@ main_gemm_gemm(char ** args)
         printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
     }
 
-    /* check correctness */
-    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
-    if (r == 0)
-        puts("Result is CORRECT");
-    else
-        puts("Result is INCORRECT !!");
+    if (!SKIP_CHECK)
+    {
+        /* check correctness */
+        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
+        if (r == 0)
+            puts("Result is CORRECT");
+        else
+            puts("Result is INCORRECT !!");
+    }
 
     return 0;
 }
@@ -134,7 +141,7 @@ main_gemm(char ** args)
     uintptr_t alignon = sizeof(TYPE) * ld;
 
     /* allocate matrices */
-    uintptr_t mem = (uintptr_t) malloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t mem    = impl.alloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
@@ -157,7 +164,6 @@ main_gemm(char ** args)
     FILL(A, 3*ld*ld); // fill A, B and C
     FILL(&alpha, 1);
     FILL(&beta, 1);
-
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
@@ -174,12 +180,15 @@ main_gemm(char ** args)
         printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
     }
 
-    /* check correctness */
-    int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
-    if (r == 0)
-        puts("Result is CORRECT");
-    else
-        puts("Result is INCORRECT !!");
+    if (!SKIP_CHECK)
+    {
+        /* check correctness */
+        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
+        if (r == 0)
+            puts("Result is CORRECT");
+        else
+            puts("Result is INCORRECT !!");
+    }
 
     return 0;
 }
@@ -207,7 +216,7 @@ main_trsm(char ** args)
     uintptr_t alignon = sizeof(TYPE) * ld;
 
     /* allocate matrices */
-    uintptr_t mem = (uintptr_t) malloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
+    uintptr_t mem    = impl.alloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
@@ -274,7 +283,7 @@ main_copyscale(char ** args)
     uintptr_t alignon = sizeof(TYPE) * ld;
 
     /* allocate matrices */
-    uintptr_t mem = (uintptr_t) malloc(alignon + 3 * sizeof(TYPE) * (ld * ld));
+    uintptr_t mem = impl.alloc(alignon + 3 * sizeof(TYPE) * (ld * ld));
     uintptr_t Dp  = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Lp  = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Up  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
@@ -502,6 +511,9 @@ error_usage(const char * label, func_t * func)
 int
 main(int argc, char ** argv)
 {
+    SKIP_CHECK = getenv("SKIP_CHECK") ? true : false;
+    printf("Check %s", SKIP_CHECK ? "disabled" : "enabled");
+
     if (argc >= 2)
     {
         int    nargs = argc - 1;
