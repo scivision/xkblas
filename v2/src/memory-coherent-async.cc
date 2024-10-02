@@ -131,11 +131,11 @@ static task_format_id_t TASK_FORMAT_COHERENT_ASYNC;
 // args for 'TASK_FORMAT_COHERENT_ASYNC'
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
-    Access::Region region;
+    Access::Cube cube;
 
     args_t(const Access & x, const Access & y)
     {
-        Access::Region::intersection(&region, x.region, y.region);
+        Access::Cube::intersection(&cube, x.cube, y.cube);
     }
 
     ~args_t() {}
@@ -161,7 +161,7 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(args);
 
     fetch_list_t list;
-    context->memtree.create_fetch_list_for_host(thread, args->region, &list);
+    context->memtree.create_fetch_list_for_host(thread, args->cube, &list);
 
     // the size of the list should be one at that stage
     assert(list.fetches && list.fetches->next == NULL);
@@ -274,7 +274,7 @@ xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 //      - create one successor Yi task per conflicting tasks Xi - to be executed on the helper thread
 //      - when Xi complete, it makes Yi ready
 //      - When Yi executes,
-//          - it find all fetches to do (i.e. which region on which device) - there should be only one region on one device at that point
+//          - it find all fetches to do (i.e. which cube on which device) - there should be only one cube on one device at that point
 //          - it creates a task Zi pushed into the device's thread queue
 //      - Zi is scheduled on the device thread queue, and will launch the asynchronous fetch
 //          - Yi completion is deferred to Zi completion

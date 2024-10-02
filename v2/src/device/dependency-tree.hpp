@@ -5,7 +5,7 @@
 
 # define KINTERVAL_BTREE_CUT
 # define KINTERVAL_BTREE_REBALANCE
-# include "sync/kinterval-btree.hpp"
+# include "sync/cube-tree.hpp"
 # undef KINTERVAL_BTREE_CUT
 # undef KINTERVAL_BTREE_REBALANCE
 
@@ -86,7 +86,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 
     using Base          = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
     using Node          = KDependencyTreeNode<K>;
-    using Region        = Intervals<K>;
+    using Hypercube        = KHypercube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using TaskAccess    = KTaskAccess<K>;
 
@@ -104,7 +104,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
     public:
 
         KDependencyTreeNode<K>(
-            const Region & r,
+            const Hypercube & r,
             const int k,
             const Color color
         ) :
@@ -116,7 +116,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 
         /* a new node from a split, inherit 'src' accesses */
         KDependencyTreeNode<K>(
-            const Region & r,
+            const Hypercube & r,
             const int k,
             const Color color,
             const Node * inherit
@@ -170,18 +170,18 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
         inline bool
         intersect_stop_test(
             Search & search,
-            const Region & region,
+            const Hypercube & cube,
             const access_mode_t mode
         ) const {
             (void) search;
-            (void) region;
+            (void) cube;
             return (mode == ACCESS_MODE_R && this->nwrites == 0);
         }
 
         inline void
         on_intersect(
             Search & search,
-            const Region & region,
+            const Hypercube & cube,
             const access_mode_t mode
         ) {
             switch (search.type)
@@ -245,9 +245,9 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
         }
 
         void
-        dump_region_str(FILE * f) const
+        dump_cube_str(FILE * f) const
         {
-            KIntervalBtree<K, KDependencyTreeSearch<K>>::Node::dump_region_str(f);
+            KIntervalBtree<K, KDependencyTreeSearch<K>>::Node::dump_cube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -264,7 +264,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
     using Base          = KIntervalBtree<K, KDependencyTreeSearch<K>>;
     using Node          = KDependencyTreeNode<K>;
     using NodeBase      = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
-    using Region        = Intervals<K>;
+    using Hypercube        = KHypercube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
@@ -291,7 +291,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
                     const Access * access = task->accesses + access_id;
                     assert(access);
 
-                    this->intersect(search, access->region, access->mode);
+                    this->intersect(search, access->cube, access->mode);
                 }
 
                 // insert for future tasks
@@ -302,7 +302,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
                     const Access * access = task->accesses + access_id;
                     assert(access);
 
-                    this->insert(search, access->region, access->mode);
+                    this->insert(search, access->cube, access->mode);
                 }
             }
         }
@@ -314,7 +314,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
         ) {
             Search search;
             search.prepare_conflicting(conflicts, access);
-            this->intersect(search, access->region, access->mode);
+            this->intersect(search, access->cube, access->mode);
         }
 
         //////////////
@@ -324,24 +324,24 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
         Node *
         new_node(
             Search & search,
-            const Region & region,
+            const Hypercube & cube,
             const int k,
             const Color color
         ) const {
             (void) search;
-            return new Node(region, k, color);
+            return new Node(cube, k, color);
         }
 
         Node *
         new_node(
             Search & search,
-            const Region & region,
+            const Hypercube & cube,
             const int k,
             const Color color,
             const NodeBase * inherit
         ) const {
             (void) search;
-            return new Node(region, k, color, reinterpret_cast<const Node *>(inherit));
+            return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };
 

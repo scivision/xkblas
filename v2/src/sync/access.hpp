@@ -2,32 +2,32 @@
 # define __ACCESS_HPP__
 
 # include "access-mode.h"
-# include "intervals.hpp"
+# include "cube.hpp"
 # include "matrix-tile.h"
 
 template<int K>
 class access_t
 {
     public:
-        using Region = Intervals<K>;
+        using Hypercube = KHypercube<K>;
 
     public:
-        Region region;
+        Hypercube cube;
         access_mode_t mode;
 
     public:
         access_t() :
-            region(),
+            cube(),
             mode(ACCESS_MODE_VOID)
         {}
 
         access_t(const access_t & access) :
-            region(access.region),
+            cube(access.cube),
             mode(access.mode)
         {}
 
-        access_t(const access_mode_t m, const Intervals<K> & r) :
-            region(r),
+        access_t(const access_mode_t m, const KHypercube<K> & r) :
+            cube(r),
             mode(m)
         {}
 
@@ -35,7 +35,7 @@ class access_t
             const matrix_tile_t & t,
             const access_mode_t & m
         ) :
-            region(t),
+            cube(t),
             mode(m)
         {}
 

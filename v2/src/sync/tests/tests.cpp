@@ -73,7 +73,7 @@ insert(
     access_mode_t mode,
     Interval intervals[K]
 ) {
-    Intervals<K> region(intervals);
+    KCube<K> region(intervals);
 //    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "rw" : mode == ACCESS_MODE_R ? "r" : mode == ACCESS_MODE_W ? "w" :  "unk") << " " << region << std::endl;
     KTask<K> * task = task_new<K>();
     tree.intersect(task, region, mode);
@@ -108,7 +108,7 @@ disjoint_hyperplans(KDependencyTree<K> & tree, int n)
     }
 }
 
-//Generate 'n' hypercubes that includes all dimensions but one
+//Generate 'n' cubes that includes all dimensions but one
 template<int K>
 void
 pyramid(KDependencyTree<K> & tree, int n)
@@ -133,7 +133,7 @@ pyramid(KDependencyTree<K> & tree, int n)
     }
 }
 
-//Generate 'n' hypercubes that are included on all dimensions but one
+//Generate 'n' cubes that are included on all dimensions but one
 template<int K>
 void
 pyramid_inverted(KDependencyTree<K> & tree, int n)
@@ -158,7 +158,7 @@ pyramid_inverted(KDependencyTree<K> & tree, int n)
     }
 }
 
-// Generate 'n' hypercubes that are successively included into previous ones
+// Generate 'n' cubes that are successively included into previous ones
 template<int K>
 static void
 squares_included(KDependencyTree<K> & tree, int n)
@@ -287,7 +287,7 @@ static void launch_tests(KDependencyTree<K> & tree)
     int nedges = get_nedges<K>();
     printf("Took %lf s.\n", dt);
     printf("    Inserted %d regions and %d elements\n", ntasks, nelements);
-    printf("        Intervals/s. = %.2lf\n", ntasks / dt);
+    printf("        KCube/s. = %.2lf\n", ntasks / dt);
     printf("         Elements/s. = %.2lf\n", nelements / dt);
     printf("     Inserted %d tasks\n", ntasks);
     printf("        Tasks/s. = %.2lf\n", ntasks / dt);

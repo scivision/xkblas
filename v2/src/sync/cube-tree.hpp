@@ -2,11 +2,11 @@
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
 //  - check loop unrolling
 
-#ifndef __KINTERVAL_BTREE_H__
-# define __KINTERVAL_BTREE_H__
+#ifndef __HYPERCUBE_TREE_H__
+# define __HYPERCUBE_TREE_H__
 
-# if defined(KINTERVAL_BTREE_REBALANCE) && !defined(KINTERVAL_BTREE_CUT)
-#  error "Defining 'KINTERVAL_BTREE_REBALANCE' but not 'KINTERVAL_BTREE_CUT' has no effects"
+# if defined(HYPERCUBE_TREE_REBALANCE) && !defined(HYPERCUBE_TREE_CUT)
+#  error "Defining 'HYPERCUBE_TREE_REBALANCE' but not 'HYPERCUBE_TREE_CUT' has no effects"
 # endif
 
 // tree assert, must be called within a member function
@@ -18,7 +18,7 @@
     do {                                                                        \
         if (!(expr))                                                            \
         {                                                                       \
-            this->export_pdf("kinterval");                                      \
+            this->export_pdf("cube");                                      \
             fprintf(stdout, "%s:%d: assertion `" #expr "` failed in `%s`\n",    \
                    __FILE__,__LINE__,__func__);                                 \
             abort();                                                            \
@@ -27,9 +27,9 @@
 # endif /* NDEBUG */
 
 // coherency checks
-# undef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
-# ifndef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
-#  pragma message("Define `KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS` for max performance")
+# undef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
+# ifndef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
+#  pragma message("Define `HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS` for max performance")
 # endif
 
 # include <cassert>
@@ -49,7 +49,7 @@ using namespace std::placeholders;
 
 # ifndef MIN
 #  define MIN(X, Y) ((Y) < (X) ? (Y) : (X))
-# endif /* MINode */
+# endif /* MIN */
 
 # ifndef MAX
 #  define MAX(X, Y) ((X) < (Y) ? (Y) : (X))
@@ -112,7 +112,7 @@ do {                                                                    \
 template<int K, typename T>
 class KIntervalBtree {
 
-    using Region = Intervals<K>;
+    using Hypercube = KHypercube<K>;
 
     public:
 
@@ -136,8 +136,8 @@ class KIntervalBtree {
                 /* node's color in each subtree */
                 Color colors[K];
 
-                /* the region represented by this node */
-                Region region;
+                /* the cube represented by this node */
+                Hypercube cube;
 
                 /* the dimension represented by this node */
                 int k;
@@ -146,7 +146,7 @@ class KIntervalBtree {
                 subtree_t st[K];
 
                 struct {
-                    Region region;    // subtree englobing region
+                    Hypercube cube;    // subtree englobing cube
                     int nelements[K];       // subtree number of elements
                     int height[K];          // subtree height
                     int outdated;           // whether 'includes' struct must be recomputed
@@ -166,18 +166,18 @@ class KIntervalBtree {
                 {}
 
                 Node(
-                    const Region & r,
+                    const Hypercube & r,
                     const int k,
                     const Color color
                 ) :
                     parent(nullptr),
                     colors{BLACK},
-                    region(r),
+                    cube(r),
                     k(k)
                 {
                     memset(this->st, 0, sizeof(this->st));
 
-                    this->includes.region.copy(r);
+                    this->includes.cube.copy(r);
                     this->includes.outdated = 0;
 
                     memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
@@ -197,17 +197,17 @@ class KIntervalBtree {
                 /////////////////////////
 
                 /* called whenever this node is added to the tree with an
-                 * access (this->region, mode) */
+                 * access (this->cube, mode) */
                 virtual void on_insert(T & t, const access_mode_t mode) = 0;
 
                 /* called whenever this node is being shrinked on dimension 'k' to 'interval' */
                 virtual void on_shrink(const Interval & interval, int k) = 0;
 
                 /* called to detect whether the access intersects with 'this' node */
-                virtual bool intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const = 0;
+                virtual bool intersect_stop_test(T & t, const Hypercube & cube, const access_mode_t mode) const = 0;
 
                 /* called whenever 'this' intersects with the access */
-                virtual void on_intersect(T & t, const Region & region, const access_mode_t mode) = 0;
+                virtual void on_intersect(T & t, const Hypercube & cube, const access_mode_t mode) = 0;
 
                 ///////////////
                 // Utilities //
@@ -259,19 +259,19 @@ class KIntervalBtree {
                 {
                     for (int k = 0 ; k < K ; ++k)
                     {
-                        this->includes.region[k].a = this->region[k].a;
-                        this->includes.region[k].b = this->region[k].b;
+                        this->includes.cube[k].a = this->cube[k].a;
+                        this->includes.cube[k].b = this->cube[k].b;
 
                         FOREACH_CHILD_BEGIN(this, child, kk, dir)
                         {
-                            this->includes.region[k].a = MIN(
-                                 this->includes.region[k].a,
-                                child->includes.region[k].a
+                            this->includes.cube[k].a = MIN(
+                                 this->includes.cube[k].a,
+                                child->includes.cube[k].a
                             );
 
-                            this->includes.region[k].b = MAX(
-                                 this->includes.region[k].b,
-                                child->includes.region[k].b
+                            this->includes.cube[k].b = MAX(
+                                 this->includes.cube[k].b,
+                                child->includes.cube[k].b
                             );
                         }
                         FOREACH_CHILD_END(this, child, kk, dir);
@@ -335,16 +335,16 @@ class KIntervalBtree {
                 virtual void
                 dump_str(FILE * f) const
                 {
-                    char region[1024];
-                    this->region.tostring(region, sizeof(region));
+                    char cube[1024];
+                    this->cube.tostring(cube, sizeof(cube));
 
-                    char include_region[1024];
-                    this->includes.region.tostring(include_region, sizeof(include_region));
+                    char include_cube[1024];
+                    this->includes.cube.tostring(include_cube, sizeof(include_cube));
 
                     fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d",
                             this->k,
-                            region,
-                            include_region,
+                            cube,
+                            include_cube,
                             this->size(),
                             this->includes.nelements[0],
                             this->includes.nelements[1],
@@ -353,40 +353,40 @@ class KIntervalBtree {
                 }
 
                 void
-                dump_region(FILE * f) const
+                dump_cube(FILE * f) const
                 {
                     assert(K == 1 || K == 2);
                     if (K == 1)
                     {
                         fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[};\n",
-                                this->region[0].a, 0,
-                                this->region[0].b, 2,
-                                this->region[0].a, this->region[0].b
+                                this->cube[0].a, 0,
+                                this->cube[0].b, 2,
+                                this->cube[0].a, this->cube[0].b
                         );
                     }
                     else if (K == 2)
                     {
                         fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {",
-                            this->region[1].a, this->region[0].a,
-                            this->region[1].b, this->region[0].b
+                            this->cube[1].a, this->cube[0].a,
+                            this->cube[1].b, this->cube[0].b
                         );
-                        this->dump_region_str(f);
+                        this->dump_cube_str(f);
                         fprintf(f, "};\n");
                     }
 
                     FOREACH_CHILD_BEGIN(this, child, k, dir)
                     {
-                        child->dump_region(f);
+                        child->dump_cube(f);
                     }
                     FOREACH_CHILD_END(this, child, k, dir);
                 }
 
                 virtual void
-                dump_region_str(FILE * f) const
+                dump_cube_str(FILE * f) const
                 {
                     fprintf(f, "[%d..%d[ x [%d..%d[",
-                        this->region[0].a, this->region[0].b,
-                        this->region[1].a, this->region[1].b
+                        this->cube[0].a, this->cube[0].b,
+                        this->cube[1].a, this->cube[1].b
                     );
                 }
 
@@ -413,20 +413,20 @@ class KIntervalBtree {
                 }
 
                 bool
-                intersect_stop_test(T & t, const Region & region, const access_mode_t mode) const
+                intersect_stop_test(T & t, const Hypercube & cube, const access_mode_t mode) const
                 {
                     (void) t;
-                    (void) region;
+                    (void) cube;
                     (void) mode;
                     assert(0);
                     return true;
                 }
 
                 void
-                on_intersect(T & t, const Region & region, const access_mode_t mode)
+                on_intersect(T & t, const Hypercube & cube, const access_mode_t mode)
                 {
                     (void) t;
-                    (void) region;
+                    (void) cube;
                     (void) mode;
                     assert(0);
                 }
@@ -441,10 +441,10 @@ class KIntervalBtree {
 
     private:
 
-# ifdef KINTERVAL_BTREE_CUT
+# ifdef HYPERCUBE_TREE_CUT
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
-# endif /* KINTERVAL_BTREE_CUT */
+# endif /* HYPERCUBE_TREE_CUT */
 
         /* Buffer of nodes inserted by an insert() call */
         std::vector<Node *> outdated;
@@ -452,9 +452,9 @@ class KIntervalBtree {
     public:
         KIntervalBtree() :
             root(nullptr),
-# ifdef KINTERVAL_BTREE_CUT
+# ifdef HYPERCUBE_TREE_CUT
             limbs(),
-# endif /* KINTERVAL_BTREE_CUT */
+# endif /* HYPERCUBE_TREE_CUT */
             outdated() {}
 
         inline void
@@ -472,7 +472,7 @@ class KIntervalBtree {
             delete node;
         }
 
-# ifdef KINTERVAL_BTREE_CUT
+# ifdef HYPERCUBE_TREE_CUT
         inline void
         cut(Node * parent, int k, int dir)
         {
@@ -494,12 +494,12 @@ class KIntervalBtree {
             this->garbage_collector_run();
         }
 
-# else /* KINTERVAL_BTREE_CUT */
+# else /* HYPERCUBE_TREE_CUT */
         virtual ~KIntervalBtree()
         {
             subtree_delete(this->root);
         }
-# endif /* KINTERVAL_BTREE_CUT */
+# endif /* HYPERCUBE_TREE_CUT */
 
         ///////////
         // UTILS //
@@ -567,13 +567,13 @@ class KIntervalBtree {
             if (r)
                 fprintf(stderr, "dot failed\n");
 
-            snprintf(filename, sizeof(filename), "%s-region.tex", label);
+            snprintf(filename, sizeof(filename), "%s-cube.tex", label);
             file = fopen(filename, "w");
-            this->dump_region(file);
+            this->dump_cube(file);
             fclose(file);
 
             snprintf(filename, sizeof(filename),
-                    "pdflatex -interaction=nonstopmode %s-region.tex > /dev/null 2>&1",
+                    "pdflatex -interaction=nonstopmode %s-cube.tex > /dev/null 2>&1",
                     label
             );
             r = system(filename);
@@ -587,23 +587,23 @@ class KIntervalBtree {
         inline void
         intersect_from(
             T & t,
-            const Region & region,
+            const Hypercube & cube,
             const access_mode_t mode,
             Node * node
         ) const {
 
-            if (node == nullptr || !region.intersects(node->includes.region))
+            if (node == nullptr || !cube.intersects(node->includes.cube))
                 return ;
 
-            if (node->intersect_stop_test(t, region, mode))
+            if (node->intersect_stop_test(t, cube, mode))
                 return ;
 
-            if (region.intersects(node->region))
-                node->on_intersect(t, region, mode);
+            if (cube.intersects(node->cube))
+                node->on_intersect(t, cube, mode);
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
-                this->intersect_from(t, region, mode, child);
+                this->intersect_from(t, cube, mode, child);
             }
             FOREACH_CHILD_END(node, child, k, dir);
         }
@@ -611,10 +611,10 @@ class KIntervalBtree {
         inline void
         intersect(
             T & t,
-            const Region & region,
+            const Hypercube & cube,
             const access_mode_t mode
         ) const {
-            this->intersect_from(t, region, mode, this->root);
+            this->intersect_from(t, cube, mode, this->root);
         }
 
 
@@ -821,7 +821,7 @@ class KIntervalBtree {
         inline void
         insert_fixup(
             T & t,
-            Region region,
+            Hypercube cube,
             const access_mode_t mode,
             Node * parent,
             int k,
@@ -830,9 +830,9 @@ class KIntervalBtree {
         ) {
             Node * node;
             if (inherit)
-                node = this->new_node(t, region, k, RED, inherit);
+                node = this->new_node(t, cube, k, RED, inherit);
             else
-                node = this->new_node(t, region, k, RED);
+                node = this->new_node(t, cube, k, RED);
             tassert(node);
 
             parent->st[k].children[dir] = node;
@@ -852,7 +852,7 @@ class KIntervalBtree {
             }
         }
 
-# ifdef KINTERVAL_BTREE_REBALANCE
+# ifdef HYPERCUBE_TREE_REBALANCE
         static inline void
         compress(Node * root, int k, int m)
         {
@@ -948,7 +948,7 @@ class KIntervalBtree {
             rebalance_fixup(nullptr, new_root, k, 0, height);
 
 # ifndef NDEBUG
-            this->coherency(root->includes.region);
+            this->coherency(root->includes.cube);
 # endif /* NDEBUG */
         }
 
@@ -1004,13 +1004,13 @@ class KIntervalBtree {
             return this->root && requires_rebalance(this->root);
         }
 
-# endif /* KINTERVAL_BTREE_REBALANCE */
+# endif /* HYPERCUBE_TREE_REBALANCE */
 
-        /* called to create a new node with a region that never appeared before. */
+        /* called to create a new node with a cube that never appeared before. */
         virtual Node *
         new_node(
             T & t,
-            const Region & region,
+            const Hypercube & cube,
             const int k,
             const Color color
         ) const = 0;
@@ -1020,35 +1020,35 @@ class KIntervalBtree {
         virtual Node *
         new_node(
             T & t,
-            const Region & region,
+            const Hypercube & cube,
             const int k,
             const Color color,
             const Node * inherit
         ) const = 0;
 
         void
-        post_insert(const Region & region)
+        post_insert(const Hypercube & cube)
         {
             this->update();
 
-# ifdef KINTERVAL_BTREE_REBALANCE
+# ifdef HYPERCUBE_TREE_REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
                 this->rebalance();
-# else /* KINTERVAL_BTREE_REBALANCE */
-#  pragma message("Automatic rebalance disabled. Enable it with '-DKINTERVAL_BTREE_REBALANCE'")
-# endif /* KINTERVAL_BTREE_REBALANCE */
+# else /* HYPERCUBE_TREE_REBALANCE */
+#  pragma message("Automatic rebalance disabled. Enable it with '-DHYPERCUBE_TREE_REBALANCE'")
+# endif /* HYPERCUBE_TREE_REBALANCE */
 
 # ifndef NDEBUG
-            this->coherency(region);
+            this->coherency(cube);
 # endif /* NDEBUG */
         }
 
-# ifdef KINTERVAL_BTREE_CUT
+# ifdef HYPERCUBE_TREE_CUT
         inline void
         insert_from_cut(
             T & t,
-            const Region & region,
+            const Hypercube & cube,
             const access_mode_t mode,
             Node * parent
         ) {
@@ -1060,17 +1060,17 @@ class KIntervalBtree {
             }
             FOREACH_CHILD_END(parent, child, k, dir);
 
-            parent->region.copy(region);
+            parent->cube.copy(cube);
             parent->on_insert(t, mode);
 
             this->outdate(parent);
         }
-# endif /* KINTERVAL_BTREE_CUT */
+# endif /* HYPERCUBE_TREE_CUT */
 
         inline void
         insert_from(
             T & t,
-            Region & region,
+            Hypercube & cube,
             const access_mode_t mode,
             Node * parent,
             int k,
@@ -1079,53 +1079,53 @@ class KIntervalBtree {
 
             while (k < K)
             {
-# ifdef KINTERVAL_BTREE_CUT
+# ifdef HYPERCUBE_TREE_CUT
 #  pragma message("Tree cut enable")
-                // quick-way out, if the region includes all subregion with an
+                // quick-way out, if the cube includes all subcube with an
                 // 'out' access, we can discard all children
                 if (mode & ACCESS_MODE_W)
                 {
                     // the includes test is accelerated as we know we are
                     // already matching dimensions <k
-                    if (region.includes(parent->includes.region, k))
+                    if (cube.includes(parent->includes.cube, k))
                     {
                         // TODO : what if 'node' is not null ?  probably want to
                         // return something to callee for the case (3)
-                        this->insert_from_cut(t, region, mode, parent);
+                        this->insert_from_cut(t, cube, mode, parent);
                         break ;
                     }
                 }
 # else
-#  pragma message("Tree cut disabled. Enable it using '-DKINTERVAL_BTREE_CUT'")
-# endif /* KINTERVAL_BTREE_CUT */
+#  pragma message("Tree cut disabled. Enable it using '-DHYPERCUBE_TREE_CUT'")
+# endif /* HYPERCUBE_TREE_CUT */
 
                 // case (1)    J << I
-                if (region[k].b <= parent->region[k].a)
+                if (cube[k].b <= parent->cube[k].a)
                 {
                     if (parent->st[k].left == nullptr)
                     {
-                        this->insert_fixup(t, region, mode, parent, k, LEFT, inherit);
+                        this->insert_fixup(t, cube, mode, parent, k, LEFT, inherit);
                         break ;
                     }
                     else
                         parent = parent->get_child(k, LEFT);
                 }
                 // case (2)     J >> I
-                else if (region[k].a >= parent->region[k].b)
+                else if (cube[k].a >= parent->cube[k].b)
                 {
                     if (parent->st[k].right == nullptr)
                     {
-                        this->insert_fixup(t, region, mode, parent, k, RIGHT, inherit);
+                        this->insert_fixup(t, cube, mode, parent, k, RIGHT, inherit);
                         break ;
                     }
                     else
                         parent = parent->get_child(k, RIGHT);
                 }
                 // case (3)     J c I   (or I == J)
-                else if (parent->region[k].a <= region[k].a && region[k].b <= parent->region[k].b)
+                else if (parent->cube[k].a <= cube[k].a && cube[k].b <= parent->cube[k].b)
                 {
                     // I == J
-                    if (region[k].a == parent->region[k].a && region[k].b == parent->region[k].b)
+                    if (cube[k].a == parent->cube[k].a && cube[k].b == parent->cube[k].b)
                     {
                         if (++k == K)
                         {
@@ -1139,42 +1139,42 @@ class KIntervalBtree {
                     {
                         assert(K == 1 || K == 2);
 
-                        class ReinsertRegion {
+                        class ReinsertHypercube {
                             public:
-                                Region region;
+                                Hypercube cube;
                                 Node * inherit;
                             public:
-                                ReinsertRegion(const Region & r, const Interval & interval, int k, Node * i) :
-                                    region(r),
+                                ReinsertHypercube(const Hypercube & r, const Interval & interval, int k, Node * i) :
+                                    cube(r),
                                     inherit(i)
                                 {
-                                    region[k] = interval;
-                                    inherit = region.intersects(i->region) ? i : nullptr;
+                                    cube[k] = interval;
+                                    inherit = cube.intersects(i->cube) ? i : nullptr;
                                 }
 
-                                ~ReinsertRegion() {}
+                                ~ReinsertHypercube() {}
                         };
 
-                        std::vector<ReinsertRegion> to_reinsert;
+                        std::vector<ReinsertHypercube> to_reinsert;
                         const Interval intervals[] = {
-                            Interval(parent->region[k].a,         region[k].a),
-                            Interval(        region[k].a,         region[k].b),
-                            Interval(        region[k].b, parent->region[k].b)
+                            Interval(parent->cube[k].a,         cube[k].a),
+                            Interval(        cube[k].a,         cube[k].b),
+                            Interval(        cube[k].b, parent->cube[k].b)
                         };
 
                         std::function<void(Node *)> f = [&f, &inherit, &intervals, &k, &to_reinsert](Node * node)
                         {
-                            assert(node->region[k].includes(intervals[1]));
+                            assert(node->cube[k].includes(intervals[1]));
 
                             // reinsert sides
                             if (!intervals[0].is_empty())
-                                to_reinsert.push_back(ReinsertRegion(node->region, intervals[0], k, node));
+                                to_reinsert.push_back(ReinsertHypercube(node->cube, intervals[0], k, node));
                             if (!intervals[2].is_empty())
-                                to_reinsert.push_back(ReinsertRegion(node->region, intervals[2], k, node));
+                                to_reinsert.push_back(ReinsertHypercube(node->cube, intervals[2], k, node));
 
                             // shrink node
                             node->on_shrink(intervals[1], k);
-                            node->region[k] = intervals[1];
+                            node->cube[k] = intervals[1];
 
                             // shrink all child
                             for (int kk = k+1; kk < K ; ++kk)
@@ -1190,10 +1190,10 @@ class KIntervalBtree {
                         f(parent);
 
                         assert(inherit == nullptr);
-                        for (ReinsertRegion & rr : to_reinsert)
-                            this->insert_from(t, rr.region, ACCESS_MODE_VOID, this->root, 0, rr.inherit);
+                        for (ReinsertHypercube & rr : to_reinsert)
+                            this->insert_from(t, rr.cube, ACCESS_MODE_VOID, this->root, 0, rr.inherit);
 
-                        return this->insert_from(t, region, mode, this->root, 0, nullptr);
+                        return this->insert_from(t, cube, mode, this->root, 0, nullptr);
 
                     } /* I == J ||  J c I */
                 }
@@ -1207,32 +1207,32 @@ class KIntervalBtree {
                     //
                     //  [           J           ]
                     //          [           I             ]
-                    const int a = region[k].a;
-                    const int b = region[k].b;
+                    const int a = cube[k].a;
+                    const int b = cube[k].b;
 
                     // (1)
-                    if (region[k].a < parent->region[k].a)
+                    if (cube[k].a < parent->cube[k].a)
                     {
-                        region[k].b = parent->region[k].a;
-                        this->insert_from(t, region, mode, this->root, 0, inherit);
-                        region[k].b = b;
+                        cube[k].b = parent->cube[k].a;
+                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        cube[k].b = b;
                     }
 
                     // (2)
-                    if (parent->region[k].b < region[k].b)
+                    if (parent->cube[k].b < cube[k].b)
                     {
-                        region[k].a = parent->region[k].b;
-                        this->insert_from(t, region, mode, this->root, 0, inherit);
-                        region[k].a = a;
+                        cube[k].a = parent->cube[k].b;
+                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        cube[k].a = a;
                     }
 
                     // (3)
                     {
-                        region[k].a = MAX(a, parent->region[k].a);
-                        region[k].b = MIN(b, parent->region[k].b);
-                        this->insert_from(t, region, mode, this->root, 0, inherit);
-                        region[k].a = a;
-                        region[k].b = b;
+                        cube[k].a = MAX(a, parent->cube[k].a);
+                        cube[k].b = MIN(b, parent->cube[k].b);
+                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        cube[k].a = a;
+                        cube[k].b = b;
                     }
 
                     break ;
@@ -1240,27 +1240,27 @@ class KIntervalBtree {
             }
         }
 
-        /* TODO: determine where to use a reference on 'region' */
+        /* TODO: determine where to use a reference on 'cube' */
         inline void
         insert(
             T & t,
-            Region region,
+            Hypercube cube,
             const access_mode_t mode
         ) {
-            tassert(!region.is_empty());
+            tassert(!cube.is_empty());
 
             if (this->root == nullptr)
             {
-                this->root = this->new_node(t, region, 0, BLACK);
+                this->root = this->new_node(t, cube, 0, BLACK);
                 this->root->on_insert(t, mode);
                 this->root->update_includes();
             }
             else
             {
-                this->insert_from(t, region, mode, this->root, 0, nullptr);
+                this->insert_from(t, cube, mode, this->root, 0, nullptr);
             }
 
-            this->post_insert(region);
+            this->post_insert(cube);
         }
 
         // Dump the tree to the given file
@@ -1273,9 +1273,9 @@ class KIntervalBtree {
             fprintf(f, "}\n");
         }
 
-        // Dump represented region to the given file
+        // Dump represented cube to the given file
         void
-        dump_region(FILE * f) const
+        dump_cube(FILE * f) const
         {
             fprintf(f, "\\documentclass[crop,tikz]{standalone}\n");
             fprintf(f, "\\usetikzlibrary{shapes.multipart}\n");
@@ -1285,7 +1285,7 @@ class KIntervalBtree {
             if constexpr (K == 1 || K == 2)
             {
                 if (this->root)
-                    this->root->dump_region(f);
+                    this->root->dump_cube(f);
             }
             else
             {
@@ -1347,46 +1347,46 @@ class KIntervalBtree {
         }
 
         void
-        coherency_region_includes_check(Node * ref, void * args) const
+        coherency_cube_includes_check(Node * ref, void * args) const
         {
             Node * root = (Node *) args;
-            tassert(root->includes.region.includes(ref->region));
+            tassert(root->includes.cube.includes(ref->cube));
         }
 
         void
-        coherency_region_includes_foreach(Node * node, void * args) const
+        coherency_cube_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_includes_check, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
-        coherency_region_includes(Node * root) const
+        coherency_cube_includes(Node * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
         void
-        coherency_region_disjoint_compare(Node * ref, void * args) const
+        coherency_cube_disjoint_compare(Node * ref, void * args) const
         {
             Node * node = (Node *) args;
-            tassert(node == ref || !node->region.intersects(ref->region));
+            tassert(node == ref || !node->cube.intersects(ref->cube));
         }
 
         void
-        coherency_region_disjoint_for(Node * node, void * args) const
+        coherency_cube_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
-        coherency_region_disjoint(Node * root) const
+        coherency_cube_disjoint(Node * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1412,7 +1412,7 @@ class KIntervalBtree {
         int
         coherency_black_height_k(Node * node, int k) const
         {
-#ifdef KINTERVAL_BTREE_CUT
+#ifdef HYPERCUBE_TREE_CUT
             // when cut is enabled, black_height is not guaranteed
             return 1;
 #endif
@@ -1478,7 +1478,7 @@ class KIntervalBtree {
             {
                 tassert(child->k == k);
                 tassert(node->k <= child->k);
-                tassert(k == 0 || node->region[k-1] == child->region[k-1]);
+                tassert(k == 0 || node->cube[k-1] == child->cube[k-1]);
                 coherency_k_hierarchy(child);
             }
             FOREACH_CHILD_END(node, child, k, dir);
@@ -1499,11 +1499,11 @@ class KIntervalBtree {
             // TODO : this fail
             // TODO : all new nodes for a new dimension should be black ?
 
-            /* 5. region must be disjoint (weak check) */
-            coherency_region_disjoint(root);
+            /* 5. cube must be disjoint (weak check) */
+            coherency_cube_disjoint(root);
 
-            /* 6. check includes region */
-            coherency_region_includes(root);
+            /* 6. check includes cube */
+            coherency_cube_includes(root);
 
             /* 7. includeness relationship between nodes dimension */
             coherency_k(root);
@@ -1516,25 +1516,25 @@ class KIntervalBtree {
         }
 
         void
-        coherency_region_represented_check(Node * node, void * args) const
+        coherency_cube_represented_check(Node * node, void * args) const
         {
-            const Region * region = (const Region *) args;
-            tassert(region->includes(node->region) || !region->intersects(node->region));
+            const Hypercube * cube = (const Hypercube *) args;
+            tassert(cube->includes(node->cube) || !cube->intersects(node->cube));
         }
 
         // TODO : this test is incomplete, should test that all nodes union
-        // also forms the region
+        // also forms the cube
         void
-        coherency_region_represented(Region region)
+        coherency_cube_represented(Hypercube cube)
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_region_represented_check, this, _1, _2);
-            foreach_node(this->root, f, &region);
+            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_represented_check, this, _1, _2);
+            foreach_node(this->root, f, &cube);
         }
 
         int
-        coherency(const Region & region)
+        coherency(const Hypercube & cube)
         {
-            # ifdef KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS
+            # ifdef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
             return 1;
             # endif
 
@@ -1547,8 +1547,8 @@ class KIntervalBtree {
                 /* per-node checks */
                 this->coherency_from(this->root);
 
-                /* ensure the region is represented in the tree */
-                this->coherency_region_represented(region);
+                /* ensure the cube is represented in the tree */
+                this->coherency_cube_represented(cube);
 
                 /* 7. check balance */
                 this->coherency_balance();
@@ -1561,4 +1561,4 @@ class KIntervalBtree {
 
 };
 
-#endif /* __KINTERVAL_BTREE_H__ */
+#endif /* __HYPERCUBE_TREE_H__ */
