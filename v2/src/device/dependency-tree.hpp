@@ -86,7 +86,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 
     using Base          = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
     using Node          = KDependencyTreeNode<K>;
-    using Hypercube        = KHypercube<K>;
+    using Cube        = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using TaskAccess    = KTaskAccess<K>;
 
@@ -104,7 +104,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
     public:
 
         KDependencyTreeNode<K>(
-            const Hypercube & r,
+            const Cube & r,
             const int k,
             const Color color
         ) :
@@ -116,7 +116,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 
         /* a new node from a split, inherit 'src' accesses */
         KDependencyTreeNode<K>(
-            const Hypercube & r,
+            const Cube & r,
             const int k,
             const Color color,
             const Node * inherit
@@ -146,7 +146,6 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 
             const Access * access = search.task_access.task->accesses + search.task_access.access_id;
             assert(access);
-            assert(access->mode == mode);
 
             if (access->mode & ACCESS_MODE_W)
             {
@@ -170,7 +169,7 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
         inline bool
         intersect_stop_test(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const access_mode_t mode
         ) const {
             (void) search;
@@ -181,9 +180,11 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
         inline void
         on_intersect(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const access_mode_t mode
         ) {
+            (void) cube;
+
             switch (search.type)
             {
                 case (Search::Type::SEARCH_TYPE_RESOLVE):
@@ -264,7 +265,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
     using Base          = KIntervalBtree<K, KDependencyTreeSearch<K>>;
     using Node          = KDependencyTreeNode<K>;
     using NodeBase      = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
-    using Hypercube        = KHypercube<K>;
+    using Cube        = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
@@ -324,7 +325,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
         Node *
         new_node(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const int k,
             const Color color
         ) const {
@@ -335,7 +336,7 @@ class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
         Node *
         new_node(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const int k,
             const Color color,
             const NodeBase * inherit
