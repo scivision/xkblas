@@ -1,5 +1,5 @@
 # include "demangle.hpp"
-# include "intervals.hpp"
+# include "cube.hpp"
 # include "dependency-tree.hpp"
 # include "task.hpp"
 
@@ -71,13 +71,17 @@ static void
 insert(
     KDependencyTree<K> & tree,
     access_mode_t mode,
-    Interval intervals[K]
+    Interval cube[K]
 ) {
-    KCube<K> region(intervals);
+    KCube<K> region(cube);
 //    std::cout << "inserting " << (mode == ACCESS_MODE_RW ? "rw" : mode == ACCESS_MODE_R ? "r" : mode == ACCESS_MODE_W ? "w" :  "unk") << " " << region << std::endl;
     KTask<K> * task = task_new<K>();
-    tree.intersect(task, region, mode);
-    tree.insert(task, region, mode);
+    KDependencyTreeSearch<K> search;
+    search.prepare_resolve(task, 0);
+    // task->accesses[0].cube = cube; 
+    task->accesses[0].mode = mode;
+    tree.intersect(search, region, mode);
+    tree.insert(search, region, mode);
     ++NINSERT;
 }
 
@@ -90,21 +94,21 @@ disjoint_hyperplans(KDependencyTree<K> & tree, int n)
 
     for (int i = 0 ; i < n ; ++i)
     {
-        Interval intervals[K];
+        Interval cube[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k != PLAN_DIM)
             {
-                intervals[k].a =   0;
-                intervals[k].b = n*8;
+                cube[k].a =   0;
+                cube[k].b = n*8;
             }
             else
             {
-                intervals[k].a = 4*(i+0);
-                intervals[k].b = 4*(i+1);
+                cube[k].a = 4*(i+0);
+                cube[k].b = 4*(i+1);
             }
         }
-        insert(tree, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, cube);
     }
 }
 
@@ -115,21 +119,21 @@ pyramid(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        Interval intervals[K];
+        Interval cube[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k < K - 1)
             {
-                intervals[k].a = n*8/2-4*(i+1);
-                intervals[k].b = n*8/2+4*(i+1);
+                cube[k].a = n*8/2-4*(i+1);
+                cube[k].b = n*8/2+4*(i+1);
             }
             else
             {
-                intervals[k].a = 4*(i+0);
-                intervals[k].b = 4*(i+1);
+                cube[k].a = 4*(i+0);
+                cube[k].b = 4*(i+1);
             }
         }
-        insert(tree, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, cube);
     }
 }
 
@@ -140,21 +144,21 @@ pyramid_inverted(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        Interval intervals[K];
+        Interval cube[K];
         for (int k = 0 ; k < K ; ++k)
         {
             if (k < K - 1)
             {
-                intervals[k].a = 0+4*i;
-                intervals[k].b = n*8-4*i;
+                cube[k].a = 0+4*i;
+                cube[k].b = n*8-4*i;
             }
             else
             {
-                intervals[k].a = 4*(i+0);
-                intervals[k].b = 4*(i+1);
+                cube[k].a = 4*(i+0);
+                cube[k].b = 4*(i+1);
             }
         }
-        insert(tree, ACCESS_MODE_RW, intervals);
+        insert(tree, ACCESS_MODE_RW, cube);
     }
 }
 
@@ -165,13 +169,13 @@ squares_included(KDependencyTree<K> & tree, int n)
 {
     for (int i = 0 ; i < n ; ++i)
     {
-        Interval intervals[K];
+        Interval cube[K];
         for (int k = 0 ; k < K ; ++k)
         {
-            intervals[k].a =     i*4;
-            intervals[k].b = n*8-i*4;
+            cube[k].a =     i*4;
+            cube[k].b = n*8-i*4;
         }
-        insert<K>(tree, ACCESS_MODE_RW, intervals);
+        insert<K>(tree, ACCESS_MODE_RW, cube);
     }
 }
 
@@ -193,13 +197,13 @@ template<int K, int P>
 static void
 matrix_tiles_insert(KDependencyTree<K> & tree, std::array<int, K> indices)
 {
-    Interval intervals[K];
+    Interval cube[K];
     for (int k = 0 ; k < K ; ++k)
     {
-        intervals[k].a = (indices[k]+0)*P;
-        intervals[k].b = (indices[k]+1)*P;
+        cube[k].a = (indices[k]+0)*P;
+        cube[k].b = (indices[k]+1)*P;
     }
-    insert(tree, ACCESS_MODE_RW, intervals);
+    insert(tree, ACCESS_MODE_RW, cube);
 }
 
 // Generate n^K tiles of size P
@@ -225,32 +229,32 @@ static void launch_tests(KDependencyTree<K> & tree)
         # if 1
         static_assert(K == 2);
 
-        Interval intervals[] = {
-            Interval(0,4), Interval(  4,  20),
-            Interval(0,3), Interval(  0,  10),
+        Interval cube[] = {
+            Interval(0,16), Interval(0,16),
+            Interval(8,24), Interval(8,24),
         };
 
         # if 0
-        int min = intervals[0].a;
-        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
+        int min = cube[0].a;
+        for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
         {
-            if (intervals[i].a < min)
-                min = intervals[0].a;
+            if (cube[i].a < min)
+                min = cube[0].a;
         }
 
-        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
+        for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
         {
-            intervals[i].a -= min;
-            intervals[i].b -= min;
-            intervals[i+1].a /= sizeof(float);
-            intervals[i+1].b /= sizeof(float);
+            cube[i].a -= min;
+            cube[i].b -= min;
+            cube[i+1].a /= sizeof(float);
+            cube[i+1].b /= sizeof(float);
         }
         # endif
 
 
-        for (unsigned int i = 0 ; i < sizeof(intervals) / sizeof(Interval) ; i += 2)
+        for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
         {
-            Interval x[K] = { intervals[i+0], intervals[i+1] };
+            Interval x[K] = { cube[i+0], cube[i+1] };
             insert<K>(tree, ACCESS_MODE_R, x);
         }
 

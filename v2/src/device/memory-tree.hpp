@@ -124,7 +124,7 @@ class MemoryReplicate
 template <int K>
 class KMemoryBlock {
 
-    using Hypercube = KHypercube<K>;
+    using Cube = KCube<K>;
 
     public:
 
@@ -148,16 +148,16 @@ class KMemoryBlock {
 
         void
         memory_block_init(
-            const Hypercube & block_cube,
+            const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Hypercube & inheriting_cube,
+            const Cube & inheriting_cube,
             const int k
         ) {
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
             /////////////////////////////////
             int d[K];
-            Hypercube::distance_manhattan(inheriting_cube, block_cube, d);
+            Cube::distance_manhattan(inheriting_cube, block_cube, d);
 
             assert(inheriting_block.host_view.order == MATRIX_COLMAJOR);
             const int sizeof_type = inheriting_block.host_view.sizeof_type;
@@ -215,9 +215,9 @@ class KMemoryBlock {
 
         /* a block from splitting an existing one */
         KMemoryBlock(
-            const Hypercube & block_cube,
+            const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Hypercube & inheriting_cube,
+            const Cube & inheriting_cube,
             const int k
         ) {
             static_assert(K == 2);
@@ -233,7 +233,7 @@ class KMemoryTreeNodeSearch {
 
     using Access = KMemoryAccess<K>;
     using MemoryBlock = KMemoryBlock<K>;
-    using Hypercube = KHypercube<K>;
+    using Cube = KCube<K>;
 
     public:
     class Partite {
@@ -244,7 +244,7 @@ class KMemoryTreeNodeSearch {
             MemoryBlock * block;
 
             /* The cube of this block (intersectoin of the access with the tree node) */
-            Hypercube cube;
+            Cube cube;
 
             /* copy of the host view */
             memory_view_t host_view;
@@ -275,7 +275,7 @@ class KMemoryTreeNodeSearch {
 
         public:
 
-            Partite(MemoryBlock * b, Hypercube & r) :
+            Partite(MemoryBlock * b, Cube & r) :
                 block(b),
                 cube(r),
                 host_view(b->host_view),
@@ -400,7 +400,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
     using MemoryBlock = KMemoryBlock<K>;
     using Node = KMemoryTreeNode<K>;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
-    using Hypercube = KHypercube<K>;
+    using Cube = KCube<K>;
     using Search = KMemoryTreeNodeSearch<K>;
 
     public:
@@ -413,7 +413,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         /* the cube was never accessed before, create a new node */
         KMemoryTreeNode<K>(
             const Access * access,
-            const Hypercube & r,
+            const Cube & r,
             const int k,
             const Color color
         ) :
@@ -435,7 +435,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
          */
         KMemoryTreeNode<K>(
             const Access * access,
-            const Hypercube & r,
+            const Cube & r,
             const int k,
             const Color color,
             const Node * src
@@ -523,7 +523,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         inline bool
         intersect_stop_test(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const access_mode_t mode
         ) const {
             (void) search;
@@ -541,7 +541,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         inline void
         on_intersect(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const access_mode_t mode
         ) {
             /* intersecting against 'cube' that had been inserted previously,
@@ -614,7 +614,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         void
         dump_cube_str(FILE * f) const
         {
-            // KIntervalBtree<K, DeviceInvalidHypercubes>::Node::dump_cube_str(f);
+            // KIntervalBtree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
@@ -641,7 +641,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
     using Node = KMemoryTreeNode<K>;
     using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
-    using Hypercube = KHypercube<K>;
+    using Cube = KCube<K>;
     using Search = KMemoryTreeNodeSearch<K>;
     using Task = KTask<K>;
 
@@ -659,7 +659,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             xkblas_device_t * device;
 
             /* logical cube */
-            Hypercube cube;
+            Cube cube;
 
             /* mark 'fetched' all the tasks awaiting on that allocation */
             uintptr_t allocation;
@@ -818,7 +818,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         void
         create_fetch_list_for_host(
             ThreadWorker * thread,
-            const Hypercube & cube,
+            const Cube & cube,
             fetch_list_t * list
         ) {
             assert(thread);
@@ -934,7 +934,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             {
                 /* compute distance from corner */
                 int d[K];
-                Hypercube::distance_manhattan(corner.cube, partite.cube, d);
+                Cube::distance_manhattan(corner.cube, partite.cube, d);
 
                 // TODO : the allocation is assumed col major, cuda
                 static_assert(K == 2);
@@ -1357,7 +1357,7 @@ next_view:
         Node *
         new_node(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const int k,
             const Color color
         ) const {
@@ -1368,7 +1368,7 @@ next_view:
         Node *
         new_node(
             Search & search,
-            const Hypercube & cube,
+            const Cube & cube,
             const int k,
             const Color color,
             const NodeBase * inherit

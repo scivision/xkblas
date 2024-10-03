@@ -9,10 +9,10 @@ template<int K>
 class access_t
 {
     public:
-        using Hypercube = KHypercube<K>;
+        using Cube = KCube<K>;
 
     public:
-        Hypercube cube;
+        Cube cube;
         access_mode_t mode;
 
     public:
@@ -26,7 +26,7 @@ class access_t
             mode(access.mode)
         {}
 
-        access_t(const access_mode_t m, const KHypercube<K> & r) :
+        access_t(const access_mode_t m, const KCube<K> & r) :
             cube(r),
             mode(m)
         {}
