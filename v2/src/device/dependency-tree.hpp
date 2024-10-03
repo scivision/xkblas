@@ -3,11 +3,11 @@
 
 # include "device/task.hpp"
 
-# define KINTERVAL_BTREE_CUT
-# define KINTERVAL_BTREE_REBALANCE
+# define CUBE_TREE_CUT
+# define CUBE_TREE_REBALANCE
 # include "sync/cube-tree.hpp"
-# undef KINTERVAL_BTREE_CUT
-# undef KINTERVAL_BTREE_REBALANCE
+# undef CUBE_TREE_CUT
+# undef CUBE_TREE_REBALANCE
 
 template <int K>
 class KTaskAccess

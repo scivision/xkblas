@@ -2,11 +2,11 @@
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
 //  - check loop unrolling
 
-#ifndef __HYPERCUBE_TREE_H__
-# define __HYPERCUBE_TREE_H__
+#ifndef __CUBE_TREE_H__
+# define __CUBE_TREE_H__
 
-# if defined(HYPERCUBE_TREE_REBALANCE) && !defined(HYPERCUBE_TREE_CUT)
-#  error "Defining 'HYPERCUBE_TREE_REBALANCE' but not 'HYPERCUBE_TREE_CUT' has no effects"
+# if defined(CUBE_TREE_REBALANCE) && !defined(CUBE_TREE_CUT)
+#  error "Defining 'CUBE_TREE_REBALANCE' but not 'CUBE_TREE_CUT' has no effects"
 # endif
 
 // tree assert, must be called within a member function
@@ -27,9 +27,9 @@
 # endif /* NDEBUG */
 
 // coherency checks
-# undef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
-# ifndef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
-#  pragma message("Define `HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS` for max performance")
+# undef CUBE_TREE_DISABLE_COHERENCY_CHECKS
+# ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
+#  pragma message("Define `CUBE_TREE_DISABLE_COHERENCY_CHECKS` for max performance")
 # endif
 
 # include <cassert>
@@ -441,10 +441,10 @@ class KIntervalBtree {
 
     private:
 
-# ifdef HYPERCUBE_TREE_CUT
+# ifdef CUBE_TREE_CUT
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
-# endif /* HYPERCUBE_TREE_CUT */
+# endif /* CUBE_TREE_CUT */
 
         /* Buffer of nodes inserted by an insert() call */
         std::vector<Node *> outdated;
@@ -452,9 +452,9 @@ class KIntervalBtree {
     public:
         KIntervalBtree() :
             root(nullptr),
-# ifdef HYPERCUBE_TREE_CUT
+# ifdef CUBE_TREE_CUT
             limbs(),
-# endif /* HYPERCUBE_TREE_CUT */
+# endif /* CUBE_TREE_CUT */
             outdated() {}
 
         inline void
@@ -472,7 +472,7 @@ class KIntervalBtree {
             delete node;
         }
 
-# ifdef HYPERCUBE_TREE_CUT
+# ifdef CUBE_TREE_CUT
         inline void
         cut(Node * parent, int k, int dir)
         {
@@ -494,12 +494,12 @@ class KIntervalBtree {
             this->garbage_collector_run();
         }
 
-# else /* HYPERCUBE_TREE_CUT */
+# else /* CUBE_TREE_CUT */
         virtual ~KIntervalBtree()
         {
             subtree_delete(this->root);
         }
-# endif /* HYPERCUBE_TREE_CUT */
+# endif /* CUBE_TREE_CUT */
 
         ///////////
         // UTILS //
@@ -852,7 +852,7 @@ class KIntervalBtree {
             }
         }
 
-# ifdef HYPERCUBE_TREE_REBALANCE
+# ifdef CUBE_TREE_REBALANCE
         static inline void
         compress(Node * root, int k, int m)
         {
@@ -1004,7 +1004,7 @@ class KIntervalBtree {
             return this->root && requires_rebalance(this->root);
         }
 
-# endif /* HYPERCUBE_TREE_REBALANCE */
+# endif /* CUBE_TREE_REBALANCE */
 
         /* called to create a new node with a cube that never appeared before. */
         virtual Node *
@@ -1031,20 +1031,20 @@ class KIntervalBtree {
         {
             this->update();
 
-# ifdef HYPERCUBE_TREE_REBALANCE
+# ifdef CUBE_TREE_REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
                 this->rebalance();
-# else /* HYPERCUBE_TREE_REBALANCE */
-#  pragma message("Automatic rebalance disabled. Enable it with '-DHYPERCUBE_TREE_REBALANCE'")
-# endif /* HYPERCUBE_TREE_REBALANCE */
+# else /* CUBE_TREE_REBALANCE */
+#  pragma message("Automatic rebalance disabled. Enable it with '-DCUBE_TREE_REBALANCE'")
+# endif /* CUBE_TREE_REBALANCE */
 
 # ifndef NDEBUG
             this->coherency(cube);
 # endif /* NDEBUG */
         }
 
-# ifdef HYPERCUBE_TREE_CUT
+# ifdef CUBE_TREE_CUT
         inline void
         insert_from_cut(
             T & t,
@@ -1065,7 +1065,7 @@ class KIntervalBtree {
 
             this->outdate(parent);
         }
-# endif /* HYPERCUBE_TREE_CUT */
+# endif /* CUBE_TREE_CUT */
 
         inline void
         insert_from(
@@ -1079,7 +1079,7 @@ class KIntervalBtree {
 
             while (k < K)
             {
-# ifdef HYPERCUBE_TREE_CUT
+# ifdef CUBE_TREE_CUT
 #  pragma message("Tree cut enable")
                 // quick-way out, if the cube includes all subcube with an
                 // 'out' access, we can discard all children
@@ -1096,8 +1096,8 @@ class KIntervalBtree {
                     }
                 }
 # else
-#  pragma message("Tree cut disabled. Enable it using '-DHYPERCUBE_TREE_CUT'")
-# endif /* HYPERCUBE_TREE_CUT */
+#  pragma message("Tree cut disabled. Enable it using '-DCUBE_TREE_CUT'")
+# endif /* CUBE_TREE_CUT */
 
                 // case (1)    J << I
                 if (cube[k].b <= parent->cube[k].a)
@@ -1412,7 +1412,7 @@ class KIntervalBtree {
         int
         coherency_black_height_k(Node * node, int k) const
         {
-#ifdef HYPERCUBE_TREE_CUT
+#ifdef CUBE_TREE_CUT
             // when cut is enabled, black_height is not guaranteed
             return 1;
 #endif
@@ -1534,7 +1534,7 @@ class KIntervalBtree {
         int
         coherency(const Hypercube & cube)
         {
-            # ifdef HYPERCUBE_TREE_DISABLE_COHERENCY_CHECKS
+            # ifdef CUBE_TREE_DISABLE_COHERENCY_CHECKS
             return 1;
             # endif
 
@@ -1561,4 +1561,4 @@ class KIntervalBtree {
 
 };
 
-#endif /* __HYPERCUBE_TREE_H__ */
+#endif /* __CUBE_TREE_H__ */

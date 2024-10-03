@@ -9,7 +9,13 @@
 # include "device/task.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
+
+# define CUBE_TREE_CUT
+# define CUBE_TREE_REBALANCE
 # include "sync/cube-tree.hpp"
+# undef CUBE_TREE_CUT
+# undef CUBE_TREE_REBALANCE
+
 # include "sync/lockable.hpp"
 
 # include <cstdint>
