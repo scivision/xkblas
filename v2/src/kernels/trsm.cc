@@ -208,8 +208,8 @@ xkblas_£trsm_async(
     int tk, tm, tn;
     int bs_km, bs_kn, bs_mm, bs_nn;
 
-    TYPE zone       = (TYPE) 1.0;
-    TYPE mzone      = (TYPE)-1.0;
+    TYPE one        = (TYPE) 1.0;
+    TYPE mone       = (TYPE)-1.0;
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
     TYPE lalpha;
 
@@ -219,7 +219,7 @@ xkblas_£trsm_async(
             if (transA == CblasNoTrans) {
                 for (tk = 0; tk < Bmt; tk++) {
                     bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : zone;
+                    lalpha = (tk == 0) ? *alpha : one;
                     for (tn = 0; tn < Bnt; tn++) {
                         bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
@@ -239,7 +239,7 @@ xkblas_£trsm_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
-                                &mzone,
+                                &mone,
                                 A, (Bmt-1-tm)*Amb, (Bmt-1-tk)*Anb, lda,
                                 B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb,
                                 &lalpha,
@@ -255,7 +255,7 @@ xkblas_£trsm_async(
             else {
                 for (tk = 0; tk < Bmt; ++tk) {
                     bs_km  = (tk == Bmt-1) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0)     ? *alpha : zone;
+                    lalpha = (tk == 0)     ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
                         bs_nn = (tn == Bnt-1) ? Bn-tn*Bnb : Bnb;
                         xkblas_£trsm_tile_async(
@@ -276,7 +276,7 @@ xkblas_£trsm_async(
                                 context,
                                 transA, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                &mzone,
+                                &mone,
                                 A, tk*Amb, tm*Anb, lda,
                                 B, tk*Bmb, tn*Bnb, ldb,
                                 &lalpha,
@@ -294,7 +294,7 @@ xkblas_£trsm_async(
             if (transA == CblasNoTrans) {
                 for (tk = 0; tk < Bmt; ++tk) {
                     bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : zone;
+                    lalpha = (tk == 0) ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
                         bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                         xkblas_£trsm_tile_async(
@@ -315,7 +315,7 @@ xkblas_£trsm_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                &mzone,
+                                &mone,
                                 A, tm*Amb, tk*Anb, lda,
                                 B, tk*Bmb, tn*Bnb, ldb,
                                 &lalpha,
@@ -331,7 +331,7 @@ xkblas_£trsm_async(
             else {
                 for (tk = 0; tk < Bmt; ++tk) {
                     bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : zone;
+                    lalpha = (tk == 0) ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
                         bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                         xkblas_£trsm_tile_async(
@@ -350,7 +350,7 @@ xkblas_£trsm_async(
                                 context,
                                 transA, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
-                                &mzone,
+                                &mone,
                                 A, (Bmt-1-tk)*Amb, (Bmt-1-tm)*Anb, lda,
                                 B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb,
                                 &lalpha,
@@ -370,7 +370,7 @@ xkblas_£trsm_async(
             if (transA == CblasNoTrans) {
                 for (tk = 0; tk < Bnt; ++tk) {
                     bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : zone;
+                    lalpha = (tk == 0) ? *alpha : one;
                     for (tm = 0; tm < Bmt; ++tm) {
                         bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
@@ -390,7 +390,7 @@ xkblas_£trsm_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
-                                &mzone,
+                                &mone,
                                 B, tm*Bmb, tk*Bnb, ldb,
                                 A, tk*Amb, tn*Anb, lda,
                                 &lalpha,
@@ -426,7 +426,7 @@ xkblas_£trsm_async(
                                 &minvalpha,
                                 B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb,
                                 A, (Bnt-1-tn)*Amb, (Bnt-1-tk)*Anb, lda,
-                                &zone,
+                                &one,
                                 B,         tm*Bmb, (Bnt-1-tn)*Bnb, ldb
                             );
                         }
@@ -441,7 +441,7 @@ xkblas_£trsm_async(
             if (transA == CblasNoTrans) {
                 for (tk = 0; tk < Bnt; ++tk) {
                     bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    lalpha = tk == 0 ? *alpha : zone;
+                    lalpha = tk == 0 ? *alpha : one;
                     for (tm = 0; tm < Bmt; ++tm) {
                         bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
@@ -459,7 +459,7 @@ xkblas_£trsm_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
-                                &mzone,
+                                &mone,
                                 B, tm*Bmb,         (Bnt-1-tk)*Bnb, ldb,
                                 A, (Bnt-1-tk)*Amb, (Bnt-1-tn)*Anb, lda,
                                 &lalpha,
@@ -493,7 +493,7 @@ xkblas_£trsm_async(
                                 &minvalpha,
                                 B, tm*Bmb, tk*Bnb, ldb,
                                 A, tn*Amb, tk*Anb, lda,
-                                &zone,
+                                &one,
                                 B, tm*Bmb, tn*Bnb, ldb
                             );
                         }

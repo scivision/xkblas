@@ -61,6 +61,27 @@ impl_t::gemm(
 }
 
 void
+impl_t::syrk(
+    int uplo, int trans,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    xkblas_ssyrk_async(
+        uplo, trans,
+        n, k,
+        alpha,
+        A, lda,
+        beta,
+        C, ldc
+    );
+}
+
+
+
+void
 impl_t::trsm(
     int side, int uplo,
     CBLAS_TRANSPOSE transA, int diag,

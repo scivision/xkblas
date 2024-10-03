@@ -47,23 +47,23 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 static task_format_id_t format_id;
 
 /* m, n, k are matrix sizes
- * Am, An, ..., Cn are index of the tile begining */
+ * A_offset_m, A_offset_n, ..., C_offset_n are index of the tile begining */
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
     int transA, int transB,
     int m, int n, int k,
     const TYPE * alpha,
-    const TYPE * A, int Am, int An, int lda,
-    const TYPE * B, int Bm, int Bn, int ldb,
+    const TYPE * A, int A_offset_m, int A_offset_n, int lda,
+    const TYPE * B, int B_offset_m, int B_offset_n, int ldb,
     const TYPE * beta,
-          TYPE * C, int Cm, int Cn, int ldc
+          TYPE * C, int C_offset_m, int C_offset_n, int ldc
 ) {
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)B % ldb == 0);
     assert((uintptr_t)C % ldc == 0);
 
-    XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", Cm, Cn, m, n);
+    XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, m, n);
 
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
@@ -80,9 +80,7 @@ xkblas_£gemm_tile_async(
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    assert(transA == CblasNoTrans);
-    assert(transB == CblasNoTrans);
-    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", Am, An, Bm, Bn, Cm, Cn);
+    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
@@ -91,9 +89,9 @@ xkblas_£gemm_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, Am, An, m, k, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, Bm, Bn, k, n, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, Cm, Cn, m, n, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, m, k, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, k, n, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, m, n, sizeof(TYPE), Cmode        );
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
@@ -318,8 +316,7 @@ body_cuda(void * vlauncher)
     assert(C->device_view.addr % C->host_view.sizeof_type == 0);
 
     args_t * args = (args_t *) (launcher->task + 1);
-    assert(args->transA == CblasNoTrans);
-    assert(args->transB == CblasNoTrans);
+    assert(args);
 
     # ifndef NDEBUG
     XKBLAS_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",

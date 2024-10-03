@@ -13,6 +13,16 @@ xkblas_£gemm_async(
 );
 
 int
+xkblas_£syrk_async(
+    int uplo, int trans,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * beta,
+          TYPE * C, int ldc
+);
+
+int
 xkblas_£trsm_async(
     int side, int uplo,
     int transA, int diag,

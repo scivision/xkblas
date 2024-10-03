@@ -42,6 +42,16 @@ class impl_t
         );
 
         void
+        syrk(
+            int uplo, int trans,
+            int n, int k,
+            const TYPE * alpha,
+            const TYPE * A, int lda,
+            const TYPE * beta,
+                  TYPE * C, int ldc
+        );
+
+        void
         copyscale(
             const BLAS_INT m, const BLAS_INT n,
             bool should_copy, int * IW,

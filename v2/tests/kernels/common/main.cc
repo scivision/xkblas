@@ -194,6 +194,75 @@ main_gemm(char ** args)
 }
 
 static int
+main_syrk(char ** args)
+{
+    /* parse arguments */
+    CBLAS_UPLO      uplo  = CblasUpper;
+    CBLAS_TRANSPOSE trans = CblasNoTrans;
+    int n = atoi(args[0]);
+    int k = atoi(args[1]);
+    int bs_m = atoi(args[2]);
+    int bs_n = atoi(args[3]);
+    TYPE alpha = (const TYPE) 0.0;
+    TYPE beta  = (const TYPE) 0.0;
+
+    /* currently only support this */
+    int ld = MAX(n, k);
+    printf("Set (n, k) = (%d, %d)\n", n, k);
+
+    uintptr_t alignon = sizeof(TYPE) * ld;
+
+    /* allocate matrices */
+    uintptr_t mem    = impl.alloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+
+    assert(Ap     % alignon == 0);
+    assert(Cp     % alignon == 0);
+    assert(CpRef  % alignon == 0);
+    assert(CpImpl % alignon == 0);
+
+    TYPE * A     = (TYPE *) Ap;
+    TYPE * C     = (TYPE *) Cp;
+    TYPE * CRef  = (TYPE *) CpRef;
+    TYPE * CImpl = (TYPE *) CpImpl;
+
+    /* initialize matrices */
+    FILL(A, 2*ld*ld); // fill A and C
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
+    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+    /* run on impl */
+    printf("Running implementation...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        impl.set_tile(bs_m, bs_n);
+        impl.syrk(uplo, trans, n, k, &alpha, A, ld, &beta, CImpl, ld);
+        impl.coherent(CImpl, n, n, ld);
+        uint64_t tt = get_nanotime();
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+    }
+
+    if (!SKIP_CHECK)
+    {
+        /* check correctness */
+        int r = syrk_cmp(uplo, trans, n, k, alpha, A, ld, beta, C, CRef, CImpl, ld, 1);
+        if (r == 0)
+            puts("Result is CORRECT");
+        else
+            puts("Result is INCORRECT !!");
+    }
+
+    return 0;
+}
+
+static int
 main_trsm(char ** args)
 {
     /* parse arguments */
@@ -454,6 +523,18 @@ static func_t funcs[] = {
                     "  - K      : n° of cols of A, rows of B\n"
                     "  - BS_M   : n° of (cols, rows) per tile of (A, B)\n"
                     "  - BS_N   : n° of (rows, cols) per tile of (A, B)\n"
+    },
+
+    {
+        .name = "SYRK",
+        .f = main_syrk,
+        .nargs = 4,
+        .descr = "C := A.A^T + C",
+        .usage =    "N K BS_M BS_N\n"
+                    "  - N      : n° of rows of A and C\n"
+                    "  - K      : n° of cols of A\n"
+                    "  - BS_M   : n° of rows per tile of A\n"
+                    "  - BS_N   : n° of cols per tile of A\n"
     },
 
     {

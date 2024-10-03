@@ -61,10 +61,10 @@ gemm_cmp(
 
     assert(An == Bm);
 
-    double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,    lda, work);
-    double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,    ldb, work);
-    double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, C,     ldc, work);
-    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CImpl, ldc, work);
+    double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
+    double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,     ldb, work);
+    double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
+    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
 
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
     dump_matrix("A",     A,     Am, An);
@@ -73,10 +73,10 @@ gemm_cmp(
     dump_matrix("CRef",  CRef,  Cm, Cn);
     dump_matrix("CImpl", CImpl, Cm, Cn);
 
-    double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I',  m, n, CRef,  ldc, work);
+    double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;
     cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
-    double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, CRef, ldc, work);
+    double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     double eps = LAPACKE_slamch_work('e');
 
     printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
@@ -114,6 +114,71 @@ gemm_cmp(
 
     int suspicious = 0;
     if (isnan(Rnorm) || isinf(Rnorm) || isnan(result) || isinf(result) || (result > 3*eps))
+        suspicious = 1;
+
+    free(work);
+
+    return suspicious;
+}
+
+int
+syrk_cmp(
+    CBLAS_UPLO uplo, CBLAS_TRANSPOSE trans,
+    const BLAS_INT n, const BLAS_INT k,
+    const TYPE alpha,
+    const TYPE * A, const BLAS_INT lda,
+    const TYPE beta,
+    const TYPE * C, TYPE * CRef, const TYPE * CImpl, const BLAS_INT ldc,
+    int repeat
+) {
+    /* run native */
+    printf("Running native...\n");
+    {
+        uint64_t t0 = get_nanotime();
+        for (int i = 0 ; i < repeat ; ++i)
+            cblas_ssyrk(CblasColMajor, uplo, trans, n, k, alpha, A, lda, beta, CRef, ldc);
+        uint64_t tf = get_nanotime();
+        printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
+    }
+
+    TYPE * work = (TYPE *) malloc(MAX(n, k) * sizeof(TYPE));
+
+    const int Am = (trans == CblasNoTrans) ? n : k;
+    const int An = (trans == CblasNoTrans) ? k : n;
+    const int Cm = n;
+    const int Cn = n;
+
+    double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
+    double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
+    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
+
+    printf("alpha=%lf, beta=%lf\n", alpha, beta);
+    dump_matrix("A",     A,     Am, An);
+    dump_matrix("C",     C,     Cm, Cn);
+    dump_matrix("CRef",  CRef,  Cm, Cn);
+    dump_matrix("CImpl", CImpl, Cm, Cn);
+
+    double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    TYPE beta_const = (TYPE) -1.0;
+    cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
+    double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    double eps = LAPACKE_slamch_work('e');
+
+    printf("Rnorm %e, Anorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
+            Rnorm, Anorm, CNorm, CImplNorm, CRefNorm);
+
+    if (CNorm == CImplNorm)
+        printf("!! CNorm == CImplNorm !! Have you forgoten to compute or move the data back ?\n");
+
+    double result = Rnorm / ((Anorm + CNorm) * n * eps);
+
+    printf("============\n");
+    printf("Checking the norm of the difference against reference SSYRK \n");
+    printf("-- ||Ccham - Clapack||_oo/((||A||_oo+||C||_oo).N.eps) = %e \n", result);
+    printf("============\n");
+
+    int suspicious = 0;
+    if (isinf(CRefNorm) || isinf(CImplNorm) || isnan(result) || isinf(result) || (result > 10.0))
         suspicious = 1;
 
     free(work);

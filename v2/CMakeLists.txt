@@ -35,6 +35,10 @@ SET(SOURCE_FILES
     src/kernels/ccopyscale.cc
     src/kernels/dcopyscale.cc
     src/kernels/zcopyscale.cc
+    src/kernels/ssyrk.cc
+    src/kernels/csyrk.cc
+    src/kernels/dsyrk.cc
+    src/kernels/zsyrk.cc
     src/logger/logger.cc
 )
 
@@ -59,6 +63,10 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/src/kernels/dcopyscale.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/ccopyscale.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/zcopyscale.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/ssyrk.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/dsyrk.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/csyrk.cc
+        ${CMAKE_SOURCE_DIR}/src/kernels/zsyrk.cc
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS
@@ -67,6 +75,7 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
+        ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
         ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
 )
 

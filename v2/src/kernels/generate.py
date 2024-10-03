@@ -15,7 +15,8 @@ print("srcdir={}, dstdir={}".format(srcdir, incdir))
 kernels=[
     "gemm",
     "trsm",
-    "copyscale"
+    "copyscale",
+    "syrk"
 ]
 
 # sed files
