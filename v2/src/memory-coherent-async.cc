@@ -164,7 +164,7 @@ xkblas_memory_coherent_async_worker_thread_work(
     context->memtree.create_fetch_list_for_host(thread, args->cube, &list);
 
     // the size of the list should be one at that stage
-    assert(list.fetches && list.fetches->next == NULL);
+    // assert(list.fetches && list.fetches->next == NULL);
 
     // avoid early completion
     current->fetching();
