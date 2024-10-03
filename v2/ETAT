@@ -1,0 +1,48 @@
+On a:
+- support dépendances sur recouvrement partiel de matrices, avec
+    - out-of-order execution correct inféré depuis les régions accédées
+    - mouvement de données multi-gpu automatique
+
+- coût création du graphe léger (~100,000-1,000,000 taches/s)
+
+-restrictions
+    - pour un appel `kernel(A, m, n, ld, type, COLMAJOR)` il faut
+            A <= (A+m*sizeof(type)) % (ld*sizeof(type)) < (A+m*sizeof(type))
+    une façon simple d'assurer ça est d'aligner 'A' sur 'LD*sizeof(type)' - voici comment je fais dans les tests
+```C
+ 57     /* allocate matrices */
+ 58     uintptr_t mem    = impl.alloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+ 59     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+ 60     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+ 61     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+ 62     uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+ 63     uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
+```
+
+- gemm/trsm/copyscale implémenté
+
+- des choses naïves
+    - système de tâche pas terrible à grain fin (des locks assez grossiers, mais les sections critiques n'incluent jamais l'exécution d'un kernel, un transfert ou une allocation mémoire)
+    - pas de batching des opérations
+    - pas d'auto-tiling
+    - des malloc/new qui trainent, plutôt utiliser une pile d'allocation par thread
+
+- des idées
+    - fusionner les transferts continuent en mémoire en 1 seul appel (à un moment, j'ai une liste de transfert à effectuer, travailler sur cette liste)
+    - `xkblas_register_memory(...)` pour traquer les régions pinnées, et scinder les transferts qui en recouvrent 2 - (ou péter une erreur à l'utilisateur, ou ajouter une option pour controler le comportement)
+    - `xkblas_sync_on(A, m, n, LD)` <=> taskwait depend(in: mat(A, m, n, LD))
+    - depends WaR - si exécution sur 2 devices différents, elles peuvent se faire en parallèle
+        - ceci peut être connu via le paramètre OCR
+    - `xkblas_register_memory_replicate(host_view, device, device_view)` - pour accélérer la gestion des dépendances/mouvement mémoires - possibilité de préallouer de la mémoire continu sur GPU
+
+
+
+------------------------------------
+
+Truc originals (?) à publier:
+- gestion des dépendances / mouvement sur région
+- gestion pinning mémoire sur consecutive virtual memory
+- étude grain optimal opération BLAS pour des implems. multi-gpu (BLASX, CublasXT, XKBlas)
+    - tile = f(kernel, kernel-parameters, #GPU, GPU-type)
+    - créer la fonction 'f' explicitement en croisant tous les paramètres sur les machines dispos sur Grid5000
+- depends WaR si exécution sur 2 devices différents

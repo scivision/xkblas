@@ -15,14 +15,8 @@ So a replicate continuous in memory is allocated all at once on the device
 # PERFORMANCE IDEA 2
 Merge fetch operation if they are continuous in memory
 
-# PERFORMANCE IDEA 3
-Memory coherency currently insert 1 big task with all the region; meaning no data will start moving until the entire region had been computed (even though some parts may be ready early)
-
 # LICENSE
 - Set header in all files, a CECILL
-
-# Impacts on previous applications
-- users must explicitly call `xkblas_thread_init` on any thread before making any other calls to xkblas on that thread
 
 # To improve
 - If OCR is set on a successor task, when the predecessor writter completes
@@ -43,5 +37,5 @@ Memory coherency currently insert 1 big task with all the region; meaning no dat
 - Device thread 'requests' mechanism got removed - use tasks instead (as per memory-coherent-async tasks)
 
 # DARK-AREA - I DONT UNDERSTAND WHY
-- Having LIFO ThreadWorker queue makes computation incorrect (against LIFO that is correct!)
+- Having LIFO ThreadWorker queue makes computation incorrect (against FIFO that is correct!)
 - Inverting 2-interval-btree coordinates (and associated memory-tree.hpp usage) makes computation incorrect

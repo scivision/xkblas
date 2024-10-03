@@ -6,7 +6,7 @@
 # include <cmath>
 # include <cstdlib>
 
-# define MAX_TASKS 1000000
+# define MAX_TASKS 10000000
 
 static inline uint64_t
 get_nanotime(void)
@@ -22,7 +22,9 @@ template<int K>
 static inline KTask<K> *
 get_tasks(void)
 {
-    static KTask<K> tasks[MAX_TASKS];
+    static KTask<K> * tasks = nullptr;
+    if (tasks == nullptr)
+        tasks = (KTask<K> *) malloc(sizeof(KTask<K>) * MAX_TASKS);
     return tasks;
 }
 
@@ -226,7 +228,7 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 1
+        # if 0
         static_assert(K == 2);
 
         Interval cube[] = {
@@ -261,24 +263,26 @@ static void launch_tests(KDependencyTree<K> & tree)
         # else
 
         // hyperplans
-        disjoint_hyperplans<K, K-1>(tree, N);
-        disjoint_hyperplans<K,   0>(tree, N);
+        //disjoint_hyperplans<K, K-1>(tree, N);
+        //disjoint_hyperplans<K,   0>(tree, N);
 
         // matrix test
-        int Nth_sqrt = std::pow(N, 1.0/K);
-        matrix_tiles<K, 2>(tree, Nth_sqrt/2*2+1);
-        matrix_tiles<K, 3>(tree, Nth_sqrt/3*2+1);
-        matrix_tiles<K, 5>(tree, Nth_sqrt/5*2+1);
-        matrix_tiles<K, 7>(tree, Nth_sqrt/7*2+1);
+        //int Nth_sqrt = std::pow(N, 1.0/K);
+        //matrix_tiles<K, 2>(tree, Nth_sqrt/2*2+1);
+        //matrix_tiles<K, 3>(tree, Nth_sqrt/3*2+1);
+        //matrix_tiles<K, 5>(tree, Nth_sqrt/5*2+1);
+        // matrix_tiles<K, 7>(tree, Nth_sqrt/7*2+1);
+
+        matrix_tiles<K,64*32>(tree, 64*32);
 
         // include squares
-        squares_included<K>(tree, N);
+        //squares_included<K>(tree, N);
 
         // pyramid inverted
-        pyramid_inverted<K>(tree, N);
+        //pyramid_inverted<K>(tree, N);
 
         // pyramid
-        pyramid<K>(tree, N);
+        //pyramid<K>(tree, N);
 
         # endif
     }
@@ -287,16 +291,17 @@ static void launch_tests(KDependencyTree<K> & tree)
     // finish
     double dt = (tf - t0) / 1e9;
     int nelements = tree.size();
+    int height    = tree.height();
     int ntasks = get_ntasks<K>();
     int nedges = get_nedges<K>();
     printf("Took %lf s.\n", dt);
-    printf("    Inserted %d regions and %d elements\n", ntasks, nelements);
-    printf("        KCube/s. = %.2lf\n", ntasks / dt);
-    printf("         Elements/s. = %.2lf\n", nelements / dt);
-    printf("     Inserted %d tasks\n", ntasks);
-    printf("        Tasks/s. = %.2lf\n", ntasks / dt);
+    printf("    Inserted %d regions, %d elements for %d height tree\n", ntasks, nelements, height);
+    printf("          Region/s. = %.2lf\n", ntasks / dt);
+    printf("        Elements/s. = %.2lf\n", nelements / dt);
+    printf("    Inserted %d tasks\n", ntasks);
+    printf("           Tasks/s. = %.2lf\n", ntasks / dt);
     printf("    Set %d task edges\n", nedges);
-    printf("        Edges/s. = %.2lf\n", nedges / dt);
+    printf("           Edges/s. = %.2lf\n", nedges / dt);
     printf("\n");
 }
 
@@ -304,6 +309,8 @@ static void launch_tests(KDependencyTree<K> & tree)
 template<int K>
 static void run(void)
 {
+    (void) get_tasks<K>();
+
     KDependencyTree<K> tree;
     launch_tests(tree);
 

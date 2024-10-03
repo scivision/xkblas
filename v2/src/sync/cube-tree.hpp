@@ -1041,6 +1041,8 @@ class KIntervalBtree {
 
 # ifndef NDEBUG
             this->coherency(cube);
+# else
+            (void) cube;
 # endif /* NDEBUG */
         }
 
