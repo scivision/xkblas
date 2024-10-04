@@ -11,39 +11,40 @@ project(${XKBLAS_NAME})
 message(STATUS "TODO: automate kernel files in the build")
 
 SET(SOURCE_FILES
-    src/xkblas-context.cc
-    src/xkblas-context-task-submit.cc
-    src/xkblas-legacy.cc
-    src/memory-coherent-async.cc
-    src/conf/conf.cc
-    src/device/device.cc
-    src/device/driver.cc
-    src/device/offloader.cc
-    src/device/stream.cc
-    src/device/stream-instruction-submit.cc
-    src/device/task.cc
-    src/device/task-format.cc
-    src/device/thread.cc
-    src/device/thread-producer.cc
-    src/device/thread-worker.cc
-    src/kernels/auto-tile.cc
-    src/kernels/sgemm.cc
-    src/kernels/cgemm.cc
-    src/kernels/dgemm.cc
-    src/kernels/zgemm.cc
-    src/kernels/strsm.cc
-    src/kernels/ctrsm.cc
-    src/kernels/dtrsm.cc
-    src/kernels/ztrsm.cc
-    src/kernels/scopyscale.cc
-    src/kernels/ccopyscale.cc
-    src/kernels/dcopyscale.cc
-    src/kernels/zcopyscale.cc
-    src/kernels/ssyrk.cc
-    src/kernels/csyrk.cc
-    src/kernels/dsyrk.cc
-    src/kernels/zsyrk.cc
-    src/logger/logger.cc
+    ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
+    ${CMAKE_SOURCE_DIR}/src/xkblas-context.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas-context-task-submit.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas-legacy.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-coherent-async.cc
+    ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
+    ${CMAKE_SOURCE_DIR}/src/device/device.cc
+    ${CMAKE_SOURCE_DIR}/src/device/driver.cc
+    ${CMAKE_SOURCE_DIR}/src/device/offloader.cc
+    ${CMAKE_SOURCE_DIR}/src/device/stream.cc
+    ${CMAKE_SOURCE_DIR}/src/device/stream-instruction-submit.cc
+    ${CMAKE_SOURCE_DIR}/src/device/task.cc
+    ${CMAKE_SOURCE_DIR}/src/device/task-format.cc
+    ${CMAKE_SOURCE_DIR}/src/device/thread.cc
+    ${CMAKE_SOURCE_DIR}/src/device/thread-producer.cc
+    ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/auto-tile.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/sgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/cgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/dgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/zgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/strsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/ctrsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/dtrsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/ztrsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/scopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/ccopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/dcopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/zcopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/ssyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/csyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/dsyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/zsyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
 )
 
 set(CUDA_SOURCE_FILES
@@ -53,13 +54,12 @@ set(CUDA_SOURCE_FILES
     src/kernels/zcopyscale.cu
 )
 
+# XKBLAS version
 add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/
-    DEPENDS
-        ${CMAKE_SOURCE_DIR}/include/xkblas-version.py
 )
 
 # TODO : I don't like this... but it is what it is
@@ -150,7 +150,7 @@ endif()
 # XKBLAS #
 ##########
 
-# Lib name
+# XKBLAS Lib
 add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
 
 if (${HWLOC_FOUND})
