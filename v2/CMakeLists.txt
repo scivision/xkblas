@@ -10,54 +10,88 @@ project(${XKBLAS_NAME})
 
 message(STATUS "TODO: automate kernel files in the build")
 
+SET(XKBLAS_KERNELS_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ccopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/cgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/cgemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csymm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csyr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ctrmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ctrsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dcopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dgemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsymm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsyr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dtrmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dtrsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/scopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/sgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/sgemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssymm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssyr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/strmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/strsm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zcopyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zgemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zgemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsymm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsyr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsyrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ztrmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ztrsm.cc
+)
+
+SET(XKBLAS_KERNELS_SOURCE_FILES_DEPS
+    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
+    ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/gemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
+    ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
+    ${CMAKE_SOURCE_DIR}/src/kernels/symm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/syr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/trmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
+)
+
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
-    ${CMAKE_SOURCE_DIR}/src/xkblas-context.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas-context-task-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas-legacy.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-coherent-async.cc
+    ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/device/device.cc
     ${CMAKE_SOURCE_DIR}/src/device/driver.cc
     ${CMAKE_SOURCE_DIR}/src/device/offloader.cc
-    ${CMAKE_SOURCE_DIR}/src/device/stream.cc
     ${CMAKE_SOURCE_DIR}/src/device/stream-instruction-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/device/task.cc
+    ${CMAKE_SOURCE_DIR}/src/device/stream.cc
     ${CMAKE_SOURCE_DIR}/src/device/task-format.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread.cc
+    ${CMAKE_SOURCE_DIR}/src/device/task.cc
     ${CMAKE_SOURCE_DIR}/src/device/thread-producer.cc
     ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
+    ${CMAKE_SOURCE_DIR}/src/device/thread.cc
     ${CMAKE_SOURCE_DIR}/src/kernels/auto-tile.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/sgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/cgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/dgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/zgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/strsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/ctrsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/dtrsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/ztrsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/scopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/ccopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/dcopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/zcopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/ssyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/csyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/dsyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/zsyrk.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-coherent-async.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas-context-task-submit.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas-context.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas-legacy.cc
+    ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 
 set(CUDA_SOURCE_FILES
-    src/kernels/scopyscale.cu
-    src/kernels/ccopyscale.cu
-    src/kernels/dcopyscale.cu
-    src/kernels/zcopyscale.cu
+    src/kernels/generated/scopyscale.cu
+    src/kernels/generated/ccopyscale.cu
+    src/kernels/generated/dcopyscale.cu
+    src/kernels/generated/zcopyscale.cu
 )
 
 # XKBLAS version
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
+        ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h # set invalid name so its always generated
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/
 )
@@ -65,32 +99,12 @@ add_custom_command(
 # TODO : I don't like this... but it is what it is
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/src/kernels/sgemm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/dgemm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/cgemm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/zgemm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/strsm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/dtrsm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/ctrsm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/ztrsm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/scopyscale.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/dcopyscale.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/ccopyscale.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/zcopyscale.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/ssyrk.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/dsyrk.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/csyrk.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/zsyrk.cc
+        ${XKBLAS_KERNELS_SOURCE_FILES}
+        ${CUDA_SOURCE_FILES}
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS
-        ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
-        ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
-        ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
-        ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
+        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)

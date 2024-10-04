@@ -7,8 +7,8 @@
 # include "sync/alignedas.h"
 # include "sync/spinlock.h"
 
-# if __has_include("kernels/kernel-task-format-register.h")
-#  include "kernels/kernel-task-format-register.h"
+# if __has_include("kernels/generated/kernel-task-format-register.h")
+#  include "kernels/generated/kernel-task-format-register.h"
 # else
 #  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
 # endif
@@ -44,7 +44,7 @@ static inline void
 xkblas_task_format_register(void)
 {
     xkblas_memory_coherent_async_register_format();
-    # include "kernels/kernel-task-format-register.cc"
+    # include "kernels/generated/kernel-task-format-register.cc"
 }
 
 extern "C"

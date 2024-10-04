@@ -11,16 +11,20 @@ srcdir=sys.argv[1]
 incdir=sys.argv[2]
 
 kernels=[
-    "gemm",
-    "trsm",
     "copyscale",
-    "syrk"
+    "gemm",
+    "gemmt",
+    "symm",
+    "syr2k",
+    "syrk",
+    "trmm",
+    "trsm",
 ]
 
 # sed files
 files=[
+    "copyscale.cu",
     "kernel.h",
-    "copyscale.cu"
 ]
 files += ["{}.cc".format(kernel) for kernel in kernels]
 
@@ -37,7 +41,7 @@ def cmd(s):
 
 for f in files:
     for mode in modes:
-        cmd("cat {}/{} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}/{}{}".format(
+        cmd("cat {}/{} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}/generated/{}{}".format(
                 srcdir,
                 f,
                 mode[0].upper(),
@@ -52,10 +56,10 @@ for f in files:
 
 # move header files
 for mode in modes:
-    cmd("mv {}/{}kernel.h {}/xkblas-{}kernel.h".format(srcdir, mode[0], incdir, mode[0]))
+    cmd("mv {}/generated/{}kernel.h {}/xkblas-{}kernel.h".format(srcdir, mode[0], incdir, mode[0]))
 
 # task format register
-f = "kernel-task-format-register"
+f = "generated/kernel-task-format-register"
 cmd("echo -n '' > {}/{}.cc".format(srcdir, f))
 cmd("echo -n '' > {}/{}.h".format(srcdir, f))
 for kernel in kernels:
