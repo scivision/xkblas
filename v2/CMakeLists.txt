@@ -57,7 +57,9 @@ add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
+        python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/include/xkblas-version.py
 )
 
 # TODO : I don't like this... but it is what it is
