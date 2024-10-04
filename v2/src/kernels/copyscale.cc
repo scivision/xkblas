@@ -86,6 +86,7 @@ xkblas_£copyscale_tile_async(
     return 0;
 }
 
+extern "C"
 int
 xkblas_£copyscale_async(
     int m, int n,

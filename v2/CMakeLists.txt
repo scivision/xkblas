@@ -2,14 +2,18 @@
 cmake_minimum_required(VERSION 3.7)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+# TODO : rename me to 'xkblas' for retro-compatibility (some interfaces may be missing)
+SET(XKBLAS_NAME xkblas)
+
 # Project name
-project(xkblas)
+project(${XKBLAS_NAME})
 
 message(STATUS "TODO: automate kernel files in the build")
 
 SET(SOURCE_FILES
     src/xkblas-context.cc
     src/xkblas-context-task-submit.cc
+    src/xkblas-legacy.cc
     src/memory-coherent-async.cc
     src/conf/conf.cc
     src/device/device.cc
@@ -49,6 +53,14 @@ set(CUDA_SOURCE_FILES
     src/kernels/zcopyscale.cu
 )
 
+add_custom_command(
+    OUTPUT
+        ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
+    COMMAND
+        python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/xkblas-version.h
+)
+
+# TODO : I don't like this... but it is what it is
 add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/src/kernels/sgemm.cc
@@ -110,6 +122,9 @@ endif()
 option(USE_CPU "Whether to build the CPU driver." OFF)
 if (USE_CPU)
     add_compile_definitions(USE_CPU=1)
+    add_library(${XKBLAS_NAME}_driver_cpu SHARED src/device/driver_cpu.cc)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_driver_cpu)
+    install(TARGETS ${XKBLAS_NAME}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # CUDA
@@ -134,34 +149,32 @@ endif()
 ##########
 
 # Lib name
-add_library(xkblas SHARED ${SOURCE_FILES})
+add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
 
 if (${HWLOC_FOUND})
-    target_link_libraries(xkblas PRIVATE ${HWLOC_LIBRARIES})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${HWLOC_LIBRARIES})
 endif()
-
-# Host driver
-add_library(xkblas_driver_cpu SHARED src/device/driver_cpu.cc)
-target_link_libraries(xkblas PRIVATE xkblas_driver_cpu)
 
 # IF USING CUDA
 if (${CUDA_RT_FOUND})
 
     # Cuda driver
-    target_link_libraries(xkblas PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    add_library(xkblas_cuda_driver SHARED src/device/driver_cuda.cc)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    add_library(${XKBLAS_NAME}_cuda_driver SHARED src/device/driver_cuda.cc)
     if (${HWLOC_FOUND})
-        target_link_libraries(xkblas_cuda_driver PRIVATE ${HWLOC_LIBRARIES})
+        target_link_libraries(${XKBLAS_NAME}_cuda_driver PRIVATE ${HWLOC_LIBRARIES})
     endif()
-    target_link_libraries(xkblas PRIVATE xkblas_cuda_driver)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_cuda_driver)
 
     # Cuda kernels
     set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
-    cuda_add_library(xkblas_cuda_kernels SHARED ${CUDA_SOURCE_FILES})
-    target_link_libraries(xkblas PRIVATE xkblas_cuda_kernels)
+    cuda_add_library(${XKBLAS_NAME}_cuda_kernels SHARED ${CUDA_SOURCE_FILES})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_cuda_kernels)
+    install(TARGETS ${XKBLAS_NAME}_cuda_kernels LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
     # Cuda Cublas
-    target_link_libraries(xkblas_cuda_driver PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${XKBLAS_NAME}_cuda_driver PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    install(TARGETS ${XKBLAS_NAME}_cuda_driver LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -170,14 +183,14 @@ include_directories(include/)
 include_directories(src/)
 
 # Installation
-install(TARGETS xkblas LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
-    target_compile_options(xkblas PRIVATE -Wfatal-errors)
+    target_compile_options(${XKBLAS_NAME} PRIVATE -Wfatal-errors)
     if (${CUDA_RT_FOUND})
-        target_compile_options(xkblas_cuda_driver PRIVATE -Wfatal-errors)
-        target_compile_options(xkblas_cuda_kernels PRIVATE -Wfatal-errors)
+        target_compile_options(${XKBLAS_NAME}_cuda_driver PRIVATE -Wfatal-errors)
+        target_compile_options(${XKBLAS_NAME}_cuda_kernels PRIVATE -Wfatal-errors)
     endif()
 endif()
 

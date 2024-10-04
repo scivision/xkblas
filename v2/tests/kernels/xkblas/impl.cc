@@ -1,6 +1,7 @@
 # include <assert.h>
 
 # include "common/impl.hpp"
+
 # include "xkblas.h"
 # include "xkblas-kernel.h"
 # include "xkblas-context.h"
@@ -29,7 +30,7 @@ impl_t::deinit(void)
 uintptr_t
 impl_t::alloc(size_t size)
 {
-    return (uintptr_t) xkblas_malloc(size);
+    return (uintptr_t) xkblas_host_alloc(size);
 }
 
 /* wait for kernels completion */

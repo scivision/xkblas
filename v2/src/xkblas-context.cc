@@ -118,6 +118,14 @@ xkblas_deinit(void)
     }
 }
 
+/* legacy compatibility (deprecated) */
+extern "C"
+void
+xkblas_finalize(void)
+{
+    xkblas_deinit();
+}
+
 //////////////////////////////
 //  Runtime synchronize     //
 //////////////////////////////
@@ -206,7 +214,7 @@ retry:
 
 extern "C"
 void *
-xkblas_malloc(size_t size)
+xkblas_host_alloc(size_t size)
 {
     # if USE_HIP
     #   error "Implement me"
@@ -221,8 +229,15 @@ xkblas_malloc(size_t size)
 }
 
 extern "C"
+void *
+xkblas_malloc(size_t size)
+{
+    return xkblas_host_alloc(size);
+}
+
+extern "C"
 void
-xkblas_free(void * ptr, size_t size)
+xkblas_host_free(void * ptr, size_t size)
 {
     #if USE_HIP
     # error "Implement me"
@@ -232,4 +247,11 @@ xkblas_free(void * ptr, size_t size)
     # else
     free(ptr);
     # endif
+}
+
+extern "C"
+void
+xkblas_free(void * ptr, size_t size)
+{
+    return xkblas_host_free(ptr, size);
 }

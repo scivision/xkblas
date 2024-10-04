@@ -10,8 +10,6 @@ if len(sys.argv) != 3:
 srcdir=sys.argv[1]
 incdir=sys.argv[2]
 
-print("srcdir={}, dstdir={}".format(srcdir, incdir))
-
 kernels=[
     "gemm",
     "trsm",

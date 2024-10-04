@@ -56,4 +56,4 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS})
 add_executable(xkblas-kernels common/main.cc)
-target_link_libraries(xkblas-kernels PRIVATE xkblas xkblas_cuda_kernels ${BLAS_LIBRARIES})
+target_link_libraries(xkblas-kernels PRIVATE ${XKBLAS_NAME} ${XKBLAS_NAME}_cuda_kernels ${BLAS_LIBRARIES})

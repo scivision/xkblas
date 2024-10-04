@@ -109,6 +109,7 @@ xkblas_£gemm_tile_async(
           TYPE * C, int Cm, int Cn, int ldc
 );
 
+extern "C"
 int
 xkblas_£syrk_async(
     int uplo, int trans,

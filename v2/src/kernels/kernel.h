@@ -1,6 +1,7 @@
 #ifndef __£KERNEL_H__
 # define __£KERNEL_H__
 
+extern "C"
 int
 xkblas_£gemm_async(
     int transA, int transB,
@@ -12,6 +13,7 @@ xkblas_£gemm_async(
           TYPE * C, int ldc
 );
 
+extern "C"
 int
 xkblas_£syrk_async(
     int uplo, int trans,
@@ -22,6 +24,7 @@ xkblas_£syrk_async(
           TYPE * C, int ldc
 );
 
+extern "C"
 int
 xkblas_£trsm_async(
     int side, int uplo,
@@ -32,6 +35,7 @@ xkblas_£trsm_async(
           TYPE * B, int ldb
 );
 
+extern "C"
 int
 xkblas_£copyscale_async(
     int m, int n,

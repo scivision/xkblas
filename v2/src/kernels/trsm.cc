@@ -117,6 +117,7 @@ xkblas_£gemm_tile_async(
 // A*X = B or X*A = B
 // B is (M, N)
 // A is whether (M, M) if side is left, whether (N, N) if side is right
+extern "C"
 int
 xkblas_£trsm_async(
     int side, int uplo,

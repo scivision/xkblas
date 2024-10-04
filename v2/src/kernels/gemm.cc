@@ -100,6 +100,7 @@ xkblas_£gemm_tile_async(
     return 0;
 }
 
+extern "C"
 int
 xkblas_£gemm_async(
     int transA, int transB,
