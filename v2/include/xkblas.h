@@ -4,6 +4,10 @@
 # include <stddef.h>
 # include <stdint.h>
 
+// TODO : remove me, this is here for legacy purposes
+# include "xkblas-kernel.h"
+# include "xkblas-kernel-type.h"
+
 /* XKBLAS LEGACY INTERFACES */
 
 # ifdef __cplusplus

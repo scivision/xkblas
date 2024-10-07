@@ -1,6 +1,7 @@
 # include <cblas.h>
 
 # include "min-max.h"
+# include "xkblas-kernel-type.h"
 # include "xkblas-context.h"
 
 # include "device/task-launcher.h"
@@ -8,7 +9,6 @@
 # include "logger/todo.h"
 # include "logger/logger.h"
 # include "kernels/auto-tile.h"
-# include "kernels/kernel-type.h"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 # include "sync/cache-line-size.hpp"
@@ -19,7 +19,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
     args_t(
         int m, int n,
-        bool should_copy, int * IW
+        int should_copy, int * IW
     ) :
         m(m), n(n),
         should_copy(should_copy), IW(IW)
@@ -29,7 +29,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     const int m;
     const int n;
-    const bool should_copy;
+    const int should_copy;
     int * IW;
 
 } args_t;
@@ -42,7 +42,7 @@ int
 xkblas_£copyscale_tile_async(
     xkblas_context_t * context,
     int m, int n,
-    bool should_copy,
+    int should_copy,
     int * IW,
     const TYPE * D, int Dm, int Dn, int ldd,
           TYPE * L, int Lm, int Ln, int ldl,
@@ -90,7 +90,7 @@ extern "C"
 int
 xkblas_£copyscale_async(
     int m, int n,
-    bool should_copy,
+    int should_copy,
     int * IW,
     const TYPE * D, int ldd,
           TYPE * L, int ldl,
@@ -195,7 +195,7 @@ int
 cuda_£copyscale(
     cudaStream_t cuda_stream,
     int m, int n,
-    bool should_copy, int * IW,
+    int should_copy, int * IW,
     const CU_TYPE * D, int ldd,
           CU_TYPE * L, int ldl,
           CU_TYPE * U, int ldu
@@ -243,7 +243,7 @@ extern "C"
 int
 xkblas_£copyscale_native(
     int m, int n,
-    bool should_copy,
+    int should_copy,
     int * IW,
     const TYPE * D, int ldd,
           TYPE * L, int ldl,

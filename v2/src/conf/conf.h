@@ -3,9 +3,9 @@
 
 # include <stdint.h>
 
+# include "xkblas-kernel-type.h"
 # include "logger/todo.h"
 # include "device/stream.h"
-# include "kernels/kernel-type.h"
 
 # pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 

@@ -8,7 +8,7 @@
 # include "logger/todo.h"
 # include "logger/logger.h"
 # include "kernels/auto-tile.h"
-# include "kernels/kernel-type.h"
+# include "xkblas-kernel-type.h"
 # include "sync/access.hpp"
 # include "sync/alignedas.h"
 # include "sync/cache-line-size.hpp"

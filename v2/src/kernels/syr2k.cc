@@ -1,5 +1,6 @@
 # include "logger/logger.h"
 
+extern "C"
 int
 xkblas_£syr2k_async(
     int uplo, int trans,

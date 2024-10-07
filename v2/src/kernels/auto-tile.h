@@ -1,7 +1,7 @@
 #ifndef __AUTO_TILE_H__
 # define __AUTO_TILE_H__
 
-# include "kernels/kernel-type.h"
+# include "xkblas-kernel-type.h"
 
 void
 xkblas_kernel_auto_tile(

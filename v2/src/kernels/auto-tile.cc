@@ -1,4 +1,4 @@
-# include "kernels/kernel-type.h"
+# include "xkblas-kernel-type.h"
 # include "logger/logger.h"
 
 void

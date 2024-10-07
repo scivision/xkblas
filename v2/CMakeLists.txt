@@ -100,7 +100,6 @@ add_custom_command(
 add_custom_command(
     OUTPUT
         ${XKBLAS_KERNELS_SOURCE_FILES}
-        ${CUDA_SOURCE_FILES}
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS

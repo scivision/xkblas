@@ -14,7 +14,6 @@
  * @date 2024-01-24
  * @precisions normal z -> s d c
  */
-#include <stdbool.h>
 #include <stdio.h>
 
 #include <cooperative_groups.h>
@@ -23,7 +22,7 @@
 # include "kernels/precision_£.h"
 
 __global__ void kernel_£copyscale_1x1( 
-		int m, int n, bool should_copy, 
+		int m, int n, int should_copy, 
 		const CU_TYPE* D, size_t ldd, 
 		CU_TYPE* L, size_t ldl,
 		CU_TYPE* U, size_t ldu )
@@ -99,7 +98,7 @@ int
 cuda_£copyscale(
 	cudaStream_t cuda_stream,
     int m, int n,
-    bool should_copy, int* IW,
+    int should_copy, int* IW,
 	const CU_TYPE * D, int ldd,
           CU_TYPE * L, int ldl,
           CU_TYPE * U, int ldu

@@ -39,7 +39,7 @@ extern "C" {
     int
     xkblas_£copyscale_async(
         int m, int n,
-        bool should_copy, int * IW,
+        int should_copy, int * IW,
         const TYPE * D, int ldd,
               TYPE * L, int ldl,
               TYPE * U, int ldu
