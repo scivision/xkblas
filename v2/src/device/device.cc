@@ -14,6 +14,160 @@
 
 # pragma message(TODO "Move these initializer into class member functions")
 
+
+///////////////////////
+//  MEMORY ALLOCATOR //
+///////////////////////
+
+static inline void
+xkblas_device_memory_reset(xkblas_device_t * device)
+{
+    # pragma message(TODO "This is leaking")
+    xkblas_alloc_chunk_t * chunk0 = (xkblas_alloc_chunk_t *) malloc(sizeof(xkblas_alloc_chunk_t));
+    assert(chunk0);
+    memcpy(chunk0, &(device->memdev.chunk0), sizeof(xkblas_alloc_chunk_t));
+    device->memdev.free_chunk_list = chunk0;
+}
+
+static inline void
+xkblas_device_init_memory(xkblas_device_t * device)
+{
+    assert(device->memdev.chunk0.device_ptr);
+    assert(device->memdev.chunk0.size);
+
+    device->memdev.chunk0.state = FREE_STATE;
+    device->memdev.chunk0.prev  = NULL;
+    device->memdev.chunk0.next  = NULL;
+
+    XKBLAS_MUTEX_INIT(device->memdev.lock);
+    xkblas_device_memory_reset(device);
+}
+
+/**
+ * Allocate memory on device from list of free chunk
+ * It may fail and return NULL
+ */
+static inline void *
+xkblas_try_allocate_on_device(
+    xkblas_device_t * device,
+    size_t size
+) {
+    /* adapted from kaapi_memory_alloc */
+
+    /* align data */
+    size = (size + 7UL) & ~7UL;
+
+    XKBLAS_MUTEX_LOCK(device->memdev.lock);
+
+    xkblas_alloc_chunk * curr = device->memdev.free_chunk_list;
+    xkblas_alloc_chunk * prevfree = NULL;
+    size_t min_size = 0;
+    xkblas_alloc_chunk_t * min_size_curr = NULL;
+    xkblas_alloc_chunk_t * min_size_prevfree = NULL;
+    while (curr)
+    {
+        size_t curr_size = curr->size;
+        if (curr_size >= size)
+        {
+            // TODO : check original code, seems it does not check the min...
+            min_size = curr_size;
+            min_size_curr = curr;
+            min_size_prevfree = prevfree;
+        }
+        prevfree = curr;
+        curr = curr->freelink;
+    }
+
+    curr = min_size_curr;
+    prevfree = min_size_prevfree;
+
+    /* split chunk */
+    if ((curr != NULL) && (min_size - size >= 0.5*size))
+    {
+        size_t curr_size = curr->size;
+        xkblas_alloc_chunk_t * remainder = (xkblas_alloc_chunk_t *) malloc(sizeof(xkblas_alloc_chunk_t));
+        remainder->device_ptr = size + curr->device_ptr;
+        remainder->size       = (curr_size - size);
+        remainder->state      = FREE_STATE;
+
+        /* link remainder segment after curr */
+        remainder->prev       = curr;
+        remainder->next       = curr->next;
+        if (curr->next) curr->next->prev = remainder;
+        curr->next            = remainder;
+        curr->size            = size;
+
+        /* link freelist */
+        remainder->freelink = curr->freelink;
+        curr->freelink = remainder;
+    }
+
+    if (curr != NULL)
+    {
+        if (prevfree) prevfree->freelink = curr->freelink;
+        else device->memdev.free_chunk_list = curr->freelink;
+        curr->state &= ~FREE_STATE;
+        curr->freelink = 0;
+    }
+
+    XKBLAS_MUTEX_UNLOCK( device->memdev.lock );
+
+    return (curr != NULL) ? ((void*) curr->device_ptr) : NULL;
+}
+
+static inline size_t
+xkblas_evict_memory_from_device(
+    xkblas_device_t * device,
+    size_t size
+) {
+    /* reference code: kaapi_memory_cache_evict_fromlist  */
+    // TODO implement eviction strategy
+    # pragma message(TODO "Implement xkblas_evict_memory_from_device")
+    XKBLAS_FATAL( "Try to evict data from global device %d, function not implemented - it may create an infite loop\n", device->global_id);
+    return ENOMEM;
+}
+
+void *
+xkblas_memory_allocate(
+    xkblas_driver_t * driver,
+    xkblas_device_t * device,
+    size_t size
+) {
+    // TODO : i don't like this infinite loop, do some maximum n° of attempts instead ?
+
+    do {
+
+        void * ptr = xkblas_try_allocate_on_device(device, size);
+        if (ptr)
+            return ptr;
+
+        xkblas_device_poll(device);
+        xkblas_evict_memory_from_device(device, size);
+
+    } while (1);
+
+    return NULL;
+}
+
+void
+xkblas_memory_deallocate_all(void)
+{
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    for (int device_global_id = 0 ; device_global_id < context->drivers.devices.n ; ++device_global_id)
+    {
+        xkblas_device_t * device = xkblas_device_get(device_global_id);
+        assert(device);
+
+        xkblas_device_memory_reset(device);
+    }
+}
+
+///////////////////////////
+// DEVICE INITIALIZATION //
+///////////////////////////
+
 static void
 xkblas_device_commit(
     xkblas_driver_t * driver,
@@ -24,12 +178,6 @@ xkblas_device_commit(
     if (err)
         XKBLAS_FATAL("Commit fail device %d of driver %s", device->driver_id, driver->f_get_name());
 
-    # if 0
-    assert(0 == pthread_mutex_lock(&device->lock));
-    assert(0 == pthread_cond_signal(&device->cond_sleep));
-    assert(0 == pthread_mutex_unlock(&device->lock));
-    # endif
-
     assert(device->state == XKBLAS_DEVICE_STATE_INIT);
     device->state = XKBLAS_DEVICE_STATE_COMMIT;
 }
@@ -39,50 +187,15 @@ xkblas_device_init(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
-    # if 0
-    device->tid = 0;
-    device->spawn_count = 0;
-    device->exec_count = 0;
-    device->finalize = false;
-    assert(0 == pthread_mutex_init(&device->lock, 0));
-    assert(0 == pthread_cond_init(&device->cond, 0));
-    assert(0 == pthread_cond_init(&device->cond_sleep, 0));
-    device->issleeping = 0;
-    device->request.op = XKBLAS_DEVICE_REQUEST_TYPE_NOP;
-    device->request.arg = 0;
-    device->request.counter = 0;
-
-    device->cnt_push = 0;
-    # endif
-
     driver->f_device_init(device->driver_id);
-
-    # if 0
-    device->time_tasks = 0.0;
-    device->exectasks  = 0;
-    device->flops_exectasks = 0.0;
-    device->data_exectasks = 0.0;
-    device->submittasks = 0;
-    device->flops_submittasks= 0.0;
-    device->data_submittasks = 0.0;
-
-    device->cnt_pending = 0;
-    device->cnt_ready = 0;
-    device->cnt_exec = 0;
-    # endif
 
     xkblas_context_t * context = xkblas_context_get();
     device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
 
     /* initialize device memory management */
-    XKBLAS_MUTEX_INIT( device->memdev.mem_lock );
+    xkblas_device_init_memory(device);
 
-    # if 0
-    assert(0 == pthread_mutex_lock(&device->lock));
-    assert(0 == pthread_cond_signal(&device->cond_sleep));
-    assert(0 == pthread_mutex_unlock(&device->lock));
-    # endif
-
+    /* attach current thread to the device */
     if (driver->f_device_attach(device->driver_id))
         XKBLAS_FATAL("Could not attach to device %d of driver %s", device->driver_id, driver->f_get_name());
 
@@ -117,6 +230,9 @@ xkblas_device_create(
     return device;
 }
 
+/////////////////////////
+//  DEVICE PROGRESSION //
+/////////////////////////
 int
 xkblas_device_poll(xkblas_device_t * device)
 {
@@ -156,20 +272,7 @@ xkblas_device_prepare_task(
     # endif /* NDEBUG */
 
     xkblas_context_t * context = xkblas_context_get();
-
-    // 'prepare_execute:' label
-
-# if 0
-    // TODO : this part of the code had been changed quite a bit, check performances impact
-    xkblas_device_poll(device);
-    while (!xkblas_device_accept_new_task(device))
-    {
-        xkblas_device_poll(device);
-        int err = device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_D2D, true);   // Romain: why wait on D2D ? (inherited from kaapi)
-        assert(err == 0);
-        xkblas_device_poll(device);
-    }
-# endif
+    assert(context);
 
     /* fetch, return 'TASK_STATE_DATA_FETCHED' if the data got fetched early */
     if (context->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
@@ -188,10 +291,6 @@ xkblas_device_progress(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
-    // TODO : implement 'kaapi_sched_idle_offload' switch case
-
-    # pragma message(TODO "Do we really need all that 'device request' stuff ? Just poll streams for now")
-
     int err = xkblas_device_poll(device);
     assert((err == 0) || (err == EINPROGRESS));
 }
@@ -234,6 +333,10 @@ xkblas_device_thread_main_loop(
     return EINTR;
 }
 
+///////////
+//  MAIN //
+///////////
+
 /* Main entry thread created per device */
 void *
 xkblas_device_thread_main(void * a)
@@ -250,6 +353,7 @@ xkblas_device_thread_main(void * a)
     unsigned int cpu, node;
     getcpu(&cpu, &node);
 
+    /* init the device */
     xkblas_device_t * device = xkblas_device_create(drivers, driver_id, driver_device_id);
     xkblas_device_init(driver, device);
 
@@ -269,6 +373,7 @@ xkblas_device_thread_main(void * a)
     int err = xkblas_device_thread_main_loop(driver, device);
     assert((err==0) || (err==EINTR));
 
+    # pragma message(TODO "Implement proper device deinitialization")
     # if 0
 
     /* */

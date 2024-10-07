@@ -74,7 +74,10 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/device/thread.cc
     ${CMAKE_SOURCE_DIR}/src/kernels/auto-tile.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-coherent-async.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-alloc.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/xkblas-context-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/xkblas-context.cc
     ${CMAKE_SOURCE_DIR}/src/xkblas-legacy.cc

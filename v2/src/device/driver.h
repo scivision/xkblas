@@ -76,6 +76,12 @@ typedef struct  xkblas_driver_t
     int (*f_device_detach)(xkblas_device_t*);
 
     ////////////////////////////////
+    //  MEMORY MANAGEMENT         //
+    ////////////////////////////////
+    int (*f_memory_register)(void * ptr, uint64_t size);
+    int (*f_memory_unregister)(void * ptr, uint64_t size);
+
+    ////////////////////////////////
     //  DRIVER STREAM MANAGEMENT  //
     ////////////////////////////////
 
@@ -175,11 +181,8 @@ void * xkblas_memory_allocate(
     size_t size
 );
 
-/* deallocate all memory allocated previously */
-void xkblas_driver_invalidate_caches(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device
-);
+/* deallocate all memory previously allocated on any devices */
+void xkblas_memory_deallocate_all(void);
 
 /* must be call once task accesses were all fetched */
 void xkblas_device_task_execute(

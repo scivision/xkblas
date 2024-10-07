@@ -77,29 +77,6 @@ xkblas_init(void)
 
 extern "C"
 void
-xkblas_invalidate_caches(void)
-{
-    XKBLAS_INFO("Invalidate XKBlas caches");
-    xkblas_context_t * context = xkblas_context_get();
-    if( context->state.current == XKBLAS_CONTEXT_INITIALIZED)
-    {
-        SPINLOCK_LOCK(context->state.spinlock);
-        if( context->state.current == XKBLAS_CONTEXT_INITIALIZED)
-        {
-	    /*
-	    // TODO : add a driver count so we can stop earlier ...
-            for( int driver_id = 0; driver_id < MAX_DRIVER_COUNT; driver_id++ )
-	    {
-	        xkblas_driver_invalidate_caches( context->drivers.list + driver_id );
-	    }
-	    */
-        }
-        SPINLOCK_UNLOCK(context->state.spinlock);
-    }
-}
-
-extern "C"
-void
 xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
@@ -198,60 +175,4 @@ retry:
     // dependency kinterval btree
     thread->deptree.export_pdf("dependency");
 # endif
-}
-
-///////////////////////
-// Memory allocation //
-///////////////////////
-
-# pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
-
-# if USE_CUDA
-#  include <cuda_runtime.h>
-# endif /* USE_CUDA */
-
-# include <stddef.h>
-
-extern "C"
-void *
-xkblas_host_alloc(size_t size)
-{
-    # if USE_HIP
-    #   error "Implement me"
-    # elif USE_CUDA
-    void * ptr;
-    int err = cudaHostAlloc(&ptr, size, cudaHostAllocPortable);
-    assert(err == cudaSuccess);
-    return ptr;
-    # else
-    return malloc(size);
-    # endif
-}
-
-extern "C"
-void *
-xkblas_malloc(size_t size)
-{
-    return xkblas_host_alloc(size);
-}
-
-extern "C"
-void
-xkblas_host_free(void * ptr, size_t size)
-{
-    #if USE_HIP
-    # error "Implement me"
-    # elif USE_CUDA
-    int err = cudaFreeHost(ptr);
-    assert(err == cudaSuccess);
-    # else
-    free(ptr);
-    # endif
-}
-
-extern "C"
-void
-xkblas_free(void * ptr, size_t size)
-{
-    return xkblas_host_free(ptr, size);
 }

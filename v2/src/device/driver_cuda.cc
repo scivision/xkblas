@@ -404,56 +404,17 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->mem_limit = (size_t)((double)ctx->conf.cuda_cache_limit
             * (double)(device->free_mem-180UL*1024UL*1024UL));
 
-    { /* work memory allocation, maybe smarter to do it in xkblas_device_init */
-        size_t free;
-        size_t total;
+    /* work memory allocation, maybe smarter to do it in xkblas_device_init */
+    {
+        size_t free, total;
         res = cudaMemGetInfo(&free, &total);
         __check_error(res);
 
         /* allocate 90% of free memory, into a new chunk */
-        size_t target = free * 0.9;
-        xkblas_alloc_chunk_t* chunk0 = (xkblas_alloc_chunk_t*) malloc( sizeof(xkblas_alloc_chunk_t) );
-        res = cudaMalloc( (void**) &(chunk0->device_ptr), target );
+        device->inherited.memdev.chunk0.size = free * 0.9;
+        res = cudaMalloc((void **) &(device->inherited.memdev.chunk0.device_ptr), device->inherited.memdev.chunk0.size);
         __check_error(res);
-
-        chunk0->size = target;
-        chunk0->state = FREE_STATE;
-        chunk0->prev = NULL;
-        chunk0->next = NULL;
-        chunk0->freelink = NULL;
-        device->inherited.memdev.free_chunk_list = chunk0;
-        device->inherited.memdev.memory_allocated = 1;
     }
-
-
-
-    if (getenv("XKBLAS_NO_GPUALLOCATOR"))
-        XKBLAS_ERROR("XKBLAS_NO_GPUALLOCATOR but code do not compile for this option");
-
-    //device->inherited.memdev.f_alloc = cuda_alloc;
-    //device->inherited.memdev.f_free = cuda_free;
-
-    # pragma message(TODO "Implement missing interfaces")
-    # if 0
-    device->inherited.memdev.f_copy = cuda_copy;
-    device->inherited.memdev.f_memsync = cuda_memsync;
-    device->inherited.memdev.f_get_mem_info = cuda_get_mem_info;
-    device->inherited.memdev.f_get_free_mem = cuda_get_free_mem;
-    {
-        size_t free;
-        size_t total;
-        res = cudaMemGetInfo(&free, &total);
-        __check_error(res);
-
-        device->inherited.free_mem = (size_t)free;
-    }
-    device->inherited.memdev.f_get_source = cuda_get_source;
-
-    device->inherited.stream.f_stream_free = cuda_stream_free;
-    device->inherited.stream.f_stream_alloc = cuda_stream_alloc;
-    device->inherited.stream.f_stream_process_pending = cuda_stream_process_pending;
-    device->inherited.stream.f_stream_decode_ioinstruction = cuda_stream_decode_ioinstruction;
-    # endif
 }
 
 static int
@@ -602,6 +563,28 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
         }
     }
 
+    return 0;
+}
+
+static int
+XKBLAS_DRIVER_ENTRYPOINT(memory_register)(
+    void * ptr,
+    uint64_t size
+) {
+    cudaError_t err = cudaHostRegister(ptr, size, cudaHostRegisterPortable);
+    __check_error(err);
+    return 0;
+}
+
+static int
+XKBLAS_DRIVER_ENTRYPOINT(memory_unregister)(
+    void * ptr,
+    uint64_t size
+) {
+    (void) size;
+
+    cudaError_t err = cudaHostUnregister(ptr);
+    __check_error(err);
     return 0;
 }
 
@@ -962,6 +945,9 @@ XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
     EP(device_init);
     EP(device_attach);
     EP(device_commit);
+
+    EP(memory_register);
+    EP(memory_unregister);
 
     EP(stream_create);
     EP(stream_delete);

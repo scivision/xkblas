@@ -80,15 +80,10 @@ typedef struct xkblas_memory_view_t {
 
 typedef struct  xkblas_device_memory_t
 {
-    // TODO check what is used or not ...
-    xkblas_address_space_id_t asid;
-    // xkblas_device_t * device;
-    xkblas_mutex_t mem_lock;                /* used */
-    int memory_allocated;                   /* used */
-    xkblas_alloc_data_t * freelist_bloc;
-    xkblas_alloc_data_t * freelist_metabloc;
-    xkblas_alloc_chunk_t * free_chunk_list; /* used */
-    xkblas_alloc_chunk_t * main_chunk;
+    xkblas_mutex_t lock;
+    int memory_allocated;
+    xkblas_alloc_chunk_t chunk0;
+    xkblas_alloc_chunk_t * free_chunk_list;
 
 }               xkblas_device_memory_t;
 

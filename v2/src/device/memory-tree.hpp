@@ -193,6 +193,7 @@ class KMemoryBlock {
                     const uintptr_t offset      = d[1] + d[0] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
 
+                    # pragma message(TODO "This memory is currently leaked when 'invalidate' is called")
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->allocation, begin_addr, inheriting_allocation->view.ld);
                     replicate->allocations[i] = allocation;
                     // allocation->awaiting must remain empty, tasks will be notified through the shrinked block
@@ -1310,9 +1311,13 @@ next_view:
         //  INVALIDATE  //
         //////////////////
         void
-        invalidate_caches(void)
+        invalidate(void)
         {
-            # pragma message(TODO "Empty the memory tree")
+            // empty the tree
+            this->clear();
+
+            // release all memory allocated on every devices
+            xkblas_memory_deallocate_all();
         }
 
         //////////////

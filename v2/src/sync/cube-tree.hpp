@@ -441,10 +441,8 @@ class KIntervalBtree {
 
     private:
 
-# ifdef CUBE_TREE_CUT
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
-# endif /* CUBE_TREE_CUT */
 
         /* Buffer of nodes inserted by an insert() call */
         std::vector<Node *> outdated;
@@ -452,9 +450,7 @@ class KIntervalBtree {
     public:
         KIntervalBtree() :
             root(nullptr),
-# ifdef CUBE_TREE_CUT
             limbs(),
-# endif /* CUBE_TREE_CUT */
             outdated() {}
 
         inline void
@@ -472,11 +468,16 @@ class KIntervalBtree {
             delete node;
         }
 
-# ifdef CUBE_TREE_CUT
+        inline void
+        cut(Node * node)
+        {
+            this->limbs.push_back(node);
+        }
+
         inline void
         cut(Node * parent, int k, int dir)
         {
-            this->limbs.push_back(parent->st[k].children[dir]);
+            this->cut(parent->st[k].children[dir]);
             parent->st[k].children[dir] = nullptr;
         }
 
@@ -493,13 +494,6 @@ class KIntervalBtree {
             subtree_delete(this->root);
             this->garbage_collector_run();
         }
-
-# else /* CUBE_TREE_CUT */
-        virtual ~KIntervalBtree()
-        {
-            subtree_delete(this->root);
-        }
-# endif /* CUBE_TREE_CUT */
 
         ///////////
         // UTILS //
@@ -1263,6 +1257,14 @@ class KIntervalBtree {
             }
 
             this->post_insert(cube);
+        }
+
+        inline void
+        clear(void)
+        {
+            this->cut(this->root);
+            this->garbage_collector_run();
+            this->root = nullptr;
         }
 
         // Dump the tree to the given file
