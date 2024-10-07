@@ -27,7 +27,7 @@ typedef enum    task_state_t : uint8_t
     TASK_STATE_READY            = 1,    // Task data can be fetched
     TASK_STATE_DATA_FETCHING    = 2,    // Task data is being fetched
     TASK_STATE_DATA_FETCHED     = 3,    // Task data is fetched, kernel can be executed
-    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved (data moved, kernel executed)
+    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved (kernel executed)
     TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
 }               task_state_t;
 
@@ -133,13 +133,12 @@ class alignas(CACHE_LINE_SIZE) KTask
 
             if (this->state.value < TASK_STATE_COMPLETED)
             {
-                Edge edge(succ);
                 SPINLOCK_LOCK(this->state.lock);
                 {
                     if (this->state.value < TASK_STATE_COMPLETED)
                     {
                         succ->wc.fetch_add(1, std::memory_order_seq_cst);
-                        this->edges.push_back(edge);
+                        this->edges.push_back(Edge(succ));
                     }
                 }
                 SPINLOCK_UNLOCK(this->state.lock);
@@ -175,12 +174,14 @@ class alignas(CACHE_LINE_SIZE) KTask
         fetched(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
+
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
                 return TASK_STATE_DATA_FETCHED;
             }
+
             return TASK_STATE_DATA_FETCHING;
         }
 

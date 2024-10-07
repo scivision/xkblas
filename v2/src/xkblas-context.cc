@@ -150,11 +150,11 @@ retry:
     XKBLAS_INFO("Synchronized Xkblas");
 
 
-#if USE_STATS == 1
+# if USE_STATS == 1
     xkblas_stats_report(&(context->stats));
-#endif // USE_STATS == 1
+# endif // USE_STATS == 1
 
-    #if 0 && !defined(NDEBUG)
+# if !defined(NDEBUG)
     // task dependency graph
     XKBLAS_INFO("Exporting Dependency Tree...");
     ThreadProducer * thread = ThreadProducer::self();
@@ -162,8 +162,7 @@ retry:
     thread->dump_tasks(f);
     fclose(f);
     system("dot -Tpdf tasks.dot > tasks.pdf");
-    # endif
-
+# endif
 
 
 # if 0

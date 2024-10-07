@@ -611,7 +611,6 @@ class KIntervalBtree {
             this->intersect_from(t, cube, mode, this->root);
         }
 
-
         //////////////
         //  INSERT  //
         //////////////

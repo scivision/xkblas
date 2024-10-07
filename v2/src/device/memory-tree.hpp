@@ -545,14 +545,16 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             const Cube & cube,
             const access_mode_t mode
         ) {
-            /* intersecting against 'cube' that had been inserted previously,
-             * so 'this' must be a sub-block of 'cube' */
-            assert(cube.includes(this->cube));
+            assert(cube.intersects(this->cube));
 
             switch (search.type)
             {
                 case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
+                    /* intersecting against 'cube' that had been inserted previously,
+                     * so 'this' must be a sub-block of 'cube' */
+                    assert(cube.includes(this->cube));
+
                     search.partition.push_back(Partite(&(this->block), this->cube));
                     break ;
                 }
@@ -1239,16 +1241,19 @@ next_view:
             Task * task,
             Access * access
         ) {
-
             Search search(device->global_id);
             uintptr_t allocation = 0;
             this->lock();
             {
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
-                // XKBLAS_DEBUG("Inserting (%d,%d) of size (%d,%d)", access->host_view.offset_m, access->host_view.offset_n, access->host_view.m, access->host_view.n);
-                // XKBLAS_DEBUG("Inserting cube (%d,%d)x(%d,%d)",
-                //         access->cube[0].a, access->cube[0].b, access->cube[1].a, access->cube[1].b);
+                # if 0
+                XKBLAS_DEBUG(
+                    "Interval(%16d, %16d), Interval(%16d, %16d),",
+                    access->cube[0].a, access->cube[0].b,
+                    access->cube[1].a, access->cube[1].b
+                );
+                # endif
 
                /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
@@ -1296,14 +1301,12 @@ next_view:
              * (eg before we processed all accesses bellow)
              */
             task->fetching();
-            XKBLAS_DEBUG("Task `%s` fetching one (avoid early launch)", task->label);
 
             /* for each access */
             assert(task->naccesses <= TASK_MAX_ACCESSES);
             for (int i = 0 ; i < task->naccesses ; ++i)
                 this->fetch_access(driver, device, task, task->accesses + i);
 
-            XKBLAS_DEBUG("Task `%s` fetched one (avoid early launch)", task->label);
             return task->fetched();
         }
 
