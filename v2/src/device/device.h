@@ -3,11 +3,11 @@
 
 # include <stdint.h>    /* uint64_t */
 
+# include "device/device-memory.h"
 # include "device/offloader.hpp"
-# include "device/memory.h"
-# include "logger/todo.h"
 # include "device/task.hpp"
 # include "device/thread-worker.hpp"
+# include "logger/todo.h"
 # include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
 
@@ -36,56 +36,6 @@ typedef struct  xkblas_device_t
     uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ - host is a virtual device of id 'XKBLAS_DEVICES_MAX'*/
     std::atomic<uint8_t> state;         /* True if driver is initialized */
     ThreadWorker * thread;              /* the device worker thread */
-
-    # if 0
-    /* pipline: a way to enforce execution order of kernel to device */
-    pthread_mutex_t             pipe_lock __attribute__((aligned(CACHE_LINE_SIZE)));
-    uint64_t                    pipe_size;
-    Task **                     pipeline;          /* circular buffer to store pipeline of task to run on the device */
-    uint64_t                    p_write;           /* next position in the pipeline to write a new task */
-    uint64_t                    p_ready;           /* position of the first ready task submitted to stream but not yet tested finish */
-    uint64_t                    p_finish;          /* position in the stream of the next task to finish */
-    # endif
-
-
-# if 0
-
-    Thread  * thread;                               /* running thread */
-    std::atomic<int>             cnt_push;          /* number of times the ressource is pushed */
-    pthread_t                   tid;
-   // struct xkblas_driver*        driver;
-    uint64_t                    spawn_count;       /* number of tasks */
-    uint64_t                    exec_count;        /* number of tasks completed */
-    int volatile                finalize;          /* true iff driver stop device */
-
-    double                      time_tasks;        /* cumulative time for all executed tasks */
-    uint64_t                    exectasks;         /* #tasks executed */
-    double                      flops_exectasks;   /* cumulative flops for all executed tasks */
-    double                      data_exectasks;    /* cumulative data for all executed tasks */
-    uint64_t                    submittasks;       /* #tasks (between prepare data and end of execution) */
-    double                      flops_submittasks; /* idem for pending tasks (between prepare data and end of execution) */
-    double                      data_submittasks;  /* idem for pending tasks */
-    // const char*                 name;              /* Device name */
-
-    size_t                      mem_limit;
-    size_t                      mem_total;
-
-    int                         issleeping;        /* */
-    struct {
-        xkblas_device_request_t      op;                   /* op request for a device */
-        uintptr_t              arg;
-        std::atomic<int64_t>   counter;              /* for MEMSYNC or WRITEBACK request */
-        int                    err;                  /* error returned by the request */
-    } request;
-
-    size_t                      free_mem;
-    size_t                      size_alloc;
-    size_t                      size_free;
-
-    std::atomic<int16_t>        cnt_pending;       /* number of tasks waiting for data (not too much) */
-    std::atomic<int16_t>        cnt_ready;         /* number of ready tasks inserted into device stream  (not too much) */
-    std::atomic<int32_t>        cnt_exec;          /* number of tasks executed */
-    # endif
 
 }               xkblas_device_t;
 

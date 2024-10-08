@@ -35,7 +35,7 @@ xkblas_device_init_memory(xkblas_device_t * device)
     assert(device->memdev.chunk0.device_ptr);
     assert(device->memdev.chunk0.size);
 
-    device->memdev.chunk0.state = FREE_STATE;
+    device->memdev.chunk0.state = XKBLAS_ALLOC_CHUNK_STATE_FREE;
     device->memdev.chunk0.prev  = NULL;
     device->memdev.chunk0.next  = NULL;
 
@@ -47,7 +47,7 @@ xkblas_device_init_memory(xkblas_device_t * device)
  * Allocate memory on device from list of free chunk
  * It may fail and return NULL
  */
-static inline void *
+static inline xkblas_alloc_chunk_t *
 xkblas_try_allocate_on_device(
     xkblas_device_t * device,
     size_t size
@@ -59,11 +59,13 @@ xkblas_try_allocate_on_device(
 
     XKBLAS_MUTEX_LOCK(device->memdev.lock);
 
-    xkblas_alloc_chunk * curr = device->memdev.free_chunk_list;
-    xkblas_alloc_chunk * prevfree = NULL;
+    /* best fit strategy */
+    xkblas_alloc_chunk_t * curr = device->memdev.free_chunk_list;
+    xkblas_alloc_chunk_t * prevfree = NULL;
     size_t min_size = 0;
     xkblas_alloc_chunk_t * min_size_curr = NULL;
     xkblas_alloc_chunk_t * min_size_prevfree = NULL;
+
     while (curr)
     {
         size_t curr_size = curr->size;
@@ -88,7 +90,7 @@ xkblas_try_allocate_on_device(
         xkblas_alloc_chunk_t * remainder = (xkblas_alloc_chunk_t *) malloc(sizeof(xkblas_alloc_chunk_t));
         remainder->device_ptr = size + curr->device_ptr;
         remainder->size       = (curr_size - size);
-        remainder->state      = FREE_STATE;
+        remainder->state      = XKBLAS_ALLOC_CHUNK_STATE_FREE;
 
         /* link remainder segment after curr */
         remainder->prev       = curr;
@@ -106,45 +108,52 @@ xkblas_try_allocate_on_device(
     {
         if (prevfree) prevfree->freelink = curr->freelink;
         else device->memdev.free_chunk_list = curr->freelink;
-        curr->state &= ~FREE_STATE;
+        curr->state &= ~XKBLAS_ALLOC_CHUNK_STATE_FREE;
         curr->freelink = 0;
     }
 
     XKBLAS_MUTEX_UNLOCK( device->memdev.lock );
 
-    return (curr != NULL) ? ((void*) curr->device_ptr) : NULL;
+    return curr;
 }
 
+# pragma message(TODO "Implement xkblas_evict_memory_from_device")
 static inline size_t
 xkblas_evict_memory_from_device(
     xkblas_device_t * device,
     size_t size
 ) {
     /* reference code: kaapi_memory_cache_evict_fromlist  */
-    // TODO implement eviction strategy
-    # pragma message(TODO "Implement xkblas_evict_memory_from_device")
-    XKBLAS_FATAL( "Try to evict data from global device %d, function not implemented - it may create an infite loop\n", device->global_id);
+
+
     return ENOMEM;
 }
 
-void *
+xkblas_alloc_chunk_t *
 xkblas_memory_allocate(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     size_t size
 ) {
-    // TODO : i don't like this infinite loop, do some maximum n° of attempts instead ?
+
+    int retry_cnt = 0;
 
     do {
 
-        void * ptr = xkblas_try_allocate_on_device(device, size);
-        if (ptr)
-            return ptr;
+        xkblas_alloc_chunk_t * chunk = xkblas_try_allocate_on_device(device, size);
+        if (chunk)
+            return chunk;
 
-        xkblas_device_poll(device);
+        XKBLAS_FATAL("GPU IS OUT OF MEMORY!");
+
+        // TODO : polling is risky here, because it may take a lock on the
+        // memory tree, and 'xkblas_memory_allocate' is called within a
+        // memory-tree lock => double-lock deadlock
+
+        // xkblas_device_poll(device);
         xkblas_evict_memory_from_device(device, size);
 
-    } while (1);
+    } while (++retry_cnt < 32);
 
     return NULL;
 }
@@ -155,7 +164,9 @@ xkblas_memory_deallocate_all(void)
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    for (int device_global_id = 0 ; device_global_id < context->drivers.devices.n ; ++device_global_id)
+    for (xkblas_device_global_id_t device_global_id = 0 ;
+            device_global_id < context->drivers.devices.n ;
+            ++device_global_id)
     {
         xkblas_device_t * device = xkblas_device_get(device_global_id);
         assert(device);

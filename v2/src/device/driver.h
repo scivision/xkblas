@@ -175,7 +175,7 @@ xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
 int xkblas_task_launch(task_launcher_t * launcher);
 
 /* allocate memory on the passed device */
-void * xkblas_memory_allocate(
+xkblas_alloc_chunk_t * xkblas_memory_allocate(
     xkblas_driver_t * driver,
     xkblas_device_t * device,
     size_t size
