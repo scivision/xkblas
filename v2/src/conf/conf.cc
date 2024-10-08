@@ -44,10 +44,7 @@ __parse_tile_size(xkblas_conf_t * conf, char const * value)
 static void
 __parse_ngpus(xkblas_conf_t * conf, char const * value)
 {
-    if (value)
-        conf->ngpus = atoi(value);
-    else
-        conf->ngpus = UINT8_MAX;
+    conf->ngpus = value ? (uint8_t) atoi(value) : UINT8_MAX;
 }
 
 static void
@@ -57,7 +54,7 @@ __parse_gpuset(xkblas_conf_t * conf, char const * value)
     {
         unsigned int gpuset = atoi(value);
         if (__builtin_popcount(gpuset) < conf->ngpus)
-            conf->ngpus = __builtin_popcount(gpuset);
+            conf->ngpus = (uint8_t) __builtin_popcount(gpuset);
         else if (conf->ngpus ==0)
             gpuset = 0;
         else
@@ -89,7 +86,7 @@ __parse_offloader_capacity(xkblas_conf_t * conf, char const * value)
 {
     if (value)
     {
-        conf->device.offloader.capacity = atoi(value);
+        conf->device.offloader.capacity = (uint16_t) atoi(value);
         XKBLAS_INFO("Set offloader capacity to %d", conf->device.offloader.capacity);
     }
 }

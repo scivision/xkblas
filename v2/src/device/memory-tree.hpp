@@ -58,7 +58,7 @@ class MemoryReplicateAllocationView {
         MemoryReplicateAllocationView(
             const uintptr_t allocation,
             const uintptr_t addr,
-            const int ld
+            const size_t ld
         ) :
             allocation(allocation),
             view(addr, ld),
@@ -99,6 +99,11 @@ class MemoryReplicate
          */
         # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
         # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
+
+        /* if this fails, replace 'uint8_t' indexing views by a larger type */
+        static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX < 256);
+
+        /* array of allocations */
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
         volatile uint8_t nallocations;
 
@@ -156,11 +161,11 @@ class KMemoryBlock {
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
             /////////////////////////////////
-            int d[K];
+            INTERVAL_DIFF_TYPE_T d[K];
             Cube::distance_manhattan(inheriting_cube, block_cube, d);
 
             assert(inheriting_block.host_view.order == MATRIX_COLMAJOR);
-            const int sizeof_type = inheriting_block.host_view.sizeof_type;
+            const size_t sizeof_type = inheriting_block.host_view.sizeof_type;
 
             this->host_view = inheriting_block.host_view;
             this->host_view.offset_m += d[1] / sizeof_type;
@@ -251,10 +256,10 @@ class KMemoryTreeNodeSearch {
             memory_view_t host_view;
 
             /* dst device */
-            int8_t dst_device_global_id;
+            xkblas_device_global_id_t dst_device_global_id;
 
             /* replicate allocation to use as dst (in MemoryReplicate::allocations) */
-            uint8_t dst_allocation_view_id;
+            xkblas_device_global_id_t dst_allocation_view_id;
 
             /* the allocation address in which belongs the 'dst' view */
             uintptr_t dst_allocation;
@@ -263,10 +268,10 @@ class KMemoryTreeNodeSearch {
             memory_replicate_view_t dst_view;
 
             /* source device */
-            int8_t src_device_global_id;
+            xkblas_device_global_id_t src_device_global_id;
 
             /* replicate allocation to use as src (in MemoryReplicate::allocations) */
-            uint8_t src_allocation_view_id;
+            xkblas_device_global_id_t src_allocation_view_id;
 
             /* src view */
             memory_replicate_view_t src_view;
@@ -315,7 +320,7 @@ class KMemoryTreeNodeSearch {
        Type type;
 
         /* device global id, on which we are looking for invalid blocks or validating blocks */
-       const uint8_t device_global_id;
+       const xkblas_device_global_id_t device_global_id;
 
        //////////////////////////////////////////////////////
        // used if type == INSERTING_BLOCKS //
@@ -349,7 +354,7 @@ class KMemoryTreeNodeSearch {
        KMemoryTreeNodeSearch() : KMemoryTreeNodeSearch(0) {}
 
        KMemoryTreeNodeSearch(
-           uint8_t devid
+           xkblas_device_global_id_t devid
        ) :
            type(INSERTING_BLOCKS),
            device_global_id(devid),
@@ -470,13 +475,13 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             //  SHRINK HOST VIEW //
             ///////////////////////
 
-            const int sizeof_type = this->block.host_view.sizeof_type;
+            const size_t sizeof_type = this->block.host_view.sizeof_type;
 
             assert(this->cube[k].a <= interval.a);
-            const int da = interval.a - this->cube[k].a;
+            const INTERVAL_DIFF_TYPE_T da = interval.a - this->cube[k].a;
 
             assert(this->cube[k].b >= interval.b);
-            const int db = this->cube[k].b - interval.b;
+            const INTERVAL_DIFF_TYPE_T db = this->cube[k].b - interval.b;
 
             if (k == 1)
             {
@@ -499,7 +504,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * r = replicate.allocations[i];
-                        const int offset = (k == 1) ? da : (da * r->view.ld * sizeof_type);
+                        const INTERVAL_DIFF_TYPE_T offset = (k == 1) ? da : (da * r->view.ld * sizeof_type);
                         r->view.addr += offset;
                         assert(r->view.addr >= r->allocation);
                     }
@@ -623,7 +628,7 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
 
          // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
-            for (uint8_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX+1 ; ++device_global_id)
+            for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX+1 ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
                 fprintf(f, "\\\\ dev %d - valid=%d",
@@ -855,7 +860,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                     // TODO : currently taking source as the device with the smallest id,
                     // instead, maybe try to balance the workload between GPU and use
                     // devices with the best bandwidth
-                    int src = __builtin_ffs(partite.block->valid) - 1;
+                    xkblas_device_global_id_t src = (xkblas_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
                     assert(src >= 0);
 
                     // Get the first valid allocation on that device
@@ -890,7 +895,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         fetch_access_get_first_block(
             std::vector<Partite> & partition
         ) {
-            const int nblocks = partition.size();
+            const size_t nblocks = partition.size();
             int j = 0;
 
             for (int i = 1 ; i < nblocks ; ++i)
@@ -921,10 +926,10 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
 
             /* allocate continuous memory for that access */
-            const int          ld = access->host_view.m;            // cuda is col major
-            const int sizeof_type = access->host_view.sizeof_type;
-            uint64_t  size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
-            uintptr_t addr        = (uintptr_t) xkblas_memory_allocate(driver, device, size);
+            const size_t          ld = access->host_view.m;            // cuda is col major
+            const size_t sizeof_type = access->host_view.sizeof_type;
+            const size_t size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
+            const uintptr_t addr     = (uintptr_t) xkblas_memory_allocate(driver, device, size);
             XKBLAS_DEBUG("  allocated at %p for size %zu", (void *) addr, size);
             assert(addr);
 
@@ -936,7 +941,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             for (Partite & partite : partition)
             {
                 /* compute distance from corner */
-                int d[K];
+                INTERVAL_DIFF_TYPE_T d[K];
                 Cube::distance_manhattan(corner.cube, partite.cube, d);
 
                 // TODO : the allocation is assumed col major, cuda
@@ -944,7 +949,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 const uintptr_t begin_addr = addr + d[1] + d[0]*ld*access->host_view.sizeof_type;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                const int allocation_view_id = replicate.nallocations++;
+                const uint8_t allocation_view_id = replicate.nallocations++;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     XKBLAS_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile XKBLAS");
 
@@ -967,9 +972,9 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
         ) {
             assert(this->is_locked());
 
-            int j = 0;
+            uint8_t j = 0;
             int nallocations = partition[0].block->replicates[device->global_id].nallocations;
-            int nblocks = partition.size();
+            size_t nblocks = partition.size();
 
             /* for each allocation of the block 0 */
             while (j < nallocations)
@@ -982,7 +987,7 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
                 {
                     /* for each allocation of other blocks */
                     int nallocations = partition[i].block->replicates[device->global_id].nallocations;
-                    for (int k = 0 ; k < nallocations ; ++k)
+                    for (uint8_t k = 0 ; k < nallocations ; ++k)
                     {
                         /* this block has a view with the same allocation, check next block */
                         MemoryReplicateAllocationView * rk = partition[i].block->replicates[device->global_id].allocations[k];
@@ -1128,14 +1133,14 @@ next_view:
                     else
                     {
                         // find source
-                        int src = (partite.block->valid & (1 << device->global_id)) ? device->global_id : __builtin_ffs(partite.block->valid) - 1;
+                        xkblas_device_global_id_t src = (xkblas_device_global_id_t) ((partite.block->valid & (1 << device->global_id)) ? device->global_id : __builtin_ffs(partite.block->valid) - 1);
                         // int src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
 
                         // Get the first valid allocation on that device
                         MemoryReplicate & replicate = partite.block->replicates[src];
                         assert(replicate.nallocations > 0);
                         assert(replicate.valid != 0);
-                        int allocation_view_id = __builtin_ffs(replicate.valid) - 1;
+                        uint8_t allocation_view_id = (uint8_t) (__builtin_ffs(replicate.valid) - 1);
 
                         // retrieve and set src view infos
                         MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
@@ -1267,7 +1272,7 @@ next_view:
                 /* step (3) find or allocate continuous memory for that access on that device */
                 allocation = this->fetch_access_find_allocation(driver, device, task, access, search.partition);
 
-                /* step (4) set the access view on the device (that will be used by the kernel) */
+                /* step (3) set the access view on the device (that will be used by the kernel) */
                 this->fetch_access_set_device_view(driver, device, task, access, search);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
@@ -1345,7 +1350,7 @@ next_view:
             size_t bytes_owned_max = 0;
             for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
-                const int bytes_owned = search.bytes_owned[device_global_id];
+                const size_t bytes_owned = search.bytes_owned[device_global_id];
                 if (bytes_owned_max < bytes_owned)
                 {
                     bytes_owned_max = bytes_owned;

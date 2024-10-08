@@ -82,7 +82,7 @@ xkblas_try_allocate_on_device(
     prevfree = min_size_prevfree;
 
     /* split chunk */
-    if ((curr != NULL) && (min_size - size >= 0.5*size))
+    if ((curr != NULL) && (min_size - size >= (size_t)(0.5*(double)size)))
     {
         size_t curr_size = curr->size;
         xkblas_alloc_chunk_t * remainder = (xkblas_alloc_chunk_t *) malloc(sizeof(xkblas_alloc_chunk_t));
@@ -346,7 +346,7 @@ xkblas_device_thread_main(void * a)
     xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) a;
     xkblas_drivers_t * drivers  = arg->drivers;
     uint8_t driver_id = arg->driver_id;
-    int driver_device_id = arg->driver_device_id;
+    uint8_t driver_device_id = arg->driver_device_id;
     free(arg);
 
     xkblas_driver_t * driver = drivers->list + driver_id;

@@ -52,10 +52,7 @@ body_memory_coherent_async_fetch_callback(
 
    // one fetched completed, notify the parent
     if (parent->fetched() == TASK_STATE_DATA_FETCHED)
-    {
         worker->complete(parent);
-        XKBLAS_INFO("Coherent async completed");
-    }
 }
 
 static void

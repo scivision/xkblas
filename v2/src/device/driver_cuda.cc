@@ -34,7 +34,7 @@ typedef struct  xkblas_stream_cuda_t
 
         struct {
             cudaEvent_t * end;
-            uint32_t capacity;
+            uint16_t capacity;
         } events;
 
         struct {
@@ -411,7 +411,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
         __check_error(res);
 
         /* allocate 90% of free memory, into a new chunk */
-        device->inherited.memdev.chunk0.size = free * 0.9;
+        device->inherited.memdev.chunk0.size = (size_t)((double)free * 0.9);
         res = cudaMalloc((void **) &(device->inherited.memdev.chunk0.device_ptr), device->inherited.memdev.chunk0.size);
         __check_error(res);
     }
@@ -651,8 +651,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             // assume col major for cuda - if not, need to do some shit here
             assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
-            int width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            int height = instr->copy.host_view.n;
+            size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
+            size_t height = instr->copy.host_view.n;
             assert(width >= 0);
             assert(height >= 0);
 
@@ -742,7 +742,7 @@ cuda_stream_instructions_progress(
 
     while (okp < istream->pending.pos.w)
     {
-        int idx = okp % istream->pending.capacity;
+        uint16_t idx = (uint16_t) (okp % istream->pending.capacity);
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
         cudaError_t res = cudaSuccess;
 
@@ -853,7 +853,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
 static xkblas_stream_t *
 XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_type_t type,
-    unsigned int capacity
+    uint16_t capacity
 ) {
     cudaError_t res;
     assert(INITIALIZED == true);

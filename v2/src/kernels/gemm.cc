@@ -19,7 +19,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
     args_t(
         int transA, int transB,
-        int m, int n, int k,
+        size_t m, size_t n, size_t k,
         const TYPE alpha,
         const TYPE beta
     ) :
@@ -36,9 +36,9 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     const int transA;
     const int transB;
-    const int m;
-    const int n;
-    const int k;
+    const size_t m;
+    const size_t n;
+    const size_t k;
     const TYPE alpha;
     const TYPE beta;
 
@@ -52,12 +52,12 @@ int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
     int transA, int transB,
-    int m, int n, int k,
+    const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, int A_offset_m, int A_offset_n, int lda,
-    const TYPE * B, int B_offset_m, int B_offset_n, int ldb,
+    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
+    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, int C_offset_m, int C_offset_n, int ldc
+          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)B % ldb == 0);
@@ -74,8 +74,8 @@ xkblas_£gemm_tile_async(
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
-    // const int ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const int ocr_access = 2;
+    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
+    const size_t ocr_access = 2;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
@@ -146,12 +146,12 @@ xkblas_£gemm_async(
         return -5;
     }
 
-    const int Am = (transA == CblasNoTrans) ? m : k;
-    const int An = (transA == CblasNoTrans) ? k : m;
-    const int Bm = (transB == CblasNoTrans) ? k : n;
-    const int Bn = (transB == CblasNoTrans) ? n : k;
-    const int Cm = m;
-    const int Cn = n;
+    const size_t Am = (transA == CblasNoTrans) ? m : k;
+    const size_t An = (transA == CblasNoTrans) ? k : m;
+    const size_t Bm = (transB == CblasNoTrans) ? k : n;
+    const size_t Bn = (transB == CblasNoTrans) ? n : k;
+    const size_t Cm = m;
+    const size_t Cn = n;
 
     if (lda < MAX(1, Am))
     {
@@ -173,7 +173,7 @@ xkblas_£gemm_async(
 
     xkblas_context_t * context = xkblas_context_get();
 
-    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_GEMM].tile;
+    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_GEMM].tile;
     if (tile[0] == 0 || tile[1] == 0)
     {
         int args[2] = {m, n};
@@ -181,29 +181,31 @@ xkblas_£gemm_async(
     }
 
     /* set tiling parameters */
-    int Amb = tile[0];
-    int Anb = tile[1];
-    int Bmb = tile[1];
-    int Bnb = tile[0];
-    int Cmb = tile[0];
-    int Cnb = tile[0];
+    const size_t Amb = tile[0];
+    const size_t Anb = tile[1];
+    const size_t Bmb = tile[1];
+    const size_t Bnb = tile[0];
+    const size_t Cmb = tile[0];
+    const size_t Cnb = tile[0];
 
-    int Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    int Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-    int Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
-    int Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
-    int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
-    int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
+    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
+    const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
+    const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
+    const size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
+    const size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+
+    const TYPE one = (TYPE) 1.0;
 
     # pragma message(TODO "Double check tiling offset in presence of transposed matrix")
 
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
     {
-        int bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
+        size_t bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
         for (int tn = 0; tn < Cnt; tn++)
         {
-            int bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
+            size_t bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
             // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
             {
@@ -211,8 +213,8 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
-                        TYPE zbeta = (tk == 0) ? *beta : 1.0;
+                        size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
@@ -230,8 +232,8 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
-                        TYPE zbeta = (tk == 0) ? *beta : 1.0;
+                        size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
@@ -252,8 +254,8 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
-                        TYPE zbeta = (tk == 0) ? *beta : 1.0;
+                        size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
@@ -271,8 +273,8 @@ xkblas_£gemm_async(
                 {
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
-                        TYPE zbeta = (tk == 0) ? *beta : 1.0;
+                        size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
                                 transA, transB,
@@ -339,12 +341,12 @@ body_cuda(void * vlauncher)
     res = cublas££gemm(
         handle,
         cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
-        args->m, args->n, args->k,
+        (int) args->m, (int) args->n, (int) args->k,
         (const CU_TYPE *) &args->alpha,
-        (const CU_TYPE *) A->device_view.addr, A->device_view.ld,
-        (const CU_TYPE *) B->device_view.addr, B->device_view.ld,
+        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+        (const CU_TYPE *) B->device_view.addr, (int) B->device_view.ld,
         (const CU_TYPE *) &args->beta,
-        (      CU_TYPE *) C->device_view.addr, C->device_view.ld
+        (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
     xkblas_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);

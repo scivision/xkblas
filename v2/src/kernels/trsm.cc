@@ -20,7 +20,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     args_t(
         const int side, const int uplo,
         const int transA, const int diag,
-        const int m, const int n,
+        const size_t m, const size_t n,
         const TYPE alpha
     ) :
         side(side),
@@ -38,8 +38,8 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
      const int uplo;
      const int transA;
      const int diag;
-     const int m;
-     const int n;
+     const size_t m;
+     const size_t n;
      const TYPE alpha;
 
 } args_t;
@@ -53,10 +53,10 @@ xkblas_£trsm_tile_async(
     xkblas_context_t * context,
     int side, int uplo,
     int transA, int diag,
-    int m, int n,
+    const size_t m, const size_t n,
     const TYPE * alpha,
-    const TYPE * A, int A_offset_m, int A_offset_n, int lda,
-          TYPE * B, int B_offset_m, int B_offset_n, int ldb
+    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
+          TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
 ) {
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)B % ldb == 0);
@@ -85,10 +85,10 @@ xkblas_£trsm_tile_async(
     new(args) args_t(side, uplo, transA, diag, m, n, *alpha);
 
     /* TODO: block size, is that correct ? */
-    const int Am = (side == CblasLeft) ? m : n;
-    const int An = (side == CblasLeft) ? m : n;
-    const int Bm = m;
-    const int Bn = n;
+    const size_t Am = (side == CblasLeft) ? m : n;
+    const size_t An = (side == CblasLeft) ? m : n;
+    const size_t Bm = m;
+    const size_t Bn = n;
 
     # define NACCESSES 2
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
@@ -106,12 +106,12 @@ int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
     int transA, int transB,
-    int m, int n, int k,
+    const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, int Am, int An, int lda,
-    const TYPE * B, int Bm, int Bn, int ldb,
+    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
+    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, int Cm, int Cn, int ldc
+          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 );
 
 // A*X = B or X*A = B
@@ -167,10 +167,10 @@ xkblas_£trsm_async(
         return -6;
     }
 
-    const int Am = (side == CblasLeft) ? m : n;
-    const int An = Am;
-    const int Bm = m;
-    const int Bn = n;
+    const size_t Am = (side == CblasLeft) ? m : n;
+    const size_t An = Am;
+    const size_t Bm = m;
+    const size_t Bn = n;
 
     if (lda < MAX(1, An))
     {
@@ -185,7 +185,7 @@ xkblas_£trsm_async(
     }
 
     xkblas_context_t * context = xkblas_context_get();
-    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_TRSM].tile;
+    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_TRSM].tile;
     if (tile[0] == 0 || tile[1] == 0)
     {
         int args[2] = {m, n};
@@ -196,18 +196,18 @@ xkblas_£trsm_async(
     assert(tile[0] == tile[1]);
 
     /* set tiling parameters */
-    int Amb = tile[0];
-    int Anb = tile[0];
-    int Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    int Ant = XKBLAS_NUM_OF_TILES(An, Anb);
+    const size_t Amb = tile[0];
+    const size_t Anb = tile[0];
+    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
+    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
 
-    int Bmb = tile[0];
-    int Bnb = tile[0];
-    int Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
-    int Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
+    const size_t Bmb = tile[0];
+    const size_t Bnb = tile[0];
+    const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
+    const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
 
     int tk, tm, tn;
-    int bs_km, bs_kn, bs_mm, bs_nn;
+    size_t bs_km, bs_kn, bs_mm, bs_nn;
 
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
@@ -533,11 +533,9 @@ body_cuda(void * vlauncher)
         args->side, args->uplo,
         args->transA, args->diag,
         &(args->alpha),
-        args->m, args->n,
-        (void *) A->device_view.addr,
-        A->device_view.ld,
-        (void *) B->device_view.addr,
-        B->device_view.ld,
+        (int) args->m, (int) args->n,
+        (void *) A->device_view.addr, (int) A->device_view.ld,
+        (void *) B->device_view.addr, (int) B->device_view.ld,
         launcher->task->label
     );
     #endif /* NDEBUG */
@@ -547,10 +545,10 @@ body_cuda(void * vlauncher)
         handle,
         cblas2cublas_side(args->side), cblas2cublas_uplo(args->uplo),
         cblas2cublas_op(args->transA), cblas2cublas_diag(args->diag),
-        args->m, args->n,
+        (int) args->m, (int) args->n,
         (const CU_TYPE *) &(args->alpha),
-        (const CU_TYPE *) A->device_view.addr, A->device_view.ld,
-              (CU_TYPE *) B->device_view.addr, B->device_view.ld
+        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+              (CU_TYPE *) B->device_view.addr, (int) B->device_view.ld
     );
     xkblas_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);

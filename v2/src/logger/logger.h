@@ -29,46 +29,46 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
 # define XKBLAS_PRINT_LINE() \
     fprintf(stderr, "%s:%d (%s)\n", __FILE__, __LINE__, __func__);
 
-# define XKBLAS_PRINT(LVL, ...)                                         \
-    do {                                                                \
-        if (LVL <= XKBLAS_VERBOSE)                                      \
-        {                                                               \
-            SPINLOCK_LOCK(XKBLAS_PRINT_MTX);                            \
-            struct timespec ts;                                         \
-            clock_gettime(CLOCK_MONOTONIC, &ts);                        \
-            uint64_t t = (uint64_t)(ts.tv_sec * 1000000000) +           \
-                            (uint64_t) ts.tv_nsec;                      \
-            if (XKBLAS_LAST_TIME != 0)                                  \
-                XKBLAS_TIME_ELAPSED += (t - XKBLAS_LAST_TIME) / 1e9;    \
-            XKBLAS_LAST_TIME = t;                                       \
-            if (isatty(STDOUT_FILENO))                                  \
-                fprintf(stdout, "[%8lf] "                               \
-                                "[TID=%d] "                             \
-                                "[\033[1;37mXKBLAS\033[0m] "            \
-                                "[%s%s\033[0m] ",                       \
-                                XKBLAS_TIME_ELAPSED,                    \
-                                gettid(),                               \
-                                XKBLAS_PRINT_COLORS[LVL],               \
-                                XKBLAS_PRINT_HEADERS[LVL]);             \
-            else                                                        \
-                fprintf(stdout, "[%8lf]"                                \
-                                "[TID=%d] "                             \
-                                "[XKBLAS] "                             \
-                                "[%s] ",                                \
-                                XKBLAS_TIME_ELAPSED,                    \
-                                gettid(),                               \
-                                XKBLAS_PRINT_HEADERS[LVL]);             \
-            fprintf(stdout, __VA_ARGS__);                               \
-            fprintf(stdout, "\n");                                      \
-            fflush(stdout);                                             \
-            SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                          \
-            if (LVL == XKBLAS_PRINT_FATAL_ID)                           \
-            {                                                           \
-                XKBLAS_PRINT_LINE();                                    \
-                fflush(stderr);                                         \
-                abort();                                                \
-            }                                                           \
-        }                                                               \
+# define XKBLAS_PRINT(LVL, ...)                                                 \
+    do {                                                                        \
+        if (LVL <= XKBLAS_VERBOSE)                                              \
+        {                                                                       \
+            SPINLOCK_LOCK(XKBLAS_PRINT_MTX);                                    \
+            struct timespec ts;                                                 \
+            clock_gettime(CLOCK_MONOTONIC, &ts);                                \
+            uint64_t t = (uint64_t)(ts.tv_sec * 1000000000) +                   \
+                            (uint64_t) ts.tv_nsec;                              \
+            if (XKBLAS_LAST_TIME != 0)                                          \
+                XKBLAS_TIME_ELAPSED += (double) (t - XKBLAS_LAST_TIME) / 1e9;   \
+            XKBLAS_LAST_TIME = t;                                               \
+            if (isatty(STDOUT_FILENO))                                          \
+                fprintf(stdout, "[%8lf] "                                       \
+                                "[TID=%d] "                                     \
+                                "[\033[1;37mXKBLAS\033[0m] "                    \
+                                "[%s%s\033[0m] ",                               \
+                                XKBLAS_TIME_ELAPSED,                            \
+                                gettid(),                                       \
+                                XKBLAS_PRINT_COLORS[LVL],                       \
+                                XKBLAS_PRINT_HEADERS[LVL]);                     \
+            else                                                                \
+                fprintf(stdout, "[%8lf]"                                        \
+                                "[TID=%d] "                                     \
+                                "[XKBLAS] "                                     \
+                                "[%s] ",                                        \
+                                XKBLAS_TIME_ELAPSED,                            \
+                                gettid(),                                       \
+                                XKBLAS_PRINT_HEADERS[LVL]);                     \
+            fprintf(stdout, __VA_ARGS__);                                       \
+            fprintf(stdout, "\n");                                              \
+            fflush(stdout);                                                     \
+            SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                                  \
+            if (LVL == XKBLAS_PRINT_FATAL_ID)                                   \
+            {                                                                   \
+                XKBLAS_PRINT_LINE();                                            \
+                fflush(stderr);                                                 \
+                abort();                                                        \
+            }                                                                   \
+        }                                                                       \
     } while (0)
 
 # define XKBLAS_NOT_IMPLEMENTED() XKBLAS_NOT_IMPLEMENTED_WARN("")

@@ -44,10 +44,10 @@ class KCube {
                 assert(tile.order == MATRIX_COLMAJOR);
 
                 const uintptr_t PP = tile.begin_addr();
-                const int x0 = PP / (tile.ld * tile.sizeof_type);
-                const int x1 = x0 + tile.n;
-                const int y0 = PP % (tile.ld * tile.sizeof_type);
-                const int y1 = y0 + tile.m * tile.sizeof_type;
+                const uintptr_t x0 = PP / (tile.ld * tile.sizeof_type);
+                const uintptr_t x1 = x0 + tile.n;
+                const uintptr_t y0 = PP % (tile.ld * tile.sizeof_type);
+                const uintptr_t y1 = y0 + tile.m * tile.sizeof_type;
 
                 assert(y1 <= tile.ld * tile.sizeof_type);
 
@@ -188,10 +188,10 @@ class KCube {
         distance_manhattan(
             const KCube & x,
             const KCube & y,
-            int d[K]
+            INTERVAL_DIFF_TYPE_T d[K]
         ) {
             for (int k = 0 ; k < K ; ++k)
-                d[k] = y.list[k].a - x.list[k].a;
+                d[k] = (INTERVAL_DIFF_TYPE_T) (y.list[k].a - x.list[k].a);
         }
 
         friend std::ostream &

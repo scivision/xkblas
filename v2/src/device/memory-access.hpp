@@ -25,12 +25,12 @@ class KMemoryAccess : public access_t<K>
         KMemoryAccess(
             const matrix_order_t & order,
             const void * addr,
-            const int & ld,
-            const int & offset_m,
-            const int & offset_n,
-            const int & m,
-            const int & n,
-            const uint32_t & sizeof_type,
+            const size_t & ld,
+            const ssize_t & offset_m,
+            const ssize_t & offset_n,
+            const size_t & m,
+            const size_t & n,
+            const size_t & sizeof_type,
             const access_mode_t & mode
         ) :
             KMemoryAccess(memory_view_t(order, addr, ld, offset_m, offset_n, m, n, sizeof_type), mode)

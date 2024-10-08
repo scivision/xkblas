@@ -20,7 +20,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     args_t(
         int uplo,
         int trans,
-        int n, int k,
+        size_t n, size_t k,
         const TYPE alpha,
         const TYPE beta
     ) :
@@ -36,8 +36,8 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     const int uplo;
     const int trans;
-    const int n;
-    const int k;
+    const size_t n;
+    const size_t k;
     const TYPE alpha;
     const TYPE beta;
 
@@ -51,11 +51,11 @@ int
 xkblas_£syrk_tile_async(
     xkblas_context_t * context,
     int uplo, int trans,
-    int n, int k,
+    size_t n, size_t k,
     const TYPE * alpha,
-    const TYPE * A, int A_offset_m, int A_offset_n, int lda,
+    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
     const TYPE * beta,
-          TYPE * C, int C_offset_m, int C_offset_n, int ldc
+          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)C % ldc == 0);
@@ -71,8 +71,8 @@ xkblas_£syrk_tile_async(
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
-    // const int ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const int ocr_access = 1;
+    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
+    const size_t ocr_access = 1;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
@@ -101,12 +101,12 @@ int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
     int transA, int transB,
-    int m, int n, int k,
+    const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, int Am, int An, int lda,
-    const TYPE * B, int Bm, int Bn, int ldb,
+    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
+    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, int Cm, int Cn, int ldc
+          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 );
 
 extern "C"
@@ -148,8 +148,8 @@ xkblas_£syrk_async(
         return -4;
     }
 
-    const int Am = (trans == CblasNoTrans) ? n : k;
-    const int An = (trans == CblasNoTrans) ? k : n;
+    const size_t Am = (trans == CblasNoTrans) ? n : k;
+    const size_t An = (trans == CblasNoTrans) ? k : n;
 
     if (lda < MAX(1, Am))
     {
@@ -163,12 +163,12 @@ xkblas_£syrk_async(
         return -10;
     }
 
-    const int Cm = n;
-    const int Cn = n;
+    const size_t Cm = n;
+    const size_t Cn = n;
 
     xkblas_context_t * context = xkblas_context_get();
 
-    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_SYRK].tile;
+    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_SYRK].tile;
     if (tile[0] == 0 || tile[1] == 0)
     {
         int args[2] = {n, k};
@@ -177,15 +177,15 @@ xkblas_£syrk_async(
     assert(tile[0] == tile[1]);
 
     /* set tiling parameters */
-    int Amb = tile[0];
-    int Anb = tile[1];
-    int Cmb = tile[0];
-    int Cnb = tile[0];
+    const size_t Amb = tile[0];
+    const size_t Anb = tile[1];
+    const size_t Cmb = tile[0];
+    const size_t Cnb = tile[0];
 
-    int Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    int Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-    int Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
-    int Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
+    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
+    const size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
+    const size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
 
     const TYPE one = (TYPE) 1.0;
 
@@ -194,12 +194,12 @@ xkblas_£syrk_async(
 
     for (int tn = 0; tn < Cnt; ++tn)
     {
-        const int bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
+        const size_t bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
         if (trans == CblasNoTrans)
         {
             for (int tk = 0; tk < Ant; ++tk)
             {
-                const int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 xkblas_£syrk_tile_async(
                     context,
@@ -214,10 +214,10 @@ xkblas_£syrk_async(
             {
                 for (int tm = tn+1; tm < Cmt; ++tm)
                 {
-                    const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
+                    const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        const int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
@@ -236,10 +236,10 @@ xkblas_£syrk_async(
             {
                 for (int tm = tn+1; tm < Cmt; ++tm)
                 {
-                    const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
+                    const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        const int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
@@ -259,7 +259,7 @@ xkblas_£syrk_async(
         {
             for (int tk = 0; tk < Amt; ++tk)
             {
-                const int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 xkblas_£syrk_tile_async(
                     context,
@@ -277,10 +277,10 @@ xkblas_£syrk_async(
             {
                 for (int tm = tn+1; tm < Cmt ; ++tm)
                 {
-                    const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
+                    const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        const int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
@@ -299,10 +299,10 @@ xkblas_£syrk_async(
             {
                 for (int tm = tn+1; tm < Cmt; ++tm)
                 {
-                    const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
+                    const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        const int bs_km = (tk == Amt-1) ? (Am-k*Amb) : Amb;
+                        const size_t bs_km = (tk == Amt-1) ? (Am-k*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
@@ -365,11 +365,11 @@ body_cuda(void * vlauncher)
     res = cublas££syrk(
         handle,
         cblas2cublas_uplo(args->uplo), cblas2cublas_op(args->trans),
-        args->n, args->k,
+        (int) args->n, (int) args->k,
         (const CU_TYPE *) &args->alpha,
-        (const CU_TYPE *) A->device_view.addr, A->device_view.ld,
+        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
         (const CU_TYPE *) &args->beta,
-        (      CU_TYPE *) C->device_view.addr, C->device_view.ld
+        (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
     xkblas_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);

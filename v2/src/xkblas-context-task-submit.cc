@@ -15,7 +15,7 @@ __random_set_bit(memory_replicates_bitfield_t bitfield)
     for (int i = 0; i <= k; ++i)
     {
         idx = __builtin_ffs(bitfield) - 1;
-        bitfield &= ~(1 << idx);
+        bitfield &= (memory_replicates_bitfield_t) ~(1 << idx);
     }
 
     return idx;
@@ -33,7 +33,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
 
     // Find the worker to offload the task
     ThreadWorker * worker = nullptr;
-    uint8_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
+    xkblas_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
 
     // if an ocr parameter is set, retrieve the device accordingly
     if (task->ocr_access_index != UNSPECIFIED_TASK_ACCESS)
@@ -42,7 +42,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         memory_replicates_bitfield_t owners = context->memtree.who_owns(task->accesses + task->ocr_access_index);
         if (owners)
         {
-            device_id = __random_set_bit(owners);
+            device_id = (xkblas_device_global_id_t) __random_set_bit(owners);
             // XKBLAS_DEBUG("owners = %d ; device_id = %d", owners, device_id);
         }
     }

@@ -5,7 +5,7 @@ void
 xkblas_kernel_auto_tile(
     xkblas_kernel_type_t kernel,
     int * args,
-    int * bs
+    size_t * bs
 ) {
     switch (kernel)
     {
@@ -16,8 +16,8 @@ xkblas_kernel_auto_tile(
             int k = args[2];
 
             /* just one big tile */
-            bs[0] = m;
-            bs[1] = n;
+            bs[0] = (size_t) m;
+            bs[1] = (size_t) n;
 
             break ;
         }
@@ -28,8 +28,8 @@ xkblas_kernel_auto_tile(
             int n = args[1];
 
             /* just one big tile */
-            bs[0] = m;
-            bs[1] = n;
+            bs[0] = (size_t) m;
+            bs[1] = (size_t) n;
             break ;
         }
 
@@ -39,8 +39,8 @@ xkblas_kernel_auto_tile(
             int n = args[1];
 
             /* just one big tile */
-            bs[0] = m;
-            bs[1] = n;
+            bs[0] = (size_t) m;
+            bs[1] = (size_t) n;
 
             break ;
         }

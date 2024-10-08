@@ -36,7 +36,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
     pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
 
     /* init each device of that driver */
-    for (int i = 0; i < n_devices; ++i)
+    for (uint8_t i = 0; i < n_devices; ++i)
     {
         pthread_attr_t attr;
         pthread_attr_init(&attr);
@@ -61,7 +61,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         }
 
         pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
-        for (int i=0; i<10; ++i) sched_yield();
+        for (int ii=0; ii<10; ++ii) sched_yield();
 
         // start the device thread
         xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) malloc(sizeof(xkblas_driver_device_thread_arg_t));

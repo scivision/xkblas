@@ -4,8 +4,8 @@
 /* maximum number of devices in total */
 # define XKBLAS_DEVICES_MAX (4)
 
-static_assert(XKBLAS_DEVICES_MAX <= 8*sizeof(uint16_t));
-typedef uint16_t xkblas_device_global_id_t;
+typedef uint8_t xkblas_device_global_id_t;
+static_assert(XKBLAS_DEVICES_MAX <= 8*sizeof(xkblas_device_global_id_t));
 
 /* an ID representing a pure virtual host device */
 # define HOST_DEVICE_GLOBAL_ID (XKBLAS_DEVICES_MAX)

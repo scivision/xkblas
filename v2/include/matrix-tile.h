@@ -4,6 +4,7 @@
 # define XKBLAS_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
 
 # include <assert.h>
+# include <stddef.h>
 # include <stdint.h>
 
 typedef enum    matrix_order_t
@@ -33,18 +34,18 @@ typedef struct  matrix_tile_t
     uintptr_t addr;
 
     /* matrix ld */
-    int ld;
+    size_t ld;
 
     /* beginning of the tile accessed */
-    int offset_m; // offset begin row
-    int offset_n; // offset begin col
+    ssize_t offset_m; // offset begin row
+    ssize_t offset_n; // offset begin col
 
     /* tile size (number of element per row/col) */
-    int m;   // size row
-    int n;   // size col
+    size_t m;   // size row
+    size_t n;   // size col
 
     /* size of type in bytes (eg float == 4, double == 8) */
-    int sizeof_type;
+    size_t sizeof_type;
 
     /* constructors */
     matrix_tile_t() : matrix_tile_t(MATRIX_COLMAJOR, static_cast<uintptr_t>(0), 0, 0, 0, 0, 0, 0) {}
@@ -52,12 +53,12 @@ typedef struct  matrix_tile_t
     matrix_tile_t(
         const matrix_order_t & order,
         const void * & addr,
-        const int & ld,
-        const int & offset_m,
-        const int & offset_n,
-        const int & m,
-        const int & n,
-        const int & sizeof_type
+        const size_t & ld,
+        const ssize_t & offset_m,
+        const ssize_t & offset_n,
+        const size_t & m,
+        const size_t & n,
+        const size_t & sizeof_type
     ) :
         matrix_tile_t(order, (uintptr_t)addr, ld, offset_m, offset_n, m, n, sizeof_type)
     {}
@@ -65,12 +66,12 @@ typedef struct  matrix_tile_t
     matrix_tile_t(
         const matrix_order_t & order,
         const uintptr_t & addr,
-        const int & ld,
-        const int & offset_m,
-        const int & offset_n,
-        const int & m,
-        const int & n,
-        const int & sizeof_type
+        const size_t & ld,
+        const ssize_t & offset_m,
+        const ssize_t & offset_n,
+        const size_t & m,
+        const size_t & n,
+        const size_t & sizeof_type
     ) :
         order(order),
         addr(addr),

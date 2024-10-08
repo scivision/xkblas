@@ -45,20 +45,6 @@ SET(XKBLAS_KERNELS_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/kernels/generated/ztrsm.cc
 )
 
-SET(XKBLAS_KERNELS_SOURCE_FILES_DEPS
-    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
-    ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/gemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
-    ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
-    ${CMAKE_SOURCE_DIR}/src/kernels/symm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/syr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/trmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
-)
-
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
@@ -84,11 +70,25 @@ SET(SOURCE_FILES
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 
-set(CUDA_SOURCE_FILES
-    src/kernels/generated/scopyscale.cu
-    src/kernels/generated/ccopyscale.cu
-    src/kernels/generated/dcopyscale.cu
-    src/kernels/generated/zcopyscale.cu
+SET(CUDA_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/scopyscale.cu
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ccopyscale.cu
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dcopyscale.cu
+    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zcopyscale.cu
+)
+
+SET(XKBLAS_KERNELS_SOURCE_FILES_DEPS
+    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
+    ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/gemmt.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
+    ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
+    ${CMAKE_SOURCE_DIR}/src/kernels/symm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/syr2k.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/trmm.cc
+    ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
 )
 
 # XKBLAS version
@@ -100,14 +100,15 @@ add_custom_command(
 )
 
 # TODO : I don't like this... but it is what it is
-add_custom_command(
-    OUTPUT
-        ${XKBLAS_KERNELS_SOURCE_FILES}
-    COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
-    DEPENDS
-        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
-)
+#add_custom_command(
+#    OUTPUT
+#        ${XKBLAS_KERNELS_SOURCE_FILES}
+#        ${CUDA_SOURCE_FILES}
+#    COMMAND
+#        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
+#    DEPENDS
+#        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
+#)
 
 option(STRICT "Enable strict compilation mode" OFF)
 
@@ -205,10 +206,11 @@ install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
-    target_compile_options(${XKBLAS_NAME} PRIVATE -Wfatal-errors)
+    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion)
+    target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_RT_FOUND})
-        target_compile_options(${XKBLAS_NAME}_cuda_driver PRIVATE -Wfatal-errors)
-        target_compile_options(${XKBLAS_NAME}_cuda_kernels PRIVATE -Wfatal-errors)
+        target_compile_options(${XKBLAS_NAME}_cuda_driver PRIVATE ${STRICT_OPTIONS})
+        target_compile_options(${XKBLAS_NAME}_cuda_kernels PRIVATE ${STRICT_OPTIONS})
     endif()
 endif()
 

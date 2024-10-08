@@ -8,7 +8,7 @@ Offloader::~Offloader() {}
 void
 Offloader::init(
     xkblas_conf_offloader_t * conf,
-    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity)
+    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, uint16_t capacity)
 ) {
     assert(conf);
     assert(f_stream_create);

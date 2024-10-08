@@ -8,7 +8,7 @@
 typedef struct  memory_replicate_view_t
 {
     uintptr_t addr; // address of the allocation containing this block on that device
-    int ld;         // ld of this replicate view (may be different from
+    size_t ld;      // ld of this replicate view (may be different from
                     // host'ld, as it is allocated compactly on the device)
 
     memory_replicate_view_t(
@@ -19,7 +19,7 @@ typedef struct  memory_replicate_view_t
 
     memory_replicate_view_t(
         uintptr_t addr,
-        int ld
+        size_t ld
     ) :
         addr(addr),
         ld(ld)

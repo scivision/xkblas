@@ -21,11 +21,13 @@
 
 # include "kernels/precision_£.h"
 
+# define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+
 __global__ void kernel_£copyscale_1x1( 
 		int m, int n, int should_copy, 
-		const CU_TYPE* D, size_t ldd, 
-		CU_TYPE* L, size_t ldl,
-		CU_TYPE* U, size_t ldu )
+		const CU_TYPE* D, int ldd, 
+		CU_TYPE* L, int ldl,
+		CU_TYPE* U, int ldu )
 {	// Expect squared Blocks
 	extern __shared__ CU_TYPE shm_ptr[];
 	CU_TYPE* shm_L = shm_ptr;
@@ -35,8 +37,8 @@ __global__ void kernel_£copyscale_1x1(
 	int idx_x = blockDim.x * blockIdx.x + threadIdx.x;
 	int idx_y = blockDim.y * blockIdx.y + threadIdx.y;
 
-	int col_count = min( blockDim.x * (blockIdx.x + 1), n ) - blockDim.x * blockIdx.x;
-	int row_count = min( blockDim.y * (blockIdx.y + 1), m ) - blockDim.y * blockIdx.y;
+	int col_count = MIN( blockDim.x * (blockIdx.x + 1), n ) - blockDim.x * blockIdx.x;
+	int row_count = MIN( blockDim.y * (blockIdx.y + 1), m ) - blockDim.y * blockIdx.y;
 
 	// Load L in shared
 	if( threadIdx.x < col_count && threadIdx.y < row_count )

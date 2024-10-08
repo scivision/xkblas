@@ -18,7 +18,7 @@
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
     args_t(
-        int m, int n,
+        size_t m, size_t n,
         int should_copy, int * IW
     ) :
         m(m), n(n),
@@ -27,8 +27,8 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     ~args_t() {}
 
-    const int m;
-    const int n;
+    const size_t m;
+    const size_t n;
     const int should_copy;
     int * IW;
 
@@ -41,12 +41,12 @@ static task_format_id_t format_id;
 int
 xkblas_£copyscale_tile_async(
     xkblas_context_t * context,
-    int m, int n,
+    size_t m, size_t n,
     int should_copy,
     int * IW,
-    const TYPE * D, int Dm, int Dn, int ldd,
-          TYPE * L, int Lm, int Ln, int ldl,
-          TYPE * U, int Um, int Un, int ldu
+    const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
+          TYPE * L, const size_t Lm, const size_t Ln, int ldl,
+          TYPE * U, const size_t Um, const size_t Un, int ldu
 ) {
     assert((uintptr_t)D % ldd == 0);
     assert((uintptr_t)L % ldl == 0);
@@ -61,8 +61,8 @@ xkblas_£copyscale_tile_async(
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
-    // const int ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const int ocr_access = 1;
+    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
+    const size_t ocr_access = 1;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
@@ -120,44 +120,34 @@ xkblas_£copyscale_async(
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    int * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_COPYSCALE].tile;
+    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_COPYSCALE].tile;
     if (tile[0] == 0 || tile[1] == 0)
     {
         int args[2] = {m, n};
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_COPYSCALE, args, tile);
     }
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
-    XKBLAS_INFO("Copyscale with tiles %d %d", tile[0], tile[1]);
 
     /* set tiling parameters */
-    const int Dmb = tile[1];
-    const int Dnb = tile[1];
-    const int Lmb = tile[0];
-    const int Lnb = tile[1];
-    const int Umb = tile[1];
-    const int Unb = tile[0];
+    const size_t Dmb = tile[1];
+    const size_t Dnb = tile[1];
+    const size_t Lmb = tile[0];
+    const size_t Lnb = tile[1];
+    const size_t Umb = tile[1];
+    const size_t Unb = tile[0];
 
-    const int Dm  = n;
-    const int Dn  = n;
-    const int Lm  = m;
-    const int Ln  = n;
-    const int Um  = n;
-    const int Un  = m;
+    const size_t Dm  = n;
+    const size_t Dn  = n;
+    const size_t Lm  = m;
+    const size_t Ln  = n;
+    const size_t Um  = n;
+    const size_t Un  = m;
 
-    const int Dmt = XKBLAS_NUM_OF_TILES(Dm, Dmb);
-    const int Dnt = XKBLAS_NUM_OF_TILES(Dn, Dnb);
-    const int Lmt = XKBLAS_NUM_OF_TILES(Lm, Lmb);
-    const int Lnt = XKBLAS_NUM_OF_TILES(Ln, Lnb);
-    const int Umt = XKBLAS_NUM_OF_TILES(Um, Umb);
-    const int Unt = XKBLAS_NUM_OF_TILES(Un, Unb);
+    const size_t Dmt = XKBLAS_NUM_OF_TILES(Dm, Dmb);
+    const size_t Dnt = XKBLAS_NUM_OF_TILES(Dn, Dnb);
+    const size_t Lmt = XKBLAS_NUM_OF_TILES(Lm, Lmb);
+    const size_t Lnt = XKBLAS_NUM_OF_TILES(Ln, Lnb);
+    const size_t Umt = XKBLAS_NUM_OF_TILES(Um, Umb);
+    const size_t Unt = XKBLAS_NUM_OF_TILES(Un, Unb);
 
     # define D(i, j) D, i*Dmb, j*Dnb
     # define L(i, j) L, i*Lmb, j*Lnb
@@ -165,10 +155,10 @@ xkblas_£copyscale_async(
 
     for (int tm = 0; tm < Lmt ; ++tm)
     {
-        const int bs_m = (tm == Lmt-1) ? (m-tm*Lnb) : Lnb;
+        const size_t bs_m = (tm == Lmt-1) ? (m-tm*Lnb) : Lnb;
         for( int tn = 0; tn < Lnt ; ++tn )
         {
-            const int bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
+            const size_t bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
             xkblas_£copyscale_tile_async(
                 context,
                 bs_m, bs_n,
@@ -228,11 +218,11 @@ body_cuda(void * vlauncher)
 
     cuda_£copyscale(
         cuda_stream,
-        args->m, args->n,
+        (int) args->m, (int) args->n,
         args->should_copy, args->IW,
-        (const CU_TYPE *) D->device_view.addr, D->device_view.ld,
-        (      CU_TYPE *) L->device_view.addr, L->device_view.ld,
-        (      CU_TYPE *) U->device_view.addr, U->device_view.ld
+        (const CU_TYPE *) D->device_view.addr, (int) D->device_view.ld,
+        (      CU_TYPE *) L->device_view.addr, (int) L->device_view.ld,
+        (      CU_TYPE *) U->device_view.addr, (int) U->device_view.ld
     );
 }
 
@@ -250,22 +240,25 @@ xkblas_£copyscale_native(
           TYPE * U, int ldu
 ) {
     // TODO need to check validity ??
-    int bsizecopy = 250;
-    for( int i_row_start = 0; i_row_start < m; i_row_start += bsizecopy )
+
+    const TYPE one = (TYPE) 1.0;
+    size_t bsizecopy = 250;
+
+    for( size_t i_row_start = 0; i_row_start < m; i_row_start += bsizecopy )
     {
-        int blocksize = MIN(bsizecopy, m - i_row_start * bsizecopy);
-        for( int i_col = 0; i_col < n; i_col++ )
+        size_t blocksize = MIN(bsizecopy, m - i_row_start * bsizecopy);
+        for( size_t i_col = 0; i_col < n; i_col++ )
         {
             // TODO implement 2x2 case (if needed)
-            TYPE A11 = 1.0/D[i_col + i_col * ldd];
+            TYPE A11 = one / D[i_col + i_col * ldd];
             if( should_copy )
             {
-                for( int i_row = 0; i_row < blocksize; i_row++ )
+                for( size_t i_row = 0; i_row < blocksize; i_row++ )
                 {
                     U[ (i_row_start+i_row) + i_col * ldu  ] = L[ (i_row_start+i_row) * ldl + i_col ];
                 }
             }
-            for( int i_row = 0; i_row < blocksize; i_row++ )
+            for( size_t i_row = 0; i_row < blocksize; i_row++ )
             {
                 L[ (i_row_start+i_row) * ldl + i_col ] *= A11;
             }

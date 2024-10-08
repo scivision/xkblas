@@ -1,14 +1,17 @@
 #ifndef __INTERVAL_HPP__
 # define __INTERVAL_HPP__
 
+# define INTERVAL_TYPE_T        uintptr_t
+# define INTERVAL_DIFF_TYPE_T   ptrdiff_t
+
 class Interval {
 
     public:
-        int a, b;
+        INTERVAL_TYPE_T a, b;
 
     public:
         Interval() : Interval(0, 0) {}
-        Interval(int aa, int bb) : a(aa), b(bb) {}
+        Interval(INTERVAL_TYPE_T aa, INTERVAL_TYPE_T bb) : a(aa), b(bb) {}
         virtual ~Interval() {}
 
         inline bool
@@ -18,10 +21,10 @@ class Interval {
             return this->a == this->b;
         }
 
-        inline int
+        inline INTERVAL_DIFF_TYPE_T
         length(void) const
         {
-            return this->b - this->a;
+            return (INTERVAL_DIFF_TYPE_T)(this->b - this->a);
         }
 
         inline bool

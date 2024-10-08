@@ -1202,8 +1202,8 @@ class KIntervalBtree {
                     //
                     //  [           J           ]
                     //          [           I             ]
-                    const int a = cube[k].a;
-                    const int b = cube[k].b;
+                    const INTERVAL_TYPE_T a = cube[k].a;
+                    const INTERVAL_TYPE_T b = cube[k].b;
 
                     // (1)
                     if (cube[k].a < parent->cube[k].a)

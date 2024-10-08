@@ -25,7 +25,7 @@ class Offloader
         /* initialise the streams */
         void init(
             xkblas_conf_offloader_t * conf,
-            xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, unsigned int capacity)
+            xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, uint16_t capacity)
         );
 
         # pragma message(TODO "Use C++ abstract method and inheritance instead of 'C-style' abstract class")
