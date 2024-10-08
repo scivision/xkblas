@@ -43,12 +43,15 @@ xkblas_device_init_memory(xkblas_device_t * device)
     xkblas_device_memory_reset(device);
 }
 
-/**
- * Allocate memory on device from list of free chunk
- * It may fail and return NULL
- */
-static inline xkblas_alloc_chunk_t *
-xkblas_try_allocate_on_device(
+void
+xkblas_memory_deallocate(xkblas_alloc_chunk_t * chunk)
+{
+    XKBLAS_FATAL("Not implemented");
+}
+
+xkblas_alloc_chunk_t *
+xkblas_memory_allocate(
+    xkblas_driver_t * driver,
     xkblas_device_t * device,
     size_t size
 ) {
@@ -115,47 +118,6 @@ xkblas_try_allocate_on_device(
     XKBLAS_MUTEX_UNLOCK( device->memdev.lock );
 
     return curr;
-}
-
-# pragma message(TODO "Implement xkblas_evict_memory_from_device")
-static inline size_t
-xkblas_evict_memory_from_device(
-    xkblas_device_t * device,
-    size_t size
-) {
-    /* reference code: kaapi_memory_cache_evict_fromlist  */
-
-
-    return ENOMEM;
-}
-
-xkblas_alloc_chunk_t *
-xkblas_memory_allocate(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device,
-    size_t size
-) {
-
-    int retry_cnt = 0;
-
-    do {
-
-        xkblas_alloc_chunk_t * chunk = xkblas_try_allocate_on_device(device, size);
-        if (chunk)
-            return chunk;
-
-        XKBLAS_FATAL("GPU IS OUT OF MEMORY!");
-
-        // TODO : polling is risky here, because it may take a lock on the
-        // memory tree, and 'xkblas_memory_allocate' is called within a
-        // memory-tree lock => double-lock deadlock
-
-        // xkblas_device_poll(device);
-        xkblas_evict_memory_from_device(device, size);
-
-    } while (++retry_cnt < 32);
-
-    return NULL;
 }
 
 void

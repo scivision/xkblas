@@ -181,6 +181,9 @@ xkblas_alloc_chunk_t * xkblas_memory_allocate(
     size_t size
 );
 
+/* release the memory chunk */
+void xkblas_memory_deallocate(xkblas_alloc_chunk_t * chunk);
+
 /* deallocate all memory previously allocated on any devices */
 void xkblas_memory_deallocate_all(void);
 

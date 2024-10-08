@@ -62,12 +62,12 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
             fprintf(stdout, "\n");                                              \
             fflush(stdout);                                                     \
             SPINLOCK_UNLOCK(XKBLAS_PRINT_MTX);                                  \
-            if (LVL == XKBLAS_PRINT_FATAL_ID)                                   \
-            {                                                                   \
-                XKBLAS_PRINT_LINE();                                            \
-                fflush(stderr);                                                 \
-                abort();                                                        \
-            }                                                                   \
+        }                                                                       \
+        if (LVL == XKBLAS_PRINT_FATAL_ID)                                       \
+        {                                                                       \
+            XKBLAS_PRINT_LINE();                                                \
+            fflush(stderr);                                                     \
+            abort();                                                            \
         }                                                                       \
     } while (0)
 

@@ -110,7 +110,7 @@ do {                                                                    \
 
 /* K is the number of dimensions */
 template<int K, typename T>
-class KIntervalBtree {
+class KCubeTree {
 
     using Cube = KCube<K>;
 
@@ -448,7 +448,7 @@ class KIntervalBtree {
         std::vector<Node *> outdated;
 
     public:
-        KIntervalBtree() :
+        KCubeTree() :
             root(nullptr),
             limbs(),
             outdated() {}
@@ -489,7 +489,7 @@ class KIntervalBtree {
             this->limbs.clear();
         }
 
-        virtual ~KIntervalBtree()
+        virtual ~KCubeTree()
         {
             subtree_delete(this->root);
             this->garbage_collector_run();
@@ -521,7 +521,8 @@ class KIntervalBtree {
         void
         foreach_node(
             Node * root,
-            std::function<void(Node *, void *)> f, void * args
+            std::function<void(Node *, void *)> f,
+            void * args
         ) const {
             f(root, args);
             FOREACH_CHILD_BEGIN(root, child, k, dir)
@@ -529,6 +530,12 @@ class KIntervalBtree {
                 foreach_node(child, f, args);
             }
             FOREACH_CHILD_END(root, child, k, dir);
+        }
+
+        void
+        foreach_node(std::function<void(Node *, void *)> f, void * args)
+        {
+            this->foreach_node(this->root, f, args);
         }
 
         int
@@ -1360,14 +1367,14 @@ class KIntervalBtree {
         coherency_cube_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_includes_check, this, _1, _2);
+            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_cube_includes(Node * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1382,14 +1389,14 @@ class KIntervalBtree {
         coherency_cube_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_cube_disjoint(Node * root) const
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1530,7 +1537,7 @@ class KIntervalBtree {
         void
         coherency_cube_represented(Cube cube)
         {
-            auto f = std::bind(&KIntervalBtree<K, T>::coherency_cube_represented_check, this, _1, _2);
+            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_represented_check, this, _1, _2);
             foreach_node(this->root, f, &cube);
         }
 

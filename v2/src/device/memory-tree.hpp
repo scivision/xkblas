@@ -23,6 +23,8 @@
 # include <functional>
 # include <map>
 
+# pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
+
 # pragma message(TODO "'fetch' implementation could be optimize by reducing critical sections")
 
 # pragma message(TODO "merge 'Replicate' on continuous "   \
@@ -219,8 +221,6 @@ class KMemoryBlock {
 
         }
 
-
-
         /* a block from splitting an existing one */
         KMemoryBlock(
             const Cube & block_cube,
@@ -401,10 +401,10 @@ class KMemoryTreeNodeSearch {
 
 
 template <int K>
-class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node {
+class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
 
     using Access = KMemoryAccess<K>;
-    using Base = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using Base = typename KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node;
     using MemoryBlock = KMemoryBlock<K>;
     using Node = KMemoryTreeNode<K>;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
@@ -618,13 +618,13 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
         void
         dump_str(FILE * f) const
         {
-            KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
+            KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
         }
 
         void
         dump_cube_str(FILE * f) const
         {
-            // KIntervalBtree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
+            // KCubeTree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
@@ -643,13 +643,13 @@ class KMemoryTreeNode : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node
 }; /* KMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable {
+class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
     using Access = KMemoryAccess<K>;
-    using Base = KIntervalBtree<K, KMemoryTreeNodeSearch<K>>;
+    using Base = KCubeTree<K, KMemoryTreeNodeSearch<K>>;
     using MemoryBlock = KMemoryBlock<K>;
     using Node = KMemoryTreeNode<K>;
-    using NodeBase = typename KIntervalBtree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using NodeBase = typename KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
     using Cube = KCube<K>;
     using Search = KMemoryTreeNodeSearch<K>;
@@ -912,6 +912,39 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             return j;
         }
 
+        inline void
+        fetch_access_allocate_eviction(
+            xkblas_device_t * device,
+            size_t size
+        ) {
+            /* adapted from 'kaapi_memory_cache_evict_fromlist' */
+
+            auto f = [device](NodeBase * nodebase, void * args) {
+                (void) args;
+
+                Node * node = reinterpret_cast<Node *>(nodebase);
+                assert(node);
+
+                MemoryBlock & block = node->block;
+
+                const bool valid_on_any_device        = block.valid != 0;
+                const bool valid_on_device            = block.valid &  (1 << device->global_id);
+                const bool valid_on_any_other_devices = block.valid & ~(1 << device->global_id);
+
+                if (!valid_on_any_device || valid_on_any_other_devices)
+                {
+                    // TODO : evict all allocations
+                    XKBLAS_FATAL("valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                }
+                else if (valid_on_device && block.replicates[device->global_id].nallocations > 1)
+                {
+                    // TODO : only keep 1 valid allocations
+                    XKBLAS_FATAL("valid_on_device=%d, nallocations=%d", valid_on_device, block.replicates[device->global_id].nallocations);
+                }
+            };
+            this->foreach_node(f, NULL);
+        }
+
         inline xkblas_alloc_chunk_t *
         fetch_access_allocate(
             xkblas_driver_t * driver,
@@ -932,7 +965,33 @@ class KMemoryTree : public KIntervalBtree<K, KMemoryTreeNodeSearch<K>>, Lockable
             const size_t sizeof_type = access->host_view.sizeof_type;
             const size_t size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
 
-            xkblas_alloc_chunk_t * chunk = xkblas_memory_allocate(driver, device, size);
+            //////////////////////////
+            // Allocate a new chunk //
+            //////////////////////////
+            xkblas_alloc_chunk_t * chunk = NULL;
+            int retry_cnt = 0;
+
+            do {
+
+                chunk = xkblas_memory_allocate(driver, device, size);
+                if (chunk)
+                    break ;
+
+                // TODO : polling is risky here, because it may take a lock on the
+                // memory tree, and 'xkblas_memory_allocate' is called within a
+                // memory-tree lock => double-lock deadlock
+
+                // xkblas_device_poll(device);
+                fetch_access_allocate_eviction(device, size);
+
+            } while (++retry_cnt < 32);
+
+            if (chunk == NULL)
+                XKBLAS_FATAL("!! GPU IS OUT OF MEMORY !!");
+
+            ////////////////////////////////////////////
+            // Create a view from the allocated chunk //
+            ////////////////////////////////////////////
             assert(chunk);
 
             /* retrieve upper left corner */

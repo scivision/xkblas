@@ -82,9 +82,9 @@ class KDependencyTreeSearch
 } /* class KDependencyTreeSearch */;
 
 template <int K>
-class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::Node {
+class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node {
 
-    using Base          = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
+    using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
     using Node          = KDependencyTreeNode<K>;
     using Cube        = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
@@ -234,21 +234,21 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
         inline void
         update_includes(void)
         {
-            KIntervalBtree<K, KDependencyTreeSearch<K>>::Node::update_includes();
+            KCubeTree<K, KDependencyTreeSearch<K>>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
         void
         dump_str(FILE * f) const
         {
-            KIntervalBtree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
+            KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
         }
 
         void
         dump_cube_str(FILE * f) const
         {
-            KIntervalBtree<K, KDependencyTreeSearch<K>>::Node::dump_cube_str(f);
+            KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_cube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -260,12 +260,12 @@ class KDependencyTreeNode : public KIntervalBtree<K, KDependencyTreeSearch<K>>::
 };
 
 template<int K>
-class KDependencyTree : public KIntervalBtree<K, KDependencyTreeSearch<K>> {
+class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
 
-    using Base          = KIntervalBtree<K, KDependencyTreeSearch<K>>;
+    using Base          = KCubeTree<K, KDependencyTreeSearch<K>>;
     using Node          = KDependencyTreeNode<K>;
-    using NodeBase      = typename KIntervalBtree<K, KDependencyTreeSearch<K>>::Node;
-    using Cube        = KCube<K>;
+    using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
+    using Cube          = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
