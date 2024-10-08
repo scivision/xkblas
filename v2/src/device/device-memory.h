@@ -28,7 +28,7 @@ typedef struct  xkblas_alloc_chunk_t
     struct xkblas_alloc_chunk_t * prev;     /* previous chunk in double chained list */
     struct xkblas_alloc_chunk_t * next;     /* next chunk in double chained list */
     struct xkblas_alloc_chunk_t * freelink; /* next freechunk in the chained list */
-
+    int use_counter;                        /* used in the memory-tree to count how many blocks relies on that allocation chunk */
 }               xkblas_alloc_chunk_t;
 
 /* The device memory with allocation information */

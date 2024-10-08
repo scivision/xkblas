@@ -168,6 +168,11 @@ void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
 void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
 void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
 
+/* set the initial free block to the xkblas device allocator (TODO: maybe
+ * change that to some 'add_block' instead to add several blocks) */
+void xkblas_device_memory_set_chunk0(xkblas_device_t * device, uintptr_t device_ptr, size_t size
+);
+
 /* return the host device */
 xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
 
@@ -182,7 +187,7 @@ xkblas_alloc_chunk_t * xkblas_memory_allocate(
 );
 
 /* release the memory chunk */
-void xkblas_memory_deallocate(xkblas_alloc_chunk_t * chunk);
+void xkblas_memory_deallocate(xkblas_device_t * device, xkblas_alloc_chunk_t * chunk);
 
 /* deallocate all memory previously allocated on any devices */
 void xkblas_memory_deallocate_all(void);

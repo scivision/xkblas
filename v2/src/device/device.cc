@@ -29,24 +29,113 @@ xkblas_device_memory_reset(xkblas_device_t * device)
     device->memdev.free_chunk_list = chunk0;
 }
 
-static inline void
-xkblas_device_init_memory(xkblas_device_t * device)
-{
-    assert(device->memdev.chunk0.device_ptr);
-    assert(device->memdev.chunk0.size);
+void
+xkblas_device_memory_set_chunk0(
+    xkblas_device_t * device,
+    uintptr_t device_ptr,
+    size_t size
+) {
+    device->memdev.chunk0.device_ptr    = device_ptr;
+    device->memdev.chunk0.size          = size;
+    device->memdev.chunk0.state         = XKBLAS_ALLOC_CHUNK_STATE_FREE;
+    device->memdev.chunk0.prev          = NULL;
+    device->memdev.chunk0.next          = NULL;
+    device->memdev.chunk0.freelink      = NULL;
+    device->memdev.chunk0.use_counter   = 0;
 
-    device->memdev.chunk0.state = XKBLAS_ALLOC_CHUNK_STATE_FREE;
-    device->memdev.chunk0.prev  = NULL;
-    device->memdev.chunk0.next  = NULL;
-
-    XKBLAS_MUTEX_INIT(device->memdev.lock);
     xkblas_device_memory_reset(device);
 }
 
-void
-xkblas_memory_deallocate(xkblas_alloc_chunk_t * chunk)
+static inline void
+xkblas_device_init_memory(xkblas_device_t * device)
 {
-    XKBLAS_FATAL("Not implemented");
+    XKBLAS_MUTEX_INIT(device->memdev.lock);
+    xkblas_device_memory_set_chunk0(device, 0, 0);
+}
+
+void
+xkblas_memory_deallocate(
+    xkblas_device_t * device,
+    xkblas_alloc_chunk_t * chunk
+) {
+
+    bool delete_chunk = false;
+
+    XKBLAS_MUTEX_LOCK(device->memdev.lock);
+    {
+        chunk->state = XKBLAS_ALLOC_CHUNK_STATE_FREE;
+
+        /* can we merge chunk into next_chunk ? */
+        xkblas_alloc_chunk_t * next_chunk = chunk->next;
+        if (next_chunk && next_chunk->state == XKBLAS_ALLOC_CHUNK_STATE_FREE)
+        {
+            next_chunk->prev = chunk->prev;
+            if (chunk->prev)
+                chunk->prev->next = next_chunk;
+            next_chunk->size += chunk->size;
+            assert(next_chunk->device_ptr > chunk->device_ptr);
+            next_chunk->device_ptr = chunk->device_ptr;
+            delete_chunk = true;
+        }
+
+        xkblas_alloc_chunk_t * prev_chunk = chunk->prev;
+        if (prev_chunk)
+        {
+            /*  if prev_chunk is a free chunk and 'delete_chunk' is true,
+             *  then we have to merge prev and next */
+            if (prev_chunk->state == XKBLAS_ALLOC_CHUNK_STATE_FREE)
+            {
+                if (delete_chunk)
+                {
+                    assert(prev_chunk->device_ptr < chunk->device_ptr);
+                    assert(prev_chunk->device_ptr < next_chunk->device_ptr);
+
+                    prev_chunk->size += next_chunk->size;
+                    prev_chunk->next = next_chunk->next;
+                    if (next_chunk->next)
+                        next_chunk->next->prev = prev_chunk;
+                    prev_chunk->freelink = next_chunk->freelink;
+                    free(next_chunk);
+                }
+                else
+                {
+                    /* merge chunk into prev_chunk */
+                    assert(prev_chunk->device_ptr < chunk->device_ptr);
+                    prev_chunk->next = chunk->next;
+                    if (chunk->next)
+                        chunk->next->prev = prev_chunk;
+                    prev_chunk->size += chunk->size;
+                    delete_chunk = true;
+                }
+            }
+            else if (!delete_chunk)
+            {
+                /* free_chunk_list is ordered by increasing adress: search form prev the previous bloc */
+                while (prev_chunk && prev_chunk->state != XKBLAS_ALLOC_CHUNK_STATE_FREE)
+                    prev_chunk = prev_chunk->prev;
+
+                if (!prev_chunk)
+                {
+                    chunk->freelink = device->memdev.free_chunk_list;
+                    device->memdev.free_chunk_list = chunk;
+                }
+                else
+                {
+                    chunk->freelink = prev_chunk->freelink;
+                    prev_chunk->freelink = chunk;
+                }
+            }
+        }
+        else if (!delete_chunk)
+        {
+            chunk->freelink = device->memdev.free_chunk_list;
+            device->memdev.free_chunk_list = chunk;
+        }
+    }
+    XKBLAS_MUTEX_UNLOCK(device->memdev.lock);
+
+    if (delete_chunk)
+        free(chunk);
 }
 
 xkblas_alloc_chunk_t *
@@ -111,8 +200,8 @@ xkblas_memory_allocate(
     {
         if (prevfree) prevfree->freelink = curr->freelink;
         else device->memdev.free_chunk_list = curr->freelink;
-        curr->state &= ~XKBLAS_ALLOC_CHUNK_STATE_FREE;
-        curr->freelink = 0;
+        curr->state = XKBLAS_ALLOC_CHUNK_STATE_ALLOCATED;
+        curr->freelink = NULL;
     }
 
     XKBLAS_MUTEX_UNLOCK( device->memdev.lock );
@@ -160,13 +249,15 @@ xkblas_device_init(
     xkblas_driver_t * driver,
     xkblas_device_t * device
 ) {
-    driver->f_device_init(device->driver_id);
-
-    xkblas_context_t * context = xkblas_context_get();
-    device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
-
     /* initialize device memory management */
     xkblas_device_init_memory(device);
+
+    /* initialize by the driver */
+    driver->f_device_init(device->driver_id);
+
+    /* init offloader */
+    xkblas_context_t * context = xkblas_context_get();
+    device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
 
     /* attach current thread to the device */
     if (driver->f_device_attach(device->driver_id))

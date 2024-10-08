@@ -404,17 +404,17 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->mem_limit = (size_t)((double)ctx->conf.cuda_cache_limit
             * (double)(device->free_mem-180UL*1024UL*1024UL));
 
-    /* work memory allocation, maybe smarter to do it in xkblas_device_init */
-    {
-        size_t free, total;
-        res = cudaMemGetInfo(&free, &total);
-        __check_error(res);
+    /* work memory allocation */
+    size_t free, total;
+    res = cudaMemGetInfo(&free, &total);
+    __check_error(res);
 
-        /* allocate 90% of free memory, into a new chunk */
-        device->inherited.memdev.chunk0.size = (size_t)((double)free * 0.9);
-        res = cudaMalloc((void **) &(device->inherited.memdev.chunk0.device_ptr), device->inherited.memdev.chunk0.size);
-        __check_error(res);
-    }
+    /* allocate 90% of free memory, into a new chunk */
+    const size_t size = (size_t) ((double)free * 0.9);
+    uintptr_t device_ptr;
+    res = cudaMalloc((void **) &device_ptr, size);
+    __check_error(res);
+    xkblas_device_memory_set_chunk0(&(device->inherited), device_ptr, size);
 }
 
 static int

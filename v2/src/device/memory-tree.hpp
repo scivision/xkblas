@@ -57,7 +57,9 @@ class MemoryReplicateAllocationView {
             chunk(chunk),
             view(addr, ld),
             awaiting()
-        {}
+        {
+            ++chunk->use_counter;
+        }
 
         virtual ~MemoryReplicateAllocationView() {}
 
@@ -917,7 +919,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             xkblas_device_t * device,
             size_t size
         ) {
+
             /* adapted from 'kaapi_memory_cache_evict_fromlist' */
+
+            // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
             auto f = [device](NodeBase * nodebase, void * args) {
                 (void) args;
@@ -931,15 +936,34 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 const bool valid_on_device            = block.valid &  (1 << device->global_id);
                 const bool valid_on_any_other_devices = block.valid & ~(1 << device->global_id);
 
+                MemoryReplicate & replicate = block.replicates[device->global_id];
+
                 if (!valid_on_any_device || valid_on_any_other_devices)
                 {
-                    // TODO : evict all allocations
-                    XKBLAS_FATAL("valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                    /* evict all allocations */
+                    for (int i = 0 ; i < replicate.nallocations ; ++i)
+                    {
+                        MemoryReplicateAllocationView * allocation = replicate.allocations[i];
+                        assert(allocation);
+
+                        /* if only this block uses the allocation */
+                        if (allocation->chunk->use_counter == 1)
+                        {
+                            xkblas_memory_deallocate(device, allocation->chunk);
+                            XKBLAS_FATAL("Worked");
+                        }
+                        /* else: what to do ? */
+                        else
+                        {
+                            XKBLAS_WARN("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                        }
+                    }
+                    replicate.nallocations = 0;
                 }
-                else if (valid_on_device && block.replicates[device->global_id].nallocations > 1)
+                else if (valid_on_device && replicate.nallocations > 1)
                 {
                     // TODO : only keep 1 valid allocations
-                    XKBLAS_FATAL("valid_on_device=%d, nallocations=%d", valid_on_device, block.replicates[device->global_id].nallocations);
+                    XKBLAS_FATAL("valid_on_device=%d, nallocations=%d", valid_on_device, replicate.nallocations);
                 }
             };
             this->foreach_node(f, NULL);
