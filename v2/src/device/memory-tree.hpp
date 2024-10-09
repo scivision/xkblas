@@ -81,7 +81,7 @@ class MemoryReplicate
     public:
 
         /* List of allocations for this device replicate.
-         * A device may have several allocations (and allocation) of the same 'host memory'
+         * A device may have several allocations for the same 'host memory'
          * For instance, in the following case scenario where blocks are read in order
          *  ._______________________.
          *  |           |           |
