@@ -143,16 +143,16 @@ xkblas_init_conf(xkblas_conf_t * conf)
     //////////////////
     conf->device.offloader.capacity = 512;
 
-    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = 2;
+    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = 4;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = 8;
 
-    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2D].n = 1;
+    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2D].n = 2;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2D].concurrency = 0;
 
-    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2H].n = 1;
+    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2H].n = 2;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_D2H].concurrency = 0;
 
-    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_H2D].n = 1;
+    conf->device.offloader.streams[XKBLAS_STREAM_TYPE_H2D].n = 2;
     conf->device.offloader.streams[XKBLAS_STREAM_TYPE_H2D].concurrency = 0;
 
     //////////////////
