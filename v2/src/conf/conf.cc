@@ -16,8 +16,19 @@ static void
 __parse_nkernels(xkblas_conf_t * conf, char const * value)
 {
     if (value)
-        conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = atoi(value);
+    {
+        conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = (uint8_t) MAX(atoi(value), 1);
+    }
 }
+
+static void
+__parse_nstreams(xkblas_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n = (uint8_t) MAX(atoi(value), 1);
+}
+
+
 
 static void
 __parse_tile_size(xkblas_conf_t * conf, char const * value)
@@ -118,7 +129,7 @@ static xkblas_conf_parse_t CONF_PARSE[] = {
     {"XKBLAS_PRECISION",            NULL,                       NULL},
     {"XKBLAS_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
     {"XKBLAS_GPUSET",               __parse_gpuset,             "A bitmask representing GPUs to use"},
-    {"XKBLAS_NSTREAMS",             NULL,                       NULL},
+    {"XKBLAS_NSTREAMS",             __parse_nstreams,           "Number of concurrent kernel streams per GPU"},
     {"XKBLAS_NKERNELS",             __parse_nkernels,           "Number of concurrent kernels per stream"},
     {"XKBLAS_CACHE_LIMIT",          NULL,                       NULL},
     {"XKBLAS_OFFLOADER_CAPACITY",   __parse_offloader_capacity, "Maximum number of pending instructions per stream"},
