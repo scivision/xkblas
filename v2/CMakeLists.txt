@@ -118,7 +118,7 @@ option(STRICT "Enable strict compilation mode" OFF)
 ################
 # STATS SYSTEM #
 ################
-option(USE_STATS "Whether to compile the built-in stat system." OFF)
+option(USE_STATS "Whether to compile the built-in stat system." ON)
 if (USE_STATS)
     LIST(APPEND SOURCE_FILES src/stats/stats.cc)
     add_compile_definitions(USE_STATS=1)

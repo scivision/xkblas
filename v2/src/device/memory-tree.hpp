@@ -58,7 +58,7 @@ class MemoryReplicateAllocationView {
             view(addr, ld),
             awaiting()
         {
-            ++chunk->use_counter;
+            ++(chunk->use_counter);
         }
 
         virtual ~MemoryReplicateAllocationView() {}
@@ -924,7 +924,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
-            auto f = [device](NodeBase * nodebase, void * args) {
+            size_t freed = 0;
+            auto f = [device, size, &freed](NodeBase * nodebase, void * args, bool & stop) {
                 (void) args;
 
                 Node * node = reinterpret_cast<Node *>(nodebase);
@@ -932,41 +933,59 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 MemoryBlock & block = node->block;
 
+                const memory_replicates_bitfield_t devbit = 1 << device->global_id;
+
                 const bool valid_on_any_device        = block.valid != 0;
-                const bool valid_on_device            = block.valid &  (1 << device->global_id);
-                const bool valid_on_any_other_devices = block.valid & ~(1 << device->global_id);
+                const bool valid_on_device            = block.valid &  devbit;
+                const bool valid_on_any_other_devices = block.valid & ~devbit;
 
                 MemoryReplicate & replicate = block.replicates[device->global_id];
+                if (replicate.fetching)
+                    return ;
 
                 if (!valid_on_any_device || valid_on_any_other_devices)
                 {
                     /* evict all allocations */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
+                        const memory_replicates_bitfield_t allocbit = 1 << i;
+
                         MemoryReplicateAllocationView * allocation = replicate.allocations[i];
                         assert(allocation);
 
                         /* if only this block uses the allocation */
                         if (allocation->chunk->use_counter == 1)
                         {
+                            XKBLAS_WARN("Evicted a block of size %u MB", allocation->chunk->size/1024/1024);
                             xkblas_memory_deallocate(device, allocation->chunk);
-                            XKBLAS_FATAL("Worked");
+                            freed += allocation->chunk->size;
                         }
                         /* else: what to do ? */
                         else
                         {
-                            XKBLAS_WARN("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                            XKBLAS_FATAL("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
                         }
+
+                        // delete allocation;
                     }
-                    replicate.nallocations = 0;
+                    replicate.nallocations  = 0;
+                    replicate.valid         = 0;
+                    assert(replicate.fetching == 0);
+
+                    block.valid &= ~devbit;
+
+                    // stop = freed >= 2*size;
+                    stop = false;
                 }
                 else if (valid_on_device && replicate.nallocations > 1)
                 {
-                    // TODO : only keep 1 valid allocations
-                    XKBLAS_FATAL("valid_on_device=%d, nallocations=%d", valid_on_device, replicate.nallocations);
+                    // TODO : only keep 1 valid allocation
+                    XKBLAS_FATAL("valid_on_device=%d, nallocations=%d",
+                            valid_on_device, replicate.nallocations);
                 }
             };
-            this->foreach_node(f, NULL);
+
+            this->foreach_node_until(f, NULL);
         }
 
         inline xkblas_alloc_chunk_t *

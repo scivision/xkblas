@@ -52,7 +52,6 @@ typedef struct  xkblas_conf_s
     uint64_t    stackblocsize;      /* default stack bloc size */
     uint8_t     ngpus;              /* number of GPU for this node */
     uint32_t    gpu_set;            /* GPU to use */
-    float cuda_cache_limit;
 
     xkblas_conf_device_t device;                            /* device conf */
     xkblas_conf_kernel_t kernels[XKBLAS_KERNEL_TYPE_MAX];   /* kernels conf */

@@ -49,7 +49,6 @@ typedef struct  xkblas_device_cuda_t
     xkblas_device_t inherited;
     int save_device_id;
 
-    size_t mem_limit;
     size_t mem_total;
     size_t free_mem;
     size_t size_alloc;
@@ -401,8 +400,6 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->size_free = 0;
     device->free_mem = 0;
     xkblas_context_t * ctx = xkblas_context_get();
-    device->mem_limit = (size_t)((double)ctx->conf.cuda_cache_limit
-            * (double)(device->free_mem-180UL*1024UL*1024UL));
 
     /* work memory allocation */
     size_t free, total;
@@ -411,6 +408,8 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
 
     /* allocate 90% of free memory, into a new chunk */
     const size_t size = (size_t) ((double)free * 0.9);
+    // const size_t size = (size_t) ((double)free * 0.1);
+    // const size_t size = (size_t) ((double)free * 0.01);
     uintptr_t device_ptr;
     res = cudaMalloc((void **) &device_ptr, size);
     __check_error(res);

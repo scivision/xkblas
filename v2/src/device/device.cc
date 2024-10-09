@@ -27,6 +27,12 @@ xkblas_device_memory_reset(xkblas_device_t * device)
     assert(chunk0);
     memcpy(chunk0, &(device->memdev.chunk0), sizeof(xkblas_alloc_chunk_t));
     device->memdev.free_chunk_list = chunk0;
+
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    stats->memory.freed += stats->memory.allocated.currently;
+    stats->memory.allocated.currently = 0;
+    # endif /* USE_STATS */
 }
 
 void
@@ -64,6 +70,7 @@ xkblas_memory_deallocate(
     XKBLAS_MUTEX_LOCK(device->memdev.lock);
     {
         chunk->state = XKBLAS_ALLOC_CHUNK_STATE_FREE;
+        chunk->use_counter = 0;
 
         /* can we merge chunk into next_chunk ? */
         xkblas_alloc_chunk_t * next_chunk = chunk->next;
@@ -134,6 +141,12 @@ xkblas_memory_deallocate(
     }
     XKBLAS_MUTEX_UNLOCK(device->memdev.lock);
 
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    stats->memory.freed += chunk->size;
+    stats->memory.allocated.currently -= chunk->size;
+    # endif /* USE_STATS */
+
     if (delete_chunk)
         free(chunk);
 }
@@ -180,31 +193,42 @@ xkblas_memory_allocate(
     {
         size_t curr_size = curr->size;
         xkblas_alloc_chunk_t * remainder = (xkblas_alloc_chunk_t *) malloc(sizeof(xkblas_alloc_chunk_t));
-        remainder->device_ptr = size + curr->device_ptr;
-        remainder->size       = (curr_size - size);
-        remainder->state      = XKBLAS_ALLOC_CHUNK_STATE_FREE;
+        remainder->device_ptr   = size + curr->device_ptr;
+        remainder->size         = (curr_size - size);
+        remainder->state        = XKBLAS_ALLOC_CHUNK_STATE_FREE;
+        remainder->use_counter  = 0;
+        remainder->prev         = curr;
+        remainder->next         = curr->next;
+        remainder->freelink     = curr->freelink;
 
         /* link remainder segment after curr */
-        remainder->prev       = curr;
-        remainder->next       = curr->next;
-        if (curr->next) curr->next->prev = remainder;
-        curr->next            = remainder;
-        curr->size            = size;
-
-        /* link freelist */
-        remainder->freelink = curr->freelink;
+        if (curr->next)
+            curr->next->prev = remainder;
+        curr->next = remainder;
+        curr->size = size;
         curr->freelink = remainder;
     }
 
     if (curr != NULL)
     {
-        if (prevfree) prevfree->freelink = curr->freelink;
-        else device->memdev.free_chunk_list = curr->freelink;
+        if (prevfree)
+            prevfree->freelink = curr->freelink;
+        else
+            device->memdev.free_chunk_list = curr->freelink;
         curr->state = XKBLAS_ALLOC_CHUNK_STATE_ALLOCATED;
         curr->freelink = NULL;
     }
 
     XKBLAS_MUTEX_UNLOCK( device->memdev.lock );
+
+    # if USE_STATS
+    if (curr)
+    {
+        xkblas_stats_t * stats = xkblas_stats_get();
+        stats->memory.allocated.total     += size;
+        stats->memory.allocated.currently += size;
+    }
+    # endif /* USE_STATS */
 
     return curr;
 }

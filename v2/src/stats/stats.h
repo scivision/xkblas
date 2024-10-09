@@ -4,23 +4,33 @@
 # include "device/stream.h"
 
 # include <atomic>
-# include <stdint.h>
+# include <stddef.h>
+
+typedef std::atomic<uint64_t> stats_int_t;
 
 typedef struct  xkblas_stats_t
 {
     struct {
-        std::atomic<uint32_t> launched;
-        std::atomic<uint32_t> completed;
+        stats_int_t freed;
+        struct {
+            stats_int_t total;
+            stats_int_t currently;
+        } allocated;
+    } memory;
+
+    struct {
+        stats_int_t launched;
+        stats_int_t completed;
     } tasks;
 
     struct {
-        std::atomic<uint32_t> launched;
-        std::atomic<uint32_t> completed;
+        stats_int_t launched;
+        stats_int_t completed;
     } kernels;
 
     struct {
-        std::atomic<uint32_t> launched;
-        std::atomic<uint32_t> completed;
+        stats_int_t launched;
+        stats_int_t completed;
     } transfers[XKBLAS_STREAM_TYPE_ALL];
 
 }               xkblas_stats_t;

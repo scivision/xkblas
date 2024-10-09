@@ -27,7 +27,6 @@
 # endif /* NDEBUG */
 
 // coherency checks
-# undef CUBE_TREE_DISABLE_COHERENCY_CHECKS
 # ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
 #  pragma message("Define `CUBE_TREE_DISABLE_COHERENCY_CHECKS` for max performance")
 # endif
@@ -533,9 +532,37 @@ class KCubeTree {
         }
 
         void
-        foreach_node(std::function<void(Node *, void *)> f, void * args)
-        {
+        foreach_node(
+            std::function<void(Node *, void *)> f,
+            void * args
+        ) {
             this->foreach_node(this->root, f, args);
+        }
+
+        void
+        foreach_node_until(
+            Node * root,
+            std::function<void(Node *, void *, bool &)> f,
+            void * args,
+            bool & stop
+        ) const {
+            f(root, args, stop);
+            if (stop) return ;
+            FOREACH_CHILD_BEGIN(root, child, k, dir)
+            {
+                foreach_node_until(child, f, args, stop);
+                if (stop) return ;
+            }
+            FOREACH_CHILD_END(root, child, k, dir);
+        }
+
+        void
+        foreach_node_until(
+            std::function<void(Node *, void *, bool &)> f,
+            void * args
+        ) {
+            bool stop = false;
+            this->foreach_node_until(this->root, f, args, stop);
         }
 
         int
