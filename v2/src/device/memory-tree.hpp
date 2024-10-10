@@ -589,8 +589,8 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                             view->awaiting.clear();
 
                             /* this replicate just got fetched and is now valid */
-                            replicate.valid    |=  allocbit;
-                            replicate.fetching &= ~allocbit;
+                            replicate.valid    |= (memory_replicates_bitfield_t)  allocbit;
+                            replicate.fetching &= (memory_replicates_bitfield_t) ~allocbit;
 
                             break ;
                         }
@@ -972,7 +972,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     replicate.valid         = 0;
                     assert(replicate.fetching == 0);
 
-                    block.valid &= ~devbit;
+                    block.valid &= (memory_replicates_bitfield_t) ~devbit;
 
                     // stop = freed >= 2*size;
                     stop = false;
@@ -1459,10 +1459,10 @@ next_view:
                 if (bytes_owned_max < bytes_owned)
                 {
                     bytes_owned_max = bytes_owned;
-                    owners = (1 << device_global_id);
+                    owners = (memory_replicates_bitfield_t) (1 << device_global_id);
                 }
                 else if (bytes_owned_max && bytes_owned_max == bytes_owned)
-                    owners |= (1 << device_global_id);
+                    owners |= (memory_replicates_bitfield_t) (1 << device_global_id);
             }
 
             return owners;
