@@ -99,21 +99,23 @@ add_custom_command(
         python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/
 )
 
-# TODO : I don't like this... but it is what it is
-#add_custom_command(
-#    OUTPUT
-#        ${XKBLAS_KERNELS_SOURCE_FILES}
-#        ${CUDA_SOURCE_FILES}
-#    COMMAND
-#        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
-#    DEPENDS
-#        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
-#)
+add_custom_command(
+    OUTPUT
+        ${XKBLAS_KERNELS_SOURCE_FILES}
+        ${CUDA_SOURCE_FILES}
+    COMMAND
+        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
+    DEPENDS
+        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
+)
 
 option(STRICT "Enable strict compilation mode" OFF)
 
-# TODO : comment to enable kinterval tree heavy debug
-#add_compile_definitions(KINTERVAL_BTREE_DISABLE_COHERENCY_CHECKS=1)
+# uncomment to disable kinterval tree heavy debug
+option(DISABLE_HEAVY_DEBUG "When compiling in BUILD_TYPE=Debug, you can disable heavy assertion tests in the cube-tree structure setting this variable to 'ON' - this is not recommanded" OFF)
+if (USE_HEAVY_DEBUG)
+    add_compile_definitions(CUBE_TREE_DISABLE_COHERENCY_CHECKS=1)
+endif()
 
 ################
 # STATS SYSTEM #
@@ -130,7 +132,7 @@ endif()
 ###############
 
 # HWLOC
-option(USE_HWLOC "Whether to build the NVIDIA GPU plugin." ON)
+option(USE_HWLOC "Whether to build the NVIDIA GPU driver." ON)
 if (USE_HWLOC)
     find_package(HWLOC)
     include_directories(${HWLOC_INCLUDE_DIRS})
@@ -147,21 +149,46 @@ if (USE_CPU)
 endif()
 
 # CUDA
-option(USE_CUDA "Whether to build the NVIDIA GPU plugin." ON)
+option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
 if (USE_CUDA)
     add_compile_definitions(USE_CUDA=1)
     find_package(CUDA REQUIRED)
     find_package(CUDA_RT)
     if (NOT ${CUDA_RT_FOUND})
-        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUDA_RT could not be found.")
+        message(FATAL_ERROR "Xkblas could not find CUDA_RT.")
     endif()
     find_package(CUBLAS)
     if (NOT ${CUBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas is configured with NVIDIA GPU plugin but CUBLAS could not be found.")
+        message(FATAL_ERROR "Xkblas could not find CUBLAS.")
     endif()
     include_directories("${CUDA_INCLUDE_DIRS}")
     message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
 endif()
+
+# HIP
+option(USE_HIP "Whether to build the AMD GPU driver." OFF)
+if (USE_HIP)
+
+    add_compile_definitions(USE_HIP=1)
+    find_package(HIP REQUIRED)
+    if (NOT ${HIP_FOUND})
+        message(FATAL_ERROR "Xkblas could not find HIP.")
+    endif()
+    include_directories("${HIP_INCLUDE_DIRS}")
+    message(STATUS "Found HIP: ${HIP_LIBRARIES}")
+
+    find_package(HIPBLAS)
+    if (NOT ${HIPBLAS_FOUND})
+        message(FATAL_ERROR "Xkblas could not find HIPBLAS.")
+    endif()
+    message(STATUS "Found HIPBLAS: ${HIPBLAS_LIBRARIES}")
+
+endif()
+
+if (USE_CUDA AND USE_HIP)
+    message(STATUS "Enabling both CUDA and HIP is experimental, what kind of machine are you running on ?")
+endif()
+
 
 ##########
 # XKBLAS #

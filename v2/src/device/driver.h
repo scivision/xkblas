@@ -22,9 +22,10 @@
 
 typedef enum    xkblas_driver_type_t : uint8_t
 {
-    XKBLAS_DRIVER_TYPE_CPU = 0,
+    XKBLAS_DRIVER_TYPE_CPU  = 0,
     XKBLAS_DRIVER_TYPE_CUDA = 1,
-    XKBLAS_DRIVER_TYPE_MAX  = 2
+    XKBLAS_DRIVER_TYPE_HIP  = 2,
+    XKBLAS_DRIVER_TYPE_MAX  = 3
 }               xkblas_driver_type_t;
 
 typedef struct  xkblas_driver_t

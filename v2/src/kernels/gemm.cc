@@ -298,6 +298,54 @@ xkblas_£gemm_async(
 
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
+# if USE_HIP
+
+static inline void
+body_hip(void * vlauncher)
+{
+    task_launcher_t * launcher = (task_launcher_t *) vlauncher;
+    assert(launcher);
+
+    cublasStatus_t res;
+    cublasHandle_t handle = (cublasHandle_t) launcher->handle;
+
+    const Access * A = launcher->task->accesses + 0;
+    const Access * B = launcher->task->accesses + 1;
+    const Access * C = launcher->task->accesses + 2;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(B->device_view.addr % B->host_view.sizeof_type == 0);
+    assert(C->device_view.addr % C->host_view.sizeof_type == 0);
+
+    args_t * args = (args_t *) (launcher->task + 1);
+    assert(args);
+
+    XKBLAS_DEBUG("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+        args->m, args->n, args->k,
+        (void *) A->device_view.addr,
+        A->device_view.ld,
+        (void *) B->device_view.addr,
+        B->device_view.ld,
+        (void *) C->device_view.addr,
+        C->device_view.ld,
+        launcher->task->label
+    );
+
+    res = cublas££gemm(
+        handle,
+        cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
+        (int) args->m, (int) args->n, (int) args->k,
+        (const CU_TYPE *) &args->alpha,
+        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+        (const CU_TYPE *) B->device_view.addr, (int) B->device_view.ld,
+        (const CU_TYPE *) &args->beta,
+        (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
+    );
+    xkblas_cublas_status_check(res);
+    assert(res == CUBLAS_STATUS_SUCCESS);
+}
+# endif /* USE_HIP */
+
 # if USE_CUDA
 #  include "device/cublas-helper.h"
 
@@ -353,13 +401,11 @@ body_cuda(void * vlauncher)
 }
 # endif /* USE_CUDA */
 
-# ifdef USE_CPU
 static void
 body_cpu(void * args)
 {
     XKBLAS_DEBUG("Executing a gemm on cpu");
 }
-# endif /* USE_CPU */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -371,12 +417,20 @@ register_£gemm_format(void)
     task_format_t format;
     memset(&format, 0, sizeof(task_format_t));
 
-# ifdef USE_CPU
-    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
-# endif /* USE_CPU */
-# ifdef USE_CUDA
-    format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
-# endif /* USE_CUDA */
+    # pragma message(TODO "Use templated function to generate code instead of dupplicating HIP/Cuda kernels")
+
+    # if USE_CPU
+    format.f[XKBLAS_DRIVER_TYPE_CPU]    = body_cpu;
+    # endif /* USE_CPU */
+
+    # if USE_CUDA
+    format.f[XKBLAS_DRIVER_TYPE_CUDA]   = body_cuda;
+    # endif /* USE_CUDA */
+
+    # if USE_HIP
+    format.f[XKBLAS_DRIVER_TYPE_HIP]    = body_hip;
+    # endif /* USE_HIP */
+
     snprintf(format.label, sizeof(format.label), "£gemm");
     format.target = TASK_FORMAT_TARGET_DRIVER;
     format_id = task_format_create(&format);
