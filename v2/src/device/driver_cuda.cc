@@ -49,7 +49,8 @@ typedef struct  xkblas_device_cuda_t
 {
     xkblas_device_t inherited;
 
-    int * affinity;    /* of size cuda_count_perfrank - 1 */
+    /* affinity[i] - j-th bit is set to '1' if this device has an affinity 'i' with 'j' (the lowest affinity, the better perf) */
+    xkblas_device_global_id_bitfield_t * affinity;
 
     size_t mem_total;
     size_t free_mem;
@@ -475,7 +476,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 
     const uint64_t perfrank = cuda_count_perfrank - 1;
     const uint64_t size = sizeof(uint64_t) * perfrank;
-    device->affinity = (int *) malloc(sizeof(int) * perfrank);
+    device->affinity = (xkblas_device_global_id_bitfield_t *) malloc(sizeof(xkblas_device_global_id_bitfield_t) * perfrank);
     memset(device->affinity, 0, size);
 
     /* all other devices have been initialized, enable peer */
@@ -491,7 +492,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         /* add device with itself */
         if (device_cuda_id == other_device_cuda_id)
         {
-            device->affinity[0] |= (1UL << other_device->inherited.global_id);
+            device->affinity[0] |= (xkblas_device_global_id_bitfield_t) (1UL << other_device->inherited.global_id);
         }
         else
         {
@@ -508,7 +509,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
                     assert(rank);
                     if (cuda_perf_device[device_cuda_id*cuda_count_perfrank+rank] & (1UL << other_device_cuda_id))
                     {
-                        device->affinity[rank - 1] |= (1UL << other_device_cuda_id);
+                        device->affinity[rank - 1] |= (xkblas_device_global_id_bitfield_t) (1UL << other_device_cuda_id);
                     }
                 }
                 else
