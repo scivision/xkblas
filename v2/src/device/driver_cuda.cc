@@ -7,6 +7,7 @@
 # include "device/driver.h"
 # include "device/stream.h"
 # include "logger/logger.h"
+# include "sync/bits.h"
 # include "sync/mutex.h"
 
 # include <cuda_runtime.h>
@@ -47,14 +48,13 @@ typedef struct  xkblas_stream_cuda_t
 typedef struct  xkblas_device_cuda_t
 {
     xkblas_device_t inherited;
-    int save_device_id;
+
+    uint64_t * affinity;    /* of size cuda_count_perfrank - 1 */
 
     size_t mem_total;
     size_t free_mem;
     size_t size_alloc;
     size_t size_free;
-
-    uint64_t * affinity;
 
     /* device properties (from NVIDIA website) */
     struct
@@ -65,7 +65,6 @@ typedef struct  xkblas_device_cuda_t
         bool integrated;    /* if the device is integrated with the memory subsystem */
         bool map;           /* if the device can map host memory into the CUDA address space */
         bool concurrent;    /* if the device supports executing multiple kernels within the same context simultaneously */
-        int async_engines;  /* Number of asynchronous engines */
         char name[64];      /* GPU name */
     } prop;
 
@@ -75,31 +74,30 @@ typedef struct  xkblas_device_cuda_t
 static xkblas_device_cuda_t DEVICES[XKBLAS_DEVICES_MAX];
 
 static inline xkblas_device_t *
-__get_device(int device_id)
+__get_device(int device_driver_id)
 {
-    return (xkblas_device_t *) (DEVICES + device_id);
+    return (xkblas_device_t *) (DEVICES + device_driver_id);
 }
 
 static inline xkblas_device_cuda_t *
-__get_device_cuda(int device_id)
+__get_device_cuda(int device_driver_id)
 {
-    return (xkblas_device_cuda_t *) __get_device(device_id);
+    return (xkblas_device_cuda_t *) __get_device(device_driver_id);
 }
 
 /* Convert xkblas driver device id (in [0..ngpus-1]) to the cuda driver device id (in [0, INT_MAX[) */
-static int CUDA_DEVICE_ID[XKBLAS_DEVICES_MAX];
+static int DEVICE_CUDA_ID[XKBLAS_DEVICES_MAX];
 
 static inline void
-__set_device_cuda_id(int device_id, int cuda_device_id)
+__set_device_cuda_id(int device_driver_id, int device_cuda_id)
 {
-    CUDA_DEVICE_ID[device_id] = cuda_device_id;
-    // XKBLAS_DEBUG("driver device id = %d ; cuda device id = %d", device_id, cuda_device_id);
+    DEVICE_CUDA_ID[device_driver_id] = device_cuda_id;
 }
 
 static inline int
-__get_device_cuda_id(int device_id)
+__get_device_cuda_id(int device_driver_id)
 {
-    return CUDA_DEVICE_ID[device_id];
+    return DEVICE_CUDA_ID[device_driver_id];
 }
 
 /* initialization synchronization */
@@ -122,16 +120,16 @@ __check_error(cudaError_t err)
 }
 
 static
-uint64_t cuda_get_free_mem(int device_id)
+uint64_t cuda_get_free_mem(int device_driver_id)
 {
-    cudaError_t res = cudaSetDevice(__get_device_cuda_id(device_id));
+    cudaError_t res = cudaSetDevice(__get_device_cuda_id(device_driver_id));
     __check_error(res);
 
     uint64_t free, total;
     res = cudaMemGetInfo(&free, &total);
     __check_error(res);
 
-    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
     device->free_mem = (size_t)free;
     return device->free_mem;
 }
@@ -146,17 +144,16 @@ XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 
 // NVLINK TOPOLOGY
 
-/* cuda_perf_topo[i,j] returns the perfRank of the communication link between
+/* cuda_perf_topo[i,j] returns the perf_rank of the communication link between
    device.
    cuda_perf_device[d][i] for i=0,..,cuda_count_perfrank-1 is the mask of device
    for which the device d has link with performance i.
 */
 
-static int cuda_device_count;
-static int cuda_perf_topo[XKBLAS_DEVICES_MAX][XKBLAS_DEVICES_MAX];
-static int cuda_count_perfrank;
-static uint64_t * cuda_perf_device;
-static int* cuda_routing_table;
+static int          cuda_device_count   = 0;
+static int *        cuda_perf_topo      = nullptr;
+static int          cuda_count_perfrank = 0;
+static uint64_t *   cuda_perf_device    = 0;
 
 static void
 __get_gpu_topo(void)
@@ -168,48 +165,46 @@ __get_gpu_topo(void)
     int min_perf = 0;
     int max_perf = 0;
 
-    // Enumerates Device <-> Device links and store perfRank
-    for (int i = 0; i < cuda_device_count; i++)
+    cuda_perf_topo = (int *) malloc(sizeof(int) * cuda_device_count * cuda_device_count);
+    assert(cuda_perf_topo);
+
+    // Enumerates Device <-> Device links and store perf_rank
+    for (int i = 0; i < cuda_device_count; ++i)
     {
-        for (int j = 0; j < cuda_device_count; j++)
+        for (int j = 0; j < cuda_device_count; ++j)
         {
             if (i == j)
             {
-                cuda_perf_topo[i][j] = 0;
-                continue ;
+                cuda_perf_topo[i*cuda_device_count+j] = 0;
             }
             else
             {
-                int perfRank = 0;
-                int accessSupported = 0;
+                int perf_rank = 0;
+                int access_supported = 0;
 
                 cudaError_t res = cudaDeviceGetP2PAttribute(
-                                    &accessSupported,
+                                    &access_supported,
                                     cudaDevP2PAttrAccessSupported,
-                                    i,
-                                    j
+                                    i, j
                 );
                 __check_error(res);
-                if (accessSupported)
+                if (access_supported)
                 {
                     res = cudaDeviceGetP2PAttribute(
-                            &perfRank,
+                            &perf_rank,
                             cudaDevP2PAttrPerformanceRank,
-                            i,
-                            j
+                            i, j
                     );
                     __check_error(res);
-                    cuda_perf_topo[i][j] = 1 + perfRank;
 
-                    if (perfRank < max_perf)
-                        max_perf = perfRank;
-                    if (perfRank > min_perf)
-                        min_perf = perfRank;
+                    cuda_perf_topo[i*cuda_device_count+j] = 1 + perf_rank;
+                    max_perf = MAX(perf_rank, max_perf);
+                    min_perf = MIN(perf_rank, min_perf);
                 }
                 else
                 {
                     /* should be higher than previous value: computed after */
-                    cuda_perf_topo[i][j] = -1;
+                    cuda_perf_topo[i*cuda_device_count+j] = -1;
                 }
             }
         }
@@ -219,33 +214,27 @@ __get_gpu_topo(void)
 
     /* if there is no link, set to the minmum perf */
     ++min_perf;
-    for (int i = 0 ; i < cuda_device_count ; ++i)
+    for (int i = 0 ; i < cuda_device_count*cuda_device_count ; ++i)
     {
-        for (int j = 0 ; j < cuda_device_count ; ++j)
-        {
-            if (cuda_perf_topo[i][j] == -1)
-            {
-                cuda_perf_topo[i][j] = min_perf + 1;    // TODO : this +1 is suspicious to me
-                XKBLAS_INFO("Cuda GPU : no peer access from %d to %d", i, j);
-            }
-        }
+        if (cuda_perf_topo[i] == -1)
+            cuda_perf_topo[i] = min_perf + 1;
     }
 
     cuda_count_perfrank = min_perf - max_perf + 2;
     size_t size = cuda_device_count * cuda_count_perfrank * sizeof(uint64_t);
-    cuda_perf_device = (uint64_t *) malloc( size );
+    cuda_perf_device = (uint64_t *) malloc(size);
     assert(cuda_perf_device);
     memset(cuda_perf_device, 0, size);
 
-    for (int i = 0 ; i < cuda_device_count ; ++i)
+    for (int device_cuda_id = 0 ; device_cuda_id < cuda_device_count ; ++device_cuda_id)
     {
-        for (int j = 0 ; j < cuda_device_count ; ++j)
+        for (int other_device_cuda_id = 0 ; other_device_cuda_id < cuda_device_count ; ++other_device_cuda_id)
         {
-            int rank = cuda_perf_topo[i][j];
-            assert(0 <= i * cuda_device_count + rank );
-            assert(i * cuda_count_perfrank + rank <= cuda_device_count * cuda_count_perfrank);
-            cuda_perf_device[i * cuda_count_perfrank + rank] |= (1UL << j);
-            XKBLAS_INFO("Cuda GPU %d -> %d with perf = %d", i, j, rank);
+            int rank = cuda_perf_topo[device_cuda_id*cuda_device_count+other_device_cuda_id];
+            assert(0 <= device_cuda_id * cuda_device_count   + rank);
+            assert(     device_cuda_id * cuda_count_perfrank + rank <= cuda_device_count * cuda_count_perfrank);
+
+            cuda_perf_device[device_cuda_id * cuda_count_perfrank + rank] |= (1UL << other_device_cuda_id);
         }
     }
 }
@@ -256,14 +245,23 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
     if (INITIALIZED)
         return 0;
 
-    memset(CUDA_DEVICE_ID, -1, sizeof(CUDA_DEVICE_ID));
-
     XKBLAS_MUTEX_LOCK(DRIVER_MUTEX);
     {
         if (INITIALIZED)
         {
             XKBLAS_MUTEX_UNLOCK(DRIVER_MUTEX);
             return 0;
+        }
+        INITIALIZED = true;
+
+        memset(DEVICE_GLOBAL_ID, -1, sizeof(DEVICE_GLOBAL_ID));
+        memset(DEVICE_CUDA_ID,   -1, sizeof(DEVICE_CUDA_ID));
+
+        for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
+        {
+            xkblas_device_cuda_t * device = __get_device_cuda(i);
+            assert(device);
+            device->state = XKBLAS_DEVICE_STATE_DEALLOCATED;
         }
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
@@ -279,31 +277,11 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
             __set_device_cuda_id(i, idx);
         }
 
-        INITIALIZED = true;
+        hwloc_topology_init(&TOPOLOGY);
+        hwloc_topology_load(TOPOLOGY);
+        __get_gpu_topo();
     }
     XKBLAS_MUTEX_UNLOCK(DRIVER_MUTEX);
-
-    hwloc_topology_init(&TOPOLOGY);
-    hwloc_topology_load(TOPOLOGY);
-    __get_gpu_topo();
-
-    # pragma message(TODO "What is RRL ? Register memory (for pinning)")
-    # if 0
-    int nrrl = getenv("XKBLAS_RRL_SIZE") ? atoi(getenv("XKBLAS_RRL_SIZE")) : 1;
-    if (nrrl <= 0)
-        nrrl = 1;
-    if (nrrl >= ctx->conf.ngpus)
-        nrrl = ctx->conf.ngpus;
-
-    all_rrl_size = nrrl;
-    all_rrl = (host_register_queue_t*)malloc(all_rrl_size* sizeof(host_register_queue_t));
-    for (int i=0; i<nrrl; ++i)
-    {
-        xkblas_cuda_init_reqreg_list(&all_rrl[i]);
-        int err = pthread_create(&all_rrl[i].thread, 0, xkblas_cuda_register_thread, (void*)(uintptr_t)i );
-        assert(err ==0);
-    }
-    # endif
 
     return 0;
 }
@@ -333,19 +311,19 @@ XKBLAS_DRIVER_ENTRYPOINT(get_name)(void)
 }
 
 static int
-XKBLAS_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_id)
+XKBLAS_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_driver_id)
 {
     if (schedset == NULL)
         return EINVAL;
 
-    assert(device_id >= 0);
-    assert(device_id < XKBLAS_DEVICES_MAX);
-    assert(__get_device_cuda_id(device_id) != -1);
+    assert(device_driver_id >= 0);
+    assert(device_driver_id < XKBLAS_DEVICES_MAX);
+    assert(__get_device_cuda_id(device_driver_id) != -1);
 
     CPU_ZERO(schedset);
 
     hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-    int err = hwloc_cudart_get_device_cpuset(TOPOLOGY, __get_device_cuda_id(device_id), cpuset);
+    int err = hwloc_cudart_get_device_cpuset(TOPOLOGY, __get_device_cuda_id(device_driver_id), cpuset);
     if (err == 0)
     {
         err = hwloc_cpuset_to_glibc_sched_affinity(TOPOLOGY, cpuset, schedset, sizeof(cpu_set_t));
@@ -354,38 +332,40 @@ XKBLAS_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_id)
             err = ENOTSUP;
     }
     else
-        XKBLAS_WARN("Could not get a 'cpuset' for CUDA device %d, falling back to glibc...", device_id);
+        XKBLAS_WARN("Could not get a 'cpuset' for CUDA device %d, falling back to glibc...", device_driver_id);
 
     hwloc_bitmap_free(cpuset);
     return err;
 }
 
 static xkblas_device_t *
-XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_id)
+XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_driver_id)
 {
     assert(INITIALIZED);
-    assert(device_id >= 0 && device_id < XKBLAS_DEVICES_MAX);
+    assert(device_driver_id >= 0 && device_driver_id < XKBLAS_DEVICES_MAX);
 
-    xkblas_device_cuda_t * device = DEVICES + device_id;
-    device->save_device_id = -1;
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
+    assert(device);
+    assert(device->state == XKBLAS_DEVICE_STATE_DEALLOCATED);
 
     return (xkblas_device_t *) device;
 }
 
 static void
-XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_id)
+XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 {
     assert(INITIALIZED);
 
-    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
-    # pragma message(TODO "Check device lifecycle: must be created here")
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
+    assert(device);
+    assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
 
     struct cudaDeviceProp prop;
     cudaError_t res;
-    res = cudaSetDevice(__get_device_cuda_id(device_id));
+    res = cudaSetDevice(__get_device_cuda_id(device_driver_id));
     __check_error(res);
 
-    res = cudaGetDeviceProperties(&prop, __get_device_cuda_id(device_id));
+    res = cudaGetDeviceProperties(&prop, __get_device_cuda_id(device_driver_id));
     __check_error(res);
 
     device->prop.pciBusID = prop.pciBusID;
@@ -425,86 +405,72 @@ XKBLAS_DRIVER_ENTRYPOINT(device_destroy)(xkblas_device_t * device)
 }
 
 static int
-XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_id)
+XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
 {
     assert(INITIALIZED);
 
-    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
-    assert(device->save_device_id == -1);
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
 
-    cudaError_t res;
-    res = cudaGetDevice(&device->save_device_id);
-    __check_error(res);
-
-    res = cudaSetDevice(__get_device_cuda_id(device_id));
+    cudaError_t res = cudaSetDevice(__get_device_cuda_id(device_driver_id));
     __check_error(res);
 
     return 0;
 }
 
+/**
+ * @params
+ *      'dst_global_id' is where to send the data
+ *      'valid'         is a bitmask of 'device_global_id' where '1' means the device holds valid data
+ *  @return
+ *      the source device to use for a valid transfer
+ */
 static int
-XKBLAS_DRIVER_ENTRYPOINT(get_source)(int dst_global_id, int bitmask)
-{
-    # pragma message(TODO "Converting device 'global' to 'driver' id here - maybe create a mapping at initialization, instead of doing it everytime")
+XKBLAS_DRIVER_ENTRYPOINT(get_source)(
+    int dst_global_id,
+    int valid
+) {
+    # pragma message(TODO "Improve this heuristic, naive currently")
 
-    // retrieve the 'driver' id of the 'dst_global_id' passed
-    int dst_driver_id = -1;
-    for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
+    /* fast way out: valid on no devices, assume valid on host */
+    if (valid == 0)
+        return HOST_DEVICE_GLOBAL_ID;
+
+    /* fast way out: valid on that device already */
+    if (valid & (1 << dst_global_id))
+        return dst_global_id;
+
+    xkblas_device_cuda_t * device = (xkblas_device_cuda_t *) xkblas_device_get(dst_global_id);
+    assert(device);
+
+    for (int rank = 0 ; rank < cuda_count_perfrank -1 ; ++rank)
     {
-         xkblas_device_cuda_t* pdev = DEVICES + driver_dev_id;
-         if( pdev->inherited.state == XKBLAS_DEVICE_STATE_CREATE )
-             continue;
-         if( pdev->inherited.global_id == dst_global_id )
-         {
-             dst_driver_id = pdev->inherited.driver_id;
-             break;
-         }
-    }
-    if( dst_driver_id == -1 )
-    { // Can't found dst in the driver devices...
-        return -1;
+        /* get valid devices for this affinity */
+        int mask = valid & device->affinity[rank];
+        if (mask == 0)
+            continue ;
+
+        /* return a random device with this affinity */
+        return __random_set_bit(mask) - 1;
     }
 
-
-    # pragma message(TODO "This loop implementation is O(n) with 'n' the number of devices - it can be O(m) with 'm' the number of distinct performances using the 'cuda_perf_device' array - maybe reimplement it using 'cuda_perf_device'")
-    // get the valid device with the best connectivity
-    int src = -1;
-    int src_rank = INT_MAX;
-    for( int driver_dev_id = 0; driver_dev_id < XKBLAS_DEVICES_MAX; driver_dev_id++ )
-    {
-         xkblas_device_cuda_t* pdev = DEVICES + driver_dev_id;
-
-         // 1 - check if the device exist/is initialized ?
-         if( !(pdev->inherited.state == XKBLAS_DEVICE_STATE_COMMIT || pdev->inherited.state == XKBLAS_DEVICE_STATE_RUNNING) )
-             continue; // Device is not is a valid state
-
-         // 2 - check if the data is valid here
-         if( ((1 << pdev->inherited.global_id) & bitmask) == 0 )
-             continue; // Data is not valid on this device
-
-         // 3 - check the rank
-         int rank = cuda_perf_topo[dst_driver_id][driver_dev_id];
-         if( rank < src_rank )
-         {
-             src = pdev->inherited.global_id;
-             src_rank = rank;
-         }
-    }
-    return src_rank;
+    return __builtin_ffs
 }
 
 /* Called on all devices of the driver after they have been initialized */
 static int
-XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
+XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 {
 # ifndef NDEBUG
     int cu_devid = -1;
     cudaGetDevice(&cu_devid);
-    assert(cu_devid == __get_device_cuda_id(device_id));
+    assert(cu_devid == __get_device_cuda_id(device_driver_id));
 # endif /* NDEBUG */
 
-    xkblas_device_cuda_t * device = __get_device_cuda(device_id);
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
+    assert(device->state == XKBLAS_DEVICE_STATE_INIT);
+
+    int device_cuda_id = __get_device_cuda_id(device_driver_id);
 
     const uint64_t perfrank = cuda_count_perfrank - 1;
     const uint64_t size = sizeof(uint64_t) * perfrank;
@@ -512,42 +478,36 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_id)
     memset(device->affinity, 0, size);
 
     /* all other devices have been initialized, enable peer */
-    int i = __get_device_cuda_id(device_id);
-    for (int dev = 0 ; dev < XKBLAS_DEVICES_MAX ; ++dev)
+    for (int other_device_driver_id = 0 ; other_device_driver_id < XKBLAS_DEVICES_MAX ; ++other_device_driver_id)
     {
-        int j = __get_device_cuda_id(dev);
+        xkblas_device_cuda_t * other_device = __get_device_cuda(other_device_driver_id);
+        assert(other_device);
+        if (other_device->inherited.state < XKBLAS_DEVICE_STATE_INIT)
+            continue ;
+
+        int other_device_cuda_id = __get_device_cuda_id(other_device_driver_id);
 
         /* add device with itself */
-        if (i == j)
+        if (device_cuda_id == other_device_cuda_id)
         {
-            # if 0
-            device->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-            ld->affinity[0] |= (1UL<<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-            # endif
+            device->affinity[0] |= (1UL << other_device->inherited.global_id);
         }
         else
         {
-            xkblas_device_cuda_t * odevice = __get_device_cuda(j);
-            if (odevice->inherited.state != XKBLAS_DEVICE_STATE_INIT)
-                continue ;
-
             int access;
-            cudaError_t res;
-            res = cudaDeviceCanAccessPeer(&access, i, j);
+            cudaError_t res = cudaDeviceCanAccessPeer(&access, device_cuda_id, other_device_cuda_id);
             __check_error(res);
 
             if (access)
             {
-                res = cudaDeviceEnablePeerAccess(j, 0);
+                res = cudaDeviceEnablePeerAccess(other_device_cuda_id, 0);
                 if ((res == cudaSuccess) || (res == cudaErrorPeerAccessAlreadyEnabled))
                 {
-                    int rank = cuda_perf_topo[i][j];
+                    int rank = cuda_perf_topo[i*cuda_device_count+j];
                     assert(rank);
-                    if (cuda_perf_device[i * cuda_count_perfrank + rank] & (1 << j))
+                    if (cuda_perf_device[i * cuda_count_perfrank + rank] & (1UL << other_device_cuda_id))
                     {
-                        # if 0
-                        device->affinity[rank-1] |= (1UL <<xkblas_memory_asid_get_lid(xkblas_device_list[j]->inherited.memdev.asid));
-                        # endif
+                        device->affinity[rank - 1] |= (1UL << other_device_cuda_id);
                     }
                 }
                 else
@@ -929,6 +889,42 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_delete)(
     free(stream);
 }
 
+static inline void
+_print_mask(char * buffer, ssize_t size, uint64_t v)
+{
+    for (int i = 0; i < size; ++i)
+        buffer[size-1-i] = (v & (1ULL<<i)) ? '1' : '0';
+}
+
+
+const char *
+XKBLAS_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
+{
+    static char buffer[256];
+    static char buf1[16];
+    static char buf2[16];
+    static char buf3[16];
+
+    xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
+    assert(device);
+
+    buf1[10] = 0;
+    buf2[10] = 0;
+    buf3[10] = 0;
+    _print_mask(buf1, 10, device->affinity[0]);
+    _print_mask(buf2, 10, device->affinity[1]);
+    _print_mask(buf3, 10, device->affinity[2]);
+    snprintf(buffer, 256, "%s, cuda device: %i, pci: %02x:%02x, %.2f (GB), affinity: %s,%s,%s",
+        device->prop.name,
+        device->inherited.global_id,
+        device->prop.pciBusID,
+        device->prop.pciDeviceID,
+        ((double)device->mem_total)/1024.0/1024.0/1024.0,
+        buf1, buf2, buf3
+    );
+    return buffer;
+}
+
 void
 XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
 {
@@ -944,6 +940,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
     EP(device_init);
     EP(device_attach);
     EP(device_commit);
+    EP(device_info);
 
     EP(memory_register);
     EP(memory_unregister);
@@ -952,21 +949,6 @@ XKBLAS_DRIVER_ENTRYPOINT(get_driver)(xkblas_driver_t * driver)
     EP(stream_delete);
 
     EP(get_source);
-
-    #if 0
-
-    EP(get_flags);
-    EP(get_type);
-    EP(host_register);
-    EP(host_register_testwait);
-    EP(host_unregister);
-
-    EP(device_info);
-    EP(device_finalize);
-    EP(device_detach);
-    EP(get_gpublas_handle);
-
-    #endif
 
     # undef EP
 }

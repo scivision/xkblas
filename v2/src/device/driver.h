@@ -62,19 +62,21 @@ typedef struct  xkblas_driver_t
     /* Set the cpuset of the attr for creating the thread that will manage the device dev */
     int (*f_device_set_cpuset)(cpu_set_t*, int);
 
-    /* create device object and initialize device_id field with argument */
+    /* create device object and initialize device_driver_id field with argument */
     xkblas_device_t * (*f_device_create)(xkblas_driver_t *, int);
     int (*f_device_destroy)(xkblas_device_t*);
 
     /* initialize device fields, especially with virtual functions */
-    const char* (*f_device_info)(xkblas_device_t*);
-    void (*f_device_init)(int device_id);
-    int (*f_device_commit)(int device_id);
+    void (*f_device_init)(int device_driver_id);
+    int (*f_device_commit)(int device_driver_id);
     void (*f_device_finalize)(xkblas_device_t*);
 
     /* consider device as the current device */
-    int (*f_device_attach)(int device_id);
+    int (*f_device_attach)(int device_driver_id);
     int (*f_device_detach)(xkblas_device_t*);
+
+    /* get device infos */
+    const char * (*f_device_info)(int device_driver_id);
 
     ////////////////////////////////
     //  MEMORY MANAGEMENT         //
@@ -149,7 +151,7 @@ typedef struct  xkblas_drivers_t
         std::atomic<uint8_t> n;
 
         /* next worker to offload round robin mode */
-        std::atomic<uint8_t> round_robin_device_id;
+        std::atomic<uint8_t> round_robin_device_driver_id;
 
     } devices;
 
@@ -162,7 +164,7 @@ typedef struct  xkblas_driver_device_thread_arg_t
 {
     xkblas_drivers_t * drivers;
     uint8_t driver_id;
-    uint8_t driver_device_id;
+    uint8_t device_driver_id;
 }               xkblas_driver_device_thread_arg_t;
 
 void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);

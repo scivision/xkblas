@@ -734,11 +734,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             int dst_device_global_id,
             int valid
         ) {
-            int src = driver->f_get_source(dst_device_global_id, valid);
-            if (src == -1) // Driver failed to find a valid source
-                src = __builtin_ffs(valid) - 1;
-            assert(src >= 0);
-            return src;
+            return driver->f_get_source(dst_device_global_id, valid);
         }
 
         inline void
@@ -1237,8 +1233,7 @@ next_view:
                     else
                     {
                         // find source
-                        xkblas_device_global_id_t src = (xkblas_device_global_id_t) ((partite.block->valid & (1 << device->global_id)) ? device->global_id : __builtin_ffs(partite.block->valid) - 1);
-                        // int src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
+                        xkblas_device_global_id_t src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
 
                         // Get the first valid allocation on that device
                         MemoryReplicate & replicate = partite.block->replicates[src];

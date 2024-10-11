@@ -304,9 +304,9 @@ xkblas_device_create(
     xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
     assert(device);
 
-    device->state           = XKBLAS_DEVICE_STATE_CREATE;
-    device->driver_id       = driver_device_id;
-    device->global_id       = drivers->devices.n++;
+    device->state     = XKBLAS_DEVICE_STATE_CREATE;
+    device->driver_id = driver_device_id;
+    device->global_id = drivers->devices.n.fetch_add(1, std::memory_order_seq_cst);
 
     drivers->devices.list[device->global_id] = device;
 
@@ -456,6 +456,8 @@ xkblas_device_thread_main(void * a)
     // can now commit my device
     xkblas_device_commit(driver, device);
     ++driver->ndevices_commited;
+
+    XKBLAS_INFO("%s", driver->f_device_info(driver_device_id));
 
     /* infinite loop with the device context */
     int err = xkblas_device_thread_main_loop(driver, device);

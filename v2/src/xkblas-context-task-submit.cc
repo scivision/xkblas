@@ -1,25 +1,5 @@
 # include "xkblas-context.h"
-
-/* utility: return the index of random select bit set to 1 */
-static inline int
-__random_set_bit(memory_replicates_bitfield_t bitfield)
-{
-    static unsigned int seed = 0x42;
-
-    if (bitfield == 0)
-        return 0;
-
-    const int nb = __builtin_popcount(bitfield);
-    int idx = 0;
-    int k = rand_r(&seed) % nb;
-    for (int i = 0; i <= k; ++i)
-    {
-        idx = __builtin_ffs(bitfield) - 1;
-        bitfield &= (memory_replicates_bitfield_t) ~(1 << idx);
-    }
-
-    return idx;
-}
+# include "sync/bits.h"
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
@@ -41,10 +21,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         assert(task->ocr_access_index >= 0 && task->ocr_access_index < task->naccesses);
         memory_replicates_bitfield_t owners = context->memtree.who_owns(task->accesses + task->ocr_access_index);
         if (owners)
-        {
-            device_id = (xkblas_device_global_id_t) __random_set_bit(owners);
-            // XKBLAS_DEBUG("owners = %d ; device_id = %d", owners, device_id);
-        }
+            device_id = (xkblas_device_global_id_t) __random_set_bit(owners) - 1;
     }
 
     // if a target device is set
