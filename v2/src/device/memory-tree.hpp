@@ -146,7 +146,7 @@ class KMemoryBlock {
         MemoryReplicate replicates[XKBLAS_DEVICES_MAX];
 
         /* valid devices (i.e. devices with at least one valid allocation) */
-        volatile memory_replicates_bitfield_t valid;
+        volatile xkblas_device_global_id_bitfield_t valid;
 
     public:
 
@@ -188,7 +188,7 @@ class KMemoryBlock {
             //  DUPPLICATE REPLICATE INFOS  //
             //////////////////////////////////
 
-            for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 // retrieve this device replicate
                       MemoryReplicate *            replicate =            this->replicates + device_global_id;
@@ -572,7 +572,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 case (Search::Type::SEARCH_AWAITING):
                 {
                     MemoryReplicate & replicate = this->block.replicates[search.device_global_id];
-                    const memory_replicates_bitfield_t devbit = (1 << search.device_global_id);
+                    const xkblas_device_global_id_bitfield_t devbit = (1 << search.device_global_id);
                     this->block.valid |= devbit;
 
                     /* for each allocation of that block */
@@ -603,7 +603,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 case (Search::Type::SEARCH_OWNERS):
                 {
                     const size_t bytes = cube.size();
-                    for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+                    for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
                         if (this->block.valid & (1 << device_global_id))
                             search.bytes_owned[device_global_id] += bytes;
                     break ;
@@ -728,10 +728,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         //  DECIDE SRC DEVICE WHEN FETCHING //
         //////////////////////////////////////
 
-        static inline int
+        static inline xkblas_device_global_id_t
         fetch_access_find_src(
             xkblas_driver_t * driver,
-            int dst_device_global_id,
+            xkblas_device_global_id_t dst_device_global_id,
             int valid
         ) {
             return driver->f_get_source(dst_device_global_id, valid);
@@ -929,7 +929,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 MemoryBlock & block = node->block;
 
-                const memory_replicates_bitfield_t devbit = 1 << device->global_id;
+                const xkblas_device_global_id_bitfield_t devbit = 1 << device->global_id;
 
                 const bool valid_on_any_device        = block.valid != 0;
                 const bool valid_on_device            = block.valid &  devbit;
@@ -968,7 +968,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     replicate.valid         = 0;
                     assert(replicate.fetching == 0);
 
-                    block.valid &= (memory_replicates_bitfield_t) ~devbit;
+                    block.valid &= (xkblas_device_global_id_bitfield_t) ~devbit;
 
                     // stop = freed >= 2*size;
                     stop = false;
@@ -1448,7 +1448,7 @@ next_view:
             // find devices which owns the most bytes
             memory_replicates_bitfield_t owners = 0;
             size_t bytes_owned_max = 0;
-            for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 const size_t bytes_owned = search.bytes_owned[device_global_id];
                 if (bytes_owned_max < bytes_owned)

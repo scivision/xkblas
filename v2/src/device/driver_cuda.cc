@@ -49,7 +49,7 @@ typedef struct  xkblas_device_cuda_t
 {
     xkblas_device_t inherited;
 
-    uint64_t * affinity;    /* of size cuda_count_perfrank - 1 */
+    int * affinity;    /* of size cuda_count_perfrank - 1 */
 
     size_t mem_total;
     size_t free_mem;
@@ -254,14 +254,13 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
         }
         INITIALIZED = true;
 
-        memset(DEVICE_GLOBAL_ID, -1, sizeof(DEVICE_GLOBAL_ID));
-        memset(DEVICE_CUDA_ID,   -1, sizeof(DEVICE_CUDA_ID));
+        memset(DEVICE_CUDA_ID, -1, sizeof(DEVICE_CUDA_ID));
 
         for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
         {
             xkblas_device_cuda_t * device = __get_device_cuda(i);
             assert(device);
-            device->state = XKBLAS_DEVICE_STATE_DEALLOCATED;
+            device->inherited.state = XKBLAS_DEVICE_STATE_DEALLOCATED;
         }
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
@@ -424,10 +423,10 @@ XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
  *  @return
  *      the source device to use for a valid transfer
  */
-static int
+static xkblas_device_global_id_t
 XKBLAS_DRIVER_ENTRYPOINT(get_source)(
-    int dst_global_id,
-    int valid
+    xkblas_device_global_id_t dst_global_id,
+    xkblas_device_global_id_bitfield_t valid
 ) {
     # pragma message(TODO "Improve this heuristic, naive currently")
 
@@ -442,6 +441,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_source)(
     xkblas_device_cuda_t * device = (xkblas_device_cuda_t *) xkblas_device_get(dst_global_id);
     assert(device);
 
+    /* lowest rank <=> best performance - find a device for P2P transfer with most perf */
     for (int rank = 0 ; rank < cuda_count_perfrank -1 ; ++rank)
     {
         /* get valid devices for this affinity */
@@ -453,7 +453,8 @@ XKBLAS_DRIVER_ENTRYPOINT(get_source)(
         return __random_set_bit(mask) - 1;
     }
 
-    return __builtin_ffs
+    /* no nvlink, get any random device */
+    return __random_set_bit(valid) - 1;
 }
 
 /* Called on all devices of the driver after they have been initialized */
@@ -474,7 +475,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 
     const uint64_t perfrank = cuda_count_perfrank - 1;
     const uint64_t size = sizeof(uint64_t) * perfrank;
-    device->affinity = (uint64_t *) malloc(sizeof(uint64_t) * perfrank);
+    device->affinity = (int *) malloc(sizeof(int) * perfrank);
     memset(device->affinity, 0, size);
 
     /* all other devices have been initialized, enable peer */
@@ -503,21 +504,21 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
                 res = cudaDeviceEnablePeerAccess(other_device_cuda_id, 0);
                 if ((res == cudaSuccess) || (res == cudaErrorPeerAccessAlreadyEnabled))
                 {
-                    int rank = cuda_perf_topo[i*cuda_device_count+j];
+                    int rank = cuda_perf_topo[device_cuda_id*cuda_device_count+other_device_cuda_id];
                     assert(rank);
-                    if (cuda_perf_device[i * cuda_count_perfrank + rank] & (1UL << other_device_cuda_id))
+                    if (cuda_perf_device[device_cuda_id*cuda_count_perfrank+rank] & (1UL << other_device_cuda_id))
                     {
                         device->affinity[rank - 1] |= (1UL << other_device_cuda_id);
                     }
                 }
                 else
                 {
-                    XKBLAS_WARN("Could not enable peer from %d to %d", i, j);
+                    XKBLAS_WARN("Could not enable peer from %d to %d", device->inherited.global_id, other_device->inherited.global_id);
                 }
             }
             else
             {
-                XKBLAS_WARN("GPU peer from %d to %d is not possible", i, j);
+                XKBLAS_WARN("GPU peer from %d to %d is not possible", device->inherited.global_id, other_device->inherited.global_id);
             }
         }
     }

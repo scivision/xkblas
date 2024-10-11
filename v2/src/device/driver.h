@@ -95,7 +95,7 @@ typedef struct  xkblas_driver_t
     void (*f_stream_delete)(xkblas_stream_t * istream);
 
 		/* get best source for data movement, return global_id */
-    int (*f_get_source)(int dst_global_id, int bitmask);
+    xkblas_device_global_id_t (*f_get_source)(xkblas_device_global_id_t dst_global_id, xkblas_device_global_id_bitfield_t valid);
 
     ///////////////////////
     //  UNUSED YET       //
@@ -151,7 +151,7 @@ typedef struct  xkblas_drivers_t
         std::atomic<uint8_t> n;
 
         /* next worker to offload round robin mode */
-        std::atomic<uint8_t> round_robin_device_driver_id;
+        std::atomic<uint8_t> round_robin_device_global_id;
 
     } devices;
 

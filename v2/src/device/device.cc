@@ -295,17 +295,17 @@ static xkblas_device_t *
 xkblas_device_create(
     xkblas_drivers_t * drivers,
     uint8_t driver_id,
-    uint8_t driver_device_id
+    uint8_t device_driver_id
 ) {
     if (drivers->devices.n == XKBLAS_DEVICES_MAX)
         XKBLAS_FATAL("Too many devices. Increase 'XKBLAS_DEVICES_MAX' and recompile Xkblas");
 
     xkblas_driver_t * driver = drivers->list + driver_id;
-    xkblas_device_t * device = driver->f_device_create(driver, driver_device_id);
+    xkblas_device_t * device = driver->f_device_create(driver, device_driver_id);
     assert(device);
 
     device->state     = XKBLAS_DEVICE_STATE_CREATE;
-    device->driver_id = driver_device_id;
+    device->driver_id = device_driver_id;
     device->global_id = drivers->devices.n.fetch_add(1, std::memory_order_seq_cst);
 
     drivers->devices.list[device->global_id] = device;
@@ -434,7 +434,7 @@ xkblas_device_thread_main(void * a)
     xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) a;
     xkblas_drivers_t * drivers  = arg->drivers;
     uint8_t driver_id = arg->driver_id;
-    uint8_t driver_device_id = arg->driver_device_id;
+    uint8_t device_driver_id = arg->device_driver_id;
     free(arg);
 
     xkblas_driver_t * driver = drivers->list + driver_id;
@@ -442,11 +442,11 @@ xkblas_device_thread_main(void * a)
     getcpu(&cpu, &node);
 
     /* init the device */
-    xkblas_device_t * device = xkblas_device_create(drivers, driver_id, driver_device_id);
+    xkblas_device_t * device = xkblas_device_create(drivers, driver_id, device_driver_id);
     xkblas_device_init(driver, device);
 
     XKBLAS_INFO("Starting thread for %s device (device_driver_id=%d, device_global_id=%d) on cpu %d of node %d",
-            driver->f_get_name(), driver_device_id, device->global_id, cpu, node);
+            driver->f_get_name(), device_driver_id, device->global_id, cpu, node);
 
     // wait for all devices of that driver to be in the 'init' state
     ++driver->ndevices_inited;
@@ -457,7 +457,7 @@ xkblas_device_thread_main(void * a)
     xkblas_device_commit(driver, device);
     ++driver->ndevices_commited;
 
-    XKBLAS_INFO("%s", driver->f_device_info(driver_device_id));
+    XKBLAS_INFO("%s", driver->f_device_info(device_driver_id));
 
     /* infinite loop with the device context */
     int err = xkblas_device_thread_main_loop(driver, device);

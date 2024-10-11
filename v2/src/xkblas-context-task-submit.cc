@@ -36,7 +36,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
     {
         while (1)
         {
-            device_id = context->drivers.devices.round_robin_device_id.fetch_add(1, std::memory_order_relaxed);
+            device_id = context->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
             device_id = device_id % context->drivers.devices.n;
             if (context->drivers.devices.list[device_id])
                 break ;

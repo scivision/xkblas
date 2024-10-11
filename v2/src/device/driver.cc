@@ -67,7 +67,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) malloc(sizeof(xkblas_driver_device_thread_arg_t));
         arg->drivers = drivers;
         arg->driver_id = driver_id;
-        arg->driver_device_id = i;
+        arg->device_driver_id = i;
 
         pthread_t thread;
         err = pthread_create(&thread, &attr, xkblas_device_thread_main, arg);
@@ -93,7 +93,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     memset(drivers->list, 0, sizeof(drivers->list));
     memset(drivers->devices.list, 0, sizeof(drivers->devices.list));
     drivers->devices.n = 0;
-    drivers->devices.round_robin_device_id = 0;
+    drivers->devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
     void (*loaders[XKBLAS_DRIVER_TYPE_MAX])(xkblas_driver_t *);
