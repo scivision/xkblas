@@ -17,6 +17,7 @@
 # undef CUBE_TREE_REBALANCE
 
 # include "device/device-memory.h"
+# include "sync/bits.h"
 # include "sync/lockable.hpp"
 
 # include <cstdint>
@@ -148,13 +149,17 @@ class KMemoryBlock {
         /* valid devices (i.e. devices with at least one valid allocation) */
         volatile xkblas_device_global_id_bitfield_t valid;
 
+        /* fetching devices (i.e. devices with at least one fetching allocation) */
+        volatile xkblas_device_global_id_bitfield_t fetching;
+
     public:
 
         /* a new memory block, assume it is valid on the host */
         KMemoryBlock(const memory_view_t & v) :
             host_view(v),
             replicates(),
-            valid(0)
+            valid(0),
+            fetching(0)
         {}
 
         void
@@ -211,16 +216,15 @@ class KMemoryBlock {
                 }
 
                 // dupplicate fetching / valid infos
-                replicate->fetching = inheriting_replicate->fetching;
                 replicate->valid    = inheriting_replicate->valid;
+                replicate->fetching = inheriting_replicate->fetching;
             }
 
             //////////////////////////////
             //  VALID BITS ARE STILL OK //
             //////////////////////////////
-
-            this->valid = inheriting_block.valid;   // copy validity
-
+            this->valid     = inheriting_block.valid;       // copy validity
+            this->fetching  = inheriting_block.fetching;    // copy fetching
         }
 
         /* a block from splitting an existing one */
@@ -572,8 +576,6 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 case (Search::Type::SEARCH_AWAITING):
                 {
                     MemoryReplicate & replicate = this->block.replicates[search.device_global_id];
-                    const xkblas_device_global_id_bitfield_t devbit = (1 << search.device_global_id);
-                    this->block.valid |= devbit;
 
                     /* for each allocation of that block */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
@@ -594,6 +596,14 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
 
                             break ;
                         }
+                    }
+
+                    const xkblas_device_global_id_bitfield_t devbit = (1 << search.device_global_id);
+                    this->block.valid |= devbit;
+                    if (replicate.fetching == 0)
+                    {
+                        assert(this->block.fetching & devbit);
+                        this->block.fetching &= ~devbit;
                     }
 
                     break ;
@@ -728,15 +738,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         //  DECIDE SRC DEVICE WHEN FETCHING //
         //////////////////////////////////////
 
-        static inline xkblas_device_global_id_t
-        fetch_access_find_src(
-            xkblas_driver_t * driver,
-            xkblas_device_global_id_t dst_device_global_id,
-            int valid
-        ) {
-            return driver->f_get_source(dst_device_global_id, valid);
-        }
-
         inline void
         fetch_access_copy_partite(
             xkblas_driver_t * driver,
@@ -856,11 +857,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     // SRC - FIND BEST SRC //
                     /////////////////////////
 
-                    # pragma message(TODO "Find best device and balance workload for D2H transfers")
-                    // TODO : currently taking source as the device with the smallest id,
-                    // instead, maybe try to balance the workload between GPU and use
-                    // devices with the best bandwidth
-                    xkblas_device_global_id_t src = (xkblas_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
+                    // xkblas_device_global_id_t src = (xkblas_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
+                    xkblas_device_global_id_t src = __random_set_bit(partite.block->valid) - 1;
                     assert(src >= 0);
 
                     // Get the first valid allocation on that device
@@ -1213,6 +1211,7 @@ next_view:
                     // this task must perform the fetch
                     partite.must_fetch = true;
                     replicate.fetching |= allocbit;
+                    partite.block->fetching |= (1 << device->global_id);
 
                     // create dst view
                     partite.dst_device_global_id = device->global_id;
@@ -1232,8 +1231,21 @@ next_view:
                     // valid on some devices
                     else
                     {
-                        // find source
-                        xkblas_device_global_id_t src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
+                        // find source:
+                        //  - if its already valid on a device, use it as a source
+                        //  - else, its already transfering to any device, wait for it and transfer D2D
+                        //  - else, transfer H2D
+                        xkblas_device_global_id_t src;
+                        if (partite.block->valid)
+                            src = driver->f_get_source(device->global_id, partite.block->valid);
+                        else if (partite.block->fetching)
+                        {
+                            src = driver->f_get_source(device->global_id, partite.block->fetching);
+                            XKBLAS_FATAL("Not implemented");
+                            // TODO : add a callback once the fetch completed, to launch another fetch to the dst device
+                        }
+                        else
+                            src = HOST_DEVICE_GLOBAL_ID;
 
                         // Get the first valid allocation on that device
                         MemoryReplicate & replicate = partite.block->replicates[src];
@@ -1280,7 +1292,6 @@ next_view:
                     {
                         MemoryReplicate & replicate = partite.block->replicates[i];
                         replicate.valid = 0;
-                        replicate.fetching = 0;
                     }
 
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];

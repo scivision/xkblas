@@ -142,7 +142,7 @@ retry:
     /* if there is still work on-going */
     if (wc_global)
     {
-        usleep(500);    // TODO : pthread cond instead ? or maybe workstealing
+        usleep(50);    // TODO : pthread cond instead ? or maybe workstealing
         goto retry;
     }
 
@@ -154,6 +154,7 @@ retry:
     xkblas_stats_report(&(context->stats));
 # endif // USE_STATS == 1
 
+# if 0
 # if !defined(NDEBUG)
     // task dependency graph
     XKBLAS_INFO("Exporting Dependency Tree...");
@@ -163,7 +164,7 @@ retry:
     fclose(f);
     system("dot -Tpdf tasks.dot > tasks.pdf");
 # endif
-
+# endif
 
 # if 0
     XKBLAS_INFO("Exporting memory tree...");

@@ -38,10 +38,10 @@ class NaiveQueue : IQueue<T>
             {
                 SPINLOCK_LOCK(this->lock);
 
-                # if 1
+                # if 0          /* FIFO */
                 T t = this->list.front();
                 this->list.pop_front();
-                # else
+                # else          /* LIFO */
                 T t = this->list.back();
                 this->list.pop_back();
                 # endif

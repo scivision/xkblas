@@ -10,7 +10,7 @@
 # endif
 
 // tree assert, must be called within a member function
-# ifdef NDEBUG
+# if defined(NDEBUG) || defined(CUBE_TREE_DISABLE_COHERENCY_CHECKS)
 #  define tassert(ignore) ((void)0)
 # else /* NDEBUG */
 #  pragma message("Define `NDEBUG` for max performance")

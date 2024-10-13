@@ -346,7 +346,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_create)(xkblas_driver_t * driver, int device_dri
 
     xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
-    assert(device->state == XKBLAS_DEVICE_STATE_DEALLOCATED);
+    assert(device->inherited.state == XKBLAS_DEVICE_STATE_DEALLOCATED);
 
     return (xkblas_device_t *) device;
 }
@@ -358,7 +358,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 
     xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
-    assert(device->state == XKBLAS_DEVICE_STATE_CREATE);
+    assert(device->inherited.state == XKBLAS_DEVICE_STATE_CREATE);
 
     struct cudaDeviceProp prop;
     cudaError_t res;
@@ -427,26 +427,25 @@ XKBLAS_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
 static xkblas_device_global_id_t
 XKBLAS_DRIVER_ENTRYPOINT(get_source)(
     xkblas_device_global_id_t dst_global_id,
-    xkblas_device_global_id_bitfield_t valid
+    xkblas_device_global_id_bitfield_t bitfield
 ) {
     # pragma message(TODO "Improve this heuristic, naive currently")
 
-    /* fast way out: valid on no devices, assume valid on host */
-    if (valid == 0)
-        return HOST_DEVICE_GLOBAL_ID;
+    assert(bitfield);
 
-    /* fast way out: valid on that device already */
-    if (valid & (1 << dst_global_id))
-        return dst_global_id;
-
+    /* retrieve dst device */
     xkblas_device_cuda_t * device = (xkblas_device_cuda_t *) xkblas_device_get(dst_global_id);
     assert(device);
+
+    /* fast way out: good on that device already */
+    if (bitfield & (1 << dst_global_id))
+        return dst_global_id;
 
     /* lowest rank <=> best performance - find a device for P2P transfer with most perf */
     for (int rank = 0 ; rank < cuda_count_perfrank -1 ; ++rank)
     {
         /* get valid devices for this affinity */
-        int mask = valid & device->affinity[rank];
+        const xkblas_device_global_id_bitfield_t mask = bitfield & device->affinity[rank];
         if (mask == 0)
             continue ;
 
@@ -455,7 +454,7 @@ XKBLAS_DRIVER_ENTRYPOINT(get_source)(
     }
 
     /* no nvlink, get any random device */
-    return __random_set_bit(valid) - 1;
+    return __random_set_bit(bitfield) - 1;
 }
 
 /* Called on all devices of the driver after they have been initialized */
@@ -470,7 +469,7 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 
     xkblas_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
-    assert(device->state == XKBLAS_DEVICE_STATE_INIT);
+    assert(device->inherited.state == XKBLAS_DEVICE_STATE_INIT);
 
     int device_cuda_id = __get_device_cuda_id(device_driver_id);
 
