@@ -18,6 +18,9 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
     // if an ocr parameter is set, retrieve the device accordingly
     if (task->ocr_access_index != UNSPECIFIED_TASK_ACCESS)
     {
+        // TODO : instead of doing a complex search in the memory-tree, could
+        // instead simply just the 'predecessor -> successor' relationship -
+        // and register the 'predecessor' device for the ocr access
         assert(task->ocr_access_index >= 0 && task->ocr_access_index < task->naccesses);
         xkblas_device_global_id_bitfield_t owners = context->memtree.who_owns(task->accesses + task->ocr_access_index);
         if (owners)
