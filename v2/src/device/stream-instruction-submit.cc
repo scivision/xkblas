@@ -73,6 +73,12 @@ xkblas_stream_instruction_submit_copy(
     assert(ThreadWorker::self() == device->thread);
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
+    assert(dst_device_view.addr);
+    assert(dst_device_view.ld);
+
+    assert(src_device_view.addr);
+    assert(src_device_view.ld);
+
     /* find the type of copy instruction */
     xkblas_stream_instruction_type_t itype;
     if (src_device_global_id == HOST_DEVICE_GLOBAL_ID)
