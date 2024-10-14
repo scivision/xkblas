@@ -1,3 +1,10 @@
+# BUILD EXAMPLE
+```bash
+mkdir build-debug
+cd build-debug
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkblas/v2/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_HWLOC=on -DUSE_CPU=off -DUSE_CUDA=on -DUSE_HIP=off -DUSE_MKL=on ../
+```
+
 # PERFORMANCE IDEA
 If memory capacity is not a limitation, add public interfaces to preallocate memory onto the device
 ```C

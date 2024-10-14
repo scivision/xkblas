@@ -61,14 +61,14 @@ xkblas_stream_instruction_submit_kernel(
 # pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
 void
 xkblas_stream_instruction_submit_copy(
-    const xkblas_driver_t          * driver,
-    xkblas_device_t                * device,
-    const memory_view_t            & host_view,
-    const uint8_t                    dst_device_global_id,
-    const memory_replicate_view_t  & dst_device_view,
-    const uint8_t                    src_device_global_id,
-    const memory_replicate_view_t  & src_device_view,
-    const xkblas_callback_t & callback
+    const xkblas_driver_t           * driver,
+    xkblas_device_t                 * device,
+    const memory_view_t             & host_view,
+    const xkblas_device_global_id_t   dst_device_global_id,
+    const memory_replicate_view_t   & dst_device_view,
+    const xkblas_device_global_id_t   src_device_global_id,
+    const memory_replicate_view_t   & src_device_view,
+    const xkblas_callback_t         & callback
 ) {
     assert(ThreadWorker::self() == device->thread);
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
