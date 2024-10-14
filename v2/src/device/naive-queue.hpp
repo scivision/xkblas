@@ -18,7 +18,7 @@ class NaiveQueue : IQueue<T>
 {
     public:
 
-        NaiveQueue() : list(), lock(0) {}
+        NaiveQueue() : list(), lock() {}
         ~NaiveQueue() {}
 
         void

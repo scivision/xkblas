@@ -298,6 +298,8 @@ xkblas_memory_coherent_async(
     const Access access(MATRIX_COLMAJOR, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
     thread->deptree.conflicting(&conflicts, &access);
 
+    XKBLAS_DEBUG("`xkblas_memory_coherent_async` found %d conflicts", conflicts.size());
+
     /* create one task per conflict shrinking the access, responsible of fetching the chunk */
     const uint64_t task_size = sizeof(Task);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));

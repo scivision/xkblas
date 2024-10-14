@@ -9,29 +9,35 @@ class Lockable {
     public:
         spinlock_t spinlock;
 
+        volatile bool locked;
+
     public:
-        Lockable() : spinlock{0} {}
+        Lockable() : spinlock(), locked(false) {}
         ~Lockable() {}
 
     public:
 
-        void
+        inline void
         lock(void)
         {
             SPINLOCK_LOCK(this->spinlock);
+            this->locked = true;
         }
 
-        void
+        inline void
         unlock(void)
         {
+            this->locked = false;
             SPINLOCK_UNLOCK(this->spinlock);
         }
 
+        #ifndef NDEBUG
         bool
         is_locked(void) const
         {
-            return SPINLOCK_ISLOCKED(this->spinlock);
+            return this->locked;
         }
+        # endif /* NDEBUG */
 };
 
 #endif /* __LOCKABLE_HPP__ */

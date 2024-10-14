@@ -9,7 +9,7 @@
 # include <stdlib.h>
 # include <stdint.h>
 
-extern volatile int XKBLAS_PRINT_MTX;
+extern spinlock_t XKBLAS_PRINT_MTX;
 
 # define XKBLAS_PRINT_FATAL_ID      0
 # define XKBLAS_PRINT_ERROR_ID      1

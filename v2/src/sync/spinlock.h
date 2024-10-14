@@ -3,6 +3,8 @@
 
 # include "sync/mem.h"
 
+#if 1
+
 typedef volatile int spinlock_t;
 
 # define SPINLOCK_LOCK(L)                                       \
@@ -17,6 +19,13 @@ typedef volatile int spinlock_t;
         __sync_fetch_and_xor(&L, L);    \
     } while (0)
 
-# define SPINLOCK_ISLOCKED(L) (L)
+# else
+
+# include <pthread.h>
+typedef pthread_mutex_t spinlock_t;
+# define SPINLOCK_LOCK(L)       pthread_mutex_lock(&L)
+# define SPINLOCK_UNLOCK(L)     pthread_mutex_unlock(&L)
+
+# endif
 
 #endif /* __SPINLOCK_H__ */

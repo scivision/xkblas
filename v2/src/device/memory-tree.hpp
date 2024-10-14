@@ -36,7 +36,7 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
@@ -44,6 +44,8 @@ static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= (1 << (sizeof(memory_allo
 
 typedef uint8_t memory_allocation_view_id_bitfield_t;
 static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= sizeof(memory_allocation_view_id_bitfield_t) * 8);
+
+static std::map<uintptr_t, bool> LAUNCHED;
 
 /* a forward request */
 template <int K>
@@ -843,53 +845,50 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             assert(ThreadWorker::self() == fetch->device->thread);
 
             //  `fetch->task` is the task that initiated the fetch: notify that the data has arrived
-            if (fetch->task)
-                fetch_callback_task(fetch, fetch->task);
+            assert(fetch->task);
+            fetch_callback_task(fetch, fetch->task);
 
-            //  `fetch->chunk` is the memory allocated chunk on which the data had been fetched.
-            //  If it is non-null, it means whether:
-            //      -    other tasks try to concurrently fetch on the same device (`awaiting.tasks` holds tasks)
-            //      - or another device tried to fetch the same data, and this must forwards data to it (`awaiting.forwards` holds info)
-            if (fetch->dst_chunk)
+            //  `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
+            //  Search in the tree for awaiting tasks and forwards
+            assert(fetch->dst_chunk);
+
+            // search for blocks and its allocation, that matches the region fetched onto 'chunk'
+            Search search(fetch->dst_device_global_id);
+            search.prepare_search_awaiting(fetch->dst_chunk);
+            fetch->tree->lock();
             {
-                // search for blocks and its allocation, that matches the region fetched onto 'chunk'
-                Search search(fetch->dst_device_global_id);
-                search.prepare_search_awaiting(fetch->dst_chunk);
-                fetch->tree->lock();
-                {
-                    fetch->tree->intersect(search, fetch->cube, ACCESS_MODE_VOID);
-                }
-                fetch->tree->unlock();
+                fetch->tree->intersect(search, fetch->cube, ACCESS_MODE_VOID);
+            }
+            fetch->tree->unlock();
 
-                // notify awaiting tasks that the data had been fetched
-                for (Task * & task : search.awaiting.tasks)
-                    fetch_callback_task(fetch, task);
+            // notify awaiting tasks that the data had been fetched
+            for (Task * & task : search.awaiting.tasks)
+                fetch_callback_task(fetch, task);
 
-                // forward the data to other devices
-                for (MemoryForward & forward : search.awaiting.forwards)
-                {
-                    XKBLAS_ERROR(
-                        "Forwarding from %d to %d using alloc %p",
-                        fetch->device->global_id, forward.device_global_id, forward.chunk
-                    );
+            // forward the data to other devices
+            for (MemoryForward & forward : search.awaiting.forwards)
+            {
+                XKBLAS_ERROR(
+                    "Forwarding from %d to %d using alloc %p",
+                    fetch->device->global_id, forward.device_global_id, forward.chunk
+                );
 
-                    assert(forward.task);
-                    assert(forward.chunk);
-                    assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
+                assert(forward.task);
+                assert(forward.chunk);
+                assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
 
-                    fetch->tree->fetch_access_launch_copy(
-                        fetch->driver,                  // use the same driver
-                        fetch->device,                  // use the same (old dst, that is now src) device
-                        forward.task,                   // use the forwarded task
-                        forward.chunk,                  // the chunk allocated when requesting the forward
-                        fetch->cube,                    // the logicial view hasn't changed
-                        fetch->host_view,               // the host view hasn't changed
-                        forward.device_global_id,       // use the forwarded dst device
-                        forward.view,                   // use the forwarded dst view
-                        fetch->dst_device_global_id,    // the current 'dst' is the new 'src'
-                        fetch->dst_view                 // the current 'dst' is the new 'src'
-                    );
-                }
+                fetch->tree->fetch_access_launch_copy(
+                    fetch->driver,                  // use the same driver
+                    fetch->device,                  // use the same (old dst, that is now src) device
+                    forward.task,                   // use the forwarded task
+                    forward.chunk,                  // the chunk allocated when requesting the forward
+                    fetch->cube,                    // the logicial view hasn't changed
+                    fetch->host_view,               // the host view hasn't changed
+                    forward.device_global_id,       // use the forwarded dst device
+                    forward.view,                   // use the forwarded dst view
+                    fetch->dst_device_global_id,    // the current 'dst' is the new 'src'
+                    fetch->dst_view                 // the current 'dst' is the new 'src'
+                );
             }
 
             delete fetch;
@@ -1351,6 +1350,7 @@ next_view:
                         partite.must_fetch = false;
                         continue ;
                     }
+                    assert((partite.block->valid & devbit) == 0);
 
                     MemoryReplicateAllocationView * dst_alloc_view = dst_replicate.allocations[allocation_view_id];
 
@@ -1359,7 +1359,8 @@ next_view:
                     XKBLAS_DEBUG("Task `%s` fetching one by `%s` on `%p`",
                             task->label,
                             (dst_replicate.fetching & allocbit) ? "awaiting" : "launching",
-                            dst_alloc_view->view.addr);
+                            dst_alloc_view->view.addr
+                    );
 
                     // partite is already being fetched on that device, on the same allocation
                     if (dst_replicate.fetching & allocbit)
@@ -1547,6 +1548,16 @@ next_view:
                     /* this code is currently only executed when 'dst' is a device */
                     assert(0 <= partite.dst_device_global_id && partite.dst_device_global_id < XKBLAS_DEVICES_MAX);
                     assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
+
+                    // TODO: use this to debug single GPU correctnesss issue
+                    # if 0
+                    // TODO : remove me (begin)
+                    uintptr_t addr = host_view.begin_addr();
+                    assert(LAUNCHED.count(addr) == 0);
+                    LAUNCHED[addr] = true;
+                    # endif
+
+                    // TODO : remove me (end)
 
                     /* host replicate view if no allocation were found */
                     const memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
