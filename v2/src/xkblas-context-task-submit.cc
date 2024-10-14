@@ -19,7 +19,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
     if (task->ocr_access_index != UNSPECIFIED_TASK_ACCESS)
     {
         assert(task->ocr_access_index >= 0 && task->ocr_access_index < task->naccesses);
-        memory_replicates_bitfield_t owners = context->memtree.who_owns(task->accesses + task->ocr_access_index);
+        xkblas_device_global_id_bitfield_t owners = context->memtree.who_owns(task->accesses + task->ocr_access_index);
         if (owners)
             device_id = (xkblas_device_global_id_t) __random_set_bit(owners) - 1;
     }

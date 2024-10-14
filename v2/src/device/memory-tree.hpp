@@ -67,14 +67,14 @@ class MemoryReplicateAllocationView {
 }; /* MemoryReplicateAllocationView */
 
 
-typedef uint16_t memory_replicates_bitfield_t;
-static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= XKBLAS_DEVICES_MAX);
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
+# define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
-// if this assertion, many bitwise operation in the runtime will be wrong as
-// they are implicitly done on int32 : (1 << device_global_id) will be an int -
-// should update the runtime with (1UL << device_global_id) - maybe use a macro
-// for 'one' depending on that size
-static_assert(sizeof(memory_replicates_bitfield_t) * 8 <= 32);
+typedef uint8_t memory_allocation_view_id_t;
+static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= (1 << (sizeof(memory_allocation_view_id_t)*8)));
+
+typedef uint8_t memory_allocation_view_id_bitfield_t;
+static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= sizeof(memory_allocation_view_id_bitfield_t) * 8);
 
 /* a host replicate on a device */
 class MemoryReplicate
@@ -104,23 +104,17 @@ class MemoryReplicate
          *  The 'MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX' controls how many
          *  allocations of the same data may exists at most
          */
-        # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
-        # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
         /* if this fails, replace 'uint8_t' indexing views by a larger type */
-        static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX < 256);
-
         /* array of allocations */
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
-        volatile uint8_t nallocations;
+        volatile memory_allocation_view_id_t nallocations;
 
         /* valid allocations */
-        volatile memory_replicates_bitfield_t valid;
+        volatile memory_allocation_view_id_bitfield_t valid;
 
         /* fetching allocations */
-        volatile memory_replicates_bitfield_t fetching;
-
-        static_assert(sizeof(memory_replicates_bitfield_t) * 8 >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX);
+        volatile memory_allocation_view_id_bitfield_t fetching;
 
     public:
         MemoryReplicate() : allocations(), nallocations(0), valid(0), fetching(0) {}
@@ -131,6 +125,12 @@ class MemoryReplicate
         ~MemoryReplicate() {}
 
 }; /* MemoryReplicate */
+
+// if this assertion, many bitwise operation in the runtime will be wrong as
+// they are implicitly done on int32 : (1 << device_global_id) will be an int -
+// should update the runtime with (1UL << device_global_id) - maybe use a macro
+// for 'one' depending on that size
+static_assert(sizeof(xkblas_device_global_id_bitfield_t) * 8 <= 32);
 
 /* a memory block, one per tree node */
 template <int K>
@@ -267,7 +267,7 @@ class KMemoryTreeNodeSearch {
             xkblas_device_global_id_t dst_device_global_id;
 
             /* replicate allocation to use as dst (in MemoryReplicate::allocations) */
-            xkblas_device_global_id_t dst_allocation_view_id;
+            memory_allocation_view_id_t dst_allocation_view_id;
 
             /* the allocation address in which belongs the 'dst' view */
             xkblas_alloc_chunk_t * dst_chunk;
@@ -279,7 +279,7 @@ class KMemoryTreeNodeSearch {
             xkblas_device_global_id_t src_device_global_id;
 
             /* replicate allocation to use as src (in MemoryReplicate::allocations) */
-            xkblas_device_global_id_t src_allocation_view_id;
+            memory_allocation_view_id_t src_allocation_view_id;
 
             /* src view */
             memory_replicate_view_t src_view;
@@ -404,7 +404,6 @@ class KMemoryTreeNodeSearch {
        }
 
 }; /* KMemoryTreeNodeSearch */
-
 
 template <int K>
 class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
@@ -580,7 +579,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                     /* for each allocation of that block */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
-                        const memory_replicates_bitfield_t allocbit = (1 << i);
+                        const xkblas_device_global_id_bitfield_t allocbit = (1 << i);
                         MemoryReplicateAllocationView * view = replicate.allocations[i];
 
                         /* if it matches the allocation being searched */
@@ -591,8 +590,8 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                             view->awaiting.clear();
 
                             /* this replicate just got fetched and is now valid */
-                            replicate.valid    |= (memory_replicates_bitfield_t)  allocbit;
-                            replicate.fetching &= (memory_replicates_bitfield_t) ~allocbit;
+                            replicate.valid    |= (memory_allocation_view_id_bitfield_t)  allocbit;
+                            replicate.fetching &= (memory_allocation_view_id_bitfield_t) ~allocbit;
 
                             break ;
                         }
@@ -942,7 +941,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     /* evict all allocations */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
-                        const memory_replicates_bitfield_t allocbit = 1 << i;
+                        const xkblas_device_global_id_bitfield_t allocbit = 1 << i;
 
                         MemoryReplicateAllocationView * allocation = replicate.allocations[i];
                         assert(allocation);
@@ -1047,7 +1046,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 const uintptr_t begin_addr = chunk->device_ptr + d[1] + d[0]*ld*access->host_view.sizeof_type;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-                const uint8_t allocation_view_id = replicate.nallocations++;
+                const memory_allocation_view_id_t allocation_view_id = replicate.nallocations++;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     XKBLAS_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile XKBLAS");
 
@@ -1070,8 +1069,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         ) {
             assert(this->is_locked());
 
-            uint8_t j = 0;
-            int nallocations = partition[0].block->replicates[device->global_id].nallocations;
+            memory_allocation_view_id_bitfield_t j = 0;
+            memory_allocation_view_id_t nallocations = partition[0].block->replicates[device->global_id].nallocations;
             size_t nblocks = partition.size();
 
             /* for each allocation of the block 0 */
@@ -1084,8 +1083,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 while (i < nblocks)
                 {
                     /* for each allocation of other blocks */
-                    int nallocations = partition[i].block->replicates[device->global_id].nallocations;
-                    for (uint8_t k = 0 ; k < nallocations ; ++k)
+                    memory_allocation_view_id_t nallocations = partition[i].block->replicates[device->global_id].nallocations;
+                    for (memory_allocation_view_id_t k = 0 ; k < nallocations ; ++k)
                     {
                         /* this block has a view with the same allocation, check next block */
                         MemoryReplicateAllocationView * rk = partition[i].block->replicates[device->global_id].allocations[k];
@@ -1170,6 +1169,8 @@ next_view:
             // if read mode is set
             if (access->mode & ACCESS_MODE_R)
             {
+                xkblas_device_global_id_bitfield_t devbit = (1 << device->global_id);
+
                 // for each block of that access
                 for (Partite & partite : search.partition)
                 {
@@ -1180,7 +1181,7 @@ next_view:
                     // destinary allocation view id
                     const int allocation_view_id = partite.dst_allocation_view_id;
                     assert(allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
-                    const memory_replicates_bitfield_t allocbit = (1 << allocation_view_id);
+                    const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
 
                     // partite is already valid on that device
                     MemoryReplicate & replicate = partite.block->replicates[device->global_id];
@@ -1208,11 +1209,6 @@ next_view:
                         continue ;
                     }
 
-                    // this task must perform the fetch
-                    partite.must_fetch = true;
-                    replicate.fetching |= allocbit;
-                    partite.block->fetching |= (1 << device->global_id);
-
                     // create dst view
                     partite.dst_device_global_id = device->global_id;
                     partite.dst_view = r->view;
@@ -1221,52 +1217,69 @@ next_view:
                     // SETUP SRC //
                     ///////////////
 
-                    // not valid on any devices, using the host as the source
-                    if (partite.block->valid == 0)
-                    {
-                        XKBLAS_DEBUG("No valid block... assuming host is valid");
-                        partite.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
-                        partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
-                    }
+                    // find source:
+                    //  - if its already valid on a device, use it as a source
+                    //  - else, its already transfering to any device, wait for it and transfer D2D
+                    //  - else, transfer H2D
+
                     // valid on some devices
-                    else
+                    if (partite.block->valid || partite.block->fetching)
                     {
-                        // find source:
-                        //  - if its already valid on a device, use it as a source
-                        //  - else, its already transfering to any device, wait for it and transfer D2D
-                        //  - else, transfer H2D
                         xkblas_device_global_id_t src;
+                        memory_allocation_view_id_t src_alloc_view_id;
+
                         if (partite.block->valid)
-                            src = driver->f_get_source(device->global_id, partite.block->valid);
-                        else if (partite.block->fetching)
                         {
-                            src = driver->f_get_source(device->global_id, partite.block->fetching);
-                            XKBLAS_FATAL("Not implemented");
-                            // TODO : add a callback once the fetch completed, to launch another fetch to the dst device
+                            src = driver->f_get_source(device->global_id, partite.block->valid);
+                            src_alloc_view_id = (memory_allocation_view_id_t) (__builtin_ffs(replicate.valid) - 1);
                         }
                         else
-                            src = HOST_DEVICE_GLOBAL_ID;
+                        {
+                            // one device is already fetching, add a D2D callback
+                            assert(partite.block->fetching);
+                            src = driver->f_get_source(device->global_id, partite.block->fetching);
+
+                            // TODO : maybe there is several fetching alloc ? in such case, which one to pick ? currently select the first one
+                            MemoryReplicate & src_replicate = partite.block->replicates[src];
+                            assert(src_replicate.fetching);
+                            src_alloc_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.fetching) - 1);
+                            XKBLAS_FATAL("Not implemented (src=%d, dst=%d) - alloc src = %d, alloc dst = %d", src, device->global_id, src_alloc_view_id, allocation_view_id);
+                        }
 
                         // Get the first valid allocation on that device
                         MemoryReplicate & replicate = partite.block->replicates[src];
-                        assert(replicate.nallocations > 0);
-                        assert(replicate.valid != 0);
-                        uint8_t allocation_view_id = (uint8_t) (__builtin_ffs(replicate.valid) - 1);
+                        assert(replicate.valid & (1 << src) || replicate.fetching & (1 << src));
+                        assert(0 <= src_alloc_view_id && src_alloc_view_id < replicate.nallocations);
 
                         // retrieve and set src view infos
                         MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
                         partite.src_device_global_id   = src;
-                        partite.src_allocation_view_id = allocation_view_id;
+                        partite.src_allocation_view_id = src_alloc_view_id;
                         partite.src_view               = r->view;
+
                     }
+                    // not valid on any devices
+                    else
+                    {
+                        // no device are fetching, assume valid on host and launch H2D
+                        assert(!partite.block->valid && !partite.block->fetching);
+                        XKBLAS_DEBUG("No valid block... assuming host is valid");
+                        partite.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
+                        partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
+                    }
+
+                    // this task must perform the fetch
+                    partite.must_fetch = true;
+                    replicate.fetching |= allocbit;
+                    partite.block->fetching |= devbit;
 
                     //////////////////////////////
                     // ASSERTION ON SRC AND DST //
                     //////////////////////////////
-
                     assert(partite.dst_device_global_id   != partite.src_device_global_id ||
                            partite.dst_allocation_view_id != partite.src_allocation_view_id);
-                }
+
+                } /* foreach partite */
             }
         }
 
@@ -1283,7 +1296,7 @@ next_view:
             // if write mode, set the valid bits
             if (access->mode & ACCESS_MODE_W)
             {
-                const memory_replicates_bitfield_t devbit = (1 << device->global_id);
+                const xkblas_device_global_id_bitfield_t devbit = (1 << device->global_id);
 
                 for (Partite & partite : search.partition)
                 {
@@ -1319,7 +1332,7 @@ next_view:
                     // set valid bits
                     // Even though the data is not written, as we are writing,
                     // there are no other tasks accessing concurrently
-                    const memory_replicates_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
+                    const memory_allocation_view_id_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
                     partite.block->valid = devbit;
                     replicate.valid      = allocbit;
                     replicate.fetching   = allocbit;
@@ -1443,7 +1456,7 @@ next_view:
         //  OCR     //
         //////////////
 
-        memory_replicates_bitfield_t
+        xkblas_device_global_id_bitfield_t
         who_owns(
             Access * access
         ) {
@@ -1457,7 +1470,7 @@ next_view:
             this->unlock();
 
             // find devices which owns the most bytes
-            memory_replicates_bitfield_t owners = 0;
+            xkblas_device_global_id_bitfield_t owners = 0;
             size_t bytes_owned_max = 0;
             for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
@@ -1465,10 +1478,10 @@ next_view:
                 if (bytes_owned_max < bytes_owned)
                 {
                     bytes_owned_max = bytes_owned;
-                    owners = (memory_replicates_bitfield_t) (1 << device_global_id);
+                    owners = (xkblas_device_global_id_bitfield_t) (1 << device_global_id);
                 }
                 else if (bytes_owned_max && bytes_owned_max == bytes_owned)
-                    owners |= (memory_replicates_bitfield_t) (1 << device_global_id);
+                    owners |= (xkblas_device_global_id_bitfield_t) (1 << device_global_id);
             }
 
             return owners;
