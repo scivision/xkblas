@@ -152,7 +152,7 @@ retry:
     XKBLAS_INFO("Synchronized Xkblas");
 
 # if USE_STATS == 1
-    xkblas_stats_report(&(context->stats));
+    xkblas_stats_report();
 # endif // USE_STATS == 1
 
 # if 0

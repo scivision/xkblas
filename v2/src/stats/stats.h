@@ -33,7 +33,7 @@ typedef struct  xkblas_stats_t
 
 }               xkblas_stats_t;
 
-void xkblas_stats_report(xkblas_stats_t * stats);
+void xkblas_stats_report(void);
 void xkblas_stats_init(xkblas_stats_t * stats);
 xkblas_stats_t * xkblas_stats_get(void);
 

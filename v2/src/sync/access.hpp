@@ -18,7 +18,7 @@ class access_t
     public:
         access_t() : cube(), mode(ACCESS_MODE_VOID) {}
 
-        access_t(const access_t & access) : access_t(access.mode, access.cube) {}
+        access_t(const access_t & access) : access_t(access.cube, access.mode) {}
         access_t(const KCube<K> & r, const access_mode_t m) : cube(r), mode(m) {}
 
         access_t(
