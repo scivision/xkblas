@@ -559,11 +559,6 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     switch (instr->type)
     {
-        case (XKBLAS_STREAM_INSTR_TYPE_NOP):
-        {
-            return 0;
-        }
-
         case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
         {
             cudaError_t res;
@@ -743,7 +738,6 @@ cuda_stream_instructions_progress(
                 }
             } /* intentionally fallthrough */
 
-            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
             case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
             {
                 ++okp;
@@ -777,39 +771,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     assert(err == 0 || err == EINPROGRESS);
 
     for (xkblas_stream_instruction_counter_t p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
-    {
-        const xkblas_stream_instruction_counter_t idx = p % istream->pending.capacity;
-        xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
-        assert(instr);
-
-        switch (instr->type)
-        {
-            case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
-            case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
-            case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2H):
-            case (XKBLAS_STREAM_INSTR_TYPE_COPY_D2D):
-            case (XKBLAS_STREAM_INSTR_TYPE_BARRIER):
-            case (XKBLAS_STREAM_INSTR_TYPE_KERN):
-            {
-                if (instr->callback.func)
-                    instr->callback.func(instr->callback.args);
-
-            } /* intentionally fallthrough the next case */
-
-            case (XKBLAS_STREAM_INSTR_TYPE_NOP):
-            {
-                ++istream->pending.pos.r;
-                break ;
-            }
-
-            default:
-            {
-                /* unreachable code */
-                XKBLAS_FATAL("Unreachable code - instr->type=%d", instr->type);
-                return EINVAL;
-            }
-        }
-    }
+        istream->complete(p);
 
     return 0;
 }

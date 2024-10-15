@@ -31,8 +31,6 @@ xkblas_stream_instruction_type_to_str(xkblas_stream_instruction_type_t type)
 {
      switch (type)
      {
-         case (XKBLAS_STREAM_INSTR_TYPE_NOP):
-             return "NOP";
          case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2H):
              return "COPY_H2H";
          case (XKBLAS_STREAM_INSTR_TYPE_COPY_H2D):
@@ -121,23 +119,40 @@ xkblas_stream_t::instruction_new(
     return instr;
 }
 
+void
+xkblas_stream_t::complete(const xkblas_stream_instruction_counter_t i)
+{
+    xkblas_stream_instruction_t * instr = this->pending.instr + (i % this->pending.capacity);
+    assert(instr);
+
+    if (instr->callback.func)
+        instr->callback.func(instr->callback.args);
+
+    ++this->pending.pos.r;
+
+    # if USE_STATS
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+    ++context->stats.streams[this->type].instructions[instr->type].completed;
+    # endif /* USE_STATS */
+}
+
 int
-xkblas_stream_t::commit(
-    xkblas_stream_instruction_t * instr
-) {
+xkblas_stream_t::commit(xkblas_stream_instruction_t * instr)
+{
     assert(instr);
 
     XKBLAS_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
             xkblas_stream_instruction_type_to_str(instr->type),
             this->ready.size(), this->pending.size());
 
+    ++this->ready.pos.w;
+
     # if USE_STATS
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
     ++context->stats.streams[this->type].instructions[instr->type].launched;
     # endif /* USE_STATS */
-
-    ++this->ready.pos.w;
 
     return 0;
 }

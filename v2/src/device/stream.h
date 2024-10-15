@@ -84,6 +84,9 @@ class xkblas_stream_t : public Lockable
             const xkblas_callback_t & callback
         );
 
+        /* complete the instruction at the i-th position in the pending queue (invoke the callback) */
+        void complete(const xkblas_stream_instruction_counter_t i);
+
         /* commit the instruction to the stream (must be allocated via 'instruction_new') */
         int commit(xkblas_stream_instruction_t * instruction);
 

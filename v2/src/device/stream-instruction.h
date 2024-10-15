@@ -19,14 +19,13 @@ typedef struct  xkblas_io_status_t
 
 typedef enum    xkblas_stream_instruction_type_t
 {
-    XKBLAS_STREAM_INSTR_TYPE_NOP      = 0,
-    XKBLAS_STREAM_INSTR_TYPE_COPY_H2H = 1,
-    XKBLAS_STREAM_INSTR_TYPE_COPY_H2D = 2,
-    XKBLAS_STREAM_INSTR_TYPE_COPY_D2H = 3,
-    XKBLAS_STREAM_INSTR_TYPE_COPY_D2D = 4,
-    XKBLAS_STREAM_INSTR_TYPE_BARRIER  = 5,
-    XKBLAS_STREAM_INSTR_TYPE_KERN     = 6,
-    XKBLAS_STREAM_INSTR_TYPE_MAX      = 7,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_H2H = 0,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_H2D = 1,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_D2H = 2,
+    XKBLAS_STREAM_INSTR_TYPE_COPY_D2D = 3,
+    XKBLAS_STREAM_INSTR_TYPE_BARRIER  = 4,
+    XKBLAS_STREAM_INSTR_TYPE_KERN     = 5,
+    XKBLAS_STREAM_INSTR_TYPE_MAX      = 6,
 }               xkblas_stream_instruction_type_t;
 
 const char * xkblas_stream_instruction_type_to_str(xkblas_stream_instruction_type_t type);
