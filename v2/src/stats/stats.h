@@ -2,10 +2,12 @@
 # define __STATS_H__
 
 # include "device/stream.h"
+# include "device/task.hpp"
 
 # include <atomic>
 # include <stddef.h>
 
+# define XKBLAS_STATS_TASK_FORMAT_MAX 64
 typedef std::atomic<uint64_t> stats_int_t;
 
 typedef struct  xkblas_stats_t
@@ -19,20 +21,15 @@ typedef struct  xkblas_stats_t
     } memory;
 
     struct {
-        stats_int_t commited;
-        stats_int_t launched;
-        stats_int_t completed;
-    } tasks;
+        stats_int_t states[TASK_STATE_MAX];
+    } tasks[XKBLAS_STATS_TASK_FORMAT_MAX];
 
     struct {
-        stats_int_t launched;
-        stats_int_t completed;
-    } kernels;
-
-    struct {
-        stats_int_t launched;
-        stats_int_t completed;
-    } transfers[XKBLAS_STREAM_TYPE_ALL];
+        struct {
+            stats_int_t launched;
+            stats_int_t completed;
+        } instructions[XKBLAS_STREAM_INSTR_TYPE_MAX];
+    } streams[XKBLAS_STREAM_TYPE_ALL];
 
 }               xkblas_stats_t;
 

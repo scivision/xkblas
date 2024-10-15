@@ -1,4 +1,7 @@
-# include "stream.h"
+# if USE_STATS
+#  include "xkblas-context.h"
+# endif /* USE_STATS */
+# include "device/stream.h"
 # include "logger/todo.h"
 
 # pragma message(TODO "Make 'init' and 'deinit' methods too ? They are used by drivers, idk if we want C++ drivers...")
@@ -127,6 +130,12 @@ xkblas_stream_t::commit(
     XKBLAS_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
             xkblas_stream_instruction_type_to_str(instr->type),
             this->ready.size(), this->pending.size());
+
+    # if USE_STATS
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+    ++context->stats.streams[this->type].instructions[instr->type].launched;
+    # endif /* USE_STATS */
 
     ++this->ready.pos.w;
 

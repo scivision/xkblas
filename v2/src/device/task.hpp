@@ -29,7 +29,36 @@ typedef enum    task_state_t : uint8_t
     TASK_STATE_DATA_FETCHED     = 3,    // Task data is fetched, kernel can be executed
     TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved (kernel executed)
     TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
+    TASK_STATE_MAX              = 6,
 }               task_state_t;
+
+static inline const char *
+task_state_to_str(task_state_t state)
+{
+    switch (state)
+    {
+        case (TASK_STATE_ALLOCATED):
+            return "allocated";
+        case (TASK_STATE_READY):
+            return "ready";
+        case (TASK_STATE_DATA_FETCHING):
+            return "fetching";
+        case (TASK_STATE_DATA_FETCHED):
+            return "fetched";
+        case (TASK_STATE_COMPLETED):
+            return "completed";
+        case (TASK_STATE_DEALLOCATED):
+            return "deallocated";
+        default:
+            return "unk";
+    }
+}
+
+# if USE_STATS
+void xkblas_stats_task_state_incr(task_format_id_t fmtid, task_state_t state);
+# else
+#  define xkblas_stats_task_state_incr(...)
+# endif /* USE_STATS */
 
 template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
@@ -150,10 +179,12 @@ class alignas(CACHE_LINE_SIZE) KTask
         commit(void)
         {
             assert(this->state.value == TASK_STATE_ALLOCATED);
+            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
+                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
                 return true;
             }
             return false;
@@ -167,6 +198,7 @@ class alignas(CACHE_LINE_SIZE) KTask
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 assert(this->state.value == TASK_STATE_READY);
                 this->state.value = TASK_STATE_DATA_FETCHING;
+                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHING);
             }
         }
 
@@ -179,6 +211,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
+                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHED);
                 return TASK_STATE_DATA_FETCHED;
             }
 
@@ -192,7 +225,8 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_COMPLETED;
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to executed", this->label);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to completed", this->label);
+                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_COMPLETED);
             }
             SPINLOCK_UNLOCK(this->state.lock);
 

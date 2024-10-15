@@ -177,18 +177,6 @@ xkblas_device_task_executed(
 ) {
     assert(task);
 
-    # if USE_STATS
-    xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->tasks.completed;
-    # if 0  /* cannot detect completed kernels only, depends on the 'format'
-               which does not have that info atm */
-    if (task->fmtid != TASK_FORMAT_NULL)
-        ++stats->kernels.completed;
-    # else
-    stats->kernels.completed = -1;
-    # endif
-    # endif /* USE_STATS */
-
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread);
 
@@ -216,11 +204,6 @@ xkblas_device_task_execute(
                Task * task
 ) {
     assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
-
-    # if USE_STATS
-    xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->tasks.launched;
-    # endif /* USE_STATS */
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)

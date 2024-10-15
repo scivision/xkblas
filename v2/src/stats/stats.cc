@@ -1,8 +1,17 @@
 # include "xkblas-context.h"
+# include "device/task.hpp"
 # include "logger/logger.h"
 # include "stats/stats.h"
 
 # include <string.h>
+
+void
+xkblas_stats_task_state_incr(task_format_id_t fmtid, task_state_t state)
+{
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+    ++context->stats.tasks[fmtid].states[state];
+}
 
 void
 xkblas_stats_report(xkblas_stats_t * stats)
@@ -14,23 +23,27 @@ xkblas_stats_report(xkblas_stats_t * stats)
     XKBLAS_WARN("    currently: %zu", stats->memory.allocated.currently.load());
     XKBLAS_WARN("  freed: %zu", stats->memory.freed.load());
     XKBLAS_WARN("tasks:");
-    XKBLAS_WARN("  commited: %zu", stats->tasks.commited.load());
-    XKBLAS_WARN("  launched: %zu", stats->tasks.launched.load());
-    XKBLAS_WARN("  completed: %zu", stats->tasks.completed.load());
-    XKBLAS_WARN("kernels:");
-    XKBLAS_WARN("  launched: %zu", stats->kernels.launched.load());
-    XKBLAS_WARN("  completed: %zu", stats->kernels.completed.load());
-    XKBLAS_WARN("transfers:");
-    XKBLAS_WARN("  launched:");
+    for (int i = 0 ; i < XKBLAS_STATS_TASK_FORMAT_MAX ; ++i)
+    {
+        if (stats->tasks[i].states[0].load())
+        {
+            task_format_t * format = task_format_get((task_format_id_t)i);
+            XKBLAS_WARN("  `%s`", format ? format->label : "unk");
+            for (int j = 0 ; j < TASK_STATE_MAX ; ++j)
+                XKBLAS_WARN("    `%s` %zu", stats->tasks[i].states[j].load());
+        }
+    }
+    XKBLAS_WARN("streams:");
     for (int i = 0 ; i < XKBLAS_STREAM_TYPE_ALL ; ++i)
-        XKBLAS_WARN("    `%4s`: %zu",
-                xkblas_stream_type_to_str((xkblas_stream_type_t) i),
-                stats->transfers[i].launched.load());
-    XKBLAS_WARN("  completed:");
-    for (int i = 0 ; i < XKBLAS_STREAM_TYPE_ALL ; ++i)
-        XKBLAS_WARN("    `%4s`: %zu",
-                xkblas_stream_type_to_str((xkblas_stream_type_t) i),
-                stats->transfers[i].completed.load());
+    {
+        XKBLAS_WARN("  `%s`", xkblas_stream_type_to_str((xkblas_stream_type_t) i));
+        XKBLAS_WARN("    instructions");
+        for (int j = 0 ; j < XKBLAS_STREAM_INSTR_TYPE_MAX ; ++j)
+        {
+            XKBLAS_WARN("      launched: %zu", stats->streams[i].instructions[j].launched.load());
+            XKBLAS_WARN("      completed: %zu", stats->streams[i].instructions[j].completed.load());
+        }
+    }
 
     XKBLAS_WARN("-----------------------------------------");
 }

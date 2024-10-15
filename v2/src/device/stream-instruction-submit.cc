@@ -66,11 +66,6 @@ xkblas_stream_instruction_submit_kernel(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
-
-    # if USE_STATS
-    xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->kernels.launched;
-    # endif /* USE_STATS */
 }
 
 # pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
@@ -164,9 +159,4 @@ xkblas_stream_instruction_submit_copy(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
-
-    # if USE_STATS
-    xkblas_stats_t * stats = xkblas_stats_get();
-    ++stats->transfers[stype].launched;
-    # endif /* USE_STATS */
 }
