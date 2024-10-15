@@ -154,7 +154,7 @@ retry:
     xkblas_stats_report(&(context->stats));
 # endif // USE_STATS == 1
 
-# if 1
+# if 0
 # if !defined(NDEBUG)
     // task dependency graph
     XKBLAS_INFO("Exporting Dependency Tree...");
@@ -166,7 +166,7 @@ retry:
 # endif
 # endif
 
-# if 1
+# if 0
     XKBLAS_INFO("Exporting memory tree...");
 
     // memory kinterval btree
