@@ -9,10 +9,17 @@ class Lockable {
     public:
         spinlock_t spinlock;
 
+        # ifndef NDEBUG
         volatile bool locked;
+        # endif /* NDEBUG */
 
     public:
+        # ifndef NDEBUG
         Lockable() : spinlock(), locked(false) {}
+        # else
+        Lockable() : spinlock() {}
+        # endif /* NDEBUG */
+
         ~Lockable() {}
 
     public:
@@ -21,13 +28,17 @@ class Lockable {
         lock(void)
         {
             SPINLOCK_LOCK(this->spinlock);
+            # ifndef NDEBUG
             this->locked = true;
+            # endif /* NDEBUG */
         }
 
         inline void
         unlock(void)
         {
+            # ifndef NDEBUG
             this->locked = false;
+            # endif /* NDEBUG */
             SPINLOCK_UNLOCK(this->spinlock);
         }
 

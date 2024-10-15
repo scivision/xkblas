@@ -180,8 +180,13 @@ xkblas_device_task_executed(
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
     ++stats->tasks.completed;
+    # if 0  /* cannot detect completed kernels only, depends on the 'format'
+               which does not have that info atm */
     if (task->fmtid != TASK_FORMAT_NULL)
         ++stats->kernels.completed;
+    # else
+    stats->kernels.completed = -1;
+    # endif
     # endif /* USE_STATS */
 
     ThreadWorker * thread = ThreadWorker::self();
@@ -215,8 +220,6 @@ xkblas_device_task_execute(
     # if USE_STATS
     xkblas_stats_t * stats = xkblas_stats_get();
     ++stats->tasks.launched;
-    if (task->fmtid != TASK_FORMAT_NULL)
-        ++stats->kernels.launched;
     # endif /* USE_STATS */
 
     /* running an empty task */

@@ -69,6 +69,7 @@ xkblas_stream_init(
     int (*f_instructions_progress)(xkblas_stream_t *, int)
 ) {
     stream->type = type;
+    stream->spinlock = SPINLOCK_INITIALIZER;
 
     stream->f_instruction_launch    = f_instruction_launch;
     stream->f_instructions_progress = f_instructions_progress;
@@ -129,6 +130,9 @@ xkblas_stream_t::commit(
 
     ++this->ready.pos.w;
 
+    assert(this->is_locked());
+    this->unlock();
+
     return 0;
 }
 
@@ -144,63 +148,67 @@ xkblas_stream_t::launch_ready_instructions(void)
     int err = 0;
     while (!this->ready.is_empty())
     {
-        /* retrieve the next instruction to launch at index 'p' */
-        uint64_t p = this->ready.pos.r % this->ready.capacity;
-        ++this->ready.pos.r;
-
-        xkblas_stream_instruction_t * instr = this->ready.instr + p;
-        assert(instr);
-
-        XKBLAS_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
-            xkblas_stream_instruction_type_to_str(instr->type),
-            this,
-            xkblas_stream_type_to_str(this->type),
-            this->f_instruction_launch
-        );
-
-        assert(this->f_instruction_launch);
-        err = this->f_instruction_launch(this, instr);
-
-        switch (err)
+        this->lock();
         {
-            case (0):
+            /* retrieve the next instruction to launch at index 'p' */
+            uint64_t p = this->ready.pos.r % this->ready.capacity;
+            ++this->ready.pos.r;
+
+            xkblas_stream_instruction_t * instr = this->ready.instr + p;
+            assert(instr);
+
+            XKBLAS_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
+                xkblas_stream_instruction_type_to_str(instr->type),
+                this,
+                xkblas_stream_type_to_str(this->type),
+                this->f_instruction_launch
+            );
+
+            assert(this->f_instruction_launch);
+            err = this->f_instruction_launch(this, instr);
+
+            switch (err)
             {
-                /* no error */
-                XKBLAS_DEBUG("Instruction completed");
-                break ;
-            }
+                case (0):
+                {
+                    /* no error */
+                    XKBLAS_DEBUG("Instruction completed");
+                    break ;
+                }
 
-            case (EINPROGRESS):
-            {
-                /* recopy op in pending op if still progressing */
+                case (EINPROGRESS):
+                {
+                    /* recopy op in pending op if still progressing */
 
-                /* the pending queue must not be full */
-                assert(!this->pending.is_full());
-                uint32_t wp = this->pending.pos.w % this->pending.capacity;
-                ++this->pending.pos.w;
-                writemem_barrier();
+                    /* the pending queue must not be full */
+                    assert(!this->pending.is_full());
+                    uint32_t wp = this->pending.pos.w % this->pending.capacity;
+                    ++this->pending.pos.w;
+                    writemem_barrier();
 
-                memcpy(
-                    this->pending.instr + wp,
-                    this->ready.instr + p,
-                    sizeof(xkblas_stream_instruction_t)
-                );
+                    memcpy(
+                        this->pending.instr + wp,
+                        this->ready.instr + p,
+                        sizeof(xkblas_stream_instruction_t)
+                    );
 
-                break ;
-            }
+                    break ;
+                }
 
-            case (ENOSYS):
-            {
-                XKBLAS_IMPL("Instruction `%s` not implemented",
-                        xkblas_stream_instruction_type_to_str(instr->type));
-                break ;
-            }
+                case (ENOSYS):
+                {
+                    XKBLAS_IMPL("Instruction `%s` not implemented",
+                            xkblas_stream_instruction_type_to_str(instr->type));
+                    break ;
+                }
 
-            default:
-            {
-                XKBLAS_FATAL("Unknown error after decoding instruction");
+                default:
+                {
+                    XKBLAS_FATAL("Unknown error after decoding instruction");
+                }
             }
         }
+        this->unlock();
     }
     return err;
 }

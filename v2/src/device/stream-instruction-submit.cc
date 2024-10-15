@@ -8,6 +8,12 @@
 #  include "stats/stats.h"
 # endif /* USE_STATS */
 
+/**
+ *  Several threads may concurrently submit instructions to a device, in the case of "D2D" forwarding.
+ *  The source device "src" will queue forwarding cudaMemcpy to its stream, and on completion, submit the kernel to the "dst" device
+ *  In parallel, the "dst" device thread may queue other instructions
+ */
+
 /* commit a stream instruction and wakeup thread */
 static inline void
 xkblas_device_submit(
@@ -15,7 +21,7 @@ xkblas_device_submit(
     xkblas_stream_t * stream,
     xkblas_stream_instruction_t * instr
 ) {
-    assert(device->thread == ThreadWorker::self());
+    // assert(device->thread == ThreadWorker::self());
 
     /* commit instruction to the stream */
     stream->commit(instr);
@@ -36,8 +42,6 @@ xkblas_stream_instruction_submit_kernel(
     XKBLAS_INFO("Task `%s` is ready for kernel execution", task->label);
     # endif /* NDEBUG */
 
-    assert(ThreadWorker::self() == device->thread);
-
     /* create a new instruction and retrieve its offload stream */
     xkblas_stream_t * stream;
     xkblas_stream_instruction_t * instr;
@@ -56,6 +60,11 @@ xkblas_stream_instruction_submit_kernel(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
+
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    ++stats->kernels.launched;
+    # endif /* USE_STATS */
 }
 
 # pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
@@ -70,7 +79,7 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t   & src_device_view,
     const xkblas_callback_t         & callback
 ) {
-    assert(ThreadWorker::self() == device->thread);
+    // assert(ThreadWorker::self() == device->thread);
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
     assert(dst_device_view.addr);

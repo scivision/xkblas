@@ -36,7 +36,7 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
@@ -875,9 +875,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 assert(forward.chunk);
                 assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
 
+                xkblas_device_t * device = xkblas_device_get(forward.device_global_id);
                 fetch->tree->fetch_access_launch_copy(
                     fetch->driver,                  // use the same driver
-                    fetch->device,                  // use the same (old dst, that is now src) device
+                    device,                         // use the same (old dst, that is now src) device
                     forward.task,                   // use the forwarded task
                     forward.chunk,                  // the chunk allocated when requesting the forward
                     fetch->cube,                    // the logicial view hasn't changed

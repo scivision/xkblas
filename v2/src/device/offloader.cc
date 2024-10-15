@@ -178,25 +178,19 @@ Offloader::instruction_new(
 
     /* allocate the instruction */
     xkblas_stream_instruction_t * instr;
-try_instruction_new:
-    instr = stream->instruction_new(itype, callback);
-    if (instr == NULL)
-    {
+    do {
+        stream->lock();
+        {
+            instr = stream->instruction_new(itype, callback);
+            if (instr)
+                break ;
+        }
+        stream->unlock();
+
         XKBLAS_FATAL("Stream is full, increase 'XKBLAS_OFFLOADER_CAPACITY' or implement support for full-queue management in XKBLAS yourself :-) (sorry)");
-        # if 0
-        # pragma message(TODO "If instruction allocation fail, it means the ring buffer is full on that stream. We currently progress every other streams : do we want to only progress the failing stream ?")
-        int err;
+    } while (instr == NULL);
 
-        err = this->launch_ready_instructions(XKBLAS_STREAM_TYPE_ALL);
-        assert( (err == 0) || (err == EINPROGRESS));
-
-        err = this->progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, false);
-        assert( (err == 0) || (err == EINPROGRESS));
-
-        goto try_instruction_new;
-        # endif
-    }
-    assert(instr);
+    /* 'stream' is still locked, it will be unlocked in the commit */
 
     /* out */
     assert(stream);

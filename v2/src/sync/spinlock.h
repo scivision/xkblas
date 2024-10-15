@@ -19,12 +19,15 @@ typedef volatile int spinlock_t;
         __sync_fetch_and_xor(&L, L);    \
     } while (0)
 
+# define SPINLOCK_INITIALIZER 0
+
 # else
 
 # include <pthread.h>
 typedef pthread_mutex_t spinlock_t;
 # define SPINLOCK_LOCK(L)       pthread_mutex_lock(&L)
 # define SPINLOCK_UNLOCK(L)     pthread_mutex_unlock(&L)
+# define SPINLOCK_INITIALIZER   PTHREAD_MUTEX_INITIALIZER
 
 # endif
 

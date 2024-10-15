@@ -28,6 +28,16 @@ class xkblas_stream_instruction_queue_t
             uint32_t w;   /* next position for inserting instructions */
         } pos;
 
+        # if 0
+        xkblas_stream_instruction_queue_t() :
+            instr(nullptr),
+            capacity(0),
+            pos{0, 0}
+        {}
+
+        ~xkblas_stream_instruction_queue_t() {}
+        # endif
+
     public:
 
         /* methods */
@@ -51,7 +61,9 @@ class xkblas_stream_instruction_queue_t
 };
 
 # pragma message(TODO "make this a C++ class and use inheritance/pure virtual - currently hybrid of C struct C++ class :(")
-class xkblas_stream_t
+
+/* this is a 'kaapi_io_stream' equivalent */
+class xkblas_stream_t : public Lockable
 {
     public:
         xkblas_stream_type_t type;
