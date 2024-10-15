@@ -19,6 +19,7 @@ typedef struct  xkblas_stats_t
     } memory;
 
     struct {
+        stats_int_t commited;
         stats_int_t launched;
         stats_int_t completed;
     } tasks;

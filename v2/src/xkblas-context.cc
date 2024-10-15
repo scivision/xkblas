@@ -116,6 +116,8 @@ xkblas_sync(void)
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
+    # if 1
+
     /* other threads */
     ThreadWorker * workers[] = {
         ThreadWorker::self(),
@@ -125,13 +127,14 @@ xkblas_sync(void)
     const int ndevices = context->drivers.devices.n;
 
 retry:
+
     /* wait for all devices thread */
     int32_t wc_global = 0;
     for (int i = 0 ; i < ndevices ; ++i)
     {
         xkblas_device_t * device = context->drivers.devices.list[i];
         if (!device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
-            goto retry;
+            ++wc_global;
         wc_global += device->thread->wc;
     }
 
@@ -146,9 +149,14 @@ retry:
         goto retry;
     }
 
+    # else
+
+    sleep(2);
+
+    # endif
+
     /* all threads completed :-) */
     XKBLAS_INFO("Synchronized Xkblas");
-
 
 # if USE_STATS == 1
     xkblas_stats_report(&(context->stats));

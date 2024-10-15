@@ -265,9 +265,9 @@ XKBLAS_DRIVER_ENTRYPOINT(init)(void)
         }
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
-        xkblas_context_t * ctx = xkblas_context_get();
-        uint32_t ngpus = MIN(XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(), ctx->conf.ngpus);
-        uint32_t gpuset = ctx->conf.gpu_set;
+        xkblas_context_t * context = xkblas_context_get();
+        uint32_t ngpus = MIN(XKBLAS_DRIVER_ENTRYPOINT(get_ndevices_max)(), context->conf.ngpus);
+        uint32_t gpuset = context->conf.gpu_set;
         for (int i = 0; i < ngpus ; ++i)
         {
             int idx = __builtin_ffs((unsigned int)gpuset);
@@ -379,17 +379,17 @@ XKBLAS_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
     device->size_alloc = 0;
     device->size_free = 0;
     device->free_mem = 0;
-    xkblas_context_t * ctx = xkblas_context_get();
 
     /* work memory allocation */
     size_t free, total;
     res = cudaMemGetInfo(&free, &total);
     __check_error(res);
 
-    /* allocate 90% of free memory, into a new chunk */
-    const size_t size = (size_t) ((double)free * 0.9);
-    // const size_t size = (size_t) ((double)free * 0.1);
-    // const size_t size = (size_t) ((double)free * 0.01);
+    /* allocate memory into an initial chunk */
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    const size_t size = (size_t) ((double)free * (double)(context->conf.gpu_mem_percent / 100.0));
     uintptr_t device_ptr;
     res = cudaMalloc((void **) &device_ptr, size);
     __check_error(res);
@@ -590,7 +590,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             # pragma message(TODO "Add support for end event records")
 
-            uint32_t wp = istream->pending.pos.w % istream->pending.capacity;
+            xkblas_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
             assert(stream->cu.events.capacity == istream->pending.capacity);
             cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle.high);
             assert(err == cudaSuccess);
@@ -772,9 +772,9 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     int err = cuda_stream_instructions_progress(istream, blocking);
     assert(err == 0 || err == EINPROGRESS);
 
-    for (int p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
+    for (xkblas_stream_instruction_counter_t p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
     {
-        int idx = p % istream->pending.capacity;
+        xkblas_stream_instruction_counter_t idx = p % istream->pending.capacity;
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
         assert(instr);
 

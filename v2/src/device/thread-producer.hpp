@@ -63,6 +63,10 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             if (task->commit())
                 xkblas_context_submit_task(context, task);
 
+            # if USE_STATS
+            ++context->stats.tasks.commited;
+            # endif /* USE_STATS */
+
             # ifndef NDEBUG
             tasks.push_back(task);
             # endif

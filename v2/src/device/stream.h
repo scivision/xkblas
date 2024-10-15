@@ -17,43 +17,35 @@ typedef enum    xkblas_stream_type_t
 
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
+typedef volatile uint64_t xkblas_stream_instruction_counter_t;
+
 class xkblas_stream_instruction_queue_t
 {
     public:
 
-        xkblas_stream_instruction_t * instr;    /* instructions buffer */
-        uint32_t capacity;                      /* buffer capacity */
+        xkblas_stream_instruction_t * instr;            /* instructions buffer */
+        xkblas_stream_instruction_counter_t capacity;   /* buffer capacity */
         struct {
-            uint32_t r;   /* first instruction to process */
-            uint32_t w;   /* next position for inserting instructions */
+            xkblas_stream_instruction_counter_t r;      /* first instruction to process */
+            xkblas_stream_instruction_counter_t w;      /* next position for inserting instructions */
         } pos;
-
-        # if 0
-        xkblas_stream_instruction_queue_t() :
-            instr(nullptr),
-            capacity(0),
-            pos{0, 0}
-        {}
-
-        ~xkblas_stream_instruction_queue_t() {}
-        # endif
 
     public:
 
         /* methods */
-        int
+        bool
         is_full(void) const
         {
             return (this->pos.w - this->pos.r >= this->capacity);
         }
 
-        int
+        bool
         is_empty(void) const
         {
             return (this->pos.r == this->pos.w);
         }
 
-        int
+        xkblas_stream_instruction_counter_t
         size(void) const
         {
             return (this->pos.w - this->pos.r);
@@ -81,7 +73,7 @@ class xkblas_stream_t : public Lockable
         xkblas_stream_instruction_queue_t pending;
 
         /* the first event in the pending queue before which all events are completed */
-        volatile uint64_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+        xkblas_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
     public:
 

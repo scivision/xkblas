@@ -62,7 +62,7 @@ __parse_tile_size(xkblas_conf_t * conf, char const * value)
 static void
 __parse_ngpus(xkblas_conf_t * conf, char const * value)
 {
-    conf->ngpus = value ? (uint8_t) atoi(value) : UINT8_MAX;
+    conf->ngpus = value ? (uint8_t) atoi(value) : 1;
 }
 
 static void
@@ -100,6 +100,13 @@ __parse_gpuset(xkblas_conf_t * conf, char const * value)
 }
 
 static void
+__parse_gpu_mem_percent(xkblas_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->gpu_mem_percent = (float) atof(value);
+}
+
+static void
 __parse_offloader_capacity(xkblas_conf_t * conf, char const * value)
 {
     if (value)
@@ -129,6 +136,7 @@ static xkblas_conf_parse_t CONF_PARSE[] = {
     {"XKBLAS_PRECISION",            NULL,                       NULL},
     {"XKBLAS_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
     {"XKBLAS_GPUSET",               __parse_gpuset,             "A bitmask representing GPUs to use"},
+    {"XKBLAS_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,    "%% of total memory to allocate initially per GPU (in ]0..100["},
     {"XKBLAS_NSTREAMS",             __parse_nstreams,           "Number of concurrent kernel streams per GPU"},
     {"XKBLAS_NKERNELS",             __parse_nkernels,           "Number of concurrent kernels per stream"},
     {"XKBLAS_CACHE_LIMIT",          NULL,                       NULL},
@@ -155,6 +163,7 @@ xkblas_init_conf(xkblas_conf_t * conf)
     conf->stackblocsize     = (uint64_t)-1;
     conf->ngpus             = (uint8_t)-1;
     conf->gpu_set           = (uint32_t) ~0;
+    conf->gpu_mem_percent   = (float) 92.0;
 
     //////////////////
     //  KERNEL CONF //

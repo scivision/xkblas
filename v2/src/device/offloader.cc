@@ -120,7 +120,7 @@ Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocki
             if (stream->pending.is_empty())
                 continue ;
 
-            int n;
+            xkblas_stream_instruction_counter_t n;
             do {
                 err = stream->progress_pending_instructions(blocking);
                 n = stream->pending.size();

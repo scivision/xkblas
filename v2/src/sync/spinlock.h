@@ -3,7 +3,7 @@
 
 # include "sync/mem.h"
 
-#if 1
+#if 0
 
 typedef volatile int spinlock_t;
 

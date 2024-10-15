@@ -14,6 +14,7 @@ xkblas_stats_report(xkblas_stats_t * stats)
     XKBLAS_WARN("    currently: %zu", stats->memory.allocated.currently.load());
     XKBLAS_WARN("  freed: %zu", stats->memory.freed.load());
     XKBLAS_WARN("tasks:");
+    XKBLAS_WARN("  commited: %zu", stats->tasks.commited.load());
     XKBLAS_WARN("  launched: %zu", stats->tasks.launched.load());
     XKBLAS_WARN("  completed: %zu", stats->tasks.completed.load());
     XKBLAS_WARN("kernels:");

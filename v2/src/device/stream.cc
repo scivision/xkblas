@@ -110,7 +110,7 @@ xkblas_stream_t::instruction_new(
     if (this->ready.is_full())
         return NULL;
 
-    const int32_t w = this->ready.pos.w % this->ready.capacity;
+    const xkblas_stream_instruction_counter_t w = this->ready.pos.w % this->ready.capacity;
     xkblas_stream_instruction_t * instr = this->ready.instr + w;
     instr->type = itype;
     instr->callback = callback;
@@ -182,7 +182,7 @@ xkblas_stream_t::launch_ready_instructions(void)
 
                     /* the pending queue must not be full */
                     assert(!this->pending.is_full());
-                    uint32_t wp = this->pending.pos.w % this->pending.capacity;
+                    const xkblas_stream_instruction_counter_t wp = this->pending.pos.w % this->pending.capacity;
                     ++this->pending.pos.w;
                     writemem_barrier();
 
