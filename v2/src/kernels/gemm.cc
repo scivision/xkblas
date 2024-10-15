@@ -199,6 +199,10 @@ xkblas_£gemm_async(
 
     # pragma message(TODO "Double check tiling offset in presence of transposed matrix")
 
+    # define A(I, J) A, I*Amb, J*Anb, lda
+    # define B(I, J) B, I*Bmb, J*Bnb, ldb
+    # define C(I, J) C, I*Cmb, J*Cnb, ldc
+
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
     {
@@ -220,10 +224,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm*Amb, tk*Anb, lda,
-                                B, tk*Bmb, tn*Bnb, ldb,
+                                A(tm, tk),
+                                B(tk, tn),
                                 &zbeta,
-                                C, tm*Cmb, tn*Cnb, ldc
+                                C(tm, tn)
                         );
                     }
                 }
@@ -239,10 +243,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
-                                A, tm*Amb, tk*Anb, lda,
-                                B, tn*Bmb, tk*Bnb, ldb,
+                                A(tm, tk),
+                                B(tn, tk),
                                 &zbeta,
-                                C, tm*Cmb, tn*Cnb, ldc
+                                C(tm, tn)
                         );
                     }
                 }
@@ -261,10 +265,10 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,
-                                A, tk*Amb, tm*Anb, lda,
-                                B, tk*Bmb, tn*Bnb, ldb,
+                                A(tk, tm),
+                                B(tk, tn),
                                 &zbeta,
-                                C, tm*Cmb, tn*Cnb, ldc
+                                C(tm, tn)
                         );
                     }
                 }
@@ -280,16 +284,20 @@ xkblas_£gemm_async(
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,
-                                A, tk*Amb, tm*Anb, lda,
-                                B, tn*Bmb, tk*Bnb, ldb,
+                                A(tk, tm),
+                                B(tn, tk),
                                 &zbeta,
-                                C, tm*Cmb, tn*Cnb, ldc
+                                C(tm, tn)
                         );
                     }
                 }
             }
         }
     }
+
+    # undef A
+    # undef B
+    # undef C
 
     XKBLAS_INFO("GEMM dependency graph submitted");
 
