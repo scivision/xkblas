@@ -18,17 +18,17 @@ typedef enum    xkblas_stream_type_t
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
 /* counter for the stream queues */
-typedef volatile uint64_t xkblas_stream_instruction_counter_t;
+typedef uint32_t xkblas_stream_instruction_counter_t;
 
 class xkblas_stream_instruction_queue_t
 {
     public:
 
-        xkblas_stream_instruction_t * instr;            /* instructions buffer */
-        xkblas_stream_instruction_counter_t capacity;   /* buffer capacity */
+        xkblas_stream_instruction_t * instr;                /* instructions buffer */
+        xkblas_stream_instruction_counter_t capacity;       /* buffer capacity */
         struct {
-            xkblas_stream_instruction_counter_t r;      /* first instruction to process */
-            xkblas_stream_instruction_counter_t w;      /* next position for inserting instructions */
+            volatile xkblas_stream_instruction_counter_t r; /* first instruction to process */
+            volatile xkblas_stream_instruction_counter_t w; /* next position for inserting instructions */
         } pos;
 
     public:

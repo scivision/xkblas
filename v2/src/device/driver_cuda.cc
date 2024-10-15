@@ -555,6 +555,8 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkblas_stream_cuda_t * stream = (xkblas_stream_cuda_t *) istream;
     assert(stream);
 
+    assert(istream->is_locked());
+
     switch (instr->type)
     {
         case (XKBLAS_STREAM_INSTR_TYPE_NOP):
@@ -655,7 +657,9 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
             cudaError_t err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle);
             __check_error(err);
-            err = cudaEventRecord(stream->cu.events.end[istream->pending.pos.w % istream->pending.capacity], handle);
+
+            xkblas_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
+            err = cudaEventRecord(stream->cu.events.end[wp], handle);
             __check_error(err);
 
             return EINPROGRESS;
@@ -697,7 +701,8 @@ cuda_stream_instructions_progress(
     /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
     xkblas_stream_instruction_counter_t     size = istream->pending.pos.w - istream->pending.pos.r;
     xkblas_stream_instruction_counter_t      okp = istream->ok_p;
-    xkblas_stream_instruction_counter_t prev_okp = okp - 1;
+    int64_t                             prev_okp = ((int64_t) okp) - 1;
+    assert(prev_okp < (int64_t) okp);
 
     while (okp < istream->pending.pos.w)
     {
@@ -731,7 +736,7 @@ cuda_stream_instructions_progress(
                     else
                     {
                         assert(res == cudaSuccess);
-                        if (prev_okp + 1 == okp)
+                        if (prev_okp + 1 == (int64_t) okp)
                             ++prev_okp;
                         break ;
                     }
@@ -754,9 +759,9 @@ cuda_stream_instructions_progress(
 
     /* all events have been tested, test the prev_okp has been incremented */
     okp = istream->ok_p;
-    if (prev_okp != okp - 1)
+    if (prev_okp != (((int64_t) okp) - 1))
     {
-        istream->ok_p = prev_okp + 1;
+        istream->ok_p = (xkblas_stream_instruction_counter_t) (prev_okp + 1);
         return 0;
     }
 

@@ -251,7 +251,10 @@ xkblas_device_task_execute(
             xkblas_callback_t callback;
             callback.func    = xkblas_device_task_executed_callback;
             callback.args[0] = task;
+
             xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+            if (device->thread == ThreadWorker::self())
+                device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
 
             /* kernel launch will be called asynchronously in the driver */
             /* the 'executed' callback will be called asynchronously in the

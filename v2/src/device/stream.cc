@@ -212,6 +212,7 @@ xkblas_stream_t::progress_pending_instructions(int blocking)
 {
     XKBLAS_DEBUG("Progressing pending instructions of stream %p of type `%s` (%d pending)",
             this, xkblas_stream_type_to_str(this->type), this->pending.size());
+
     assert(this->pending.pos.r <= this->pending.pos.w);
     assert(this->f_instructions_progress);
 
