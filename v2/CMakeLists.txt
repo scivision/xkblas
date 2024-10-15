@@ -113,7 +113,7 @@ option(STRICT "Enable strict compilation mode" OFF)
 
 # uncomment to disable kinterval tree heavy debug
 option(DISABLE_HEAVY_DEBUG "When compiling in BUILD_TYPE=Debug, you can disable heavy assertion tests in the cube-tree structure setting this variable to 'ON' - this is not recommanded" OFF)
-if (USE_HEAVY_DEBUG)
+if (DISABLE_HEAVY_DEBUG)
     add_compile_definitions(CUBE_TREE_DISABLE_COHERENCY_CHECKS=1)
 endif()
 
