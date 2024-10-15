@@ -24,7 +24,7 @@
 # include <functional>
 # include <map>
 
-# define USE_D2D_FORWARDING 0
+# define USE_D2D_FORWARDING 1
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -866,9 +866,9 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             // forward the data to other devices
             for (MemoryForward & forward : search.awaiting.forwards)
             {
-                XKBLAS_ERROR(
+                XKBLAS_WARN(
                     "Forwarding from %d to %d using alloc %p",
-                    fetch->device->global_id, forward.device_global_id, forward.chunk
+                    fetch->device->global_id, forward.device_global_id, forward.chunk->device_ptr
                 );
 
                 assert(forward.task);
@@ -1344,10 +1344,10 @@ next_view:
                     ///////////////
 
                     // destinary allocation view id
-                    const memory_allocation_view_id_t allocation_view_id = partite.dst_allocation_view_id;
-                    assert(allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
+                    const memory_allocation_view_id_t dst_alloc_view_id = partite.dst_allocation_view_id;
+                    assert(dst_alloc_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
 
-                    const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
+                    const memory_allocation_view_id_bitfield_t allocbit = (1 << dst_alloc_view_id);
 
                     // partite is already valid on that device
                     MemoryReplicate & dst_replicate = partite.block->replicates[device->global_id];
@@ -1358,7 +1358,7 @@ next_view:
                     }
                     assert((partite.block->valid & devbit) == 0);
 
-                    MemoryReplicateAllocationView * dst_alloc_view = dst_replicate.allocations[allocation_view_id];
+                    MemoryReplicateAllocationView * dst_alloc_view = dst_replicate.allocations[dst_alloc_view_id];
 
                     /* increment task fetch counter */
                     task->fetching();
@@ -1368,13 +1368,13 @@ next_view:
                             dst_alloc_view->view.addr
                     );
 
-                    // partite is already being fetched on that device, on the same allocation
+                    /* partite is already being fetched on that device, on the same allocation */
                     if (dst_replicate.fetching & allocbit)
                     {
                         partite.must_fetch = false;
                         XKBLAS_DEBUG("Skipping fetch of a block already being fetched (concurrent read)");
 
-                        // add the task to the awaiting list of that block
+                        /* add the task to the awaiting list of that block */
                         dst_alloc_view->awaiting.tasks.push_back(task);
 
                         continue ;
@@ -1397,6 +1397,7 @@ next_view:
 
                         // create dst view
                         partite.dst_device_global_id = device->global_id;
+                        assert(partite.dst_allocation_view_id == dst_alloc_view_id);
                         partite.dst_view = dst_alloc_view->view;
 
                         // get a valid source
@@ -1412,10 +1413,10 @@ next_view:
                         assert(0 <= src_alloc_view_id && src_alloc_view_id < src_replicate.nallocations);
 
                         // retrieve and set src view infos
-                        MemoryReplicateAllocationView * r = src_replicate.allocations[allocation_view_id];
+                        MemoryReplicateAllocationView * src_alloc_view = src_replicate.allocations[src_alloc_view_id];
                         partite.src_device_global_id   = src;
                         partite.src_allocation_view_id = src_alloc_view_id;
-                        partite.src_view               = dst_alloc_view->view;
+                        partite.src_view               = src_alloc_view->view;
                     }
 # if USE_D2D_FORWARDING
                     // already fetching on some devices
@@ -1429,6 +1430,7 @@ next_view:
                         // one device is already fetching, add a D2D forward callback
                         xkblas_device_global_id_t src = driver->f_get_source(device->global_id, partite.block->fetching);
                         assert(0 <= src && src < XKBLAS_DEVICES_MAX);
+                        assert(partite.block->fetching & (1 << src));
 
                         MemoryReplicate & src_replicate = partite.block->replicates[src];
                         assert(src_replicate.fetching);
