@@ -357,15 +357,15 @@ class KCubeTree {
                     assert(K == 1 || K == 2);
                     if (K == 1)
                     {
-                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {[%d..%d[};\n",
-                                this->cube[0].a, 0,
-                                this->cube[0].b, 2,
+                        fprintf(f, "    \\draw (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") rectangle (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") node[midway] {[" INTERVAL_TYPE_MODIFIER ".." INTERVAL_TYPE_MODIFIER "[};\n",
+                                this->cube[0].a, (INTERVAL_TYPE_T) 0,
+                                this->cube[0].b, (INTERVAL_TYPE_T) 2,
                                 this->cube[0].a, this->cube[0].b
                         );
                     }
                     else if (K == 2)
                     {
-                        fprintf(f, "    \\draw (%d,-%d) rectangle (%d,-%d) node[midway] {",
+                        fprintf(f, "    \\draw (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") rectangle (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") node[midway] {",
                             this->cube[1].a, this->cube[0].a,
                             this->cube[1].b, this->cube[0].b
                         );
@@ -383,7 +383,7 @@ class KCubeTree {
                 virtual void
                 dump_cube_str(FILE * f) const
                 {
-                    fprintf(f, "[%d..%d[ x [%d..%d[",
+                    fprintf(f, "[" INTERVAL_TYPE_MODIFIER ".." INTERVAL_TYPE_MODIFIER "[ x [" INTERVAL_TYPE_MODIFIER ".." INTERVAL_TYPE_MODIFIER "[",
                         this->cube[0].a, this->cube[0].b,
                         this->cube[1].a, this->cube[1].b
                     );

@@ -6,6 +6,8 @@
 # include <assert.h>
 # include <stddef.h>
 # include <stdint.h>
+# include <sys/types.h>
+# include <stdlib.h>
 
 typedef enum    matrix_order_t
 {

@@ -10,21 +10,21 @@
 # include "logger/logger.h"
 # include "logger/todo.h"
 
-# define CUBE_TREE_CUT
-# define CUBE_TREE_REBALANCE
-# include "sync/cube-tree.hpp"
+// tree cutting would fuck things up
 # undef CUBE_TREE_CUT
 # undef CUBE_TREE_REBALANCE
+# include "sync/cube-tree.hpp"
 
 # include "device/device-memory.h"
 # include "sync/bits.h"
 # include "sync/lockable.hpp"
 
 # include <cstdint>
+# include <csignal> // std::raise for debguning
 # include <functional>
 # include <map>
 
-# define USE_D2D_FORWARDING 1
+# define USE_D2D_FORWARDING 0
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -44,8 +44,6 @@ static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= (1 << (sizeof(memory_allo
 
 typedef uint8_t memory_allocation_view_id_bitfield_t;
 static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= sizeof(memory_allocation_view_id_bitfield_t) * 8);
-
-static std::map<uintptr_t, bool> LAUNCHED;
 
 /* a forward request */
 template <int K>
@@ -1073,6 +1071,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
+            XKBLAS_WARN("Evicting...");
+
             size_t freed = 0;
             auto f = [device, size, &freed](NodeBase * nodebase, void * args, bool & stop) {
                 (void) args;
@@ -1182,7 +1182,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             if (partition.chunk == NULL)
                 XKBLAS_FATAL("!! GPU IS OUT OF MEMORY !!");
 
-            XKBLAS_DEBUG("Allocated a new chunk `%p` on device %d", partition.chunk, device->global_id);
+            XKBLAS_DEBUG("Allocated a new chunk `%p` on device %d", partition.chunk->device_ptr, device->global_id);
 
             ////////////////////////////////////////////
             // Create a view from the allocated chunk //
@@ -1272,6 +1272,12 @@ next_view:
 
             /* no continuous allocation found */
             partition.chunk = nullptr;
+
+            # if 0
+            uintptr_t addr = access->host_view.begin_addr();
+            if (LAUNCHED[addr])
+                std::raise(SIGINT);
+            # endif
         }
 
         inline void
@@ -1518,9 +1524,10 @@ next_view:
                     // Even though the data is not written, as we are writing,
                     // there are no other tasks accessing concurrently
                     const memory_allocation_view_id_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
-                    partite.block->valid = devbit;
+                    assert(0 <= partite.dst_allocation_view_id && partite.dst_allocation_view_id < replicate.nallocations);
                     replicate.valid      = allocbit;
                     replicate.fetching   = allocbit;
+                    partite.block->valid = devbit;
                 }
             }
         }
@@ -1548,16 +1555,6 @@ next_view:
                     /* this code is currently only executed when 'dst' is a device */
                     assert(0 <= partite.dst_device_global_id && partite.dst_device_global_id < XKBLAS_DEVICES_MAX);
                     assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
-
-                    // TODO: use this to debug single GPU correctnesss issue
-                    # if 0
-                    // TODO : remove me (begin)
-                    uintptr_t addr = host_view.begin_addr();
-                    assert(LAUNCHED.count(addr) == 0);
-                    LAUNCHED[addr] = true;
-                    # endif
-
-                    // TODO : remove me (end)
 
                     /* host replicate view if no allocation were found */
                     const memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
@@ -1593,7 +1590,23 @@ next_view:
 
                 # if 0
                 XKBLAS_DEBUG(
-                    "Interval(%16d, %16d), Interval(%16d, %16d),",
+                    "KMemoryAccess<2>(%s, (void *) %p, %lu, %ld, %ld, %ld, %ld, %ld, %s),",
+                    access->host_view.order == MATRIX_ROWMAJOR ? "MATRIX_ROWMAJOR" : access->host_view.order == MATRIX_COLMAJOR ? "MATRIX_COLMAJOR" : "unk",
+                    access->host_view.addr,
+                    access->host_view.ld,
+                    access->host_view.offset_m,
+                    access->host_view.offset_n,
+                    access->host_view.m,
+                    access->host_view.n,
+                    access->host_view.sizeof_type,
+                    access->mode == ACCESS_MODE_R ? "ACCESS_MODE_R" : access->mode == ACCESS_MODE_W ? "ACCESS_MODE_W" : access->mode == ACCESS_MODE_RW ? "ACCESS_MODE_RW" : "unk"
+                );
+
+                # endif
+
+                # if 0
+                XKBLAS_DEBUG(
+                    "Interval(" INTERVAL_TYPE_MODIFIER ", " INTERVAL_TYPE_MODIFIER "), Interval(" INTERVAL_TYPE_MODIFIER ", " INTERVAL_TYPE_MODIFIER "),",
                     access->cube[0].a, access->cube[0].b,
                     access->cube[1].a, access->cube[1].b
                 );

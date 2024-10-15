@@ -94,7 +94,7 @@ class KCube {
             int r = 0;
             for (int k = 0 ; k < K ; ++k)
             {
-                r += snprintf(buffer + r, size - r, "[%d..%d[%c",
+                r += snprintf(buffer + r, size - r, "[" INTERVAL_TYPE_MODIFIER ".." INTERVAL_TYPE_MODIFIER "[%c",
                         this->list[k].a, this->list[k].b,
                         (k == K - 1) ? '\0' : '\n');
                 if (r == size)

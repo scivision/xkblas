@@ -228,12 +228,36 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 0
+        # if 1
         static_assert(K == 2);
 
         Interval cube[] = {
-            Interval(0,16), Interval(0,16),
-            Interval(8,24), Interval(8,24),
+            Interval(       29,        33), Interval(               0,               16),
+            Interval(       37,        41), Interval(               0,               16),
+            Interval(       61,        65), Interval(               0,               16),
+            Interval(       29,        33), Interval(               0,               16),
+            Interval(       41,        45), Interval(               0,               16),
+            Interval(       65,        69), Interval(               0,               16),
+            Interval(       33,        37), Interval(               0,               16),
+            Interval(       37,        41), Interval(              16,               32),
+            Interval(       61,        65), Interval(               0,               16),
+            Interval(       33,        37), Interval(               0,               16),
+            Interval(       41,        45), Interval(              16,               32),
+            Interval(       65,        69), Interval(               0,               16),
+            // FUCK 0x7fe69d8004a0 - using chunk 0x7fe69e000200 - Interval is (65, 69) x (0, 16)
+            Interval(       29,        33), Interval(              16,               32),
+            Interval(       41,        45), Interval(               0,               16),
+            // FUCK 0x7fe69d8001a0 - using chunk 0x7fe69e000280 - Interval is (41, 45) x (0, 16)
+            Interval(       65,        69), Interval(              16,               32),
+            Interval(       29,        33), Interval(              16,               32),
+            Interval(       37,        41), Interval(               0,               16),
+            Interval(       61,        65), Interval(              16,               32),
+            Interval(       33,        37), Interval(              16,               32),
+            Interval(       41,        45), Interval(              16,               32),
+            Interval(       65,        69), Interval(              16,               32),
+            Interval(       33,        37), Interval(              16,               32),
+            Interval(       37,        41), Interval(              16,               32),
+            Interval(       61,        65), Interval(              16,               32),
         };
 
         # if 0

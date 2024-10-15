@@ -3,6 +3,7 @@
 
 # define INTERVAL_TYPE_T        uintptr_t
 # define INTERVAL_DIFF_TYPE_T   ptrdiff_t
+# define INTERVAL_TYPE_MODIFIER "%lu"
 
 class Interval {
 

@@ -74,8 +74,8 @@ xkblas_£gemm_tile_async(
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
-    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const size_t ocr_access = 2;
+    const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
+    // const size_t ocr_access = 2;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
