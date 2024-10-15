@@ -400,21 +400,8 @@ xkblas_device_thread_main_loop(
     while (device->state == XKBLAS_DEVICE_STATE_RUNNING)
     {
         Task * task;
-
-        # if 1
-        # pragma message(TODO "'device->offloader.is_empty' is called with no lock, while inner lists are modifed under locks, is this a problem ?")
         while ((task = worker->pop()) == NULL && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
             worker->pause();
-        # else
-        task = worker->pop();
-        # endif
-
-        # pragma message(TODO "why this ?")
-        while (!xkblas_device_accept_new_task(device))
-        {
-            int err = device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, true);
-            assert(err == 0);
-        }
 
         xkblas_device_progress(driver, device);
         if (task)

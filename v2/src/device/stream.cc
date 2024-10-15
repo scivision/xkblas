@@ -141,8 +141,6 @@ xkblas_stream_t::launch_ready_instructions(void)
 
     assert(this->ready.pos.r <= this->ready.pos.w);
 
-    this->lock();
-
     /* launch every ready instructions */
     int err = 0;
     while (!this->ready.is_empty())
@@ -205,8 +203,6 @@ xkblas_stream_t::launch_ready_instructions(void)
             }
         }
     }
-
-    this->unlock();
 
     return err;
 }

@@ -473,9 +473,8 @@ XKBLAS_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 
     int device_cuda_id = __get_device_cuda_id(device_driver_id);
 
-    const uint64_t perfrank = cuda_count_perfrank - 1;
-    const uint64_t size = sizeof(uint64_t) * perfrank;
-    device->affinity = (xkblas_device_global_id_bitfield_t *) malloc(sizeof(xkblas_device_global_id_bitfield_t) * perfrank);
+    const uint64_t size = sizeof(xkblas_device_global_id_bitfield_t) * cuda_count_perfrank;
+    device->affinity = (xkblas_device_global_id_bitfield_t *) malloc(size);
     memset(device->affinity, 0, size);
 
     /* all other devices have been initialized, enable peer */

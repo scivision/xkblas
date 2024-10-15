@@ -74,7 +74,10 @@ Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
             xkblas_stream_t * stream = this->streams[s][i];
             assert(stream);
 
+            stream->lock();
             err = stream->launch_ready_instructions();
+            stream->unlock();
+
             switch (err)
             {
                 case (0):
@@ -120,9 +123,11 @@ Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocki
             if (stream->pending.is_empty())
                 continue ;
 
-            int n;
+            xkblas_stream_instruction_counter_t n;
             do {
+                stream->lock();
                 err = stream->progress_pending_instructions(blocking);
+                stream->unlock();
                 n = stream->pending.size();
             } while (s == XKBLAS_STREAM_TYPE_KERN && n > ctx->conf.device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency);
             assert(err == 0 || err == EINPROGRESS);
