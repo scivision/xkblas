@@ -35,7 +35,7 @@ typedef struct  xkblas_stream_cuda_t
 
         struct {
             cudaEvent_t * end;
-            uint16_t capacity;
+            xkblas_stream_instruction_counter_t capacity;
         } events;
 
         struct {
@@ -696,13 +696,13 @@ cuda_stream_instructions_progress(
     }
 
     /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
-    uint64_t     size = istream->pending.pos.w - istream->pending.pos.r;
-    uint64_t      okp = istream->ok_p;
-     int64_t prev_okp = okp - 1;
+    xkblas_stream_instruction_counter_t     size = istream->pending.pos.w - istream->pending.pos.r;
+    xkblas_stream_instruction_counter_t      okp = istream->ok_p;
+    xkblas_stream_instruction_counter_t prev_okp = okp - 1;
 
     while (okp < istream->pending.pos.w)
     {
-        uint16_t idx = (uint16_t) (okp % istream->pending.capacity);
+        const xkblas_stream_instruction_counter_t idx = okp % istream->pending.capacity;
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
         cudaError_t res = cudaSuccess;
 
@@ -774,7 +774,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
 
     for (xkblas_stream_instruction_counter_t p = istream->pending.pos.r ; p < istream->ok_p ; ++p)
     {
-        xkblas_stream_instruction_counter_t idx = p % istream->pending.capacity;
+        const xkblas_stream_instruction_counter_t idx = p % istream->pending.capacity;
         xkblas_stream_instruction_t * instr = istream->pending.instr + idx;
         assert(instr);
 
@@ -813,7 +813,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instructions_progress)(
 static xkblas_stream_t *
 XKBLAS_DRIVER_ENTRYPOINT(stream_create)(
     xkblas_stream_type_t type,
-    uint16_t capacity
+    xkblas_stream_instruction_counter_t capacity
 ) {
     cudaError_t res;
     assert(INITIALIZED == true);

@@ -17,7 +17,8 @@ typedef enum    xkblas_stream_type_t
 
 const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
 
-typedef volatile uint64_t xkblas_stream_instruction_counter_t;
+/* counter for the stream queues */
+typedef int xkblas_stream_instruction_counter_t;
 
 class xkblas_stream_instruction_queue_t
 {
@@ -27,19 +28,19 @@ class xkblas_stream_instruction_queue_t
         xkblas_stream_instruction_counter_t capacity;   /* buffer capacity */
         struct {
             xkblas_stream_instruction_counter_t r;      /* first instruction to process */
-            xkblas_stream_instruction_counter_t w;      /* next position for inserting instructions */
+            xkblas_stream_instruction_counter_t  w;     /* next position for inserting instructions */
         } pos;
 
     public:
 
         /* methods */
-        bool
+        int
         is_full(void) const
         {
             return (this->pos.w - this->pos.r >= this->capacity);
         }
 
-        bool
+        int
         is_empty(void) const
         {
             return (this->pos.r == this->pos.w);
@@ -73,7 +74,7 @@ class xkblas_stream_t : public Lockable
         xkblas_stream_instruction_queue_t pending;
 
         /* the first event in the pending queue before which all events are completed */
-        xkblas_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+        volatile xkblas_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
     public:
 
@@ -104,7 +105,7 @@ class xkblas_stream_t : public Lockable
 void xkblas_stream_init(
     xkblas_stream_t * stream,
     xkblas_stream_type_t type,
-    unsigned int capacity,
+    xkblas_stream_instruction_counter_t capacity,
     int (*f_instruction_launch)(xkblas_stream_t *, xkblas_stream_instruction_t *),
     int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking)
 );

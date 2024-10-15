@@ -401,7 +401,7 @@ xkblas_device_thread_main_loop(
     {
         Task * task;
 
-        # if 0
+        # if 1
         # pragma message(TODO "'device->offloader.is_empty' is called with no lock, while inner lists are modifed under locks, is this a problem ?")
         while ((task = worker->pop()) == NULL && device->offloader.is_empty(XKBLAS_STREAM_TYPE_ALL))
             worker->pause();

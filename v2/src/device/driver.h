@@ -89,7 +89,7 @@ typedef struct  xkblas_driver_t
     ////////////////////////////////
 
     /* alllocate and initialize a stream */
-    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, uint16_t capacity);
+    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, xkblas_stream_instruction_counter_t capacity);
 
     /* deallocate a stream */
     void (*f_stream_delete)(xkblas_stream_t * istream);
@@ -154,9 +154,6 @@ typedef struct  xkblas_drivers_t
         std::atomic<uint8_t> round_robin_device_global_id;
 
     } devices;
-
-    /* number of uncompleted tasks (used for xkblas_sync) */
-    std::atomic<uint32_t> uncompleted_tasks;
 
 }               xkblas_drivers_t;
 

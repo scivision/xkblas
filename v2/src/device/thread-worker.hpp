@@ -62,7 +62,7 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
     public:
 
         /* number of uncompleted tasks */
-        volatile int32_t wc;
+        int32_t wc;
 
     private:
 

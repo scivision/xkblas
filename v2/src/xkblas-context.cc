@@ -116,8 +116,6 @@ xkblas_sync(void)
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    # if 1
-
     /* other threads */
     ThreadWorker * workers[] = {
         ThreadWorker::self(),
@@ -125,11 +123,12 @@ xkblas_sync(void)
     };
     const int nworkers = sizeof(workers) / sizeof(ThreadWorker *);
     const int ndevices = context->drivers.devices.n;
+    int32_t wc_global;
 
 retry:
+    wc_global = 0;
 
     /* wait for all devices thread */
-    int32_t wc_global = 0;
     for (int i = 0 ; i < ndevices ; ++i)
     {
         xkblas_device_t * device = context->drivers.devices.list[i];
@@ -148,12 +147,6 @@ retry:
         usleep(50);    // TODO : pthread cond instead ? or maybe workstealing
         goto retry;
     }
-
-    # else
-
-    sleep(2);
-
-    # endif
 
     /* all threads completed :-) */
     XKBLAS_INFO("Synchronized Xkblas");

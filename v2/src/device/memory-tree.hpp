@@ -44,7 +44,7 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
@@ -800,6 +800,9 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             /* driver of the device */
             xkblas_driver_t * driver;
 
+            /* device that initiated the fetch */
+            xkblas_device_t * device;
+
             /* mark 'fetched' this task */
             Task * task;
 
@@ -829,6 +832,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             {
                 /* the task kernel is ready for execution */
                 xkblas_device_t * device = xkblas_device_get(fetch->dst_device_global_id);
+                assert(device);
+
                 xkblas_device_task_execute(fetch->driver, device, task);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
@@ -844,6 +849,9 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             assert(fetch);
 
             XKBLAS_DEBUG("Fetch completed for allocation `%p`", fetch->dst_chunk->device_ptr);
+
+            // the current thread must be the device one
+            assert(ThreadWorker::self() == fetch->device->thread);
 
             //  `fetch->task` is the task that initiated the fetch: notify that the data has arrived
             assert(fetch->task);
@@ -880,6 +888,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 fetch->tree->fetch_access_launch_copy(
                     fetch->driver,                  // use the same driver
+                    fetch->device,                  // use the same (old dst, that is now src) device
                     forward.task,                   // use the forwarded task
                     forward.chunk,                  // the chunk allocated when requesting the forward
                     fetch->cube,                    // the logicial view hasn't changed
@@ -910,14 +919,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             callback.func = fetch_callback;
             callback.args[0] = fetch;
 
-            /* get the dst device */
-            xkblas_device_t * device = xkblas_device_get(fetch->dst_device_global_id);
-            assert(device);
-
             /* launch asynchronous copy */
             xkblas_stream_instruction_submit_copy(
                 fetch->driver,
-                device,
+                fetch->device,
                 fetch->host_view,
                 fetch->dst_device_global_id,
                 fetch->dst_view,
@@ -930,6 +935,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         inline void
         fetch_access_launch_copy(
                   xkblas_driver_t           * driver,
+                  xkblas_device_t           * device,
                   Task                      * task,
                   xkblas_alloc_chunk_t      * dst_chunk,
             const Cube                      & cube,
@@ -943,6 +949,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             const internal_fetch_t * fetch = new internal_fetch_t{
                 .tree       = this,
                 .driver     = driver,
+                .device     = device,
                 .task       = task,
                 .cube{cube},
                 .host_view{host_view},
@@ -1567,6 +1574,7 @@ next_view:
 
                     this->fetch_access_launch_copy(
                         driver,
+                        device,
                         task,
                         partition.chunk,
                         partite.cube,

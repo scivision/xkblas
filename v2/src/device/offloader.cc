@@ -8,7 +8,7 @@ Offloader::~Offloader() {}
 void
 Offloader::init(
     xkblas_conf_offloader_t * conf,
-    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, uint16_t capacity)
+    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, xkblas_stream_instruction_counter_t capacity)
 ) {
     assert(conf);
     assert(f_stream_create);
@@ -120,7 +120,7 @@ Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocki
             if (stream->pending.is_empty())
                 continue ;
 
-            xkblas_stream_instruction_counter_t n;
+            int n;
             do {
                 err = stream->progress_pending_instructions(blocking);
                 n = stream->pending.size();
@@ -178,19 +178,20 @@ Offloader::instruction_new(
 
     /* allocate the instruction */
     xkblas_stream_instruction_t * instr;
+try_instruction_new:
+
     do {
         stream->lock();
-        {
-            instr = stream->instruction_new(itype, callback);
-            if (instr)
-                break ;
-        }
+        instr = stream->instruction_new(itype, callback);
+        if (instr)
+            break ;
         stream->unlock();
 
         XKBLAS_FATAL("Stream is full, increase 'XKBLAS_OFFLOADER_CAPACITY' or implement support for full-queue management in XKBLAS yourself :-) (sorry)");
-    } while (instr == NULL);
 
-    /* 'stream' is still locked, it will be unlocked in the commit */
+    } while (1);
+
+    /* stream is locked, will be unlocked in the commit */
 
     /* out */
     assert(stream);
