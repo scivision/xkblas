@@ -604,6 +604,7 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 cudaGetDevice(&device);
                 cudaPointerGetAttributes(&attr, (const void *) access->device_view.addr);
                 assert(attr.device == device);
+                assert(attr.type == cudaMemoryTypeDevice);
             }
             # endif /* NDEBUG */
 
