@@ -141,13 +141,16 @@ class alignas(CACHE_LINE_SIZE) KTask
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");
             # endif /* NDEBUG */
+            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
         }
 
         virtual ~KTask()
         {
             this->state.value = TASK_STATE_DEALLOCATED;
+            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DEALLOCATED);
         }
 
+    public:
         ////////////////////////////////////
         // Methods to transition the task //
         ////////////////////////////////////
@@ -175,19 +178,17 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         /* Return 'true' if the task is ready to be queued, 'false' otherwise */
-        inline bool
+        inline void
         commit(void)
         {
             assert(this->state.value == TASK_STATE_ALLOCATED);
-            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
                 xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
-                return true;
+                xkblas_task_ready(this);
             }
-            return false;
         }
 
         inline void
@@ -195,8 +196,8 @@ class alignas(CACHE_LINE_SIZE) KTask
         {
             if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
             {
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 assert(this->state.value == TASK_STATE_READY);
+                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHING;
                 xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHING);
             }
@@ -206,7 +207,6 @@ class alignas(CACHE_LINE_SIZE) KTask
         fetched(void)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
-
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
@@ -231,13 +231,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_UNLOCK(this->state.lock);
 
             for (Edge & edge : this->edges)
-            {
-                if (edge.successor->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
-                {
-                    edge.successor->state.value = TASK_STATE_READY;
-                    xkblas_task_ready(edge.successor);
-                }
-            }
+                edge.successor->commit();
         }
 };
 

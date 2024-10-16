@@ -59,9 +59,7 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             xkblas_context_t * context,
             Task * task
         ) {
-            // commit the task - and enqueue it if now ready
-            if (task->commit())
-                xkblas_context_submit_task(context, task);
+            task->commit();
 
             # ifndef NDEBUG
             tasks.push_back(task);
