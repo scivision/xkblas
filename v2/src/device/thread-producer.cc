@@ -31,3 +31,21 @@ ThreadProducer::self(void)
     assert(__TLS_PRODUCER);
     return __TLS_PRODUCER;
 }
+
+# ifndef NDEBUG
+void
+xkblas_thread_report_tasks(void)
+{
+    ThreadProducer * producer = ThreadProducer::self();
+    assert(producer);
+
+    for (int i = 0 ; i < producer->tasks.size() ; ++i)
+    {
+        Task * task = producer->tasks[i];
+        assert(task);
+
+        XKBLAS_WARN("%4i - %10s - %s", i, task_state_to_str(task->state.value), task->label);
+    }
+}
+
+# endif /* NDEBUG */

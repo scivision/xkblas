@@ -30,7 +30,7 @@
  *
  *  Set to '0' so multiple H2D are submitted concurrently
  */
-# define USE_D2D_FORWARDING 0
+# define USE_D2D_FORWARDING 1
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -210,7 +210,7 @@ class KMemoryBlock {
         MemoryReplicate replicates[XKBLAS_DEVICES_MAX];
 
         /* valid devices (i.e. devices with at least one valid allocation) */
-        volatile memory_allocation_view_id_bitfield_t valid;
+        volatile xkblas_device_global_id_bitfield_t valid;
 
         /* fetching devices (i.e. devices with at least one fetching allocation) */
         volatile xkblas_device_global_id_bitfield_t fetching;
@@ -256,7 +256,7 @@ class KMemoryBlock {
             //  DUPPLICATE REPLICATE INFOS  //
             //////////////////////////////////
 
-            for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 // retrieve this device replicate
                       MemoryReplicate *            replicate =            this->replicates + device_global_id;
@@ -264,7 +264,7 @@ class KMemoryBlock {
 
                 // dupplicate allocations
                 replicate->nallocations = inheriting_replicate->nallocations;
-                for (int i = 0 ; i < inheriting_replicate->nallocations ; ++i)
+                for (memory_allocation_view_id_t i = 0 ; i < inheriting_replicate->nallocations ; ++i)
                 {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
@@ -325,7 +325,7 @@ class KMemoryTreeNodeSearch {
                 MemoryBlock * block;
 
                 /* The cube of this block (intersectoin of the access with the tree node) */
-                Cube cube;
+                const Cube cube;
 
                 /* copy of the host view */
                 memory_view_t host_view;
@@ -334,13 +334,13 @@ class KMemoryTreeNodeSearch {
                 xkblas_device_global_id_t dst_device_global_id;
 
                 /* replicate allocation to use as dst (in MemoryReplicate::allocations) */
-                xkblas_device_global_id_t dst_allocation_view_id;
+                memory_allocation_view_id_t dst_allocation_view_id;
 
                 /* dst view */
                 memory_replicate_view_t dst_view;
 
                 /* source device */
-                xkblas_device_global_id_t src_device_global_id;
+                memory_allocation_view_id_t src_device_global_id;
 
                 /* replicate allocation to use as src (in MemoryReplicate::allocations) */
                 xkblas_device_global_id_t src_allocation_view_id;
@@ -353,15 +353,15 @@ class KMemoryTreeNodeSearch {
 
             public:
 
-                Partite(MemoryBlock * b, Cube & r) :
+                Partite(MemoryBlock * b, const Cube & r) :
                     block(b),
                     cube(r),
                     host_view(b->host_view),
                     dst_device_global_id(HOST_DEVICE_GLOBAL_ID),
-                    dst_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX),
+                    dst_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEW_NONE),
                     dst_view(),
                     src_device_global_id(HOST_DEVICE_GLOBAL_ID),
-                    src_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX),
+                    src_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEW_NONE),
                     src_view(),
                     must_fetch(true)
                 {}
@@ -456,7 +456,7 @@ class KMemoryTreeNodeSearch {
         ///////////////////////////////////////////
         // used if type == SEARCH_AWAITING //
         ///////////////////////////////////////////
-        xkblas_alloc_chunk_t * dst_chunk;
+        xkblas_alloc_chunk_t * chunk;
         struct {
             std::vector<Task *> tasks;
             std::vector<MemoryForward> forwards;
@@ -478,7 +478,7 @@ class KMemoryTreeNodeSearch {
            device_global_id(devid),
            access(nullptr),
            partition(),
-           dst_chunk(nullptr),
+           chunk(nullptr),
            awaiting()
        {}
 
@@ -502,7 +502,7 @@ class KMemoryTreeNodeSearch {
        void
        prepare_search_awaiting(xkblas_alloc_chunk_t * chunk)
        {
-           this->dst_chunk = chunk;
+           this->chunk = chunk;
            this->type = SEARCH_AWAITING;
        }
 
@@ -550,7 +550,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
         /**
          * A new node is being created from a split, make it inherit its original node 'src'
          *  - access - the access
-         *  - r - ??
+         *  - r - the shrinked cube that this is inheriting from
          *  - k - the dimension that got splitted
          *  - color - the node color
          *  - src - the node that got split
@@ -621,12 +621,12 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 // REPLICATES VIEW
                 for (MemoryReplicate & replicate : this->block.replicates)
                 {
-                    for (int i = 0 ; i < replicate.nallocations ; ++i)
+                    for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
                     {
-                        MemoryReplicateAllocationView * r = replicate.allocations[i];
-                        const INTERVAL_DIFF_TYPE_T offset = (k == 1) ? da : (da * r->view.ld * sizeof_type);
-                        r->view.addr += offset;
-                        assert(r->view.addr >= r->chunk->device_ptr);
+                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
+                        const INTERVAL_DIFF_TYPE_T offset = (k == 1) ? da : (da * allocation_view->view.ld * sizeof_type);
+                        allocation_view->view.addr += offset;
+                        assert(allocation_view->view.addr >= allocation_view->chunk->device_ptr);
                     }
                 }
             }
@@ -696,11 +696,15 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                         MemoryReplicateAllocationView * view = replicate.allocations[i];
 
                         /* if it matches the allocation being searched */
-                        if (view->chunk == search.dst_chunk)
+                        if (view->chunk == search.chunk)
                         {
                             /* move the awaiting tasks */
                             search.awaiting.tasks.insert(search.awaiting.tasks.end(), view->awaiting.tasks.begin(), view->awaiting.tasks.end());
                             view->awaiting.tasks.clear();
+
+                            /* move awaiting forwards */
+                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), view->awaiting.forwards.begin(), view->awaiting.forwards.end());
+                            view->awaiting.forwards.clear();
 
                             /* this replicate just got fetched and is now valid */
                             replicate.valid    |= (memory_allocation_view_id_bitfield_t)  allocbit;
@@ -711,12 +715,8 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                     }
 
                     /* set device bits */
-                    this->block.valid |= devbit;
-                    if (replicate.fetching == 0)
-                    {
-                        assert(this->block.fetching & devbit);
-                        this->block.fetching &= ~devbit;
-                    }
+                    this->block.valid    |=  devbit;
+                    this->block.fetching &= ~devbit;
 
                     break ;
                 }
@@ -725,7 +725,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 case (Search::Type::SEARCH_OWNERS):
                 {
                     const size_t bytes = cube.size();
-                    for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+                    for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
                         if (this->block.valid & (1 << device_global_id))
                             search.bytes_owned[device_global_id] += bytes;
                     break ;
@@ -773,6 +773,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
     using Base = KCubeTree<K, KMemoryTreeNodeSearch<K>>;
     using Cube = KCube<K>;
     using MemoryBlock = KMemoryBlock<K>;
+    using MemoryForward = KMemoryForward<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
     using Node = KMemoryTreeNode<K>;
@@ -792,29 +793,38 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             /* driver of the device */
             xkblas_driver_t * driver;
 
-            /* device fetching */
+            /* device that initiated the fetch */
             xkblas_device_t * device;
-
-            /* logical cube */
-            Cube cube;
-
-            /* mark 'fetched' all the tasks awaiting on that allocation */
-            xkblas_alloc_chunk_t * chunk;
 
             /* mark 'fetched' this task */
             Task * task;
 
+            /* logical cube */
+            const Cube cube;
+
+            /* the host memory view */
+            memory_view_t host_view;
+
+            /* mark 'fetched' all the tasks awaiting on that allocation */
+            xkblas_alloc_chunk_t * dst_chunk;
+
+            /* dst device id */
+            xkblas_device_global_id_t dst_device_global_id;
+
+            /* dst view */
+            memory_replicate_view_t dst_view;
+
         }               internal_fetch_t;
 
         static inline void
-        fetch_callback_task(internal_fetch_t * f, Task * task)
+        fetch_callback_task(internal_fetch_t * fetch, Task * task)
         {
             /* a fetch completed */
-            XKBLAS_DEBUG("Task `%s` fetched `%p`", task->label, f->chunk->device_ptr);
+            XKBLAS_DEBUG("Task `%s` fetched `%p`", task->label, fetch->dst_chunk->device_ptr);
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
                 /* the task kernel is ready for execution */
-                xkblas_device_task_execute(f->driver, f->device, task);
+                xkblas_device_task_execute(fetch->driver, fetch->device, task);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
         }
@@ -824,29 +834,55 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         {
             assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
 
-            internal_fetch_t * f = (internal_fetch_t *) args[0];
-            assert(f);
+            internal_fetch_t * fetch = (internal_fetch_t *) args[0];
+            assert(fetch);
 
-            XKBLAS_DEBUG("Fetch completed for allocation `%p`", f->chunk->device_ptr);
+            XKBLAS_DEBUG("Fetch completed for allocation `%p`", fetch->dst_chunk->device_ptr);
 
-            if (f->task)
-                fetch_callback_task(f, f->task);
+            /* fetch->task initiated the fetch, can now be released */
+            assert(fetch->task);
+            fetch_callback_task(fetch, fetch->task);
 
-            if (f->chunk)
+            /* `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
+             * Search in the tree for awaiting tasks and forwards */
+            assert(fetch->dst_chunk);
+
+            Search search(fetch->device->global_id);
+            search.prepare_search_awaiting(fetch->dst_chunk);
+            fetch->tree->lock();
             {
-                Search search(f->device->global_id);
-                search.prepare_search_awaiting(f->chunk);
-                f->tree->lock();
-                {
-                    f->tree->intersect(search, f->cube, ACCESS_MODE_VOID);
-                }
-                f->tree->unlock();
+                fetch->tree->intersect(search, fetch->cube, ACCESS_MODE_VOID);
+            }
+            fetch->tree->unlock();
 
-                for (Task * & task : search.awaiting.tasks)
-                    fetch_callback_task(f, task);
+            /* callback to release awaiting tasks */
+            for (Task * & task : search.awaiting.tasks)
+                fetch_callback_task(fetch, task);
+
+            /* callback to forward the data to other devices */
+            for (MemoryForward & forward : search.awaiting.forwards)
+            {
+                XKBLAS_WARN("Found a forward for `%s`", forward.task->label);
+
+                assert(forward.task);
+                assert(forward.chunk);
+                assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
+
+                fetch->tree->fetch_access_launch_copy(
+                    fetch->driver,                  // use the same driver
+                    fetch->device,                  // use the same (old dst, that is now src) device
+                    forward.task,                   // use the forwarded task
+                    forward.chunk,                  // the chunk allocated when requesting the forward
+                    fetch->cube,                    // the logicial view hasn't changed
+                    fetch->host_view,               // the host view hasn't changed
+                    forward.device_global_id,       // use the forwarded dst device
+                    forward.view,                   // use the forwarded dst view
+                    fetch->dst_device_global_id,    // the current 'dst' is the new 'src'
+                    fetch->dst_view                 // the current 'dst' is the new 'src'
+                );
             }
 
-            delete f;
+            delete fetch;
         }
 
         //////////////////////////////////////
@@ -864,50 +900,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 src = __builtin_ffs(valid) - 1;
             assert(src >= 0);
             return src;
-        }
-
-        inline void
-        fetch_access_copy_partite(
-            xkblas_driver_t * driver,
-            xkblas_device_t * device,
-            Task * task,
-            Partite & partite,
-            xkblas_alloc_chunk_t * chunk
-        ) {
-            /* one replicate must be non-null (a null replicate means to use the host view) */
-            assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE ||
-                   partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
-
-            /* host replicate view if no allocation were found */
-            memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
-
-            /* allocate fetch info for the callback argument */
-            internal_fetch_t * f = new internal_fetch_t{
-                .tree       = this,
-                .driver     = driver,
-                .device     = device,
-                .cube{partite.cube},
-                .chunk      = chunk,
-                .task       = task
-            };
-
-            /* callback setup */
-            assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
-            xkblas_callback_t callback;
-            callback.func = fetch_callback;
-            callback.args[0] = f;
-
-            /* launch asynchronous copy */
-            xkblas_stream_instruction_submit_copy(
-                driver,
-                device,
-                partite.host_view,
-                partite.dst_device_global_id,
-               (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view,
-                partite.src_device_global_id,
-               (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view,
-                callback
-            );
         }
 
         ////////////////////////////////////////////////////////////
@@ -1286,7 +1278,7 @@ next_view:
             xkblas_device_t * device,
             Task * task,
             Access * access,
-            Search & search
+            Partition & partition
         ) {
             assert(this->is_locked());
 
@@ -1296,7 +1288,7 @@ next_view:
                 const xkblas_device_global_id_bitfield_t dst_devbit = (1 << device->global_id);
 
                 // for each block of that access
-                for (Partite & partite : search.partition.partites)
+                for (Partite & partite : partition.partites)
                 {
                     ///////////////
                     // SETUP DST //
@@ -1333,10 +1325,6 @@ next_view:
                         continue ;
                     }
 
-                    /* this task must initiate the fetch */
-                    dst_replicate.fetching  |= dst_allocbit;
-                    partite.block->fetching |= dst_devbit;
-
                     ///////////////
                     // SETUP SRC //
                     ///////////////
@@ -1354,18 +1342,21 @@ next_view:
                         partite.dst_device_global_id = device->global_id;
                         partite.dst_view = dst_allocation_view->view;
 
-                        /* find source */
-                        xkblas_device_global_id_t src = (xkblas_device_global_id_t) ((partite.block->valid & (1 << device->global_id)) ? device->global_id : __builtin_ffs(partite.block->valid) - 1);
-                        // int src = this->fetch_access_find_src(driver, device->global_id, partite.block->valid);
+                        /* get a valid source */
+                        xkblas_device_global_id_t src = driver->f_get_source(device->global_id, partite.block->valid);
+                        assert(partite.block->valid & (1 << src));
 
                         /* Get the first valid allocation on that device */
-                        MemoryReplicate & replicate = partite.block->replicates[src];
-                        assert(replicate.nallocations > 0);
-                        assert(replicate.valid != 0);
-                        memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(replicate.valid) - 1);
+                        MemoryReplicate & src_replicate = partite.block->replicates[src];
+                        assert(src_replicate.nallocations > 0);
+                        assert(src_replicate.valid);
+
+                        memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
+                        assert(src_replicate.valid & (1 << src_allocation_view_id));
+                        assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
 
                         /* Retrieve and set src view infos */
-                        MemoryReplicateAllocationView * src_allocation_view = replicate.allocations[src_allocation_view_id];
+                        MemoryReplicateAllocationView * src_allocation_view = src_replicate.allocations[src_allocation_view_id];
                         partite.src_device_global_id   = src;
                         partite.src_allocation_view_id = src_allocation_view_id;
                         partite.src_view               = src_allocation_view->view;
@@ -1373,7 +1364,33 @@ next_view:
                     # if USE_D2D_FORWARDING
                     else if (partite.block->fetching)
                     {
+                        /* the fetch will be initiated by the other device that
+                         * is already fetching that data for a D2D transfer.
+                         * No need to create partite.src and partite.dst as we
+                         * are not fetching now */
                         partite.must_fetch = false;
+
+                        /* one device is already fetching, add a D2D forward callback */
+                        xkblas_device_global_id_t fetching = driver->f_get_source(device->global_id, partite.block->fetching);
+                        assert(0 <= fetching && fetching < XKBLAS_DEVICES_MAX);
+                        assert(partite.block->fetching & (1 << fetching));
+
+                        MemoryReplicate & fetching_replicate = partite.block->replicates[fetching];
+                        assert(fetching_replicate.fetching);
+
+                        // TODO : maybe there is several fetching alloc ?
+                        // in such case, which one to pick ? currently select the first one
+
+                        memory_allocation_view_id_t fetching_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(fetching_replicate.fetching) - 1);
+                        assert(0 <= fetching_allocation_view_id && fetching_allocation_view_id < fetching_replicate.nallocations);
+
+                        MemoryReplicateAllocationView * fetching_allocation_view = fetching_replicate.allocations[fetching_allocation_view_id];
+                        assert(fetching_allocation_view);
+
+                        XKBLAS_DEBUG("registered a forward for task `%s`", task->label);
+
+                        const MemoryForward forward(task, partition.chunk, device->global_id, dst_allocation_view->view);
+                        fetching_allocation_view->awaiting.forwards.push_back(forward);
                     }
                     # endif /* USE_D2D_FORWARDING */
                     else
@@ -1394,6 +1411,10 @@ next_view:
                         partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
                     }
 
+                    /* update bitfields so no other concurrent fetch occurs */
+                    dst_replicate.fetching  |= dst_allocbit;
+                    partite.block->fetching |= dst_devbit;
+
                     //////////////////////////////
                     // ASSERTION ON SRC AND DST //
                     //////////////////////////////
@@ -1410,7 +1431,7 @@ next_view:
             xkblas_device_t * device,
             Task * task,
             Access * access,
-            Search & search
+            Partition & partition
         ) {
             assert(this->is_locked());
 
@@ -1419,7 +1440,7 @@ next_view:
             {
                 const memory_allocation_view_id_bitfield_t devbit = (1 << device->global_id);
 
-                for (Partite & partite : search.partition.partites)
+                for (Partite & partite : partition.partites)
                 {
                     # pragma message(TODO "Can validity be managed in a more lazy way ?")
                     for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
@@ -1462,6 +1483,54 @@ next_view:
             }
         }
 
+
+        inline void
+        fetch_access_launch_copy(
+                  xkblas_driver_t           * driver,
+                  xkblas_device_t           * device,
+                  Task                      * task,
+                  xkblas_alloc_chunk_t      * dst_chunk,
+            const Cube                      & cube,
+            const memory_view_t             & host_view,
+            const xkblas_device_global_id_t   dst_device_global_id,
+            const memory_replicate_view_t   & dst_view,
+            const xkblas_device_global_id_t   src_device_global_id,
+            const memory_replicate_view_t   & src_view
+        ) {
+
+            /* allocate fetch info for the callback argument */
+            const internal_fetch_t * fetch = new internal_fetch_t{
+                .tree       = this,
+                .driver     = driver,
+                .device     = device,
+                .task       = task,
+                .cube{cube},
+                .host_view{host_view},
+                .dst_chunk  = dst_chunk,
+                .dst_device_global_id = dst_device_global_id,
+                .dst_view{dst_view}
+            };
+
+            /* callback setup */
+            assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
+            xkblas_callback_t callback;
+            callback.func = fetch_callback;
+            callback.args[0] = fetch;
+
+            /* launch asynchronous copy */
+            xkblas_stream_instruction_submit_copy(
+                driver,
+                device,
+                host_view,
+                dst_device_global_id,
+                dst_view,
+                src_device_global_id,
+                src_view,
+                callback
+            );
+        }
+
+
         /* launch asynchronous copies for the given partition to the given device, using the given allocation as dst */
         inline void
         fetch_access_launch_copies(
@@ -1478,7 +1547,27 @@ next_view:
                     if (!partite.must_fetch)
                         continue ;
 
-                    this->fetch_access_copy_partite(driver, device, task, partite, partition.chunk);
+                    /* one replicate must be non-null (a null replicate means to use the host view) */
+                    assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE ||
+                            partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
+
+                    /* set the views */
+                    const memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
+                    const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
+                    const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
+
+                    this->fetch_access_launch_copy(
+                        driver,
+                        device,
+                        task,
+                        partition.chunk,
+                        partite.cube,
+                        partite.host_view,
+                        partite.dst_device_global_id,
+                        dst_view,
+                        partite.src_device_global_id,
+                        src_view
+                    );
                 }
             }
         }
@@ -1520,10 +1609,10 @@ next_view:
                 this->fetch_access_set_device_view(driver, device, task, access, search);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
-                this->fetch_access_setup_copies(driver, device, task, access, search);
+                this->fetch_access_setup_copies(driver, device, task, access, search.partition);
 
                 /* step (6) if write access, invalidate other copies */
-                this->fetch_access_set_valid(driver, device, task, access, search);
+                this->fetch_access_set_valid(driver, device, task, access, search.partition);
 
             } /* this->lock(); */
             this->unlock();
@@ -1592,7 +1681,7 @@ next_view:
             // find devices which owns the most bytes
             memory_allocation_view_id_bitfield_t owners = 0;
             size_t bytes_owned_max = 0;
-            for (int device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+            for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
                 const size_t bytes_owned = search.bytes_owned[device_global_id];
                 if (bytes_owned_max < bytes_owned)
