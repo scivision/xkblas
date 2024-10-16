@@ -591,6 +591,22 @@ XKBLAS_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle.high);
             assert(err == cudaSuccess);
 
+            /* coherency check: ensure that all access device pointer are on
+             * the device executing the kernel */
+            # ifndef NDEBUG
+            cudaPointerAttributes attr;
+            for (int i = 0 ; i < op->task->naccesses ; ++i)
+            {
+                Access * access = op->task->accesses + i;
+                assert(access);
+
+                int device;
+                cudaGetDevice(&device);
+                cudaPointerGetAttributes(&attr, (const void *) access->device_view.addr);
+                assert(attr.device == device);
+            }
+            # endif /* NDEBUG */
+
             return EINPROGRESS;
 
         } /* XKBLAS_STREAM_INSTR_TYPE_KERN */

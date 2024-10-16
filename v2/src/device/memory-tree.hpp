@@ -833,8 +833,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             XKBLAS_DEBUG("Task `%s` fetched `%p`", task->label, fetch->dst_chunk->device_ptr);
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
-                /* the task kernel is ready for execution */
-                xkblas_device_task_execute(fetch->driver, fetch->device, task);
+                xkblas_device_t * device = xkblas_device_get(fetch->dst_device_global_id);
+                xkblas_device_task_execute(fetch->driver, device, task);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
         }
@@ -872,8 +872,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             /* callback to forward the data to other devices */
             for (MemoryForward & forward : search.awaiting.forwards)
             {
-                XKBLAS_WARN("Found a forward for `%s`", forward.task->label);
-
                 assert(forward.task);
                 assert(forward.chunk);
                 assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
