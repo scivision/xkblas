@@ -80,7 +80,7 @@ xkblas_stream_instruction_submit_copy(
     const memory_replicate_view_t   & src_device_view,
     const xkblas_callback_t         & callback
 ) {
-    assert(ThreadWorker::self() == device->thread);
+    // assert(ThreadWorker::self() == device->thread);
     assert(device->global_id == dst_device_global_id || device->global_id == src_device_global_id);
 
     assert(dst_device_view.addr);

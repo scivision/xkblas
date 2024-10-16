@@ -876,9 +876,12 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 assert(forward.chunk);
                 assert(0 <= forward.device_global_id && forward.device_global_id < XKBLAS_DEVICES_MAX);
 
+                xkblas_device_t * device = xkblas_device_get(forward.device_global_id);
+                assert(device);
+
                 fetch->tree->fetch_access_launch_copy(
                     fetch->driver,                  // use the same driver
-                    fetch->device,                  // use the same (old dst, that is now src) device
+                    device,                         // use the dst device
                     forward.task,                   // use the forwarded task
                     forward.chunk,                  // the chunk allocated when requesting the forward
                     fetch->cube,                    // the logicial view hasn't changed
