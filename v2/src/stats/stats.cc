@@ -21,12 +21,16 @@ xkblas_stats_report(void)
     xkblas_stats_t * stats = &(context->stats);
 
     XKBLAS_WARN("----------------- STATS -----------------");
+
     XKBLAS_WARN("memory:");
     XKBLAS_WARN("  allocated:");
     XKBLAS_WARN("    total: %zu", stats->memory.allocated.total.load());
     XKBLAS_WARN("    currently: %zu", stats->memory.allocated.currently.load());
     XKBLAS_WARN("  freed: %zu", stats->memory.freed.load());
+
     XKBLAS_WARN("tasks:");
+    stats_int_t summary[TASK_STATE_MAX];
+    memset(summary, 0, sizeof(summary));
     for (int i = 0 ; i < XKBLAS_STATS_TASK_FORMAT_MAX ; ++i)
     {
         if (stats->tasks[i].states[0].load())
@@ -34,9 +38,17 @@ xkblas_stats_report(void)
             task_format_t * format = task_format_get((task_format_id_t)i);
             XKBLAS_WARN("  `%s`", format ? format->label : "unk");
             for (int j = 0 ; j < TASK_STATE_MAX ; ++j)
-                XKBLAS_WARN("    `%s` %zu", task_state_to_str((task_state_t) j), stats->tasks[i].states[j].load());
+            {
+                XKBLAS_WARN("     %s: %zu", task_state_to_str((task_state_t) j), stats->tasks[i].states[j].load());
+                summary[j] += stats->tasks[i].states[j].load();
+            }
         }
     }
+
+    XKBLAS_WARN("tasks (summary):");
+    for (int j = 0 ; j < TASK_STATE_MAX ; ++j)
+        XKBLAS_WARN("  %12s: %zu", task_state_to_str((task_state_t) j), summary[j].load());
+
     XKBLAS_WARN("streams:");
     for (int i = 0 ; i < XKBLAS_STREAM_TYPE_ALL ; ++i)
     {

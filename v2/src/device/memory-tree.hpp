@@ -9,6 +9,7 @@
 # include "device/task.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
+# include "sync/bits.h"
 
 // tree cutting would suppress validity/transfer information of some blocks
 # undef CUBE_TREE_CUT
@@ -42,7 +43,7 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
@@ -289,7 +290,6 @@ class KMemoryBlock {
 
             this->valid = inheriting_block.valid;
             this->fetching = inheriting_block.fetching;
-
         }
 
         /* a block from splitting an existing one */
@@ -689,25 +689,32 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                 {
                     MemoryReplicate & replicate = this->block.replicates[search.device_global_id];
                     const memory_allocation_view_id_bitfield_t devbit = (1 << search.device_global_id);
+
                     /* for each allocation of that block */
-                    for (int i = 0 ; i < replicate.nallocations ; ++i)
+                    for (memory_allocation_view_id_t allocation_view_id = 0 ; allocation_view_id < replicate.nallocations ; ++allocation_view_id)
                     {
-                        const memory_allocation_view_id_bitfield_t allocbit = (1 << i);
-                        MemoryReplicateAllocationView * view = replicate.allocations[i];
+                        const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
+                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[allocation_view_id];
 
                         /* if it matches the allocation being searched */
-                        if (view->chunk == search.chunk)
+                        if (allocation_view->chunk == search.chunk)
                         {
                             /* move the awaiting tasks */
-                            search.awaiting.tasks.insert(search.awaiting.tasks.end(), view->awaiting.tasks.begin(), view->awaiting.tasks.end());
-                            view->awaiting.tasks.clear();
+                            search.awaiting.tasks.insert(search.awaiting.tasks.end(), allocation_view->awaiting.tasks.begin(), allocation_view->awaiting.tasks.end());
+                            allocation_view->awaiting.tasks.clear();
 
                             /* move awaiting forwards */
-                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), view->awaiting.forwards.begin(), view->awaiting.forwards.end());
-                            view->awaiting.forwards.clear();
+                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), allocation_view->awaiting.forwards.begin(), allocation_view->awaiting.forwards.end());
+                            allocation_view->awaiting.forwards.clear();
 
                             /* this replicate just got fetched and is now valid */
-                            replicate.valid    |= (memory_allocation_view_id_bitfield_t)  allocbit;
+
+                            // this assertion is not always true, if coming from
+                            // an ACCESS_MODE_W, the data was already set valid
+                            // assert((replicate.valid & allocbit) == 0);
+                            replicate.valid |= (memory_allocation_view_id_bitfield_t) allocbit;
+
+                            assert(replicate.fetching & allocbit);
                             replicate.fetching &= (memory_allocation_view_id_bitfield_t) ~allocbit;
 
                             break ;
@@ -715,8 +722,11 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                     }
 
                     /* set device bits */
-                    this->block.valid    |=  devbit;
-                    this->block.fetching &= ~devbit;
+                    assert(replicate.valid);
+                    this->block.valid |= devbit;
+
+                    if (replicate.fetching == 0)
+                        this->block.fetching &= ~devbit;
 
                     break ;
                 }
@@ -847,7 +857,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
              * Search in the tree for awaiting tasks and forwards */
             assert(fetch->dst_chunk);
 
-            Search search(fetch->device->global_id);
+            Search search(fetch->dst_device_global_id);
             search.prepare_search_awaiting(fetch->dst_chunk);
             fetch->tree->lock();
             {
@@ -977,28 +987,27 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     // SRC - FIND BEST SRC //
                     /////////////////////////
 
-                    # pragma message(TODO "Find best device and balance workload for D2H transfers")
-                    // TODO : currently taking source as the device with the smallest id,
-                    // instead, maybe try to balance the workload between GPU and use
-                    // devices with the best bandwidth
-                    xkblas_device_global_id_t src = (xkblas_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
+                    xkblas_device_global_id_t src = __random_set_bit(partite.block->valid) - 1;
                     assert(src >= 0);
 
                     // Get the first valid allocation on that device
-                    MemoryReplicate & replicate = partite.block->replicates[src];
-                    assert(replicate.nallocations > 0);
-                    assert(replicate.valid != 0);
-                    int allocation_view_id = __builtin_ffs(replicate.valid) - 1;
+                    MemoryReplicate & src_replicate = partite.block->replicates[src];
+                    assert(src_replicate.nallocations > 0);
+                    assert(src_replicate.valid);
+
+                    const memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
+                    assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
 
                     // retrieve and set src view infos
-                    MemoryReplicateAllocationView * r = replicate.allocations[allocation_view_id];
+                    MemoryReplicateAllocationView * src_allocation_view = src_replicate.allocations[src_allocation_view_id];
+                    assert(src_allocation_view);
 
                     // allocate fetch info for the callback argument
                     // fetch_t * fetch = (fetch_t *) thread->allocate(sizeof(fetch_t));
                     fetch_t * fetch = (fetch_t *) malloc(sizeof(fetch_t));
                     fetch->host_view            = partite.host_view;
                     fetch->src_device_global_id = src;
-                    fetch->src_view             = r->view;
+                    fetch->src_view             = src_allocation_view->view;
                     fetch->next                 = list->fetches;
 
                     list->fetches = fetch;
@@ -1018,6 +1027,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         ) {
 
             /* adapted from 'kaapi_memory_cache_evict_fromlist' */
+            XKBLAS_WARN("Evicting memory...");
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
@@ -1435,50 +1445,30 @@ next_view:
         ) {
             assert(this->is_locked());
 
-            // if write mode, set the valid bits
+            /* if access has a write mode, invalidate all copies */
             if (access->mode & ACCESS_MODE_W)
             {
-                const memory_allocation_view_id_bitfield_t devbit = (1 << device->global_id);
-
+                const memory_allocation_view_id_bitfield_t devbit   = (1 << device->global_id);
                 for (Partite & partite : partition.partites)
                 {
-                    # pragma message(TODO "Can validity be managed in a more lazy way ?")
-                    for (int i = 0 ; i < XKBLAS_DEVICES_MAX ; ++i)
-                    {
-                        MemoryReplicate & replicate = partite.block->replicates[i];
-                        replicate.valid = 0;
-                        replicate.fetching = 0;
-                    }
-
-                    MemoryReplicate & replicate = partite.block->replicates[device->global_id];
-
-                    # pragma message(TODO "Free each allocation")
-                    # if 0
-                    // release allocation that are no longer required, as we are rewritting that block.
-                    XKBLAS_IMPL("Releasing allocations from a block...");
-                    for (int i = 0 ; i < replicate.nallocations ; ++i)
-                    {
-                        if (i != partite.dst_allocation_view_id)
-                        {
-                            // TODO : xkblas_memory_device_free(...)
-                            delete replicate.allocations[i];
-                        }
-                    }
-
-                    // update the allocations id
-                    const int allocation_view_id = 0;
-                    replicate.nallocations = 1;
-                    replicate.allocations[0] = replicate.allocations[partite.dst_allocation_view_id];
-                    partite.dst_allocation_view_id = allocation_view_id;
-                    # endif
-
-                    // set valid bits
-                    // Even though the data is not written, as we are writing,
-                    // there are no other tasks accessing concurrently
                     const memory_allocation_view_id_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
+
+                    /* invalidate all replicates */
+                    # pragma message(TODO "Can validity be managed in a more lazy way ?")
+                    for (xkblas_device_global_id_t device_global_id = 0 ;
+                            device_global_id < XKBLAS_DEVICES_MAX ;
+                            ++device_global_id)
+                    {
+                        MemoryReplicate & replicate = partite.block->replicates[device_global_id];
+                        replicate.valid = 0;
+                    }
+                    partite.block->valid = 0;
+
+                    /* There is no concurrent access anyway, so make data valid now
+                     * (even though the kernel has not executed, and the data is not rigourously valid yet) */
+                    MemoryReplicate & replicate = partite.block->replicates[device->global_id];
+                    replicate.valid = allocbit;
                     partite.block->valid = devbit;
-                    replicate.valid      = allocbit;
-                    replicate.fetching   = allocbit;
                 }
             }
         }
