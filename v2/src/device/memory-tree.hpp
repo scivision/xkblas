@@ -4,20 +4,19 @@
 # include "matrix-tile.h"
 # include "device/consts.h"
 # include "device/device.h"
+# include "device/device-memory.h"
 # include "device/driver.h"
 # include "device/stream-instruction-submit.h"
 # include "device/task.hpp"
 # include "logger/logger.h"
 # include "logger/todo.h"
 # include "sync/bits.h"
+# include "sync/lockable.hpp"
 
 // tree cutting would suppress validity/transfer information of some blocks
 # undef CUBE_TREE_CUT
 # undef CUBE_TREE_REBALANCE
 # include "sync/cube-tree.hpp"
-
-# include "device/device-memory.h"
-# include "sync/lockable.hpp"
 
 # include <cstdint>
 # include <functional>
@@ -43,7 +42,7 @@
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (1)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
