@@ -66,7 +66,8 @@ ThreadWorker::pop(void)
 void
 ThreadWorker::complete(Task * task)
 {
-    task->complete();
+    task->complete();           /* this may 'push' tasks, incrementing 'wc' */
+    writemem_barrier();         /* membarrier to avoid 'wc' being decremented before the previous line increment */
     ThreadWorker::move_wc(-1);
 }
 
