@@ -6,7 +6,7 @@
 # include <cstdint>
 
 # ifndef THREAD_MAX_MEMORY
-#  define THREAD_MAX_MEMORY (128*1024*1024)
+#  define THREAD_MAX_MEMORY (256*1024*1024)
 # endif /* THREAD_MAX_MEMORY */
 
 class alignas(CACHE_LINE_SIZE) Thread

@@ -246,7 +246,13 @@ xkblas_memory_deallocate_all(void)
         xkblas_device_t * device = xkblas_device_get(device_global_id);
         assert(device);
 
+        // device memory
         xkblas_device_memory_reset(device);
+
+        // worker thread memory
+        ThreadWorker * worker = device->thread;
+        assert(worker);
+        worker->deallocate_all();
     }
 }
 
