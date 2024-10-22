@@ -1,5 +1,12 @@
 // TODO PERFORMANCES IDEA
+//  - when inserting, it currently queue tasks to propagates 'includes' info before returning doing a bottom-up traversal
+//    Instead, 'includes' info could be updated when
+//      - 'going-down' during the insertion,
+//      - 'rotating'
+//    so there is no need for the bottom-up traversal...
+//
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
+//
 //  - check loop unrolling
 
 #ifndef __CUBE_TREE_H__
