@@ -81,7 +81,7 @@ xkblas_£copyscale_tile_async(
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
-    thread->commit(context, task);
+    thread->commit(task);
 
     return 0;
 }

@@ -232,33 +232,16 @@ static void launch_tests(KDependencyTree<K> & tree)
         static_assert(K == 2);
 
         Interval cube[] = {
-            Interval(       29,        33), Interval(               0,               16),
-            Interval(       37,        41), Interval(               0,               16),
-            Interval(       61,        65), Interval(               0,               16),
-            Interval(       29,        33), Interval(               0,               16),
-            Interval(       41,        45), Interval(               0,               16),
-            Interval(       65,        69), Interval(               0,               16),
-            Interval(       33,        37), Interval(               0,               16),
-            Interval(       37,        41), Interval(              16,               32),
-            Interval(       61,        65), Interval(               0,               16),
-            Interval(       33,        37), Interval(               0,               16),
-            Interval(       41,        45), Interval(              16,               32),
-            Interval(       65,        69), Interval(               0,               16),
-            // FUCK 0x7fe69d8004a0 - using chunk 0x7fe69e000200 - Interval is (65, 69) x (0, 16)
-            Interval(       29,        33), Interval(              16,               32),
-            Interval(       41,        45), Interval(               0,               16),
-            // FUCK 0x7fe69d8001a0 - using chunk 0x7fe69e000280 - Interval is (41, 45) x (0, 16)
-            Interval(       65,        69), Interval(              16,               32),
-            Interval(       29,        33), Interval(              16,               32),
-            Interval(       37,        41), Interval(               0,               16),
-            Interval(       61,        65), Interval(              16,               32),
-            Interval(       33,        37), Interval(              16,               32),
-            Interval(       41,        45), Interval(              16,               32),
-            Interval(       65,        69), Interval(              16,               32),
-            Interval(       33,        37), Interval(              16,               32),
-            Interval(       37,        41), Interval(              16,               32),
-            Interval(       61,        65), Interval(              16,               32),
+            Interval(       0,        4), Interval(               0,               4),
+            Interval(       0,        4), Interval(               4,               8),
+            Interval(       0,        8), Interval(               0,               8),
         };
+        access_mode_t modes[] = {
+            ACCESS_MODE_W,
+            ACCESS_MODE_W,
+            ACCESS_MODE_R,
+        };
+        assert(sizeof(cube) / sizeof(Interval) / 2 == sizeof(modes) / sizeof(access_mode_t));
 
         # if 0
         int min = cube[0].a;
@@ -281,7 +264,7 @@ static void launch_tests(KDependencyTree<K> & tree)
         for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
         {
             Interval x[K] = { cube[i+0], cube[i+1] };
-            insert<K>(tree, ACCESS_MODE_R, x);
+            insert<K>(tree, modes[i/2], x);
         }
 
         # else

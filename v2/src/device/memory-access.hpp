@@ -40,9 +40,9 @@ class KMemoryAccess : public access_t<K>
             const memory_view_t & t,
             const access_mode_t & m
         ) :
+            access_t<K>(t, m),
             host_view(t),
-            device_view(),
-            access_t<K>(t, m)
+            device_view()
         {}
 
         virtual ~KMemoryAccess() {}
@@ -58,7 +58,7 @@ class KMemoryAccess : public access_t<K>
             // must intersect
             assert(
                 (this->host_view.begin_addr() <= othr.host_view.begin_addr() && othr.host_view.begin_addr() <= this->host_view.end_addr()) ||
-                (othr->host_view.begin_addr() <= this.host_view.begin_addr() && this.host_view.begin_addr() <= othr->host_view.end_addr())
+                (othr->host_view.begin_addr() <= this->host_view.begin_addr() && this->host_view.begin_addr() <= othr->host_view.end_addr())
             );
 
             // device_view is invalid now

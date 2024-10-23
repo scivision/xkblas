@@ -42,13 +42,13 @@ xkblas_thread_report_tasks(void)
     int summary[TASK_STATE_MAX];
     memset(summary, 0, sizeof(summary));
 
-    for (int i = 0 ; i < producer->tasks.size() ; ++i)
+    for (size_t i = 0 ; i < producer->tasks.size() ; ++i)
     {
         Task * task = producer->tasks[i];
         assert(task);
 
         XKBLAS_WARN(
-            "%4d - %12s - wc=%u - %s",
+            "%4lu - %12s - wc=%u - %s",
             i, task_state_to_str(task->state.value), task->wc.load(), task->label
         );
 

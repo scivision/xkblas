@@ -1198,7 +1198,7 @@ class KCubeTree {
                             Interval(        cube[k].b, parent->cube[k].b)
                         };
 
-                        std::function<void(Node *)> f = [&f, &inherit, &intervals, &k, &to_reinsert](Node * node)
+                        std::function<void(Node *)> f = [&f, &intervals, &k, &to_reinsert](Node * node)
                         {
                             assert(node->cube[k].includes(intervals[1]));
 

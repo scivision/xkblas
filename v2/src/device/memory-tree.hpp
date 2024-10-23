@@ -187,6 +187,7 @@ class KMemoryReplicate
         KMemoryReplicate() : allocations(), nallocations(0), valid(0), fetching(0) {}
         KMemoryReplicate(const KMemoryReplicate & r)
         {
+            (void) r;
             XKBLAS_FATAL("Implement copy constructor");
         }
         ~KMemoryReplicate() {}
@@ -229,8 +230,7 @@ class KMemoryBlock {
         memory_block_init(
             const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Cube & inheriting_cube,
-            const int k
+            const Cube & inheriting_cube
         ) {
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
@@ -559,7 +559,6 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
          *  n (src->cube, r) = {} - empty intersection
          */
         KMemoryTreeNode<K>(
-            const Access * access,
             const Cube & r,
             const int k,
             const Color color,
@@ -576,6 +575,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             Search & search,
             const access_mode_t mode
         ) {
+            (void) mode;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
 
@@ -669,6 +669,8 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             const Cube & cube,
             const access_mode_t mode
         ) {
+            (void) mode;
+
             assert(cube.intersects(this->cube));
 
             switch (search.type)
@@ -1055,8 +1057,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     /* evict all allocations */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
                     {
-                        const memory_allocation_view_id_bitfield_t allocbit = 1 << i;
-
                         MemoryReplicateAllocationView * allocation = replicate.allocations[i];
                         assert(allocation);
 
@@ -1099,7 +1099,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         fetch_access_allocate(
             xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
             Access * access
         ) {
             //////////////////////////
@@ -1107,8 +1106,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             //////////////////////////
 
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
-            const size_t          ld = access->host_view.m;            // cuda is col major
-            const size_t sizeof_type = access->host_view.sizeof_type;
             const size_t        size = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
 
             xkblas_alloc_chunk_t * chunk = nullptr;
@@ -1137,9 +1134,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         /* Create a view for each partite of the partition, for the newly allocated chunk */
         inline void
         fetch_access_create_allocation_views(
-            xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
             Access * access,
             Partition & partition,
             xkblas_alloc_chunk_t * chunk
@@ -1150,7 +1145,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
             const size_t          ld = access->host_view.m;            // cuda is col major
             const size_t sizeof_type = access->host_view.sizeof_type;
-            const size_t size        = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
 
             /* retrieve upper left corner */
             const Partite & corner = partition.get_uppermost_leftmost_block();
@@ -1181,10 +1175,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         /* look for a continuous allocation that can store 'access' for the given partition */
         inline xkblas_alloc_chunk_t *
         fetch_access_find_allocation_continuous(
-            xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
-            Access * access,
             Partition & partition
         ) {
             assert(this->is_locked());
@@ -1199,7 +1190,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 MemoryReplicateAllocationView * rj = partition.partites[0].block->replicates[device->global_id].allocations[j];
 
                 /* for each other blocks */
-                int i = 1;
+                size_t i = 1;
                 while (i < nblocks)
                 {
                     /* for each allocation of other blocks */
@@ -1246,7 +1237,7 @@ next_view:
             assert(this->is_locked());
 
             /* lookfor a continuous allocation already existing for that access block partitioning */
-            xkblas_alloc_chunk_t * chunk = this->fetch_access_find_allocation_continuous(driver, device, task, access, partition);
+            xkblas_alloc_chunk_t * chunk = this->fetch_access_find_allocation_continuous(driver, device, access, partition);
             if (chunk == nullptr)
             {
                 /* no continuous allocation found, make a new one */
@@ -1263,9 +1254,7 @@ next_view:
 
         inline void
         fetch_access_set_device_view(
-            xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
             Access * access,
             Search & search
         ) {
@@ -1437,9 +1426,7 @@ next_view:
 
         inline void
         fetch_access_set_valid(
-            xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
             Access * access,
             Partition & partition
         ) {

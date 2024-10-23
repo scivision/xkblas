@@ -55,10 +55,8 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         }
 
         inline void
-        commit(
-            xkblas_context_t * context,
-            Task * task
-        ) {
+        commit(Task * task)
+        {
             task->commit();
 
             # ifndef NDEBUG
