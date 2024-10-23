@@ -86,7 +86,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
 
     using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
     using Node          = KDependencyTreeNode<K>;
-    using Cube        = KCube<K>;
+    using Cube          = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using TaskAccess    = KTaskAccess<K>;
 

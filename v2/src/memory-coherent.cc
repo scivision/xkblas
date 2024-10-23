@@ -193,7 +193,7 @@ xkblas_memory_coherent_async_worker_thread_work(
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);
-        producer->commit(context, task);
+        producer->commit(task);
     }
 
     // if early-completion happened
@@ -328,7 +328,7 @@ xkblas_memory_coherent_async(
         strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
         #endif /* NDEBUG */
 
-        thread->commit(context, task);
+        thread->commit(task);
     }
 }
 

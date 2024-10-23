@@ -158,11 +158,11 @@ class KCubeTree {
                     int outdated;           // whether 'includes' struct must be recomputed
                 } includes;
 
-                #ifndef NDEBUG
+                #ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
                 struct {
                     int id;
                 } checks;
-                #endif /* NDEBUG */
+                #endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
 
             public:
 
@@ -981,9 +981,9 @@ class KCubeTree {
 
             rebalance_fixup(nullptr, new_root, k, 0, height);
 
-# ifndef NDEBUG
+# ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
             this->coherency(root->includes.cube);
-# endif /* NDEBUG */
+# endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
         }
 
         inline void
@@ -1073,11 +1073,11 @@ class KCubeTree {
 #  pragma message("Automatic rebalance disabled. Enable it with '-DCUBE_TREE_REBALANCE'")
 # endif /* CUBE_TREE_REBALANCE */
 
-# ifndef NDEBUG
+# ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
             this->coherency(cube);
 # else
             (void) cube;
-# endif /* NDEBUG */
+# endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
         }
 
 # ifdef CUBE_TREE_CUT
@@ -1340,7 +1340,7 @@ class KCubeTree {
             fprintf(f, "\\end{document}\n");
         }
 
-#ifndef NDEBUG
+#ifndef CUBE_TREE_DISABLE_COHERENCY_CHECKS
 
     public:
         //////////////////////
@@ -1578,10 +1578,6 @@ class KCubeTree {
         int
         coherency(const Cube & cube)
         {
-            # ifdef CUBE_TREE_DISABLE_COHERENCY_CHECKS
-            return 1;
-            # endif
-
             if (this->root)
             {
                 /* 1. The root of the this is always black */
@@ -1601,7 +1597,7 @@ class KCubeTree {
             return 1;
         }
 
-#endif /* NDEBUG */
+#endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
 
 };
 

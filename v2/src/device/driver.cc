@@ -104,7 +104,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     loaders[XKBLAS_DRIVER_CPU] = XKBLAS_DRIVER_CPU_get_driver;
 # endif /* USE_CPU */
 
-# if USE_CUDA
+# if USE_CUDA && 0
     extern void XKBLAS_DRIVER_TYPE_CUDA_get_driver(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_TYPE_CUDA] = XKBLAS_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
@@ -134,7 +134,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
 
     // DEBUG OUTPUT
     if (total_devices == 0)
-        XKBLAS_FATAL("No devices found :-(");
+        XKBLAS_WARN("No devices found :-(");
 
     XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, ngpus);
     assert(total_devices <= ngpus);

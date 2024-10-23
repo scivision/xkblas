@@ -299,7 +299,7 @@ class KMemoryBlock {
             const int k
         ) {
             static_assert(K == 2);
-            this->memory_block_init(block_cube, inheriting_block, inheriting_cube, k);
+            this->memory_block_init(block_cube, inheriting_block, inheriting_cube);
         }
         ~KMemoryBlock() {}
 
@@ -1237,16 +1237,16 @@ next_view:
             assert(this->is_locked());
 
             /* lookfor a continuous allocation already existing for that access block partitioning */
-            xkblas_alloc_chunk_t * chunk = this->fetch_access_find_allocation_continuous(driver, device, access, partition);
+            xkblas_alloc_chunk_t * chunk = this->fetch_access_find_allocation_continuous(device, partition);
             if (chunk == nullptr)
             {
                 /* no continuous allocation found, make a new one */
                 XKBLAS_DEBUG("No continuous allocation found, reallocating and creating a new view");
-                chunk = this->fetch_access_allocate(driver, device, task, access);
+                chunk = this->fetch_access_allocate(driver, device, access);
                 assert(chunk);
 
                 /* create new views */
-                this->fetch_access_create_allocation_views(driver, device, task, access, partition, chunk);
+                this->fetch_access_create_allocation_views(device, access, partition, chunk);
             }
 
             partition.chunk = chunk;
@@ -1583,13 +1583,13 @@ next_view:
                 this->fetch_access_find_allocation(driver, device, task, access, search.partition);
 
                 /* step (3) set the access view on the device (that will be used by the kernel) */
-                this->fetch_access_set_device_view(driver, device, task, access, search);
+                this->fetch_access_set_device_view(device, access, search);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
                 this->fetch_access_setup_copies(driver, device, task, access, search.partition);
 
                 /* step (6) if write access, invalidate other copies */
-                this->fetch_access_set_valid(driver, device, task, access, search.partition);
+                this->fetch_access_set_valid(device, access, search.partition);
 
             } /* this->lock(); */
             this->unlock();
@@ -1698,7 +1698,7 @@ next_view:
         ) const {
             assert(search.type == Search::Type::INSERTING_BLOCKS);
             assert(!cube.intersects(inherit->cube));
-            return new Node(search.access, cube, k, color, reinterpret_cast<const Node *>(inherit));
+            return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };
 
