@@ -295,8 +295,7 @@ class KMemoryBlock {
         KMemoryBlock(
             const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Cube & inheriting_cube,
-            const int k
+            const Cube & inheriting_cube
         ) {
             static_assert(K == 2);
             this->memory_block_init(block_cube, inheriting_block, inheriting_cube);
@@ -565,7 +564,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             const Node * src
         ) :
             Base(r, k, color),
-            block(r, src->block, src->cube, k)
+            block(r, src->block, src->cube)
         {}
 
     public:
@@ -575,6 +574,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             Search & search,
             const access_mode_t mode
         ) {
+            (void) search;
             (void) mode;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
@@ -600,10 +600,11 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             const INTERVAL_DIFF_TYPE_T da = interval.a - this->cube[k].a;
 
             assert(this->cube[k].b >= interval.b);
-            const INTERVAL_DIFF_TYPE_T db = this->cube[k].b - interval.b;
 
             if (k == 1)
             {
+                const INTERVAL_DIFF_TYPE_T db = this->cube[k].b - interval.b;
+                (void) db;
                 assert(da % sizeof_type == 0);
                 assert(db % sizeof_type == 0);
             }
@@ -958,11 +959,9 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
         void
         create_fetch_list_for_host(
-            ThreadWorker * thread,
             const Cube & cube,
             fetch_list_t * list
         ) {
-            assert(thread);
             assert(!cube.is_empty());
             assert(list);
 
@@ -1230,7 +1229,6 @@ next_view:
         fetch_access_find_allocation(
             xkblas_driver_t * driver,
             xkblas_device_t * device,
-            Task * task,
             Access * access,
             Partition & partition
         ) {
@@ -1580,7 +1578,7 @@ next_view:
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (3) find or allocate continuous memory for that access on that device */
-                this->fetch_access_find_allocation(driver, device, task, access, search.partition);
+                this->fetch_access_find_allocation(driver, device, access, search.partition);
 
                 /* step (3) set the access view on the device (that will be used by the kernel) */
                 this->fetch_access_set_device_view(device, access, search);
@@ -1696,6 +1694,7 @@ next_view:
             const Color color,
             const NodeBase * inherit
         ) const {
+            (void) search;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
             assert(!cube.intersects(inherit->cube));
             return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
