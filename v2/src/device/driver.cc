@@ -104,7 +104,7 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     loaders[XKBLAS_DRIVER_CPU] = XKBLAS_DRIVER_CPU_get_driver;
 # endif /* USE_CPU */
 
-# if USE_CUDA && 0
+# if USE_CUDA
     extern void XKBLAS_DRIVER_TYPE_CUDA_get_driver(xkblas_driver_t *);
     loaders[XKBLAS_DRIVER_TYPE_CUDA] = XKBLAS_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
