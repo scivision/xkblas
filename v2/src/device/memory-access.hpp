@@ -47,6 +47,7 @@ class KMemoryAccess : public access_t<K>
 
         virtual ~KMemoryAccess() {}
 
+        # if 0
         /* shrink 'this' to its intersection with 'other'
          * Behavior is undefined if
          *  - 'this' and 'other' does not intersect
@@ -63,10 +64,12 @@ class KMemoryAccess : public access_t<K>
 
             // device_view is invalid now
             assert(memset(&this->device_view, 0, sizeof(memory_replicate_view_t)));
+            (void) othr;
 
             // shrink
 
         }
+        # endif
 
 }; /* KMemoryAccess */
 

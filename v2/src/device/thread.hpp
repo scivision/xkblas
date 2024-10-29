@@ -3,10 +3,11 @@
 
 # include "sync/cache-line-size.hpp"
 
-# include <cstdint>
+# include <stddef.h>
+# include <stdint.h>
 
 # ifndef THREAD_MAX_MEMORY
-#  define THREAD_MAX_MEMORY (256*1024*1024)
+#  define THREAD_MAX_MEMORY ((size_t)2*1024*1024*1024)
 # endif /* THREAD_MAX_MEMORY */
 
 class alignas(CACHE_LINE_SIZE) Thread
@@ -31,6 +32,9 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* next free task pointer in the stack */
         uint8_t * memory_stack_ptr;
+
+        /* memory capacity */
+        size_t capacity;
 
 };
 

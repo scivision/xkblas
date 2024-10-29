@@ -158,7 +158,7 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(args);
 
     fetch_list_t list;
-    context->memtree.create_fetch_list_for_host(thread, args->cube, &list);
+    context->memtree.create_fetch_list_for_host(args->cube, &list);
 
     // the size of the list should be one at that stage
     // assert(list.fetches && list.fetches->next == NULL);
@@ -193,7 +193,7 @@ xkblas_memory_coherent_async_worker_thread_work(
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);
-        producer->commit(context, task);
+        producer->commit(task);
     }
 
     // if early-completion happened
@@ -328,7 +328,7 @@ xkblas_memory_coherent_async(
         strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
         #endif /* NDEBUG */
 
-        thread->commit(context, task);
+        thread->commit(task);
     }
 }
 

@@ -6,11 +6,20 @@
 
 Thread::Thread()
 {
-    this->memory_stack_bottom   = (uint8_t *) malloc(THREAD_MAX_MEMORY);
-    this->memory_stack_ptr      = this->memory_stack_bottom;
+    this->capacity = THREAD_MAX_MEMORY;
+    while (1)
+    {
+        this->memory_stack_bottom = (uint8_t *) malloc(this->capacity);
+        if (this->memory_stack_bottom)
+            break ;
 
+        this->capacity = (size_t) (this->capacity * 2 / 3);
+        if (this->capacity == 0)
+            this->memory_stack_bottom = NULL;
+    }
+    this->memory_stack_ptr = this->memory_stack_bottom;
     assert(this->memory_stack_bottom);
-    memset(this->memory_stack_bottom, 0, THREAD_MAX_MEMORY);
+    memset(this->memory_stack_bottom, 0, this->capacity);
 }
 
 Thread::~Thread()
