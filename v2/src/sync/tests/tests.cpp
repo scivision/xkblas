@@ -228,7 +228,7 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 1
+        # if 0
         static_assert(K == 2);
 
         Interval cube[] = {
@@ -270,26 +270,24 @@ static void launch_tests(KDependencyTree<K> & tree)
         # else
 
         // hyperplans
-        //disjoint_hyperplans<K, K-1>(tree, N);
-        //disjoint_hyperplans<K,   0>(tree, N);
+        disjoint_hyperplans<K, K-1>(tree, N);
+        disjoint_hyperplans<K,   0>(tree, N);
 
         // matrix test
-        //int Nth_sqrt = std::pow(N, 1.0/K);
-        //matrix_tiles<K, 2>(tree, Nth_sqrt/2*2+1);
-        //matrix_tiles<K, 3>(tree, Nth_sqrt/3*2+1);
-        //matrix_tiles<K, 5>(tree, Nth_sqrt/5*2+1);
-        // matrix_tiles<K, 7>(tree, Nth_sqrt/7*2+1);
-
-        matrix_tiles<K,64*32>(tree, 64*32);
+        int Nth_sqrt = std::pow(N, 1.0/K);
+        matrix_tiles<K, 2>(tree, Nth_sqrt/2*2+1);
+        matrix_tiles<K, 3>(tree, Nth_sqrt/3*2+1);
+        matrix_tiles<K, 5>(tree, Nth_sqrt/5*2+1);
+        matrix_tiles<K, 7>(tree, Nth_sqrt/7*2+1);
 
         // include squares
-        //squares_included<K>(tree, N);
+        squares_included<K>(tree, N);
 
         // pyramid inverted
-        //pyramid_inverted<K>(tree, N);
+        pyramid_inverted<K>(tree, N);
 
         // pyramid
-        //pyramid<K>(tree, N);
+        pyramid<K>(tree, N);
 
         # endif
     }
@@ -323,7 +321,10 @@ static void run(void)
 
     # ifdef EXPORT_PDF
     std::cout << "Exporting pdf..." << std::endl;
-    tree.export_pdf("dependency");
+
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "dependency-%d", K);
+    tree.export_pdf(buffer);
     # endif /* EXPORT_PDF */
 }
 
@@ -335,8 +336,8 @@ main(int argc, char ** argv)
 
     printf("Testing with N=%d, you can change running `%s [N]`\n\n", N, argv[0]);
 
-//    run<1>();
-    run<2>();
+    run<1>();
+//    run<2>();
 //    run<3>();
 //    run<4>();
 //    run<5>();

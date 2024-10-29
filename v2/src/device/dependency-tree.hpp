@@ -37,6 +37,7 @@ class KTaskAccess
 template<int K>
 class KDependencyTreeSearch
 {
+    using Task = KTask<K>;
     using TaskAccess = KTaskAccess<K>;
 
     public:
@@ -84,9 +85,10 @@ class KDependencyTreeSearch
 template <int K>
 class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node {
 
+    using Access        = KMemoryAccess<K>;
     using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
     using Node          = KDependencyTreeNode<K>;
-    using Cube        = KCube<K>;
+    using Cube          = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
     using TaskAccess    = KTaskAccess<K>;
 

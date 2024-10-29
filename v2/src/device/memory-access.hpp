@@ -8,7 +8,7 @@
 template<int K>
 class KMemoryAccess : public access_t<K>
 {
-    static_assert(K == 2);
+    // static_assert(K == 2);
 
     public:
 

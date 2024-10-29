@@ -347,7 +347,9 @@ class KCubeTree {
                     char include_cube[1024];
                     this->includes.cube.tostring(include_cube, sizeof(include_cube));
 
-                    fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d",
+                    if (K == 2)
+                    {
+                        fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d",
                             this->k,
                             cube,
                             include_cube,
@@ -355,7 +357,8 @@ class KCubeTree {
                             this->includes.nelements[0],
                             this->includes.nelements[1],
                             this->height()
-                    );
+                        );
+                    }
                 }
 
                 void

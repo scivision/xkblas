@@ -64,7 +64,7 @@ template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
 {
     /* only supporting dimension K == 2 */
-    static_assert(K == 2);
+    // static_assert(K == 2);
     using Access = KMemoryAccess<K>;
 
     public:

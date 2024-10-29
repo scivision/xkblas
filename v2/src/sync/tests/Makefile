@@ -1,9 +1,9 @@
 CXX=g++
 CFLAGS=-Wall -Werror -Wextra
 CFLAGS+=-Wno-error=write-strings
-CFLAGS+=-g -O0
+#CFLAGS+=-g -O0
 CFLAGS+=-I . -I ../ -I ../../ -I ../../device -I ../../../include
-#CFLAGS+=-DNDEBUG
+CFLAGS+=-O3 -DNDEBUG
 CFLAGS+=-DEXPORT_PDF
 CFLAGS+=
 LDFLAGS+=
