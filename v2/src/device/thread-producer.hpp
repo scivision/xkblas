@@ -51,7 +51,36 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             task->naccesses = N;
 
             if (N)
-                this->deptree.resolve<N>(task);
+            {
+                # pragma message(TODO "If we semantically force a task accesses to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
+
+                DependencyTree::Search search;
+                DependencyTree * deptrees[N];
+
+                // intersect with past tasks
+                for (int access_id = 0 ; access_id < N ; ++access_id)
+                {
+                    search.prepare_resolve(task, access_id);
+
+                    const Access * access = task->accesses + access_id;
+                    assert(access);
+
+                    deptrees[access_id] = this->get_dependency_tree_for_ld(access->host_view.ld);
+                    deptrees[access_id]->intersect(search, access->cube, access->mode);
+                }
+
+                // insert for future tasks
+                for (int access_id = 0 ; access_id < N ; ++access_id)
+                {
+                    search.prepare_resolve(task, access_id);
+
+                    const Access * access = task->accesses + access_id;
+                    assert(access);
+
+                    assert(deptrees[access_id]);
+                    deptrees[access_id]->insert(search, access->cube, access->mode);
+                }
+            }
         }
 
         inline void
@@ -62,6 +91,22 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             # ifndef NDEBUG
             tasks.push_back(task);
             # endif
+        }
+
+        inline DependencyTree *
+        get_dependency_tree_for_ld(const size_t ld)
+        {
+            /* find previous deptree for that ld */
+            for (DependencyTree * deptree : this->deptrees)
+                if (deptree->ld == ld)
+                    return deptree;
+
+            /* if not found, create a new deptree */
+            DependencyTree * deptree = new DependencyTree(ld);
+            assert(deptree);
+            assert(deptree->ld == ld);
+            this->deptrees.push_back(deptree);
+            return deptree;
         }
 
         # ifndef NDEBUG
@@ -85,13 +130,15 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         }
         # endif /* NDEBUG */
 
-        #ifndef NDEBUG
     public:
+
+        /* Dependency tree */
+        std::vector<DependencyTree *> deptrees;
+
+        #ifndef NDEBUG
         std::vector<Task *> tasks;
         #endif /* NDEBUG */
 
-        /* Dependency tree */
-        DependencyTree deptree;
 };
 
 #endif /* __THREAD_PRODUCER_HPP__ */

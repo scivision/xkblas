@@ -128,13 +128,15 @@ static task_format_id_t TASK_FORMAT_COHERENT_ASYNC;
 // args for 'TASK_FORMAT_COHERENT_ASYNC'
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
-    Access::Cube cube;
+    Cube cube;
+    size_t ld;
 
     args_t(const Access & x, const Access & y)
     {
-        Access::Cube::intersection(&cube, x.cube, y.cube);
+        assert(x.host_view.ld == y.host_view.ld);
+        this->ld = x.host_view.ld;
+        Access::Cube::intersection(&this->cube, x.cube, y.cube);
     }
-
     ~args_t() {}
 }                                       args_t;
 
@@ -157,8 +159,11 @@ xkblas_memory_coherent_async_worker_thread_work(
     const args_t * args = (const args_t *) (current + 1);
     assert(args);
 
+    MemoryTree * memtree = context->get_memory_tree_for_ld(args->ld);
+    assert(memtree);
+
     fetch_list_t list;
-    context->memtree.create_fetch_list_for_host(args->cube, &list);
+    memtree->create_fetch_list_for_host(args->cube, &list);
 
     // the size of the list should be one at that stage
     // assert(list.fetches && list.fetches->next == NULL);
@@ -296,7 +301,10 @@ xkblas_memory_coherent_async(
     /* create an access, and retrieve all tasks that are in conflict */
     std::vector<TaskAccess> conflicts;
     const Access access(MATRIX_COLMAJOR, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
-    thread->deptree.conflicting(&conflicts, &access);
+
+    DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
+    assert(deptree);
+    deptree->conflicting(&conflicts, &access);
 
     XKBLAS_DEBUG("`xkblas_memory_coherent_async` found %d conflicts", conflicts.size());
 

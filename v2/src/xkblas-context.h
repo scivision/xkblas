@@ -31,7 +31,22 @@ typedef struct  xkblas_context_t
     xkblas_drivers_t drivers;
 
     /* memory state on each device */
-    MemoryTree memtree;
+    std::vector<MemoryTree *> memtrees;
+    MemoryTree *
+    get_memory_tree_for_ld(const size_t ld)
+    {
+        /* find previous memtree for that ld */
+        for (MemoryTree * memtree : this->memtrees)
+            if (memtree->ld == ld)
+                return memtree;
+
+        /* if not found, create a new memtree */
+        MemoryTree * memtree = new MemoryTree(ld);
+        assert(memtree);
+        assert(memtree->ld == ld);
+        this->memtrees.push_back(memtree);
+        return memtree;
+    }
 
     /* stats for debugging */
     xkblas_stats_t stats;

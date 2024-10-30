@@ -45,7 +45,7 @@ class KMemoryAccess : public access_t<K>
             device_view()
         {
             /* to ensure bijection from memory space to cube space */
-            assert((t.addr % t.ld) + t.m < t.ld);
+            assert((t.addr % t.ld) + t.m <= t.ld);
         }
 
         virtual ~KMemoryAccess() {}

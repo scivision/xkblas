@@ -368,8 +368,25 @@ xkblas_device_prepare_task(
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    /* fetch, return 'TASK_STATE_DATA_FETCHED' if the data got fetched early */
-    if (context->memtree.fetch(driver, device, task) == TASK_STATE_DATA_FETCHED)
+    /* increase task 'fetching' counter so it does not get ready early
+     * (eg before we processed all accesses bellow) */
+    task->fetching();
+
+    /* for each access */
+    assert(task->naccesses <= TASK_MAX_ACCESSES);
+    for (int i = 0 ; i < task->naccesses ; ++i)
+    {
+        Access * access = task->accesses + i;
+        assert(access);
+
+        MemoryTree * memtree = context->get_memory_tree_for_ld(access->host_view.ld);
+        assert(memtree);
+
+        memtree->fetch_access(driver, device, task, access);
+    }
+
+    /* fetch, return 'TASK_STATE_DATA_FETCHED' if the data got fetched already */
+    if (task->fetched() == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
         xkblas_device_task_execute(driver, device, task);

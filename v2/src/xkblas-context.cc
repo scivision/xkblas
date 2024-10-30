@@ -34,6 +34,7 @@ xkblas_context_get(void)
         },
         .conf = {},
         .memory_coherent_worker_thread = nullptr,
+        // .memtrees = std::vector<MemoryTree *>(),
         .drivers = {}
     };
 

@@ -11,7 +11,8 @@ xkblas_memory_invalidate_caches(void)
     assert(context);
 
     // memory tree and device memory
-    context->memtree.invalidate();
+    for (MemoryTree * memtree : context->memtrees)
+        memtree->invalidate();
 
     // coherent worker
     ThreadWorker * worker = context->memory_coherent_worker_thread;

@@ -208,4 +208,6 @@ class KCube {
 
 }; /* class KCube */
 
+using Cube = KCube<2>;
+
 #endif /* __INTERVALS_HPP__ */

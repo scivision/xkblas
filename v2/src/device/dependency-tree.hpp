@@ -279,47 +279,21 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
     using Node          = KDependencyTreeNode<K>;
     using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
     using Cube          = KCube<K>;
-    using Search        = KDependencyTreeSearch<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
 
     public:
 
-        template <int N>
-        inline void
-        resolve(Task * task)
-        {
-            assert(task->naccesses == N);
+        using Search = KDependencyTreeSearch<K>;
 
-            # pragma message(TODO "If we semantically force a task accesses to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
+        KDependencyTree(const size_t ld) : Base(), ld(ld) {}
+        ~KDependencyTree() {}
 
-            if (N)
-            {
-                Search search;
+        /* ld for this dep tree */
+        const size_t ld;
 
-                // intersect with past tasks
-                for (int access_id = 0 ; access_id < N ; ++access_id)
-                {
-                    search.prepare_resolve(task, access_id);
+    public:
 
-                    const Access * access = task->accesses + access_id;
-                    assert(access);
-
-                    this->intersect(search, access->cube, access->mode);
-                }
-
-                // insert for future tasks
-                for (int access_id = 0 ; access_id < N ; ++access_id)
-                {
-                    search.prepare_resolve(task, access_id);
-
-                    const Access * access = task->accesses + access_id;
-                    assert(access);
-
-                    this->insert(search, access->cube, access->mode);
-                }
-            }
-        }
 
         inline void
         conflicting(

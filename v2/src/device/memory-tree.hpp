@@ -796,6 +796,13 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
     using Task = KTask<K>;
 
     public:
+        KMemoryTree(const size_t ld) : Base(), ld(ld) {}
+        ~KMemoryTree() {}
+
+        /* the ld used in that memory tree */
+        const size_t ld;
+
+    public:
 
         typedef struct  internal_fetch_t
         {
@@ -1596,33 +1603,6 @@ next_view:
             this->fetch_access_launch_copies(driver, device, task, access, search.partition);
         }
 
-        # pragma message(TODO "Driver and device shouldn't be passed as a parameter here... use device_global_id instead - the memory tree should abstract all that shit")
-        /** initiate memory transfer to ensure coherency */
-        task_state_t
-        fetch(
-            xkblas_driver_t * driver,
-            xkblas_device_t * device,
-            Task * task
-        ) {
-            assert(driver);
-            assert(device);
-
-            # pragma message(TODO "continuous blocks on the same device "       \
-                    "could be detected here and fetched with a single request")
-
-            /* increase task 'fetching' counter so it does not get ready early
-             * (eg before we processed all accesses bellow)
-             */
-            task->fetching();
-
-            /* for each access */
-            assert(task->naccesses <= TASK_MAX_ACCESSES);
-            for (int i = 0 ; i < task->naccesses ; ++i)
-                this->fetch_access(driver, device, task, task->accesses + i);
-
-            return task->fetched();
-        }
-
         //////////////////
         //  INVALIDATE  //
         //////////////////
@@ -1642,7 +1622,7 @@ next_view:
 
         memory_allocation_view_id_bitfield_t
         who_owns(
-            Access * access
+            const Access * access
         ) {
             // find how much bytes are owned per device
             Search search;

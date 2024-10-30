@@ -32,7 +32,8 @@ main(void)
         KMemoryAccess<2>(MATRIX_COLMAJOR, (void *) 0x7f3d6d800420, 8, 4, 0, 4, 4, 4, ACCESS_MODE_RW),
     };
 
-    KMemoryTree<2> tree;
+    const size_t ld = 131072;
+    KMemoryTree<2> tree(ld);
 
     KMemoryTreeNodeSearch<2> search(0);
 
