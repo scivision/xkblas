@@ -68,11 +68,17 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
         void
         dump_tasks(FILE * f)
         {
+            ThreadProducer::dump_tasks(f, this->tasks);
+        }
+
+        static void
+        dump_tasks(FILE * f, std::vector<Task *> & tasks)
+        {
             fprintf(f, "digraph G {\n");
-            for (Task * & task : this->tasks)
+            for (Task * & task : tasks)
                 fprintf(f, "    \"%p\" [label=\"%s\"] ;\n", task, task->label);
 
-            for (Task * & pred : this->tasks)
+            for (Task * & pred : tasks)
                 for (Task::Edge & edge : pred->edges)
                     fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, edge.successor);
             fprintf(f, "}\n");

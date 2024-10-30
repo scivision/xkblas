@@ -180,6 +180,17 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
         }
 
         inline void
+        precedence(Task * pred, Task * succ) const
+        {
+            /* avoid redundant edges when 2 tasks are conflicting on several
+             * accesses, this optimization is possible as we are in a
+             * sequential task flow paradigm : if pred -> succ, then
+             * 'succ' must be the last successor inserted */
+            if (pred->edges.size() == 0 || pred->edges.back().successor != succ)
+                pred->precedes(succ);
+        }
+
+        inline void
         on_intersect(
             Search & search,
             const Cube & cube,
@@ -193,9 +204,9 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
                 {
                     if (mode & ACCESS_MODE_W && this->last_reads.size())
                         for (TaskAccess & pred : this->last_reads)
-                            pred.task->precedes(search.task_access.task);
+                            this->precedence(pred.task, search.task_access.task);
                     else if (this->last_write.task)
-                        this->last_write.task->precedes(search.task_access.task);
+                        this->precedence(this->last_write.task, search.task_access.task);
 
                     break ;
                 }

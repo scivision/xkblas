@@ -109,8 +109,9 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     loaders[XKBLAS_DRIVER_TYPE_CUDA] = XKBLAS_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
 
+    uint8_t total_devices = 0;
     uint8_t i;
-    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
+    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX && total_devices < ngpus ; ++i)
     {
         void (*loader)(xkblas_driver_t *) = loaders[i];
         if (loader)
@@ -120,20 +121,19 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
             if (drivers->devices.n == ngpus)
                 break ;
         }
+        total_devices += drivers->devices.n;
     }
 
     /* wait each thread of each device of each driver to start */
-    int total_devices = 0;
     for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
     {
         xkblas_driver_t * driver = drivers->list + i;
         while (driver->ndevices_commited < driver->ndevices_targeted)
             mem_pause();
-        total_devices += driver->ndevices_targeted;
     }
 
     // DEBUG OUTPUT
-    if (total_devices == 0)
+    if (total_devices == 0 && ngpus != 0)
         XKBLAS_WARN("No devices found :-(");
 
     XKBLAS_INFO("Enabled %d devices (with %d requested)", total_devices, ngpus);

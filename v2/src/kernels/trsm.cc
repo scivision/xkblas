@@ -214,6 +214,8 @@ xkblas_£trsm_async(
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
     TYPE lalpha;
 
+    # pragma message(TODO "Block sizes truncation are suspicious to me here, double check")
+
     /* CblasLeft / CblasUpper / CblasNoTrans  */
     if (side == CblasLeft) {
         if (uplo == CblasUpper) {
