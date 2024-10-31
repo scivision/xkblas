@@ -17,6 +17,9 @@ extern "C" {
     /* initialize the runtime (must be called by the main thread) */
     void xkblas_init(void);
 
+    /* return the number of devices available */
+    int xkblas_get_device_count(int * count);
+
     /* Wait for the completion of every threads */
     void xkblas_sync(void);
 

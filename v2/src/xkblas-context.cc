@@ -77,6 +77,27 @@ xkblas_init(void)
 }
 
 extern "C"
+int
+xkblas_get_device_count(int * count)
+{
+    assert(count);
+
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    *count = 0;
+    for (int i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
+    {
+        xkblas_driver_t * driver = context->drivers.list + i;
+        assert(driver);
+
+        if (driver->f_get_ndevices_max)
+            *count += driver->f_get_ndevices_max();
+    }
+    return 0;
+}
+
+extern "C"
 void
 xkblas_deinit(void)
 {
