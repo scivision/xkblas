@@ -49,7 +49,7 @@ xkblas_task_format_register(void)
 }
 
 extern "C"
-void
+int
 xkblas_init(void)
 {
     XKBLAS_INFO("Initializing Xkblas");
@@ -74,6 +74,7 @@ xkblas_init(void)
         }
         SPINLOCK_UNLOCK(context->state.spinlock);
     }
+    return 0;
 }
 
 extern "C"
