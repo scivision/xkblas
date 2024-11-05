@@ -59,10 +59,6 @@ xkblas_£gemm_tile_async(
     const TYPE * beta,
           TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
-    assert((uintptr_t)A % lda == 0);
-    assert((uintptr_t)B % ldb == 0);
-    assert((uintptr_t)C % ldc == 0);
-
     XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, m, n);
 
     const uint64_t task_size = sizeof(Task);
@@ -231,7 +227,7 @@ xkblas_£gemm_async(
                         );
                     }
                 }
-                // A: CblasNoTrans / B: Cham[Conj]Trans
+                // A: CblasNoTrans / B: CBlasTrans
                 else
                 {
                     for (int tk = 0; tk < Ant; ++tk)
@@ -251,7 +247,7 @@ xkblas_£gemm_async(
                     }
                 }
             }
-            // A: Cham[Conj]Trans / B: CblasNoTrans
+            // A: CblasTrans / B: CblasNoTrans
             else
             {
                 if (transB == CblasNoTrans)
@@ -272,7 +268,7 @@ xkblas_£gemm_async(
                         );
                     }
                 }
-                // A: Cham[Conj]Trans / B: Cham[Conj]Trans
+                // A: CblasTrans / B: CBlasTrans
                 else
                 {
                     for (int tk = 0; tk < Amt; ++tk)

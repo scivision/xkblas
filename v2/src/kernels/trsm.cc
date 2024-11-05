@@ -72,8 +72,8 @@ xkblas_£trsm_tile_async(
     new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    assert(transA == CblasNoTrans);
-    assert(side == CblasLeft);
+    // assert(transA == CblasNoTrans);
+    // assert(side == CblasLeft);
     snprintf(task->label, sizeof(task->label), "trsm(A=(%d,%d) ; B=(%d,%d))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
     # endif /* NDEBUG */
@@ -250,11 +250,11 @@ xkblas_£trsm_async(
                 }
             }
             /*
-             *  CblasLeft / CblasUpper / Cblas[Conj]Trans
+             *  CblasLeft / CblasUpper / CblasTrans
              */
             else {
                 for (tk = 0; tk < Bmt; ++tk) {
-                    bs_km  = (tk == Bmt-1) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
                     lalpha = (tk == 0)     ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
                         bs_nn = (tn == Bnt-1) ? Bn-tn*Bnb : Bnb;
@@ -521,18 +521,18 @@ body_cuda(void * vlauncher)
     assert(handle);
 
     args_t * args = (args_t *) (launcher->task + 1);
-    assert(args->transA == CblasNoTrans);
-    assert(args->side   == CblasLeft);
+    // assert(args->transA == CblasNoTrans);
+    // assert(args->side   == CblasLeft);
 
     const Access * A = launcher->task->accesses + 0;
     const Access * B = launcher->task->accesses + 1;
 
     # ifndef NDEBUG
-    XKBLAS_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, m=%d, n=%d, alpha=%p, A=%p, lda=%d, B=%p, ldb=%d) on task=`%s`",
+    XKBLAS_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%d, B=%p, ldb=%d) on task=`%s`",
         args->side, args->uplo,
         args->transA, args->diag,
-        &(args->alpha),
-        (int) args->m, (int) args->n,
+        args->alpha,
+        args->m, args->n,
         (void *) A->device_view.addr, (int) A->device_view.ld,
         (void *) B->device_view.addr, (int) B->device_view.ld,
         launcher->task->label
