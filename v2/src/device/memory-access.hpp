@@ -45,7 +45,20 @@ class KMemoryAccess : public access_t<K>
             device_view()
         {
             /* to ensure bijection from memory space to cube space */
-            assert((t.addr % t.ld) + t.m <= t.ld);
+            switch (host_view.order):
+            {
+                case (MATRIX_COLMAJOR):
+                {
+                    assert((t.addr % (t.ld * t.sizeof_type)) + (t.m * t.sizeof_type) <= t.ld * sizeof_type);
+                    break ;
+                }
+
+                case (MATRIX_ROWMAJOR):
+                {
+                    assert((t.addr % (t.ld * t.sizeof_type)) + (t.n * t.sizeof_type) <= t.ld * sizeof_type);
+                    break ;
+                }
+            }
         }
 
         virtual ~KMemoryAccess() {}
