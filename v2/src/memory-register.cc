@@ -49,8 +49,24 @@ xkblas_unregister_memory(void * ptr, uint64_t size)
 
 extern "C"
 int
+xkblas_unregister_memory_async(void * ptr, uint64_t size)
+{
+    return xkblas_unregister_memory( ptr, size ); // not async ...
+}
+
+extern "C"
+int
 xkblas_register_memory_waitall(void)
 {
     // nothing to do, as we are synchronous
     return 0;
+}
+
+extern "C"
+uint64_t
+xkblas_register_memory(void * ptr, uint64_t size)
+{
+    uint64_t ret = xkblas_register_memory_async(ptr, size);
+    xkblas_register_memory_waitall();
+    return ret;
 }
