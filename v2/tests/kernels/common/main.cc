@@ -350,18 +350,18 @@ main_trsm(char ** args)
     for(int i = 0 ; i < ld ; ++i)
         A[ld*i+i] = 1.0;
 
-    int s = 0;
-    int u = 1;
-    int t = 0;
-    int d = 0;
+    // int s = 0;
+    // int u = 1;
+    // int t = 0;
+    // int d = 0;
 
-    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
         {
-            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
             {
-                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
 

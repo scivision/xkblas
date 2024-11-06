@@ -72,8 +72,6 @@ xkblas_£trsm_tile_async(
     new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    // assert(transA == CblasNoTrans);
-    // assert(side == CblasLeft);
     snprintf(task->label, sizeof(task->label), "trsm(A=(%d,%d) ; B=(%d,%d))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
     # endif /* NDEBUG */
@@ -203,47 +201,46 @@ xkblas_£trsm_async(
     const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
     const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
 
-    int tk, tm, tn;
-    size_t bs_km, bs_kn, bs_mm, bs_nn;
-
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
-    TYPE lalpha;
 
     # pragma message(TODO "Block sizes truncation are suspicious to me here, double check")
+
+    # define A(I, J) A, (I)*Amb, (J)*Anb, lda
+    # define B(I, J) B, (I)*Bmb, (J)*Bnb, ldb
 
     /* CblasLeft / CblasUpper / CblasNoTrans  */
     if (side == CblasLeft) {
         if (uplo == CblasUpper) {
             if (transA == CblasNoTrans) {
-                for (tk = 0; tk < Bmt; tk++) {
-                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : one;
-                    for (tn = 0; tn < Bnt; tn++) {
-                        bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                for (int tk = 0; tk < Bmt; tk++) {
+                    size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (int tn = 0; tn < Bnt; tn++) {
+                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A, (Bmt-1-tk)*Amb, (Bmt-1-tk)*Anb, lda,
-                            B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb
+                            A(Bmt-1-tk, Bmt-1-tk),
+                            B(Bmt-1-tk,       tn)
                         );
                     }
-                    for (tm = tk+1; tm < Bmt; ++tm) {
-                        for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (int tm = tk+1; tm < Bmt; ++tm) {
+                        for (int tn = 0; tn < Bnt; ++tn) {
+                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
                                 &mone,
-                                A, (Bmt-1-tm)*Amb, (Bmt-1-tk)*Anb, lda,
-                                B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb,
+                                A(Bmt-1-tm, Bmt-1-tk),
+                                B(Bmt-1-tk,       tn),
                                 &lalpha,
-                                B, (Bmt-1-tm)*Bmb,         tn*Bnb, ldb
+                                B(Bmt-1-tm,       tn)
                             );
                         }
                     }
@@ -253,34 +250,34 @@ xkblas_£trsm_async(
              *  CblasLeft / CblasUpper / CblasTrans
              */
             else {
-                for (tk = 0; tk < Bmt; ++tk) {
-                    bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
-                    lalpha = (tk == 0)     ? *alpha : one;
-                    for (tn = 0; tn < Bnt; ++tn) {
-                        bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                for (int tk = 0; tk < Bmt; ++tk) {
+                    size_t bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
+                    TYPE lalpha = (tk == 0)     ? *alpha : one;
+                    for (int tn = 0; tn < Bnt; ++tn) {
+                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A, tk*Amb, tk*Anb, lda,
-                            B, tk*Bmb, tn*Bnb, ldb
+                            A(tk, tk),
+                            B(tk, tn)
                         );
                     }
-                    for (tm = tk+1; tm < Bmt; tm++) {
-                        bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (int tm = tk+1; tm < Bmt; tm++) {
+                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                        for (int tn = 0; tn < Bnt; ++tn) {
+                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 transA, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
-                                A, tk*Amb, tm*Anb, lda,
-                                B, tk*Bmb, tn*Bnb, ldb,
+                                A(tk, tm),
+                                B(tk, tn),
                                 &lalpha,
-                                B, tm*Bmb, tn*Bnb, ldb
+                                B(tm, tn)
                             );
                         }
                     }
@@ -292,34 +289,34 @@ xkblas_£trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (tk = 0; tk < Bmt; ++tk) {
-                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : one;
-                    for (tn = 0; tn < Bnt; ++tn) {
-                        bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                for (int tk = 0; tk < Bmt; ++tk) {
+                    size_t bs_km  = (tk == Bmt-1) ? (Bm-tk*Bmb) : Bmb;
+                    TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (int tn = 0; tn < Bnt; ++tn) {
+                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A, tk*Amb, tk*Anb, lda,
-                            B, tk*Bmb, n*Bnb, ldb
+                            A(tk, tk),
+                            B(tk, tn)
                         );
                     }
-                    for (tm = tk+1; tm < Bmt; ++tm) {
-                        bs_mm = tm == Bmt-1 ? Bm-m*Bmb : Bmb;
-                        for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                    for (int tm = tk+1; tm < Bmt; ++tm) {
+                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                        for (int tn = 0; tn < Bnt; ++tn) {
+                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
-                                A, tm*Amb, tk*Anb, lda,
-                                B, tk*Bmb, tn*Bnb, ldb,
+                                A(tm, tk),
+                                B(tk, tn),
                                 &lalpha,
-                                B, tm*Bmb, tn*Bnb, ldb
+                                B(tm, tn)
                             );
                         }
                     }
@@ -329,32 +326,32 @@ xkblas_£trsm_async(
              *  CblasLeft / CblasLower / Cblas[Conj]Trans
              */
             else {
-                for (tk = 0; tk < Bmt; ++tk) {
-                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : one;
-                    for (tn = 0; tn < Bnt; ++tn) {
-                        bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                for (int tk = 0; tk < Bmt; ++tk) {
+                    size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (int tn = 0; tn < Bnt; ++tn) {
+                        size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo, transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A, (Bmt-1-tk)*Amb, (Bmt-1-tk)*Anb, lda,
-                            B, (Bmt-1-tk)*Bmb,          n*Bnb, ldb
+                            A(Bmt-1-tk, Bmt-1-tk),
+                            B(Bmt-1-tk,       tn)
                         );
                     }
-                    for (tm = tk+1; tm < Bmt; ++tm) {
-                        for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (int tm = tk+1; tm < Bmt; ++tm) {
+                        for (int tn = 0; tn < Bnt; ++tn) {
+                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 transA, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
                                 &mone,
-                                A, (Bmt-1-tk)*Amb, (Bmt-1-tm)*Anb, lda,
-                                B, (Bmt-1-tk)*Bmb,         tn*Bnb, ldb,
+                                A(Bmt-1-tk, Bmt-1-tm),
+                                B(Bmt-1-tk,       tn),
                                 &lalpha,
-                                B, (Bmt-1-tm)*Bmb,         tn*Bnb, ldb
+                                B(Bmt-1-tm,       tn)
                             );
                         }
                     }
@@ -368,33 +365,33 @@ xkblas_£trsm_async(
     else {
         if (uplo == CblasUpper) {
             if (transA == CblasNoTrans) {
-                for (tk = 0; tk < Bnt; ++tk) {
-                    bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    lalpha = (tk == 0) ? *alpha : one;
-                    for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                for (int tk = 0; tk < Bnt; ++tk) {
+                    size_t bs_kn = (tk == Bnt-1) ? (Bn-tk*Bnb) : Bnb;
+                    TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (int tm = 0; tm < Bmt; ++tm) {
+                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo, transA, diag,
                             bs_mm, bs_kn,
                             &lalpha,
-                            A, tk*Amb, tk*Anb, lda,
-                            B, tm*Bnb, tk*Bnb, ldb
+                            A(tk, tk),
+                            B(tm, tk)
                         );
                     }
-                    for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = m == Bmt-1 ? Bm-tm*Bmb : Bmb;
-                        for (tn = tk+1; tn < Bnt; ++tn) {
-                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                    for (int tm = 0; tm < Bmt; ++tm) {
+                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
-                                B, tm*Bmb, tk*Bnb, ldb,
-                                A, tk*Amb, tn*Anb, lda,
+                                B(tm, tk),
+                                A(tk, tn),
                                 &lalpha,
-                                B, tm*Bmb, tn*Bnb, ldb
+                                B(tm, tn)
                             );
                         }
                     }
@@ -404,10 +401,10 @@ xkblas_£trsm_async(
              *  CblasRight / CblasUpper / CblasConjTrans
              */
             else {
-                for (tk = 0; tk < Bnt; ++tk) {
-                    bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                for (int tk = 0; tk < Bnt; ++tk) {
+                    size_t bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+                    for (int tm = 0; tm < Bmt; ++tm) {
+                        size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
@@ -418,7 +415,7 @@ xkblas_£trsm_async(
                             B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
                         );
 
-                        for (tn = tk+1; tn < Bnt; ++tn) {
+                        for (int tn = tk+1; tn < Bnt; ++tn) {
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, transA,
@@ -439,11 +436,11 @@ xkblas_£trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (tk = 0; tk < Bnt; ++tk) {
-                    bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    lalpha = tk == 0 ? *alpha : one;
-                    for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                for (int tk = 0; tk < Bnt; ++tk) {
+                    size_t bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+                    TYPE lalpha = tk == 0 ? *alpha : one;
+                    for (int tm = 0; tm < Bmt; ++tm) {
+                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
@@ -454,7 +451,7 @@ xkblas_£trsm_async(
                             B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
                         );
 
-                        for (tn = tk+1; tn < Bnt; ++tn) {
+                        for (int tn = tk+1; tn < Bnt; ++tn) {
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, CblasNoTrans,
@@ -470,10 +467,10 @@ xkblas_£trsm_async(
                 }
             }
             else {
-                for (tk = 0; tk < Bnt; ++tk) {
-                    bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
-                    for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                for (int tk = 0; tk < Bnt; ++tk) {
+                    size_t bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
+                    for (int tm = 0; tm < Bmt; ++tm) {
+                        size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
@@ -484,8 +481,8 @@ xkblas_£trsm_async(
                             B, tm*Bmb, tk*Bnb, ldb
                         );
 
-                        for (tn = tk+1; tn < Bnt; ++tn) {
-                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                            size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 CblasNoTrans, transA,
@@ -502,6 +499,9 @@ xkblas_£trsm_async(
             }
         }
     }
+
+    # undef A
+    # undef B
 
     return 0;
 }

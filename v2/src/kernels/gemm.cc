@@ -202,9 +202,9 @@ xkblas_£gemm_async(
 
     # pragma message(TODO "Double check tiling offset in presence of transposed matrix")
 
-    # define A(I, J) A, I*Amb, J*Anb, lda
-    # define B(I, J) B, I*Bmb, J*Bnb, ldb
-    # define C(I, J) C, I*Cmb, J*Cnb, ldc
+    # define A(I, J) A, (I)*Amb, (J)*Anb, lda
+    # define B(I, J) B, (I)*Bmb, (J)*Bnb, ldb
+    # define C(I, J) C, (I)*Cmb, (J)*Cnb, ldc
 
     // iterator on tiles
     for (int tm = 0; tm < Cmt; ++tm)
