@@ -257,7 +257,7 @@ xkblas_£trsm_async(
                     bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
                     lalpha = (tk == 0)     ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
-                        bs_nn = (tn == Bnt-1) ? Bn-tn*Bnb : Bnb;
+                        bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
@@ -269,9 +269,9 @@ xkblas_£trsm_async(
                         );
                     }
                     for (tm = tk+1; tm < Bmt; tm++) {
-                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = n == Bnt-1 ? Bn-n*Bnb : Bnb;
+                            bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 transA, CblasNoTrans,
@@ -296,7 +296,7 @@ xkblas_£trsm_async(
                     bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
                     lalpha = (tk == 0) ? *alpha : one;
                     for (tn = 0; tn < Bnt; ++tn) {
-                        bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                        bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,
@@ -345,7 +345,7 @@ xkblas_£trsm_async(
                     }
                     for (tm = tk+1; tm < Bmt; ++tm) {
                         for (tn = 0; tn < Bnt; ++tn) {
-                            bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                            bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
                                 transA, CblasNoTrans,
@@ -401,7 +401,7 @@ xkblas_£trsm_async(
                 }
             }
             /*
-             *  CblasRight / CblasUpper / Cblas[Conj]Trans
+             *  CblasRight / CblasUpper / CblasConjTrans
              */
             else {
                 for (tk = 0; tk < Bnt; ++tk) {
@@ -443,7 +443,7 @@ xkblas_£trsm_async(
                     bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
                     lalpha = tk == 0 ? *alpha : one;
                     for (tm = 0; tm < Bmt; ++tm) {
-                        bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+                        bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
                             side, uplo,

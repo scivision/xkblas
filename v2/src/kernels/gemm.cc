@@ -82,12 +82,19 @@ xkblas_£gemm_tile_async(
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
     new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
 
+    const size_t Am = (transA == CblasNoTrans) ? m : k;
+    const size_t An = (transA == CblasNoTrans) ? k : m;
+    const size_t Bm = (transB == CblasNoTrans) ? k : n;
+    const size_t Bn = (transB == CblasNoTrans) ? n : k;
+    const size_t Cm = m;
+    const size_t Cn = n;
+
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, m, k, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, k, n, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, m, n, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        );
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
@@ -386,9 +393,11 @@ body_cuda(void * vlauncher)
     );
     #endif /* NDEBUG */
 
+    # if 0
     assert(handle);
     res = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
     assert(res == CUBLAS_STATUS_SUCCESS);
+    # endif
 
     res = cublas££gemm(
         handle,

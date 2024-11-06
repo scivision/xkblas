@@ -63,30 +63,6 @@ class KMemoryAccess : public access_t<K>
 
         virtual ~KMemoryAccess() {}
 
-        # if 0
-        /* shrink 'this' to its intersection with 'other'
-         * Behavior is undefined if
-         *  - 'this' and 'other' does not intersect
-         *  - 'device_view' are used after shrinking
-         */
-        void
-        shrink(const KMemoryAccess & othr)
-        {
-            // must intersect
-            assert(
-                (this->host_view.begin_addr() <= othr.host_view.begin_addr() && othr.host_view.begin_addr() <= this->host_view.end_addr()) ||
-                (othr->host_view.begin_addr() <= this->host_view.begin_addr() && this->host_view.begin_addr() <= othr->host_view.end_addr())
-            );
-
-            // device_view is invalid now
-            assert(memset(&this->device_view, 0, sizeof(memory_replicate_view_t)));
-            (void) othr;
-
-            // shrink
-
-        }
-        # endif
-
 }; /* KMemoryAccess */
 
 using Access = KMemoryAccess<2>;

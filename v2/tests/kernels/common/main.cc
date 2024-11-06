@@ -269,8 +269,8 @@ main_trsm(char ** args)
     CBLAS_SIDE side = CblasLeft;
     CBLAS_UPLO uplo = CblasUpper;
     CBLAS_DIAG diag = CblasNonUnit;
-    // CBLAS_TRANSPOSE transA = CblasNoTrans;
-    CBLAS_TRANSPOSE transA = CblasTrans;
+    CBLAS_TRANSPOSE transA = CblasNoTrans;
+    //CBLAS_TRANSPOSE transA = CblasTrans;
 
     int m = atoi(args[0]);
     int n = atoi(args[1]);
