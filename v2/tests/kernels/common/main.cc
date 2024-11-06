@@ -201,33 +201,32 @@ main_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
+    int t1 = 0;
+    int t2 = 1;
+
     for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
         for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
-            impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
-            {
-                uint64_t t0 = get_nanotime();
-                impl.set_tile(bs_m, bs_n);
-                impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
-                impl.coherent(CImpl, m, n, ld);
-                uint64_t tt = get_nanotime();
-                impl.wait();
-                uint64_t tf = get_nanotime();
-                printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-            }
+            uint64_t t0 = get_nanotime();
+            impl.set_tile(bs_m, bs_n);
+            impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+            impl.coherent(CImpl, m, n, ld);
+            uint64_t tt = get_nanotime();
+            impl.wait();
+            uint64_t tf = get_nanotime();
+            impl.reset();
+            printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
 
             if (!SKIP_CHECK)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
-                if (r == 0)
-                    puts("Result is CORRECT");
-                else
-                    puts("Result is INCORRECT !!");
+                printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                puts("--------------------------");
             }
         }
     }

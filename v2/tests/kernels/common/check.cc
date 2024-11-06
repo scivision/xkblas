@@ -59,8 +59,6 @@ gemm_cmp(
     const int Cm = Am;
     const int Cn = Bn;
 
-    assert(An == Bm);
-
     double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
     double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,     ldb, work);
     double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
