@@ -302,7 +302,8 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
         ) {
             Search search;
             search.prepare_conflicting(conflicts, access);
-            this->intersect(search, access->cube, access->mode);
+            this->intersect(search, access->cubes[0], access->mode);
+            this->intersect(search, access->cubes[1], access->mode);
         }
 
         //////////////

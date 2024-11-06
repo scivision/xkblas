@@ -35,34 +35,6 @@ class KCube {
             this->set_list(copy.list);
         }
 
-        // TODO : super-dirty stuff, to make xkblas code looks good
-        KCube(const matrix_tile_t & tile)
-        {
-            if constexpr(K == 2)
-            {
-                // not sure about this if other ordering
-                assert(tile.order == MATRIX_COLMAJOR);
-
-                const uintptr_t PP = tile.begin_addr();
-                const uintptr_t x0 = PP / (tile.ld * tile.sizeof_type);
-                const uintptr_t x1 = x0 + tile.n;
-                const uintptr_t y0 = PP % (tile.ld * tile.sizeof_type);
-                const uintptr_t y1 = y0 + tile.m * tile.sizeof_type;
-
-                assert(y1 <= tile.ld * tile.sizeof_type);
-
-                this->list[0].a = x0;
-                this->list[0].b = x1;
-                this->list[1].a = y0;
-                this->list[1].b = y1;
-            }
-            else
-            {
-                assert(0 && "Not supported");
-                // ERROR
-            }
-        }
-
         virtual ~KCube() {}
 
         void

@@ -1577,17 +1577,19 @@ next_view:
 
                /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->cube, access->mode);
+                this->insert(search, access->cubes[0], access->mode);
+                this->insert(search, access->cubes[1], access->mode);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_blocks();
-                this->intersect(search, access->cube, access->mode);
+                this->intersect(search, access->cubes[0], access->mode);
+                this->intersect(search, access->cubes[1], access->mode);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (3) find or allocate continuous memory for that access on that device */
                 this->fetch_access_find_allocation(driver, device, access, search.partition);
 
-                /* step (3) set the access view on the device (that will be used by the kernel) */
+                /* step (4) set the access view on the device (that will be used by the kernel) */
                 this->fetch_access_set_device_view(device, access, search);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */

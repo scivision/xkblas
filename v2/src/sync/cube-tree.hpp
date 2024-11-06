@@ -652,6 +652,8 @@ class KCubeTree {
             const Cube & cube,
             const access_mode_t mode
         ) const {
+            if (cube.is_empty())
+                return ;
             this->intersect_from(t, cube, mode, this->root);
         }
 
@@ -1286,7 +1288,8 @@ class KCubeTree {
             Cube cube,
             const access_mode_t mode
         ) {
-            tassert(!cube.is_empty());
+            if (cube.is_empty())
+                return ;
 
             if (this->root == nullptr)
             {

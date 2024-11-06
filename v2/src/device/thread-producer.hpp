@@ -66,7 +66,8 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
                     assert(access);
 
                     deptrees[access_id] = this->get_dependency_tree_for_ld(access->host_view.ld);
-                    deptrees[access_id]->intersect(search, access->cube, access->mode);
+                    deptrees[access_id]->intersect(search, access->cubes[0], access->mode);
+                    deptrees[access_id]->intersect(search, access->cubes[1], access->mode);
                 }
 
                 // insert for future tasks
@@ -78,7 +79,8 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
                     assert(access);
 
                     assert(deptrees[access_id]);
-                    deptrees[access_id]->insert(search, access->cube, access->mode);
+                    deptrees[access_id]->insert(search, access->cubes[0], access->mode);
+                    deptrees[access_id]->insert(search, access->cubes[1], access->mode);
                 }
             }
         }
