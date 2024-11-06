@@ -73,6 +73,9 @@ class impl_t
         /* wait for the completion of previously sent operations */
         void wait(void);
 
+        /* invalidate all memory replicates, reset the runtime */
+        void reset(void);
+
 }; /* impl_t */
 
 #endif /* __IMPL_HPP__ */

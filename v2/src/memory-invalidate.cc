@@ -14,6 +14,9 @@ xkblas_memory_invalidate_caches(void)
     for (MemoryTree * memtree : context->memtrees)
         memtree->invalidate();
 
+    # pragma message(TODO "deallocating threads memory causes error: why ?")
+    # if 0
+
     // coherent worker
     ThreadWorker * worker = context->memory_coherent_worker_thread;
     assert(worker);
@@ -23,6 +26,8 @@ xkblas_memory_invalidate_caches(void)
     ThreadProducer * producer = ThreadProducer::self();
     assert(producer);
     producer->deallocate_all();
+
+    # endif
 
     return 0;
 }

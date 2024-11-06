@@ -137,3 +137,8 @@ impl_t::set_tile(
     }
 }
 
+void
+impl_t::reset(void)
+{
+    xkblas_memory_invalidate_caches();
+}

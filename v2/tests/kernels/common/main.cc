@@ -27,6 +27,26 @@ extern "C" {
 static impl_t impl;
 static bool SKIP_CHECK;
 
+/////////////////////////
+//  PARAMETERS TO TEST //
+/////////////////////////
+
+# define N_CBLAS_SIDE 2
+static CBLAS_SIDE SIDE[N_CBLAS_SIDE]       = { CblasLeft,    CblasRight };
+static const char * SIDE_STR[N_CBLAS_SIDE] = { "Left ", "Right" };
+
+# define N_CBLAS_UPLO 2
+static CBLAS_UPLO UPLO[N_CBLAS_UPLO]       = { CblasUpper,   CblasLower };
+static const char * UPLO_STR[N_CBLAS_UPLO] = { "Upper", "Lower" };
+
+# define N_CBLAS_DIAG 2
+static CBLAS_DIAG DIAG[N_CBLAS_DIAG]       = { CblasNonUnit, CblasUnit  };
+static const char * DIAG_STR[N_CBLAS_DIAG]  = { "NonUnit", "Unit   " };
+
+# define N_CBLAS_TRANSPOSE 3
+static CBLAS_TRANSPOSE TRANS[N_CBLAS_TRANSPOSE]  = { CblasNoTrans, CblasTrans, CblasConjTrans };
+static const char * TRANS_STR[N_CBLAS_TRANSPOSE] = { "N", "T", "H" };
+
 //////////////////////
 //  CLI TO RUN-TIME //
 //////////////////////
@@ -80,38 +100,56 @@ main_gemm_gemm(char ** args)
         FILL(A, 3*ld*ld); // fill A, B and C
         FILL(&alpha, 1);
         FILL(&beta, 1);
-
-        memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-        memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
     }
 
-    /* run on impl */
-    printf("Running implementation...\n");
+    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        uint64_t t0 = get_nanotime();
+        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        {
+            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            {
+                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                {
+                    int s = 0;
+                    int u = 0;
+                    int t = 0;
+                    int d = 0;
 
-        impl.set_tile(bs1_m, bs1_n);
-        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                    impl.reset();
+                    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-        impl.set_tile(bs2_m, bs2_n);
-        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                    /* run on impl */
+                    printf("Running implementation with (%s, %s, %s, %s)\n",
+                            SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
+                    {
+                        uint64_t t0 = get_nanotime();
+                        impl.set_tile(bs1_m, bs1_n);
+                        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-        impl.coherent(CImpl, m, n, ld);
+                        impl.set_tile(bs2_m, bs2_n);
+                        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-        uint64_t tt = get_nanotime();
-        impl.wait();
-        uint64_t tf = get_nanotime();
-        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-    }
+                        impl.coherent(CImpl, m, n, ld);
 
-    if (!SKIP_CHECK)
-    {
-        /* check correctness */
-        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
-        if (r == 0)
-            puts("Result is CORRECT");
-        else
-            puts("Result is INCORRECT !!");
+                        uint64_t tt = get_nanotime();
+                        impl.wait();
+                        uint64_t tf = get_nanotime();
+                        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+                    }
+
+                    if (!SKIP_CHECK)
+                    {
+                        /* check correctness */
+                        memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+                        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
+                        if (r == 0)
+                            puts("Result is CORRECT");
+                        else
+                            puts("Result is INCORRECT !!");
+                    }
+                }
+            }
+        }
     }
 
     return 0;
@@ -123,8 +161,6 @@ static int
 main_gemm(char ** args)
 {
     /* parse arguments */
-    CBLAS_TRANSPOSE transA = CblasNoTrans;
-    CBLAS_TRANSPOSE transB = CblasNoTrans;
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int k = atoi(args[2]);
@@ -164,30 +200,36 @@ main_gemm(char ** args)
     FILL(A, 3*ld*ld); // fill A, B and C
     FILL(&alpha, 1);
     FILL(&beta, 1);
-    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-    /* run on impl */
-    printf("Running implementation...\n");
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        uint64_t t0 = get_nanotime();
-        impl.set_tile(bs_m, bs_n);
-        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
-        impl.coherent(CImpl, m, n, ld);
-        uint64_t tt = get_nanotime();
-        impl.wait();
-        uint64_t tf = get_nanotime();
-        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-    }
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        {
+            impl.reset();
+            memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-    if (!SKIP_CHECK)
-    {
-        /* check correctness */
-        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
-        if (r == 0)
-            puts("Result is CORRECT");
-        else
-            puts("Result is INCORRECT !!");
+            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
+            {
+                uint64_t t0 = get_nanotime();
+                impl.set_tile(bs_m, bs_n);
+                impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                impl.coherent(CImpl, m, n, ld);
+                uint64_t tt = get_nanotime();
+                impl.wait();
+                uint64_t tf = get_nanotime();
+                printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+            }
+
+            if (!SKIP_CHECK)
+            {
+                memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+                int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
+                if (r == 0)
+                    puts("Result is CORRECT");
+                else
+                    puts("Result is INCORRECT !!");
+            }
+        }
     }
 
     return 0;
@@ -266,12 +308,6 @@ static int
 main_trsm(char ** args)
 {
     /* parse arguments */
-    CBLAS_SIDE side = CblasLeft;
-    CBLAS_UPLO uplo = CblasUpper;
-    CBLAS_DIAG diag = CblasNonUnit;
-    CBLAS_TRANSPOSE transA = CblasNoTrans;
-    //CBLAS_TRANSPOSE transA = CblasTrans;
-
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int bs_m = atoi(args[2]);
@@ -314,27 +350,44 @@ main_trsm(char ** args)
     for(int i = 0 ; i < ld ; ++i)
         A[ld*i+i] = 1.0;
 
-    memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
-    memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
+    int s = 0;
+    int u = 1;
+    int t = 0;
+    int d = 0;
 
-    /* run on impl */
-    printf("Running implementation...\n");
+    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        uint64_t t0 = get_nanotime();
-        impl.set_tile(bs_m, bs_n);
-        impl.trsm(side, uplo, transA, diag, m, n, &alpha, A, ld, BImpl, ld);
-        impl.coherent(BImpl, m, n, ld);
-        impl.wait();
-        uint64_t tf = get_nanotime();
-        printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
-    }
+        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        {
+            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            {
+                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                {
+                    memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
 
-    /* check correctness */
-    int r = trsm_cmp(side, uplo, transA, diag, m, n, alpha, A, ld, B, BRef, BImpl, ld);
-    if (r == 0)
-        puts("Result is CORRECT");
-    else
-        puts("Result is INCORRECT !!");
+                    /* run on impl */
+                    printf("Running implementation with (%s, %s, %s, %s)\n",
+                            SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
+                    uint64_t t0 = get_nanotime();
+                    impl.set_tile(bs_m, bs_n);
+                    impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld);
+                    impl.coherent(BImpl, m, n, ld);
+                    impl.wait();
+                    uint64_t tf = get_nanotime();
+                    impl.reset();
+                    printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
+
+                    if (!SKIP_CHECK)
+                    {
+                        memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
+                        int r = trsm_cmp(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, alpha, A, ld, B, BRef, BImpl, ld);
+                        printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                        puts("--------------------------");
+                    }
+                }
+            }
+        }
+    }
 
     return 0;
 }
