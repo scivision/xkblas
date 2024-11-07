@@ -84,7 +84,7 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
     }
 
     /* initialize matrices */
-    FILL((TYPE *)mem, memsize);
+    FILL((TYPE *)mem, memsize/s);
 }
 
 // GEMM - GEMM //
