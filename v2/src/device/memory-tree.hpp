@@ -226,20 +226,20 @@ class KMemoryBlock {
         memory_block_init(
             const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Cube & inheriting_cube
+            const Cube & inheriting_cube,
+            const size_t sizeof_type
         ) {
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
             /////////////////////////////////
             INTERVAL_DIFF_TYPE_T d[K];
             Cube::distance_manhattan(inheriting_cube, block_cube, d);
+            assert(d[0] >= 0);
+            assert(d[1] >= 0);
 
             //////////////////////////////////
             //  DUPPLICATE REPLICATE INFOS  //
             //////////////////////////////////
-
-            // TODO
-            size_t sizeof_type = 4;
 
             for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
@@ -254,7 +254,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const uintptr_t offset      = d[1] + d[0] * inheriting_allocation->view.ld * sizeof_type;
+                    const uintptr_t offset      = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
 
                     # pragma message(TODO "This memory is currently leaked when 'invalidate' is called")
@@ -280,10 +280,11 @@ class KMemoryBlock {
         KMemoryBlock(
             const Cube & block_cube,
             const KMemoryBlock & inheriting_block,
-            const Cube & inheriting_cube
+            const Cube & inheriting_cube,
+            const size_t sizeof_type
         ) {
             static_assert(K == 2);
-            this->memory_block_init(block_cube, inheriting_block, inheriting_cube);
+            this->memory_block_init(block_cube, inheriting_block, inheriting_cube, sizeof_type);
         }
         ~KMemoryBlock() {}
 
@@ -353,15 +354,34 @@ class KMemoryTreeNodeSearch {
                     memory_view_t host_view;
 
                     host_view.order         = MATRIX_COLMAJOR;
-                    host_view.addr          = this->cube[1].a + this->cube[0].a * ld * sizeof_type;
+                    host_view.addr          = this->cube[0].a + this->cube[1].a * ld * sizeof_type;
                     host_view.ld            = ld;
                     host_view.offset_m      = 0;
                     host_view.offset_n      = 0;
-                    host_view.m             = this->cube[1].length() / sizeof_type;
-                    host_view.n             = this->cube[0].length();
+                    host_view.m             = this->cube[0].length() / sizeof_type;
+                    host_view.n             = this->cube[1].length();
                     host_view.sizeof_type   = sizeof_type;
 
+                    // accesses must be aligned on sizeof(type)
+                    assert(host_view.m * sizeof_type == this->cube[0].length());
+
                     return host_view;
+                }
+
+                bool
+                operator<(const Partite & p) const
+                {
+                    for (int k = K - 1 ; k >= 0 ; --k)
+                    {
+                        if (this->cube[k].a < p.cube[k].a)
+                            return true;
+                        else if (this->cube[k].a > p.cube[k].a)
+                            return false;
+                        else
+                            continue ;
+                    }
+                    assert(0 && "Partites should be disjointed... and you should not compare 'this' with 'p'");
+                    return false;
                 }
 
         }; /* Partite */
@@ -382,7 +402,7 @@ class KMemoryTreeNodeSearch {
 
                 /* return the left-most and upper-most block of the partition */
                 inline Partite &
-                get_uppermost_leftmost_block(void)
+                get_leftmost_uppermost_block(void)
                 {
                     const size_t nblocks = this->partites.size();
                     int j = 0;
@@ -391,9 +411,8 @@ class KMemoryTreeNodeSearch {
                     {
                         const Partite & bi = this->partites[i];
                         const Partite & bj = this->partites[j];
-                        for (int k = 0 ; k < K ; ++k)
-                            if (bi.cube[k].a < bj.cube[k].a)
-                                j = i;
+                        if (bi < bj)
+                            j = i;
                     }
 
                     return this->partites[j];
@@ -402,7 +421,7 @@ class KMemoryTreeNodeSearch {
                 Partite &
                 get_corner(void)
                 {
-                    const int i = this->get_uppermost_leftmost_block();
+                    const int i = this->get_leftmost_uppermost_block();
                     return this->partites[i];
                 }
 
@@ -557,178 +576,14 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             const Cube & r,
             const int k,
             const Color color,
-            const Node * src
+            const Node * src,
+            const size_t sizeof_type
         ) :
             Base(r, k, color),
-            block(r, src->block, src->cube)
+            block(r, src->block, src->cube, sizeof_type)
         {}
 
     public:
-
-        void
-        on_insert(
-            Search & search,
-            const access_mode_t mode
-        ) {
-            (void) search;
-            (void) mode;
-            assert(search.type == Search::Type::INSERTING_BLOCKS);
-        }
-
-        /* shrinking on dimension 'k' from 'this->cube[k]' to 'interval' */
-        void
-        on_shrink(
-            const Interval & interval,
-            int k
-        ) {
-            static_assert(K == 2);
-
-            assert(k < K);
-            assert(this->cube[k].includes(interval));
-
-            ///////////////////////
-            //  SHRINK HOST VIEW //
-            ///////////////////////
-
-            const size_t sizeof_type = 4;
-
-            assert(this->cube[k].a <= interval.a);
-            const INTERVAL_DIFF_TYPE_T da = interval.a - this->cube[k].a;
-
-            assert(this->cube[k].b >= interval.b);
-
-            if (k == 1)
-            {
-                const INTERVAL_DIFF_TYPE_T db = this->cube[k].b - interval.b;
-                (void) db;
-                assert(da % sizeof_type == 0);
-                assert(db % sizeof_type == 0);
-            }
-
-            // shrinked-left, gotta offset the views
-            if (da)
-            {
-                // REPLICATES VIEW
-                for (MemoryReplicate & replicate : this->block.replicates)
-                {
-                    for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
-                    {
-                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
-                        const INTERVAL_DIFF_TYPE_T offset = (k == 1) ? da : (da * allocation_view->view.ld * sizeof_type);
-                        allocation_view->view.addr += offset;
-                        assert(allocation_view->view.addr >= allocation_view->chunk->device_ptr);
-                    }
-                }
-            }
-        }
-
-        //////////////////
-        //  INTERSECT   //
-        //////////////////
-        inline bool
-        intersect_stop_test(
-            Search & search,
-            const Cube & cube,
-            const access_mode_t mode
-        ) const {
-            (void) search;
-            (void) cube;
-            (void) mode;
-
-            // TODO : can we fasten intersection by keeping track of an included 'valid' bitmask ?
-
-            return false;
-        }
-
-        /**
-         * The passed access is intersecting with 'this'
-         */
-        inline void
-        on_intersect(
-            Search & search,
-            const Cube & cube,
-            const access_mode_t mode
-        ) {
-            (void) mode;
-
-            assert(cube.intersects(this->cube));
-
-            switch (search.type)
-            {
-                case (Search::Type::SEARCH_FOR_BLOCKS):
-                {
-                    /* intersecting against 'cube' that had been inserted previously,
-                     * so 'this' must be a sub-block of 'cube' */
-                    assert(cube.includes(this->cube));
-
-                    search.partition.partites.push_back(Partite(&(this->block), this->cube));
-                    break ;
-                }
-
-                /* search for tasks awaiting on that cube for a given allocation */
-                case (Search::Type::SEARCH_AWAITING):
-                {
-                    MemoryReplicate & replicate = this->block.replicates[search.device_global_id];
-                    const memory_allocation_view_id_bitfield_t devbit = (1 << search.device_global_id);
-
-                    /* for each allocation of that block */
-                    for (memory_allocation_view_id_t allocation_view_id = 0 ; allocation_view_id < replicate.nallocations ; ++allocation_view_id)
-                    {
-                        const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
-                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[allocation_view_id];
-
-                        /* if it matches the allocation being searched */
-                        if (allocation_view->chunk == search.chunk)
-                        {
-                            /* move the awaiting tasks */
-                            search.awaiting.tasks.insert(search.awaiting.tasks.end(), allocation_view->awaiting.tasks.begin(), allocation_view->awaiting.tasks.end());
-                            allocation_view->awaiting.tasks.clear();
-
-                            /* move awaiting forwards */
-                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), allocation_view->awaiting.forwards.begin(), allocation_view->awaiting.forwards.end());
-                            allocation_view->awaiting.forwards.clear();
-
-                            /* this replicate just got fetched and is now valid */
-
-                            // this assertion is not always true, if coming from
-                            // an ACCESS_MODE_W, the data was already set valid
-                            // assert((replicate.valid & allocbit) == 0);
-                            replicate.valid |= (memory_allocation_view_id_bitfield_t) allocbit;
-
-                            assert(replicate.fetching & allocbit);
-                            replicate.fetching &= (memory_allocation_view_id_bitfield_t) ~allocbit;
-
-                            break ;
-                        }
-                    }
-
-                    /* set device bits */
-                    assert(replicate.valid);
-                    this->block.valid |= devbit;
-
-                    if (replicate.fetching == 0)
-                        this->block.fetching &= ~devbit;
-
-                    break ;
-                }
-
-                /* search for owners of the access */
-                case (Search::Type::SEARCH_OWNERS):
-                {
-                    const size_t bytes = cube.size();
-                    for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
-                        if (this->block.valid & (1 << device_global_id))
-                            search.bytes_owned[device_global_id] += bytes;
-                    break ;
-                }
-
-                default:
-                {
-                    XKBLAS_FATAL("Invalid search type in memory tree");
-                    assert(0);
-                }
-            }
-        }
 
         void
         dump_str(FILE * f) const
@@ -1142,11 +997,73 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
             /* allocate continuous memory for that access */
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
+
+            # if 1
+
+            std::vector<int> partition_sorted_indices;
+            for (int i = 0 ; i < partition.partites.size() ; ++i)
+                partition_sorted_indices.push_back(i);
+
+            std::sort(
+                partition_sorted_indices.begin(),
+                partition_sorted_indices.end(),
+                [partition](int i, int j) {
+                    return partition.partites[i] < partition.partites[j];
+                }
+            );
+
+            const size_t          ld = access->host_view.m;            // cuda is col major
+            const size_t sizeof_type = access->host_view.sizeof_type;
+
+            uintptr_t begin_addr = chunk->device_ptr;
+            for (int idx = 0 ; idx < partition_sorted_indices.size() ; ++idx)
+            {
+                const int & i = partition_sorted_indices[idx];
+                Partite & pi = partition.partites[i];
+
+                MemoryReplicate & replicate = pi.block->replicates[device->global_id];
+                const uint8_t allocation_view_id = replicate.nallocations++;
+                if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
+                    XKBLAS_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile XKBLAS");
+
+                /* allocate the view of that block in the allocation */
+                MemoryReplicateAllocationView * r = new MemoryReplicateAllocationView(chunk, begin_addr, ld);
+                replicate.allocations[allocation_view_id] = r;
+                pi.dst_allocation_view_id = allocation_view_id;
+
+                /* offset begin_addr */
+                if (idx < partition_sorted_indices.size() - 1)
+                {
+                    const int & j = partition_sorted_indices[idx+1];
+                    Partite & pj = partition.partites[j];
+                    assert(pi < pj);
+
+                    INTERVAL_DIFF_TYPE_T d[K];
+                    Cube::distance_manhattan(pi.cube, pj.cube, d);
+
+                    assert(d[1] >= 0);
+                    uintptr_t offset;
+                    if (d[0] < 0)
+                    {
+                        assert(d[1] == 1);
+                        offset = pi.cube[0].length();
+                    }
+                    else
+                    {
+                       offset = d[0] + d[1]*ld*sizeof_type;
+                    }
+                    begin_addr += offset;
+                }
+            }
+
+            # else
+            /* this code is only correct if all accesses are aligned on LD.s */
+
             const size_t          ld = access->host_view.m;            // cuda is col major
             const size_t sizeof_type = access->host_view.sizeof_type;
 
             /* retrieve upper left corner */
-            const Partite & corner = partition.get_uppermost_leftmost_block();
+            const Partite & corner = partition.get_leftmost_uppermost_block();
 
             /* add a view */
             for (Partite & partite : partition.partites)
@@ -1169,6 +1086,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 replicate.allocations[allocation_view_id] = r;
                 partite.dst_allocation_view_id = allocation_view_id;
             }
+            # endif
         }
 
         /* look for a continuous allocation that can store 'access' for the given partition */
@@ -1260,7 +1178,7 @@ next_view:
 
             // we currently set the access view as the 'left-most' and 'upper-most' tile
             // (i.e with the smallest address - corresponding to the begining of this allocation)
-            const Partite & partite = search.partition.get_uppermost_leftmost_block();
+            const Partite & partite = search.partition.get_leftmost_uppermost_block();
             assert(partite.dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
 
             const MemoryReplicateAllocationView * r = partite.block->replicates[device->global_id].allocations[partite.dst_allocation_view_id];
@@ -1652,6 +1570,178 @@ next_view:
         //  INSERT  //
         //////////////
 
+        void
+        on_insert(
+            NodeBase * nodebase,
+            Search & search,
+            const access_mode_t mode
+        ) {
+            (void) nodebase;
+            (void) search;
+            (void) mode;
+            assert(search.type == Search::Type::INSERTING_BLOCKS);
+        }
+
+        /* shrinking on dimension 'k' from 'this->cube[k]' to 'interval' */
+        void
+        on_shrink(
+            NodeBase * nodebase,
+            const Interval & interval,
+            int k
+        ) {
+            static_assert(K == 2);
+            Node * node = reinterpret_cast<Node *>(nodebase);
+
+            assert(k < K);
+            assert(node->cube[k].includes(interval));
+
+            ///////////////////////
+            //  SHRINK HOST VIEW //
+            ///////////////////////
+
+            assert(node->cube[k].a <= interval.a);
+            const INTERVAL_DIFF_TYPE_T da = interval.a - node->cube[k].a;
+
+            assert(node->cube[k].b >= interval.b);
+
+            if (k == 1)
+            {
+                const INTERVAL_DIFF_TYPE_T db = node->cube[k].b - interval.b;
+                (void) db;
+                assert(da % this->sizeof_type == 0);
+                assert(db % this->sizeof_type == 0);
+            }
+
+            // shrinked-left, gotta offset the views
+            if (da)
+            {
+                // REPLICATES VIEW
+                for (MemoryReplicate & replicate : node->block.replicates)
+                {
+                    for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
+                    {
+                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
+                        const INTERVAL_DIFF_TYPE_T offset = (k == 0) ? da : (da * allocation_view->view.ld * this->sizeof_type);
+                        allocation_view->view.addr += offset;
+                        assert(allocation_view->view.addr >= allocation_view->chunk->device_ptr);
+                    }
+                }
+            }
+        }
+
+        //////////////////
+        //  INTERSECT   //
+        //////////////////
+        inline bool
+        intersect_stop_test(
+            NodeBase * nodebase,
+            Search & search,
+            const Cube & cube,
+            const access_mode_t mode
+        ) const {
+
+            (void) nodebase;
+            (void) search;
+            (void) cube;
+            (void) mode;
+
+            // TODO : can we fasten intersection by keeping track of an included 'valid' bitmask ?
+
+            return false;
+        }
+
+        /**
+         * The passed access is intersecting with 'this'
+         */
+        inline void
+        on_intersect(
+            NodeBase * nodebase,
+            Search & search,
+            const Cube & cube,
+            const access_mode_t mode
+        ) const {
+            (void) mode;
+
+            assert(nodebase);
+            Node * node = reinterpret_cast<Node *>(nodebase);
+            assert(cube.intersects(node->cube));
+
+            switch (search.type)
+            {
+                case (Search::Type::SEARCH_FOR_BLOCKS):
+                {
+                    /* intersecting against 'cube' that had been inserted previously,
+                     * so 'node' must be a sub-block of 'cube' */
+                    assert(cube.includes(node->cube));
+
+                    search.partition.partites.push_back(Partite(&(node->block), node->cube));
+                    break ;
+                }
+
+                /* search for tasks awaiting on that cube for a given allocation */
+                case (Search::Type::SEARCH_AWAITING):
+                {
+                    MemoryReplicate & replicate = node->block.replicates[search.device_global_id];
+                    const memory_allocation_view_id_bitfield_t devbit = (1 << search.device_global_id);
+
+                    /* for each allocation of that block */
+                    for (memory_allocation_view_id_t allocation_view_id = 0 ; allocation_view_id < replicate.nallocations ; ++allocation_view_id)
+                    {
+                        const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
+                        MemoryReplicateAllocationView * allocation_view = replicate.allocations[allocation_view_id];
+
+                        /* if it matches the allocation being searched */
+                        if (allocation_view->chunk == search.chunk)
+                        {
+                            /* move the awaiting tasks */
+                            search.awaiting.tasks.insert(search.awaiting.tasks.end(), allocation_view->awaiting.tasks.begin(), allocation_view->awaiting.tasks.end());
+                            allocation_view->awaiting.tasks.clear();
+
+                            /* move awaiting forwards */
+                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), allocation_view->awaiting.forwards.begin(), allocation_view->awaiting.forwards.end());
+                            allocation_view->awaiting.forwards.clear();
+
+                            /* this replicate just got fetched and is now valid */
+
+                            // this assertion is not always true, if coming from
+                            // an ACCESS_MODE_W, the data was already set valid
+                            // assert((replicate.valid & allocbit) == 0);
+                            replicate.valid |= (memory_allocation_view_id_bitfield_t) allocbit;
+
+                            assert(replicate.fetching & allocbit);
+                            replicate.fetching &= (memory_allocation_view_id_bitfield_t) ~allocbit;
+
+                            break ;
+                        }
+                    }
+
+                    /* set device bits */
+                    assert(replicate.valid);
+                    node->block.valid |= devbit;
+
+                    if (replicate.fetching == 0)
+                        node->block.fetching &= ~devbit;
+
+                    break ;
+                }
+
+                /* search for owners of the access */
+                case (Search::Type::SEARCH_OWNERS):
+                {
+                    const size_t bytes = cube.size();
+                    for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
+                        if (node->block.valid & (1 << device_global_id))
+                            search.bytes_owned[device_global_id] += bytes;
+                    break ;
+                }
+
+                default:
+                {
+                    XKBLAS_FATAL("Invalid search type in memory tree");
+                    assert(0);
+                }
+            }
+        }
         Node *
         new_node(
             Search & search,
@@ -1674,7 +1764,7 @@ next_view:
             (void) search;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
             assert(!cube.intersects(inherit->cube));
-            return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
+            return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit), this->sizeof_type);
         }
 };
 

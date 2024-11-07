@@ -198,23 +198,6 @@ class KCubeTree {
 
                 virtual ~Node() {}
 
-                /////////////////////////
-                // ABSTRACT INTERFACES //
-                /////////////////////////
-
-                /* called whenever this node is added to the tree with an
-                 * access (this->cube, mode) */
-                virtual void on_insert(T & t, const access_mode_t mode) = 0;
-
-                /* called whenever this node is being shrinked on dimension 'k' to 'interval' */
-                virtual void on_shrink(const Interval & interval, int k) = 0;
-
-                /* called to detect whether the access intersects with 'this' node */
-                virtual bool intersect_stop_test(T & t, const Cube & cube, const access_mode_t mode) const = 0;
-
-                /* called whenever 'this' intersects with the access */
-                virtual void on_intersect(T & t, const Cube & cube, const access_mode_t mode) = 0;
-
                 ///////////////
                 // Utilities //
                 ///////////////
@@ -400,47 +383,6 @@ class KCubeTree {
                 }
 
         }; /* class Node */
-
-        /* pseudo node to implement Day-Stout-Warren algorithm. Abstract
-         * interfaces are not used, so just implemented them as 'no-op' */
-        class PseudoNode : public Node
-        {
-                void
-                on_insert(T & t, const access_mode_t mode)
-                {
-                    (void) t;
-                    (void) mode;
-                    assert(0);
-                }
-
-                void
-                on_shrink(const Interval & interval, int k)
-                {
-                    (void) interval;
-                    (void) k;
-                    assert(0);
-                }
-
-                bool
-                intersect_stop_test(T & t, const Cube & cube, const access_mode_t mode) const
-                {
-                    (void) t;
-                    (void) cube;
-                    (void) mode;
-                    assert(0);
-                    return true;
-                }
-
-                void
-                on_intersect(T & t, const Cube & cube, const access_mode_t mode)
-                {
-                    (void) t;
-                    (void) cube;
-                    (void) mode;
-                    assert(0);
-                }
-
-        }; /* PseudoNode */
 
     /* class tree */
     public:
@@ -633,11 +575,11 @@ class KCubeTree {
             if (node == nullptr || !cube.intersects(node->includes.cube))
                 return ;
 
-            if (node->intersect_stop_test(t, cube, mode))
+            if (this->intersect_stop_test(node, t, cube, mode))
                 return ;
 
             if (cube.intersects(node->cube))
-                node->on_intersect(t, cube, mode);
+                this->on_intersect(node, t, cube, mode);
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
@@ -876,7 +818,7 @@ class KCubeTree {
 
             parent->st[k].children[dir] = node;
             node->parent = parent;
-            node->on_insert(t, mode);
+            this->on_insert(node, t, mode);
             this->outdate(node);
 
             // inserting a new k-subtree, this k-root is black
@@ -968,7 +910,7 @@ class KCubeTree {
             printf("Rebalancing for k=%d\n", k);
             tassert(k == 0 && K == 0 && "Not implemented when K>1");
 
-            PseudoNode pseudo_root;
+            Node pseudo_root;
             pseudo_root.st[k].right = root;
 
             rbtree_to_vine(&pseudo_root, k);
@@ -1170,7 +1112,7 @@ class KCubeTree {
                     {
                         if (++k == K)
                         {
-                            parent->on_insert(t, mode);
+                            this->on_insert(parent, t, mode);
                             this->outdate(parent);
                             break ;
                         }
@@ -1203,7 +1145,7 @@ class KCubeTree {
                             Interval(        cube[k].b, parent->cube[k].b)
                         };
 
-                        std::function<void(Node *)> f = [&f, &intervals, &k, &to_reinsert](Node * node)
+                        std::function<void(Node *)> f = [this, &f, &intervals, &k, &to_reinsert](Node * node)
                         {
                             assert(node->cube[k].includes(intervals[1]));
 
@@ -1214,7 +1156,7 @@ class KCubeTree {
                                 to_reinsert.push_back(ReinsertCube(node->cube, intervals[2], k, node));
 
                             // shrink node
-                            node->on_shrink(intervals[1], k);
+                            this->on_shrink(node, intervals[1], k);
                             node->cube[k] = intervals[1];
 
                             // shrink all child
@@ -1294,7 +1236,7 @@ class KCubeTree {
             if (this->root == nullptr)
             {
                 this->root = this->new_node(t, cube, 0, BLACK);
-                this->root->on_insert(t, mode);
+                this->on_insert(this->root, t, mode);
                 this->root->update_includes();
             }
             else
@@ -1605,6 +1547,24 @@ class KCubeTree {
 
 #endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
 
+    public:
+
+        /////////////////////////
+        // ABSTRACT INTERFACES //
+        /////////////////////////
+
+        /* called whenever this node is added to the tree with an
+         * access (this->cube, mode) */
+        virtual void on_insert(Node * node, T & t, const access_mode_t mode) = 0;
+
+        /* called whenever this node is being shrinked on dimension 'k' to 'interval' */
+        virtual void on_shrink(Node * node, const Interval & interval, int k) = 0;
+
+        /* called to detect whether the access intersects with 'this' node */
+        virtual bool intersect_stop_test(Node * node, T & t, const Cube & cube, const access_mode_t mode) const = 0;
+
+        /* called whenever 'this' intersects with the access */
+        virtual void on_intersect(Node * node, T & t, const Cube & cube, const access_mode_t mode) const = 0;
 };
 
 #endif /* __CUBE_TREE_H__ */

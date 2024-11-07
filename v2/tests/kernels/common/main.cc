@@ -72,21 +72,41 @@ main_gemm_gemm(char ** args)
     /* currently only support this */
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
     int ld = MAX(MAX(m, n), k);
-    uintptr_t alignon = sizeof(TYPE) * ld;
 
     /* allocate matrices */
-    uintptr_t mem    = impl.alloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t alignon = sizeof(TYPE) * ld;
+    uintptr_t mem    = impl.alloc(5 * alignon + 5 * sizeof(TYPE) * (ld * ld));
+
+    # if 0
+    /* force alignment on LD.s */
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
     uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
     uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
-
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(Cp     % alignon == 0);
     assert(CpRef  % alignon == 0);
     assert(CpImpl % alignon == 0);
+    # else
+    /* force unaligned (but align on sizeof(type) still) */
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    assert(Ap     % alignon != 0);
+    assert(Bp     % alignon != 0);
+    assert(Cp     % alignon != 0);
+    assert(CpRef  % alignon != 0);
+    assert(CpImpl % alignon != 0);
+    assert(Ap     % sizeof(TYPE) == 0);
+    assert(Bp     % sizeof(TYPE) == 0);
+    assert(Cp     % sizeof(TYPE) == 0);
+    assert(CpRef  % sizeof(TYPE) == 0);
+    assert(CpImpl % sizeof(TYPE) == 0);
+    # endif
 
     TYPE * A     = (TYPE *) Ap;
     TYPE * B     = (TYPE *) Bp;
@@ -94,60 +114,46 @@ main_gemm_gemm(char ** args)
     TYPE * CRef  = (TYPE *) CpRef;
     TYPE * CImpl = (TYPE *) CpImpl;
 
-    if (!SKIP_CHECK)
-    {
-        /* initialize matrices */
-        FILL(A, 3*ld*ld); // fill A, B and C
-        FILL(&alpha, 1);
-        FILL(&beta, 1);
-    }
+    /* initialize matrices */
+    FILL(A, 3*ld*ld); // fill A, B and C
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
 
-    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    int t1 = 0;
+    int t2 = 0;
+
+    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
-            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            impl.reset();
+            memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+            /* run on impl */
+            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             {
-                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
-                {
-                    int s = 0;
-                    int u = 0;
-                    int t = 0;
-                    int d = 0;
+                uint64_t t0 = get_nanotime();
+                impl.set_tile(bs1_m, bs1_n);
+                impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-                    impl.reset();
-                    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+                impl.set_tile(bs2_m, bs2_n);
+                impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-                    /* run on impl */
-                    printf("Running implementation with (%s, %s, %s, %s)\n",
-                            SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
-                    {
-                        uint64_t t0 = get_nanotime();
-                        impl.set_tile(bs1_m, bs1_n);
-                        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                impl.coherent(CImpl, m, n, ld);
 
-                        impl.set_tile(bs2_m, bs2_n);
-                        impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                uint64_t tt = get_nanotime();
+                impl.wait();
+                uint64_t tf = get_nanotime();
+                printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+            }
 
-                        impl.coherent(CImpl, m, n, ld);
-
-                        uint64_t tt = get_nanotime();
-                        impl.wait();
-                        uint64_t tf = get_nanotime();
-                        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-                    }
-
-                    if (!SKIP_CHECK)
-                    {
-                        /* check correctness */
-                        memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-                        int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
-                        if (r == 0)
-                            puts("Result is CORRECT");
-                        else
-                            puts("Result is INCORRECT !!");
-                    }
-                }
+            if (!SKIP_CHECK)
+            {
+                /* check correctness */
+                memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+                int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
+                printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                puts("--------------------------");
             }
         }
     }
@@ -178,8 +184,8 @@ main_gemm(char ** args)
     uintptr_t alignon = sizeof(TYPE) * ld;
     uintptr_t mem    = impl.alloc(5 * alignon + 5 * sizeof(TYPE) * (ld * ld));
 
-    # if 1
-    /* force alignment */
+    # if 0
+    /* force alignment on LD.s */
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
@@ -191,17 +197,22 @@ main_gemm(char ** args)
     assert(CpRef  % alignon == 0);
     assert(CpImpl % alignon == 0);
     # else
-    /* force unaligned */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld) + alignon / 3;
+    /* force unaligned (but align on sizeof(type) still) */
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
     assert(Ap     % alignon != 0);
     assert(Bp     % alignon != 0);
     assert(Cp     % alignon != 0);
     assert(CpRef  % alignon != 0);
     assert(CpImpl % alignon != 0);
+    assert(Ap     % sizeof(TYPE) == 0);
+    assert(Bp     % sizeof(TYPE) == 0);
+    assert(Cp     % sizeof(TYPE) == 0);
+    assert(CpRef  % sizeof(TYPE) == 0);
+    assert(CpImpl % sizeof(TYPE) == 0);
     # endif
 
     TYPE * A     = (TYPE *) Ap;
@@ -216,12 +227,13 @@ main_gemm(char ** args)
     FILL(&beta, 1);
 
     int t1 = 0;
-    int t2 = 1;
+    int t2 = 0;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
+            impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
@@ -232,7 +244,6 @@ main_gemm(char ** args)
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
-            impl.reset();
             printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
 
             if (!SKIP_CHECK)
@@ -335,7 +346,7 @@ main_trsm(char ** args)
     /* allocate matrices */
 
     uintptr_t alignon   = sizeof(TYPE) * ld;
-    uintptr_t mem       = impl.alloc(4 * alignon + 4 * sizeof(TYPE) * (ld * ld));
+    uintptr_t mem       = impl.alloc(4 * alignon + 4 * sizeof(TYPE) * (ld * ld) + 4 * sizeof(TYPE));
 
     # if 0
     /* force to be aligned on 'alignon' */
@@ -349,14 +360,18 @@ main_trsm(char ** args)
     assert(BpImpl % alignon == 0);
     # else
     /* force not to be aligned on 'align on' */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 3;
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 3;
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
     assert(Ap     % alignon != 0);
     assert(Bp     % alignon != 0);
     assert(BpRef  % alignon != 0);
     assert(BpImpl % alignon != 0);
+    assert(Ap     % sizeof(TYPE) == 0);
+    assert(Bp     % sizeof(TYPE) == 0);
+    assert(BpRef  % sizeof(TYPE) == 0);
+    assert(BpImpl % sizeof(TYPE) == 0);
     # endif
 
     TYPE * A     = (TYPE *) Ap;
@@ -389,6 +404,7 @@ main_trsm(char ** args)
             {
                 for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
+                    impl.reset();
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
 
                     /* run on impl */
@@ -400,7 +416,6 @@ main_trsm(char ** args)
                     impl.coherent(BImpl, m, n, ld);
                     impl.wait();
                     uint64_t tf = get_nanotime();
-                    impl.reset();
                     printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
 
                     if (!SKIP_CHECK)

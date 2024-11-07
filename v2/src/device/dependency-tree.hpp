@@ -136,100 +136,6 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
             );
         }
 
-        ////////////////////////////////
-        // When an access is inserted //
-        ////////////////////////////////
-        inline void
-        on_insert(
-            Search & search,
-            const access_mode_t mode
-        ) {
-            assert(search.type == Search::Type::SEARCH_TYPE_RESOLVE);
-
-            const Access * access = search.task_access.task->accesses + search.task_access.access_id;
-            assert(access);
-
-            if (access->mode & ACCESS_MODE_W)
-            {
-                this->last_reads.clear();
-                this->last_write = search.task_access;
-            }
-            else if (mode == ACCESS_MODE_R)
-                this->last_reads.push_back(search.task_access);
-        }
-
-        inline void
-        on_shrink(const Interval & interval, int k)
-        {
-            (void) interval;
-            (void) k;
-        }
-
-        //////////////////
-        //  INTERSECT   //
-        //////////////////
-        inline bool
-        intersect_stop_test(
-            Search & search,
-            const Cube & cube,
-            const access_mode_t mode
-        ) const {
-            (void) search;
-            (void) cube;
-            return (mode == ACCESS_MODE_R && this->nwrites == 0);
-        }
-
-        inline void
-        precedence(Task * pred, Task * succ) const
-        {
-            /* avoid redundant edges when 2 tasks are conflicting on several
-             * accesses, this optimization is possible as we are in a
-             * sequential task flow paradigm : if pred -> succ, then
-             * 'succ' must be the last successor inserted */
-            if (pred->edges.size() == 0 || pred->edges.back().successor != succ)
-                pred->precedes(succ);
-        }
-
-        inline void
-        on_intersect(
-            Search & search,
-            const Cube & cube,
-            const access_mode_t mode
-        ) {
-            (void) cube;
-
-            switch (search.type)
-            {
-                case (Search::Type::SEARCH_TYPE_RESOLVE):
-                {
-                    if (mode & ACCESS_MODE_W && this->last_reads.size())
-                        for (TaskAccess & pred : this->last_reads)
-                            this->precedence(pred.task, search.task_access.task);
-                    else if (this->last_write.task)
-                        this->precedence(this->last_write.task, search.task_access.task);
-
-                    break ;
-                }
-
-                case (Search::Type::SEARCH_TYPE_CONFLICTING):
-                {
-                    if (this->last_write.task)
-                    {
-                        assert(search.conflicts);
-                        search.conflicts->push_back(this->last_write);
-                    }
-
-                    break ;
-                }
-
-                default:
-                {
-                    assert(0);
-                    break ;
-                }
-            }
-        }
-
         ////////////
         // UPDATE //
         ////////////
@@ -294,7 +200,6 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
 
     public:
 
-
         inline void
         conflicting(
             std::vector<TaskAccess> * conflicts,
@@ -309,6 +214,42 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
         //////////////
         //  INSERT  //
         //////////////
+
+        inline void
+        on_insert(
+            NodeBase * nodebase,
+            Search & search,
+            const access_mode_t mode
+        ) {
+            assert(nodebase);
+            assert(search.type == Search::Type::SEARCH_TYPE_RESOLVE);
+
+            Node * node = reinterpret_cast<Node *>(nodebase);
+
+            const Access * access = search.task_access.task->accesses + search.task_access.access_id;
+            assert(access);
+
+            if (access->mode & ACCESS_MODE_W)
+            {
+                node->last_reads.clear();
+                node->last_write = search.task_access;
+            }
+            else if (mode == ACCESS_MODE_R)
+                node->last_reads.push_back(search.task_access);
+        }
+
+        inline void
+        on_shrink(
+            NodeBase * nodebase,
+            const Interval & interval,
+            int k
+        ) {
+            (void) nodebase;
+            (void) interval;
+            (void) k;
+        }
+
+
 
         Node *
         new_node(
@@ -332,6 +273,81 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
             (void) search;
             return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
         }
+
+
+        //////////////////
+        //  INTERSECT   //
+        //////////////////
+        inline bool
+        intersect_stop_test(
+            NodeBase * nodebase,
+            Search & search,
+            const Cube & cube,
+            const access_mode_t mode
+        ) const {
+            (void) search;
+            (void) cube;
+            assert(nodebase);
+            Node * node = reinterpret_cast<Node *>(nodebase);
+            return (mode == ACCESS_MODE_R && node->nwrites == 0);
+        }
+
+        inline void
+        precedence(Task * pred, Task * succ) const
+        {
+            /* avoid redundant edges when 2 tasks are conflicting on several
+             * accesses, this optimization is possible as we are in a
+             * sequential task flow paradigm : if pred -> succ, then
+             * 'succ' must be the last successor inserted */
+            if (pred->edges.size() == 0 || pred->edges.back().successor != succ)
+                pred->precedes(succ);
+        }
+
+        inline void
+        on_intersect(
+            NodeBase * nodebase,
+            Search & search,
+            const Cube & cube,
+            const access_mode_t mode
+        ) const {
+            (void) cube;
+
+            assert(nodebase);
+            Node * node = reinterpret_cast<Node *>(nodebase);
+
+            switch (search.type)
+            {
+                case (Search::Type::SEARCH_TYPE_RESOLVE):
+                {
+                    if (mode & ACCESS_MODE_W && node->last_reads.size())
+                        for (TaskAccess & pred : node->last_reads)
+                            this->precedence(pred.task, search.task_access.task);
+                    else if (node->last_write.task)
+                        this->precedence(node->last_write.task, search.task_access.task);
+
+                    break ;
+                }
+
+                case (Search::Type::SEARCH_TYPE_CONFLICTING):
+                {
+                    if (node->last_write.task)
+                    {
+                        assert(search.conflicts);
+                        search.conflicts->push_back(node->last_write);
+                    }
+
+                    break ;
+                }
+
+                default:
+                {
+                    assert(0);
+                    break ;
+                }
+            }
+        }
+
+
 };
 
 using TaskAccess = KTaskAccess<2>;
