@@ -526,8 +526,8 @@ error_usage(const char * label, func_t * func)
 int
 main(int argc, char ** argv)
 {
-    SKIP_CHECK = getenv("SKIP_CHECK") ? true : false;
-    ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? true : false;
+    SKIP_CHECK = getenv("SKIP_CHECK") ? atoi(getenv("SKIP_CHECK")) : false;
+    ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? atoi(getenv("ALIGN_MATRICES")) : false;
     printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
     printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
 
