@@ -128,14 +128,17 @@ static task_format_id_t TASK_FORMAT_COHERENT_ASYNC;
 // args for 'TASK_FORMAT_COHERENT_ASYNC'
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
-    Cube cube;
+    Cube cubes[4];
     size_t ld;
 
     args_t(const Access & x, const Access & y)
     {
         assert(x.host_view.ld == y.host_view.ld);
         this->ld = x.host_view.ld;
-        Access::Cube::intersection(&this->cube, x.cube, y.cube);
+        Access::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
+        Access::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
+        Access::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
+        Access::Cube::intersection(this->cubes + 3, x.cubes[1], y.cubes[1]);
     }
     ~args_t() {}
 }                                       args_t;
@@ -163,7 +166,11 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(memtree);
 
     fetch_list_t list;
-    memtree->create_fetch_list_for_host(args->cube, &list);
+    memtree->fetch_list_init(&list);
+    memtree->fetch_list_append(&list, args->cubes[0]);
+    memtree->fetch_list_append(&list, args->cubes[1]);
+    memtree->fetch_list_append(&list, args->cubes[2]);
+    memtree->fetch_list_append(&list, args->cubes[3]);
 
     // the size of the list should be one at that stage
     // assert(list.fetches && list.fetches->next == NULL);

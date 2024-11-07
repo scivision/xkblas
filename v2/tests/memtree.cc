@@ -42,7 +42,8 @@ main(void)
         KMemoryAccess<2> * access = accesses + i;
 
         search.prepare_insert(access);
-        tree.insert(search, access->cube, access->mode);
+        tree.insert(search, access->cubes[0], access->mode);
+        tree.insert(search, access->cubes[1], access->mode);
     }
 
     return 0;

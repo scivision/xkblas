@@ -964,16 +964,24 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
         }               fetch_list_t;
 
+        /* initialize a list of fetch request */
         void
-        create_fetch_list_for_host(
-            const Cube & cube,
-            fetch_list_t * list
-        ) {
-            assert(!cube.is_empty());
-            assert(list);
-
+        fetch_list_init(fetch_list_t * list)
+        {
             list->tree = this;
             list->fetches = NULL;
+        }
+
+        /* append D2H fetch request to the list matching the cube */
+        void
+        fetch_list_append(
+            fetch_list_t * list,
+            const Cube & cube
+        ) {
+
+            assert(list);
+            if (cube.is_empty())
+                return ;
 
             Search search(HOST_DEVICE_GLOBAL_ID);
             search.prepare_search_blocks();
@@ -1631,7 +1639,8 @@ next_view:
             search.prepare_search_owners();
             this->lock();
             {
-                this->intersect(search, access->cube, access->mode);
+                this->intersect(search, access->cubes[0], access->mode);
+                this->intersect(search, access->cubes[1], access->mode);
             }
             this->unlock();
 

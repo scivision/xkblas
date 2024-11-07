@@ -174,21 +174,28 @@ main_gemm(char ** args)
 
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 
-    uintptr_t alignon = sizeof(TYPE) * ld;
-
     /* allocate matrices */
+    # if 0
+    uintptr_t alignon = sizeof(TYPE) * ld;
     uintptr_t mem    = impl.alloc(alignon + 5 * sizeof(TYPE) * (ld * ld));
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
     uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
     uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
     uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
-
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(Cp     % alignon == 0);
     assert(CpRef  % alignon == 0);
     assert(CpImpl % alignon == 0);
+    # else
+    uintptr_t mem    = impl.alloc(5 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Cp     = mem + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpRef  = mem + 3 * sizeof(TYPE) * (ld * ld);
+    uintptr_t CpImpl = mem + 4 * sizeof(TYPE) * (ld * ld);
+    # endif
 
     TYPE * A     = (TYPE *) Ap;
     TYPE * B     = (TYPE *) Bp;
@@ -318,9 +325,10 @@ main_trsm(char ** args)
 
     printf("Set (m, n) = (%d, %d)\n", m, n);
 
+    /* allocate matrices */
+    # if 0
     uintptr_t alignon = sizeof(TYPE) * ld;
 
-    /* allocate matrices */
     uintptr_t mem    = impl.alloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
     uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
     uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
@@ -331,6 +339,13 @@ main_trsm(char ** args)
     assert(Bp     % alignon == 0);
     assert(BpRef  % alignon == 0);
     assert(BpImpl % alignon == 0);
+    # else
+    uintptr_t mem    = impl.alloc(4 * sizeof(TYPE) * (ld * ld));
+    uintptr_t Ap     = mem + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpRef  = mem + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpImpl = mem + 3 * sizeof(TYPE) * (ld * ld);
+    # endif
 
     TYPE * A     = (TYPE *) Ap;
     TYPE * B     = (TYPE *) Bp;
