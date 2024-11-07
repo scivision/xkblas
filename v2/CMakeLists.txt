@@ -106,7 +106,7 @@ add_custom_command(
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
     DEPENDS
-        ${XKBLAS_KERNEL_SOURCE_FILES_DEPS}
+        ${XKBLAS_KERNELS_SOURCE_FILES_DEPS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)

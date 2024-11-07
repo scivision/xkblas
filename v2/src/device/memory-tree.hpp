@@ -234,8 +234,6 @@ class KMemoryBlock {
             /////////////////////////////////
             INTERVAL_DIFF_TYPE_T d[K];
             Cube::distance_manhattan(inheriting_cube, block_cube, d);
-            assert(d[0] >= 0);
-            assert(d[1] >= 0);
 
             //////////////////////////////////
             //  DUPPLICATE REPLICATE INFOS  //
@@ -254,8 +252,9 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const uintptr_t offset      = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
-                    const uintptr_t begin_addr  = inheriting_allocation->view.addr + offset;
+                    const INTERVAL_DIFF_TYPE_T offset   = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
+                    const uintptr_t begin_addr          = (uintptr_t) ((INTERVAL_DIFF_TYPE_T) inheriting_allocation->view.addr + offset);
+                    assert(begin_addr >= inheriting_allocation->chunk->device_ptr);
 
                     # pragma message(TODO "This memory is currently leaked when 'invalidate' is called")
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->chunk, begin_addr, inheriting_allocation->view.ld);
@@ -1040,18 +1039,15 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                     INTERVAL_DIFF_TYPE_T d[K];
                     Cube::distance_manhattan(pi.cube, pj.cube, d);
-
-                    assert(d[1] >= 0);
-                    uintptr_t offset;
                     if (d[0] < 0)
                     {
-                        assert(d[1] == 1);
-                        offset = pi.cube[0].length();
+                        d[0] += (this->ld * this->sizeof_type);
+                        d[1] -= 1;
                     }
-                    else
-                    {
-                       offset = d[0] + d[1]*ld*sizeof_type;
-                    }
+
+                    assert(d[0] >= 0);
+                    assert(d[1] >= 0);
+                    const uintptr_t offset = d[0] + d[1]*ld*sizeof_type;
                     begin_addr += offset;
                 }
             }
@@ -1604,7 +1600,7 @@ next_view:
 
             assert(node->cube[k].b >= interval.b);
 
-            if (k == 1)
+            if (k == 0)
             {
                 const INTERVAL_DIFF_TYPE_T db = node->cube[k].b - interval.b;
                 (void) db;

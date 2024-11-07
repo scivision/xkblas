@@ -56,8 +56,6 @@ static int
 main_gemm_gemm(char ** args)
 {
     /* parse arguments */
-    CBLAS_TRANSPOSE transA = CblasNoTrans;
-    CBLAS_TRANSPOSE transB = CblasNoTrans;
     int m     = atoi(args[0]);
     int n     = atoi(args[1]);
     int k     = atoi(args[2]);
@@ -74,16 +72,17 @@ main_gemm_gemm(char ** args)
     int ld = MAX(MAX(m, n), k);
 
     /* allocate matrices */
-    uintptr_t alignon = sizeof(TYPE) * ld;
-    uintptr_t mem    = impl.alloc(5 * alignon + 5 * sizeof(TYPE) * (ld * ld));
+    const size_t s    = sizeof(TYPE);
+    uintptr_t alignon = s * ld;
+    uintptr_t mem     = impl.alloc(5 * alignon + 5 * s * (ld * ld));
 
     # if 0
     /* force alignment on LD.s */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld);
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(Cp     % alignon == 0);
@@ -91,16 +90,22 @@ main_gemm_gemm(char ** args)
     assert(CpImpl % alignon == 0);
     # else
     /* force unaligned (but align on sizeof(type) still) */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld) + alignon / 2;
     assert(Ap     % alignon != 0);
     assert(Bp     % alignon != 0);
     assert(Cp     % alignon != 0);
     assert(CpRef  % alignon != 0);
     assert(CpImpl % alignon != 0);
+
+    Ap     =     Ap + (s -     (Ap % s));
+    Bp     =     Bp + (s -     (Bp % s));
+    Cp     =     Cp + (s -     (Cp % s));
+    CpRef  =  CpRef + (s -  (CpRef % s));
+    CpImpl = CpImpl + (s - (CpImpl % s));
     assert(Ap     % sizeof(TYPE) == 0);
     assert(Bp     % sizeof(TYPE) == 0);
     assert(Cp     % sizeof(TYPE) == 0);
@@ -119,12 +124,12 @@ main_gemm_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    int t1 = 0;
-    int t2 = 0;
+    // int t1 = 0;
+    // int t2 = 0;
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -134,10 +139,10 @@ main_gemm_gemm(char ** args)
             {
                 uint64_t t0 = get_nanotime();
                 impl.set_tile(bs1_m, bs1_n);
-                impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
                 impl.set_tile(bs2_m, bs2_n);
-                impl.gemm(transA, transB, m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+                impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
                 impl.coherent(CImpl, m, n, ld);
 
@@ -151,7 +156,7 @@ main_gemm_gemm(char ** args)
             {
                 /* check correctness */
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-                int r = gemm_cmp(transA, transB, m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
+                int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
                 printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
                 puts("--------------------------");
             }
@@ -181,16 +186,17 @@ main_gemm(char ** args)
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 
     /* allocate matrices */
-    uintptr_t alignon = sizeof(TYPE) * ld;
-    uintptr_t mem    = impl.alloc(5 * alignon + 5 * sizeof(TYPE) * (ld * ld));
+    const size_t s    = sizeof(TYPE);
+    uintptr_t alignon = s * ld;
+    uintptr_t mem     = impl.alloc(5 * alignon + 5 * s * (ld * ld));
 
     # if 0
     /* force alignment on LD.s */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld);
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(Cp     % alignon == 0);
@@ -198,16 +204,22 @@ main_gemm(char ** args)
     assert(CpImpl % alignon == 0);
     # else
     /* force unaligned (but align on sizeof(type) still) */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
+    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
+    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
+    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld) + alignon / 2;
     assert(Ap     % alignon != 0);
     assert(Bp     % alignon != 0);
     assert(Cp     % alignon != 0);
     assert(CpRef  % alignon != 0);
     assert(CpImpl % alignon != 0);
+
+    Ap     =     Ap + (s -     (Ap % s));
+    Bp     =     Bp + (s -     (Bp % s));
+    Cp     =     Cp + (s -     (Cp % s));
+    CpRef  =  CpRef + (s -  (CpRef % s));
+    CpImpl = CpImpl + (s - (CpImpl % s));
     assert(Ap     % sizeof(TYPE) == 0);
     assert(Bp     % sizeof(TYPE) == 0);
     assert(Cp     % sizeof(TYPE) == 0);
@@ -226,12 +238,12 @@ main_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    int t1 = 0;
-    int t2 = 0;
+    // int t1 = 0;
+    // int t2 = 0;
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -345,33 +357,39 @@ main_trsm(char ** args)
 
     /* allocate matrices */
 
-    uintptr_t alignon   = sizeof(TYPE) * ld;
-    uintptr_t mem       = impl.alloc(4 * alignon + 4 * sizeof(TYPE) * (ld * ld) + 4 * sizeof(TYPE));
+    const size_t s      = sizeof(TYPE);
+    uintptr_t alignon   = ld * s;
+    uintptr_t mem       = impl.alloc(4 * alignon + 4 * s * (ld * ld));
 
     # if 0
-    /* force to be aligned on 'alignon' */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+    /* force alignment on LD.s */
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
+    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
+    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
     assert(Ap     % alignon == 0);
     assert(Bp     % alignon == 0);
     assert(BpRef  % alignon == 0);
     assert(BpImpl % alignon == 0);
     # else
-    /* force not to be aligned on 'align on' */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    /* force unaligned (but align on sizeof(type) still) */
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
+    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
+    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
     assert(Ap     % alignon != 0);
     assert(Bp     % alignon != 0);
     assert(BpRef  % alignon != 0);
     assert(BpImpl % alignon != 0);
-    assert(Ap     % sizeof(TYPE) == 0);
-    assert(Bp     % sizeof(TYPE) == 0);
-    assert(BpRef  % sizeof(TYPE) == 0);
-    assert(BpImpl % sizeof(TYPE) == 0);
+
+    Ap     =     Ap + (s -     (Ap % s));
+    Bp     =     Bp + (s -     (Bp % s));
+    BpRef  =  BpRef + (s -  (BpRef % s));
+    BpImpl = BpImpl + (s - (BpImpl % s));
+    assert(Ap     % s == 0);
+    assert(Bp     % s == 0);
+    assert(BpRef  % s == 0);
+    assert(BpImpl % s == 0);
     # endif
 
     TYPE * A     = (TYPE *) Ap;
@@ -445,16 +463,27 @@ main_copyscale(char ** args)
     int ld = MAX(m, n);
     printf("Set (m, n) = (%d, %d)\n", m, n);
     uintptr_t alignon = sizeof(TYPE) * ld;
+    uintptr_t mem     = impl.alloc(3 * alignon + 3 * sizeof(TYPE) * (ld * ld) + 3 * sizeof(TYPE));
 
-    /* allocate matrices */
-    uintptr_t mem = impl.alloc(alignon + 3 * sizeof(TYPE) * (ld * ld));
-    uintptr_t Dp  = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Lp  = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Up  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-
-    assert(Dp % alignon == 0);
-    assert(Lp % alignon == 0);
-    assert(Up % alignon == 0);
+    # if 0
+    /* force to be aligned on 'alignon' */
+    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
+    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
+    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
+    assert(Ap     % alignon == 0);
+    assert(Bp     % alignon == 0);
+    assert(BpRef  % alignon == 0);
+    assert(BpImpl % alignon == 0);
+    # else
+    /* force not to be aligned on 'align on' */
+    uintptr_t Dp = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Lp = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    uintptr_t Up = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
+    assert(Dp % alignon != 0);
+    assert(Lp % alignon != 0);
+    assert(Up % alignon != 0);
+    # endif
 
     TYPE * D = (TYPE *) Dp;
     TYPE * L = (TYPE *) Lp;

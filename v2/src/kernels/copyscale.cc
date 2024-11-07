@@ -48,10 +48,6 @@ xkblas_£copyscale_tile_async(
           TYPE * L, const size_t Lm, const size_t Ln, int ldl,
           TYPE * U, const size_t Um, const size_t Un, int ldu
 ) {
-    assert((uintptr_t)D % ldd == 0);
-    assert((uintptr_t)L % ldl == 0);
-    assert((uintptr_t)U % ldu == 0);
-
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
