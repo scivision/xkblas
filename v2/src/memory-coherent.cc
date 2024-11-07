@@ -129,12 +129,13 @@ static task_format_id_t TASK_FORMAT_COHERENT_ASYNC;
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
     Cube cubes[4];
-    size_t ld;
+    const size_t ld;
+    const size_t sizeof_type;
 
-    args_t(const Access & x, const Access & y)
+    args_t(const Access & x, const Access & y) : ld(x.host_view.ld), sizeof_type(x.host_view.sizeof_type)
     {
         assert(x.host_view.ld == y.host_view.ld);
-        this->ld = x.host_view.ld;
+        assert(x.host_view.sizeof_type == y.host_view.sizeof_type);
         Access::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
         Access::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
         Access::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
@@ -162,15 +163,12 @@ xkblas_memory_coherent_async_worker_thread_work(
     const args_t * args = (const args_t *) (current + 1);
     assert(args);
 
-    MemoryTree * memtree = context->get_memory_tree_for_ld(args->ld);
+    MemoryTree * memtree = context->get_memory_tree(args->ld, args->sizeof_type);
     assert(memtree);
 
     fetch_list_t list;
     memtree->fetch_list_init(&list);
-    memtree->fetch_list_append(&list, args->cubes[0]);
-    memtree->fetch_list_append(&list, args->cubes[1]);
-    memtree->fetch_list_append(&list, args->cubes[2]);
-    memtree->fetch_list_append(&list, args->cubes[3]);
+    memtree->fetch_list_append<4>(&list, args->cubes);
 
     // the size of the list should be one at that stage
     // assert(list.fetches && list.fetches->next == NULL);

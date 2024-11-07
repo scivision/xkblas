@@ -54,16 +54,16 @@ class access_t
                 assert(t.order == MATRIX_COLMAJOR);
 
                 // only 1 cube is needed
-                if ((A % (LD * s)) + (m * s) <= LD * s)
+                if ((A % (LD * s)) + m * s <= LD * s)
                 {
                     /**
-                     *                 y0       y1
-                     *           |  .   .   .   .   .
-                     *      x0   |  .   x   x   x   .
-                     *           |  .   x   x   x   .
-                     *           |  .   x   x   x   .
-                     *      x1   |  .   x   x   x   .
-                     *           v  .   .   .   .   .
+                     *        ^               y0       y1
+                     *        |         |  .   .   .   .   .
+                     *        |      x0 |  .   x   x   x   .
+                     *   LD.s |         |  .   x   x   x   .
+                     *        |         |  .   x   x   x   .
+                     *        |      x1 |  .   x   x   x   .
+                     *        v         v  .   .   .   .   .
                      */
                     const uintptr_t x0 = A % (LD * s);
                     const uintptr_t x1 = x0 + m * s;
@@ -93,29 +93,27 @@ class access_t
                      *      x1   v  .   x   x   x   x   .   .
                      *                 y0          y1
                      */
-
                     const uintptr_t x0 = A % (LD * s);
                     const uintptr_t x1 = LD * s;
-                    const uintptr_t y0 = A / (LD * s);
-                    const uintptr_t y1 = y0 + n;
-
-                    const Interval list0[K] = {
-                        Interval(y0, y1),
-                        Interval(x0, x1)
-                    };
-                    this->cubes[0].set_list(list0);
-                    assert(!this->cubes[0].is_empty());
-
                     const uintptr_t x2 = 0;
-                    const uintptr_t x3 = m - (x1 - x0);
+                    const uintptr_t x3 = m*s - (x1 - x0);
+
+                    const uintptr_t y0 = A / (LD * s);
+                    const uintptr_t y1 = y0 + n - 1;
                     const uintptr_t y2 = y0 + 1;
                     const uintptr_t y3 = y1 + 1;
-                    const Interval list1[K] = {
-                        Interval(y2, y3),
-                        Interval(x2, x3)
-                    };
-                    this->cubes[1].set_list(list1);
-                    assert(!this->cubes[1].is_empty());
+
+                    {
+                        const Interval list0[K] = { Interval(y0, y1), Interval(x0, x1) };
+                        this->cubes[0].set_list(list0);
+                        assert(!this->cubes[0].is_empty());
+                    }
+
+                    {
+                        const Interval list1[K] = { Interval(y2, y3), Interval(x2, x3) };
+                        this->cubes[1].set_list(list1);
+                        assert(!this->cubes[1].is_empty());
+                    }
                 }
 
             } /* K == 2 */

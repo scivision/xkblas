@@ -25,7 +25,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         const Access * access = task->accesses + task->ocr_access_index;
         assert(access);
 
-        MemoryTree * memtree = context->get_memory_tree_for_ld(access->host_view.ld);
+        MemoryTree * memtree = context->get_memory_tree(access->host_view.ld, access->host_view.sizeof_type);
         assert(memtree);
 
         const xkblas_device_global_id_bitfield_t owners = memtree->who_owns(access);

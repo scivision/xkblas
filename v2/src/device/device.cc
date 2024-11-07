@@ -379,7 +379,7 @@ xkblas_device_prepare_task(
         Access * access = task->accesses + i;
         assert(access);
 
-        MemoryTree * memtree = context->get_memory_tree_for_ld(access->host_view.ld);
+        MemoryTree * memtree = context->get_memory_tree(access->host_view.ld, access->host_view.sizeof_type);
         assert(memtree);
 
         memtree->fetch_access(driver, device, task, access);

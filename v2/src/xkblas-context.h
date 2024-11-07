@@ -33,17 +33,18 @@ typedef struct  xkblas_context_t
     /* memory state on each device */
     std::vector<MemoryTree *> memtrees;
     MemoryTree *
-    get_memory_tree_for_ld(const size_t ld)
+    get_memory_tree(const size_t ld, const size_t sizeof_type)
     {
         /* find previous memtree for that ld */
         for (MemoryTree * memtree : this->memtrees)
-            if (memtree->ld == ld)
+            if (memtree->ld == ld && memtree->sizeof_type == sizeof_type)
                 return memtree;
 
         /* if not found, create a new memtree */
-        MemoryTree * memtree = new MemoryTree(ld);
+        MemoryTree * memtree = new MemoryTree(ld, sizeof_type);
         assert(memtree);
         assert(memtree->ld == ld);
+        assert(memtree->sizeof_type == sizeof_type);
         this->memtrees.push_back(memtree);
         return memtree;
     }

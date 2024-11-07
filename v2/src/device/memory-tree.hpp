@@ -204,9 +204,6 @@ class KMemoryBlock {
 
     public:
 
-        /* host memory view of that block */
-        memory_view_t host_view;
-
         /* per device replicate info */
         MemoryReplicate replicates[XKBLAS_DEVICES_MAX];
 
@@ -219,8 +216,7 @@ class KMemoryBlock {
     public:
 
         /* a new memory block, assume it is valid on the host */
-        KMemoryBlock(const memory_view_t & v) :
-            host_view(v),
+        KMemoryBlock() :
             replicates(),
             valid(0),
             fetching(0)
@@ -238,23 +234,12 @@ class KMemoryBlock {
             INTERVAL_DIFF_TYPE_T d[K];
             Cube::distance_manhattan(inheriting_cube, block_cube, d);
 
-            assert(inheriting_block.host_view.order == MATRIX_COLMAJOR);
-            const size_t sizeof_type = inheriting_block.host_view.sizeof_type;
-
-            this->host_view = inheriting_block.host_view;
-            this->host_view.offset_m += d[1] / sizeof_type;
-            this->host_view.m         = block_cube[1].length() / sizeof_type;
-            this->host_view.offset_n += d[0];
-            this->host_view.n         = block_cube[0].length();
-
-            assert(this->host_view.offset_m >= 0);
-            assert(this->host_view.offset_n >= 0);
-            assert(this->host_view.m         > 0);
-            assert(this->host_view.n         > 0);
-
             //////////////////////////////////
             //  DUPPLICATE REPLICATE INFOS  //
             //////////////////////////////////
+
+            // TODO
+            size_t sizeof_type = 4;
 
             for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX ; ++device_global_id)
             {
@@ -322,11 +307,8 @@ class KMemoryTreeNodeSearch {
                 /* memory block in the tree (WARNING : this is mutable outside a 'lock' section) */
                 MemoryBlock * block;
 
-                /* The cube of this block (intersectoin of the access with the tree node) */
+                /* The cube of this block (intersection of the access with the tree node) */
                 const Cube cube;
-
-                /* copy of the host view */
-                memory_view_t host_view;
 
                 /* dst device */
                 xkblas_device_global_id_t dst_device_global_id;
@@ -354,7 +336,6 @@ class KMemoryTreeNodeSearch {
                 Partite(MemoryBlock * b, const Cube & r) :
                     block(b),
                     cube(r),
-                    host_view(b->host_view),
                     dst_device_global_id(HOST_DEVICE_GLOBAL_ID),
                     dst_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEW_NONE),
                     dst_view(),
@@ -366,9 +347,24 @@ class KMemoryTreeNodeSearch {
 
                 virtual ~Partite() {}
 
+                inline memory_view_t
+                create_host_view(const size_t ld, const size_t sizeof_type) const
+                {
+                    memory_view_t host_view;
+
+                    host_view.order         = MATRIX_COLMAJOR;
+                    host_view.addr          = this->cube[1].a + this->cube[0].a * ld * sizeof_type;
+                    host_view.ld            = ld;
+                    host_view.offset_m      = 0;
+                    host_view.offset_n      = 0;
+                    host_view.m             = this->cube[1].length() / sizeof_type;
+                    host_view.n             = this->cube[0].length();
+                    host_view.sizeof_type   = sizeof_type;
+
+                    return host_view;
+                }
+
         }; /* Partite */
-
-
 
         class Partition {
 
@@ -542,7 +538,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             const Color color
         ) :
             Base(r, k, color),
-            block(access->host_view)
+            block()
         {}
 
         /**
@@ -594,7 +590,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             //  SHRINK HOST VIEW //
             ///////////////////////
 
-            const size_t sizeof_type = this->block.host_view.sizeof_type;
+            const size_t sizeof_type = 4;
 
             assert(this->cube[k].a <= interval.a);
             const INTERVAL_DIFF_TYPE_T da = interval.a - this->cube[k].a;
@@ -612,12 +608,6 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
             // shrinked-left, gotta offset the views
             if (da)
             {
-                // HOST VIEW
-                if (k == 1)
-                    this->block.host_view.offset_m += (da / sizeof_type);
-                else
-                    this->block.host_view.offset_n += da;
-
                 // REPLICATES VIEW
                 for (MemoryReplicate & replicate : this->block.replicates)
                 {
@@ -630,17 +620,6 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
                     }
                 }
             }
-
-            // resize the views
-            if (k == 1)
-                this->block.host_view.m = interval.length() / sizeof_type;
-            else
-                this->block.host_view.n = interval.length();
-
-            assert(this->block.host_view.offset_m >= 0);
-            assert(this->block.host_view.offset_n >= 0);
-            assert(this->block.host_view.m > 0);
-            assert(this->block.host_view.n > 0);
         }
 
         //////////////////
@@ -761,9 +740,11 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
         dump_cube_str(FILE * f) const
         {
             // KCubeTree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
+            # if 0
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
             fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
+            # endif
 
          // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
             for (xkblas_device_global_id_t device_global_id = 0 ; device_global_id < XKBLAS_DEVICES_MAX+1 ; ++device_global_id)
@@ -796,11 +777,14 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
     using Task = KTask<K>;
 
     public:
-        KMemoryTree(const size_t ld) : Base(), ld(ld) {}
+        KMemoryTree(const size_t ld, const size_t sizeof_type) : Base(), ld(ld), sizeof_type(sizeof_type) {}
         ~KMemoryTree() {}
 
         /* the ld used in that memory tree */
         const size_t ld;
+
+        /* the size of type */
+        const size_t sizeof_type;
 
     public:
 
@@ -968,27 +952,27 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         void
         fetch_list_init(fetch_list_t * list)
         {
+            assert(list);
             list->tree = this;
             list->fetches = NULL;
         }
 
         /* append D2H fetch request to the list matching the cube */
+        template <int NC>
         void
         fetch_list_append(
             fetch_list_t * list,
-            const Cube & cube
+            const Cube cubes[NC]
         ) {
-
             assert(list);
-            if (cube.is_empty())
-                return ;
 
             Search search(HOST_DEVICE_GLOBAL_ID);
             search.prepare_search_blocks();
             this->lock();
             {
                 /* find all blocks that intersects with that access */
-                this->intersect(search, cube, ACCESS_MODE_R);
+                for (int i = 0 ; i < NC ; ++i)
+                    this->intersect(search, cubes[i], ACCESS_MODE_R);
 
                 /* launch fetch on each device */
                 for (Partite & partite : search.partition.partites)
@@ -1021,11 +1005,12 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     // allocate fetch info for the callback argument
                     // fetch_t * fetch = (fetch_t *) thread->allocate(sizeof(fetch_t));
                     fetch_t * fetch = (fetch_t *) malloc(sizeof(fetch_t));
-                    fetch->host_view            = partite.host_view;
+                    assert(fetch);
                     fetch->src_device_global_id = src;
                     fetch->src_view             = src_allocation_view->view;
-                    fetch->next                 = list->fetches;
+                    fetch->host_view            = partite.create_host_view(this->ld, this->sizeof_type);
 
+                    fetch->next = list->fetches;
                     list->fetches = fetch;
                 }
             }
@@ -1120,7 +1105,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             //////////////////////////
 
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
-            const size_t        size = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
+            const size_t size = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
 
             xkblas_alloc_chunk_t * chunk = nullptr;
             int retry_cnt = 0;
@@ -1542,7 +1527,8 @@ next_view:
                             partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
 
                     /* set the views */
-                    const memory_replicate_view_t host_replicate_view(partite.host_view.begin_addr(), partite.host_view.ld);
+                    const memory_view_t host_view = partite.create_host_view(this->ld, this->sizeof_type);
+                    const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
                     const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
                     const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
 
@@ -1552,7 +1538,7 @@ next_view:
                         task,
                         partition.chunk,
                         partite.cube,
-                        partite.host_view,
+                        host_view,
                         partite.dst_device_global_id,
                         dst_view,
                         partite.src_device_global_id,
@@ -1583,7 +1569,7 @@ next_view:
                 );
                 # endif
 
-               /* step (1) ensure the access is represented in the tree as blocks */
+                /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
                 this->insert(search, access->cubes[0], access->mode);
                 this->insert(search, access->cubes[1], access->mode);

@@ -33,7 +33,7 @@ main(void)
     };
 
     const size_t ld = 131072;
-    KMemoryTree<2> tree(ld);
+    KMemoryTree<2> tree(ld, 1);
 
     KMemoryTreeNodeSearch<2> search(0);
 
