@@ -25,9 +25,9 @@ extern "C" {
 # include "xkblas/impl.cc"
 # include "common/check.cc"
 static impl_t impl;
-static bool SKIP_CHECK;
+static bool SKIP_CHECK = 0;
+static bool ALIGN_MATRICES = 0;
 
-/////////////////////////
 //  PARAMETERS TO TEST //
 /////////////////////////
 
@@ -51,6 +51,42 @@ static const char * TRANS_STR[N_CBLAS_TRANSPOSE] = { "N", "T", "H" };
 //  CLI TO RUN-TIME //
 //////////////////////
 
+static void
+prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
+{
+    /* allocate matrices */
+    const size_t s = sizeof(TYPE);
+    const uintptr_t alignon = s * ld;
+    const uintptr_t memsize = n * (alignon + s * ld * ld);
+    const uintptr_t mem     = impl.alloc(memsize);
+
+    for (int i = 0 ; i < n ; ++i)
+    {
+        uintptr_t M;
+
+        /* force alignment on LD.s */
+        if (ALIGN_MATRICES)
+        {
+            M = mem + (alignon - (mem % alignon)) + i * s * (ld * ld);
+            assert(M % alignon == 0);
+        }
+        /* force unaligned (but align on sizeof(type) still) */
+        else
+        {
+            M = mem + (alignon - (mem % alignon)) + i * s * (ld * ld) + alignon / 2;
+            assert(M % alignon != 0);
+
+            M = M + (s - (M % s));
+            assert(M % s == 0);
+        }
+
+        matrices[i] = M;
+    }
+
+    /* initialize matrices */
+    FILL((TYPE *)mem, memsize);
+}
+
 // GEMM - GEMM //
 static int
 main_gemm_gemm(char ** args)
@@ -72,55 +108,13 @@ main_gemm_gemm(char ** args)
     int ld = MAX(MAX(m, n), k);
 
     /* allocate matrices */
-    const size_t s    = sizeof(TYPE);
-    uintptr_t alignon = s * ld;
-    uintptr_t mem     = impl.alloc(5 * alignon + 5 * s * (ld * ld));
-
-    # if 0
-    /* force alignment on LD.s */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld);
-    assert(Ap     % alignon == 0);
-    assert(Bp     % alignon == 0);
-    assert(Cp     % alignon == 0);
-    assert(CpRef  % alignon == 0);
-    assert(CpImpl % alignon == 0);
-    # else
-    /* force unaligned (but align on sizeof(type) still) */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld) + alignon / 2;
-    assert(Ap     % alignon != 0);
-    assert(Bp     % alignon != 0);
-    assert(Cp     % alignon != 0);
-    assert(CpRef  % alignon != 0);
-    assert(CpImpl % alignon != 0);
-
-    Ap     =     Ap + (s -     (Ap % s));
-    Bp     =     Bp + (s -     (Bp % s));
-    Cp     =     Cp + (s -     (Cp % s));
-    CpRef  =  CpRef + (s -  (CpRef % s));
-    CpImpl = CpImpl + (s - (CpImpl % s));
-    assert(Ap     % sizeof(TYPE) == 0);
-    assert(Bp     % sizeof(TYPE) == 0);
-    assert(Cp     % sizeof(TYPE) == 0);
-    assert(CpRef  % sizeof(TYPE) == 0);
-    assert(CpImpl % sizeof(TYPE) == 0);
-    # endif
-
-    TYPE * A     = (TYPE *) Ap;
-    TYPE * B     = (TYPE *) Bp;
-    TYPE * C     = (TYPE *) Cp;
-    TYPE * CRef  = (TYPE *) CpRef;
-    TYPE * CImpl = (TYPE *) CpImpl;
-
-    /* initialize matrices */
-    FILL(A, 3*ld*ld); // fill A, B and C
+    uintptr_t matrices[5];
+    # define A     ((TYPE *)matrices[0])
+    # define B     ((TYPE *)matrices[1])
+    # define C     ((TYPE *)matrices[2])
+    # define CRef  ((TYPE *)matrices[3])
+    # define CImpl ((TYPE *)matrices[4])
+    prepare_n_matrices(matrices, 5, ld);
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
@@ -158,10 +152,15 @@ main_gemm_gemm(char ** args)
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
                 printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
-                puts("--------------------------");
             }
         }
     }
+
+    # undef A
+    # undef B
+    # undef C
+    # undef CRef
+    # undef CImpl
 
     return 0;
 }
@@ -186,55 +185,13 @@ main_gemm(char ** args)
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 
     /* allocate matrices */
-    const size_t s    = sizeof(TYPE);
-    uintptr_t alignon = s * ld;
-    uintptr_t mem     = impl.alloc(5 * alignon + 5 * s * (ld * ld));
-
-    # if 0
-    /* force alignment on LD.s */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld);
-    assert(Ap     % alignon == 0);
-    assert(Bp     % alignon == 0);
-    assert(Cp     % alignon == 0);
-    assert(CpRef  % alignon == 0);
-    assert(CpImpl % alignon == 0);
-    # else
-    /* force unaligned (but align on sizeof(type) still) */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 4 * s * (ld * ld) + alignon / 2;
-    assert(Ap     % alignon != 0);
-    assert(Bp     % alignon != 0);
-    assert(Cp     % alignon != 0);
-    assert(CpRef  % alignon != 0);
-    assert(CpImpl % alignon != 0);
-
-    Ap     =     Ap + (s -     (Ap % s));
-    Bp     =     Bp + (s -     (Bp % s));
-    Cp     =     Cp + (s -     (Cp % s));
-    CpRef  =  CpRef + (s -  (CpRef % s));
-    CpImpl = CpImpl + (s - (CpImpl % s));
-    assert(Ap     % sizeof(TYPE) == 0);
-    assert(Bp     % sizeof(TYPE) == 0);
-    assert(Cp     % sizeof(TYPE) == 0);
-    assert(CpRef  % sizeof(TYPE) == 0);
-    assert(CpImpl % sizeof(TYPE) == 0);
-    # endif
-
-    TYPE * A     = (TYPE *) Ap;
-    TYPE * B     = (TYPE *) Bp;
-    TYPE * C     = (TYPE *) Cp;
-    TYPE * CRef  = (TYPE *) CpRef;
-    TYPE * CImpl = (TYPE *) CpImpl;
-
-    /* initialize matrices */
-    FILL(A, 3*ld*ld); // fill A, B and C
+    uintptr_t matrices[5];
+    # define A     ((TYPE *)matrices[0])
+    # define B     ((TYPE *)matrices[1])
+    # define C     ((TYPE *)matrices[2])
+    # define CRef  ((TYPE *)matrices[3])
+    # define CImpl ((TYPE *)matrices[4])
+    prepare_n_matrices(matrices, 5, ld);
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
@@ -263,10 +220,16 @@ main_gemm(char ** args)
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
                 printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
-                puts("--------------------------");
             }
         }
     }
+
+    # undef A
+    # undef B
+    # undef C
+    # undef CRef
+    # undef CImpl
+
 
     return 0;
 }
@@ -288,29 +251,16 @@ main_syrk(char ** args)
     int ld = MAX(n, k);
     printf("Set (n, k) = (%d, %d)\n", n, k);
 
-    uintptr_t alignon = sizeof(TYPE) * ld;
-
     /* allocate matrices */
-    uintptr_t mem    = impl.alloc(alignon + 4 * sizeof(TYPE) * (ld * ld));
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Cp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t CpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
-
-    assert(Ap     % alignon == 0);
-    assert(Cp     % alignon == 0);
-    assert(CpRef  % alignon == 0);
-    assert(CpImpl % alignon == 0);
-
-    TYPE * A     = (TYPE *) Ap;
-    TYPE * C     = (TYPE *) Cp;
-    TYPE * CRef  = (TYPE *) CpRef;
-    TYPE * CImpl = (TYPE *) CpImpl;
-
-    /* initialize matrices */
-    FILL(A, 2*ld*ld); // fill A and C
+    uintptr_t matrices[4];
+    # define A     ((TYPE *)matrices[0])
+    # define C     ((TYPE *)matrices[1])
+    # define CRef  ((TYPE *)matrices[2])
+    # define CImpl ((TYPE *)matrices[3])
+    prepare_n_matrices(matrices, 4, ld);
     FILL(&alpha, 1);
     FILL(&beta, 1);
+
     memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
     memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
@@ -331,11 +281,13 @@ main_syrk(char ** args)
     {
         /* check correctness */
         int r = syrk_cmp(uplo, trans, n, k, alpha, A, ld, beta, C, CRef, CImpl, ld, 1);
-        if (r == 0)
-            puts("Result is CORRECT");
-        else
-            puts("Result is INCORRECT !!");
+        printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
     }
+
+    # undef A
+    # undef C
+    # undef CRef
+    # undef CImpl
 
     return 0;
 }
@@ -356,50 +308,12 @@ main_trsm(char ** args)
     printf("Set (m, n) = (%d, %d)\n", m, n);
 
     /* allocate matrices */
-
-    const size_t s      = sizeof(TYPE);
-    uintptr_t alignon   = ld * s;
-    uintptr_t mem       = impl.alloc(4 * alignon + 4 * s * (ld * ld));
-
-    # if 0
-    /* force alignment on LD.s */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld);
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld);
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld);
-    assert(Ap     % alignon == 0);
-    assert(Bp     % alignon == 0);
-    assert(BpRef  % alignon == 0);
-    assert(BpImpl % alignon == 0);
-    # else
-    /* force unaligned (but align on sizeof(type) still) */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * s * (ld * ld) + alignon / 2;
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * s * (ld * ld) + alignon / 2;
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * s * (ld * ld) + alignon / 2;
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * s * (ld * ld) + alignon / 2;
-    assert(Ap     % alignon != 0);
-    assert(Bp     % alignon != 0);
-    assert(BpRef  % alignon != 0);
-    assert(BpImpl % alignon != 0);
-
-    Ap     =     Ap + (s -     (Ap % s));
-    Bp     =     Bp + (s -     (Bp % s));
-    BpRef  =  BpRef + (s -  (BpRef % s));
-    BpImpl = BpImpl + (s - (BpImpl % s));
-    assert(Ap     % s == 0);
-    assert(Bp     % s == 0);
-    assert(BpRef  % s == 0);
-    assert(BpImpl % s == 0);
-    # endif
-
-    TYPE * A     = (TYPE *) Ap;
-    TYPE * B     = (TYPE *) Bp;
-    TYPE * BRef  = (TYPE *) BpRef;
-    TYPE * BImpl = (TYPE *) BpImpl;
-
-    /* initialize matrices */
-    FILL(A, ld*ld);
-    FILL(B, ld*ld);
+    uintptr_t matrices[4];
+    # define A     ((TYPE *)matrices[0])
+    # define B     ((TYPE *)matrices[1])
+    # define BRef  ((TYPE *)matrices[2])
+    # define BImpl ((TYPE *)matrices[3])
+    prepare_n_matrices(matrices, 4, ld);
     FILL(&alpha, 1);
 
     // diagonal dominante
@@ -441,12 +355,16 @@ main_trsm(char ** args)
                         memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
                         int r = trsm_cmp(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, alpha, A, ld, B, BRef, BImpl, ld);
                         printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
-                        puts("--------------------------");
                     }
                 }
             }
         }
     }
+
+    # undef A
+    # undef B
+    # undef BRef
+    # undef BImpl
 
     return 0;
 }
@@ -462,35 +380,13 @@ main_copyscale(char ** args)
     /* currently only support this */
     int ld = MAX(m, n);
     printf("Set (m, n) = (%d, %d)\n", m, n);
-    uintptr_t alignon = sizeof(TYPE) * ld;
-    uintptr_t mem     = impl.alloc(3 * alignon + 3 * sizeof(TYPE) * (ld * ld) + 3 * sizeof(TYPE));
 
-    # if 0
-    /* force to be aligned on 'alignon' */
-    uintptr_t Ap     = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld);
-    uintptr_t Bp     = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld);
-    uintptr_t BpRef  = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld);
-    uintptr_t BpImpl = mem + (alignon - (mem % alignon)) + 3 * sizeof(TYPE) * (ld * ld);
-    assert(Ap     % alignon == 0);
-    assert(Bp     % alignon == 0);
-    assert(BpRef  % alignon == 0);
-    assert(BpImpl % alignon == 0);
-    # else
-    /* force not to be aligned on 'align on' */
-    uintptr_t Dp = mem + (alignon - (mem % alignon)) + 0 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Lp = mem + (alignon - (mem % alignon)) + 1 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    uintptr_t Up = mem + (alignon - (mem % alignon)) + 2 * sizeof(TYPE) * (ld * ld) + alignon / 2 + sizeof(TYPE);
-    assert(Dp % alignon != 0);
-    assert(Lp % alignon != 0);
-    assert(Up % alignon != 0);
-    # endif
-
-    TYPE * D = (TYPE *) Dp;
-    TYPE * L = (TYPE *) Lp;
-    TYPE * U = (TYPE *) Up;
-
-    /* initialize matrices */
-    FILL(D, 3*ld*ld);
+    /* allocate matrices */
+    uintptr_t matrices[3];
+    # define D  ((TYPE *)matrices[0])
+    # define L  ((TYPE *)matrices[1])
+    # define U  ((TYPE *)matrices[2])
+    prepare_n_matrices(matrices, 3, ld);
 
     /* run on impl */
     printf("Running implementation...\n");
@@ -509,98 +405,12 @@ main_copyscale(char ** args)
 
     puts("Correctness check not implemented");
 
-    return 0;
-}
-
-# if 0
-static int
-main_copyscale(char ** args)
-{
-    assert(0);
-
-    int M  = atoi(args[0]);
-    int N  = atoi(args[1]);
-    int ld = N + M;
-    int S = atoi(args[2]);
-
-    if (ld < M || ld < N)
-    {
-        fprintf(stderr, "ld must be greated than M and N\n");
-        return 1;
-    }
-    if (M % S || N % S)
-    {
-        fprintf(stderr, "Tile sizes must divide matrix sizes");
-        return 1;
-    }
-
-    int D = 0;
-    int L = ld * N;
-    int U = N;
-
-    printf("Set (M, N, ld) = (%d, %d, %d) with tile (%d, %d)\n", M, N, ld, S, S);
-
-    uint64_t t0 = get_nanotime();
-    // TODO
-    uint64_t tf = get_nanotime();
-
-    printf("Took %lf s.\n", (tf - t0) / (double)1e9);
+    # undef D
+    # undef L
+    # undef U
 
     return 0;
 }
-
-static int
-main_trsm_copyscale_gemm(char ** args)
-{
-    assert(0);
-
-    int N_ITER  = atoi(args[0]);
-    int MODE    = atoi(args[1]);
-    int M       = atoi(args[2]);
-    int N       = atoi(args[3]);
-    int S       = atoi(args[4]);
-
-    # if 0
-    int S_trsm      = (int)(S*1.25);
-    int S_copyscale = (int)(S*2.00);
-    int S_gemm      = (int)(S*0.75);
-    # else
-    int S_trsm      = S;
-    int S_copyscale = S;
-    int S_gemm      = S;
-    # endif
-
-    if (M % S || N % S)
-    {
-        fprintf(stderr, "Tile sizes must divide matrix sizes");
-        return 1;
-    }
-
-    int ld = N + M;
-    printf("Set (M, N, ld) = (%d, %d, %d) with tiles (S, trsm, copyscale, gemm)=(%d, %d, %d, %d)\n", M, N, ld, S, S_trsm, S_copyscale, S_gemm);
-
-    uint64_t dt = 0;
-
-    for (int i = 0 ; i < N_ITER ; ++i)
-    {
-        int D = (MODE == 0) ? 0 : i * ld*(M+N);
-        int L = D + ld*N;
-        int U = D + N;
-        int G = D + ld*N + N;
-
-        uint64_t t0 = get_nanotime();
-        // TODO
-        uint64_t tf = get_nanotime();
-
-        dt += (tf - t0);
-    }
-
-    double t = dt / (double)1e9;
-
-    return 0;
-}
-
-# endif
 
 typedef struct  func_t
 {
@@ -717,7 +527,9 @@ int
 main(int argc, char ** argv)
 {
     SKIP_CHECK = getenv("SKIP_CHECK") ? true : false;
-    printf("Check %s", SKIP_CHECK ? "disabled" : "enabled");
+    ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? true : false;
+    printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
+    printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
 
     if (argc >= 2)
     {

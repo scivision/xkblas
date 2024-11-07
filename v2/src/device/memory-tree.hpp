@@ -997,64 +997,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             /* allocate continuous memory for that access */
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
 
-            # if 1
-
-            std::vector<int> partition_sorted_indices;
-            for (int i = 0 ; i < partition.partites.size() ; ++i)
-                partition_sorted_indices.push_back(i);
-
-            std::sort(
-                partition_sorted_indices.begin(),
-                partition_sorted_indices.end(),
-                [partition](int i, int j) {
-                    return partition.partites[i] < partition.partites[j];
-                }
-            );
-
-            const size_t          ld = access->host_view.m;            // cuda is col major
-            const size_t sizeof_type = access->host_view.sizeof_type;
-
-            uintptr_t begin_addr = chunk->device_ptr;
-            for (int idx = 0 ; idx < partition_sorted_indices.size() ; ++idx)
-            {
-                const int & i = partition_sorted_indices[idx];
-                Partite & pi = partition.partites[i];
-
-                MemoryReplicate & replicate = pi.block->replicates[device->global_id];
-                const uint8_t allocation_view_id = replicate.nallocations++;
-                if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
-                    XKBLAS_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile XKBLAS");
-
-                /* allocate the view of that block in the allocation */
-                MemoryReplicateAllocationView * r = new MemoryReplicateAllocationView(chunk, begin_addr, ld);
-                replicate.allocations[allocation_view_id] = r;
-                pi.dst_allocation_view_id = allocation_view_id;
-
-                /* offset begin_addr */
-                if (idx < partition_sorted_indices.size() - 1)
-                {
-                    const int & j = partition_sorted_indices[idx+1];
-                    Partite & pj = partition.partites[j];
-                    assert(pi < pj);
-
-                    INTERVAL_DIFF_TYPE_T d[K];
-                    Cube::distance_manhattan(pi.cube, pj.cube, d);
-                    if (d[0] < 0)
-                    {
-                        d[0] += (this->ld * this->sizeof_type);
-                        d[1] -= 1;
-                    }
-
-                    assert(d[0] >= 0);
-                    assert(d[1] >= 0);
-                    const uintptr_t offset = d[0] + d[1]*ld*sizeof_type;
-                    begin_addr += offset;
-                }
-            }
-
-            # else
-            /* this code is only correct if all accesses are aligned on LD.s */
-
             const size_t          ld = access->host_view.m;            // cuda is col major
             const size_t sizeof_type = access->host_view.sizeof_type;
 
@@ -1067,10 +1009,16 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 /* compute distance from corner */
                 INTERVAL_DIFF_TYPE_T d[K];
                 Cube::distance_manhattan(corner.cube, partite.cube, d);
+                if (d[0] < 0)
+                {
+                    d[0] += this->ld * this->sizeof_type;
+                    d[1] -= 1;
+                }
+                assert(d[0] >= 0);
+                assert(d[1] >= 0);
 
-                // TODO : the allocation is assumed col major, cuda
-                static_assert(K == 2);
-                const uintptr_t begin_addr = chunk->device_ptr + d[1] + d[0]*ld*sizeof_type;
+                const uintptr_t offset = d[0] + d[1]*ld*sizeof_type;
+                const uintptr_t begin_addr = chunk->device_ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
                 const uint8_t allocation_view_id = replicate.nallocations++;
@@ -1082,7 +1030,6 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 replicate.allocations[allocation_view_id] = r;
                 partite.dst_allocation_view_id = allocation_view_id;
             }
-            # endif
         }
 
         /* look for a continuous allocation that can store 'access' for the given partition */
