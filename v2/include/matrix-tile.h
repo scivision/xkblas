@@ -103,18 +103,20 @@ typedef struct  matrix_tile_t
     begin_addr(void) const
     {
         assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
+        assert(this->offset_n >= 0);
+        assert(this->offset_m >= 0);
 
         switch (this->order)
         {
             case (MATRIX_ROWMAJOR):
                 return this->addr +
-                    (this->offset_n * this->sizeof_type) +
-                    (this->offset_m * this->sizeof_type * this->ld);
+                    ((size_t)this->offset_n * this->sizeof_type) +
+                    ((size_t)this->offset_m * this->sizeof_type * this->ld);
 
             case (MATRIX_COLMAJOR):
                 return this->addr +
-                    (this->offset_n * this->sizeof_type * this->ld) +
-                    (this->offset_m * this->sizeof_type);
+                    ((size_t)this->offset_n * this->sizeof_type * this->ld) +
+                    ((size_t)this->offset_m * this->sizeof_type);
         }
         abort();
     }
@@ -124,18 +126,20 @@ typedef struct  matrix_tile_t
     end_addr(void) const
     {
         assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
+        assert(this->offset_n >= 0);
+        assert(this->offset_m >= 0);
 
         switch (this->order)
         {
             case (MATRIX_ROWMAJOR):
                 return this->addr +
-                    ((this->offset_n + this->n) * this->sizeof_type) +
-                    ((this->offset_m + this->m) * this->sizeof_type * this->ld);
+                    (((size_t)this->offset_n + this->n) * this->sizeof_type) +
+                    (((size_t)this->offset_m + this->m) * this->sizeof_type * this->ld);
 
             case (MATRIX_COLMAJOR):
                 return this->addr +
-                    ((this->offset_n + this->n) * this->sizeof_type * this->ld) +
-                    ((this->offset_m + this->m) * this->sizeof_type);
+                    (((size_t)this->offset_n + this->n) * this->sizeof_type * this->ld) +
+                    (((size_t)this->offset_m + this->m) * this->sizeof_type);
         }
         abort();
     }

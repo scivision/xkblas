@@ -750,12 +750,12 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         static inline int
         fetch_access_find_src(
             xkblas_driver_t * driver,
-            int dst_device_global_id,
-            int valid
+            xkblas_device_global_id_t dst_device_global_id,
+            xkblas_device_global_id_bitfield_t valid
         ) {
-            int src = driver->f_get_source(dst_device_global_id, valid);
+            xkblas_device_global_id_bitfield_t src = driver->f_get_source(dst_device_global_id, valid);
             if (src == -1) // Driver failed to find a valid source
-                src = __builtin_ffs(valid) - 1;
+                src = (xkblas_device_global_id_bitfield_t) (__builtin_ffs(valid) - 1);
             assert(src >= 0);
             return src;
         }
@@ -895,7 +895,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 MemoryBlock & block = node->block;
 
-                const memory_allocation_view_id_bitfield_t devbit = 1 << device->global_id;
+                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device->global_id);
 
                 const bool valid_on_any_device        = block.valid != 0;
                 const bool valid_on_device            = block.valid &  devbit;
@@ -1155,7 +1155,7 @@ next_view:
                     /* destinary allocation view id (cannot be host in this routine) */
                     const int dst_allocation_view_id = partite.dst_allocation_view_id;
                     assert(dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
-                    const memory_allocation_view_id_bitfield_t dst_allocbit = (1 << dst_allocation_view_id);
+                    const memory_allocation_view_id_bitfield_t dst_allocbit = (memory_allocation_view_id_bitfield_t) (1 << dst_allocation_view_id);
 
                     /* partite and its view are already valid on that device */
                     MemoryReplicate & dst_replicate = partite.block->replicates[device->global_id];
@@ -1294,10 +1294,10 @@ next_view:
             /* if access has a write mode, invalidate all copies */
             if (access->mode & ACCESS_MODE_W)
             {
-                const memory_allocation_view_id_bitfield_t devbit   = (1 << device->global_id);
+                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device->global_id);
                 for (Partite & partite : partition.partites)
                 {
-                    const memory_allocation_view_id_bitfield_t allocbit = (1 << partite.dst_allocation_view_id);
+                    const memory_allocation_view_id_bitfield_t allocbit = (memory_allocation_view_id_bitfield_t) (1 << partite.dst_allocation_view_id);
 
                     /* invalidate all replicates */
                     # pragma message(TODO "Can validity be managed in a more lazy way ?")
@@ -1630,13 +1630,13 @@ next_view:
                 /* search for tasks awaiting on that cube for a given allocation */
                 case (Search::Type::SEARCH_AWAITING):
                 {
+                    const xkblas_device_global_id_bitfield_t devbit = (xkblas_device_global_id_bitfield_t) (1 << search.device_global_id);
                     MemoryReplicate & replicate = node->block.replicates[search.device_global_id];
-                    const memory_allocation_view_id_bitfield_t devbit = (1 << search.device_global_id);
 
                     /* for each allocation of that block */
                     for (memory_allocation_view_id_t allocation_view_id = 0 ; allocation_view_id < replicate.nallocations ; ++allocation_view_id)
                     {
-                        const memory_allocation_view_id_bitfield_t allocbit = (1 << allocation_view_id);
+                        const memory_allocation_view_id_bitfield_t allocbit = (memory_allocation_view_id_bitfield_t) (1 << allocation_view_id);
                         MemoryReplicateAllocationView * allocation_view = replicate.allocations[allocation_view_id];
 
                         /* if it matches the allocation being searched */

@@ -233,7 +233,7 @@ install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
-    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv)
+    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_RT_FOUND})
         target_compile_options(${XKBLAS_NAME}_cuda_driver PRIVATE ${STRICT_OPTIONS})

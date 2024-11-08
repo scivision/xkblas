@@ -75,7 +75,7 @@ using namespace std::placeholders;
 # include <cstdint>
 
 static inline int
-log2(int n)
+log2(unsigned int n)
 {
     return 31 - __builtin_clz(n);
 }

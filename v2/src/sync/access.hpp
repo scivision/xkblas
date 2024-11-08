@@ -21,7 +21,6 @@ class access_t
 
     public:
         access_t() : cubes(), mode(ACCESS_MODE_VOID) {}
-        access_t(const access_t & access) : access_t(access.cube, access.mode) {}
 
         // Welcome traveller \o/ I am glad you found me
         //

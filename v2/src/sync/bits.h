@@ -15,7 +15,7 @@ __random_set_bit(xkblas_device_global_id_bitfield_t bitfield)
     /* must be true, as 'builtin_popcount' works on 'int' type */
     static_assert(sizeof(xkblas_device_global_id_bitfield_t) <= sizeof(int));
 
-    const int nb = __builtin_popcount(static_cast<int>(bitfield));
+    const int nb = __builtin_popcount(bitfield);
     xkblas_device_global_id_t idx = 0;
     int k = rand_r(&seed) % nb;
     for (int i = 0; i <= k; ++i)
