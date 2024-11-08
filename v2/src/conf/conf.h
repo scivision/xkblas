@@ -42,7 +42,7 @@ typedef struct  xkblas_conf_device_t
 
 typedef struct  xkblas_conf_kernel_t
 {
-    size_t tile[2];
+    size_t tile;
 }               xkblas_conf_kernel_t;
 
 //////////////////////////////////////////////////////////////////

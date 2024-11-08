@@ -116,20 +116,20 @@ xkblas_£copyscale_async(
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_COPYSCALE].tile;
-    if (tile[0] == 0 || tile[1] == 0)
+    size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_COPYSCALE].tile;
+    if (ts == 0)
     {
         int args[2] = {m, n};
-        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_COPYSCALE, args, tile);
+        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_COPYSCALE, args, &ts);
     }
 
     /* set tiling parameters */
-    const size_t Dmb = tile[1];
-    const size_t Dnb = tile[1];
-    const size_t Lmb = tile[0];
-    const size_t Lnb = tile[1];
-    const size_t Umb = tile[1];
-    const size_t Unb = tile[0];
+    const size_t Dmb = ts;
+    const size_t Dnb = ts;
+    const size_t Lmb = ts;
+    const size_t Lnb = ts;
+    const size_t Umb = ts;
+    const size_t Unb = ts;
 
     const size_t Dm  = n;
     const size_t Dn  = n;

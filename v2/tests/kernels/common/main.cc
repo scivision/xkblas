@@ -92,13 +92,11 @@ static int
 main_gemm_gemm(char ** args)
 {
     /* parse arguments */
-    int m     = atoi(args[0]);
-    int n     = atoi(args[1]);
-    int k     = atoi(args[2]);
-    int bs1_m = atoi(args[3]);
-    int bs1_n = atoi(args[4]);
-    int bs2_m = atoi(args[5]);
-    int bs2_n = atoi(args[6]);
+    int m   = atoi(args[0]);
+    int n   = atoi(args[1]);
+    int k   = atoi(args[2]);
+    int ts1 = atoi(args[3]);
+    int ts2 = atoi(args[4]);
 
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
@@ -132,10 +130,10 @@ main_gemm_gemm(char ** args)
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             {
                 uint64_t t0 = get_nanotime();
-                impl.set_tile(bs1_m, bs1_n);
+                impl.set_tile(ts1);
                 impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-                impl.set_tile(bs2_m, bs2_n);
+                impl.set_tile(ts2);
                 impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
                 impl.coherent(CImpl, m, n, ld);
@@ -173,15 +171,17 @@ main_gemm(char ** args)
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int k = atoi(args[2]);
-    int bs_m = atoi(args[3]);
-    int bs_n = atoi(args[4]);
+    int ts = atoi(args[3]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
 
     /* currently only support this */
-    int ld = m + n + k;
+    int ld = MAX(MAX(m, n), k) * 2;
 
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
+
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
 
     /* allocate matrices */
     uintptr_t matrices[5];
@@ -191,8 +191,22 @@ main_gemm(char ** args)
     # define CRef  ((TYPE *)matrices[3])
     # define CImpl ((TYPE *)matrices[4])
     prepare_n_matrices(matrices, 5, ld);
-    FILL(&alpha, 1);
-    FILL(&beta, 1);
+
+    # if 1
+    alpha = (TYPE) 1.0;
+    beta  = (TYPE) 1.0;
+    memset(A, 0, ld * ld * sizeof(TYPE));
+    memset(B, 0, ld * ld * sizeof(TYPE));
+    memset(C, 0, ld * ld * sizeof(TYPE));
+    for (int i = 0 ; i < ld ; ++i)
+    {
+        B[i * ld + i] = 1.0;
+        for (int j = 0 ; j < ld ; ++j)
+        {
+            A[i * ld + j] = i * j;
+        }
+    }
+    # endif
 
     int t1 = 0;
     int t2 = 1;
@@ -206,7 +220,7 @@ main_gemm(char ** args)
 
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             uint64_t t0 = get_nanotime();
-            impl.set_tile(bs_m, bs_n);
+            impl.set_tile(ts);
             impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
             impl.coherent(CImpl, m, n, ld);
             uint64_t tt = get_nanotime();
@@ -241,8 +255,7 @@ main_syrk(char ** args)
     CBLAS_TRANSPOSE trans = CblasNoTrans;
     int n = atoi(args[0]);
     int k = atoi(args[1]);
-    int bs_m = atoi(args[2]);
-    int bs_n = atoi(args[3]);
+    int ts = atoi(args[2]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
 
@@ -267,7 +280,7 @@ main_syrk(char ** args)
     printf("Running implementation...\n");
     {
         uint64_t t0 = get_nanotime();
-        impl.set_tile(bs_m, bs_n);
+        impl.set_tile(ts);
         impl.syrk(uplo, trans, n, k, &alpha, A, ld, &beta, CImpl, ld);
         impl.coherent(CImpl, n, n, ld);
         uint64_t tt = get_nanotime();
@@ -297,8 +310,7 @@ main_trsm(char ** args)
     /* parse arguments */
     int m = atoi(args[0]);
     int n = atoi(args[1]);
-    int bs_m = atoi(args[2]);
-    int bs_n = atoi(args[3]);
+    int ts = atoi(args[2]);
     TYPE alpha = (const TYPE) 0.0;
 
     /* currently only support this */
@@ -342,7 +354,7 @@ main_trsm(char ** args)
                     printf("Running implementation with (%s, %s, %s, %s)\n",
                             SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
                     uint64_t t0 = get_nanotime();
-                    impl.set_tile(bs_m, bs_n);
+                    impl.set_tile(ts);
                     impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld);
                     impl.coherent(BImpl, m, n, ld);
                     impl.wait();
@@ -371,10 +383,9 @@ main_trsm(char ** args)
 static int
 main_copyscale(char ** args)
 {
-    int m    = atoi(args[0]);
-    int n    = atoi(args[1]);
-    int bs_m = atoi(args[2]);
-    int bs_n = atoi(args[3]);
+    int m  = atoi(args[0]);
+    int n  = atoi(args[1]);
+    int ts = atoi(args[2]);
 
     /* currently only support this */
     int ld = MAX(m, n);
@@ -393,7 +404,7 @@ main_copyscale(char ** args)
         uint64_t t0 = get_nanotime();
         bool should_copy = true;
         int * IW = NULL;
-        impl.set_tile(bs_m, bs_n);
+        impl.set_tile(ts);
         impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
         impl.coherent(L, m, n, ld);
         impl.coherent(U, n, m, ld);
@@ -418,7 +429,7 @@ main_trsm_copyscale_gemm(char ** args)
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int k = atoi(args[2]);
-    int bs = atoi(args[3]);
+    int ts = atoi(args[3]);
     TYPE alpha = (const TYPE) 0.0;
     TYPE beta  = (const TYPE) 0.0;
     int ld = MAX(MAX(m, n), k);
@@ -449,7 +460,7 @@ main_trsm_copyscale_gemm(char ** args)
         // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
-            impl.set_tile(bs, bs);
+            impl.set_tile(ts);
 
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             uint64_t t0 = get_nanotime();
@@ -503,64 +514,58 @@ static func_t funcs[] = {
     {
         .name = "COPYSCALE",
         .f = main_copyscale,
-        .nargs = 4,
+        .nargs = 3,
         .descr = "???",
         .usage =    "M N BS_M BS_N\n"
-                    "  - M      : number of rows of matrices L, and number of cols of U\n"
-                    "  - N      : number of rows of matrices D and U, cols of matrices D and L\n"
-                    "  - BS_M   : n° of (cols, rows) per tile of (L, U)\n"
-                    "  - BS_N   : n° of (rows, cols) per tile of (L, U)\n"
+                    "  - M  : number of rows of matrices L, and number of cols of U\n"
+                    "  - N  : number of rows of matrices D and U, cols of matrices D and L\n"
+                    "  - TS : tile size\n"
     },
     {
         .name = "GEMM",
         .f = main_gemm,
-        .nargs = 5,
+        .nargs = 4,
         .descr = "C := A.B + C",
-        .usage =    "M N K BS_M BS_N\n"
-                    "  - M      : n° of rows of A and C\n"
-                    "  - N      : n° of cols of B and C\n"
-                    "  - K      : n° of cols of A, rows of B\n"
-                    "  - BS_M   : n° of (cols, rows) per tile of (A, B)\n"
-                    "  - BS_N   : n° of (rows, cols) per tile of (A, B)\n"
+        .usage =    "M N K TS\n"
+                    "  - M    : n° of rows of A and C\n"
+                    "  - N    : n° of cols of B and C\n"
+                    "  - K    : n° of cols of A, rows of B\n"
+                    "  - BS_N : tile size\n"
     },
 
     {
         .name = "SYRK",
         .f = main_syrk,
-        .nargs = 4,
+        .nargs = 3,
         .descr = "C := A.A^T + C",
-        .usage =    "N K BS_M BS_N\n"
-                    "  - N      : n° of rows of A and C\n"
-                    "  - K      : n° of cols of A\n"
-                    "  - BS_M   : n° of rows per tile of A\n"
-                    "  - BS_N   : n° of cols per tile of A\n"
+        .usage =    "N K TS\n"
+                    "  - N  : n° of rows of A and C\n"
+                    "  - K  : n° of cols of A\n"
+                    "  - TS : tile size\n"
     },
 
     {
         .name = "TRSM",
         .f = main_trsm,
-        .nargs = 4,
+        .nargs = 3,
         .descr = "A.X = B",
-        .usage =    "M N S\n"
-                    "  - M      : number of rows of matrices L\n"
-                    "  - N      : number of rows of matrices D, cols of matrices D and L\n"
-                    "  - BS_M   : n° of (cols, rows) per tile of (D, L)\n"
-                    "  - BS_N   : n° of (rows, cols) per tile of (L, D)\n"
+        .usage =    "M N TS\n"
+                    "  - M  : number of rows of matrices L\n"
+                    "  - N  : number of rows of matrices D, cols of matrices D and L\n"
+                    "  - TS : tile size\n"
     },
 
     {
         .name = "GEMM-GEMM",
         .f = main_gemm_gemm,
-        .nargs = 7,
+        .nargs = 5,
         .descr = "C := a.A.B + b.C - repeat twice with two block sizes",
-        .usage =    "M N K\n"
-                    "  - M      : n° of rows of A and C\n"
-                    "  - N      : n° of cols of B and C\n"
-                    "  - K      : n° of cols of A, rows of B\n"
-                    "  - BS1_M  : 1st gemm block size\n"
-                    "  - BS1_N  : 1st gemm block size\n"
-                    "  - BS2_M  : 2nd gemm block size\n"
-                    "  - BS2_N  : 2nd gemm block size\n"
+        .usage =    "M N K TS1 TS2\n"
+                    "  - M    : n° of rows of A and C\n"
+                    "  - N    : n° of cols of B and C\n"
+                    "  - K    : n° of cols of A, rows of B\n"
+                    "  - TS1  : 1st gemm block size\n"
+                    "  - TS1  : 2nd gemm block size\n"
     },
 
 
@@ -569,11 +574,11 @@ static func_t funcs[] = {
         .f = main_trsm_copyscale_gemm,
         .nargs = 4,
         .descr = "???",
-        .usage =    "M BS\n"
-                    "  - M      : n° of rows of A and C\n"
-                    "  - N      : n° of cols of B and C\n"
-                    "  - K      : n° of cols of A, rows of B\n"
-                    "  - BS : block size\n"
+        .usage =    "M N K TS\n"
+                    "  - M  : n° of rows of A and C\n"
+                    "  - N  : n° of cols of B and C\n"
+                    "  - K  : n° of cols of A, rows of B\n"
+                    "  - TS : tile size\n"
     },
 
 

@@ -8,16 +8,15 @@ void
 xkblas_kernel_auto_tile(
     xkblas_kernel_type_t kernel,
     int * args,
-    size_t * bs
+    size_t * ts
 ) {
-
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
     const int ngpus        = context->drivers.devices.n;
     const int nstream_kern = context->conf.device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].n;
 
-    size_t bs_auto = 0;
+    size_t ts_auto = 0;
     switch (kernel)
     {
         case (XKBLAS_KERNEL_TYPE_GEMM):
@@ -28,7 +27,7 @@ xkblas_kernel_auto_tile(
             int n = args[1];
 
             const double f = 4.0;
-            bs_auto = (size_t) ceil(sqrt((double)m*(double)n / (f * (double)(ngpus * nstream_kern))));
+            ts_auto = (size_t) ceil(sqrt((double)m*(double)n / (f * (double)(ngpus * nstream_kern))));
 
             break ;
         }
@@ -41,11 +40,10 @@ xkblas_kernel_auto_tile(
     }
 
     # define MIN_BS 2048
-    if (bs_auto < MIN_BS)
-        bs_auto = MIN_BS;
+    if (ts_auto < MIN_BS)
+        ts_auto = MIN_BS;
 
-    bs[0] = bs_auto;
-    bs[1] = bs_auto;
+    *ts = ts_auto;
 
-    XKBLAS_DEBUG("Return tile size = (%d,%d)", bs[0], bs[1]);
+    XKBLAS_DEBUG("Return tile size = %lu", *ts);
 }

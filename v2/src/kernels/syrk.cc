@@ -168,19 +168,18 @@ xkblas_£syrk_async(
 
     xkblas_context_t * context = xkblas_context_get();
 
-    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_SYRK].tile;
-    if (tile[0] == 0 || tile[1] == 0)
+    size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_SYRK].tile;
+    if (ts == 0)
     {
         int args[2] = {n, k};
-        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_SYRK, args, tile);
+        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_SYRK, args, &ts);
     }
-    assert(tile[0] == tile[1]);
 
     /* set tiling parameters */
-    const size_t Amb = tile[0];
-    const size_t Anb = tile[1];
-    const size_t Cmb = tile[0];
-    const size_t Cnb = tile[0];
+    const size_t Amb = ts;
+    const size_t Anb = ts;
+    const size_t Cmb = ts;
+    const size_t Cnb = ts;
 
     const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
     const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);

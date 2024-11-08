@@ -124,17 +124,10 @@ impl_t::coherent(
 }
 
 void
-impl_t::set_tile(
-    int m, int n
-) {
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    for (int i = 0 ; i < XKBLAS_KERNEL_TYPE_MAX ; ++i)
-    {
-        context->conf.kernels[i].tile[0] = m;
-        context->conf.kernels[i].tile[1] = n;
-    }
+impl_t::set_tile(int ts)
+{
+    int p = 0;
+    xkblas_set_param(ts, p);
 }
 
 void

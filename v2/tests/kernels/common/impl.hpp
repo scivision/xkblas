@@ -68,7 +68,7 @@ class impl_t
         );
 
         void
-        set_tile(int m, int n);
+        set_tile(int ts);
 
         /* wait for the completion of previously sent operations */
         void wait(void);

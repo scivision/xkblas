@@ -34,10 +34,10 @@ extern volatile uint64_t XKBLAS_LAST_TIME;
         if (LVL <= XKBLAS_VERBOSE)                                              \
         {                                                                       \
             SPINLOCK_LOCK(XKBLAS_PRINT_MTX);                                    \
-            struct timespec ts;                                                 \
-            clock_gettime(CLOCK_MONOTONIC, &ts);                                \
-            uint64_t t = (uint64_t)(ts.tv_sec * 1000000000) +                   \
-                            (uint64_t) ts.tv_nsec;                              \
+            struct timespec _ts;                                                \
+            clock_gettime(CLOCK_MONOTONIC, &_ts);                               \
+            uint64_t t = (uint64_t)(_ts.tv_sec * 1000000000) +                  \
+                            (uint64_t) _ts.tv_nsec;                             \
             if (XKBLAS_LAST_TIME != 0)                                          \
                 XKBLAS_TIME_ELAPSED += (double) (t - XKBLAS_LAST_TIME) / 1e9;   \
             XKBLAS_LAST_TIME = t;                                               \

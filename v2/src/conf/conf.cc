@@ -36,26 +36,18 @@ __parse_tile_size(xkblas_conf_t * conf, char const * value)
     if (value)
     {
         char kernel[32];
-        int m, n;
-        int r = sscanf(value, "%31[^()]%*c%d,%d", kernel, &m, &n);
-        if (r != 3)
-            XKBLAS_FATAL("Invalid `XKBLAS_TILE_SIZE` - parsed %s(%d,%d)", kernel, m, n);
+        int ts;
+        int r = sscanf(value, "%31[^()]%*c%d", kernel, &ts);
+        if (r != 2)
+            XKBLAS_FATAL("Invalid `XKBLAS_TILE_SIZE` - parsed %s(%d)", kernel, ts);
 
-        XKBLAS_DEBUG("Setting tile size for `%s` to `(%d, %d)`", kernel, m, n);
+        XKBLAS_DEBUG("Setting tile size for `%s` to `%d`", kernel, ts);
         if (strcmp(kernel, "gemm") == 0)
-        {
-            conf->kernels[XKBLAS_KERNEL_TYPE_GEMM].tile[0] = m;
-            conf->kernels[XKBLAS_KERNEL_TYPE_GEMM].tile[1] = n;
-        }
+            conf->kernels[XKBLAS_KERNEL_TYPE_GEMM].tile = ts;
         else if (strcmp(kernel, "trsm") == 0)
-        {
-            conf->kernels[XKBLAS_KERNEL_TYPE_TRSM].tile[0] = m;
-            conf->kernels[XKBLAS_KERNEL_TYPE_TRSM].tile[1] = n;
-        }
+            conf->kernels[XKBLAS_KERNEL_TYPE_TRSM].tile = ts;
         else
-        {
             XKBLAS_FATAL("Unknown kernel `%s` set in `XKBLAS_TILE_SIZE`", kernel);
-        }
     }
 }
 
@@ -186,10 +178,7 @@ xkblas_init_conf(xkblas_conf_t * conf)
     //  DEVICE CONF //
     //////////////////
     for (int i = 0 ; i < XKBLAS_KERNEL_TYPE_MAX ; ++i)
-    {
-        conf->kernels[i].tile[0] = 0;
-        conf->kernels[i].tile[1] = 0;
-    }
+        conf->kernels[i].tile = 0;
 
     // check all environment variable and report unknown variables
     for (char ** s = environ; *s; ++s)

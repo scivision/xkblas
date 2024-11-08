@@ -11,14 +11,15 @@ dump_matrix(
     const char * label,
     const TYPE * M,
     const BLAS_INT m,
-    const BLAS_INT n
+    const BLAS_INT n,
+    const BLAS_INT ld
 ) {
     if (m <= 32 && n <= 32)
     {
         printf("---- %s ----\n", label);
         for (int j = 0 ; j < m ; ++j)
             for (int i = 0 ; i < n ; ++i)
-                printf("%4.8f%c", M[i*m+j], (i == n-1) ? '\n' : ' ');
+                printf("%4.3f%c", M[i*ld+j], (i == n-1) ? '\n' : ' ');
 
     }
 }
@@ -29,14 +30,15 @@ dump_matrix_diff(
     const TYPE * A,
     const TYPE * B,
     const BLAS_INT m,
-    const BLAS_INT n
+    const BLAS_INT n,
+    const BLAS_INT ld
 ) {
     if (m <= 32 && n <= 32)
     {
         printf("---- %s ----\n", label);
         for (int j = 0 ; j < m ; ++j)
             for (int i = 0 ; i < n ; ++i)
-                printf("%4.8f%c", A[i*m+j] - B[i*m+j], (i == n-1) ? '\n' : ' ');
+                printf("%4.8f%c", A[i*ld+j] - B[i*ld+j], (i == n-1) ? '\n' : ' ');
 
     }
 }
@@ -84,12 +86,12 @@ gemm_cmp(
 
     assert(CRef != CImpl);
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
-    dump_matrix("A",     A,     Am, An);
-    dump_matrix("B",     B,     Bm, Bn);
-    dump_matrix("C",     C,     Cm, Cn);
-    dump_matrix("CRef",  CRef,  Cm, Cn);
-    dump_matrix("CImpl", CImpl, Cm, Cn);
-    dump_matrix_diff("CRef - CImpl", CRef, CImpl, Cm, Cn);
+    dump_matrix("A", A, Am, An, lda);
+    dump_matrix("B", B, Bm, Bn, ldb);
+    dump_matrix("C", C, Cm, Cn, ldc);
+    dump_matrix("CRef",  CRef,  Cm, Cn, ldc);
+    dump_matrix("CImpl", CImpl, Cm, Cn, ldc);
+    dump_matrix_diff("CRef - CImpl", CRef, CImpl, Cm, Cn, ldc);
 
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;
@@ -171,10 +173,10 @@ syrk_cmp(
     double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
 
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
-    dump_matrix("A",     A,     Am, An);
-    dump_matrix("C",     C,     Cm, Cn);
-    dump_matrix("CRef",  CRef,  Cm, Cn);
-    dump_matrix("CImpl", CImpl, Cm, Cn);
+    dump_matrix("A",     A,     Am, An, lda);
+    dump_matrix("C",     C,     Cm, Cn, ldc);
+    dump_matrix("CRef",  CRef,  Cm, Cn, ldc);
+    dump_matrix("CImpl", CImpl, Cm, Cn, ldc);
 
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;
@@ -228,12 +230,12 @@ trsm_cmp(
     }
 
     printf("alpha=%lf\n", alpha);
-    dump_matrix("A",     A,     Am, An);
-    dump_matrix("B",     B,     Bm, Bn);
-    dump_matrix("BRef",  BRef,  Bm, Bn);
-    dump_matrix("BImpl", BImpl, Bm, Bn);
+    dump_matrix("A",     A,     Am, An, lda);
+    dump_matrix("B",     B,     Bm, Bn, ldb);
+    dump_matrix("BRef",  BRef,  Bm, Bn, ldb);
+    dump_matrix("BImpl", BImpl, Bm, Bn, ldb);
 
-    TYPE * work = (TYPE *)malloc(MAX(m, n)* sizeof(TYPE));
+    TYPE * work = (TYPE *)malloc(MAX(m, n) * sizeof(TYPE));
     assert(work);
     double Anorm        = LAPACKE_slantr_work(LAPACK_COL_MAJOR, 'I', uplo, diag, Am, An, A, lda, work);
     double Bnorm        = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);

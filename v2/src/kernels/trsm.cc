@@ -180,24 +180,21 @@ xkblas_£trsm_async(
     }
 
     xkblas_context_t * context = xkblas_context_get();
-    size_t * tile = context->conf.kernels[XKBLAS_KERNEL_TYPE_TRSM].tile;
-    if (tile[0] == 0 || tile[1] == 0)
+    size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_TRSM].tile;
+    if (ts == 0)
     {
         int args[2] = {m, n};
-        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_TRSM, args, tile);
+        xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_TRSM, args, &ts);
     }
 
-    XKBLAS_IMPL("TODO: trsm tiling");
-    assert(tile[0] == tile[1]);
-
     /* set tiling parameters */
-    const size_t Amb = tile[0];
-    const size_t Anb = tile[0];
+    const size_t Amb = ts;
+    const size_t Anb = ts;
+    const size_t Bmb = ts;
+    const size_t Bnb = ts;
+
     const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
     const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-
-    const size_t Bmb = tile[0];
-    const size_t Bnb = tile[0];
     const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
     const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
 
