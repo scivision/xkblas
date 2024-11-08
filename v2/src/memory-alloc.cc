@@ -51,3 +51,13 @@ xkblas_free(void * ptr, size_t size)
 {
     return xkblas_host_free(ptr, size);
 }
+
+// Added symbols for compatibility with previous version and unified version
+extern "C"
+void xkblas_activate_custom_alloc(){}
+
+extern "C"
+void xkblas_deactivate_custom_alloc(){}
+
+extern "C"
+void xkblas_2D_copy(){}
