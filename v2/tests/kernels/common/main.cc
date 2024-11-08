@@ -165,7 +165,6 @@ main_gemm_gemm(char ** args)
     return 0;
 }
 
-
 // GEMM //
 static int
 main_gemm(char ** args)
@@ -412,6 +411,72 @@ main_copyscale(char ** args)
     return 0;
 }
 
+static int
+main_trsm_copyscale_gemm(char ** args)
+{
+    /* parse arguments */
+    int m = atoi(args[0]);
+    int n = atoi(args[1]);
+    int k = atoi(args[2]);
+    int bs = atoi(args[3]);
+    TYPE alpha = (const TYPE) 0.0;
+    TYPE beta  = (const TYPE) 0.0;
+    int ld = MAX(MAX(m, n), k);
+
+    /* allocate matrices */
+    uintptr_t matrices[4];
+    # define D  ((TYPE *)matrices[0])
+    # define L  ((TYPE *)matrices[1])
+    # define U  ((TYPE *)matrices[2])
+    # define G  ((TYPE *)matrices[3])
+    prepare_n_matrices(matrices, 4, ld);
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
+
+    int s = 0;
+    int u = 0;
+    int d = 0;
+    int t = 0;
+    int t1 = 0;
+    int t2 = 0;
+    bool should_copy = true;
+    int * IW = NULL;
+
+    // trsm en CblasLeft, CblasUpper, CBlasTrans, CBlasUnit et le gemm CBlasNoTrans, CBlasNoTrans
+
+    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    {
+        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        {
+            impl.reset();
+            impl.set_tile(bs, bs);
+
+            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
+            uint64_t t0 = get_nanotime();
+            assert(m == n);
+            impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, k, &alpha, D, ld, L, ld);
+            impl.copyscale(m, k, should_copy, IW, D, ld, L, ld, U, ld);
+            impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, L, ld, U, ld, &beta, G, ld);
+            impl.coherent(D, k, k, ld);
+            impl.coherent(L, m, k, ld);
+            impl.coherent(U, k, n, ld);
+            impl.coherent(G, m, n, ld);
+            uint64_t tt = get_nanotime();
+            impl.wait();
+            uint64_t tf = get_nanotime();
+            printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+        }
+    }
+
+    # undef D
+    # undef L
+    # undef U
+    # undef G
+
+    return 0;
+}
+
+
 typedef struct  func_t
 {
     const char * name;
@@ -496,6 +561,19 @@ static func_t funcs[] = {
                     "  - BS1_N  : 1st gemm block size\n"
                     "  - BS2_M  : 2nd gemm block size\n"
                     "  - BS2_N  : 2nd gemm block size\n"
+    },
+
+
+    {
+        .name = "TRSM-COPYSCALE-GEMM",
+        .f = main_trsm_copyscale_gemm,
+        .nargs = 4,
+        .descr = "???",
+        .usage =    "M BS\n"
+                    "  - M      : n° of rows of A and C\n"
+                    "  - N      : n° of cols of B and C\n"
+                    "  - K      : n° of cols of A, rows of B\n"
+                    "  - BS : block size\n"
     },
 
 

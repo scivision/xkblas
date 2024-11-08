@@ -15,11 +15,11 @@ access_mode_to_str(access_mode_t mode)
     switch (mode)
     {
         case (ACCESS_MODE_R):
-            return "r";
+            return "ACCESS_MODE_R";
         case (ACCESS_MODE_W):
-            return "w";
+            return "ACCESS_MODE_W";
         case (ACCESS_MODE_RW):
-            return "rw";
+            return "ACCESS_MODE_RW";
         default:
             return "unkn";
     }

@@ -1422,11 +1422,17 @@ next_view:
             {
                 # pragma message(TODO "Step (1) and (2) could be merged to only search once")
 
-                # if 0
+                # if 1
                 XKBLAS_DEBUG(
-                    "Interval(%16d, %16d), Interval(%16d, %16d),",
-                    access->cube[0].a, access->cube[0].b,
-                    access->cube[1].a, access->cube[1].b
+                    "KMemoryAccess<2>(MATRIX_COLMAJOR, (void *) %p, %lu, %lu, %lu, %lu, %lu, %lu, %s),",
+                    access->host_view.addr,
+                    access->host_view.ld,
+                    access->host_view.offset_m,
+                    access->host_view.offset_n,
+                    access->host_view.m,
+                    access->host_view.n,
+                    access->host_view.sizeof_type,
+                    access_mode_to_str(access->mode)
                 );
                 # endif
 
