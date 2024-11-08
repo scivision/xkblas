@@ -188,8 +188,7 @@ xkblas_memory_coherent_async_worker_thread_work(
         assert(is_alignedas(task_size, CACHE_LINE_SIZE));
         assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
-        // uint8_t * mem  = thread->allocate(task_size + args_size);
-        uint8_t * mem  = (uint8_t *) malloc(task_size + args_size);
+        uint8_t * mem = thread->allocate(task_size + args_size);
         assert(mem);
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);

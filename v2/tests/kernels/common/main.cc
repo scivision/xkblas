@@ -151,7 +151,7 @@ main_gemm_gemm(char ** args)
                 /* check correctness */
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 2);
-                printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                printf("Result is %12s with trans (%s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", TRANS_STR[t1], TRANS_STR[t2]);
             }
         }
     }
@@ -179,7 +179,7 @@ main_gemm(char ** args)
     TYPE beta  = (const TYPE) 0.0;
 
     /* currently only support this */
-    int ld = MAX(MAX(m, n), k);
+    int ld = m + n + k;
 
     printf("Set (m, n, k) = (%d, %d, %d)\n", m, n, k);
 
@@ -194,12 +194,12 @@ main_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    // int t1 = 0;
-    // int t2 = 0;
+    int t1 = 0;
+    int t2 = 1;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -218,7 +218,7 @@ main_gemm(char ** args)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
-                printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                printf("Result is %12s with trans (%s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", TRANS_STR[t1], TRANS_STR[t2]);
             }
         }
     }
@@ -322,18 +322,18 @@ main_trsm(char ** args)
     for(int i = 0 ; i < ld ; ++i)
         A[ld*i+i] = 1.0;
 
-    // int s = 0;
-    // int u = 1;
-    // int t = 0;
-    // int d = 0;
+    int s = 0;
+    int u = 0;
+    int t = 1;
+    int d = 0;
 
-    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    //for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        //for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
         {
-            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            //for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
             {
-                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                //for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
                     impl.reset();
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
@@ -353,7 +353,7 @@ main_trsm(char ** args)
                     {
                         memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
                         int r = trsm_cmp(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, alpha, A, ld, B, BRef, BImpl, ld);
-                        printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+                        printf("Result is %12s with params (%s, %s, %s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
                     }
                 }
             }

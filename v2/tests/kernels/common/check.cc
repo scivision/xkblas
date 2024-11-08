@@ -18,7 +18,25 @@ dump_matrix(
         printf("---- %s ----\n", label);
         for (int j = 0 ; j < m ; ++j)
             for (int i = 0 ; i < n ; ++i)
-                printf("%4.4f%c", M[i*m+j], (i == n-1) ? '\n' : ' ');
+                printf("%4.8f%c", M[i*m+j], (i == n-1) ? '\n' : ' ');
+
+    }
+}
+
+static void
+dump_matrix_diff(
+    const char * label,
+    const TYPE * A,
+    const TYPE * B,
+    const BLAS_INT m,
+    const BLAS_INT n
+) {
+    if (m <= 32 && n <= 32)
+    {
+        printf("---- %s ----\n", label);
+        for (int j = 0 ; j < m ; ++j)
+            for (int i = 0 ; i < n ; ++i)
+                printf("%4.8f%c", A[i*m+j] - B[i*m+j], (i == n-1) ? '\n' : ' ');
 
     }
 }
@@ -64,12 +82,14 @@ gemm_cmp(
     double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
     double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
 
+    assert(CRef != CImpl);
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
     dump_matrix("A",     A,     Am, An);
     dump_matrix("B",     B,     Bm, Bn);
     dump_matrix("C",     C,     Cm, Cn);
     dump_matrix("CRef",  CRef,  Cm, Cn);
     dump_matrix("CImpl", CImpl, Cm, Cn);
+    dump_matrix_diff("CRef - CImpl", CRef, CImpl, Cm, Cn);
 
     double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;

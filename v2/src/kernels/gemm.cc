@@ -207,10 +207,10 @@ xkblas_£gemm_async(
     # define C(I, J) C, (I)*Cmb, (J)*Cnb, ldc
 
     // iterator on tiles
-    for (int tm = 0; tm < Cmt; ++tm)
+    for (size_t tm = 0; tm < Cmt; ++tm)
     {
         size_t bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
-        for (int tn = 0; tn < Cnt; tn++)
+        for (size_t tn = 0; tn < Cnt; tn++)
         {
             size_t bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
             // A: CblasNoTrans / B: CblasNoTrans
@@ -218,7 +218,7 @@ xkblas_£gemm_async(
             {
                 if (transB == CblasNoTrans)
                 {
-                    for (int tk = 0; tk < Ant; ++tk)
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
                         size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
@@ -237,7 +237,7 @@ xkblas_£gemm_async(
                 // A: CblasNoTrans / B: CBlasTrans
                 else
                 {
-                    for (int tk = 0; tk < Ant; ++tk)
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
                         size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
@@ -259,7 +259,7 @@ xkblas_£gemm_async(
             {
                 if (transB == CblasNoTrans)
                 {
-                    for (int tk = 0; tk < Amt; ++tk)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
                         size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
@@ -278,7 +278,7 @@ xkblas_£gemm_async(
                 // A: CblasTrans / B: CBlasTrans
                 else
                 {
-                    for (int tk = 0; tk < Amt; ++tk)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
                         size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
