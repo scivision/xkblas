@@ -69,13 +69,11 @@ class access_t
                     const uintptr_t y0 = A / (LD * s);
                     const uintptr_t y1 = y0 + n;
 
-                    const Interval list[K] = {
-                        Interval(x0, x1),
-                        Interval(y0, y1)
-                    };
-
-                    this->cubes[0].set_list(list);
-                    assert(!this->cubes[0].is_empty());
+                    {
+                        const Interval list[K] = { Interval(x0, x1), Interval(y0, y1) };
+                        this->cubes[0].set_list(list);
+                        assert(!this->cubes[0].is_empty());
+                    }
 
                     assert( this->cubes[1].is_empty());
                 }

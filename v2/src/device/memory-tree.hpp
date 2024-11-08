@@ -430,10 +430,11 @@ class KMemoryTreeNodeSearch {
 
        /* different search type */
        enum Type : uint8_t {
-           INSERTING_BLOCKS     = 0,
-           SEARCH_FOR_BLOCKS    = 1,
-           SEARCH_AWAITING      = 2,
-           SEARCH_OWNERS        = 3
+           INSERTING_BLOCKS     = 0,    // insert new blocks
+           SEARCH_FOR_PARTITION = 1,    // search for a partition
+           SEARCH_AWAITING      = 2,    // search tasks awaiting on blocks (to be transfered onto a gpu, typically)
+           SEARCH_OWNERS        = 3,    // search how many bytes owns each device
+           SEARCH_FOR_BLOCKS    = 4     // search for blocks intersecting, but not necessarily being a partition (access can be larger than the ones inserted)
        };
 
    public:
@@ -456,7 +457,7 @@ class KMemoryTreeNodeSearch {
        Access * access;
 
        ///////////////////////////////////////
-       // used if type == SEARCH_FOR_BLOCKS //
+       // used if type == SEARCH_FOR_PARTITION //
        ///////////////////////////////////////
 
        /*
@@ -473,7 +474,6 @@ class KMemoryTreeNodeSearch {
             std::vector<Task *> tasks;
             std::vector<MemoryForward> forwards;
         } awaiting;
-
 
         ///////////////////////////////////
         // used if type == SEARCH_OWNERS //
@@ -501,6 +501,14 @@ class KMemoryTreeNodeSearch {
        {
            this->access = a;
            this->type = INSERTING_BLOCKS;
+       }
+
+       void
+       prepare_search_partition(void)
+       {
+           assert(this->partition.partites.size() == 0);
+           this->partition.partites.clear();
+           this->type = SEARCH_FOR_PARTITION;
        }
 
        void
@@ -821,10 +829,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             assert(list);
 
             Search search(HOST_DEVICE_GLOBAL_ID);
-            search.prepare_search_blocks();
             this->lock();
             {
                 /* find all blocks that intersects with that access */
+                search.prepare_search_blocks();
                 for (int i = 0 ; i < NC ; ++i)
                     this->intersect(search, cubes[i], ACCESS_MODE_R);
 
@@ -1442,7 +1450,7 @@ next_view:
                 this->insert(search, access->cubes[1], access->mode);
 
                 /* step (2) find all blocks representing the access */
-                search.prepare_search_blocks();
+                search.prepare_search_partition();
                 this->intersect(search, access->cubes[0], access->mode);
                 this->intersect(search, access->cubes[1], access->mode);
                 assert(search.partition.partites.size() >= 1);
@@ -1617,12 +1625,18 @@ next_view:
 
             switch (search.type)
             {
+                case (Search::Type::SEARCH_FOR_PARTITION):
+                {
+                    /* intersecting against 'cube' that had been inserted
+                     * previously, so 'node' must be a sub-block of 'cube'
+                     */
+                    assert(cube.includes(node->cube));
+                    search.partition.partites.push_back(Partite(&(node->block), node->cube));
+                    break ;
+                }
+
                 case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
-                    /* intersecting against 'cube' that had been inserted previously,
-                     * so 'node' must be a sub-block of 'cube' */
-                    assert(cube.includes(node->cube));
-
                     search.partition.partites.push_back(Partite(&(node->block), node->cube));
                     break ;
                 }
