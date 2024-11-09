@@ -72,8 +72,8 @@ xkblas_£copyscale_tile_async(
     # define NACCESSES 3
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     new(task->accesses + 0) Access(MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, L, ldl, Lm, Ln, m, n, sizeof(TYPE), ACCESS_MODE_RW);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, U, ldu, Um, Un, n, m, sizeof(TYPE), ACCESS_MODE_W);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW);
+    new(task->accesses + 2) Access(MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W);
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 

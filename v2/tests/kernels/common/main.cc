@@ -211,9 +211,9 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 1;
 
-    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -339,13 +339,13 @@ main_trsm(char ** args)
     int t = 1;
     int d = 0;
 
-    //for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        //for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
         {
-            //for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
             {
-                //for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
                     impl.reset();
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
@@ -455,9 +455,9 @@ main_trsm_copyscale_gemm(char ** args)
 
     // trsm en CblasLeft, CblasUpper, CBlasTrans, CBlasUnit et le gemm CBlasNoTrans, CBlasNoTrans
 
-    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             impl.set_tile(ts);

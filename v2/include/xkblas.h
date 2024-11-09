@@ -56,7 +56,7 @@ extern "C" {
     int xkblas_unregister_memory(void * ptr, uint64_t sz);
     int xkblas_register_memory_waitall(void);
 
-    int xkblas_get_ngpus(void);
+    int xkblas_get_ngpus(int * count);
 
     //////////////////////////////////
     // DEPRECATED LEGACY INTERFACES //

@@ -252,7 +252,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const INTERVAL_DIFF_TYPE_T offset   = d[0] + d[1] * inheriting_allocation->view.ld * sizeof_type;
+                    const INTERVAL_DIFF_TYPE_T offset   = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr          = (uintptr_t) ((INTERVAL_DIFF_TYPE_T) inheriting_allocation->view.addr + offset);
                     assert(begin_addr >= inheriting_allocation->chunk->device_ptr);
 
@@ -353,16 +353,16 @@ class KMemoryTreeNodeSearch {
                     memory_view_t host_view;
 
                     host_view.order         = MATRIX_COLMAJOR;
-                    host_view.addr          = this->cube[0].a + this->cube[1].a * ld * sizeof_type;
+                    host_view.addr          = this->cube[ACCESS_CUBE_ROW_DIM].a + this->cube[ACCESS_CUBE_COL_DIM].a * ld * sizeof_type;
                     host_view.ld            = ld;
                     host_view.offset_m      = 0;
                     host_view.offset_n      = 0;
-                    host_view.m             = this->cube[0].length() / sizeof_type;
-                    host_view.n             = this->cube[1].length();
+                    host_view.m             = this->cube[ACCESS_CUBE_ROW_DIM].length() / sizeof_type;
+                    host_view.n             = this->cube[ACCESS_CUBE_COL_DIM].length();
                     host_view.sizeof_type   = sizeof_type;
 
                     // accesses must be aligned on sizeof(type)
-                    assert(host_view.m * sizeof_type == this->cube[0].length());
+                    assert(host_view.m * sizeof_type == this->cube[ACCESS_CUBE_ROW_DIM].length());
 
                     return host_view;
                 }
@@ -370,16 +370,29 @@ class KMemoryTreeNodeSearch {
                 bool
                 operator<(const Partite & p) const
                 {
-                    for (int k = K - 1 ; k >= 0 ; --k)
-                    {
-                        if (this->cube[k].a < p.cube[k].a)
-                            return true;
-                        else if (this->cube[k].a > p.cube[k].a)
-                            return false;
-                        else
-                            continue ;
-                    }
-                    assert(0 && "Partites should be disjointed... and you should not compare 'this' with 'p'");
+                    const bool is_left  = this->cube[ACCESS_CUBE_COL_DIM].a < p.cube[ACCESS_CUBE_COL_DIM].a;
+                    const bool is_right = this->cube[ACCESS_CUBE_COL_DIM].a > p.cube[ACCESS_CUBE_COL_DIM].a;
+
+                    if (is_left)
+                        return true;
+
+                    if (is_right)
+                        return false;
+
+                    // vertically aligned
+                    assert(this->cube[ACCESS_CUBE_COL_DIM].a == p.cube[ACCESS_CUBE_COL_DIM].a);
+
+                    const bool is_up    = this->cube[ACCESS_CUBE_ROW_DIM].a < p.cube[ACCESS_CUBE_ROW_DIM].a;
+                    const bool is_down  = this->cube[ACCESS_CUBE_ROW_DIM].a > p.cube[ACCESS_CUBE_ROW_DIM].a;
+
+                    if (is_up)
+                        return true;
+
+                    if (is_down)
+                        return false;
+
+                    // horizontally aligned
+                    assert(0 && "Partites should be disjointed... and you should not compare 'this' to itself");
                     return false;
                 }
 
@@ -828,6 +841,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         ) {
             assert(list);
 
+            # pragma message(TODO "merge continuous partites using the same 'chunk'")
+
             Search search(HOST_DEVICE_GLOBAL_ID);
             this->lock();
             {
@@ -1017,15 +1032,15 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 /* compute distance from corner */
                 INTERVAL_DIFF_TYPE_T d[K];
                 Cube::distance_manhattan(corner.cube, partite.cube, d);
-                if (d[0] < 0)
+                if (d[ACCESS_CUBE_ROW_DIM] < 0)
                 {
-                    d[0] += this->ld * this->sizeof_type;
-                    d[1] -= 1;
+                    d[ACCESS_CUBE_ROW_DIM] += this->ld * this->sizeof_type;
+                    d[ACCESS_CUBE_COL_DIM] -= 1;
                 }
-                assert(d[0] >= 0);
-                assert(d[1] >= 0);
+                assert(d[ACCESS_CUBE_ROW_DIM] >= 0);
+                assert(d[ACCESS_CUBE_COL_DIM] >= 0);
 
-                const uintptr_t offset = d[0] + d[1]*ld*sizeof_type;
+                const uintptr_t offset = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM]*ld*sizeof_type;
                 const uintptr_t begin_addr = chunk->device_ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device->global_id];
@@ -1384,6 +1399,8 @@ next_view:
             Access * access,
             Partition & partition
         ) {
+            # pragma message(TODO "merge continuous partites using the same 'chunk'")
+
             if (access->mode & ACCESS_MODE_R)
             {
                 for (Partite & partite : partition.partites)
@@ -1561,7 +1578,8 @@ next_view:
 
             assert(node->cube[k].b >= interval.b);
 
-            if (k == 0)
+            // must be aligned on sizeof(type)
+            if (k == ACCESS_CUBE_ROW_DIM)
             {
                 const INTERVAL_DIFF_TYPE_T db = node->cube[k].b - interval.b;
                 (void) db;
@@ -1578,7 +1596,7 @@ next_view:
                     for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
-                        const INTERVAL_DIFF_TYPE_T offset = (k == 0) ? da : (da * allocation_view->view.ld * this->sizeof_type);
+                        const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_CUBE_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
                         allocation_view->view.addr += offset;
                         assert(allocation_view->view.addr >= allocation_view->chunk->device_ptr);
                     }

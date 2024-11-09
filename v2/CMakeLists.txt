@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.7)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 # TODO : rename me to 'xkblas' for retro-compatibility (some interfaces may be missing)
-SET(XKBLAS_NAME xkblas-v2)
+# SET(XKBLAS_NAME xkblas-v2)
+SET(XKBLAS_NAME xkblas)
 
 # Project name
 project(${XKBLAS_NAME})

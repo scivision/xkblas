@@ -5,6 +5,18 @@
 # include "cube.hpp"
 # include "matrix-tile.h"
 
+/**
+ *  We assume col major, dim 0 is for rows; dim 1 is for cols.
+ *  These variables controls how a matrix (A, m, n, LD) is converted to an
+ *  hypercube for the xktree.
+ *
+ *  e.g the matrix (0, 4, 8, 8) can whether be represented as the hypercube
+ *      (0:4, 0:8) - if ACCESS_CUBE_ROW_DIM == 0
+ *   or (0:8, 0:4) - if ACCESS_CUBE_ROW_DIM == 1
+ */
+# define ACCESS_CUBE_ROW_DIM 0
+# define ACCESS_CUBE_COL_DIM (1 - ACCESS_CUBE_ROW_DIM)
+
 template<int K>
 class access_t
 {
@@ -70,7 +82,9 @@ class access_t
                     const uintptr_t y1 = y0 + n;
 
                     {
-                        const Interval list[K] = { Interval(x0, x1), Interval(y0, y1) };
+                        Interval list[K];
+                        list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
+                        list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
                         this->cubes[0].set_list(list);
                         assert(!this->cubes[0].is_empty());
                     }
@@ -101,13 +115,18 @@ class access_t
                     const uintptr_t y3 = y1 + 1;
 
                     {
-                        const Interval list0[K] = { Interval(x0, x1), Interval(y0, y1) };
+                        Interval list0[K];
+                        list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
+                        list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
+
                         this->cubes[0].set_list(list0);
                         assert(!this->cubes[0].is_empty());
                     }
 
                     {
-                        const Interval list1[K] = { Interval(x2, x3), Interval(y2, y3) };
+                        Interval list1[K];
+                        list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
+                        list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
                         this->cubes[1].set_list(list1);
                         assert(!this->cubes[1].is_empty());
                     }

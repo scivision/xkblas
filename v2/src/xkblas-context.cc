@@ -78,31 +78,14 @@ xkblas_init(void)
 }
 
 extern "C"
-int
-xkblas_get_device_count(int * count)
-{
-    assert(count);
-
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    *count = 0;
-    for (int i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
-    {
-        xkblas_driver_t * driver = context->drivers.list + i;
-        assert(driver);
-
-        if (driver->f_get_ndevices_max)
-            *count += driver->f_get_ndevices_max();
-    }
-    return 0;
-}
-
-extern "C"
 void
 xkblas_deinit(void)
 {
     XKBLAS_INFO("Deinitializing Xkblas");
+
+# if USE_STATS == 1
+    xkblas_stats_report();
+# endif // USE_STATS == 1
 
     xkblas_context_t * context = xkblas_context_get();
     if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
@@ -173,10 +156,6 @@ retry:
 
     /* all threads completed :-) */
     XKBLAS_INFO("Synchronized Xkblas");
-
-# if USE_STATS == 1
-    xkblas_stats_report();
-# endif // USE_STATS == 1
 
 # if 0
 # if !defined(NDEBUG)
