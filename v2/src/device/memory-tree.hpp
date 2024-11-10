@@ -32,6 +32,12 @@
  */
 # define USE_D2D_FORWARDING 1
 
+/** Set to '1' to merge copies on the same device on consecutive memory to be merged to a single driver copy */
+# define MERGE_COPIES 0
+# if MERGE_COPIES
+#  include <algorithm>  // std::sort
+# endif
+
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
 # pragma message(TODO "'fetch' implementation could be optimize by reducing critical sections")
@@ -350,19 +356,26 @@ class KMemoryTreeNodeSearch {
                 inline memory_view_t
                 create_host_view(const size_t ld, const size_t sizeof_type) const
                 {
+                    const INTERVAL_TYPE_T       x = this->cube[ACCESS_CUBE_ROW_DIM].a;
+                    const INTERVAL_DIFF_TYPE_T dx = this->cube[ACCESS_CUBE_ROW_DIM].length();
+                    const INTERVAL_TYPE_T       y = this->cube[ACCESS_CUBE_COL_DIM].a;
+                    const INTERVAL_DIFF_TYPE_T dy = this->cube[ACCESS_CUBE_COL_DIM].length();
+                    assert(dx > 0);
+                    assert(dy > 0);
+
                     memory_view_t host_view;
 
                     host_view.order         = MATRIX_COLMAJOR;
-                    host_view.addr          = this->cube[ACCESS_CUBE_ROW_DIM].a + this->cube[ACCESS_CUBE_COL_DIM].a * ld * sizeof_type;
+                    host_view.addr          = x + y * ld * sizeof_type;
                     host_view.ld            = ld;
                     host_view.offset_m      = 0;
                     host_view.offset_n      = 0;
-                    host_view.m             = this->cube[ACCESS_CUBE_ROW_DIM].length() / sizeof_type;
-                    host_view.n             = this->cube[ACCESS_CUBE_COL_DIM].length();
+                    host_view.m             = dx / sizeof_type;
+                    host_view.n             = dy;
                     host_view.sizeof_type   = sizeof_type;
 
                     // accesses must be aligned on sizeof(type)
-                    assert(host_view.m * sizeof_type == this->cube[ACCESS_CUBE_ROW_DIM].length());
+                    assert(host_view.m * sizeof_type == dx);
 
                     return host_view;
                 }
@@ -392,7 +405,7 @@ class KMemoryTreeNodeSearch {
                         return false;
 
                     // horizontally aligned
-                    assert(0 && "Partites should be disjointed... and you should not compare 'this' to itself");
+                    assert(this == &p);
                     return false;
                 }
 
@@ -430,12 +443,44 @@ class KMemoryTreeNodeSearch {
                     return this->partites[j];
                 }
 
-                Partite &
-                get_corner(void)
-                {
-                    const int i = this->get_leftmost_uppermost_block();
-                    return this->partites[i];
+            # if MERGE_COPIES
+
+                inline memory_view_t
+                create_host_view(
+                    const size_t ld,
+                    const size_t sizeof_type,
+                    const std::vector<size_t> sorted_partition_indices
+                ) const {
+
+                    const Partite & p0 = this->partites[sorted_partition_indices[0]];
+                    const Partite & pf = this->partites[sorted_partition_indices[this->partites.size() - 1]];
+                    assert(p0 < pf);
+
+                    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) p0.cube[ACCESS_CUBE_ROW_DIM].a;
+                    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) pf.cube[ACCESS_CUBE_ROW_DIM].b;
+                    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) p0.cube[ACCESS_CUBE_COL_DIM].a;
+                    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) pf.cube[ACCESS_CUBE_COL_DIM].b;
+                    assert(0 <= x0 && x0 <= ld * sizeof_type);
+                    assert(0 <= xf && xf <= ld * sizeof_type);
+                    assert(y0 < yf);
+
+                    size_t m = (size_t) ((xf - x0 + (ld * sizeof_type)) % (ld * sizeof_type)) / sizeof_type;
+                    size_t n = (size_t)  (yf - y0);
+
+                    memory_view_t host_view;
+                    host_view.order        = MATRIX_COLMAJOR;
+                    host_view.addr         = x0 + y0 * ld * sizeof_type;
+                    host_view.ld           = ld;
+                    host_view.offset_m     = 0;
+                    host_view.offset_n     = 0;
+                    host_view.m            = m;
+                    host_view.n            = n;
+                    host_view.sizeof_type  = sizeof_type;
+
+                    return host_view;
                 }
+
+            # endif /* MERGE_COPIES */
 
         }; /* Partition */
 
@@ -665,8 +710,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
         typedef struct  fetch_t
         {
-            /* logical cube */
-            Cube cube;
+            /* logical cubes representing that fetch */
+            std::vector<Cube> cubes;
 
             /* the host memory view */
             memory_view_t host_view;
@@ -714,6 +759,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 fetch_t * fetch = this->fetches + this->n;
                 ++this->n;
                 assert(this->n <= this->capacity);
+                new (fetch) fetch_t();
                 return fetch;
             }
 
@@ -771,7 +817,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             search.prepare_search_awaiting(fetch->dst_chunk);
             tree->lock();
             {
-                tree->intersect(search, fetch->cube, ACCESS_MODE_VOID);
+                for (Cube & cube : fetch->cubes)
+                    tree->intersect(search, cube, ACCESS_MODE_VOID);
             }
             tree->unlock();
 
@@ -805,7 +852,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     assert(i == forward_list->n - 1);
                     forward_list->fetching();
 
-                    new (&forward_fetch->cube)      Cube(fetch->cube);                  // the logicial view hasn't changed
+                    forward_fetch->cubes                = fetch->cubes;                 // the logicial view hasn't changed
                     new (&forward_fetch->host_view) memory_view_t(fetch->host_view);    // the host view hasn't changed
                     forward_fetch->dst_chunk            = forward.chunk;
                     forward_fetch->dst_device_global_id = forward.device_global_id;     // use the forwarded dst device
@@ -852,6 +899,78 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
             new (list) fetch_list_t(this, (fetch_t *) (list + 1), capacity);
 
+            # pragma message(TODO "The current heuristic only merges if ALL partites are consecutive on the same devices, and all must be fetched, to a single fetch")
+
+            # if MERGE_COPIES
+            if (capacity > 1)
+            {
+                bool merge_to_a_single_fetch = true;
+
+                std::vector<size_t> partition_indices(capacity);
+                for (size_t i = 0 ; i < capacity ; ++i)
+                    partition_indices[i] = i;
+
+                std::sort(
+                    std::begin(partition_indices),
+                    std::end(partition_indices),
+                    [partition](size_t i, size_t j) {
+                        assert(i != j);
+                        return partition.partites[i] < partition.partites[i];
+                    }
+                );
+                for (size_t i = 0 ; i < capacity - 1 ; ++i)
+                {
+                    Partite & pi = partition.partites[i];
+
+                    size_t j = i + 1;
+                    Partite & pj = partition.partites[j];
+
+                    if (    pi.must_fetch               == false                        ||
+                            pi.src_device_global_id     != pj.src_device_global_id      ||
+                            pi.dst_device_global_id     != pj.dst_device_global_id      ||
+                            pi.src_allocation_view_id   != pj.src_allocation_view_id    ||
+                            pi.dst_allocation_view_id   != pj.dst_allocation_view_id
+                    ) {
+                        merge_to_a_single_fetch = false;
+                        break ;
+                    }
+                }
+
+                /* can be merged to a single fetch */
+                if (merge_to_a_single_fetch)
+                {
+                    Partite & p0 = partition.partites[0];
+
+                    /* set the views */
+                    const memory_view_t host_view = partition.create_host_view(this->ld, this->sizeof_type, partition_indices);
+                    const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
+                    const memory_replicate_view_t dst_view = (p0.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.dst_view;
+                    const memory_replicate_view_t src_view = (p0.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.src_view;
+
+                    /* allocate fetch info for the callback argument */
+                    fetch_t * fetch = list->prepare_next_fetch();
+                    fetch->host_view            = host_view;
+                    fetch->src_device_global_id = p0.src_device_global_id;
+                    fetch->src_view             = src_view;
+                    fetch->dst_chunk            = partition.chunk;
+                    fetch->dst_device_global_id = p0.dst_device_global_id;
+                    fetch->dst_view             = dst_view;
+
+                    # pragma message(TODO "Here, we could minimize the number of cubes in the logical view")
+                    for (Partite & partite : partition.partites)
+                        fetch->cubes.push_back(partite.cube);
+
+                    list->fetching();
+                    return list;
+                }
+                else
+                {
+                    /* cannot be merged, fallback to default case */
+                }
+
+            } /* only 1 partite anyway */
+            # endif
+
             for (Partite & partite : partition.partites)
             {
                 if (!partite.must_fetch)
@@ -869,7 +988,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 /* allocate fetch info for the callback argument */
                 fetch_t * fetch = list->prepare_next_fetch();
-                new (&fetch->cube) Cube(partite.cube);
+                fetch->cubes.push_back(partite.cube);
                 fetch->host_view            = host_view;
                 fetch->src_device_global_id = partite.src_device_global_id;
                 fetch->src_view             = src_view;
