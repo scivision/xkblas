@@ -36,7 +36,6 @@ xkblas_device_submit(
 /* submit a kernel execution instruction on that device */
 void
 xkblas_stream_instruction_submit_kernel(
-    xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task,
     const xkblas_callback_t & callback
@@ -71,7 +70,6 @@ xkblas_stream_instruction_submit_kernel(
 # pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
 void
 xkblas_stream_instruction_submit_copy(
-    const xkblas_driver_t           * driver,
     xkblas_device_t                 * device,
     const memory_view_t             & host_view,
     const xkblas_device_global_id_t   dst_device_global_id,

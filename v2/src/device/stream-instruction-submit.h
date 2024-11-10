@@ -10,7 +10,6 @@
 
 /* submit a kernel execution instruction on that device */
 void xkblas_stream_instruction_submit_kernel(
-    xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task,
     const xkblas_callback_t & callback
@@ -18,7 +17,6 @@ void xkblas_stream_instruction_submit_kernel(
 
 /* submit a memory copy */
 void xkblas_stream_instruction_submit_copy(
-    const xkblas_driver_t          * driver,
     xkblas_device_t                * device,
     const memory_view_t            & host_view,
     const uint8_t                   dst_device_global_id,

@@ -194,7 +194,6 @@ void xkblas_memory_deallocate_all(void);
 
 /* must be call once task accesses were all fetched */
 void xkblas_device_task_execute(
-    xkblas_driver_t * driver,
     xkblas_device_t * device,
     Task * task
 );

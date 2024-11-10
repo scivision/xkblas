@@ -22,9 +22,10 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
     Task * parent;
 
     /* the fetch to perform */
-    fetch_t * fetch;
+    fetch_list_t * list;
+    uint32_t fetch_idx;
 
-    args_fetch_t(ThreadWorker * w, Task * p, fetch_t * f) : worker(w), parent(p), fetch(f) {}
+    args_fetch_t(ThreadWorker * w, Task * p, fetch_list_t * l, uint32_t i) : worker(w), parent(p), list(l), fetch_idx(i) {}
     ~args_fetch_t() {}
 
 }                                       args_fetch_t;
@@ -47,12 +48,15 @@ body_memory_coherent_async_fetch_callback(
     Task * parent = (Task *) args[1];
     assert(parent);
 
-    Task * child = (Task *) args[2];
-    assert(child);
-
-   // one fetched completed, notify the parent
+    // one fetched completed, notify the parent
     if (parent->fetched() == TASK_STATE_DATA_FETCHED)
         worker->complete(parent);
+
+    fetch_list_t * list = (fetch_list_t *) args[2];
+    assert(list);
+
+    if (list->fetched() == 0)
+        free(list);
 }
 
 static void
@@ -62,7 +66,10 @@ body_memory_coherent_async_fetch(void * vlauncher)
     const task_launcher_t * launcher = (task_launcher_t *) vlauncher;
     assert(launcher);
 
-    const args_fetch_t * args = (args_fetch_t *) (launcher->task + 1);
+    const Task * task = launcher->task;
+    assert(task);
+
+    const args_fetch_t * args = (args_fetch_t *) (task + 1);
     assert(args);
 
     const ThreadWorker * worker = args->worker;
@@ -71,23 +78,24 @@ body_memory_coherent_async_fetch(void * vlauncher)
     const Task * parent = args->parent;
     assert(parent);
 
-    const fetch_t * fetch = args->fetch;
-    assert(fetch);
+    const fetch_list_t * list = args->list;
+    assert(list);
+    assert(args->fetch_idx < list->n);
+    assert(args->fetch_idx < list->capacity);
 
-    const Task * task = launcher->task;
-    assert(task);
+    const fetch_t * fetch = list->fetches + args->fetch_idx;
+    assert(fetch);
 
     // worker is the memory async thread, self is the device thread
     assert(worker != ThreadWorker::self());
 
     // TODO : submit fetch - with a callback doing parent->fetched() on completion
-    static_assert(XKBLAS_CALLBACK_ARGS_MAX >= 4);
+    static_assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
     xkblas_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
     callback.args[0] = worker;
     callback.args[1] = parent;
-    callback.args[2] = task;
-    callback.args[3] = fetch;
+    callback.args[2] = list;
 
     # if !USE_CUDA
     XKBLAS_FATAL("Only supporting CUDA driver for D2H transfers");
@@ -107,7 +115,6 @@ body_memory_coherent_async_fetch(void * vlauncher)
     /* launch asynchronous copy */
     memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
     xkblas_stream_instruction_submit_copy(
-        driver,
         device,
         fetch->host_view,
         HOST_DEVICE_GLOBAL_ID,
@@ -166,9 +173,8 @@ xkblas_memory_coherent_async_worker_thread_work(
     MemoryTree * memtree = context->get_memory_tree(args->ld, args->sizeof_type);
     assert(memtree);
 
-    fetch_list_t list;
-    memtree->fetch_list_init(&list);
-    memtree->fetch_list_append<4>(&list, args->cubes);
+    fetch_list_t * list = memtree->fetch_list_to_host_from_cubes<4>(args->cubes);
+    assert(list);
 
     // the size of the list should be one at that stage
     // assert(list.fetches && list.fetches->next == NULL);
@@ -180,9 +186,13 @@ xkblas_memory_coherent_async_worker_thread_work(
     ThreadProducer * producer = ThreadProducer::self();
     assert(producer);
 
-    for (fetch_t * fetch = list.fetches ; fetch != NULL ; fetch = fetch->next)
+    for (uint32_t i = 0 ; i < list->n ; ++i)
     {
         current->fetching();
+
+        fetch_t * fetch = list->fetches + i;
+        assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
+
         const uint64_t task_size = sizeof(Task);
         const uint64_t args_size = sizeof(args_fetch_t);
         assert(is_alignedas(task_size, CACHE_LINE_SIZE));
@@ -195,10 +205,10 @@ xkblas_memory_coherent_async_worker_thread_work(
         new(task) Task(TASK_FORMAT_COHERENT_ASYNC_FETCH, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
 
         args_fetch_t  * args = reinterpret_cast<args_fetch_t *>(mem + task_size);
-        new(args) args_fetch_t(thread, current, fetch);
+        new(args) args_fetch_t(thread, current, list, i);
 
         #ifndef NDEBUG
-        snprintf(task->label, sizeof(task->label), "coherent_fetch(%p)", fetch);
+        snprintf(task->label, sizeof(task->label), "coherent_fetch(%p)", list);
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);

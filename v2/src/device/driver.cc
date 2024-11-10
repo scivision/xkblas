@@ -197,7 +197,6 @@ xkblas_device_task_executed_callback(
  */
 void
 xkblas_device_task_execute(
-    xkblas_driver_t * driver,
     xkblas_device_t * device,
                Task * task
 ) {
@@ -233,7 +232,7 @@ xkblas_device_task_execute(
             callback.func    = xkblas_device_task_executed_callback;
             callback.args[0] = task;
 
-            xkblas_stream_instruction_submit_kernel(driver, device, task, callback);
+            xkblas_stream_instruction_submit_kernel(device, task, callback);
             if (device->thread == ThreadWorker::self())
                 device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
 

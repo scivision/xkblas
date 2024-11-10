@@ -389,7 +389,7 @@ xkblas_device_prepare_task(
     if (task->fetched() == TASK_STATE_DATA_FETCHED)
     {
         /* all data has been fetched, the task kernel is ready for execution */
-        xkblas_device_task_execute(driver, device, task);
+        xkblas_device_task_execute(device, task);
     }
     else
     {
