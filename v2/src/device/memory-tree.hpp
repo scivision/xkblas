@@ -842,6 +842,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 new (forward_list) fetch_list_t(tree, (fetch_t *) (forward_list + 1), nforwards);
                 forward_list->fetching();
 
+                # pragma message(TODO "Forwards consecutive in memory should be merged")
                 for (size_t i = 0 ; i < nforwards ; ++i)
                 {
                     MemoryForward & forward = search.awaiting.forwards[i];
