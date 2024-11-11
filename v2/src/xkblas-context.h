@@ -40,8 +40,11 @@ typedef struct  xkblas_context_t
             if (memtree->ld == ld && memtree->sizeof_type == sizeof_type)
                 return memtree;
 
+        XKBLAS_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
+                ld, sizeof_type, this->conf.merge_transfers ? "true" : "false");
+
         /* if not found, create a new memtree */
-        MemoryTree * memtree = new MemoryTree(ld, sizeof_type);
+        MemoryTree * memtree = new MemoryTree(ld, sizeof_type, this->conf.merge_transfers);
         assert(memtree);
         assert(memtree->ld == ld);
         assert(memtree->sizeof_type == sizeof_type);

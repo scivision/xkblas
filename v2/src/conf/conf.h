@@ -57,6 +57,8 @@ typedef struct  xkblas_conf_s
     xkblas_conf_device_t device;                            /* device conf */
     xkblas_conf_kernel_t kernels[XKBLAS_KERNEL_TYPE_MAX];   /* kernels conf */
 
+    bool merge_transfers;
+
 }               xkblas_conf_t;
 
 void xkblas_init_conf(xkblas_conf_t * conf);

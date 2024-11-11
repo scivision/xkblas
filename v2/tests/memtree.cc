@@ -1710,7 +1710,7 @@ main(void)
 
     const size_t ld = 8000;
     const size_t s  = sizeof(float);
-    KMemoryTree<2> tree(ld, s);
+    KMemoryTree<2> tree(ld, s, true);
 
     for (unsigned int i = 0 ; i < sizeof(accesses) / sizeof(KMemoryAccess<2>) ; ++i)
     {

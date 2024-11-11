@@ -18,6 +18,7 @@
 # undef CUBE_TREE_REBALANCE
 # include "sync/cube-tree.hpp"
 
+# include <algorithm>  // std::sort
 # include <cstdint>
 # include <functional>
 
@@ -31,12 +32,6 @@
  *  Set to '0' so multiple H2D are submitted concurrently
  */
 # define USE_D2D_FORWARDING 1
-
-/** Set to '1' to merge copies on the same device on consecutive memory to be merged to a single driver copy */
-# define MERGE_COPIES 0
-# if MERGE_COPIES
-#  include <algorithm>  // std::sort
-# endif
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -443,8 +438,6 @@ class KMemoryTreeNodeSearch {
                     return this->partites[j];
                 }
 
-            # if MERGE_COPIES
-
                 inline memory_view_t
                 create_host_view(
                     const size_t ld,
@@ -464,8 +457,14 @@ class KMemoryTreeNodeSearch {
                     assert(0 <= xf && xf <= ld * sizeof_type);
                     assert(y0 < yf);
 
-                    size_t m = (size_t) ((xf - x0 + (ld * sizeof_type)) % (ld * sizeof_type)) / sizeof_type;
-                    size_t n = (size_t)  (yf - y0);
+                    INTERVAL_DIFF_TYPE_T n = yf - y0;
+                    INTERVAL_DIFF_TYPE_T m = xf - x0;
+                    if (m < 0)
+                    {
+                        m += ld * sizeof_type;
+                        n -= 1;
+                    }
+                    m = m / sizeof_type;
 
                     memory_view_t host_view;
                     host_view.order        = MATRIX_COLMAJOR;
@@ -473,14 +472,12 @@ class KMemoryTreeNodeSearch {
                     host_view.ld           = ld;
                     host_view.offset_m     = 0;
                     host_view.offset_n     = 0;
-                    host_view.m            = m;
-                    host_view.n            = n;
+                    host_view.m            = (size_t) m;
+                    host_view.n            = (size_t) n;
                     host_view.sizeof_type  = sizeof_type;
 
                     return host_view;
                 }
-
-            # endif /* MERGE_COPIES */
 
         }; /* Partition */
 
@@ -697,7 +694,8 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
     using Task = KTask<K>;
 
     public:
-        KMemoryTree(const size_t ld, const size_t sizeof_type) : Base(), ld(ld), sizeof_type(sizeof_type) {}
+        KMemoryTree(const size_t ld, const size_t sizeof_type, const bool merge_transfers) :
+            Base(), ld(ld), sizeof_type(sizeof_type), merge_transfers(merge_transfers) {}
         ~KMemoryTree() {}
 
         /* the ld used in that memory tree */
@@ -705,6 +703,9 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
         /* the size of type */
         const size_t sizeof_type;
+
+        /* whether transfers in continuous virtual memory should be merged */
+        const bool merge_transfers;
 
     public:
 
@@ -901,75 +902,77 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
             # pragma message(TODO "The current heuristic only merges if ALL partites are consecutive on the same devices, and all must be fetched, to a single fetch")
 
-            # if MERGE_COPIES
-            if (capacity > 1)
+            /* if transfers merge is enabled */
+            if (this->merge_transfers)
             {
-                bool merge_to_a_single_fetch = true;
+                if (capacity > 1)
+                {
+                    bool merge_to_a_single_fetch = true;
 
-                std::vector<size_t> partition_indices(capacity);
-                for (size_t i = 0 ; i < capacity ; ++i)
-                    partition_indices[i] = i;
+                    std::vector<size_t> partition_indices(capacity);
+                    for (size_t i = 0 ; i < capacity ; ++i)
+                        partition_indices[i] = i;
 
-                std::sort(
-                    std::begin(partition_indices),
-                    std::end(partition_indices),
-                    [partition](size_t i, size_t j) {
-                        assert(i != j);
-                        return partition.partites[i] < partition.partites[i];
+                    std::sort(
+                        std::begin(partition_indices),
+                        std::end(partition_indices),
+                        [partition](size_t i, size_t j) {
+                            assert(i != j);
+                            return partition.partites[i] < partition.partites[i];
+                        }
+                    );
+                    for (size_t i = 0 ; i < capacity - 1 ; ++i)
+                    {
+                        Partite & pi = partition.partites[i];
+
+                        size_t j = i + 1;
+                        Partite & pj = partition.partites[j];
+
+                        if (    pi.must_fetch               == false                        ||
+                                pi.src_device_global_id     != pj.src_device_global_id      ||
+                                pi.dst_device_global_id     != pj.dst_device_global_id      ||
+                                pi.src_allocation_view_id   != pj.src_allocation_view_id    ||
+                                pi.dst_allocation_view_id   != pj.dst_allocation_view_id
+                        ) {
+                            merge_to_a_single_fetch = false;
+                            break ;
+                        }
                     }
-                );
-                for (size_t i = 0 ; i < capacity - 1 ; ++i)
-                {
-                    Partite & pi = partition.partites[i];
 
-                    size_t j = i + 1;
-                    Partite & pj = partition.partites[j];
+                    /* can be merged to a single fetch */
+                    if (merge_to_a_single_fetch)
+                    {
+                        Partite & p0 = partition.partites[0];
 
-                    if (    pi.must_fetch               == false                        ||
-                            pi.src_device_global_id     != pj.src_device_global_id      ||
-                            pi.dst_device_global_id     != pj.dst_device_global_id      ||
-                            pi.src_allocation_view_id   != pj.src_allocation_view_id    ||
-                            pi.dst_allocation_view_id   != pj.dst_allocation_view_id
-                    ) {
-                        merge_to_a_single_fetch = false;
-                        break ;
+                        /* set the views */
+                        const memory_view_t host_view = partition.create_host_view(this->ld, this->sizeof_type, partition_indices);
+                        const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
+                        const memory_replicate_view_t dst_view = (p0.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.dst_view;
+                        const memory_replicate_view_t src_view = (p0.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.src_view;
+
+                        /* allocate fetch info for the callback argument */
+                        fetch_t * fetch = list->prepare_next_fetch();
+                        fetch->host_view            = host_view;
+                        fetch->src_device_global_id = p0.src_device_global_id;
+                        fetch->src_view             = src_view;
+                        fetch->dst_chunk            = partition.chunk;
+                        fetch->dst_device_global_id = p0.dst_device_global_id;
+                        fetch->dst_view             = dst_view;
+
+                        # pragma message(TODO "Here, we could minimize the number of cubes in the logical view")
+                        for (Partite & partite : partition.partites)
+                            fetch->cubes.push_back(partite.cube);
+
+                        list->fetching();
+                        return list;
                     }
-                }
+                    else
+                    {
+                        /* cannot be merged, fallback to default case */
+                    }
 
-                /* can be merged to a single fetch */
-                if (merge_to_a_single_fetch)
-                {
-                    Partite & p0 = partition.partites[0];
-
-                    /* set the views */
-                    const memory_view_t host_view = partition.create_host_view(this->ld, this->sizeof_type, partition_indices);
-                    const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
-                    const memory_replicate_view_t dst_view = (p0.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.dst_view;
-                    const memory_replicate_view_t src_view = (p0.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.src_view;
-
-                    /* allocate fetch info for the callback argument */
-                    fetch_t * fetch = list->prepare_next_fetch();
-                    fetch->host_view            = host_view;
-                    fetch->src_device_global_id = p0.src_device_global_id;
-                    fetch->src_view             = src_view;
-                    fetch->dst_chunk            = partition.chunk;
-                    fetch->dst_device_global_id = p0.dst_device_global_id;
-                    fetch->dst_view             = dst_view;
-
-                    # pragma message(TODO "Here, we could minimize the number of cubes in the logical view")
-                    for (Partite & partite : partition.partites)
-                        fetch->cubes.push_back(partite.cube);
-
-                    list->fetching();
-                    return list;
-                }
-                else
-                {
-                    /* cannot be merged, fallback to default case */
-                }
-
-            } /* only 1 partite anyway */
-            # endif
+                } /* only 1 partite anyway */
+            } /* if enabled transfers merging */
 
             for (Partite & partite : partition.partites)
             {

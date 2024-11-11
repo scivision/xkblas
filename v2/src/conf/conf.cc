@@ -13,12 +13,17 @@ __parse_verbose(xkblas_conf_t * conf, char const * value)
 }
 
 static void
+__parse_merge_transfers(xkblas_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->merge_transfers = atoi(value) ? true : false;
+}
+
+static void
 __parse_nkernels(xkblas_conf_t * conf, char const * value)
 {
     if (value)
-    {
         conf->device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency = (uint8_t) MAX(atoi(value), 1);
-    }
 }
 
 static void
@@ -124,6 +129,7 @@ typedef struct  xkblas_conf_parse_t
 static xkblas_conf_parse_t CONF_PARSE[] = {
     {"XKBLAS_HELP",                 __parse_help,               "Show this helper"},
     {"XKBLAS_VERBOSE",              __parse_verbose,            "Verbosity level (the higher the most)"},
+    {"XKBLAS_MERGE_TRANSFERS",      __parse_merge_transfers,    "Merge memory transfers over continuous virtual memory"},
     {"XKBLAS_TILE_SIZE",            __parse_tile_size,          "Tile size parameter - format is `kernel(m,n)` - example: gemm(16,16)"},
     {"XKBLAS_PRECISION",            NULL,                       NULL},
     {"XKBLAS_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
@@ -156,6 +162,7 @@ xkblas_init_conf(xkblas_conf_t * conf)
     conf->ngpus             = (uint8_t)-1;
     conf->gpu_set           = (uint32_t) ~0;
     conf->gpu_mem_percent   = (float) 92.0;
+    conf->merge_transfers   = false;
 
     //////////////////
     //  KERNEL CONF //
