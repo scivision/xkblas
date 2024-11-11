@@ -82,6 +82,10 @@ class KDependencyTreeSearch
 
 } /* class KDependencyTreeSearch */;
 
+# if PRINT_IDS
+static int PRINT_IDS_NEXT_VALUE = 0;
+# endif
+
 template <int K>
 class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node {
 
@@ -103,6 +107,10 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
         /* number of writes in all subtrees */
         int nwrites;
 
+        # if PRINT_IDS
+        int id;
+        # endif /* PRINT_IDS */
+
     public:
 
         KDependencyTreeNode<K>(
@@ -114,7 +122,11 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
             last_reads(),
             last_write(),
             nwrites(0)
-        {}
+        {
+            # if PRINT_IDS
+            this->id = ++PRINT_IDS_NEXT_VALUE;
+            # endif /* PRINT_IDS */
+        }
 
         /* a new node from a split, inherit 'src' accesses */
         KDependencyTreeNode<K>(
@@ -134,6 +146,9 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
                 inherit->last_reads.begin(),
                 inherit->last_reads.end()
             );
+            # if PRINT_IDS
+            this->id = ++PRINT_IDS_NEXT_VALUE;
+            # endif /* PRINT_IDS */
         }
 
         ////////////
@@ -160,13 +175,20 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
         void
         dump_str(FILE * f) const
         {
+            # if PRINT_IDS
+            fprintf(f, "%d", this->id);
+            # else
             KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
+            # endif
         }
 
         void
         dump_cube_str(FILE * f) const
         {
+            # if PRINT_IDS
+            fprintf(f, "%d", this->id);
+            # else
             KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_cube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
@@ -175,12 +197,14 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
             for (const TaskAccess & task_access : this->last_reads)
                 fprintf(f, "%p ", task_access.task);
             fprintf(f, "]");
+            # endif
         }
 };
 
 template<int K>
 class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
 
+    using Access        = KMemoryAccess<K>;
     using Base          = KCubeTree<K, KDependencyTreeSearch<K>>;
     using Node          = KDependencyTreeNode<K>;
     using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
@@ -248,8 +272,6 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
             (void) interval;
             (void) k;
         }
-
-
 
         Node *
         new_node(

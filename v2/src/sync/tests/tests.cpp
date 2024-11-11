@@ -1,5 +1,7 @@
 # include "demangle.hpp"
 # include "cube.hpp"
+
+# define PRINT_IDS 1
 # include "dependency-tree.hpp"
 # include "task.hpp"
 
@@ -228,13 +230,24 @@ static void launch_tests(KDependencyTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
-        # if 0
+        # if 1
         static_assert(K == 2);
 
         Interval cube[] = {
             Interval(       0,        4), Interval(               0,               4),
             Interval(       0,        4), Interval(               4,               8),
-            Interval(       0,        8), Interval(               0,               8),
+            Interval(       4,        8), Interval(               0,               4),
+            Interval(       4,        8), Interval(               4,               8),
+
+            Interval(       0,        3), Interval(               0,               3),
+            Interval(       0,        3), Interval(               3,               6),
+            Interval(       0,        3), Interval(               6,               8),
+            Interval(       3,        6), Interval(               0,               3),
+            Interval(       3,        6), Interval(               3,               6),
+            Interval(       3,        6), Interval(               6,               8),
+            Interval(       6,        8), Interval(               0,               3),
+            Interval(       6,        8), Interval(               3,               6),
+            Interval(       6,        8), Interval(               6,               8),
         };
         access_mode_t modes[] = {
             ACCESS_MODE_W,
@@ -243,28 +256,18 @@ static void launch_tests(KDependencyTree<K> & tree)
         };
         assert(sizeof(cube) / sizeof(Interval) / 2 == sizeof(modes) / sizeof(access_mode_t));
 
-        # if 0
-        int min = cube[0].a;
-        for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
-        {
-            if (cube[i].a < min)
-                min = cube[0].a;
-        }
-
-        for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
-        {
-            cube[i].a -= min;
-            cube[i].b -= min;
-            cube[i+1].a /= sizeof(float);
-            cube[i+1].b /= sizeof(float);
-        }
-        # endif
-
-
         for (unsigned int i = 0 ; i < sizeof(cube) / sizeof(Interval) ; i += 2)
         {
             Interval x[K] = { cube[i+0], cube[i+1] };
             insert<K>(tree, modes[i/2], x);
+
+            # ifdef EXPORT_PDF
+            std::cout << "Exporting pdf..." << std::endl;
+
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), "dependency-%d-%d", K, i);
+            tree.export_pdf(buffer);
+            # endif /* EXPORT_PDF */
         }
 
         # else
@@ -316,7 +319,8 @@ static void run(void)
 {
     (void) get_tasks<K>();
 
-    KDependencyTree<K> tree;
+    const int LD = 131072;
+    KDependencyTree<K> tree(LD);
     launch_tests(tree);
 
     # ifdef EXPORT_PDF
@@ -336,8 +340,8 @@ main(int argc, char ** argv)
 
     printf("Testing with N=%d, you can change running `%s [N]`\n\n", N, argv[0]);
 
-    run<1>();
-//    run<2>();
+//    run<1>();
+    run<2>();
 //    run<3>();
 //    run<4>();
 //    run<5>();

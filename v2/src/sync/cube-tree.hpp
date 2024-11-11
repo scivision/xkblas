@@ -17,7 +17,7 @@
 # endif
 
 // tree assert, must be called within a member function
-# if defined(NDEBUG) || defined(CUBE_TREE_DISABLE_COHERENCY_CHECKS)
+# if defined(CUBE_TREE_DISABLE_COHERENCY_CHECKS)
 #  define tassert(ignore) ((void)0)
 # else /* NDEBUG */
 #  pragma message("Define `NDEBUG` for max performance")
@@ -308,9 +308,13 @@ class KCubeTree {
                         };
                         const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
 
-                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\n", this);
+                        // fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\n", this);
+                        // this->dump_str(f);
+                        // fprintf(f, "\", style=filled, fillcolor=\"%s\"] ;\n", color);
+
+                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"", this);
                         this->dump_str(f);
-                        fprintf(f, "\", style=filled, fillcolor=\"%s\"] ;\n", color);
+                        fprintf(f, "\", shape=square, style=filled, fillcolor=\"%s\"] ;\n", color);
                     }
 
                     FOREACH_CHILD_BEGIN(this, child, k, dir)
@@ -1044,7 +1048,7 @@ class KCubeTree {
             FOREACH_CHILD_END(parent, child, k, dir);
 
             parent->cube.copy(cube);
-            parent->on_insert(t, mode);
+            this->on_insert(parent, t, mode);
 
             this->outdate(parent);
         }
