@@ -192,9 +192,9 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         inline void
-        fetching(void)
+        fetching(const uint16_t n = 1)
         {
-            if (this->wc.fetch_add(1, std::memory_order_seq_cst) == 0)
+            if (this->wc.fetch_add(n, std::memory_order_seq_cst) == 0)
             {
                 assert(this->state.value == TASK_STATE_READY);
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
@@ -204,10 +204,10 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         inline task_state_t
-        fetched(void)
+        fetched(const uint16_t n = 1)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
-            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
+            if (this->wc.fetch_sub(n, std::memory_order_seq_cst) == 1)
             {
                 XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;

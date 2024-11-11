@@ -796,19 +796,24 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
         static void
         fetch_callback(const void * args[XKBLAS_CALLBACK_ARGS_MAX])
         {
-            assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
+            assert(XKBLAS_CALLBACK_ARGS_MAX >= 3);
 
-            fetch_list_t * list = (fetch_list_t *) args[0];
+            Task * task = (Task *) args[0];
+            assert(task);
+
+            fetch_list_t * list = (fetch_list_t *) args[1];
             assert(list);
 
             KMemoryTree * tree = list->tree;
             assert(tree);
 
-            size_t fetch_idx = (size_t) args[1];
+            size_t fetch_idx = (size_t) args[2];
             assert(fetch_idx >= 0 && fetch_idx < list->n);
 
             fetch_t * fetch = list->fetches + fetch_idx;
             XKBLAS_DEBUG("Fetch completed for allocation `%p`", fetch->dst_chunk->device_ptr);
+
+            fetch_callback_task(fetch, task);
 
             /* `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
              * Search in the tree for awaiting tasks and forwards */
@@ -861,7 +866,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                     forward_fetch->src_device_global_id = fetch->dst_device_global_id;  // the current 'dst' is the new 'src'
                     forward_fetch->src_view             = fetch->dst_view;              // the current 'dst' is the new 'src'
 
-                    tree->fetch_list_launch_ith(device, forward_list, i);
+                    tree->fetch_list_launch_ith(device, forward.task, forward_list, i);
                 }
 
                 list->fetched();
@@ -1377,17 +1382,18 @@ next_view:
                     MemoryReplicateAllocationView * dst_allocation_view = dst_replicate.allocations[dst_allocation_view_id];
 
                     /* increment task fetch counter */
-                    task->fetching();
                     XKBLAS_DEBUG("Task `%s` fetching one by `%s` on `%p`", task->label, (dst_replicate.fetching & dst_allocbit) ? "awaiting" : "launching", dst_allocation_view->view.addr);
-
-                    /* register a task awaiting on the fetch completion */
-                    dst_allocation_view->awaiting.tasks.push_back(task);
 
                     /* partite is already being fetched on that device */
                     if (dst_replicate.fetching & dst_allocbit)
                     {
                         partite.must_fetch = false;
                         XKBLAS_DEBUG("Skipping fetch of a block already being fetched (concurrent read)");
+
+                        /* register a task awaiting on the fetch completion */
+                        dst_allocation_view->awaiting.tasks.push_back(task);
+                        task->fetching();
+
                         continue ;
                     }
 
@@ -1457,6 +1463,7 @@ next_view:
 
                         const MemoryForward forward(task, partition.chunk, device->global_id, dst_allocation_view->view);
                         fetching_allocation_view->awaiting.forwards.push_back(forward);
+                        task->fetching();
                     }
                     # endif /* USE_D2D_FORWARDING */
                     else
@@ -1531,19 +1538,22 @@ next_view:
         inline void
         fetch_list_launch_ith(
             xkblas_device_t * device,
+            Task * task,
             fetch_list_t * list,
             size_t i
         ) {
-            assert(i >= 0 && i < list->n);
+            assert(task);
 
+            assert(i >= 0 && i < list->n);
             fetch_t * fetch = list->fetches + i;
 
             /* callback setup */
-            assert(XKBLAS_CALLBACK_ARGS_MAX >= 2);
+            assert(XKBLAS_CALLBACK_ARGS_MAX >= 3);
             xkblas_callback_t callback;
             callback.func = fetch_callback;
-            callback.args[0] = list;
-            callback.args[1] = (void *) i;
+            callback.args[0] = task;
+            callback.args[1] = list;
+            callback.args[2] = (void *) i;
 
             /* launch asynchronous copy */
             xkblas_stream_instruction_submit_copy(
@@ -1560,30 +1570,11 @@ next_view:
         inline void
         fetch_list_launch(
             xkblas_device_t * device,
+            Task * task,
             fetch_list_t * list
         ) {
             for (size_t i = 0 ; i < list->n ; ++i)
-            {
-                fetch_t * fetch = list->fetches + i;
-
-                /* callback setup */
-                assert(XKBLAS_CALLBACK_ARGS_MAX >= 2);
-                xkblas_callback_t callback;
-                callback.func = fetch_callback;
-                callback.args[0] = list;
-                callback.args[1] = (void *) i;
-
-                /* launch asynchronous copy */
-                xkblas_stream_instruction_submit_copy(
-                    device,
-                    fetch->host_view,
-                    fetch->dst_device_global_id,
-                    fetch->dst_view,
-                    fetch->src_device_global_id,
-                    fetch->src_view,
-                    callback
-                );
-            }
+                fetch_list_launch_ith(device, task, list, i);
         }
 
         void
@@ -1645,7 +1636,8 @@ next_view:
                 fetch_list_t * list = this->fetch_list_from_partition(search.partition);
 
                 /* step (8) - launch transfers */
-                this->fetch_list_launch(device, list);
+                task->fetching((uint16_t) list->n);
+                this->fetch_list_launch(device, task, list);
             }
 
             /* step (7) - launch copies for each partite */
