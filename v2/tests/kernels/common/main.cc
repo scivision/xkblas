@@ -52,7 +52,7 @@ static const char * TRANS_STR[N_CBLAS_TRANSPOSE] = { "N", "T", "H" };
 //////////////////////
 
 static void
-prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
+prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld, bool fill = true)
 {
     /* allocate matrices */
     const size_t s = sizeof(TYPE);
@@ -84,7 +84,8 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
     }
 
     /* initialize matrices */
-    FILL((TYPE *)mem, memsize/s);
+    if (fill)
+        FILL((TYPE *)mem, memsize/s);
 }
 
 // GEMM - GEMM //
@@ -422,6 +423,22 @@ main_copyscale(char ** args)
     return 0;
 }
 
+# define SEED 0x123
+
+/* return a random integer in [a, b] */
+static inline int
+rand_int(double a, double b)
+{
+    static bool initialized = false;
+    if (!initialized)
+    {
+        srand(SEED);
+        initialized = true;
+    }
+    double f = rand() / (double) RAND_MAX;
+    return (int) (a + (b - a) * f);
+}
+
 static int
 main_mumps(char ** args)
 {
@@ -441,22 +458,6 @@ main_mumps(char ** args)
      *          n
      */
 
-    /* parse arguments */
-    int m  = 16384;
-    int n  = 4096;
-    int ts = 1024;
-    int ld = m + n;
-
-    puts("allocating and filling matrices...");
-
-    /* allocate matrices */
-    uintptr_t matrices[4];
-    # define D  ((TYPE *)matrices[0])
-    # define L  ((TYPE *)matrices[1])
-    # define U  ((TYPE *)matrices[2])
-    # define G  ((TYPE *)matrices[3])
-    prepare_n_matrices(matrices, 4, ld);
-
     TYPE alpha, beta;
     FILL(&alpha, 1);
     FILL(&beta, 1);
@@ -471,9 +472,25 @@ main_mumps(char ** args)
     int * IW = NULL;
 
     puts("Submitting kernels");
+    uint64_t tcompute = 0;
     uint64_t t0 = get_nanotime();
-    for (int i = 0 ; i < 10 ; ++i)
+    for (int i = 0 ; i < 8 ; ++i)
     {
+        /* parse arguments */
+        int m  = rand_int(200, 16384);
+        int n  = rand_int(200,  4096);
+        int ts = 1024;
+        int ld = m + n;
+        printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
+
+        /* allocate matrices */
+        uintptr_t matrices[4];
+        # define D  ((TYPE *)matrices[0])
+        # define L  ((TYPE *)matrices[1])
+        # define U  ((TYPE *)matrices[2])
+        # define G  ((TYPE *)matrices[3])
+        prepare_n_matrices(matrices, 4, ld, false);
+
         impl.reset();
         impl.set_tile(ts);
 
@@ -490,14 +507,16 @@ main_mumps(char ** args)
         uint64_t tf = get_nanotime();
         printf("[%d] Compute took %lf s. (graph construction took %lf s.)\n",
                 i, (tf-t0)/1e9, (tt-t0)/1e9);
+        tcompute += (tf - t0);
+
+
+        # undef D
+        # undef L
+        # undef U
+        # undef G
     }
     uint64_t tf = get_nanotime();
-    printf("Total took %lf s.\n", (tf-t0)/1e9);
-
-    # undef D
-    # undef L
-    # undef U
-    # undef G
+    printf("Total took %lf s. (compute took %lf s.)\n", (tf-t0)/1e9, tcompute/1e9);
 
     return 0;
 }
