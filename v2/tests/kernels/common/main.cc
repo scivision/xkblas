@@ -423,6 +423,86 @@ main_copyscale(char ** args)
 }
 
 static int
+main_mumps(char ** args)
+{
+
+    /**
+     *           n         m
+     *      .-------.-----------.
+     *      |   D   |    U      |
+     *      |       |           |
+     *      .-------.-----------.
+     *      |       |           |
+     *      |       |           |
+     *   m  |  L    |     G     |
+     *      |       |           |
+     *      |       |           |
+     *      .-------.-----------.
+     *          n
+     */
+
+    /* parse arguments */
+    int m  = 16384;
+    int n  = 4096;
+    int ts = 1024;
+    int ld = m + n;
+
+    puts("allocating and filling matrices...");
+
+    /* allocate matrices */
+    uintptr_t matrices[4];
+    # define D  ((TYPE *)matrices[0])
+    # define L  ((TYPE *)matrices[1])
+    # define U  ((TYPE *)matrices[2])
+    # define G  ((TYPE *)matrices[3])
+    prepare_n_matrices(matrices, 4, ld);
+
+    TYPE alpha, beta;
+    FILL(&alpha, 1);
+    FILL(&beta, 1);
+
+    int s = 0;
+    int u = 0;
+    int d = 0;
+    int t = 0;
+    int t1 = 0;
+    int t2 = 0;
+    bool should_copy = true;
+    int * IW = NULL;
+
+    puts("Submitting kernels");
+    uint64_t t0 = get_nanotime();
+    for (int i = 0 ; i < 10 ; ++i)
+    {
+        impl.reset();
+        impl.set_tile(ts);
+
+        uint64_t t0 = get_nanotime();
+        impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, D, ld, L, ld);
+        impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+        impl.gemm(TRANS[t1], TRANS[t2], m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
+        // impl.coherent(D, n, n, ld);
+        // impl.coherent(L, m, n, ld);
+        // impl.coherent(U, n, m, ld);
+        impl.coherent(G, m, m, ld);
+        uint64_t tt = get_nanotime();
+        impl.wait();
+        uint64_t tf = get_nanotime();
+        printf("[%d] Compute took %lf s. (graph construction took %lf s.)\n",
+                i, (tf-t0)/1e9, (tt-t0)/1e9);
+    }
+    uint64_t tf = get_nanotime();
+    printf("Total took %lf s.\n", (tf-t0)/1e9);
+
+    # undef D
+    # undef L
+    # undef U
+    # undef G
+
+    return 0;
+}
+
+static int
 main_trsm_copyscale_gemm(char ** args)
 {
     /* parse arguments */
@@ -581,7 +661,13 @@ static func_t funcs[] = {
                     "  - TS : tile size\n"
     },
 
-
+    {
+        .name = "MUMPS",
+        .f = main_mumps,
+        .nargs = 0,
+        .descr = "???",
+        .usage =    "\n"
+    },
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
 

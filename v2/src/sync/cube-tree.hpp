@@ -20,7 +20,7 @@
 # if defined(CUBE_TREE_DISABLE_COHERENCY_CHECKS)
 #  define tassert(ignore) ((void)0)
 # else /* NDEBUG */
-#  pragma message("Define `NDEBUG` for max performance")
+#  pragma message("Define `CUBE_TREE_DISABLE_COHERENCY_CHECKS` for max performance")
 #  define tassert(expr)                                                         \
     do {                                                                        \
         if (!(expr))                                                            \

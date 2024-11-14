@@ -1023,7 +1023,10 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
 
                 /* not valid on any device, then assume valid on the host */
                 if (block->valid == 0)
+                {
+                    partite.must_fetch = false;
                     continue ;
+                }
 
                 /////////////////////////
                 // SRC - FIND BEST SRC //
