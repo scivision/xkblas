@@ -86,7 +86,7 @@ class KDependencyTreeSearch
 static int PRINT_IDS_NEXT_VALUE = 0;
 # endif
 
-# define CUT true
+# define CUT false
 
 template <int K>
 class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node {

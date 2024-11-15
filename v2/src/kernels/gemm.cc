@@ -200,8 +200,6 @@ xkblas_£gemm_async(
 
     const TYPE one = (TYPE) 1.0;
 
-    # pragma message(TODO "Double check tiling offset in presence of transposed matrix")
-
     # define A(I, J) A, (I)*Amb, (J)*Anb, lda
     # define B(I, J) B, (I)*Bmb, (J)*Bnb, ldb
     # define C(I, J) C, (I)*Cmb, (J)*Cnb, ldc
