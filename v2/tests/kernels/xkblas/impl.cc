@@ -4,7 +4,6 @@
 
 # include "xkblas.h"
 # include "xkblas-kernel.h"
-# include "xkblas-context.h"
 
 /* Implementation name */
 const char *

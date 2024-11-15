@@ -98,6 +98,13 @@ typedef struct  matrix_tile_t
 
     ~matrix_tile_t() {}
 
+    /* size of the memory represented */
+    inline size_t
+    size(void) const
+    {
+        return (this->m * this->n * this->sizeof_type);
+    }
+
     /* return begin address */
     inline uintptr_t
     begin_addr(void) const

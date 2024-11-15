@@ -1,13 +1,13 @@
 #ifndef __DEPENDENCY_TREE_HPP__
 # define __DEPENDENCY_TREE_HPP__
 
+# pragma message(TODO "Dependency tree cut is always disabled currently, because the memory tree is included before the deptree... Fix me by removing 'mode' from the 'CubeTree::insert' - and overriding the 'insert_from' to cut in the dep tree")
+
+# include "sync/cube-tree.hpp"
 # include "device/task.hpp"
 
-# define CUBE_TREE_CUT
-# define CUBE_TREE_REBALANCE
-# include "sync/cube-tree.hpp"
-# undef CUBE_TREE_CUT
-# undef CUBE_TREE_REBALANCE
+# include <array>
+# include <unordered_map>
 
 template <int K>
 class KTaskAccess
@@ -54,7 +54,7 @@ class KDependencyTreeSearch
         TaskAccess task_access;
 
         // USED IF TYPE == SEARCH_TYPE_CONFLICTING
-        std::vector<TaskAccess> * conflicts;
+        std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> * conflicts;
         const Access * access;
 
     public:
@@ -72,7 +72,7 @@ class KDependencyTreeSearch
 
         void
         prepare_conflicting(
-            std::vector<TaskAccess> * conflicts,
+            std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> * conflicts,
             const Access * access
         ) {
             this->type = SEARCH_TYPE_CONFLICTING;
@@ -86,11 +86,13 @@ class KDependencyTreeSearch
 static int PRINT_IDS_NEXT_VALUE = 0;
 # endif
 
+# define CUT true
+
 template <int K>
-class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node {
+class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node {
 
     using Access        = KMemoryAccess<K>;
-    using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
+    using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node;
     using Node          = KDependencyTreeNode<K>;
     using Cube          = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
@@ -168,7 +170,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
         inline void
         update_includes(void)
         {
-            KCubeTree<K, KDependencyTreeSearch<K>>::Node::update_includes();
+            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
@@ -178,7 +180,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
             # if PRINT_IDS
             fprintf(f, "%d", this->id);
             # else
-            KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
+            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             # endif
         }
@@ -189,7 +191,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
             # if PRINT_IDS
             fprintf(f, "%d", this->id);
             # else
-            KCubeTree<K, KDependencyTreeSearch<K>>::Node::dump_cube_str(f);
+            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_cube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -202,12 +204,12 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>>::Node 
 };
 
 template<int K>
-class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
+class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>, CUT> {
 
     using Access        = KMemoryAccess<K>;
-    using Base          = KCubeTree<K, KDependencyTreeSearch<K>>;
+    using Base          = KCubeTree<K, KDependencyTreeSearch<K>, CUT>;
     using Node          = KDependencyTreeNode<K>;
-    using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>>::Node;
+    using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node;
     using Cube          = KCube<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
@@ -224,15 +226,16 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
 
     public:
 
+        # pragma message(TODO "Any better option than this unordered map ?")
         inline void
         conflicting(
-            std::vector<TaskAccess> * conflicts,
+            std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> * conflicts,
             const Access * access
         ) {
             Search search;
             search.prepare_conflicting(conflicts, access);
-            this->intersect(search, access->cubes[0], access->mode);
-            this->intersect(search, access->cubes[1], access->mode);
+            this->intersect(search, access->cubes[0]);
+            this->intersect(search, access->cubes[1]);
         }
 
         //////////////
@@ -242,8 +245,7 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
         inline void
         on_insert(
             NodeBase * nodebase,
-            Search & search,
-            const access_mode_t mode
+            Search & search
         ) {
             assert(nodebase);
             assert(search.type == Search::Type::SEARCH_TYPE_RESOLVE);
@@ -258,7 +260,7 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
                 node->last_reads.clear();
                 node->last_write = search.task_access;
             }
-            else if (mode == ACCESS_MODE_R)
+            else if (access->mode == ACCESS_MODE_R)
                 node->last_reads.push_back(search.task_access);
         }
 
@@ -296,6 +298,18 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
             return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
         }
 
+        inline bool
+        should_cut(
+            Search & search,
+            Cube & cube,
+            NodeBase * parent,
+            int k
+        ) const {
+            (void) cube;
+            (void) parent;
+            (void) k;
+            return search.access->mode & ACCESS_MODE_W;
+        }
 
         //////////////////
         //  INTERSECT   //
@@ -304,14 +318,17 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube,
-            const access_mode_t mode
+            const Cube & cube
         ) const {
-            (void) search;
             (void) cube;
-            assert(nodebase);
+
             Node * node = reinterpret_cast<Node *>(nodebase);
-            return (mode == ACCESS_MODE_R && node->nwrites == 0);
+            assert(node);
+
+            const Access * access = (search.type == Search::SEARCH_TYPE_RESOLVE) ? search.task_access.task->accesses + search.task_access.access_id : search.access;
+            assert(access);
+
+            return (access->mode == ACCESS_MODE_R) && (node->nwrites == 0);
         }
 
         inline void
@@ -329,8 +346,7 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube,
-            const access_mode_t mode
+            const Cube & cube
         ) const {
             (void) cube;
 
@@ -341,7 +357,8 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
             {
                 case (Search::Type::SEARCH_TYPE_RESOLVE):
                 {
-                    if (mode & ACCESS_MODE_W && node->last_reads.size())
+                    const Access * access = search.task_access.task->accesses + search.task_access.access_id;
+                    if (access->mode & ACCESS_MODE_W && node->last_reads.size())
                         for (TaskAccess & pred : node->last_reads)
                             this->precedence(pred.task, search.task_access.task);
                     else if (node->last_write.task)
@@ -355,7 +372,21 @@ class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>> {
                     if (node->last_write.task)
                     {
                         assert(search.conflicts);
-                        search.conflicts->push_back(node->last_write);
+
+                        const TaskAccess & task_access = node->last_write;
+                        if (search.conflicts->count(task_access.task) == 0)
+                        {
+                            std::array<bool, TASK_MAX_ACCESSES> accesses;
+                            for (int i = 0 ; i < TASK_MAX_ACCESSES ; ++i)
+                                accesses[i] = false;
+                            accesses[task_access.access_id] = true;
+                            (*search.conflicts)[task_access.task] = accesses;
+                        }
+                        else
+                        {
+                            std::array<bool, TASK_MAX_ACCESSES> & accesses = (*search.conflicts)[task_access.task];
+                            accesses[task_access.access_id] = true;
+                        }
                     }
 
                     break ;

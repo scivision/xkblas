@@ -117,8 +117,8 @@ main_gemm_gemm(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    // int t1 = 0;
-    // int t2 = 0;
+    int t1 = 0;
+    int t2 = 0;
 
     for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
@@ -210,7 +210,7 @@ main_gemm(char ** args)
     # endif
 
     int t1 = 0;
-    int t2 = 1;
+    int t2 = 0;
 
     for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
@@ -496,7 +496,7 @@ main_mumps(char ** args)
 
         uint64_t t0 = get_nanotime();
         impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, D, ld, L, ld);
-        impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+        impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
         impl.gemm(TRANS[t1], TRANS[t2], m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
         // impl.coherent(D, n, n, ld);
         // impl.coherent(L, m, n, ld);

@@ -29,6 +29,7 @@ typedef struct  xkblas_stats_t
             stats_int_t launched;
             stats_int_t completed;
         } instructions[XKBLAS_STREAM_INSTR_TYPE_MAX];
+        stats_int_t transfered;
     } streams[XKBLAS_STREAM_TYPE_ALL];
 
 }               xkblas_stats_t;

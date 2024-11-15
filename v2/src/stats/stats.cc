@@ -63,6 +63,7 @@ xkblas_stats_report(void)
                 XKBLAS_WARN("        completed: %zu", stats->streams[i].instructions[j].completed.load());
             }
         }
+        XKBLAS_WARN("    transfered (bytes): %zu", stats->streams[i].transfered.load());
     }
 
     XKBLAS_WARN("-----------------------------------------");

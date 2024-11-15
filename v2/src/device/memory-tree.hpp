@@ -14,8 +14,6 @@
 # include "sync/lockable.hpp"
 
 // tree cutting would suppress validity/transfer information of some blocks
-# undef CUBE_TREE_CUT
-# undef CUBE_TREE_REBALANCE
 # include "sync/cube-tree.hpp"
 
 # include <algorithm>  // std::sort
@@ -590,12 +588,13 @@ class KMemoryTreeNodeSearch {
 
 }; /* KMemoryTreeNodeSearch */
 
+# define CUT false
 
 template <int K>
-class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
+class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
 
     using Access = KMemoryAccess<K>;
-    using Base = typename KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using Base = typename KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
     using Cube = KCube<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
@@ -650,7 +649,7 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
         void
         dump_str(FILE * f) const
         {
-            KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
+            KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node::dump_str(f);
         }
 
         void
@@ -677,17 +676,17 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node {
 }; /* KMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
+class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>, Lockable {
 
     using Access = KMemoryAccess<K>;
-    using Base = KCubeTree<K, KMemoryTreeNodeSearch<K>>;
+    using Base = KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>;
     using Cube = KCube<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryForward = KMemoryForward<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
     using Node = KMemoryTreeNode<K>;
-    using NodeBase = typename KCubeTree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using NodeBase = typename KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
     using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
     using Search = KMemoryTreeNodeSearch<K>;
@@ -824,7 +823,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
             tree->lock();
             {
                 for (Cube & cube : fetch->cubes)
-                    tree->intersect(search, cube, ACCESS_MODE_VOID);
+                    tree->intersect(search, cube);
             }
             tree->unlock();
 
@@ -924,7 +923,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                         std::end(partition_indices),
                         [partition](size_t i, size_t j) {
                             assert(i != j);
-                            return partition.partites[i] < partition.partites[i];
+                            return partition.partites[i] < partition.partites[j];
                         }
                     );
                     for (size_t i = 0 ; i < capacity - 1 ; ++i)
@@ -1077,7 +1076,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>>, Lockable {
                 /* find all blocks that intersects with that access */
                 search.prepare_search_blocks();
                 for (int i = 0 ; i < NC ; ++i)
-                    this->intersect(search, cubes[i], ACCESS_MODE_R);
+                    this->intersect(search, cubes[i]);
 
                 /*  setup partition for D2H copies */
                 this->fetch_list_to_host_setup_partition(search.partition);
@@ -1610,13 +1609,13 @@ next_view:
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->cubes[0], access->mode);
-                this->insert(search, access->cubes[1], access->mode);
+                this->insert(search, access->cubes[0]);
+                this->insert(search, access->cubes[1]);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_partition();
-                this->intersect(search, access->cubes[0], access->mode);
-                this->intersect(search, access->cubes[1], access->mode);
+                this->intersect(search, access->cubes[0]);
+                this->intersect(search, access->cubes[1]);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (3) find or allocate continuous memory for that access on that device */
@@ -1674,8 +1673,8 @@ next_view:
             search.prepare_search_owners();
             this->lock();
             {
-                this->intersect(search, access->cubes[0], access->mode);
-                this->intersect(search, access->cubes[1], access->mode);
+                this->intersect(search, access->cubes[0]);
+                this->intersect(search, access->cubes[1]);
             }
             this->unlock();
 
@@ -1704,12 +1703,10 @@ next_view:
         void
         on_insert(
             NodeBase * nodebase,
-            Search & search,
-            const access_mode_t mode
+            Search & search
         ) {
             (void) nodebase;
             (void) search;
-            (void) mode;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
 
@@ -1761,6 +1758,20 @@ next_view:
             }
         }
 
+        bool
+        should_cut(
+            Search & search,
+            Cube & cube,
+            NodeBase * parent,
+            int k
+        ) const {
+            (void) search;
+            (void) cube;
+            (void) parent;
+            (void) k;
+            return false;
+        }
+
         //////////////////
         //  INTERSECT   //
         //////////////////
@@ -1768,14 +1779,12 @@ next_view:
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube,
-            const access_mode_t mode
+            const Cube & cube
         ) const {
 
             (void) nodebase;
             (void) search;
             (void) cube;
-            (void) mode;
 
             // TODO : can we fasten intersection by keeping track of an included 'valid' bitmask ?
 
@@ -1789,10 +1798,8 @@ next_view:
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube,
-            const access_mode_t mode
+            const Cube & cube
         ) const {
-            (void) mode;
 
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);

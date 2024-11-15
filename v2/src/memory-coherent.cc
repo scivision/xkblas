@@ -89,7 +89,7 @@ body_memory_coherent_async_fetch(void * vlauncher)
     // worker is the memory async thread, self is the device thread
     assert(worker != ThreadWorker::self());
 
-    // TODO : submit fetch - with a callback doing parent->fetched() on completion
+    // submit fetch - with a callback doing parent->fetched() on completion
     static_assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
     xkblas_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
@@ -175,9 +175,6 @@ xkblas_memory_coherent_async_worker_thread_work(
 
     fetch_list_t * list = memtree->fetch_list_to_host_from_cubes<4>(args->cubes);
     assert(list);
-
-    // the size of the list should be one at that stage
-    // assert(list.fetches && list.fetches->next == NULL);
 
     // avoid early completion
     current->fetching();
@@ -284,7 +281,6 @@ xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 //////////////////////
 
 # pragma message(TODO "'xkblas_memory_coherent_async' should take a row/col major parameter")
-# pragma message(TODO "Currently running 1 task per previous sub-matrix write - maybe we wanna batch them")
 
 //  How 'xkblas_memory_coherent_async' works
 //      - create one successor Yi task per conflicting tasks Xi - to be executed on the helper thread
@@ -313,7 +309,7 @@ xkblas_memory_coherent_async(
     assert(thread);
 
     /* create an access, and retrieve all tasks that are in conflict */
-    std::vector<TaskAccess> conflicts;
+    std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> conflicts;
     const Access access(MATRIX_COLMAJOR, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
     DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
@@ -326,10 +322,9 @@ xkblas_memory_coherent_async(
     const uint64_t task_size = sizeof(Task);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
 
-    for (const TaskAccess & conflict : conflicts)
+    for (const auto & [conflicting_task, conflicting_accesses] : conflicts)
     {
-        assert(conflict.task);
-        assert(conflict.access_id < conflict.task->naccesses);
+        assert(conflicting_task);
 
         const uint64_t task_size = sizeof(Task);
         const uint64_t args_size = sizeof(args_t);
@@ -339,18 +334,24 @@ xkblas_memory_coherent_async(
         uint8_t * mem = thread->allocate(task_size + args_size);
         assert(mem);
 
-        Task * task = reinterpret_cast<Task *>(mem);
-        new(task) Task(TASK_FORMAT_COHERENT_ASYNC, TASK_MAX_ACCESSES, HOST_DEVICE_GLOBAL_ID);
-        conflict.task->precedes(task);
+        for (int access_id = 0 ; access_id < TASK_MAX_ACCESSES ; ++access_id)
+        {
+            if (conflicting_accesses[access_id])
+            {
+                Task * task = reinterpret_cast<Task *>(mem);
+                new(task) Task(TASK_FORMAT_COHERENT_ASYNC, TASK_MAX_ACCESSES, HOST_DEVICE_GLOBAL_ID);
+                deptree->precedence(conflicting_task, task);
 
-        args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
-        new (args) args_t(access, conflict.task->accesses[conflict.access_id]);
+                args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+                new (args) args_t(access, conflicting_task->accesses[access_id]);
 
-        #ifndef NDEBUG
-        strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
-        #endif /* NDEBUG */
+                #ifndef NDEBUG
+                strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
+                #endif /* NDEBUG */
 
-        thread->commit(task);
+                thread->commit(task);
+            }
+        }
     }
 }
 

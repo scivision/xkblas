@@ -1718,12 +1718,12 @@ main(void)
         KMemoryTreeNodeSearch<2> search(0);
 
         search.prepare_insert(access);
-        tree.insert(search, access->cubes[0], access->mode);
-        tree.insert(search, access->cubes[1], access->mode);
+        tree.insert(search, access->cubes[0]);
+        tree.insert(search, access->cubes[1]);
 
         search.prepare_search_blocks();
-        tree.intersect(search, access->cubes[0], access->mode);
-        tree.intersect(search, access->cubes[1], access->mode);
+        tree.intersect(search, access->cubes[0]);
+        tree.intersect(search, access->cubes[1]);
     }
 
     return 0;

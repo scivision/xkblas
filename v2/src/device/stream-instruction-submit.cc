@@ -157,4 +157,9 @@ xkblas_stream_instruction_submit_copy(
 
     /* submit instruction to the stream */
     xkblas_device_submit(device, stream, instr);
+
+    # if USE_STATS
+    xkblas_stats_t * stats = xkblas_stats_get();
+    stats->streams[stype].transfered += host_view.size();
+    # endif /* USE_STATS */
 }

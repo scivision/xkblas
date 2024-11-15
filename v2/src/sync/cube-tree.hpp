@@ -12,10 +12,6 @@
 #ifndef __CUBE_TREE_H__
 # define __CUBE_TREE_H__
 
-# if defined(CUBE_TREE_REBALANCE) && !defined(CUBE_TREE_CUT)
-#  error "Defining 'CUBE_TREE_REBALANCE' but not 'CUBE_TREE_CUT' has no effects"
-# endif
-
 // tree assert, must be called within a member function
 # if defined(CUBE_TREE_DISABLE_COHERENCY_CHECKS)
 #  define tassert(ignore) ((void)0)
@@ -86,7 +82,6 @@ twopow(int n)
     return (1 << n);
 }
 
-# include "access-mode.h"
 # include "color.h"
 # include "direction.h"
 
@@ -114,8 +109,12 @@ do {                                                                    \
     }                                                                   \
 } while (0)
 
-/* K is the number of dimensions */
-template<int K, typename T>
+/**
+ *  K is the number of dimensions
+ *  T is search type
+ *  C is whether to cut included nodes or not
+ */
+template<int K, typename T, bool CUT>
 class KCubeTree {
 
     using Cube = KCube<K>;
@@ -572,22 +571,21 @@ class KCubeTree {
         intersect_from(
             T & t,
             const Cube & cube,
-            const access_mode_t mode,
             Node * node
         ) const {
 
             if (node == nullptr || !cube.intersects(node->includes.cube))
                 return ;
 
-            if (this->intersect_stop_test(node, t, cube, mode))
+            if (this->intersect_stop_test(node, t, cube))
                 return ;
 
             if (cube.intersects(node->cube))
-                this->on_intersect(node, t, cube, mode);
+                this->on_intersect(node, t, cube);
 
             FOREACH_CHILD_BEGIN(node, child, k, dir)
             {
-                this->intersect_from(t, cube, mode, child);
+                this->intersect_from(t, cube, child);
             }
             FOREACH_CHILD_END(node, child, k, dir);
         }
@@ -595,12 +593,11 @@ class KCubeTree {
         inline void
         intersect(
             T & t,
-            const Cube & cube,
-            const access_mode_t mode
+            const Cube & cube
         ) const {
             if (cube.is_empty())
                 return ;
-            this->intersect_from(t, cube, mode, this->root);
+            this->intersect_from(t, cube, this->root);
         }
 
         //////////////
@@ -729,7 +726,6 @@ class KCubeTree {
             A->parent = B;
          // D->parent = B;
 
-            // UPDATE ACCESS_MODE_RCLUDES
          // E->update_includes();
          // C->update_includes();
             A->update_includes();
@@ -807,7 +803,6 @@ class KCubeTree {
         insert_fixup(
             T & t,
             Cube cube,
-            const access_mode_t mode,
             Node * parent,
             int k,
             Direction dir,
@@ -822,7 +817,7 @@ class KCubeTree {
 
             parent->st[k].children[dir] = node;
             node->parent = parent;
-            this->on_insert(node, t, mode);
+            this->on_insert(node, t);
             this->outdate(node);
 
             // inserting a new k-subtree, this k-root is black
@@ -991,26 +986,6 @@ class KCubeTree {
 
 # endif /* CUBE_TREE_REBALANCE */
 
-        /* called to create a new node with a cube that never appeared before. */
-        virtual Node *
-        new_node(
-            T & t,
-            const Cube & cube,
-            const int k,
-            const Color color
-        ) const = 0;
-
-        /* called to create a new node, that intersect with a previously insert
-         * node 'inherit' */
-        virtual Node *
-        new_node(
-            T & t,
-            const Cube & cube,
-            const int k,
-            const Color color,
-            const Node * inherit
-        ) const = 0;
-
         void
         post_insert(const Cube & cube)
         {
@@ -1031,16 +1006,12 @@ class KCubeTree {
 # endif /* CUBE_TREE_DISABLE_COHERENCY_CHECKS */
         }
 
-# ifdef CUBE_TREE_CUT
         inline void
         insert_from_cut(
             T & t,
             const Cube & cube,
-            const access_mode_t mode,
             Node * parent
         ) {
-            tassert(mode & ACCESS_MODE_W);
-
             FOREACH_CHILD_BEGIN(parent, child, k, dir)
             {
                 this->cut(parent, k, dir);
@@ -1048,17 +1019,15 @@ class KCubeTree {
             FOREACH_CHILD_END(parent, child, k, dir);
 
             parent->cube.copy(cube);
-            this->on_insert(parent, t, mode);
+            this->on_insert(parent, t);
 
             this->outdate(parent);
         }
-# endif /* CUBE_TREE_CUT */
 
         inline void
         insert_from(
             T & t,
             Cube & cube,
-            const access_mode_t mode,
             Node * parent,
             int k,
             const Node * inherit
@@ -1066,32 +1035,30 @@ class KCubeTree {
 
             while (k < K)
             {
-# ifdef CUBE_TREE_CUT
-#  pragma message("Tree cut enable")
                 // quick-way out, if the cube includes all subcube with an
                 // 'out' access, we can discard all children
-                if (mode & ACCESS_MODE_W)
+                if constexpr(CUT)
                 {
-                    // the includes test is accelerated as we know we are
-                    // already matching dimensions <k
                     if (cube.includes(parent->includes.cube, k))
                     {
-                        // TODO : what if 'node' is not null ?  probably want to
-                        // return something to callee for the case (3)
-                        this->insert_from_cut(t, cube, mode, parent);
-                        break ;
+                        // the includes test is accelerated as we know we are
+                        // already matching dimensions <k
+                        if (this->should_cut(t, cube, parent, k))
+                        {
+                            // TODO : what if 'node' is not null ?  probably want to
+                            // return something to callee for the case (3)
+                            this->insert_from_cut(t, cube, parent);
+                            break ;
+                        }
                     }
                 }
-# else
-#  pragma message("Tree cut disabled. Enable it using '-DCUBE_TREE_CUT'")
-# endif /* CUBE_TREE_CUT */
 
                 // case (1)    J << I
                 if (cube[k].b <= parent->cube[k].a)
                 {
                     if (parent->st[k].left == nullptr)
                     {
-                        this->insert_fixup(t, cube, mode, parent, k, LEFT, inherit);
+                        this->insert_fixup(t, cube, parent, k, LEFT, inherit);
                         break ;
                     }
                     else
@@ -1102,7 +1069,7 @@ class KCubeTree {
                 {
                     if (parent->st[k].right == nullptr)
                     {
-                        this->insert_fixup(t, cube, mode, parent, k, RIGHT, inherit);
+                        this->insert_fixup(t, cube, parent, k, RIGHT, inherit);
                         break ;
                     }
                     else
@@ -1116,7 +1083,7 @@ class KCubeTree {
                     {
                         if (++k == K)
                         {
-                            this->on_insert(parent, t, mode);
+                            this->on_insert(parent, t);
                             this->outdate(parent);
                             break ;
                         }
@@ -1178,9 +1145,9 @@ class KCubeTree {
 
                         assert(inherit == nullptr);
                         for (ReinsertCube & rr : to_reinsert)
-                            this->insert_from(t, rr.cube, ACCESS_MODE_VOID, this->root, 0, rr.inherit);
+                            this->insert_from(t, rr.cube, this->root, 0, rr.inherit);
 
-                        return this->insert_from(t, cube, mode, this->root, 0, nullptr);
+                        return this->insert_from(t, cube, this->root, 0, nullptr);
 
                     } /* I == J ||  J c I */
                 }
@@ -1201,7 +1168,7 @@ class KCubeTree {
                     if (cube[k].a < parent->cube[k].a)
                     {
                         cube[k].b = parent->cube[k].a;
-                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        this->insert_from(t, cube, this->root, 0, inherit);
                         cube[k].b = b;
                     }
 
@@ -1209,7 +1176,7 @@ class KCubeTree {
                     if (parent->cube[k].b < cube[k].b)
                     {
                         cube[k].a = parent->cube[k].b;
-                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        this->insert_from(t, cube, this->root, 0, inherit);
                         cube[k].a = a;
                     }
 
@@ -1217,7 +1184,7 @@ class KCubeTree {
                     {
                         cube[k].a = MAX(a, parent->cube[k].a);
                         cube[k].b = MIN(b, parent->cube[k].b);
-                        this->insert_from(t, cube, mode, this->root, 0, inherit);
+                        this->insert_from(t, cube, this->root, 0, inherit);
                         cube[k].a = a;
                         cube[k].b = b;
                     }
@@ -1231,8 +1198,7 @@ class KCubeTree {
         inline void
         insert(
             T & t,
-            Cube cube,
-            const access_mode_t mode
+            Cube cube
         ) {
             if (cube.is_empty())
                 return ;
@@ -1240,12 +1206,12 @@ class KCubeTree {
             if (this->root == nullptr)
             {
                 this->root = this->new_node(t, cube, 0, BLACK);
-                this->on_insert(this->root, t, mode);
+                this->on_insert(this->root, t);
                 this->root->update_includes();
             }
             else
             {
-                this->insert_from(t, cube, mode, this->root, 0, nullptr);
+                this->insert_from(t, cube, this->root, 0, nullptr);
             }
 
             this->post_insert(cube);
@@ -1408,10 +1374,10 @@ class KCubeTree {
         int
         coherency_black_height_k(Node * node, int k) const
         {
-#ifdef CUBE_TREE_CUT
             // when cut is enabled, black_height is not guaranteed
-            return 1;
-#endif
+            if (CUT)
+                return 1;
+
             if (node == nullptr)
                 return 1;
 
@@ -1557,18 +1523,42 @@ class KCubeTree {
         // ABSTRACT INTERFACES //
         /////////////////////////
 
-        /* called whenever this node is added to the tree with an
-         * access (this->cube, mode) */
-        virtual void on_insert(Node * node, T & t, const access_mode_t mode) = 0;
+        /* called to create a new node with a cube that never appeared before. */
+        virtual Node *
+        new_node(
+            T & t,
+            const Cube & cube,
+            const int k,
+            const Color color
+        ) const = 0;
+
+        /* called to create a new node, that intersect with a previously insert
+         * node 'inherit' */
+        virtual Node *
+        new_node(
+            T & t,
+            const Cube & cube,
+            const int k,
+            const Color color,
+            const Node * inherit
+        ) const = 0;
+
+        /* called when the node being inserting includes all the descendent tree
+         * return true if the subtree should be cut, false otherwise (in such
+         * case, the insertion is propagated to all the subtree */
+        virtual bool should_cut(T & t, Cube & cube, Node * parent, int k) const = 0;
+
+        /* called whenever this node is added to the tree */
+        virtual void on_insert(Node * node, T & t) = 0;
 
         /* called whenever this node is being shrinked on dimension 'k' to 'interval' */
         virtual void on_shrink(Node * node, const Interval & interval, int k) = 0;
 
-        /* called to detect whether the access intersects with 'this' node */
-        virtual bool intersect_stop_test(Node * node, T & t, const Cube & cube, const access_mode_t mode) const = 0;
+        /* called to detect whether the intersect on 'cube' should stop on the node 'node' */
+        virtual bool intersect_stop_test(Node * node, T & t, const Cube & cube) const = 0;
 
-        /* called whenever 'this' intersects with the access */
-        virtual void on_intersect(Node * node, T & t, const Cube & cube, const access_mode_t mode) const = 0;
+        /* called whenever 'node' intersects with 'cube' */
+        virtual void on_intersect(Node * node, T & t, const Cube & cube) const = 0;
 };
 
 #endif /* __CUBE_TREE_H__ */
