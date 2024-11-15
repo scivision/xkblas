@@ -327,6 +327,9 @@ class KMemoryTreeNodeSearch {
                 /* src view */
                 memory_replicate_view_t src_view;
 
+                /* the source chunk for that partite */
+                xkblas_alloc_chunk_t * src_chunk;
+
                 /* true if this block is already being fetched by a concurrent read access */
                 bool must_fetch;
 
@@ -411,7 +414,7 @@ class KMemoryTreeNodeSearch {
                 /* the partite of that partition */
                 std::vector<Partite> partites;
 
-                /* all partite share the same allocation chunk */
+                /* the dst chunk onto the device, where all partites should write disjointly */
                 xkblas_alloc_chunk_t * chunk;
 
             public:
@@ -936,8 +939,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>, Lockable
                         if (    pi.must_fetch               == false                        ||
                                 pi.src_device_global_id     != pj.src_device_global_id      ||
                                 pi.dst_device_global_id     != pj.dst_device_global_id      ||
-                                pi.src_allocation_view_id   != pj.src_allocation_view_id    ||
-                                pi.dst_allocation_view_id   != pj.dst_allocation_view_id
+                                pi.src_chunk                != pj.src_chunk
                         ) {
                             merge_to_a_single_fetch = false;
                             break ;
@@ -1055,6 +1057,7 @@ class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>, Lockable
                 partite.src_allocation_view_id  = src_allocation_view_id;
                 partite.src_device_global_id    = src;
                 partite.src_view                = src_allocation_view->view;
+                partite.src_chunk               = src_allocation_view->chunk;
 
                 partite.dst_allocation_view_id  = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
                 partite.dst_device_global_id    = HOST_DEVICE_GLOBAL_ID;
@@ -1426,15 +1429,17 @@ next_view:
                         assert(src_replicate.nallocations > 0);
                         assert(src_replicate.valid);
 
+                        # pragma message(TODO "Instead of getting the first valid, maybe try to get the LARGEST valid, so we maximize chances to merge with future allocations (the logic is not implemented yet, though)")
                         memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
                         assert(src_replicate.valid & (1 << src_allocation_view_id));
                         assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
 
                         /* Retrieve and set src view infos */
                         MemoryReplicateAllocationView * src_allocation_view = src_replicate.allocations[src_allocation_view_id];
-                        partite.src_device_global_id   = src;
-                        partite.src_allocation_view_id = src_allocation_view_id;
-                        partite.src_view               = src_allocation_view->view;
+                        partite.src_device_global_id    = src;
+                        partite.src_allocation_view_id  = src_allocation_view_id;
+                        partite.src_view                = src_allocation_view->view;
+                        partite.src_chunk               = src_allocation_view->chunk;
                     }
                     # if USE_D2D_FORWARDING
                     else if (partite.block->fetching)
@@ -1483,8 +1488,8 @@ next_view:
                         partite.dst_view = dst_allocation_view->view;
 
                         /* using host as src, which is assumed valid */
-                        partite.src_device_global_id   = HOST_DEVICE_GLOBAL_ID;
-                        partite.src_allocation_view_id = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
+                        partite.src_device_global_id    = HOST_DEVICE_GLOBAL_ID;
+                        partite.src_allocation_view_id  = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
                     }
 
                     /* update bitfields so no other concurrent fetch occurs */
