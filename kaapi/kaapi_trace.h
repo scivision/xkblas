@@ -65,8 +65,6 @@
 extern "C" {
 #endif
 
-#if KAAPI_USE_TRACELIB==1 /* all the file ... */
-
 #if !defined(KAAPI_CACHE_LINE)
 #  define KAAPI_CACHE_LINE 64
 #endif
@@ -345,8 +343,11 @@ typedef struct {
   kaapi_atomic_t            nthreads;
   kaapi_tracelib_thread_t** threads;
 } kaapi_tracelib_param_t;
+
 extern kaapi_tracelib_param_t kaapi_tracelib_param;
 
+
+#if KAAPI_USE_TRACELIB==1 /* until ~ the end of the file ... */
 
 /* Initialize Kaapi sublibrary
    Initialize different masks from KAAPI_RECORD_MASK & KAAPI_RECORD_TRACE
@@ -787,12 +788,7 @@ static inline kaapi_event_buffer_t*  kaapi_event_push4(
   return evb;
 }
 
-
-
 #if KAAPI_USE_PERFCOUNTER==1
-/* Human readable name for event mask */
-extern size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t ssize, char* buffer);
-
 /* Write event counter values in idset to the trace file
 */
 extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
@@ -833,6 +829,7 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
 #define KAAPI_EVENT_PUSH4(kproc, eventno, kind, p1, p2, p3, p4 ) \
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
       kaapi_event_push4((kproc), kaapi_event_date(), eventno, kind, (uint64_t)(p1), (uint64_t)(p2), (uint64_t)(p3), (uint64_t)(p4) ): 0)
+
 #if KAAPI_USE_PERFCOUNTER==1
 #define KAAPI_EVENT_PUSH_PERFCTR(kproc, eventno, kind, pc, idset, perfctr ) \
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
@@ -844,7 +841,6 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
 #define KAAPI_EVENT_PUSH_PERFCTR(kproc, eventno, kind, pc, idset, perfctr ) 
 #define KAAPI_EVENT_PUSH_UNCORE_PERFCTR(kproc, numaid, idset, perfctr ) 
 #endif
-
 
 /* push new event with given date (value returned by kaapi_event_date())
    the macros returns the date of the event else 0
@@ -862,7 +858,36 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
       kaapi_event_push3((kproc), tclock, eventno, kind, (uint64_t)(p1), (uint64_t)(p2), (uint64_t)(p3)) : 0)
 
+#else // #if KAAPI_USE_TRACELIB==1
+
+#define KAAPI_IFUSE_TRACE(kproc,inst)
+#define KAAPI_EVENT_GET(kproc, eventno, kind ) 0
+#define KAAPI_EVENT_PUSH(kproc, eventno )
+
+#define KAAPI_EVENT_PUSH0(kproc, eventno, kind )
+#define KAAPI_EVENT_PUSH1(kproc, eventno, kind, p1 )
+#define KAAPI_EVENT_PUSH2(kproc, eventno, kind, p1, p2 )
+#define KAAPI_EVENT_PUSH3(kproc, eventno, kind, p1, p2, p3 )
+#define KAAPI_EVENT_PUSH4(kproc, eventno, kind, p1, p2, p3, p4 )
+#define KAAPI_EVENT_PUSH_PERFCTR(kproc, eventno, kind, pc, idset, perfctr )
+#define KAAPI_EVENT_PUSH_UNCORE_PERFCTR(kproc, numaid, idset, perfctr )
+
+/* push new event with given date (value returned by kaapi_event_date())
+   the macros returns the date of the event else 0
+*/
+#define KAAPI_EVENT_PUSH0_AT(kproc, tclock, eventno, kind )
+#define KAAPI_EVENT_PUSH1_AT(kproc, tclock, eventno, kind, p1 )
+#define KAAPI_EVENT_PUSH2_AT(kproc, tclock, eventno, kind, p1, p2 )
+#define KAAPI_EVENT_PUSH3_AT(kproc, tclock, eventno, kind, p1, p2, p3 )
+
+#endif // #if KAAPI_USE_TRACELIB==1
+
+
+
 #if KAAPI_USE_PERFCOUNTER==1
+/* Human readable name for event mask */
+extern size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t ssize, char* buffer);
+
 /* idset */
 static inline
 void kaapi_perf_idset_zero(kaapi_perf_idset_t* set)
@@ -907,29 +932,6 @@ unsigned int kaapi_perf_idset_empty(const kaapi_perf_idset_t* set)
 }
 #endif
 
-
-#else // #if KAAPI_USE_TRACELIB==1
-#define KAAPI_IFUSE_TRACE(kproc,inst)
-#define KAAPI_EVENT_GET(kproc, eventno, kind ) 0
-#define KAAPI_EVENT_PUSH(kproc, eventno )
-
-#define KAAPI_EVENT_PUSH0(kproc, eventno, kind )
-#define KAAPI_EVENT_PUSH1(kproc, eventno, kind, p1 )
-#define KAAPI_EVENT_PUSH2(kproc, eventno, kind, p1, p2 )
-#define KAAPI_EVENT_PUSH3(kproc, eventno, kind, p1, p2, p3 )
-#define KAAPI_EVENT_PUSH4(kproc, eventno, kind, p1, p2, p3, p4 )
-#define KAAPI_EVENT_PUSH_PERFCTR(kproc, eventno, kind, pc, idset, perfctr )
-#define KAAPI_EVENT_PUSH_UNCORE_PERFCTR(kproc, numaid, idset, perfctr )
-
-/* push new event with given date (value returned by kaapi_event_date())
-   the macros returns the date of the event else 0
-*/
-#define KAAPI_EVENT_PUSH0_AT(kproc, tclock, eventno, kind )
-#define KAAPI_EVENT_PUSH1_AT(kproc, tclock, eventno, kind, p1 )
-#define KAAPI_EVENT_PUSH2_AT(kproc, tclock, eventno, kind, p1, p2 )
-#define KAAPI_EVENT_PUSH3_AT(kproc, tclock, eventno, kind, p1, p2, p3 )
-
-#endif // #if KAAPI_USE_TRACELIB==1
 
 #if defined(__cplusplus)
 }

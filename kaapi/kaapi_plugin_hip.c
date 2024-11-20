@@ -59,6 +59,10 @@
 #  include <rocm_smi/rocm_smi.h>
 #endif
 
+#if KAAPI_USE_LIBNUMA
+#  include <numa.h>
+#endif
+
 #if KAAPI_HAVE_IO_THREADS
 #error "Not supported"
 #endif
@@ -72,6 +76,8 @@
 /* use nvlink related function to get topology */
 #define KAAPI_HIP_USE_TOPO 1
 
+
+//#define _OFFLOAD_DEBUG 1
 /* for debuging: 0 device thread, 1 IO helper thread */
 static __thread int thread_type = 0;
 
@@ -167,7 +173,7 @@ typedef struct kaapi_hip_io_stream_t {
   hipStream_t      stream_low;
 #if CONFIG_USE_EVENT
   hipEvent_t*      end_events;               /* size: capacity */
-#  if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   hipEvent_t*      start_events;             /* size: capacity */
 #  endif
 #endif
@@ -209,7 +215,7 @@ static void __kaapi_hip_CheckError( hipError_t err,  char *file, const int line 
     if ( hipSuccess != err )
     {
       tmp = hipGetErrorName( err );
-      snprintf( msg, 256, "cuCheckError() error:%i, failed at %s:%i : %s\n",
+      snprintf( msg, 256, "hipCheckError() error:%i, failed at %s:%i : %s\n",
                  err, file, line, tmp );
       kaapi_memory_cache_print_all();
       kaapi_abort( line, file, msg );
@@ -283,6 +289,7 @@ static int comp_perfRank(const void* a, const void* b)
 /* */
 static void _kaapi_get_gpu_topo(void)
 {
+#if KAAPI_USE_ROCSMI
   hipError_t res;
   uint64_t min_perf= UINT64_MAX; /* min_perf <= max_perf */
   uint64_t max_perf= 0;
@@ -331,9 +338,14 @@ static void _kaapi_get_gpu_topo(void)
         if (hops>0)
         {
           err = rsmi_minmax_bandwidth_get(device1, device2, &min_bandwidth, &max_bandwidth);
-          err = rsmi_topo_get_link_weight(device1, device2,&weight);
+          err = rsmi_topo_get_link_weight(device1, device2, &weight);
+#if 0 // sort and partition according to bandwidthmax
           if (max_bandwidth ==0) max_bandwidth = 1;
           perfRank = insert_perfrank(max_bandwidth);
+#else // sort and partition according to min_bandwidth
+          if (min_bandwidth ==0) min_bandwidth = 1;
+          perfRank = insert_perfrank(min_bandwidth);
+#endif
           if (perfRank > max_perf)
             max_perf= perfRank;
           if (perfRank < min_perf)
@@ -393,7 +405,7 @@ static void _kaapi_get_gpu_topo(void)
   }
 #endif
 
-  /* number of performance links: max_perf-min_perf+3  
+  /* TODO. On AMD do not distinguish high speed link with XGMI link. I.e. using Weight of network as metric ?
   */
   int rank;
   size_t size = device_count*hip_count_perfrank*sizeof(uint64_t);
@@ -450,6 +462,7 @@ static void _kaapi_get_gpu_topo(void)
   } 
 #endif
   err = rsmi_shut_down();
+#endif
 }
 #endif
 
@@ -676,10 +689,12 @@ static void _kaapi_hip_create_event( kaapi_hip_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER
   res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDefault);
   kaapi_hip_CheckError(res);
-  res = hipEventCreateWithFlags(&cios->start_events[k], hipEventDefault);
-  kaapi_hip_CheckError(res);
 #else
   res = hipEventCreateWithFlags(&cios->end_events[k], hipEventDisableTiming);
+  kaapi_hip_CheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
+  res = hipEventCreateWithFlags(&cios->start_events[k], hipEventDefault);
   kaapi_hip_CheckError(res);
 #endif
 }
@@ -690,10 +705,12 @@ static void _kaapi_hip_destroy_event( kaapi_hip_io_stream_t* cios, int k )
 #if KAAPI_USE_PERFCOUNTER
   res = hipEventDestroy(cios->end_events[k]);
   kaapi_hip_CheckError(res);
-  res = hipEventDestroy(cios->start_events[k]);
-  kaapi_hip_CheckError(res);
 #else
   res = hipEventDestroy(cios->end_events[k]);
+  kaapi_hip_CheckError(res);
+#endif
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
+  res = hipEventDestroy(cios->start_events[k]);
   kaapi_hip_CheckError(res);
 #endif
 }
@@ -772,7 +789,7 @@ static kaapi_io_stream_t* kaapi_hip_stream_alloc(
 
 #if CONFIG_USE_EVENT
   cios->end_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   cios->start_events = (hipEvent_t*)malloc( capacity * sizeof(hipEvent_t) );
 #  endif
   if (cios->end_events ==0)
@@ -780,7 +797,7 @@ static kaapi_io_stream_t* kaapi_hip_stream_alloc(
     free(cios);
     return 0;
   }
-# if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   if (cios->start_events ==0)
   {
     free(cios->end_events);
@@ -819,7 +836,7 @@ static void kaapi_hip_stream_free(
   _kaapi_hip_destroy_event(cios, k);
 
   free(cios->end_events);
-#  if KAAPI_USE_PERFCOUNTER
+#  if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
   free(cios->start_events);
 #  endif
 #endif
@@ -1033,7 +1050,6 @@ static char* name_io[] = {
 /* 2022-03-10: I assume hip functions for async copy or kernel launch are not reentrant 
    with global serialization I do not have any deadlock inside internal rocm-4.5 functions.
 */
-#warning "To solve !"
 static pthread_mutex_t access_lock= PTHREAD_MUTEX_INITIALIZER;
 #endif
 
@@ -1091,7 +1107,7 @@ static int kaapi_hip_stream_decode(
         kaapi_slowdown_cpu();
 #endif
 
-#if CONFIG_USE_EVENT && KAAPI_USE_PERFCOUNTER
+#if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB)
       instr->t1 = kaapi_get_elapsedtime();
       res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
       kaapi_assert(res == hipSuccess);
@@ -1297,7 +1313,7 @@ pthread_mutex_unlock(&access_lock);
 {
 pthread_mutex_lock(&access_lock);
 #endif
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB 
       instr->t1 = kaapi_get_elapsedtime();
 #  if CONFIG_USE_EVENT
       res = hipEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
@@ -1421,7 +1437,7 @@ static int kaapi_hip_stream_advance_pending(
             //goto break_label;
             pthread_yield();
           else {
-#if KAAPI_USE_PERFCOUNTER||(KAAPI_USE_TRACELIB==1) 
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB
             float gpu_delay; /* ms */
             res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
             if (res != hipSuccess) {
@@ -1549,7 +1565,7 @@ static int kaapi_hip_stream_process_pending(
         case KAAPI_IO_END:
         case KAAPI_IO_BARRIER:
         {
-#if KAAPI_USE_PERFCOUNTER
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACELIB
           hipError_t res;
 #  if KAAPI_DEBUG
           res = hipEventQuery( cios->start_events[idx] );
@@ -1634,11 +1650,11 @@ static uint16_t kaapi_hip_get_source(
   for (int rank = 0; rank < hip_count_perfrank-1; ++rank)
   {
     if (valid_bit !=0)
-      lid_src = KAAPI_MEMORY_FFS( valid_bit & device->affinity[rank] );
-      //lid_src = _kaapi_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+      //lid_src = KAAPI_MEMORY_FFS( valid_bit & device->affinity[rank] );
+      lid_src = _kaapi_get_random_bit1(valid_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
     else 
-      lid_src = KAAPI_MEMORY_FFS( xfer_bit & device->affinity[rank]);
-      //lid_src = _kaapi_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
+      //lid_src = KAAPI_MEMORY_FFS( xfer_bit & device->affinity[rank]);
+      lid_src = _kaapi_get_random_bit1(xfer_bit & device->affinity[rank], &device->inherited.ctxt->seed); 
     if (lid_src !=0)
     {
       --lid_src;
@@ -1725,15 +1741,70 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
   int err;
   CPU_ZERO(schedset);
 
-#if KAAPI_USE_HWLOC
+#if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
+  rsmi_status_t rerr ;
+  rerr = rsmi_init(0);
+  if (rerr != RSMI_STATUS_SUCCESS) 
+  {
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("***warning cannot initialize ROCm SMI lib\n");
+#endif
+    return ENOTSUP;
+  }
+
+  int device_count;
+  rerr = rsmi_num_monitor_devices(&device_count);
+  if (rerr != RSMI_STATUS_SUCCESS) goto return_rsmi_error;
+
+  uint32_t numa_node = -1;
+  rerr = rsmi_topo_get_numa_node_number(kaapi_device_ids[device_id], &numa_node);
+  if (rerr != RSMI_STATUS_SUCCESS) goto return_rsmi_error;
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** device id bind on numa_node: %u\n", numa_node); 
+#endif
+
+  if (numa_available() ==-1)
+  {
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** lib numa not defined\n");
+#endif
+    goto return_rsmi_error;
+  }
+
+  int ncpus = numa_num_possible_cpus();
+#if KAAPI_DEBUG
+  if (kaapi_default_param.verbose)
+    printf("*** Possible #CPUS=%i\n", ncpus);
+#endif
+  struct bitmask *mask = numa_bitmask_alloc( 1024 );
+  err = numa_node_to_cpus((int)numa_node, mask);
+  if (err !=0) 
+  {
+#if KAAPI_DEBUG
+    if (kaapi_default_param.verbose)
+      printf("*** warning cannot access to CPUsetof numa node %i. Errono:%i - %s\n", numa_node, errno, strerror(errno));
+#endif
+    goto return_rsmi_error;
+  }
+
+  for (int i=0; i<ncpus;++i)
+    if (numa_bitmask_isbitset(mask, i)) 
+      CPU_SET(i, schedset); 
+  numa_free_cpumask(mask);
+
+return_rsmi_error:
+  rsmi_shut_down();
+  if (rerr == RSMI_STATUS_SUCCESS) return 0;
+  return ENOTSUP;
+#elif KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_cpuset_t cpuset;
   hwloc_obj_t obj;
 
   cpuset = hwloc_bitmap_alloc();
-#  if KAAPI_USE_HIP 
-#    if KAAPI_USE_HWLOCROCSMI
   err = hwloc_rsmi_get_device_cpuset( topology, kaapi_device_ids[device_id], cpuset );
-#    endif
   if (err == 0)
   {
     {
@@ -1745,13 +1816,12 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
       }
     }
   }
-#  endif
 #endif
   /* no hwloc: do nothing, op not supported */
   err = ENOTSUP;
 
 retval:
-#if KAAPI_USE_HWLOC 
+#if KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_bitmap_free(cpuset);
 #endif
 

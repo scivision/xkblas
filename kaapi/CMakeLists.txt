@@ -9,25 +9,32 @@ add_custom_command (
   )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+find_package(Threads REQUIRED)
+
 find_package(Threads REQUIRED)
 
 if (${HWLOC_FOUND})
   add_compile_options("-DKAAPI_USE_HWLOC=1")
-  message(STATUS "Kaapi configure with HWLOC")
+  message(STATUS "Kaapi configured with HWLOC")
 endif()
 
 if (${HIP_FOUND})
-  message(STATUS "Kaapi configure with HIP")
+  message(STATUS "Kaapi configured with HIP")
+endif()
+
+if (KAAPI_USE_ROCSMI)
+  message(STATUS "Kaapi configured with ROCMSMI")
 endif()
 
 if (${PAPI_FOUND})
   add_compile_options("-DKAAPI_USE_PAPI=1")
+  message(STATUS "Kaapi configured with PAPI")
 else()
   add_compile_options("-DKAAPI_USE_PAPI=0")
 endif()
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 
 
 if (KAAPI_USE_CUDA_DRIVER)
@@ -60,6 +67,26 @@ endif()
 #endif()
 #
 
+if (KAAPI_USE_ROCSMI)
+  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  message(STATUS "Kaapi configured with ROCSMI")
+else()
+  add_compile_options("-DKAAPI_USE_ROCSMI=0")
+endif()
+
+if (KAAPI_USE_HWLOCROCSMI)
+  add_compile_options("-DKAAPI_USE_HWLOCROCSMI=1")
+else()
+  add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
+endif()
+
+if (KAAPI_USE_LIBNUMA)
+  add_compile_options("-DKAAPI_USE_LIBNUMA=1")
+  message(STATUS "Kaapi configured with LIBNUMA")
+else()
+  add_compile_options("-DKAAPI_USE_LIBNUMA=0")
+endif()
+
 # use, i.e. don't skip the full RPATH for the build tree
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
  
@@ -85,12 +112,16 @@ else()
 endif()
 
 
-if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
-  message(STATUS "Not found ROCSMI_INCLUDE_DIRS ${ROCSMI_INCLUDE_DIRS}")
-else()
+if (KAAPI_USE_ROCSMI)
   include_directories(${ROCSMI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${ROCSMI_LIBRARIES})
   message(STATUS "Found ROCSMI_LIBRARIES: ${ROCSMI_LIBRARIES}")
+endif()
+
+if (KAAPI_USE_LIBNUMA)
+  include_directories(${LIBNUMA_INCLUDE_DIRS})
+  target_link_libraries(kaapi PRIVATE ${LIBNUMA_LIBRARIES})
+  message(STATUS "Kaapi configured with LIBNUMA")
 endif()
 
 if (${CUDA_DRIVER_FOUND})

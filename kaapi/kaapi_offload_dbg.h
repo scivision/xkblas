@@ -65,6 +65,8 @@
 
 #if _OFFLOAD_DEBUG
 #include <stdio.h>
+extern void _kaapi_lock_print(void);
+extern void _kaapi_unlock_print(void);
 #  define KAAPI_OFFLOAD_TRACE_IN \
     _kaapi_lock_print();\
     fprintf(stdout, "%p::IN %s\n", (void*)pthread_self(), __FUNCTION__);\
