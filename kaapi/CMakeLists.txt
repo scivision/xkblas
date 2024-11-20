@@ -104,8 +104,8 @@ if (${CUDA_RT_FOUND})
 endif()
 
 if (${HIP_FOUND})
-	#include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
-  include_directories(${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
+	include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
+	#include_directories(${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
 endif()
 

@@ -937,6 +937,12 @@ void* kaapi_hip_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
+#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
+          err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
+				 // TODO check errors	
+#else
           err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
           //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
           if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
@@ -944,15 +950,22 @@ void* kaapi_hip_register_thread(void* dummy )
             printf("***[%s]: hipHostRegister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#endif // defined(KAAPI_UNIFIED)
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-          err = hipHostUnregister(req.ptr);
+#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetPreferredLocation, 0); // Data should migrate on GPU sooner
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetAccessedBy, 0);        // Data should migrate on GPU sooner
+					// No need to go back to fine-grain cache coherency policy
+#else
+					err = hipHostUnregister(req.ptr);
           if (!( (hipSuccess == err) || (hipErrorHostMemoryNotRegistered == err)))
           {
             printf("***[%s]: hipHostUnregister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#endif // defined(KAAPI_UNIFIED)
         }
       }
 #if KAAPI_USE_PERFCOUNTER
@@ -1121,6 +1134,7 @@ static int kaapi_hip_stream_decode(
 {
 pthread_mutex_lock(&access_lock);
 #endif
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1162,6 +1176,7 @@ pthread_mutex_lock(&access_lock);
             default:
               kaapi_assert_debug(0);
           };
+#endif // defined(KAAPI_UNIFIED)
 #ifdef NOT_REENTRANT
 pthread_mutex_unlock(&access_lock);
 }
@@ -1192,6 +1207,7 @@ pthread_mutex_unlock(&access_lock);
 {
 pthread_mutex_lock(&access_lock);
 #endif
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1215,6 +1231,7 @@ pthread_mutex_lock(&access_lock);
             default:
               kaapi_assert(0);
           };
+#endif // defined(KAAPI_UNIFIED)
 #ifdef NOT_REENTRANT
 pthread_mutex_unlock(&access_lock);
 }
