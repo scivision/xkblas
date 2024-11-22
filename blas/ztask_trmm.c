@@ -159,9 +159,11 @@ static void NAME(task_body_gpu)( kaapi_task_t* task, kaapi_thread_t* thread, voi
         arg->m, arg->n,
         (const cuDoubleComplex*)&arg->alpha,
         arg->A.data, arg->lda,
-//#if KAAPI_USE_HIP==0 :  to be compiled with -DHIPBLAS_V1
-        arg->B.data, arg->ldb,
-//#endif
+// HIPBlas change function definition in V2.0 to comply with cuBlas and rocBlas
+#if defined(KAAPI_USE_HIP) && (hipblasVersionMajor < 2)
+#else
+				arg->B.data, arg->ldb,
+#endif
         arg->B.data, arg->ldb);
   kaapi_assert(res == CUBLAS_STATUS_SUCCESS);
 }
