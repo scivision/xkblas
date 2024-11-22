@@ -233,7 +233,7 @@ static void __kaapi_hip_CheckError( hipError_t err,  char *file, const int line 
    for which the device d has link with performance i.
 */
 static int hip_device_count = 0;    
-static int* hip_perf_topo = 0;    
+static uint64_t* hip_perf_topo = 0;
 static int hip_count_perfrank = 0;
 static uint64_t* hip_perf_device = 0;
 static int* hip_routing_table = 0;
@@ -309,7 +309,7 @@ static void _kaapi_get_gpu_topo(void)
 
   if (device_count ==0) return;
   hip_device_count = device_count;
-  hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
+  hip_perf_topo = (uint64_t*)malloc(sizeof(uint64_t)*device_count*device_count);
 
   RSMI_IO_LINK_TYPE type;
   // Enumerates Device <-> Device links and store perfRank
@@ -1821,7 +1821,9 @@ return_rsmi_error:
   err = ENOTSUP;
 
 retval:
-#if KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
+#if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
+  // Do not free cpuset if not created
+#elif KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_bitmap_free(cpuset);
 #endif
 
