@@ -486,6 +486,9 @@ static inline void kaapi_hip_plugin_unlock(void)
 */
 static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
+#if defined(KAAPI_UNIFIED)
+	return NULL;
+#else
   void* ptr;
   hipError_t res;
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
@@ -521,6 +524,7 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
+#endif // else of: defined(KAAPI_UNIFIED)
 }
 
 
@@ -1143,6 +1147,7 @@ static int kaapi_hip_stream_decode(
       {
         case KAAPI_MEMORY_VIEW_1D:
         {
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
 #ifdef NOT_REENTRANT
@@ -1150,7 +1155,6 @@ static int kaapi_hip_stream_decode(
 {
 pthread_mutex_lock(&access_lock);
 #endif
-#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1192,16 +1196,17 @@ pthread_mutex_lock(&access_lock);
             default:
               kaapi_assert_debug(0);
           };
-#endif // defined(KAAPI_UNIFIED)
 #ifdef NOT_REENTRANT
 pthread_mutex_unlock(&access_lock);
 }
 #endif
           kaapi_hip_CheckError(res);
+#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_2D:
         {
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           size_t width, height, dpitch, spitch;
           if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
           {
@@ -1223,7 +1228,6 @@ pthread_mutex_unlock(&access_lock);
 {
 pthread_mutex_lock(&access_lock);
 #endif
-#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
@@ -1247,11 +1251,11 @@ pthread_mutex_lock(&access_lock);
             default:
               kaapi_assert(0);
           };
-#endif // defined(KAAPI_UNIFIED)
 #ifdef NOT_REENTRANT
 pthread_mutex_unlock(&access_lock);
 }
 #endif
+#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -2413,6 +2417,22 @@ KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
   return 0;
 }
 
+#if defined(KAAPI_UNIFIED)
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
+{
+	// TODO add checks
+	hipMallocManaged( pptr, size, hipMemAttachGlobal );
+}
+
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void** pptr, size_t size )
+{
+	// TODO add checks
+	hipFree( pptr );
+}
+#endif //defined(KAAPI_UNIFIED)
+
 
 /*
 */
@@ -2477,5 +2497,10 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(kaapi_driver_t* driver)
   EP (device_attach);
   EP (device_detach);
   EP (get_gpublas_handle);
+
+#if defined(KAAPI_UNIFIED)
+  EP (malloc_unified);
+  EP (free_unified);
+#endif //defined(KAAPI_UNIFIED)
 }
 #endif

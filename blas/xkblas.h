@@ -64,16 +64,16 @@ typedef double complex Complex64_t;
 typedef double CFloat64_t;
 #endif
 
+// Symbols are exported in both version (unified and not) for testing purpose 
+//#if defined(KAAPI_UNIFIED)
+// Function used to deactivate malloc interception (by preloaded library) will be removed in futur versions
 void xkblas_activate_custom_alloc();
 void xkblas_deactivate_custom_alloc();
 
-void xkblas_prefetch_memory_on_gpu();
-void xkblas_end_prefetch_memory_on_gpu();
-
-void* xkblas_unified_get_data( size_t size );
-void xkblas_unified_retrieve_data( void* dst, void* src, size_t size );
-
-void xkblas_2D_copy( void* dst, void* src, int nrow, size_t col_size, size_t lddst, size_t ldsrc );
+// Allocate and deallocate managed memory
+void xkblas_malloc_unified(void** ptr, size_t size);
+void xkblas_free_unified(void* ptr);
+//#endif // defined(KAAPI_UNIFIED)
 
 /* xkblas context
 */

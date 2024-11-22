@@ -116,56 +116,39 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 }
 */
 
-void* xkblas_unified_get_data( size_t size )
+#if defined(KAAPI_UNIFIED)
+kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
+#endif
+
+void xkblas_malloc_unified(void** ptr, size_t size)
 {
-	void* ptr = NULL;
-#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL) && KAAPI_USE_CUDA
+#if defined(KAAPI_UNIFIED)
+#if KAAPI_USE_CUDA
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
-	struct timespec t0, t1;
-	clock_gettime( CLOCK_MONOTONIC, &t0 );
-	ptr = driver->f_unified_get_data( size ); // kaapi_unified_get_data( size );
-	clock_gettime( CLOCK_MONOTONIC, &t1 );
-	double t = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec)/1e9;
-	printf("Front size %lld elements in %lf s, %lf GB/s\n", size/sizeof(double), t, size/1e9/t );
-#endif // KAAPI_UNIFIED && KAAPI_UNIFIED_PARTIAL
-	return ptr;
-}
-	
-void xkblas_unified_retrieve_data( void* dst, void* src, size_t size )
-{
-#if defined(KAAPI_UNIFIED) && defined(KAAPI_UNIFIED_PARTIAL) && KAAPI_USE_CUDA
-	struct timespec t0, t1;
-	clock_gettime( CLOCK_MONOTONIC, &t0 );
-	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
-	driver->f_unified_retrieve_data( dst, src, size );	
-	clock_gettime( CLOCK_MONOTONIC, &t1 );
-	double t = (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec)/1e9;
-	printf("Data move in in %lf s, %lf GB/s\n", size/sizeof(double), t, size/1e9/t );
-#endif // KAAPI_UNIFIED && KAAPI_UNIFIED_PARTIAL
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
+
+	driver->f_malloc_unified( ptr, size );
+#endif
 }
 
-void xkblas_2D_copy( void* dst, void* src, int nrow, size_t col_size, size_t lddst, size_t ldsrc )
+void xkblas_free_unified(void* ptr)
 {
-#if defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
+#if defined(KAAPI_UNIFIED)
+#if KAAPI_USE_CUDA
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
-	driver->f_safe_2d_copy( dst, src, nrow, col_size, lddst, ldsrc );
-#endif //defined(KAAPI_UNIFIED) && KAAPI_USE_CUDA
-}
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	if(driver == 0)
+		driver = _last_used_driver; // xkblas has been cleaned but data are still allocated... TODO FIX
 
-void xkblas_prefetch_memory_on_gpu( void* ptr, size_t size )
-{
-  //struct cudaMemLocation loc;
-  //loc.type = cudaMemLocationTypeDevice;
-  //loc.id = 0;
-  //cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc );
-  //cudaMemPrefetchAsync( ptr, size, 0, NULL );
-  //cudaStreamSynchronize(NULL);
-}
-
-void xkblas_end_prefetch_memory_on_gpu( void* ptr, size_t size )
-{
-  //struct cudaMemLocation loc;
-  //cudaMemAdvise_v2( ptr, size, cudaMemAdviseUnsetPreferredLocation, loc );
+	driver->f_free_unified( ptr );
+#endif
 }
 
 /* Deallocate the current xkblas_context */
