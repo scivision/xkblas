@@ -117,7 +117,8 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 */
 
 #if defined(KAAPI_UNIFIED)
-kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
+//kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
+void (*_last_free_to_use)(void*) = NULL;
 #endif
 
 void xkblas_malloc_unified(void** ptr, size_t size)
@@ -129,15 +130,18 @@ void xkblas_malloc_unified(void** ptr, size_t size)
 #if KAAPI_USE_HIP
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
-	_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
+	_last_free_to_use = driver->f_free_unified;
+	//_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
 
 	driver->f_malloc_unified( ptr, size );
+	//printf("Allocate unified %p %p\n", *ptr, _last_used_driver);
 #endif
 }
 
 void xkblas_free_unified(void* ptr)
 {
 #if defined(KAAPI_UNIFIED)
+	//printf("Free unified %p %p\n", ptr, _last_used_driver);
 #if KAAPI_USE_CUDA
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
 #endif
@@ -145,9 +149,14 @@ void xkblas_free_unified(void* ptr)
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
 	if(driver == 0)
-		driver = _last_used_driver; // xkblas has been cleaned but data are still allocated... TODO FIX
-
-	driver->f_free_unified( ptr );
+	{
+	//	driver = _last_used_driver; // xkblas has been cleaned but data are still allocated... TODO FIX
+		_last_free_to_use( ptr );
+	}
+	else
+	{
+		driver->f_free_unified( ptr );
+	}
 #endif
 }
 
