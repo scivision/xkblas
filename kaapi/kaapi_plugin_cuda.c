@@ -2429,10 +2429,10 @@ KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
 }
 
 KAAPI_CLASS_ENTRYPOINT void
-KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void** pptr, size_t size )
+KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void* ptr )
 {
 	// TODO add checks
-	cudaFree( pptr );
+	cudaFree( ptr );
 }
 #endif //defined(KAAPI_UNIFIED)
 

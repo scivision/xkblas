@@ -487,7 +487,7 @@ static inline void kaapi_hip_plugin_unlock(void)
 static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
 #if defined(KAAPI_UNIFIED)
-	return NULL;
+	return (uintptr_t) NULL;
 #else
   void* ptr;
   hipError_t res;
@@ -2426,10 +2426,10 @@ KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
 }
 
 KAAPI_CLASS_ENTRYPOINT void
-KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void** pptr, size_t size )
+KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void* ptr )
 {
 	// TODO add checks
-	hipFree( pptr );
+	hipFree( ptr );
 }
 #endif //defined(KAAPI_UNIFIED)
 
