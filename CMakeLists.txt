@@ -13,6 +13,10 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 ")
 #
 project (XKblas)
 
+# More detailled information to know what we are doing
+message( STATUS "C Compiler:   ${CMAKE_C_COMPILER}" )
+message( STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}" )
+
 
 # Global options
 option(KAAPI_USE_CUDA_RT "To set if Kaapi should be compiled with support for NVIDIA GPU using Runtime API." OFF)
@@ -24,6 +28,8 @@ option(KAAPI_USE_PERFCTR "Add support for performance counter in the trace of ex
 option(KAAPI_USE_MKL "Use MKL" OFF)
 option(KAAPI_USE_OPENBLAS "Use OpenBLAS" OFF)
 option(KAAPI_USE_CRAYBLAS "Use Cray LIBSCI" OFF)
+option(KAAPI_USE_NVPL "Use Nvidia NVPL from NVHPC" OFF)
+option(KAAPI_USE_AOCL "Use AMD AOCL as BLAS" OFF)
 
 option(KAAPI_USE_SLEEP "Sleep thread is nothing to do" ON)
 option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
@@ -184,7 +190,13 @@ endif()
 if (KAAPI_USE_OPENBLAS)
   set(BLA_VENDOR OpenBLAS)
 endif()
-if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS AND NOT KAAPI_USE_CRAYBLAS)
+if (KAAPI_USE_NVPL)
+	set(BLA_VENDOR NVHPC)
+endif()
+if (KAAPI_USE_OPENBLAS)
+	set(BLA_VENDOR AOCL)
+endif()
+if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS AND NOT KAAPI_USE_CRAYBLAS AND NOT KAAPI_USE_NVPL AND NOT KAAPI_USE_AOCL)
   message(FATAL_ERROR "XKblas requires you specify the BLAS Vendor library.")
 endif()
 
@@ -192,15 +204,15 @@ find_package(BLAS REQUIRED)
 if (NOT ${BLAS_FOUND})
   message(FATAL_ERROR "XKblas requires a BLAS library.")
 endif()
+
 if (KAAPI_USE_MKL)
-  find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h
-    $ENV{MKLROOT}/include
-  )
+  find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h $ENV{MKLROOT}/include)
 endif()
 if (KAAPI_USE_CRAYBLAS)
-  find_path(BLAS_INCLUDE_DIRS lapacke.h
-    ${CRAY_LIBSCI_PREFIX_DIR}/include 
-  )
+  find_path(BLAS_INCLUDE_DIRS lapacke.h ${CRAY_LIBSCI_PREFIX_DIR}/include)
+endif()
+if (KAAPI_USE_AOCL)
+  find_path(BLAS_INCLUDE_DIRS lapacke.h)
 endif()
 
 add_compile_options(${BLAS_LINKER_FLAGS})
@@ -269,6 +281,13 @@ endif()
 if (KAAPI_USE_OPENBLAS)
   add_compile_options("-DKAAPI_BLAS_USE_OPENBLAS=1")
   add_compile_options("-DXKBLAS_BLASLIB=\"libopenblas.so\"")
+endif()
+if (KAAPI_USE_AOCL)
+  add_compile_options("-DKAAPI_BLAS_USE_AOCL=1")
+  add_compile_options("-DXKBLAS_BLASLIB=\"libblis.so\"")
+endif()
+if (KAAPI_USE_NVPL)
+  message(FATAL_ERROR "Conversion to NVPL is not completed")
 endif()
 find_package(BLAS REQUIRED)
 if (NOT ${BLAS_FOUND})

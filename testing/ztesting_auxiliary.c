@@ -38,7 +38,7 @@ typedef float complex ct32_helper;
 typedef double complex ct64_helper;
 #endif
 
-#if defined(KAAPI_BLAS_USE_OPENBLAS)||defined(KAAPI_BLAS_USE_CRAYBLAS)
+#if defined(KAAPI_BLAS_USE_OPENBLAS)||defined(KAAPI_BLAS_USE_CRAYBLAS)||defined(KAAPI_BLAS_USE_AOCL)
 #  include <cblas.h>
 #  include <lapacke.h>
 #elif defined(KAAPI_BLAS_USE_MKL)
