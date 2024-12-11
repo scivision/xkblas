@@ -60,6 +60,9 @@ typedef double CFloat64_t;
 #  include <mkl_types.h>
 #  include <mkl_cblas.h>
 #  include <mkl_lapacke.h>
+#elif defined(KAAPI_BLAS_USE_NVPL)
+#  include <nvpl_blas_cblas.h>
+#  include <nvpl_lapack.h>
 #else
 #  error "Blas library undefined"
 #endif
