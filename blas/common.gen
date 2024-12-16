@@ -86,6 +86,15 @@ typedef double CFloat64_t;
 #define KBLAS_INT int
 #endif
 
+
+#if defined(KAAPI_NVTX)
+#define NVTX_PUSH nvtxRangePushA( __func__ );
+#define NVTX_POP  nvtxRangePop();
+#else
+#define NVTX_PUSH 
+#define NVTX_POP  
+#endif //defined(KAAPI_NVTX)
+
 /* Get the mode math for the next kernel.
 */
 extern xkblas_mode_math_t xkblas_get_modemath(void);

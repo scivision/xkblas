@@ -1672,6 +1672,9 @@ size_t id_sync = 0;
 #endif
 int xkblas_sync(void)
 {
+#if defined(KAAPI_NVTX)
+  nvtxRangePushA( __func__ );
+#endif //defined(KAAPI_NVTX)
   xkblas_context_t* xk_ctxt = xkblas_context_get();
   kaapi_context_t* ctxt = kaapi_thread2context(xk_ctxt->kthread);
 #if BUG_2022_03_18
@@ -1741,6 +1744,9 @@ printf("%p:: %30.30s , end sync id: %lu, #handle: %i, #count activated: %i\n\n\n
 #endif
 
   kaapi_begin_dfg( xk_ctxt->kthread, KAAPI_FRAME_FLAG_DFG_OK );
+#if defined(KAAPI_NVTX)
+  nvtxRangePop();
+#endif //defined(KAAPI_NVTX)
   return 0;
 }
 

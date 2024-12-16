@@ -122,6 +122,7 @@ int xkblas_zcopyscale_async(
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu)
 {
+	NVTX_PUSH
 #if 0
 	printf("[XKBLAS] copyscale M %d, N %d, D %p, ldd %d, L %p, ldl %d, U %p, ldu %d\n",
 									M, N, D, ldd, L, ldl, U, ldu );
@@ -130,16 +131,19 @@ int xkblas_zcopyscale_async(
 	if( ldd < N )
 	{
 		kaapi_error("zcopyscale", "Invalid value for ldd\n");
+	NVTX_POP
 		return -5;
 	}
 	if( ldl < N )
 	{
 		kaapi_error("zcopyscale", "Invalid value for ldl\n");
+	NVTX_POP
 		return -7;
 	}
 	if( ldu < M )
 	{
 		kaapi_error("zcopyscale", "Invalid value for ldu\n");
+	NVTX_POP
 		return -9;
 	}
 	
@@ -243,6 +247,7 @@ int xkblas_zcopyscale_async(
 
 		}
 	}
+	NVTX_POP
 	return 0;
 }
 
