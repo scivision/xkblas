@@ -1,6 +1,0 @@
-2022-03-18: BUG MUMPS
-	TRSM
-	SYNC
-	TRSM
-	SYNC <- deadlock because of non activated handle 
-	
