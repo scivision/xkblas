@@ -1,3 +1,16 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   khp-tree.hpp                                                             */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/* ************************************************************************** */
+
 // TODO PERFORMANCES IDEA
 //  - when inserting, it currently queue tasks to propagates 'includes' info before returning doing a bottom-up traversal
 //    Instead, 'includes' info could be updated when

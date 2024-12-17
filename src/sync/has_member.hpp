@@ -1,3 +1,16 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   has_member.hpp                                                           */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/* ************************************************************************** */
+
 // A compile-time method for checking the existence of a class member
 // @see https://general-purpose.io/2017/03/10/checking-the-existence-of-a-cpp-class-member-at-compile-time/
 

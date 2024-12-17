@@ -1,3 +1,16 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   access-mode.h                                                            */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef __ACCESS_MODE_H__
 # define __ACCESS_MODE_H__
 

@@ -1,25 +1,24 @@
 " Modified from https://github.com/42Paris/42header
 "
 " HOW TO USE
-"
 "   copy `stdheader.vim` to `$HOME/.vim/plugin`
-"   set `USER` environment variable
+"   set `NAME` environment variable
 "   set `MAIL` environment variable
 "   press `F2` while in a file
 
 let s:asciiart = [
-     \"                       ",
-     \"                       ",
-     \"                       ",
-     \"             *         ",
-     \"                   *   ",
-     \"     *      .-*-.      ",
-     \"          .'* *.'      ",
-     \" *     __/_*_*(_     * ",
-     \"     / _______ \\      ",
-     \"     \\_)     (_/      ",
-     \"  *                *   ",
-     \"                       ",
+     \"              ",
+     \"              ",
+     \"              ",
+     \"              ",
+     \"        .-*-. ",
+     \"      .'* *.' ",
+     \"   __/_*_*(_  ",
+     \" / _______ \\ ",
+     \" \\_)     (_/ ",
+     \"              ",
+     \"              ",
+     \"              ",
 \]
 
 let s:start		= '/*'
@@ -28,7 +27,7 @@ let s:fill		= '*'
 let s:length	= 80
 let s:margin	= 5
 
-let s:license   = "CeCILL-C"
+let s:license   = "CeCILL 2.1"
 
 let s:types		= {
 			\'\.c$\|\.h$\|\.cc$\|\.hh$\|\.cpp$\|\.hpp$\|\.tpp$\|\.ipp$\|\.cxx$\|\.go$\|\.rs$\|\.php$\|\.py$\|\.java$\|\.kt$\|\.kts$':
@@ -86,25 +85,25 @@ function! s:line(n)
 	elseif a:n == 3 " filename
 		return s:textline(s:filename(), s:ascii(a:n))
 	elseif a:n == 5 " author
-		return s:textline("Authors: " . s:user() . " <" . s:mail() . ">", s:ascii(a:n))
+		return s:textline("Author: " . s:name() . " <" . s:mail() . ">", s:ascii(a:n))
 	elseif a:n == 7 " created
-		return s:textline("Created: " . s:date() . " by " . s:user(), s:ascii(a:n))
+		return s:textline("Created: " . s:date() . " by " . s:name(), s:ascii(a:n))
 	elseif a:n == 8 " updated
-		return s:textline("Updated: " . s:date() . " by " . s:user(), s:ascii(a:n))
+		return s:textline("Updated: " . s:date() . " by " . s:name(), s:ascii(a:n))
 	elseif a:n == 10 " License
 		return s:textline("License: " . s:license, s:ascii(a:n))
 	endif
 endfunction
 
-function! s:user()
-	if exists('g:user')
-		return g:user
+function! s:name()
+	if exists('g:name')
+		return g:name
 	endif
-	let l:user = $USER
-	if strlen(l:user) == 0
-		let l:mail = "set 'USER' or 'g:user'"
+	let l:name = $NAME
+	if strlen(l:name) == 0
+		let l:mail = "set 'NAME' or 'g:name'"
 	endif
-	return l:user
+	return l:name
 endfunction
 
 function! s:mail()

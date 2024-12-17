@@ -1,3 +1,16 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   stream-instruction-submit.cc                                             */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include "device/device.h"
 # include "device/driver.h"
 # include "device/stream-instruction.h"
