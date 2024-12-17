@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/17 21:44:15 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -49,7 +49,7 @@ class access_t
 
         // Welcome traveller \o/ I am glad you found me
         //
-        // Here is all the super-dirty pile of shit on which relies all xkblas/v2.
+        // Here is all the super-dirty pile of shit on which relies all xkblas
         // Hopefully you are only here by curiosity, and not trying to fix something.
         //
         // Well ... you have a wonderful day :-)
@@ -70,9 +70,9 @@ class access_t
                 const size_t  s = t.sizeof_type;
                 const size_t LD = t.ld;
 
-                # if XKBLAS_ACCESS_FORCE_ALIGNMENT
+                # if ACCESS_FORCE_ALIGNMENT
                 assert((A % (LD * s)) + (m * s) <= LD * s);
-                # endif /* XKBLAS_ACCESS_FORCE_ALIGNMENT */
+                # endif /* ACCESS_FORCE_ALIGNMENT */
 
                 // not sure about what to do if other ordering
                 assert(t.order == MATRIX_COLMAJOR);

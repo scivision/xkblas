@@ -3,12 +3,12 @@
 import os
 import sys
 
-if len(sys.argv) != 2:
-    print("usage: {} [DST-DIR]".format(sys.argv[0]))
+if len(sys.argv) != 3:
+    print("usage: {} [DST-DIR] [DST-FILE]".format(sys.argv[0]))
     sys.exit(0)
 
 dstdir=sys.argv[1]
-dstfile="xkblas-version"
+dstfile=sys.argv[2]
 
 def cmd(s):
     print(s)
