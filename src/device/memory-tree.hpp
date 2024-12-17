@@ -14,7 +14,7 @@
 # include "sync/lockable.hpp"
 
 // tree cutting would suppress validity/transfer information of some blocks
-# include "sync/cube-tree.hpp"
+# include "sync/khp-tree.hpp"
 
 # include <algorithm>  // std::sort
 # include <cstdint>
@@ -594,10 +594,10 @@ class KMemoryTreeNodeSearch {
 # define CUT false
 
 template <int K>
-class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
+class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
 
     using Access = KMemoryAccess<K>;
-    using Base = typename KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
+    using Base = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
     using Cube = KCube<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
@@ -652,13 +652,13 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node
         void
         dump_str(FILE * f) const
         {
-            KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node::dump_str(f);
+            KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node::dump_str(f);
         }
 
         void
         dump_cube_str(FILE * f) const
         {
-            // KCubeTree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
+            // KHPTree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
             # if 0
             fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
             fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
@@ -679,17 +679,17 @@ class KMemoryTreeNode : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node
 }; /* KMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>, Lockable {
+class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, Lockable {
 
     using Access = KMemoryAccess<K>;
-    using Base = KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>;
+    using Base = KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>;
     using Cube = KCube<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryForward = KMemoryForward<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
     using Node = KMemoryTreeNode<K>;
-    using NodeBase = typename KCubeTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
+    using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
     using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
     using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
     using Search = KMemoryTreeNodeSearch<K>;

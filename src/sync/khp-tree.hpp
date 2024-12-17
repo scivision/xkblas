@@ -115,7 +115,7 @@ do {                                                                    \
  *  C is whether to cut included nodes or not
  */
 template<int K, typename T, bool CUT>
-class KCubeTree {
+class KHPTree {
 
     using Cube = KCube<K>;
 
@@ -402,7 +402,7 @@ class KCubeTree {
         std::vector<Node *> outdated;
 
     public:
-        KCubeTree() :
+        KHPTree() :
             root(nullptr),
             limbs(),
             outdated() {}
@@ -443,7 +443,7 @@ class KCubeTree {
             this->limbs.clear();
         }
 
-        virtual ~KCubeTree()
+        virtual ~KHPTree()
         {
             subtree_delete(this->root);
             this->garbage_collector_run();
@@ -1319,14 +1319,14 @@ class KCubeTree {
         coherency_cube_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_includes_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_cube_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_cube_includes(Node * root) const
         {
-            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1341,14 +1341,14 @@ class KCubeTree {
         coherency_cube_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_cube_disjoint(Node * root) const
         {
-            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1489,7 +1489,7 @@ class KCubeTree {
         void
         coherency_cube_represented(Cube cube)
         {
-            auto f = std::bind(&KCubeTree<K, T>::coherency_cube_represented_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_cube_represented_check, this, _1, _2);
             foreach_node(this->root, f, &cube);
         }
 

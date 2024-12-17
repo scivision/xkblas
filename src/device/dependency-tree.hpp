@@ -3,7 +3,7 @@
 
 # pragma message(TODO "Dependency tree cut is always disabled currently, because the memory tree is included before the deptree... Fix me by removing 'mode' from the 'CubeTree::insert' - and overriding the 'insert_from' to cut in the dep tree")
 
-# include "sync/cube-tree.hpp"
+# include "sync/khp-tree.hpp"
 # include "device/task.hpp"
 
 # include <array>
@@ -89,10 +89,10 @@ static int PRINT_IDS_NEXT_VALUE = 0;
 # define CUT false
 
 template <int K>
-class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node {
+class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node {
 
     using Access        = KMemoryAccess<K>;
-    using Base          = typename KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node;
+    using Base          = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
     using Node          = KDependencyTreeNode<K>;
     using Cube          = KCube<K>;
     using Search        = KDependencyTreeSearch<K>;
@@ -170,7 +170,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::
         inline void
         update_includes(void)
         {
-            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::update_includes();
+            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
@@ -180,7 +180,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::
             # if PRINT_IDS
             fprintf(f, "%d", this->id);
             # else
-            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             # endif
         }
@@ -191,7 +191,7 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::
             # if PRINT_IDS
             fprintf(f, "%d", this->id);
             # else
-            KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_cube_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_cube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write.task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -204,12 +204,12 @@ class KDependencyTreeNode : public KCubeTree<K, KDependencyTreeSearch<K>, CUT>::
 };
 
 template<int K>
-class KDependencyTree : public KCubeTree<K, KDependencyTreeSearch<K>, CUT> {
+class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT> {
 
     using Access        = KMemoryAccess<K>;
-    using Base          = KCubeTree<K, KDependencyTreeSearch<K>, CUT>;
+    using Base          = KHPTree<K, KDependencyTreeSearch<K>, CUT>;
     using Node          = KDependencyTreeNode<K>;
-    using NodeBase      = typename KCubeTree<K, KDependencyTreeSearch<K>, CUT>::Node;
+    using NodeBase      = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
     using Cube          = KCube<K>;
     using Task          = KTask<K>;
     using TaskAccess    = KTaskAccess<K>;
