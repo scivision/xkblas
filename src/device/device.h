@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/17 13:10:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,7 +48,7 @@ typedef struct  xkblas_device_t
     Offloader offloader;                /* communication streams host<->device */
     uint8_t driver_id;                  /* driver device id in [0..ngpus_for_device] */
     uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ - host is a virtual device of id 'XKBLAS_DEVICES_MAX'*/
-    std::atomic<uint8_t> state;         /* True if driver is initialized */
+    std::atomic<uint8_t> state;         /* xkblas_device_state_t */
     ThreadWorker * thread;              /* the device worker thread */
 
 }               xkblas_device_t;

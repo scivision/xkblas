@@ -1,3 +1,6 @@
+# ENVIRONMENT VARIABLES
+- `XKBLAS_HELP` - shows a helper with available environment variables
+
 # BUILD EXAMPLE
 ```bash
 mkdir build-debug
