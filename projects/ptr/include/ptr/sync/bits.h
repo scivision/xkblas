@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 14:21:49 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,23 +17,23 @@
 # include "device/consts.h"
 
 /* utility: return the index+1 of random bit set to '1' */
-static inline xkblas_device_global_id_t
-__random_set_bit(xkblas_device_global_id_bitfield_t bitfield)
+static inline ptr_device_global_id_t
+__random_set_bit(ptr_device_global_id_bitfield_t bitfield)
 {
     static unsigned int seed = 0x42;
 
     if (bitfield == 0)
-        XKBLAS_FATAL("Tried to get a random bit from a NULL bitfield");
+        LOGGER_FATAL("Tried to get a random bit from a NULL bitfield");
 
     /* must be true, as 'builtin_popcount' works on 'int' type */
-    static_assert(sizeof(xkblas_device_global_id_bitfield_t) <= sizeof(int));
+    static_assert(sizeof(ptr_device_global_id_bitfield_t) <= sizeof(int));
 
     const int nb = __builtin_popcount(bitfield);
-    xkblas_device_global_id_t idx = 0;
+    ptr_device_global_id_t idx = 0;
     int k = rand_r(&seed) % nb;
     for (int i = 0; i <= k; ++i)
     {
-        idx = static_cast<xkblas_device_global_id_t>(__builtin_ffs(static_cast<int>(bitfield)));
+        idx = static_cast<ptr_device_global_id_t>(__builtin_ffs(static_cast<int>(bitfield)));
         bitfield &= ~(1 << (idx - 1));
     }
 

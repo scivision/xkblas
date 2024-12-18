@@ -31,8 +31,8 @@
 # define TASK_MAX_ACCESSES          3
 # define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
 
-// # define XKBLAS_DEBUG_TASK(...) XKBLAS_DEBUG(__VA_ARGS__)
-# define XKBLAS_DEBUG_TASK(...)
+// # define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
+# define LOGGER_DEBUG_TASK(...)
 
 typedef enum    task_state_t : uint8_t
 {
@@ -68,9 +68,9 @@ task_state_to_str(task_state_t state)
 }
 
 # if USE_STATS
-void xkblas_stats_task_state_incr(task_format_id_t fmtid, task_state_t state);
+void ptr_stats_task_state_incr(task_format_id_t fmtid, task_state_t state);
 # else
-#  define xkblas_stats_task_state_incr(...)
+#  define ptr_stats_task_state_incr(...)
 # endif /* USE_STATS */
 
 template <int K>
@@ -112,7 +112,7 @@ class alignas(CACHE_LINE_SIZE) KTask
          * If 'UNSPECIFIED_TASK_ACCESS', leave the decision to the scheduler */
         uint8_t ocr_access_index;
 
-        /* worker id on where to schedule once ready (or XKBLAS_DEVICES_MAX if
+        /* worker id on where to schedule once ready (or PTR_DEVICES_MAX if
          * leaving the decision to the scheduler) */
         uint8_t targeted_device_id;
 
@@ -154,13 +154,13 @@ class alignas(CACHE_LINE_SIZE) KTask
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");
             # endif /* NDEBUG */
-            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
+            ptr_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
         }
 
         virtual ~KTask()
         {
             this->state.value = TASK_STATE_DEALLOCATED;
-            xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DEALLOCATED);
+            ptr_stats_task_state_incr(this->fmtid, TASK_STATE_DEALLOCATED);
         }
 
     public:
@@ -197,10 +197,10 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
             {
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to ready", this->label);
+                LOGGER_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
-                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
-                xkblas_task_ready(this);
+                ptr_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
+                ptr_task_ready(this);
             }
         }
 
@@ -210,9 +210,9 @@ class alignas(CACHE_LINE_SIZE) KTask
             if (this->wc.fetch_add(n, std::memory_order_seq_cst) == 0)
             {
                 assert(this->state.value == TASK_STATE_READY);
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
+                LOGGER_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHING;
-                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHING);
+                ptr_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHING);
             }
         }
 
@@ -222,9 +222,9 @@ class alignas(CACHE_LINE_SIZE) KTask
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(n, std::memory_order_seq_cst) == 1)
             {
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
+                LOGGER_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
-                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHED);
+                ptr_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHED);
                 return TASK_STATE_DATA_FETCHED;
             }
 
@@ -238,8 +238,8 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_COMPLETED;
-                XKBLAS_DEBUG_TASK("State of task `%s` changed to completed", this->label);
-                xkblas_stats_task_state_incr(this->fmtid, TASK_STATE_COMPLETED);
+                LOGGER_DEBUG_TASK("State of task `%s` changed to completed", this->label);
+                ptr_stats_task_state_incr(this->fmtid, TASK_STATE_COMPLETED);
             }
             SPINLOCK_UNLOCK(this->state.lock);
 
@@ -250,6 +250,6 @@ class alignas(CACHE_LINE_SIZE) KTask
 
 using Task = KTask<2>;
 
-void xkblas_task_ready(Task * task);
+void ptr_task_ready(Task * task);
 
 #endif /* __TASK_HPP__ */

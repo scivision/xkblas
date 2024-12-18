@@ -33,7 +33,7 @@ endif()
 #######
 
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/include/ptr-version-always-run.h
+    ${CMAKE_SOURCE_DIR}/include/ptr/ptr-version-always-run.h
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/device/device.cc
     ${CMAKE_SOURCE_DIR}/src/device/driver.cc
@@ -45,6 +45,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/device/thread-producer.cc
     ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/device/thread.cc
+    ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/memory-alloc.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
@@ -56,9 +57,9 @@ SET(SOURCE_FILES
 # PTR version
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/ptr-version-always-run.h # set invalid name so its always generated
+        ${CMAKE_SOURCE_DIR}/include/ptr/ptr-version-always-run.h # set invalid name so its always generated
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/ ptr-version
+        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/ptr ptr-version
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -168,6 +169,7 @@ endif()
 
 # Include directory
 include_directories(include/)
+include_directories(include/ptr)
 include_directories(src/)
 
 # Installation

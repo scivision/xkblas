@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 22:09:28 by                           \_)     (_/    */
+/*   Updated: 2024/12/18 15:23:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __LOGGER_H__
 # define __LOGGER_H__
 
-# include <sync/spinlock.h>
+# include <ptr/sync/spinlock.h>
 
 # include <time.h>
 # include <unistd.h>

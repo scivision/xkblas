@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 15:17:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,10 +16,6 @@
 
 # include <stddef.h>
 # include <stdint.h>
-
-// TODO : remove me, this is here for legacy purposes
-# include "xkblas-kernel.h"
-# include "xkblas-kernel-type.h"
 
 /* XKBLAS LEGACY INTERFACES */
 

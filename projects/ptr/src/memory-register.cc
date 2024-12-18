@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "runtime.h"
 
 //  Some ideas:
 //      - can we pin memory independently of CUDA / HIP / ... via 'mlock' and
@@ -22,18 +22,18 @@
 
 extern "C"
 uint64_t
-xkblas_register_memory_async(void * ptr, uint64_t size)
+ptr_register_memory_async(void * ptr, uint64_t size)
 {
     # if USE_CUDA
 
-    xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
+    ptr_driver_t * driver = ptr_driver_get(PTR_DRIVER_TYPE_CUDA);
     assert(driver);
     assert(driver->f_memory_register);
     driver->f_memory_register(ptr, size);
 
     # else /* USE_CUDA */
 
-    XKBLAS_FATAL("Not implemented");
+    LOGGER_FATAL("Not implemented");
 
     # endif /* USE_CUDA */
 
@@ -42,18 +42,18 @@ xkblas_register_memory_async(void * ptr, uint64_t size)
 
 extern "C"
 int
-xkblas_unregister_memory(void * ptr, uint64_t size)
+ptr_unregister_memory(void * ptr, uint64_t size)
 {
     # if USE_CUDA
 
-    xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
+    ptr_driver_t * driver = ptr_driver_get(PTR_DRIVER_TYPE_CUDA);
     assert(driver);
     assert(driver->f_memory_unregister);
     driver->f_memory_unregister(ptr, size);
 
     # else /* USE_CUDA */
 
-    XKBLAS_FATAL("Not implemented");
+    LOGGER_FATAL("Not implemented");
 
     # endif /* USE_CUDA */
 
@@ -62,14 +62,14 @@ xkblas_unregister_memory(void * ptr, uint64_t size)
 
 extern "C"
 int
-xkblas_unregister_memory_async(void * ptr, uint64_t size)
+ptr_unregister_memory_async(void * ptr, uint64_t size)
 {
-    return xkblas_unregister_memory( ptr, size ); // not async ...
+    return ptr_unregister_memory( ptr, size ); // not async ...
 }
 
 extern "C"
 int
-xkblas_register_memory_waitall(void)
+ptr_register_memory_waitall(void)
 {
     // nothing to do, as we are synchronous
     return 0;
@@ -77,9 +77,9 @@ xkblas_register_memory_waitall(void)
 
 extern "C"
 uint64_t
-xkblas_register_memory(void * ptr, uint64_t size)
+ptr_register_memory(void * ptr, uint64_t size)
 {
-    uint64_t ret = xkblas_register_memory_async(ptr, size);
-    xkblas_register_memory_waitall();
+    uint64_t ret = ptr_register_memory_async(ptr, size);
+    ptr_register_memory_waitall();
     return ret;
 }

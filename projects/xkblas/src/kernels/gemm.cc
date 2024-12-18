@@ -14,7 +14,7 @@
 # include <cblas.h>
 
 # include "min-max.h"
-# include "xkblas-context.h"
+# include "context.h"
 
 # include "device/task-launcher.h"
 # include "device/thread-producer.hpp"

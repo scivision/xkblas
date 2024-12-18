@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-context-task-submit.cc                                            */
+/*   ptr-context-task-submit.cc                                            */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,12 +11,12 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "runtime.h"
 # include "sync/bits.h"
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
-xkblas_context_submit_task(xkblas_context_t * context, Task * task)
+ptr_context_submit_task(ptr_context_t * context, Task * task)
 {
     assert(task->state.value == TASK_STATE_READY);
 
@@ -26,7 +26,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
 
     // Find the worker to offload the task
     ThreadWorker * worker = nullptr;
-    xkblas_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
+    ptr_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
 
     // if an ocr parameter is set, retrieve the device accordingly
     if (task->ocr_access_index != UNSPECIFIED_TASK_ACCESS)
@@ -41,9 +41,9 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
         MemoryTree * memtree = context->get_memory_tree(access->host_view.ld, access->host_view.sizeof_type);
         assert(memtree);
 
-        const xkblas_device_global_id_bitfield_t owners = memtree->who_owns(access);
+        const ptr_device_global_id_bitfield_t owners = memtree->who_owns(access);
         if (owners)
-            device_id = (xkblas_device_global_id_t) __random_set_bit(owners) - 1;
+            device_id = (ptr_device_global_id_t) __random_set_bit(owners) - 1;
     }
 
     // if a target device is set
@@ -74,7 +74,7 @@ xkblas_context_submit_task(xkblas_context_t * context, Task * task)
             worker = context->drivers.devices.list[device_id]->thread;
     }
 
-    XKBLAS_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);
+    LOGGER_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);
 
     assert(worker);
     worker->push(task);

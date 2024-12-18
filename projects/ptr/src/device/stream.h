@@ -18,30 +18,30 @@
 # include "sync/lockable.hpp"
 
 /* DONT CHANGE ORDER HERE !! Can have side effects (in the Offloader class for instance) */
-typedef enum    xkblas_stream_type_t
+typedef enum    ptr_stream_type_t
 {
-    XKBLAS_STREAM_TYPE_H2D  = 0, /* from CPU to GPU */
-    XKBLAS_STREAM_TYPE_D2H  = 1, /* from GPU to CPU */
-    XKBLAS_STREAM_TYPE_D2D  = 2, /* from GPU to GPU */
-    XKBLAS_STREAM_TYPE_KERN = 3,
-    XKBLAS_STREAM_TYPE_ALL       /* internal purpose */
+    PTR_STREAM_TYPE_H2D  = 0, /* from CPU to GPU */
+    PTR_STREAM_TYPE_D2H  = 1, /* from GPU to CPU */
+    PTR_STREAM_TYPE_D2D  = 2, /* from GPU to GPU */
+    PTR_STREAM_TYPE_KERN = 3,
+    PTR_STREAM_TYPE_ALL       /* internal purpose */
 
-}               xkblas_stream_type_t;
+}               ptr_stream_type_t;
 
-const char * xkblas_stream_type_to_str(xkblas_stream_type_t type);
+const char * ptr_stream_type_to_str(ptr_stream_type_t type);
 
 /* counter for the stream queues */
-typedef uint32_t xkblas_stream_instruction_counter_t;
+typedef uint32_t ptr_stream_instruction_counter_t;
 
-class xkblas_stream_instruction_queue_t
+class ptr_stream_instruction_queue_t
 {
     public:
 
-        xkblas_stream_instruction_t * instr;                /* instructions buffer */
-        xkblas_stream_instruction_counter_t capacity;       /* buffer capacity */
+        ptr_stream_instruction_t * instr;                /* instructions buffer */
+        ptr_stream_instruction_counter_t capacity;       /* buffer capacity */
         struct {
-            volatile xkblas_stream_instruction_counter_t r; /* first instruction to process */
-            volatile xkblas_stream_instruction_counter_t w; /* next position for inserting instructions */
+            volatile ptr_stream_instruction_counter_t r; /* first instruction to process */
+            volatile ptr_stream_instruction_counter_t w; /* next position for inserting instructions */
         } pos;
 
     public:
@@ -59,7 +59,7 @@ class xkblas_stream_instruction_queue_t
             return (this->pos.r == this->pos.w);
         }
 
-        xkblas_stream_instruction_counter_t
+        ptr_stream_instruction_counter_t
         size(void) const
         {
             return (this->pos.w - this->pos.r);
@@ -69,39 +69,39 @@ class xkblas_stream_instruction_queue_t
 # pragma message(TODO "make this a C++ class and use inheritance/pure virtual - currently hybrid of C struct C++ class :(")
 
 /* this is a 'kaapi_io_stream' equivalent */
-class xkblas_stream_t : public Lockable
+class ptr_stream_t : public Lockable
 {
     public:
-        xkblas_stream_type_t type;
+        ptr_stream_type_t type;
 
         /* launch a stream instruction */
-        int (*f_instruction_launch)(xkblas_stream_t * stream, xkblas_stream_instruction_t * instr);
+        int (*f_instruction_launch)(ptr_stream_t * stream, ptr_stream_instruction_t * instr);
 
         /* progress a stream instruction */
-        int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking);
+        int (*f_instructions_progress)(ptr_stream_t * stream, int blocking);
 
         /* queue for ready instruction */
-        xkblas_stream_instruction_queue_t ready;
+        ptr_stream_instruction_queue_t ready;
 
         /* queue for pending instructions to progress */
-        xkblas_stream_instruction_queue_t pending;
+        ptr_stream_instruction_queue_t pending;
 
         /* the first event in the pending queue before which all events are completed */
-        volatile xkblas_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+        volatile ptr_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
     public:
 
         /* allocate a new instruction to the stream (must then be commited via 'commit') */
-        xkblas_stream_instruction_t * instruction_new(
-            const xkblas_stream_instruction_type_t itype,
-            const xkblas_callback_t & callback
+        ptr_stream_instruction_t * instruction_new(
+            const ptr_stream_instruction_type_t itype,
+            const ptr_callback_t & callback
         );
 
         /* complete the instruction at the i-th position in the pending queue (invoke the callback) */
-        void complete(const xkblas_stream_instruction_counter_t i);
+        void complete(const ptr_stream_instruction_counter_t i);
 
         /* commit the instruction to the stream (must be allocated via 'instruction_new') */
-        int commit(xkblas_stream_instruction_t * instruction);
+        int commit(ptr_stream_instruction_t * instruction);
 
         /* launch instructions, and may generate pending instructions */
         int launch_ready_instructions(void);
@@ -116,16 +116,16 @@ class xkblas_stream_t : public Lockable
         int is_empty(void) const;
 
 
-};  /* xkblas_stream_t */
+};  /* ptr_stream_t */
 
-void xkblas_stream_init(
-    xkblas_stream_t * stream,
-    xkblas_stream_type_t type,
-    xkblas_stream_instruction_counter_t capacity,
-    int (*f_instruction_launch)(xkblas_stream_t *, xkblas_stream_instruction_t *),
-    int (*f_instructions_progress)(xkblas_stream_t * stream, int blocking)
+void ptr_stream_init(
+    ptr_stream_t * stream,
+    ptr_stream_type_t type,
+    ptr_stream_instruction_counter_t capacity,
+    int (*f_instruction_launch)(ptr_stream_t *, ptr_stream_instruction_t *),
+    int (*f_instructions_progress)(ptr_stream_t * stream, int blocking)
 );
 
-void xkblas_stream_deinit(xkblas_stream_t * stream);
+void ptr_stream_deinit(ptr_stream_t * stream);
 
 #endif /* __STREAM_HPP__ */

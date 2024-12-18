@@ -1,25 +1,28 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   task.cc                                                                  */
+/*   ptr.h                                                                    */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/18 15:33:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
-# include "device/task.hpp"
-# include "sync/mem.h"
+#ifndef __PTR_H__
+# define __PTR_H__
 
-/* to be called once a task become ready, very dirty, but good enough as long
- * as we have the 'ptr_context_t' global variable :-( */
-void
-ptr_task_ready(Task * task)
-{
-    ptr_context_t * context = ptr_context_get();
-    ptr_context_submit_task(context, task);
-}
+// TODO : PTR public api
+
+extern "C"
+int ptr_init(void);
+
+extern "C"
+int ptr_deinit(void);
+
+extern "C"
+void ptr_sync(void);
+
+#endif /* __PTR_H__ */

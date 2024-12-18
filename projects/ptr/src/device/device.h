@@ -24,36 +24,36 @@
 # include "sync/cache-line-size.hpp"
 # include "sync/mutex.h"
 
-typedef enum    xkblas_device_state_t : uint8_t
+typedef enum    ptr_device_state_t : uint8_t
 {
-    XKBLAS_DEVICE_STATE_DEALLOCATED = 0,
-    XKBLAS_DEVICE_STATE_CREATE      = 1,
-    XKBLAS_DEVICE_STATE_INIT        = 2,
-    XKBLAS_DEVICE_STATE_COMMIT      = 3,
-    XKBLAS_DEVICE_STATE_RUNNING     = 4,
-    XKBLAS_DEVICE_STATE_STOP        = 5,
-    XKBLAS_DEVICE_STATE_STOPPED     = 6,
-    XKBLAS_DEVICE_STATE_FINALISE    = 7,
-    XKBLAS_DEVICE_STATE_FINALIZED   = 8,
-    XKBLAS_DEVICE_STATE_DESTROY     = 9,
-    XKBLAS_DEVICE_STATE_DESTROYED   = 10
+    PTR_DEVICE_STATE_DEALLOCATED = 0,
+    PTR_DEVICE_STATE_CREATE      = 1,
+    PTR_DEVICE_STATE_INIT        = 2,
+    PTR_DEVICE_STATE_COMMIT      = 3,
+    PTR_DEVICE_STATE_RUNNING     = 4,
+    PTR_DEVICE_STATE_STOP        = 5,
+    PTR_DEVICE_STATE_STOPPED     = 6,
+    PTR_DEVICE_STATE_FINALISE    = 7,
+    PTR_DEVICE_STATE_FINALIZED   = 8,
+    PTR_DEVICE_STATE_DESTROY     = 9,
+    PTR_DEVICE_STATE_DESTROYED   = 10
 
-}               xkblas_device_state_t;
+}               ptr_device_state_t;
 
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource */
-typedef struct  xkblas_device_t
+typedef struct  ptr_device_t
 {
-    xkblas_device_memory_t memdev;      /* casted to xkblas_device */
+    ptr_device_memory_t memdev;      /* casted to ptr_device */
     Offloader offloader;                /* communication streams host<->device */
     uint8_t driver_id;                  /* driver device id in [0..ngpus_for_device] */
-    uint8_t global_id;                  /* global device id in [0, XKBLAS_DEVICES_MAX[ - host is a virtual device of id 'XKBLAS_DEVICES_MAX'*/
-    std::atomic<uint8_t> state;         /* xkblas_device_state_t */
+    uint8_t global_id;                  /* global device id in [0, PTR_DEVICES_MAX[ - host is a virtual device of id 'PTR_DEVICES_MAX'*/
+    std::atomic<uint8_t> state;         /* ptr_device_state_t */
     ThreadWorker * thread;              /* the device worker thread */
 
-}               xkblas_device_t;
+}               ptr_device_t;
 
-int xkblas_device_poll(xkblas_device_t * device);
-bool xkblas_device_completed(void);
+int ptr_device_poll(ptr_device_t * device);
+bool ptr_device_completed(void);
 
 #endif /* __DEVICE_H__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 15:26:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __LOCKABLE_HPP__
 # define __LOCKABLE_HPP__
 
-# include "sync/spinlock.h"
+# include <ptr/sync/spinlock.h>
 
 /* an abstract object that can be locked */
 class Lockable {

@@ -14,7 +14,7 @@
 #ifndef __MATRIX_TILE_H__
 # define __MATRIX_TILE_H__
 
-# define XKBLAS_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
+# define PTR_NUM_OF_TILES(N, TILE_SIZE) (((N)+(TILE_SIZE)-1)/(TILE_SIZE))
 
 # include <assert.h>
 # include <stddef.h>

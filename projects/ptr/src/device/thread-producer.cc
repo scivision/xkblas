@@ -47,7 +47,7 @@ ThreadProducer::self(void)
 
 # ifndef NDEBUG
 void
-xkblas_thread_report_tasks(void)
+ptr_thread_report_tasks(void)
 {
     ThreadProducer * producer = ThreadProducer::self();
     assert(producer);
@@ -60,7 +60,7 @@ xkblas_thread_report_tasks(void)
         Task * task = producer->tasks[i];
         assert(task);
 
-        XKBLAS_WARN(
+        LOGGER_WARN(
             "%4lu - %12s - wc=%u - %s",
             i, task_state_to_str(task->state.value), task->wc.load(), task->label
         );
@@ -68,9 +68,9 @@ xkblas_thread_report_tasks(void)
         ++summary[task->state.value];
     }
 
-    XKBLAS_WARN("Summary");
+    LOGGER_WARN("Summary");
     for (int i = 0 ; i < TASK_STATE_MAX ; ++i)
-        XKBLAS_WARN("  %12s: %6d", task_state_to_str((task_state_t)i), summary[i]);
+        LOGGER_WARN("  %12s: %6d", task_state_to_str((task_state_t)i), summary[i]);
 }
 
 # endif /* NDEBUG */

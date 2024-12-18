@@ -26,7 +26,7 @@ cblas2cublas_op(int trans)
         case CblasTrans:        return CUBLAS_OP_T;
         case CblasConjTrans:    return CUBLAS_OP_C;
     }
-    XKBLAS_FATAL("Unknown trans code");
+    LOGGER_FATAL("Unknown trans code");
     abort();
 }
 
@@ -38,7 +38,7 @@ cblas2cublas_side(int side)
         case CblasLeft:     return CUBLAS_SIDE_LEFT;
         case CblasRight:    return CUBLAS_SIDE_RIGHT;
     }
-    XKBLAS_FATAL("Unknown side code");
+    LOGGER_FATAL("Unknown side code");
     abort();
 }
 
@@ -50,7 +50,7 @@ cublasFillMode_t cblas2cublas_uplo( int uplo )
         case CblasUpper:    return CUBLAS_FILL_MODE_UPPER;
         case CblasLower:    return CUBLAS_FILL_MODE_LOWER;
     }
-    XKBLAS_FATAL("Unknown uplo code");
+    LOGGER_FATAL("Unknown uplo code");
     abort();
 }
 
@@ -62,12 +62,12 @@ cublasDiagType_t cblas2cublas_diag(int diag)
         case CblasNonUnit:  return CUBLAS_DIAG_NON_UNIT;
         case CblasUnit:     return CUBLAS_DIAG_UNIT;
     }
-    XKBLAS_FATAL("Unknown diag code");
+    LOGGER_FATAL("Unknown diag code");
     abort();
 }
 
 static inline void
-xkblas_cublas_status_check(cublasStatus_t status)
+ptr_cublas_status_check(cublasStatus_t status)
 {
     if (status == CUBLAS_STATUS_SUCCESS)
         return ;
@@ -98,7 +98,7 @@ xkblas_cublas_status_check(cublasStatus_t status)
     const char * name  = cublasGetStatusName(status);
     const char * descr = cublasGetStatusString(status);
     # endif /* CUBLAS_VER_MAJOR */
-    XKBLAS_FATAL("cuBlas error `%s` occured - %s", name, descr);
+    LOGGER_FATAL("cuBlas error `%s` occured - %s", name, descr);
 }
 
 #endif /* __CUBLAS_HELPER_H__ */

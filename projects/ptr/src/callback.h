@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-callback.h                                                        */
+/*   callback.h                                                        */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,15 +11,15 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKBLAS_CALLBACK_H__
-# define __XKBLAS_CALLBACK_H__
+#ifndef __PTR_CALLBACK_H__
+# define __PTR_CALLBACK_H__
 
-# define XKBLAS_CALLBACK_ARGS_MAX 5
+# define PTR_CALLBACK_ARGS_MAX 5
 
-typedef struct  xkblas_callback_t
+typedef struct  ptr_callback_t
 {
-    void (*func)(const void * [XKBLAS_CALLBACK_ARGS_MAX]);
-    const void * args[XKBLAS_CALLBACK_ARGS_MAX];
-}               xkblas_callback_t;
+    void (*func)(const void * [PTR_CALLBACK_ARGS_MAX]);
+    const void * args[PTR_CALLBACK_ARGS_MAX];
+}               ptr_callback_t;
 
-# endif /* __XKBLAS_CALLBACK_H__ */
+# endif /* __PTR_CALLBACK_H__ */

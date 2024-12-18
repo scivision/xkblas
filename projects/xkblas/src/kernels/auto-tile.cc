@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "context.h"
 # include "xkblas-kernel-type.h"
 # include "logger/logger.h"
 

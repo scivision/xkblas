@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "runtime.h"
 
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 
@@ -23,7 +23,7 @@
 
 extern "C"
 void *
-xkblas_host_alloc(size_t size)
+ptr_host_alloc(size_t size)
 {
     # if USE_HIP
     #   error "Implement me"
@@ -39,14 +39,14 @@ xkblas_host_alloc(size_t size)
 
 extern "C"
 void *
-xkblas_malloc(size_t size)
+ptr_malloc(size_t size)
 {
-    return xkblas_host_alloc(size);
+    return ptr_host_alloc(size);
 }
 
 extern "C"
 void
-xkblas_host_free(void * ptr, size_t size)
+ptr_host_free(void * ptr, size_t size)
 {
     # if USE_HIP
     #   error "Implement me"
@@ -60,17 +60,17 @@ xkblas_host_free(void * ptr, size_t size)
 
 extern "C"
 void
-xkblas_free(void * ptr, size_t size)
+ptr_free(void * ptr, size_t size)
 {
-    return xkblas_host_free(ptr, size);
+    return ptr_host_free(ptr, size);
 }
 
 // Added symbols for compatibility with previous version and unified version
 extern "C"
-void xkblas_activate_custom_alloc(){}
+void ptr_activate_custom_alloc(){}
 
 extern "C"
-void xkblas_deactivate_custom_alloc(){}
+void ptr_deactivate_custom_alloc(){}
 
 extern "C"
-void xkblas_2D_copy(){}
+void ptr_2D_copy(){}

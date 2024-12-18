@@ -12,7 +12,7 @@
 /* ************************************************************************** */
 
 # include "offloader.hpp"
-# include "xkblas-context.h"
+# include "runtime.h"
 
 Offloader::Offloader() {}
 
@@ -20,8 +20,8 @@ Offloader::~Offloader() {}
 
 void
 Offloader::init(
-    xkblas_conf_offloader_t * conf,
-    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, xkblas_stream_instruction_counter_t capacity)
+    ptr_conf_offloader_t * conf,
+    ptr_stream_t * (*f_stream_create)(ptr_stream_type_t type, ptr_stream_instruction_counter_t capacity)
 ) {
     assert(conf);
     assert(f_stream_create);
@@ -31,24 +31,24 @@ Offloader::init(
 
     /* count total number of stream */
     uint16_t cnt = 0;
-    for (int stype = 0 ; stype < XKBLAS_STREAM_TYPE_ALL ; ++stype)
+    for (int stype = 0 ; stype < PTR_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = conf->streams[stype].n;
         cnt += conf->streams[stype].n;
     }
 
     /* allocate streams array */
-    xkblas_stream_t ** all_streams = (xkblas_stream_t **) malloc(sizeof(xkblas_stream_t *) * cnt);
+    ptr_stream_t ** all_streams = (ptr_stream_t **) malloc(sizeof(ptr_stream_t *) * cnt);
     assert(all_streams);
 
     /* retrieve stream offset per type */
     uint16_t i = 0;
-    for (int stype = 0 ; stype < XKBLAS_STREAM_TYPE_ALL ; ++stype)
+    for (int stype = 0 ; stype < PTR_STREAM_TYPE_ALL ; ++stype)
     {
         this->streams[stype] = all_streams + i;
         for (int j = 0 ; j < conf->streams[stype].n ; ++j, ++i)
         {
-            all_streams[i] = f_stream_create(static_cast<xkblas_stream_type_t>(stype), conf->capacity);
+            all_streams[i] = f_stream_create(static_cast<ptr_stream_type_t>(stype), conf->capacity);
             assert(all_streams[i]);
         }
     }
@@ -57,12 +57,12 @@ Offloader::init(
 }
 
 bool
-Offloader::is_empty(xkblas_stream_type_t stype) const
+Offloader::is_empty(ptr_stream_type_t stype) const
 {
     int err = 0;
 
-    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
-    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    unsigned int bgn = (stype == PTR_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == PTR_STREAM_TYPE_ALL) ? PTR_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
             if (!this->streams[s][i]->is_empty())
@@ -72,19 +72,19 @@ Offloader::is_empty(xkblas_stream_type_t stype) const
 }
 
 int
-Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
+Offloader::launch_ready_instructions(ptr_stream_type_t stype)
 {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
 
     int err = 0;
 
-    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
-    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    unsigned int bgn = (stype == PTR_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == PTR_STREAM_TYPE_ALL) ? PTR_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            xkblas_stream_t * stream = this->streams[s][i];
+            ptr_stream_t * stream = this->streams[s][i];
             assert(stream);
 
             stream->lock();
@@ -99,13 +99,13 @@ Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
 
                 case (ENOSYS):
                 {
-                    XKBLAS_FATAL("Not implemented");
+                    LOGGER_FATAL("Not implemented");
                     break ;
                 }
 
                 default:
                 {
-                    XKBLAS_FATAL("Driver implementation of `stream_instruction_launch` returned an unknown error code");
+                    LOGGER_FATAL("Driver implementation of `stream_instruction_launch` returned an unknown error code");
                     break ;
                 }
 
@@ -117,32 +117,32 @@ Offloader::launch_ready_instructions(xkblas_stream_type_t stype)
 }
 
 int
-Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocking)
+Offloader::progress_pending_instructions(ptr_stream_type_t stype, bool blocking)
 {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
 
-    xkblas_context_t * ctx = xkblas_context_get();
+    ptr_context_t * ctx = ptr_context_get();
     int err = 0;
 
-    unsigned int bgn = (stype == XKBLAS_STREAM_TYPE_ALL) ?                      0 : stype;
-    unsigned int end = (stype == XKBLAS_STREAM_TYPE_ALL) ? XKBLAS_STREAM_TYPE_ALL : stype + 1;
+    unsigned int bgn = (stype == PTR_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int end = (stype == PTR_STREAM_TYPE_ALL) ? PTR_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            xkblas_stream_t * stream = this->streams[s][i];
+            ptr_stream_t * stream = this->streams[s][i];
             assert(stream);
 
             if (stream->pending.is_empty())
                 continue ;
 
-            xkblas_stream_instruction_counter_t n;
+            ptr_stream_instruction_counter_t n;
             do {
                 stream->lock();
                 err = stream->progress_pending_instructions(blocking);
                 stream->unlock();
                 n = stream->pending.size();
-            } while (s == XKBLAS_STREAM_TYPE_KERN && n > ctx->conf.device.offloader.streams[XKBLAS_STREAM_TYPE_KERN].concurrency);
+            } while (s == PTR_STREAM_TYPE_KERN && n > ctx->conf.device.offloader.streams[PTR_STREAM_TYPE_KERN].concurrency);
             assert(err == 0 || err == EINPROGRESS);
         }
     }
@@ -150,15 +150,15 @@ Offloader::progress_pending_instructions(xkblas_stream_type_t stype, bool blocki
     return 0;
 }
 
-xkblas_stream_t *
-Offloader::stream_next(xkblas_stream_type_t stype)
+ptr_stream_t *
+Offloader::stream_next(ptr_stream_type_t stype)
 {
     /* find native stream to use */
     int count = this->count[stype];
     switch (count)
     {
         case (0):
-            XKBLAS_FATAL("No stream of type %d", stype);
+            LOGGER_FATAL("No stream of type %d", stype);
 
         case (1):
             return this->streams[stype][0];
@@ -169,7 +169,7 @@ Offloader::stream_next(xkblas_stream_type_t stype)
              * only call by the device thread */
             int snext = this->next[stype].fetch_add(1, std::memory_order_seq_cst) % count;
 
-            XKBLAS_DEBUG("instruction_new on stream type %d - count is %d - returning %d",
+            LOGGER_DEBUG("instruction_new on stream type %d - count is %d - returning %d",
                     stype, count, snext);
 
             // TODO : track pending instr here ?
@@ -181,21 +181,21 @@ Offloader::stream_next(xkblas_stream_type_t stype)
 
 void
 Offloader::instruction_new(
-    const xkblas_stream_type_t stype,               /* IN  */
-          xkblas_stream_t ** pstream,               /* OUT */
-    const xkblas_stream_instruction_type_t itype,   /* IN  */
-          xkblas_stream_instruction_t ** pinstr,    /* OUT */
-    const xkblas_callback_t & callback       /* IN */
+    const ptr_stream_type_t stype,               /* IN  */
+          ptr_stream_t ** pstream,               /* OUT */
+    const ptr_stream_instruction_type_t itype,   /* IN  */
+          ptr_stream_instruction_t ** pinstr,    /* OUT */
+    const ptr_callback_t & callback       /* IN */
 ) {
     assert(pstream);
     assert(pinstr);
 
     /* retrieve native stream */
-    xkblas_stream_t * stream = this->stream_next(stype);
+    ptr_stream_t * stream = this->stream_next(stype);
     assert(stream->type == stype);
 
     /* allocate the instruction */
-    xkblas_stream_instruction_t * instr;
+    ptr_stream_instruction_t * instr;
 try_instruction_new:
 
     do {
@@ -205,7 +205,7 @@ try_instruction_new:
             break ;
         stream->unlock();
 
-        XKBLAS_FATAL("Stream is full, increase 'XKBLAS_OFFLOADER_CAPACITY' or implement support for full-queue management in XKBLAS yourself :-) (sorry)");
+        LOGGER_FATAL("Stream is full, increase 'PTR_OFFLOADER_CAPACITY' or implement support for full-queue management in PTR yourself :-) (sorry)");
 
     } while (1);
 

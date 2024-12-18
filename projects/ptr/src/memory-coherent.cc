@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "runtime.h"
 # include "device/thread-producer.hpp"
 # include "sync/alignedas.h"
 
@@ -45,7 +45,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
 
 static void
 body_memory_coherent_async_fetch_callback(
-    const void * args[XKBLAS_CALLBACK_ARGS_MAX]
+    const void * args[PTR_CALLBACK_ARGS_MAX]
 ) {
     // self
     ThreadWorker * self = ThreadWorker::self();
@@ -103,22 +103,22 @@ body_memory_coherent_async_fetch(void * vlauncher)
     assert(worker != ThreadWorker::self());
 
     // submit fetch - with a callback doing parent->fetched() on completion
-    static_assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
-    xkblas_callback_t callback;
+    static_assert(PTR_CALLBACK_ARGS_MAX >= 1);
+    ptr_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
     callback.args[0] = worker;
     callback.args[1] = parent;
     callback.args[2] = list;
 
     # if !USE_CUDA
-    XKBLAS_FATAL("Only supporting CUDA driver for D2H transfers");
+    LOGGER_FATAL("Only supporting CUDA driver for D2H transfers");
     # endif
 
     # pragma message(TODO "Instead, get the driver or the func associated to the 'src' device")
-    xkblas_driver_t * driver = xkblas_driver_get(XKBLAS_DRIVER_TYPE_CUDA);
+    ptr_driver_t * driver = ptr_driver_get(PTR_DRIVER_TYPE_CUDA);
     assert(driver);
 
-    xkblas_device_t * device = xkblas_device_get(fetch->src_device_global_id);
+    ptr_device_t * device = ptr_device_get(fetch->src_device_global_id);
     assert(device);
     assert(fetch->src_device_global_id == device->global_id);
 
@@ -127,7 +127,7 @@ body_memory_coherent_async_fetch(void * vlauncher)
 
     /* launch asynchronous copy */
     memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
-    xkblas_stream_instruction_submit_copy(
+    ptr_stream_instruction_submit_copy(
         device,
         fetch->host_view,
         HOST_DEVICE_GLOBAL_ID,
@@ -165,8 +165,8 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 }                                       args_t;
 
 static void
-xkblas_memory_coherent_async_worker_thread_work(
-    xkblas_context_t * context,
+ptr_memory_coherent_async_worker_thread_work(
+    ptr_context_t * context,
     ThreadWorker * thread,
     Task * current
 ) {
@@ -178,7 +178,7 @@ xkblas_memory_coherent_async_worker_thread_work(
     assert(current->wc == 0);
     assert(current->state.value == TASK_STATE_READY);
 
-    XKBLAS_DEBUG("Creating a coherent async fetch task");
+    LOGGER_DEBUG("Creating a coherent async fetch task");
 
     const args_t * args = (const args_t *) (current + 1);
     assert(args);
@@ -235,7 +235,7 @@ xkblas_memory_coherent_async_worker_thread_work(
 /////////////////////////////
 
 static void
-xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
+ptr_memory_coherent_async_worker_thread_main_loop(ptr_context_t * context)
 {
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread == context->memory_coherent_worker_thread);
@@ -248,24 +248,24 @@ xkblas_memory_coherent_async_worker_thread_main_loop(xkblas_context_t * context)
             thread->pause();
 
         assert(task->fmtid == TASK_FORMAT_COHERENT_ASYNC);
-        xkblas_memory_coherent_async_worker_thread_work(context, thread, task);
+        ptr_memory_coherent_async_worker_thread_work(context, thread, task);
     }
 }
 
 static void *
-xkblas_memory_coherent_async_worker_thread_main(void * arg)
+ptr_memory_coherent_async_worker_thread_main(void * arg)
 {
-    xkblas_context_t * context = (xkblas_context_t *) arg;
+    ptr_context_t * context = (ptr_context_t *) arg;
     assert(context);
 
     context->memory_coherent_worker_thread = ThreadWorker::self();
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
-    XKBLAS_INFO("Starting thread for async host copy on cpu %d of node %d", cpu, node);
+    LOGGER_INFO("Starting thread for async host copy on cpu %d of node %d", cpu, node);
 
     /* infinite loop with the device context */
-    xkblas_memory_coherent_async_worker_thread_main_loop(context);
+    ptr_memory_coherent_async_worker_thread_main_loop(context);
 
     return NULL;
 }
@@ -275,14 +275,14 @@ xkblas_memory_coherent_async_worker_thread_main(void * arg)
 ////////////////////////
 
 void
-xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
+ptr_memory_coherent_async_worker_thread_init(ptr_context_t * context)
 {
     context->memory_coherent_worker_thread = NULL;
 
     pthread_t thread;
-    int err = pthread_create(&thread, NULL, xkblas_memory_coherent_async_worker_thread_main, context);
+    int err = pthread_create(&thread, NULL, ptr_memory_coherent_async_worker_thread_main, context);
     if (err)
-        XKBLAS_FATAL("Could not create thread for async host copy");
+        LOGGER_FATAL("Could not create thread for async host copy");
 
     // TODO : likely need a volatile here
     while (context->memory_coherent_worker_thread == NULL)
@@ -293,9 +293,9 @@ xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 // Memory coherency //
 //////////////////////
 
-# pragma message(TODO "'xkblas_memory_coherent_async' should take a row/col major parameter")
+# pragma message(TODO "'ptr_memory_coherent_async' should take a row/col major parameter")
 
-//  How 'xkblas_memory_coherent_async' works
+//  How 'ptr_memory_coherent_async' works
 //      - create one successor Yi task per conflicting tasks Xi - to be executed on the helper thread
 //      - when Xi complete, it makes Yi ready
 //      - When Yi executes,
@@ -306,15 +306,15 @@ xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 
 extern "C"
 void
-xkblas_memory_coherent_async(
+ptr_memory_coherent_async(
     int uplo, int memflag,
     int m, int n,
     void * ptr, int ld,
     unsigned int sizeof_type
 ) {
-    XKBLAS_IMPL("in `xkblas_memory_coherent_async` - uplo and memflag parameters not supported");
+    LOGGER_IMPL("in `ptr_memory_coherent_async` - uplo and memflag parameters not supported");
 
-    xkblas_context_t * context = xkblas_context_get();
+    ptr_context_t * context = ptr_context_get();
     assert(context);
 
     // TODO : allocate instead on the worker thread ? creates a concurrency issue in the allocator though
@@ -329,7 +329,7 @@ xkblas_memory_coherent_async(
     assert(deptree);
     deptree->conflicting(&conflicts, &access);
 
-    XKBLAS_DEBUG("`xkblas_memory_coherent_async` found %d conflicts", conflicts.size());
+    LOGGER_DEBUG("`ptr_memory_coherent_async` found %d conflicts", conflicts.size());
 
     /* create one task per conflict shrinking the access, responsible of fetching the chunk */
     const uint64_t task_size = sizeof(Task);
@@ -359,7 +359,7 @@ xkblas_memory_coherent_async(
                 new (args) args_t(access, conflicting_task->accesses[access_id]);
 
                 #ifndef NDEBUG
-                strncpy(task->label, "xkblas_memory_coherent_async", sizeof(task->label));
+                strncpy(task->label, "ptr_memory_coherent_async", sizeof(task->label));
                 #endif /* NDEBUG */
 
                 thread->commit(task);
@@ -373,7 +373,7 @@ xkblas_memory_coherent_async(
 //////////////////////////
 
 void
-xkblas_memory_coherent_async_register_format(void)
+ptr_memory_coherent_async_register_format(void)
 {
     {
         task_format_t format;
@@ -387,7 +387,7 @@ xkblas_memory_coherent_async_register_format(void)
     {
         task_format_t format;
         memset(format.f, 0, sizeof(format.f));
-        format.f[XKBLAS_DRIVER_TYPE_CPU] = body_memory_coherent_async_fetch;
+        format.f[PTR_DRIVER_TYPE_CPU] = body_memory_coherent_async_fetch;
         snprintf(format.label, sizeof(format.label), "coherent_fetch");
         format.target = TASK_FORMAT_TARGET_HOST;
         TASK_FORMAT_COHERENT_ASYNC_FETCH = task_format_create(&format);

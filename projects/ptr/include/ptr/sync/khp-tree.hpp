@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 15:25:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -95,8 +95,8 @@ twopow(int n)
     return (1 << n);
 }
 
-# include "color.h"
-# include "direction.h"
+# include <ptr/sync/color.h>
+# include <ptr/sync/direction.h>
 
 # define FOREACH_K_CHILD_BEGIN(N, C, I, D)                              \
 do {                                                                    \

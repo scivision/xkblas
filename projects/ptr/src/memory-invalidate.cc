@@ -11,16 +11,16 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h"
+# include "runtime.h"
 # include "device/thread-producer.hpp"
 
 extern "C"
 int
-xkblas_memory_invalidate_caches(void)
+ptr_memory_invalidate_caches(void)
 {
-    XKBLAS_INFO("Invalidate XKBlas devices memory");
+    LOGGER_INFO("Invalidate XKBlas devices memory");
 
-    xkblas_context_t * context = xkblas_context_get();
+    ptr_context_t * context = ptr_context_get();
     assert(context);
 
     // memory tree and device memory

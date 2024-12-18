@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 15:25:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,9 +14,9 @@
 #ifndef __INTERVALS_HPP__
 # define __INTERVALS_HPP__
 
-# include "matrix-tile.h"
-# include "min-max.h"
-# include "interval.hpp"
+# include <ptr/sync/matrix-tile.h>
+# include <ptr/sync/min-max.h>
+# include <ptr/sync/interval.hpp>
 
 # include <cassert>
 # include <cstdlib>

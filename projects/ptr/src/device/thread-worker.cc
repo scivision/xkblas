@@ -49,7 +49,7 @@ ThreadWorker::self(void)
 
 ThreadWorker::ThreadWorker() : queue(), wc(0)
 {
-    // XKBLAS_DEBUG("New worker thread");
+    // LOGGER_DEBUG("New worker thread");
     pthread_mutex_init(&this->sleep.lock, 0);
     pthread_cond_init (&this->sleep.cond, 0);
     this->sleep.sleeping = false;
@@ -57,7 +57,7 @@ ThreadWorker::ThreadWorker() : queue(), wc(0)
 
 ThreadWorker::~ThreadWorker()
 {
-    // XKBLAS_DEBUG("Delete worker thread");
+    // LOGGER_DEBUG("Delete worker thread");
 }
 
 void
@@ -93,7 +93,7 @@ ThreadWorker::pause(void)
         this->sleep.sleeping = true;
         while (this->sleep.sleeping)
         {
-            XKBLAS_DEBUG("Thread paused");
+            LOGGER_DEBUG("Thread paused");
             pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
         }
     }
@@ -108,7 +108,7 @@ ThreadWorker::wakeup(void)
     {
         this->sleep.sleeping = false;
         pthread_cond_signal(&this->sleep.cond);
-        XKBLAS_DEBUG("Thread woke up");
+        LOGGER_DEBUG("Thread woke up");
     }
     pthread_mutex_unlock(&this->sleep.lock);
 }

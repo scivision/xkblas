@@ -14,7 +14,7 @@
 #ifndef __THREAD_PRODUCER_HPP__
 # define __THREAD_PRODUCER_HPP__
 
-# include "xkblas-context.h"
+# include "runtime.h"
 # include "logger/todo.h"
 # include "device/dependency-tree.hpp"
 # include "device/driver.h"
@@ -24,7 +24,7 @@
 # include "sync/cache-line-size.hpp"
 
 /**
- *  This class represents an xkblas user thread, that is producing tasks
+ *  This class represents an ptr user thread, that is producing tasks
  */
 class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
 {

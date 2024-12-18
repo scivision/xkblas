@@ -30,21 +30,21 @@
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
 
-# pragma message(TODO "Replace 'xkblas_driver_t' with a C++ abstract class")
+# pragma message(TODO "Replace 'ptr_driver_t' with a C++ abstract class")
 # pragma message(TODO "Add metadata to each interface, for instance, whether its implementation if mandatory or optional")
 
-typedef enum    xkblas_driver_type_t : uint8_t
+typedef enum    ptr_driver_type_t : uint8_t
 {
-    XKBLAS_DRIVER_TYPE_CPU  = 0,
-    XKBLAS_DRIVER_TYPE_CUDA = 1,
-    XKBLAS_DRIVER_TYPE_HIP  = 2,
-    XKBLAS_DRIVER_TYPE_MAX  = 3
-}               xkblas_driver_type_t;
+    PTR_DRIVER_TYPE_CPU  = 0,
+    PTR_DRIVER_TYPE_CUDA = 1,
+    PTR_DRIVER_TYPE_HIP  = 2,
+    PTR_DRIVER_TYPE_MAX  = 3
+}               ptr_driver_type_t;
 
-typedef struct  xkblas_driver_t
+typedef struct  ptr_driver_t
 {
     /* type */
-    xkblas_driver_type_t type;
+    ptr_driver_type_t type;
 
     /* number of devices targeted, used in initialization */
     volatile std::atomic<int> ndevices_targeted;
@@ -76,17 +76,17 @@ typedef struct  xkblas_driver_t
     int (*f_device_set_cpuset)(cpu_set_t*, int);
 
     /* create device object and initialize device_driver_id field with argument */
-    xkblas_device_t * (*f_device_create)(xkblas_driver_t *, int);
-    int (*f_device_destroy)(xkblas_device_t*);
+    ptr_device_t * (*f_device_create)(ptr_driver_t *, int);
+    int (*f_device_destroy)(ptr_device_t*);
 
     /* initialize device fields, especially with virtual functions */
     void (*f_device_init)(int device_driver_id);
     int (*f_device_commit)(int device_driver_id);
-    void (*f_device_finalize)(xkblas_device_t*);
+    void (*f_device_finalize)(ptr_device_t*);
 
     /* consider device as the current device */
     int (*f_device_attach)(int device_driver_id);
-    int (*f_device_detach)(xkblas_device_t*);
+    int (*f_device_detach)(ptr_device_t*);
 
     /* get device infos */
     const char * (*f_device_info)(int device_driver_id);
@@ -102,13 +102,13 @@ typedef struct  xkblas_driver_t
     ////////////////////////////////
 
     /* alllocate and initialize a stream */
-    xkblas_stream_t * (*f_stream_create)(xkblas_stream_type_t type, xkblas_stream_instruction_counter_t capacity);
+    ptr_stream_t * (*f_stream_create)(ptr_stream_type_t type, ptr_stream_instruction_counter_t capacity);
 
     /* deallocate a stream */
-    void (*f_stream_delete)(xkblas_stream_t * istream);
+    void (*f_stream_delete)(ptr_stream_t * istream);
 
 		/* get best source for data movement, return global_id */
-    xkblas_device_global_id_t (*f_get_source)(xkblas_device_global_id_t dst_global_id, xkblas_device_global_id_bitfield_t valid);
+    ptr_device_global_id_t (*f_get_source)(ptr_device_global_id_t dst_global_id, ptr_device_global_id_bitfield_t valid);
 
     ///////////////////////
     //  UNUSED YET       //
@@ -134,31 +134,31 @@ typedef struct  xkblas_driver_t
     /* Memory unregistration of host memory: asynchronous version */
     uint64_t  (*f_host_unregister)(
         void * ptr, uint64_t sz,
-        xkblas_stream_instruction_callback_t callback,
+        ptr_stream_instruction_callback_t callback,
         void * arg0, void * arg1, void * arg2
     );
 
     /* GPU blas support */
-    void* (*f_get_gpublas_handle)(xkblas_device_t*);
+    void* (*f_get_gpublas_handle)(ptr_device_t*);
 
     # endif
 
-}               xkblas_driver_t;
+}               ptr_driver_t;
 
-void * xkblas_device_thread_main(void * a);
+void * ptr_device_thread_main(void * a);
 
 /* one function per task per driver */
-static_assert(XKBLAS_DRIVER_TYPE_MAX <= TASK_FORMAT_FUNC_MAX);
+static_assert(PTR_DRIVER_TYPE_MAX <= TASK_FORMAT_FUNC_MAX);
 
-typedef struct  xkblas_drivers_t
+typedef struct  ptr_drivers_t
 {
     /* list of drivers */
-    xkblas_driver_t list[XKBLAS_DRIVER_TYPE_MAX];
+    ptr_driver_t list[PTR_DRIVER_TYPE_MAX];
 
     struct {
 
         /* list of devices */
-        xkblas_device_t * list[XKBLAS_DEVICES_MAX];
+        ptr_device_t * list[PTR_DEVICES_MAX];
 
         /* number of devices */
         std::atomic<uint8_t> n;
@@ -168,50 +168,50 @@ typedef struct  xkblas_drivers_t
 
     } devices;
 
-}               xkblas_drivers_t;
+}               ptr_drivers_t;
 
-typedef struct  xkblas_driver_device_thread_arg_t
+typedef struct  ptr_driver_device_thread_arg_t
 {
-    xkblas_drivers_t * drivers;
+    ptr_drivers_t * drivers;
     uint8_t driver_id;
     uint8_t device_driver_id;
-}               xkblas_driver_device_thread_arg_t;
+}               ptr_driver_device_thread_arg_t;
 
-void xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus);
-void xkblas_drivers_deinit(xkblas_drivers_t * drivers);
-void xkblas_drivers_enqueue(xkblas_drivers_t * drivers, Task * task);
+void ptr_drivers_init(ptr_drivers_t * drivers, uint8_t ngpus);
+void ptr_drivers_deinit(ptr_drivers_t * drivers);
+void ptr_drivers_enqueue(ptr_drivers_t * drivers, Task * task);
 
-/* set the initial free block to the xkblas device allocator (TODO: maybe
+/* set the initial free block to the ptr device allocator (TODO: maybe
  * change that to some 'add_block' instead to add several blocks) */
-void xkblas_device_memory_set_chunk0(xkblas_device_t * device, uintptr_t device_ptr, size_t size
+void ptr_device_memory_set_chunk0(ptr_device_t * device, uintptr_t device_ptr, size_t size
 );
 
 /* return the host device */
-xkblas_device_t * xkblas_get_device_host(xkblas_drivers_t * drivers);
+ptr_device_t * ptr_get_device_host(ptr_drivers_t * drivers);
 
 /* launch a kernel */
-int xkblas_task_launch(task_launcher_t * launcher);
+int ptr_task_launch(task_launcher_t * launcher);
 
 /* allocate memory on the passed device */
-xkblas_alloc_chunk_t * xkblas_memory_allocate(
-    xkblas_driver_t * driver,
-    xkblas_device_t * device,
+ptr_alloc_chunk_t * ptr_memory_allocate(
+    ptr_driver_t * driver,
+    ptr_device_t * device,
     size_t size
 );
 
 /* release the memory chunk */
-void xkblas_memory_deallocate(xkblas_device_t * device, xkblas_alloc_chunk_t * chunk);
+void ptr_memory_deallocate(ptr_device_t * device, ptr_alloc_chunk_t * chunk);
 
 /* deallocate all memory previously allocated on any devices */
-void xkblas_memory_deallocate_all(void);
+void ptr_memory_deallocate_all(void);
 
 /* must be call once task accesses were all fetched */
-void xkblas_device_task_execute(
-    xkblas_device_t * device,
+void ptr_device_task_execute(
+    ptr_device_t * device,
     Task * task
 );
 
-xkblas_driver_t * xkblas_driver_get(xkblas_driver_type_t type);
-xkblas_device_t * xkblas_device_get(int device_global_id);
+ptr_driver_t * ptr_driver_get(ptr_driver_type_t type);
+ptr_device_t * ptr_device_get(int device_global_id);
 
 #endif /* __DRIVER_H__ */

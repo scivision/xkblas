@@ -20,10 +20,10 @@
 # include "sync/cache-line-size.hpp"
 
 /* maximum number of workers */
-# define XKBLAS_WORKERS_MAX 8
+# define PTR_WORKERS_MAX 8
 
 /**
- *  This class represents an xkblas user thread, that is producing tasks
+ *  This class represents an ptr user thread, that is producing tasks
  */
 class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
 {

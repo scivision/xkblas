@@ -2,11 +2,8 @@
 cmake_minimum_required(VERSION 3.7)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
-# TODO : rename me to 'xkblas' for retro-compatibility (some interfaces may be missing)
-# SET(XKBLAS_NAME xkblas-v2)
-SET(XKBLAS_NAME xkblas)
-
 # Project name
+SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})
 
 message(STATUS "TODO: automate kernel files in the build")
@@ -48,26 +45,8 @@ SET(XKBLAS_KERNELS_SOURCE_FILES
 
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h
-    ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
-    ${CMAKE_SOURCE_DIR}/src/device/device.cc
-    ${CMAKE_SOURCE_DIR}/src/device/driver.cc
-    ${CMAKE_SOURCE_DIR}/src/device/offloader.cc
-    ${CMAKE_SOURCE_DIR}/src/device/stream-instruction-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/device/stream.cc
-    ${CMAKE_SOURCE_DIR}/src/device/task-format.cc
-    ${CMAKE_SOURCE_DIR}/src/device/task.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread-producer.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/auto-tile.cc
-    ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-alloc.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-register.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas-context-task-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas-context.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas-legacy.cc
+    ${CMAKE_SOURCE_DIR}/src/context.cc
+    ${CMAKE_SOURCE_DIR}/src/legacy.cc
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 
@@ -97,7 +76,7 @@ add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h # set invalid name so its always generated
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/include/xkblas-version.py ${CMAKE_SOURCE_DIR}/include/
+        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/ xkblas-version
 )
 
 add_custom_command(
@@ -112,42 +91,20 @@ add_custom_command(
 
 option(STRICT "Enable strict compilation mode" OFF)
 
-# uncomment to disable kinterval tree heavy debug
-option(DISABLE_HEAVY_DEBUG "When compiling in BUILD_TYPE=Debug, you can disable heavy assertion tests in the cube-tree structure setting this variable to 'ON' - this is not recommanded" OFF)
-if (DISABLE_HEAVY_DEBUG)
-    add_compile_definitions(CUBE_TREE_DISABLE_COHERENCY_CHECKS=1)
-endif()
-
-################
-# STATS SYSTEM #
-################
-option(USE_STATS "Whether to compile the built-in stat system." ON)
-if (USE_STATS)
-    LIST(APPEND SOURCE_FILES src/stats/stats.cc)
-    add_compile_definitions(USE_STATS=1)
-    message(STATUS "Using built-in stats system")
-endif()
-
 ###############
 # DEPENDENCES #
 ###############
 
-# HWLOC
-option(USE_HWLOC "Whether to build the NVIDIA GPU driver." ON)
-if (USE_HWLOC)
-    find_package(HWLOC)
-    include_directories(${HWLOC_INCLUDE_DIRS})
-    message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
+# ptr lib deps
+option(PTR "The path to the sync library" OFF)
+if (PTR)
+    message(STATUS "Using PTR at '${PTR}'")
+    include_directories(${PTR}/include)
+else()
+    message(FATAL_ERROR "Please set '-DPTR=path/to/ptr'")
 endif()
-
-# HOST DRIVER
-option(USE_CPU "Whether to build the CPU driver." OFF)
-if (USE_CPU)
-    add_compile_definitions(USE_CPU=1)
-    add_library(${XKBLAS_NAME}_driver_cpu SHARED src/device/driver_cpu.cc)
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_driver_cpu)
-    install(TARGETS ${XKBLAS_NAME}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-endif()
+include_directories("${PTR}/include")
+message(STATUS "Found PTR: ${PTR}")
 
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
@@ -157,10 +114,6 @@ if (USE_CUDA)
     find_package(CUDA_RT)
     if (NOT ${CUDA_RT_FOUND})
         message(FATAL_ERROR "Xkblas could not find CUDA_RT.")
-    endif()
-    find_package(CUBLAS)
-    if (NOT ${CUBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas could not find CUBLAS.")
     endif()
     include_directories("${CUDA_INCLUDE_DIRS}")
     message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
@@ -205,23 +158,11 @@ endif()
 # IF USING CUDA
 if (${CUDA_RT_FOUND})
 
-    # Cuda driver
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    add_library(${XKBLAS_NAME}_cuda_driver SHARED src/device/driver_cuda.cc)
-    if (${HWLOC_FOUND})
-        target_link_libraries(${XKBLAS_NAME}_cuda_driver PRIVATE ${HWLOC_LIBRARIES})
-    endif()
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_cuda_driver)
-
     # Cuda kernels
     set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
     cuda_add_library(${XKBLAS_NAME}_cuda_kernels SHARED ${CUDA_SOURCE_FILES})
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_cuda_kernels)
     install(TARGETS ${XKBLAS_NAME}_cuda_kernels LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-
-    # Cuda Cublas
-    target_link_libraries(${XKBLAS_NAME}_cuda_driver PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    install(TARGETS ${XKBLAS_NAME}_cuda_driver LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -237,7 +178,6 @@ if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_RT_FOUND})
-        target_compile_options(${XKBLAS_NAME}_cuda_driver PRIVATE ${STRICT_OPTIONS})
         target_compile_options(${XKBLAS_NAME}_cuda_kernels PRIVATE ${STRICT_OPTIONS})
     endif()
 endif()

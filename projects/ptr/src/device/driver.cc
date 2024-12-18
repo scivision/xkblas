@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas-context.h" // TODO : remove me
+# include "runtime.h" // TODO : remove me
 # include "min-max.h"
 # include "device/device.h"
 # include "device/driver.h"
@@ -27,11 +27,11 @@
 # pragma message(TODO "Implement host driver ?")
 
 static void
-xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
+ptr_driver_init(ptr_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 {
-    xkblas_driver_t * driver = drivers->list + driver_id;
+    ptr_driver_t * driver = drivers->list + driver_id;
 
-    XKBLAS_INFO("Loading driver '%s'", driver->f_get_name());
+    LOGGER_INFO("Loading driver '%s'", driver->f_get_name());
     assert(driver->f_init);
 
     if (driver->f_init())
@@ -60,14 +60,14 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         int err = driver->f_device_set_cpuset(&schedset, i);
         if (err)
         {
-            XKBLAS_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
+            LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
         }
         else
         {
             err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
             if (err)
             {
-                XKBLAS_ERROR("Invalid cpuset returned by the driver for device %d", i);
+                LOGGER_ERROR("Invalid cpuset returned by the driver for device %d", i);
                 --driver->ndevices_targeted;
                 continue ;
             }
@@ -77,16 +77,16 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
         for (int ii=0; ii<10; ++ii) sched_yield();
 
         // start the device thread
-        xkblas_driver_device_thread_arg_t * arg = (xkblas_driver_device_thread_arg_t *) malloc(sizeof(xkblas_driver_device_thread_arg_t));
+        ptr_driver_device_thread_arg_t * arg = (ptr_driver_device_thread_arg_t *) malloc(sizeof(ptr_driver_device_thread_arg_t));
         arg->drivers = drivers;
         arg->driver_id = driver_id;
         arg->device_driver_id = i;
 
         pthread_t thread;
-        err = pthread_create(&thread, &attr, xkblas_device_thread_main, arg);
+        err = pthread_create(&thread, &attr, ptr_device_thread_main, arg);
         if (err)
         {
-            XKBLAS_ERROR("could not create a thread for the device %d", i);
+            LOGGER_ERROR("could not create a thread for the device %d", i);
             --driver->ndevices_targeted;
             continue ;
         }
@@ -98,7 +98,7 @@ xkblas_driver_init(xkblas_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 }
 
 void
-xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
+ptr_drivers_init(ptr_drivers_t * drivers, uint8_t ngpus)
 {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
@@ -109,68 +109,68 @@ xkblas_drivers_init(xkblas_drivers_t * drivers, uint8_t ngpus)
     drivers->devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
-    void (*loaders[XKBLAS_DRIVER_TYPE_MAX])(xkblas_driver_t *);
+    void (*loaders[PTR_DRIVER_TYPE_MAX])(ptr_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
 # if USE_CPU
-    extern void XKBLAS_DRIVER_CPU_get_driver(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_CPU] = XKBLAS_DRIVER_CPU_get_driver;
+    extern void PTR_DRIVER_CPU_get_driver(ptr_driver_t *);
+    loaders[PTR_DRIVER_CPU] = PTR_DRIVER_CPU_get_driver;
 # endif /* USE_CPU */
 
 # if USE_CUDA
-    extern void XKBLAS_DRIVER_TYPE_CUDA_get_driver(xkblas_driver_t *);
-    loaders[XKBLAS_DRIVER_TYPE_CUDA] = XKBLAS_DRIVER_TYPE_CUDA_get_driver;
+    extern void PTR_DRIVER_TYPE_CUDA_get_driver(ptr_driver_t *);
+    loaders[PTR_DRIVER_TYPE_CUDA] = PTR_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
 
     uint8_t i;
-    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX && drivers->devices.n < ngpus ; ++i)
+    for (i = 0 ; i < PTR_DRIVER_TYPE_MAX && drivers->devices.n < ngpus ; ++i)
     {
-        void (*loader)(xkblas_driver_t *) = loaders[i];
+        void (*loader)(ptr_driver_t *) = loaders[i];
         if (loader)
         {
             loader(drivers->list + i);
-            xkblas_driver_init(drivers, i, ngpus);
+            ptr_driver_init(drivers, i, ngpus);
             if (drivers->devices.n == ngpus)
                 break ;
         }
     }
 
     /* wait each thread of each device of each driver to start */
-    for (i = 0 ; i < XKBLAS_DRIVER_TYPE_MAX ; ++i)
+    for (i = 0 ; i < PTR_DRIVER_TYPE_MAX ; ++i)
     {
-        xkblas_driver_t * driver = drivers->list + i;
+        ptr_driver_t * driver = drivers->list + i;
         while (driver->ndevices_commited < driver->ndevices_targeted)
             mem_pause();
     }
 
     // DEBUG OUTPUT
     if (drivers->devices.n == 0 && ngpus != 0)
-        XKBLAS_WARN("No devices found :-(");
+        LOGGER_WARN("No devices found :-(");
 
-    XKBLAS_INFO("Enabled %d devices (with %d requested)", drivers->devices.n.load(), ngpus);
+    LOGGER_INFO("Enabled %d devices (with %d requested)", drivers->devices.n.load(), ngpus);
     assert(drivers->devices.n <= ngpus);
 }
 
 void
-xkblas_drivers_deinit(xkblas_drivers_t * drivers)
+ptr_drivers_deinit(ptr_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
 }
 
-xkblas_device_t *
-xkblas_get_device_host(xkblas_drivers_t * drivers)
+ptr_device_t *
+ptr_get_device_host(ptr_drivers_t * drivers)
 {
     assert(drivers->devices.n);
     return drivers->devices.list[0];
 }
 
 int
-xkblas_task_launch(task_launcher_t * launcher)
+ptr_task_launch(task_launcher_t * launcher)
 {
     assert(launcher);
     assert(launcher->task);
     assert(launcher->task->fmtid);
-    assert(launcher->target >= 0 && launcher->target <= XKBLAS_DRIVER_TYPE_MAX);
+    assert(launcher->target >= 0 && launcher->target <= PTR_DRIVER_TYPE_MAX);
 
     task_format_t * format = task_format_get(launcher->task->fmtid);
     assert(format);
@@ -183,7 +183,7 @@ xkblas_task_launch(task_launcher_t * launcher)
 
 /* callback after the task kernel executed */
 static inline void
-xkblas_device_task_executed(
+ptr_device_task_executed(
     Task * task
 ) {
     assert(task);
@@ -195,11 +195,11 @@ xkblas_device_task_executed(
 }
 
 static void
-xkblas_device_task_executed_callback(
-    const void * args[XKBLAS_CALLBACK_ARGS_MAX]
+ptr_device_task_executed_callback(
+    const void * args[PTR_CALLBACK_ARGS_MAX]
 ) {
     assert(args[0]);
-    xkblas_device_task_executed((Task *) args[0]);
+    ptr_device_task_executed((Task *) args[0]);
 }
 
 /**
@@ -209,16 +209,16 @@ xkblas_device_task_executed_callback(
  *  - task   - the task
  */
 void
-xkblas_device_task_execute(
-    xkblas_device_t * device,
+ptr_device_task_execute(
+    ptr_device_t * device,
                Task * task
 ) {
-    assert(XKBLAS_CALLBACK_ARGS_MAX >= 1);
+    assert(PTR_CALLBACK_ARGS_MAX >= 1);
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
     {
-        xkblas_device_task_executed(task);
+        ptr_device_task_executed(task);
     }
     else
     {
@@ -233,21 +233,21 @@ xkblas_device_task_execute(
                 .task   = task,
                 .handle = NULL
             };
-            xkblas_task_launch(&launcher);
-            xkblas_device_task_executed(task);
+            ptr_task_launch(&launcher);
+            ptr_device_task_executed(task);
         }
         /* running a device task */
         else
         {
             assert(format->target == TASK_FORMAT_TARGET_DRIVER);
 
-            xkblas_callback_t callback;
-            callback.func    = xkblas_device_task_executed_callback;
+            ptr_callback_t callback;
+            callback.func    = ptr_device_task_executed_callback;
             callback.args[0] = task;
 
-            xkblas_stream_instruction_submit_kernel(device, task, callback);
+            ptr_stream_instruction_submit_kernel(device, task, callback);
             if (device->thread == ThreadWorker::self())
-                device->offloader.launch_ready_instructions(XKBLAS_STREAM_TYPE_KERN);
+                device->offloader.launch_ready_instructions(PTR_STREAM_TYPE_KERN);
 
             /* kernel launch will be called asynchronously in the driver */
             /* the 'executed' callback will be called asynchronously in the
@@ -257,22 +257,22 @@ xkblas_device_task_execute(
 }
 
 static inline void
-xkblas_device_wait(xkblas_device_t * device)
+ptr_device_wait(ptr_device_t * device)
 {
-    XKBLAS_DEBUG("Waiting for device %d...", device->global_id);
-    device->offloader.progress_pending_instructions(XKBLAS_STREAM_TYPE_ALL, true);
+    LOGGER_DEBUG("Waiting for device %d...", device->global_id);
+    device->offloader.progress_pending_instructions(PTR_STREAM_TYPE_ALL, true);
 }
 
-xkblas_driver_t *
-xkblas_driver_get(xkblas_driver_type_t type)
+ptr_driver_t *
+ptr_driver_get(ptr_driver_type_t type)
 {
-    xkblas_context_t * context = xkblas_context_get();
-    return context->drivers.list + XKBLAS_DRIVER_TYPE_CUDA;
+    ptr_context_t * context = ptr_context_get();
+    return context->drivers.list + PTR_DRIVER_TYPE_CUDA;
 }
 
-xkblas_device_t *
-xkblas_device_get(int device_global_id)
+ptr_device_t *
+ptr_device_get(int device_global_id)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    ptr_context_t * context = ptr_context_get();
     return context->drivers.devices.list[device_global_id];
 }

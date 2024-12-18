@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 21:44:15 by                           \_)     (_/    */
+/*   Updated: 2024/12/18 15:24:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,9 +14,9 @@
 #ifndef __ACCESS_HPP__
 # define __ACCESS_HPP__
 
-# include "access-mode.h"
-# include "cube.hpp"
-# include "matrix-tile.h"
+# include <ptr/sync/access-mode.h>
+# include <ptr/sync/cube.hpp>
+# include <ptr/sync/matrix-tile.h>
 
 /**
  *  We assume col major, dim 0 is for rows; dim 1 is for cols.
@@ -49,7 +49,7 @@ class access_t
 
         // Welcome traveller \o/ I am glad you found me
         //
-        // Here is all the super-dirty pile of shit on which relies all xkblas
+        // Here is all the super-dirty pile of shit on which relies all ptr
         // Hopefully you are only here by curiosity, and not trying to fix something.
         //
         // Well ... you have a wonderful day :-)

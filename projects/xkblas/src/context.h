@@ -1,24 +1,23 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-context.h                                                         */
+/*   context.h                                                                */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 15:31:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKBLAS_CONTEXT_H__
-# define __XKBLAS_CONTEXT_H__
+#ifndef __CONTEXT_H__
+# define __CONTEXT_H__
 
-# include "conf/conf.h"
-# include "device/driver.h"
-# include "device/memory-tree.hpp"
-# include "stats/stats.h"
-# include "sync/spinlock.h"
+# include <ptr/sync/spinlock.h>
+
+# include <atomic>
+# include <stdint.h>
 
 typedef enum    xkblas_context_state_t : uint8_t
 {
@@ -34,40 +33,6 @@ typedef struct  xkblas_context_t
         volatile std::atomic<xkblas_context_state_t> current;
     } state;
 
-    /* user conf */
-    xkblas_conf_t conf;
-
-    /* worker thread to copy data asynchronously */
-    ThreadWorker * memory_coherent_worker_thread;
-
-    /* driver list */
-    xkblas_drivers_t drivers;
-
-    /* memory state on each device */
-    std::vector<MemoryTree *> memtrees;
-    MemoryTree *
-    get_memory_tree(const size_t ld, const size_t sizeof_type)
-    {
-        /* find previous memtree for that ld */
-        for (MemoryTree * memtree : this->memtrees)
-            if (memtree->ld == ld && memtree->sizeof_type == sizeof_type)
-                return memtree;
-
-        XKBLAS_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
-                ld, sizeof_type, this->conf.merge_transfers ? "true" : "false");
-
-        /* if not found, create a new memtree */
-        MemoryTree * memtree = new MemoryTree(ld, sizeof_type, this->conf.merge_transfers);
-        assert(memtree);
-        assert(memtree->ld == ld);
-        assert(memtree->sizeof_type == sizeof_type);
-        this->memtrees.push_back(memtree);
-        return memtree;
-    }
-
-    /* stats for debugging */
-    xkblas_stats_t stats;
-
 }               xkblas_context_t;
 
 // TODO : currently using a global variable to preserve previous 'xkblas_init'
@@ -77,11 +42,10 @@ typedef struct  xkblas_context_t
 extern "C"
 xkblas_context_t * xkblas_context_get(void);
 
-/* submit a ready task */
-void xkblas_context_submit_task(xkblas_context_t * context, Task * task);
-
+# if 0
 /* memory async thread management */
 void xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context);
 void xkblas_memory_coherent_async_register_format(void);
+# endif
 
-#endif /* __XKBLAS_CONTEXT_H__ */
+#endif /* __CONTEXT_H__ */
