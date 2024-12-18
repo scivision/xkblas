@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:34:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 16:16:57 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,8 +34,6 @@
 xkblas_context_t *
 xkblas_context_get(void)
 {
-    # pragma message(TODO "Optimize this default conf")
-
     static xkblas_context_t context = {
         .state = {
             .spinlock = 0,

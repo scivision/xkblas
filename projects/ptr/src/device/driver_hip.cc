@@ -279,7 +279,7 @@ PTR_DRIVER_ENTRYPOINT(init)(void)
         }
 
         # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
-        ptr_context_t * ctx = ptr_context_get();
+        ptr_runtime_t * ctx = ptr_runtime_get();
         uint32_t ngpus = MIN(PTR_DRIVER_ENTRYPOINT(get_ndevices_max)(), ctx->conf.ngpus);
         uint32_t gpuset = ctx->conf.gpu_set;
         for (int i = 0; i < ngpus ; ++i)
@@ -411,7 +411,7 @@ PTR_DRIVER_ENTRYPOINT(device_init)(int device_id)
     device->size_alloc = 0;
     device->size_free = 0;
     device->free_mem = 0;
-    ptr_context_t * ctx = ptr_context_get();
+    ptr_runtime_t * ctx = ptr_runtime_get();
 
     /* work memory allocation */
     size_t free, total;

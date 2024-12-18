@@ -16,10 +16,10 @@
 # include "sync/mem.h"
 
 /* to be called once a task become ready, very dirty, but good enough as long
- * as we have the 'ptr_context_t' global variable :-( */
+ * as we have the 'ptr_runtime_t' global variable :-( */
 void
 ptr_task_ready(Task * task)
 {
-    ptr_context_t * context = ptr_context_get();
-    ptr_context_submit_task(context, task);
+    ptr_runtime_t * context = ptr_runtime_get();
+    ptr_runtime_submit_task(context, task);
 }

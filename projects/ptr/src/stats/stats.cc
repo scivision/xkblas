@@ -21,7 +21,7 @@
 void
 ptr_stats_task_state_incr(task_format_id_t fmtid, task_state_t state)
 {
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
     ++context->stats.tasks[fmtid].states[state];
 }
@@ -29,7 +29,7 @@ ptr_stats_task_state_incr(task_format_id_t fmtid, task_state_t state)
 void
 ptr_stats_report(void)
 {
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
     ptr_stats_t * stats = &(context->stats);
 
@@ -91,5 +91,5 @@ ptr_stats_init(ptr_stats_t * stats)
 ptr_stats_t *
 ptr_stats_get(void)
 {
-    return &(ptr_context_get()->stats);
+    return &(ptr_runtime_get()->stats);
 }

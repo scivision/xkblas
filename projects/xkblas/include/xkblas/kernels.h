@@ -1,25 +1,22 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   min-max.h                                                                */
+/*   xkblas-kernel.h                                                          */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 16:20:44 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __MIN_MAX_H__
-# define __MIN_MAX_H__
+#ifndef __KERNELS_H__
+# define __KERNELS_H__
 
-# ifndef MIN
-#  define MIN(X, Y) ((Y) < (X) ? (Y) : (X))
-# endif /* MIN */
+# include "skernels.h"
+# include "dkernels.h"
+# include "ckernels.h"
+# include "zkernels.h"
 
-# ifndef MAX
-#  define MAX(X, Y) ((X) < (Y) ? (Y) : (X))
-# endif /* MAX */
-
-#endif
+#endif /* __KERNELS_H__ */

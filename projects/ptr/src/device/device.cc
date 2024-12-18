@@ -249,7 +249,7 @@ ptr_memory_allocate(
 void
 ptr_memory_deallocate_all(void)
 {
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
 
     for (ptr_device_global_id_t device_global_id = 0 ;
@@ -299,7 +299,7 @@ ptr_device_init(
     driver->f_device_init(device->driver_id);
 
     /* init offloader */
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
 
     /* attach current thread to the device */
@@ -378,7 +378,7 @@ ptr_device_prepare_task(
             task->label, task->fmtid, device->global_id, driver->f_get_name());
     # endif /* NDEBUG */
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
 
     /* increase task 'fetching' counter so it does not get ready early

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:31:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 16:16:43 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,6 +13,8 @@
 
 #ifndef __CONTEXT_H__
 # define __CONTEXT_H__
+
+# include "conf.h"
 
 # include <ptr/sync/spinlock.h>
 
@@ -32,6 +34,8 @@ typedef struct  xkblas_context_t
         spinlock_t spinlock;
         volatile std::atomic<xkblas_context_state_t> current;
     } state;
+
+    xkblas_conf_t conf;
 
 }               xkblas_context_t;
 

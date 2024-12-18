@@ -1,18 +1,18 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-kernel-type.h                                                     */
+/*   kernel-type.h                                                            */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 16:21:41 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKBLAS_KERNEL_TYPE_H__
-# define __XKBLAS_KERNEL_TYPE_H__
+#ifndef __KERNEL_TYPE_H__
+# define __KERNEL_TYPE_H__
 
 typedef enum    xkblas_kernel_type_t
 {
@@ -45,4 +45,4 @@ typedef enum    xkblas_kernel_type_deprecated_t
 
 typedef xkblas_kernel_type_deprecated_t xkblas_kernel_t;
 
-#endif /* __XKBLAS_KERNEL_TYPE_H__ */
+#endif /* __KERNEL_TYPE_H__ */

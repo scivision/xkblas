@@ -16,7 +16,7 @@
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
-ptr_context_submit_task(ptr_context_t * context, Task * task)
+ptr_runtime_submit_task(ptr_runtime_t * context, Task * task)
 {
     assert(task->state.value == TASK_STATE_READY);
 

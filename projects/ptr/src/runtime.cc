@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:29:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/18 16:04:31 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -37,12 +37,12 @@
 //////////////////////////////
 
 // singleton of runtime context
-ptr_context_t *
-ptr_context_get(void)
+ptr_runtime_t *
+ptr_runtime_get(void)
 {
     # pragma message(TODO "Optimize this default conf")
 
-    static ptr_context_t context = {
+    static ptr_runtime_t context = {
         .state = {
             .spinlock = 0,
             .current = { PTR_CONTEXT_DEINITIALIZED }
@@ -68,7 +68,7 @@ ptr_init(void)
 {
     LOGGER_INFO("Initializing Xkblas");
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     if (context->state.current == PTR_CONTEXT_DEINITIALIZED)
     {
         SPINLOCK_LOCK(context->state.spinlock);
@@ -101,7 +101,7 @@ ptr_deinit(void)
     ptr_stats_report();
 # endif // USE_STATS == 1
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     if (context->state.current == PTR_CONTEXT_INITIALIZED)
     {
         SPINLOCK_LOCK(context->state.spinlock);
@@ -134,7 +134,7 @@ ptr_sync(void)
 {
     LOGGER_INFO("Synchronizing Xkblas");
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
 
     /* other threads */
@@ -193,4 +193,29 @@ retry:
     // dependency kinterval btree
     thread->deptree.export_pdf("dependency");
 # endif
+}
+
+///////////////
+// UTILITIES //
+///////////////
+
+extern "C"
+int
+ptr_get_ngpus(int * count)
+{
+    assert(count);
+
+    ptr_runtime_t * context = ptr_runtime_get();
+    assert(context);
+
+    *count = 0;
+    for (int i = 0 ; i < PTR_DRIVER_TYPE_MAX ; ++i)
+    {
+        ptr_driver_t * driver = context->drivers.list + i;
+        assert(driver);
+
+        if (driver->f_get_ndevices_max)
+            *count += driver->f_get_ndevices_max();
+    }
+    return 0;
 }

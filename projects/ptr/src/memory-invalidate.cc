@@ -20,7 +20,7 @@ ptr_memory_invalidate_caches(void)
 {
     LOGGER_INFO("Invalidate XKBlas devices memory");
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
 
     // memory tree and device memory

@@ -20,18 +20,18 @@
 # include "stats/stats.h"
 # include "sync/spinlock.h"
 
-typedef enum    ptr_context_state_t : uint8_t
+typedef enum    ptr_runtime_state_t : uint8_t
 {
     PTR_CONTEXT_DEINITIALIZED = 0,
     PTR_CONTEXT_INITIALIZED,
-}               ptr_context_state_t;
+}               ptr_runtime_state_t;
 
-typedef struct  ptr_context_t
+typedef struct  ptr_runtime_t
 {
     /* context state */
     struct {
         spinlock_t spinlock;
-        volatile std::atomic<ptr_context_state_t> current;
+        volatile std::atomic<ptr_runtime_state_t> current;
     } state;
 
     /* user conf */
@@ -68,20 +68,20 @@ typedef struct  ptr_context_t
     /* stats for debugging */
     ptr_stats_t stats;
 
-}               ptr_context_t;
+}               ptr_runtime_t;
 
 // TODO : currently using a global variable to preserve previous 'ptr_init'
 // and 'ptr_deinit' interfaces that takes no arguments.  Instead, we should
-// have them taking an 'ptr_context_t' argument that the user must keep
+// have them taking an 'ptr_runtime_t' argument that the user must keep
 // track of
 extern "C"
-ptr_context_t * ptr_context_get(void);
+ptr_runtime_t * ptr_runtime_get(void);
 
 /* submit a ready task */
-void ptr_context_submit_task(ptr_context_t * context, Task * task);
+void ptr_runtime_submit_task(ptr_runtime_t * context, Task * task);
 
 /* memory async thread management */
-void ptr_memory_coherent_async_worker_thread_init(ptr_context_t * context);
+void ptr_memory_coherent_async_worker_thread_init(ptr_runtime_t * context);
 void ptr_memory_coherent_async_register_format(void);
 
 #endif /* __PTR_CONTEXT_H__ */

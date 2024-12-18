@@ -166,7 +166,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
 static void
 ptr_memory_coherent_async_worker_thread_work(
-    ptr_context_t * context,
+    ptr_runtime_t * context,
     ThreadWorker * thread,
     Task * current
 ) {
@@ -235,7 +235,7 @@ ptr_memory_coherent_async_worker_thread_work(
 /////////////////////////////
 
 static void
-ptr_memory_coherent_async_worker_thread_main_loop(ptr_context_t * context)
+ptr_memory_coherent_async_worker_thread_main_loop(ptr_runtime_t * context)
 {
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread == context->memory_coherent_worker_thread);
@@ -255,7 +255,7 @@ ptr_memory_coherent_async_worker_thread_main_loop(ptr_context_t * context)
 static void *
 ptr_memory_coherent_async_worker_thread_main(void * arg)
 {
-    ptr_context_t * context = (ptr_context_t *) arg;
+    ptr_runtime_t * context = (ptr_runtime_t *) arg;
     assert(context);
 
     context->memory_coherent_worker_thread = ThreadWorker::self();
@@ -275,7 +275,7 @@ ptr_memory_coherent_async_worker_thread_main(void * arg)
 ////////////////////////
 
 void
-ptr_memory_coherent_async_worker_thread_init(ptr_context_t * context)
+ptr_memory_coherent_async_worker_thread_init(ptr_runtime_t * context)
 {
     context->memory_coherent_worker_thread = NULL;
 
@@ -314,7 +314,7 @@ ptr_memory_coherent_async(
 ) {
     LOGGER_IMPL("in `ptr_memory_coherent_async` - uplo and memflag parameters not supported");
 
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
 
     // TODO : allocate instead on the worker thread ? creates a concurrency issue in the allocator though

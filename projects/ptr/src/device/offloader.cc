@@ -121,7 +121,7 @@ Offloader::progress_pending_instructions(ptr_stream_type_t stype, bool blocking)
 {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
 
-    ptr_context_t * ctx = ptr_context_get();
+    ptr_runtime_t * ctx = ptr_runtime_get();
     int err = 0;
 
     unsigned int bgn = (stype == PTR_STREAM_TYPE_ALL) ?                      0 : stype;

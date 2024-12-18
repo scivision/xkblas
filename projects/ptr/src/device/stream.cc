@@ -144,7 +144,7 @@ ptr_stream_t::complete(const ptr_stream_instruction_counter_t i)
     ++this->pending.pos.r;
 
     # if USE_STATS
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
     ++context->stats.streams[this->type].instructions[instr->type].completed;
     # endif /* USE_STATS */
@@ -162,7 +162,7 @@ ptr_stream_t::commit(ptr_stream_instruction_t * instr)
     ++this->ready.pos.w;
 
     # if USE_STATS
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     assert(context);
     ++context->stats.streams[this->type].instructions[instr->type].launched;
     # endif /* USE_STATS */

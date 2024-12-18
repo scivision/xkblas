@@ -1,22 +1,31 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-kernel.h                                                          */
+/*   conf.h                                                                   */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/18 16:17:40 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKBLAS_KERNEL_H__
-# define __XKBLAS_KERNEL_H__
+#ifndef __XKBLAS_CONF_H__
+# define __XKBLAS_CONF_H__
 
-# include "xkblas-skernel.h"
-# include "xkblas-dkernel.h"
-# include "xkblas-ckernel.h"
-# include "xkblas-zkernel.h"
+# include <stddef.h>
 
-#endif /* __XKBLAS_KERNEL_H__ */
+typedef struct  xkblas_conf_kernel_t
+{
+    size_t tile;
+}               xkblas_conf_kernel_t;
+
+typedef struct  xkblas_conf_s
+{
+    xkblas_conf_kernel_t kernels[XKBLAS_KERNEL_TYPE_MAX];
+}               xkblas_conf_t;
+
+void xkblas_init_conf(xkblas_conf_t * conf);
+
+#endif /* __XKBLAS_CONF_H__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 16:09:57 by                           \_)     (_/    */
+/*   Updated: 2024/12/18 16:17:54 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,6 +31,7 @@ __parse_merge_transfers(ptr_conf_t * conf, char const * value)
     if (value)
         conf->merge_transfers = atoi(value) ? true : false;
 }
+
 
 static void
 __parse_nkernels(ptr_conf_t * conf, char const * value)

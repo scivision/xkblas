@@ -266,13 +266,13 @@ ptr_device_wait(ptr_device_t * device)
 ptr_driver_t *
 ptr_driver_get(ptr_driver_type_t type)
 {
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     return context->drivers.list + PTR_DRIVER_TYPE_CUDA;
 }
 
 ptr_device_t *
 ptr_device_get(int device_global_id)
 {
-    ptr_context_t * context = ptr_context_get();
+    ptr_runtime_t * context = ptr_runtime_get();
     return context->drivers.devices.list[device_global_id];
 }
