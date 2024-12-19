@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:23:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:17:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,17 +14,17 @@
 # include <cblas.h>
 
 # include "context.h"
+# include "kernels/auto-tile.h"
+# include "xkblas/kernel-type.h"
 
 # include <ptr/device/task-launcher.h>
 # include <ptr/device/thread-producer.hpp>
-# include <ptr/kernels/auto-tile.h>
 # include <ptr/logger/logger.h>
 # include <ptr/logger/todo.h>
 # include <ptr/min-max.h>
 # include <ptr/sync/access.hpp>
 # include <ptr/sync/alignedas.h>
 # include <ptr/sync/cache-line-size.hpp>
-# include <ptr/xkblas-kernel-type.h>
 
 # include <cassert>
 
@@ -141,37 +141,37 @@ xkblas_£trsm_async(
     /* Check input arguments */
     if (side != CblasLeft && side != CblasRight)
     {
-        XKBLAS_ERROR("illegal value of side");
+        LOGGER_ERROR("illegal value of side");
         return -1;
     }
 
     if ((uplo != CblasUpper) && (uplo != CblasLower))
     {
-        XKBLAS_ERROR("illegal value of uplo");
+        LOGGER_ERROR("illegal value of uplo");
         return -2;
     }
 
     if (((transA < CblasNoTrans) || (transA > CblasConjTrans)))
     {
-        XKBLAS_ERROR("illegal value of transA");
+        LOGGER_ERROR("illegal value of transA");
         return -3;
     }
 
     if ((diag != CblasUnit) && (diag != CblasNonUnit))
     {
-        XKBLAS_ERROR("illegal value of diag");
+        LOGGER_ERROR("illegal value of diag");
         return -4;
     }
 
     if (m < 0)
     {
-        XKBLAS_ERROR("illegal value of m");
+        LOGGER_ERROR("illegal value of m");
         return -5;
     }
 
     if (n < 0)
     {
-        XKBLAS_ERROR("illegal value of n");
+        LOGGER_ERROR("illegal value of n");
         return -6;
     }
 
@@ -182,13 +182,13 @@ xkblas_£trsm_async(
 
     if (lda < MAX(1, An))
     {
-        XKBLAS_ERROR("illegal value of lda");
+        LOGGER_ERROR("illegal value of lda");
         return -8;
     }
 
     if (ldb < MAX(1, Bn))
     {
-        XKBLAS_ERROR("illegal value of ldb");
+        LOGGER_ERROR("illegal value of ldb");
         return -10;
     }
 
@@ -206,10 +206,10 @@ xkblas_£trsm_async(
     const size_t Bmb = ts;
     const size_t Bnb = ts;
 
-    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-    const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
-    const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
+    const size_t Amt = NUM_OF_TILES(Am, Amb);
+    const size_t Ant = NUM_OF_TILES(An, Anb);
+    const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
+    const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
 
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
@@ -519,7 +519,7 @@ xkblas_£trsm_async(
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if USE_CUDA
-#  include "device/cublas-helper.h"
+#  include <ptr/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -538,7 +538,7 @@ body_cuda(void * vlauncher)
     const Access * B = launcher->task->accesses + 1;
 
     # ifndef NDEBUG
-    XKBLAS_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%d, B=%p, ldb=%d) on task=`%s`",
+    LOGGER_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%d, B=%p, ldb=%d) on task=`%s`",
         args->side, args->uplo,
         args->transA, args->diag,
         args->alpha,
@@ -559,7 +559,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
               (CU_TYPE *) B->device_view.addr, (int) B->device_view.ld
     );
-    xkblas_cublas_status_check(res);
+    ptr_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -568,7 +568,7 @@ body_cuda(void * vlauncher)
 static void
 body_cpu(void * args)
 {
-    XKBLAS_DEBUG("Executing a trsm on cpu");
+    LOGGER_DEBUG("Executing a trsm on cpu");
 }
 # endif /* USE_CPU */
 
@@ -583,10 +583,10 @@ register_£trsm_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
 # ifdef USE_CPU
-    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
+    format.f[PTR_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
-    format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[PTR_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     snprintf(format.label, sizeof(format.label), "£trsm");
     format.target = TASK_FORMAT_TARGET_DRIVER;

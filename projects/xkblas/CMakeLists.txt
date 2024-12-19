@@ -103,8 +103,9 @@ if (PTR)
 else()
     message(FATAL_ERROR "Please set '-DPTR=path/to/ptr'")
 endif()
-include_directories("${PTR}/include")
 message(STATUS "Found PTR: ${PTR}")
+include_directories("${PTR}/include")
+target_link_libraries(${XKBLAS_NAME} PRIVATE ${PTR}/)
 
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
@@ -160,9 +161,9 @@ if (${CUDA_RT_FOUND})
 
     # Cuda kernels
     set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
-    cuda_add_library(${XKBLAS_NAME}_cuda_kernels SHARED ${CUDA_SOURCE_FILES})
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_cuda_kernels)
-    install(TARGETS ${XKBLAS_NAME}_cuda_kernels LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+    install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -178,7 +179,7 @@ if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_RT_FOUND})
-        target_compile_options(${XKBLAS_NAME}_cuda_kernels PRIVATE ${STRICT_OPTIONS})
+        target_compile_options(${XKBLAS_NAME}_kernels_cuda PRIVATE ${STRICT_OPTIONS})
     endif()
 endif()
 

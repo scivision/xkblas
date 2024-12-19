@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:09:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:11:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -108,19 +108,19 @@ xkblas_£copyscale_async(
 
     if (ldd < n)
     {
-        XKBLAS_FATAL("Invalid value for ldd\n");
+        LOGGER_FATAL("Invalid value for ldd\n");
         return -5;
     }
 
     if (ldl < n)
     {
-        XKBLAS_FATAL("Invalid value for ldl");
+        LOGGER_FATAL("Invalid value for ldl");
         return -7;
     }
 
     if (ldu < m)
     {
-        XKBLAS_FATAL("Invalid value for ldu");
+        LOGGER_FATAL("Invalid value for ldu");
         return -9;
     }
 
@@ -151,12 +151,12 @@ xkblas_£copyscale_async(
     const size_t Um  = n;
     const size_t Un  = m;
 
-    const size_t Dmt = XKBLAS_NUM_OF_TILES(Dm, Dmb);
-    const size_t Dnt = XKBLAS_NUM_OF_TILES(Dn, Dnb);
-    const size_t Lmt = XKBLAS_NUM_OF_TILES(Lm, Lmb);
-    const size_t Lnt = XKBLAS_NUM_OF_TILES(Ln, Lnb);
-    const size_t Umt = XKBLAS_NUM_OF_TILES(Um, Umb);
-    const size_t Unt = XKBLAS_NUM_OF_TILES(Un, Unb);
+    const size_t Dmt = NUM_OF_TILES(Dm, Dmb);
+    const size_t Dnt = NUM_OF_TILES(Dn, Dnb);
+    const size_t Lmt = NUM_OF_TILES(Lm, Lmb);
+    const size_t Lnt = NUM_OF_TILES(Ln, Lnb);
+    const size_t Umt = NUM_OF_TILES(Um, Umb);
+    const size_t Unt = NUM_OF_TILES(Un, Unb);
 
     # define D(i, j) D, i*Dmb, j*Dnb
     # define L(i, j) L, i*Lmb, j*Lnb
@@ -283,7 +283,7 @@ xkblas_£copyscale_native(
 static void
 body_cpu(void * args)
 {
-    XKBLAS_DEBUG("Executing a copyscale on cpu");
+    LOGGER_DEBUG("Executing a copyscale on cpu");
     xkblas_zcopyscale_native(...);
 }
 

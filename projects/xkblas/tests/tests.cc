@@ -5,13 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 14:14:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "xkblas.h"
+# include "xkblas/xkblas.h"
 
 # include <assert.h>
 # include <stdlib.h>
@@ -19,7 +19,7 @@
 # include <cblas.h>
 
 # if 1
-# include "xkblas-skernel.h"
+# include "xkblas/skernels.h"
 # define TYPE               float
 # define xkblas_gemm_async  xkblas_sgemm_async
 # else

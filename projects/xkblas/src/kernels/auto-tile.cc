@@ -48,7 +48,7 @@ xkblas_kernel_auto_tile(
 
         default:
         {
-            XKBLAS_FATAL("Tile for kernel type %d is not implemented", kernel);
+            LOGGER_FATAL("Tile for kernel type %d is not implemented", kernel);
             break ;
         }
     }
@@ -59,5 +59,5 @@ xkblas_kernel_auto_tile(
 
     *ts = ts_auto;
 
-    XKBLAS_DEBUG("Return tile size = %lu", *ts);
+    LOGGER_DEBUG("Return tile size = %lu", *ts);
 }

@@ -110,10 +110,6 @@ if (USE_CUDA)
     if (NOT ${CUDA_RT_FOUND})
         message(FATAL_ERROR "Xkblas could not find CUDA_RT.")
     endif()
-    find_package(CUBLAS)
-    if (NOT ${CUBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas could not find CUBLAS.")
-    endif()
     include_directories("${CUDA_INCLUDE_DIRS}")
     message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
 endif()
@@ -158,7 +154,7 @@ endif()
 if (${CUDA_RT_FOUND})
 
     # Cuda driver
-    target_link_libraries(${PTR_NAME} PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${PTR_NAME} PRIVATE ${CUDA_RT_LIBRARIES})
     add_library(${PTR_NAME}_cuda_driver SHARED src/device/driver_cuda.cc)
     if (${HWLOC_FOUND})
         target_link_libraries(${PTR_NAME}_cuda_driver PRIVATE ${HWLOC_LIBRARIES})
@@ -172,7 +168,7 @@ include_directories(include/)
 include_directories(src/)
 
 # Installation
-install(TARGETS ${PTR_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS ${PTR_NAME} ${PTR_NAME}_cuda_driver LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)

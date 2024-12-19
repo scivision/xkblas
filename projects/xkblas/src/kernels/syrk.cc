@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:23:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:17:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,17 +14,17 @@
 # include <cblas.h>
 
 # include "context.h"
+# include "kernels/auto-tile.h"
+# include "xkblas/kernel-type.h"
 
 # include <ptr/device/task-launcher.h>
 # include <ptr/device/thread-producer.hpp>
-# include <ptr/kernels/auto-tile.h>
 # include <ptr/logger/logger.h>
 # include <ptr/logger/todo.h>
 # include <ptr/min-max.h>
 # include <ptr/sync/access.hpp>
 # include <ptr/sync/alignedas.h>
 # include <ptr/sync/cache-line-size.hpp>
-# include <ptr/xkblas-kernel-type.h>
 
 # include <cassert>
 
@@ -73,7 +73,7 @@ xkblas_£syrk_tile_async(
     assert((uintptr_t)A % lda == 0);
     assert((uintptr_t)C % ldc == 0);
 
-    XKBLAS_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, n, k);
+    LOGGER_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, n, k);
 
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
@@ -139,25 +139,25 @@ xkblas_£syrk_async(
     /* Check input arguments */
     if ((uplo != CblasUpper) && (uplo != CblasLower))
     {
-        XKBLAS_FATAL("illegal value of uplo");
+        LOGGER_FATAL("illegal value of uplo");
         return -1;
     }
 
     if ((trans != CblasNoTrans) && (trans != CblasTrans))
     {
-        XKBLAS_FATAL("illegal value of trans");
+        LOGGER_FATAL("illegal value of trans");
         return -2;
     }
 
     if (n < 0)
     {
-        XKBLAS_FATAL("illegal value of N");
+        LOGGER_FATAL("illegal value of N");
         return -3;
     }
 
     if (k < 0)
     {
-        XKBLAS_FATAL("illegal value of K");
+        LOGGER_FATAL("illegal value of K");
         return -4;
     }
 
@@ -166,13 +166,13 @@ xkblas_£syrk_async(
 
     if (lda < MAX(1, Am))
     {
-        XKBLAS_FATAL("illegal value of lda");
+        LOGGER_FATAL("illegal value of lda");
         return -7;
     }
 
     if (ldc < MAX(1, n))
     {
-        XKBLAS_FATAL("illegal value of ldc");
+        LOGGER_FATAL("illegal value of ldc");
         return -10;
     }
 
@@ -194,10 +194,10 @@ xkblas_£syrk_async(
     const size_t Cmb = ts;
     const size_t Cnb = ts;
 
-    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-    const size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
-    const size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+    const size_t Amt = NUM_OF_TILES(Am, Amb);
+    const size_t Ant = NUM_OF_TILES(An, Anb);
+    const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
+    const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
     const TYPE one = (TYPE) 1.0;
 
@@ -332,14 +332,14 @@ xkblas_£syrk_async(
         }
     }
 
-    XKBLAS_INFO("TRSM dependency graph submitted");
+    LOGGER_INFO("TRSM dependency graph submitted");
     return 0;
 }
 
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if USE_CUDA
-#  include "device/cublas-helper.h"
+#  include <ptr/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -360,7 +360,7 @@ body_cuda(void * vlauncher)
     assert(args->trans == CblasNoTrans);
 
     # ifndef NDEBUG
-    XKBLAS_INFO("Calling cublasSyrk(n=%d, k=%d, A=%p, lda=%d, C=%p, ldc=%d) on task=`%s`",
+    LOGGER_INFO("Calling cublasSyrk(n=%d, k=%d, A=%p, lda=%d, C=%p, ldc=%d) on task=`%s`",
         args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,
@@ -383,7 +383,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
-    xkblas_cublas_status_check(res);
+    ptr_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -392,7 +392,7 @@ body_cuda(void * vlauncher)
 static void
 body_cpu(void * args)
 {
-    XKBLAS_DEBUG("Executing a syrk on cpu");
+    LOGGER_DEBUG("Executing a syrk on cpu");
 }
 # endif /* USE_CPU */
 
@@ -407,10 +407,10 @@ register_£syrk_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
 # ifdef USE_CPU
-    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
+    format.f[PTR_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
-    format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[PTR_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     snprintf(format.label, sizeof(format.label), "£syrk");
     format.target = TASK_FORMAT_TARGET_DRIVER;

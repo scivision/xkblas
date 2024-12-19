@@ -5,13 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:20:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "logger/logger.h"
+# include <ptr/logger/logger.h>
 
 extern "C"
 int
@@ -24,12 +24,12 @@ xkblas_£syr2k_async(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
-    XKBLAS_FATAL("Not implemented");
+    LOGGER_FATAL("Not implemented");
     return 0;
 }
 
 void
 register_£syr2k_format(void)
 {
-    XKBLAS_IMPL("Not implemented");
+    LOGGER_IMPL("Not implemented");
 }

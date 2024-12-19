@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:23:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:17:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,17 +15,17 @@
 # include <cassert>
 
 # include "context.h"
+# include "kernels/auto-tile.h"
+# include "xkblas/kernel-type.h"
 
 # include <ptr/device/task-launcher.h>
 # include <ptr/device/thread-producer.hpp>
-# include <ptr/kernels/auto-tile.h>
 # include <ptr/logger/logger.h>
 # include <ptr/logger/todo.h>
 # include <ptr/min-max.h>
 # include <ptr/sync/access.hpp>
 # include <ptr/sync/alignedas.h>
 # include <ptr/sync/cache-line-size.hpp>
-# include <ptr/xkblas-kernel-type.h>
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
@@ -159,25 +159,25 @@ xkblas_£gemmt_async(
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans))
     {
-        XKBLAS_FATAL("illegal value of transA");
+        LOGGER_FATAL("illegal value of transA");
         return -1;
     }
 
     if ((transB < CblasNoTrans) || (transB > CblasConjTrans))
     {
-        XKBLAS_FATAL("illegal value of transB");
+        LOGGER_FATAL("illegal value of transB");
         return -2;
     }
 
     if (n < 0)
     {
-        XKBLAS_FATAL("illegal value of n");
+        LOGGER_FATAL("illegal value of n");
         return -4;
     }
 
     if (k < 0)
     {
-        XKBLAS_FATAL("illegal value of k");
+        LOGGER_FATAL("illegal value of k");
         return -5;
     }
 
@@ -190,19 +190,19 @@ xkblas_£gemmt_async(
 
     if (lda < MAX(1, Am))
     {
-        XKBLAS_FATAL("illegal value of lda");
+        LOGGER_FATAL("illegal value of lda");
         return -8;
     }
 
     if (ldb < MAX(1, Bm))
     {
-        XKBLAS_FATAL("illegal value of ldb");
+        LOGGER_FATAL("illegal value of ldb");
         return -10;
     }
 
     if (ldc < MAX(1, Cm))
     {
-        XKBLAS_FATAL("illegal value of ldc");
+        LOGGER_FATAL("illegal value of ldc");
         return -13;
     }
 
@@ -223,12 +223,12 @@ xkblas_£gemmt_async(
     const size_t Cmb = ts;
     const size_t Cnb = ts;
 
-    const size_t Amt = XKBLAS_NUM_OF_TILES(Am, Amb);
-    const size_t Ant = XKBLAS_NUM_OF_TILES(An, Anb);
-    const size_t Bmt = XKBLAS_NUM_OF_TILES(Bm, Bmb);
-    const size_t Bnt = XKBLAS_NUM_OF_TILES(Bn, Bnb);
-    const size_t Cmt = XKBLAS_NUM_OF_TILES(Cm, Cmb);
-    const size_t Cnt = XKBLAS_NUM_OF_TILES(Cn, Cnb);
+    const size_t Amt = NUM_OF_TILES(Am, Amb);
+    const size_t Ant = NUM_OF_TILES(An, Anb);
+    const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
+    const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
+    const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
+    const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
     const TYPE one = (TYPE) 1.0;
 
@@ -312,7 +312,7 @@ xkblas_£gemmt_async(
     # undef B
     # undef C
 
-    XKBLAS_INFO("GEMMT dependency graph submitted");
+    LOGGER_INFO("GEMMT dependency graph submitted");
 
     return 0;
 }
@@ -327,7 +327,7 @@ body_hip(void * vlauncher)
 # endif /* USE_HIP */
 
 # if USE_CUDA
-#  include "device/cublas-helper.h"
+#  include <ptr/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -350,7 +350,7 @@ body_cuda(void * vlauncher)
     assert(args);
 
     # ifndef NDEBUG
-    XKBLAS_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+    LOGGER_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
         args->n, args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,
@@ -378,7 +378,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
-    xkblas_cublas_status_check(res);
+    ptr_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -386,7 +386,7 @@ body_cuda(void * vlauncher)
 static void
 body_cpu(void * args)
 {
-    XKBLAS_DEBUG("Executing a gemm on cpu");
+    LOGGER_DEBUG("Executing a gemm on cpu");
 }
 
 
@@ -403,15 +403,15 @@ register_£gemmt_format(void)
     # pragma message(TODO "Use templated function to generate code instead of dupplicating HIP/Cuda kernels")
 
     # if USE_CPU
-    format.f[XKBLAS_DRIVER_TYPE_CPU]    = body_cpu;
+    format.f[PTR_DRIVER_TYPE_CPU]    = body_cpu;
     # endif /* USE_CPU */
 
     # if USE_CUDA
-    format.f[XKBLAS_DRIVER_TYPE_CUDA]   = body_cuda;
+    format.f[PTR_DRIVER_TYPE_CUDA]   = body_cuda;
     # endif /* USE_CUDA */
 
     # if USE_HIP
-    format.f[XKBLAS_DRIVER_TYPE_HIP]    = body_hip;
+    format.f[PTR_DRIVER_TYPE_HIP]    = body_hip;
     # endif /* USE_HIP */
 
     snprintf(format.label, sizeof(format.label), "£gemmt");
