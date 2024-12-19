@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:39:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,14 +14,14 @@
 #ifndef __THREAD_PRODUCER_HPP__
 # define __THREAD_PRODUCER_HPP__
 
-# include "runtime.h"
-# include "logger/todo.h"
-# include "device/dependency-tree.hpp"
-# include "device/driver.h"
-# include "device/naive-queue.hpp"
-# include "device/task.hpp"
-# include "device/thread.hpp"
-# include "sync/cache-line-size.hpp"
+# include <ptr/device/dependency-tree.hpp>
+# include <ptr/device/driver.h>
+# include <ptr/device/naive-queue.hpp>
+# include <ptr/device/task.hpp>
+# include <ptr/device/thread.hpp>
+# include <ptr/logger/todo.h>
+# include <ptr/runtime.h>
+# include <ptr/sync/cache-line-size.hpp>
 
 /**
  *  This class represents an ptr user thread, that is producing tasks

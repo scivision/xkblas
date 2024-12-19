@@ -5,20 +5,19 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 16:04:31 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 12:04:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
-
-# include "conf/conf.h"
-# include "logger/logger.h"
-# include "device/driver.h"
-# include "device/thread-producer.hpp"
-# include "sync/alignedas.h"
-# include "sync/spinlock.h"
+# include <ptr/runtime.h>
+# include <ptr/conf/conf.h>
+# include <ptr/logger/logger.h>
+# include <ptr/device/driver.h>
+# include <ptr/device/thread-producer.hpp>
+# include <ptr/sync/alignedas.h>
+# include <ptr/sync/spinlock.h>
 
 # if 0
 # if __has_include("kernels/generated/kernel-task-format-register.h")

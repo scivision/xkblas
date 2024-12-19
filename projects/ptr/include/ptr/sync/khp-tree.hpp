@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:25:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:47:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1332,14 +1332,14 @@ class KHPTree {
         coherency_cube_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KHPTree<K, T>::coherency_cube_includes_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_cube_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_cube_includes(Node * root) const
         {
-            auto f = std::bind(&KHPTree<K, T>::coherency_cube_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_cube_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1354,14 +1354,14 @@ class KHPTree {
         coherency_cube_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&KHPTree<K, T>::coherency_cube_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_cube_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_cube_disjoint(Node * root) const
         {
-            auto f = std::bind(&KHPTree<K, T>::coherency_cube_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_cube_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1502,7 +1502,7 @@ class KHPTree {
         void
         coherency_cube_represented(Cube cube)
         {
-            auto f = std::bind(&KHPTree<K, T>::coherency_cube_represented_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_cube_represented_check, this, _1, _2);
             foreach_node(this->root, f, &cube);
         }
 

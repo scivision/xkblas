@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 16:09:57 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 12:01:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "conf/conf.h"
-# include "logger/logger.h"
+# include <ptr/conf/conf.h>
+# include <ptr/logger/logger.h>
 
 # include <assert.h>
 # include <stdlib.h>

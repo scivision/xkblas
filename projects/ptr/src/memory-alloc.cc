@@ -5,13 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:02:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
+# include <ptr/runtime.h>
 
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 

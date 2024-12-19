@@ -5,17 +5,17 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:58:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # if USE_STATS
-#  include "runtime.h"
+#  include <ptr/runtime.h>
 # endif /* USE_STATS */
-# include "device/stream.h"
-# include "logger/todo.h"
+# include <ptr/device/stream.h>
+# include <ptr/logger/todo.h>
 
 # pragma message(TODO "Make 'init' and 'deinit' methods too ? They are used by drivers, idk if we want C++ drivers...")
 

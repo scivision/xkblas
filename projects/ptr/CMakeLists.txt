@@ -169,7 +169,6 @@ endif()
 
 # Include directory
 include_directories(include/)
-include_directories(include/ptr)
 include_directories(src/)
 
 # Installation

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -20,13 +20,13 @@
 # include <sched.h>     /* cpu_set_t */
 # include <stdint.h>    /* uint64_t */
 
-# include "device/consts.h"
-# include "device/device.h"
-# include "device/stream.h"
-# include "device/task.hpp"
-# include "device/task-launcher.h"
-# include "logger/todo.h"
-# include "sync/mutex.h"
+# include <ptr/device/consts.h>
+# include <ptr/device/device.h>
+# include <ptr/device/stream.h>
+# include <ptr/device/task.hpp>
+# include <ptr/device/task-launcher.h>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/mutex.h>
 
 # pragma message(TODO "Organize this file, split independent part in multiple files")
 

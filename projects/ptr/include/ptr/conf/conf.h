@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 14:14:32 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 12:00:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,8 +16,8 @@
 
 # include <stdint.h>
 
-# include "logger/todo.h"
-# include "device/stream.h"
+# include <ptr/logger/todo.h>
+# include <ptr/device/stream.h>
 
 # pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 

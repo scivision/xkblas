@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 16:17:40 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 11:18:51 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,6 +15,8 @@
 # define __XKBLAS_CONF_H__
 
 # include <stddef.h>
+
+# include "xkblas/kernel-type.h"
 
 typedef struct  xkblas_conf_kernel_t
 {

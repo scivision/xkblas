@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:29:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,14 +19,14 @@
 # include <cstdint>
 # include <vector>
 
-# include "device/consts.h"
-# include "device/task-format.h"
-# include "logger/logger.h"
-# include "logger/todo.h"
-# include "device/memory-access.hpp"
-# include "sync/access.hpp"
-# include "sync/cache-line-size.hpp"
-# include "sync/spinlock.h"
+# include <ptr/device/consts.h>
+# include <ptr/device/memory-access.hpp>
+# include <ptr/device/task-format.h>
+# include <ptr/logger/logger.h>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/access.hpp>
+# include <ptr/sync/cache-line-size.hpp>
+# include <ptr/sync/spinlock.h>
 
 # define TASK_MAX_ACCESSES          3
 # define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)

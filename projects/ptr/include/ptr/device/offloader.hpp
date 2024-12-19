@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:53:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,10 +14,10 @@
 #ifndef __OFFLOADER_HPP__
 # define __OFFLOADER_HPP__
 
-# include "conf/conf.h"
-# include "device/stream.h"
-# include "logger/todo.h"
-# include "sync/mutex.h"
+# include <ptr/conf/conf.h>
+# include <ptr/device/stream.h>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/mutex.h>
 
 # define PTR_STREAM_
 # define PTR_STREAM_IO_INSTR_CAPACITY 512

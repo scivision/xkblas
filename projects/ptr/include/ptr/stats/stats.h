@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:51:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,8 +14,8 @@
 #ifndef __STATS_H__
 # define __STATS_H__
 
-# include "device/stream.h"
-# include "device/task.hpp"
+# include <ptr/device/stream.h>
+# include <ptr/device/task.hpp>
 
 # include <atomic>
 # include <stddef.h>

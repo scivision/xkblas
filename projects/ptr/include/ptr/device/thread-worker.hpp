@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:39:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,10 +14,10 @@
 #ifndef __THREAD_WORKER_HPP__
 # define __THREAD_WORKER_HPP__
 
-# include "device/naive-queue.hpp"
-# include "device/task.hpp"
-# include "device/thread.hpp"
-# include "sync/cache-line-size.hpp"
+# include <ptr/device/naive-queue.hpp>
+# include <ptr/device/task.hpp>
+# include <ptr/device/thread.hpp>
+# include <ptr/sync/cache-line-size.hpp>
 
 /* maximum number of workers */
 # define PTR_WORKERS_MAX 8

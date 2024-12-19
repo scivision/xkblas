@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 14:21:49 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 12:00:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __BITS_H__
 # define __BITS_H__
 
-# include "device/consts.h"
+# include <ptr/device/consts.h>
 
 /* utility: return the index+1 of random bit set to '1' */
 static inline ptr_device_global_id_t

@@ -1,18 +1,18 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   ptr-context-task-submit.cc                                            */
+/*   runtime-task-submit.cc                                                   */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:04:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
-# include "sync/bits.h"
+# include <ptr/runtime.h>
+# include <ptr/sync/bits.h>
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void

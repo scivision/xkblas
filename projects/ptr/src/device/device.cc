@@ -5,21 +5,21 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:56:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
-# include "device/device.h"
-# include "device/driver.h"
-# include "device/stream.h"
-# include "device/stream-instruction-submit.h"
-# include "logger/logger.h"
-# include "logger/todo.h"
-# include "device/thread-worker.hpp"
-# include "sync/mem.h"
+# include <ptr/device/device.h>
+# include <ptr/device/driver.h>
+# include <ptr/device/stream-instruction-submit.h>
+# include <ptr/device/stream.h>
+# include <ptr/device/thread-worker.hpp>
+# include <ptr/logger/logger.h>
+# include <ptr/logger/todo.h>
+# include <ptr/runtime.h>
+# include <ptr/sync/mem.h>
 
 # include <cassert>
 # include <cstring>

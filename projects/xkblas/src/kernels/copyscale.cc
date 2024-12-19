@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:09:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,18 +13,18 @@
 
 # include <cblas.h>
 
-# include "min-max.h"
-# include "xkblas-kernel-type.h"
 # include "context.h"
-
-# include "device/task-launcher.h"
-# include "device/thread-producer.hpp"
-# include "logger/todo.h"
-# include "logger/logger.h"
 # include "kernels/auto-tile.h"
-# include "sync/access.hpp"
-# include "sync/alignedas.h"
-# include "sync/cache-line-size.hpp"
+# include "xkblas/kernel-type.h"
+
+# include <ptr/device/task-launcher.h>
+# include <ptr/device/thread-producer.hpp>
+# include <ptr/logger/logger.h>
+# include <ptr/logger/todo.h>
+# include <ptr/min-max.h>
+# include <ptr/sync/access.hpp>
+# include <ptr/sync/alignedas.h>
+# include <ptr/sync/cache-line-size.hpp>
 
 # include <cassert>
 
@@ -187,7 +187,7 @@ xkblas_£copyscale_async(
 }
 
 # if USE_CUDA
-#  include "device/cublas-helper.h"
+#  include <ptr/device/cublas-helper.h>
 
 extern "C"
 int
@@ -223,7 +223,7 @@ body_cuda(void * vlauncher)
 
     cudaStream_t cuda_stream;
     res = cublasGetStream( (cublasHandle_t) handle, &cuda_stream );
-    xkblas_cublas_status_check(res);
+    ptr_cublas_status_check(res);
 
     cuda_£copyscale(
         cuda_stream,
@@ -300,10 +300,10 @@ register_£copyscale_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
 # ifdef USE_CPU
-    format.f[XKBLAS_DRIVER_TYPE_CPU] = body_cpu;
+    format.f[PTR_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
-    format.f[XKBLAS_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[PTR_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     snprintf(format.label, sizeof(format.label), "£copyscale");
     format.target = TASK_FORMAT_TARGET_DRIVER;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:00:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,8 +14,8 @@
 #ifndef __STREAM_HPP__
 # define __STREAM_HPP__
 
-# include "device/stream-instruction.h"
-# include "sync/lockable.hpp"
+# include <ptr/device/stream-instruction.h>
+# include <ptr/sync/lockable.hpp>
 
 /* DONT CHANGE ORDER HERE !! Can have side effects (in the Offloader class for instance) */
 typedef enum    ptr_stream_type_t

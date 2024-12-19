@@ -5,15 +5,15 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:02:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "runtime.h"
-# include "device/thread-producer.hpp"
-# include "sync/alignedas.h"
+# include <ptr/runtime.h>
+# include <ptr/device/thread-producer.hpp>
+# include <ptr/sync/alignedas.h>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;

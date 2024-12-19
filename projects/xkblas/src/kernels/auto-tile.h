@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:19:44 by                           \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __AUTO_TILE_H__
 # define __AUTO_TILE_H__
 
-# include "xkblas-kernel-type.h"
+# include "xkblas/kernel-type.h"
 
 void
 xkblas_kernel_auto_tile(

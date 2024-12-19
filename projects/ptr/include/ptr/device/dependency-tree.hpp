@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:46:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,10 +14,8 @@
 #ifndef __DEPENDENCY_TREE_HPP__
 # define __DEPENDENCY_TREE_HPP__
 
-# pragma message(TODO "Dependency tree cut is always disabled currently, because the memory tree is included before the deptree... Fix me by removing 'mode' from the 'CubeTree::insert' - and overriding the 'insert_from' to cut in the dep tree")
-
-# include "sync/khp-tree.hpp"
-# include "device/task.hpp"
+# include <ptr/device/task.hpp>
+# include <ptr/sync/khp-tree.hpp>
 
 # include <array>
 # include <unordered_map>

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:53:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,8 +14,8 @@
 #ifndef __DEQUE_HPP__
 # define __DEQUE_HPP__
 
-# include "sync/spinlock.h"
-# include "device/iqueue.hpp"
+# include <ptr/sync/spinlock.h>
+# include <ptr/device/iqueue.hpp>
 
 # include <atomic>
 # include <assert.h>

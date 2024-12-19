@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:10:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:49:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,13 +16,13 @@
 
 # include <stdint.h>    /* uint64_t */
 
-# include "device/device-memory.h"
-# include "device/offloader.hpp"
-# include "device/task.hpp"
-# include "device/thread-worker.hpp"
-# include "logger/todo.h"
-# include "sync/cache-line-size.hpp"
-# include "sync/mutex.h"
+# include <ptr/device/device-memory.h>
+# include <ptr/device/offloader.hpp>
+# include <ptr/device/task.hpp>
+# include <ptr/device/thread-worker.hpp>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/cache-line-size.hpp>
+# include <ptr/sync/mutex.h>
 
 typedef enum    ptr_device_state_t : uint8_t
 {

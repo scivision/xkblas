@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:54:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,11 +14,11 @@
 #ifndef __STREAM_INSTRUCTION_H__
 # define __STREAM_INSTRUCTION_H__
 
-# include "callback.h"
-# include "device/task.hpp"
-# include "logger/todo.h"
-# include "sync/cache-line-size.hpp"
-# include "sync/mutex.h"
+# include <ptr/callback.h>
+# include <ptr/device/task.hpp>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/cache-line-size.hpp>
+# include <ptr/sync/mutex.h>
 
 # include <functional>
 

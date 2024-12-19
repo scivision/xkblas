@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 12:06:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,20 +14,18 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
-# include "matrix-tile.h"
-# include "device/consts.h"
-# include "device/device.h"
-# include "device/device-memory.h"
-# include "device/driver.h"
-# include "device/stream-instruction-submit.h"
-# include "device/task.hpp"
-# include "logger/logger.h"
-# include "logger/todo.h"
-# include "sync/bits.h"
-# include "sync/lockable.hpp"
-
-// tree cutting would suppress validity/transfer information of some blocks
-# include "sync/khp-tree.hpp"
+# include <ptr/device/consts.h>
+# include <ptr/device/device.h>
+# include <ptr/device/device-memory.h>
+# include <ptr/device/driver.h>
+# include <ptr/device/stream-instruction-submit.h>
+# include <ptr/device/task.hpp>
+# include <ptr/logger/logger.h>
+# include <ptr/logger/todo.h>
+# include <ptr/sync/bits.h>
+# include <ptr/sync/lockable.hpp>
+# include <ptr/sync/matrix-tile.h>
+# include <ptr/sync/khp-tree.hpp>
 
 # include <algorithm>  // std::sort
 # include <cstdint>

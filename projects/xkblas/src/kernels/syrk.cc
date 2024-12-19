@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:23:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,18 +13,18 @@
 
 # include <cblas.h>
 
-# include "min-max.h"
 # include "context.h"
 
-# include "device/task-launcher.h"
-# include "device/thread-producer.hpp"
-# include "logger/todo.h"
-# include "logger/logger.h"
-# include "kernels/auto-tile.h"
-# include "xkblas-kernel-type.h"
-# include "sync/access.hpp"
-# include "sync/alignedas.h"
-# include "sync/cache-line-size.hpp"
+# include <ptr/device/task-launcher.h>
+# include <ptr/device/thread-producer.hpp>
+# include <ptr/kernels/auto-tile.h>
+# include <ptr/logger/logger.h>
+# include <ptr/logger/todo.h>
+# include <ptr/min-max.h>
+# include <ptr/sync/access.hpp>
+# include <ptr/sync/alignedas.h>
+# include <ptr/sync/cache-line-size.hpp>
+# include <ptr/xkblas-kernel-type.h>
 
 # include <cassert>
 

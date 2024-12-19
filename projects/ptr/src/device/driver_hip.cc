@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 11:57:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,14 +13,14 @@
 
 # define PTR_DRIVER_ENTRYPOINT(N) PTR_DRIVER_TYPE_CUDA_ ## N
 
-# include "runtime.h"
-# include "conf/conf.h"
-# include "device/cublas-helper.h"
-# include "device/device.h"
-# include "device/driver.h"
-# include "device/stream.h"
-# include "logger/logger.h"
-# include "sync/mutex.h"
+# include <conf/conf.h>
+# include <device/cublas-helper.h>
+# include <device/device.h>
+# include <device/driver.h>
+# include <device/stream.h>
+# include <logger/logger.h>
+# include <runtime.h>
+# include <sync/mutex.h>
 
 # include <hip/hip_runtime.h>
 # include <hipblas.h>
