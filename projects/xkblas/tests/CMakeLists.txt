@@ -7,6 +7,6 @@ project(tests)
 set(CMAKE_BUILD_TYPE Debug)
 
 add_executable(tests tests.cc)
-target_link_libraries(tests ${XKBLAS_NAME} ${XKBLAS_NAME}_cuda_kernels)
+target_link_libraries(tests ${XKBLAS_NAME} ${XKBLAS_NAME}_kernels_cuda)
 
 add_subdirectory(kernels/)

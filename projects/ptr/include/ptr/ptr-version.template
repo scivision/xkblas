@@ -1,6 +1,0 @@
-#ifndef __PTR_VERSION_H__
-# define __PTR_VERSION_H__
-
-# define PTR_VERSION_GITHASH "£GIT_HASH"
-
-#endif /* __PTR_VERSION_H__ */

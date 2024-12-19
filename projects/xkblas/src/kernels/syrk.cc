@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:17:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 19:57:05 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,18 +13,18 @@
 
 # include <cblas.h>
 
+# include "auto-tile.h"
 # include "context.h"
-# include "kernels/auto-tile.h"
 # include "xkblas/kernel-type.h"
 
-# include <ptr/device/task-launcher.h>
-# include <ptr/device/thread-producer.hpp>
-# include <ptr/logger/logger.h>
-# include <ptr/logger/todo.h>
-# include <ptr/min-max.h>
-# include <ptr/sync/access.hpp>
-# include <ptr/sync/alignedas.h>
-# include <ptr/sync/cache-line-size.hpp>
+# include <kaapi/device/task-launcher.h>
+# include <kaapi/device/thread-producer.hpp>
+# include <kaapi/logger/logger.h>
+# include <kaapi/logger/todo.h>
+# include <kaapi/min-max.h>
+# include <kaapi/sync/access.hpp>
+# include <kaapi/sync/alignedas.h>
+# include <kaapi/sync/cache-line-size.hpp>
 
 # include <cassert>
 
@@ -339,7 +339,7 @@ xkblas_£syrk_async(
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if USE_CUDA
-#  include <ptr/device/cublas-helper.h>
+#  include <kaapi/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -383,7 +383,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
-    ptr_cublas_status_check(res);
+    kaapi_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -407,10 +407,10 @@ register_£syrk_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
 # ifdef USE_CPU
-    format.f[PTR_DRIVER_TYPE_CPU] = body_cpu;
+    format.f[KAAPI_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
-    format.f[PTR_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[KAAPI_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     snprintf(format.label, sizeof(format.label), "£syrk");
     format.target = TASK_FORMAT_TARGET_DRIVER;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:19:11 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 21:15:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,8 +15,8 @@
 # include "xkblas/xkblas.h"
 # include "xkblas/kernel-type.h"
 
-# include <ptr/ptr.h>
-# include <ptr/logger/logger.h>
+# include <kaapi/kaapi.h>
+# include <kaapi/logger/logger.h>
 
 # include <assert.h>
 
@@ -31,7 +31,7 @@ extern "C"
 int
 xkblas_get_ngpus(int * count)
 {
-    return ptr_get_ngpus(count);
+    return kaapi_get_ngpus(count);
 }
 
 extern "C"

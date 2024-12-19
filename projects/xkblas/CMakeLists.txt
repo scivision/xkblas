@@ -45,8 +45,13 @@ SET(XKBLAS_KERNELS_SOURCE_FILES
 
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h
+    ${CMAKE_SOURCE_DIR}/src/auto-tile.cc
+    ${CMAKE_SOURCE_DIR}/src/conf.cc
     ${CMAKE_SOURCE_DIR}/src/context.cc
     ${CMAKE_SOURCE_DIR}/src/legacy.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-alloc.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 
@@ -76,7 +81,7 @@ add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h # set invalid name so its always generated
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/ xkblas-version
+        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkblas xkblas-version
 )
 
 add_custom_command(
@@ -96,16 +101,15 @@ option(STRICT "Enable strict compilation mode" OFF)
 ###############
 
 # ptr lib deps
-option(PTR "The path to the sync library" OFF)
-if (PTR)
-    message(STATUS "Using PTR at '${PTR}'")
-    include_directories(${PTR}/include)
+option(KAAPI "The path to the sync library" OFF)
+if (KAAPI)
+    message(STATUS "Using KAAPI at '${KAAPI}'")
+    include_directories(${KAAPI}/include)
 else()
-    message(FATAL_ERROR "Please set '-DPTR=path/to/ptr'")
+    message(FATAL_ERROR "Please set '-DKAAPI=path/to/ptr'")
 endif()
-message(STATUS "Found PTR: ${PTR}")
-include_directories("${PTR}/include")
-target_link_libraries(${XKBLAS_NAME} PRIVATE ${PTR}/)
+message(STATUS "Found KAAPI: ${KAAPI}")
+include_directories("${KAAPI}/include")
 
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
@@ -151,6 +155,7 @@ endif()
 
 # XKBLAS Lib
 add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
+target_link_libraries(${XKBLAS_NAME} PRIVATE ${KAAPI}/lib/libkaapi.so)
 
 if (${HWLOC_FOUND})
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${HWLOC_LIBRARIES})

@@ -1,0 +1,6 @@
+#ifndef __KAAPI_VERSION_H__
+# define __KAAPI_VERSION_H__
+
+# define KAAPI_VERSION_GITHASH "£GIT_HASH"
+
+#endif /* __KAAPI_VERSION_H__ */

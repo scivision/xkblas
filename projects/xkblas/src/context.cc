@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 16:16:57 by                           \_)     (_/    */
+/*   Updated: 2024/12/19 19:23:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,8 +19,8 @@
 #  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
 # endif
 
-# include <ptr/ptr.h>
-# include <ptr/sync/spinlock.h>
+# include <kaapi/kaapi.h>
+# include <kaapi/sync/spinlock.h>
 
 # include <atomic>
 # include <stdlib.h>
@@ -54,7 +54,7 @@ extern "C"
 int
 xkblas_init(void)
 {
-    ptr_init();
+    kaapi_init();
 
     xkblas_context_t * context = xkblas_context_get();
     if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
@@ -76,7 +76,7 @@ extern "C"
 void
 xkblas_deinit(void)
 {
-    ptr_deinit();
+    kaapi_deinit();
 
     xkblas_context_t * context = xkblas_context_get();
     if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
@@ -100,5 +100,5 @@ extern "C"
 void
 xkblas_sync(void)
 {
-    ptr_sync();
+    kaapi_sync();
 }

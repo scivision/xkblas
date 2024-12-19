@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 21:57:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -225,9 +225,9 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 0;
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));

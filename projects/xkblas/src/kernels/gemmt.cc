@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:17:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 19:56:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,18 +14,19 @@
 # include <cblas.h>
 # include <cassert>
 
+# include "auto-tile.h"
 # include "context.h"
-# include "kernels/auto-tile.h"
+
 # include "xkblas/kernel-type.h"
 
-# include <ptr/device/task-launcher.h>
-# include <ptr/device/thread-producer.hpp>
-# include <ptr/logger/logger.h>
-# include <ptr/logger/todo.h>
-# include <ptr/min-max.h>
-# include <ptr/sync/access.hpp>
-# include <ptr/sync/alignedas.h>
-# include <ptr/sync/cache-line-size.hpp>
+# include <kaapi/device/task-launcher.h>
+# include <kaapi/device/thread-producer.hpp>
+# include <kaapi/logger/logger.h>
+# include <kaapi/logger/todo.h>
+# include <kaapi/min-max.h>
+# include <kaapi/sync/access.hpp>
+# include <kaapi/sync/alignedas.h>
+# include <kaapi/sync/cache-line-size.hpp>
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
@@ -327,7 +328,7 @@ body_hip(void * vlauncher)
 # endif /* USE_HIP */
 
 # if USE_CUDA
-#  include <ptr/device/cublas-helper.h>
+#  include <kaapi/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -378,7 +379,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
-    ptr_cublas_status_check(res);
+    kaapi_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -403,15 +404,15 @@ register_£gemmt_format(void)
     # pragma message(TODO "Use templated function to generate code instead of dupplicating HIP/Cuda kernels")
 
     # if USE_CPU
-    format.f[PTR_DRIVER_TYPE_CPU]    = body_cpu;
+    format.f[KAAPI_DRIVER_TYPE_CPU]    = body_cpu;
     # endif /* USE_CPU */
 
     # if USE_CUDA
-    format.f[PTR_DRIVER_TYPE_CUDA]   = body_cuda;
+    format.f[KAAPI_DRIVER_TYPE_CUDA]   = body_cuda;
     # endif /* USE_CUDA */
 
     # if USE_HIP
-    format.f[PTR_DRIVER_TYPE_HIP]    = body_hip;
+    format.f[KAAPI_DRIVER_TYPE_HIP]    = body_hip;
     # endif /* USE_HIP */
 
     snprintf(format.label, sizeof(format.label), "£gemmt");

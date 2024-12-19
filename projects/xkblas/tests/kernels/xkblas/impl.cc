@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2024/12/19 19:25:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,8 +15,8 @@
 
 # include "common/impl.hpp"
 
-# include "xkblas.h"
-# include "xkblas-kernel.h"
+# include <xkblas/xkblas.h>
+# include <xkblas/kernels.h>
 
 /* Implementation name */
 const char *
