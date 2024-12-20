@@ -20,6 +20,6 @@
 void
 kaapi_task_ready(Task * task)
 {
-    kaapi_runtime_t * context = kaapi_runtime_get();
-    kaapi_runtime_submit_task(context, task);
+    kaapi_runtime_t * runtime = kaapi_runtime_get();
+    kaapi_runtime_submit_task(runtime, task);
 }

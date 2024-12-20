@@ -20,9 +20,10 @@ extern "C" {
 
     int kaapi_init(void);
     int kaapi_deinit(void);
-    void kaapi_memory_coherent_async(int uplo, int memflag, int m, int n, void * addr, int ld, unsigned int sizeof_type);
+    int kaapi_sync(void);
+
     void kaapi_memory_invalidate(void);
-    void kaapi_sync(void);
+    void kaapi_memory_coherent_async(int uplo, int memflag, int m, int n, void * addr, int ld, unsigned int sizeof_type);
     int kaapi_get_ngpus(int * count);
 };
 

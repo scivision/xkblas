@@ -19,14 +19,6 @@
 # include <kaapi/sync/alignedas.h>
 # include <kaapi/sync/spinlock.h>
 
-# if 0
-# if __has_include("kernels/generated/kernel-task-format-register.h")
-#  include "kernels/generated/kernel-task-format-register.h"
-# else
-#  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
-# endif
-# endif
-
 # include <atomic>
 # include <stdlib.h>
 # include <string.h>
@@ -91,7 +83,7 @@ kaapi_init(void)
 }
 
 extern "C"
-void
+int
 kaapi_deinit(void)
 {
     LOGGER_INFO("Deinitializing Xkblas");
@@ -113,6 +105,7 @@ kaapi_deinit(void)
         }
         SPINLOCK_UNLOCK(runtime->state.spinlock);
     }
+    return 0;
 }
 
 /* legacy compatibility (deprecated) */
@@ -128,7 +121,7 @@ kaapi_finalize(void)
 //////////////////////////////
 
 extern "C"
-void
+int
 kaapi_sync(void)
 {
     LOGGER_INFO("Synchronizing Xkblas");
@@ -164,7 +157,7 @@ retry:
     /* if there is still work on-going */
     if (wc_global)
     {
-        usleep(50);    // TODO : pthread cond instead ? or maybe workstealing
+        usleep(5);    // TODO : pthread cond instead ? or maybe workstealing
         goto retry;
     }
 
@@ -192,6 +185,7 @@ retry:
     // dependency kinterval btree
     thread->deptree.export_pdf("dependency");
 # endif
+    return 0;
 }
 
 ///////////////

@@ -325,9 +325,9 @@ kaapi_memory_coherent_async(
     std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> conflicts;
     const Access access(MATRIX_COLMAJOR, kaapi, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
-    DependencyTree * dekaapiee = thread->get_dependency_tree_for_ld(ld);
-    assert(dekaapiee);
-    dekaapiee->conflicting(&conflicts, &access);
+    DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
+    assert(deptree);
+    deptree->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`kaapi_memory_coherent_async` found %d conflicts", conflicts.size());
 
@@ -352,8 +352,8 @@ kaapi_memory_coherent_async(
             if (conflicting_accesses[access_id])
             {
                 Task * task = reinterpret_cast<Task *>(mem);
-                new(task) Task(TASK_FORMAT_COHERENT_ASYNC, TASK_MAX_ACCESSES, HOST_DEVICE_GLOBAL_ID);
-                dekaapiee->precedence(conflicting_task, task);
+                new(task) Task(TASK_FORMAT_COHERENT_ASYNC, UNSPECIFIED_TASK_ACCESS, HOST_DEVICE_GLOBAL_ID);
+                deptree->precedence(conflicting_task, task);
 
                 args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
                 new (args) args_t(access, conflicting_task->accesses[access_id]);

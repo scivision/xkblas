@@ -2,10 +2,10 @@
 cmake_minimum_required(VERSION 3.7)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
-SET(KAAPI_NAME kaapi)
+SET(KAAPI kaapi)
 
 # Project name
-project(${KAAPI_NAME})
+project(${KAAPI})
 
 ###############
 # DEPENDENCES #
@@ -25,9 +25,9 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/device/thread.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-register.cc
+    ${CMAKE_SOURCE_DIR}/src/device/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/device/memory-invalidate.cc
+    ${CMAKE_SOURCE_DIR}/src/device/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
 )
@@ -65,7 +65,7 @@ endif()
 # HWLOC
 option(USE_HWLOC "Whether to build the NVIDIA GPU driver." ON)
 if (USE_HWLOC)
-    find_package(HWLOC)
+    find_package(HWLOC REQUIRED)
     include_directories(${HWLOC_INCLUDE_DIRS})
     message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 endif()
@@ -74,9 +74,9 @@ endif()
 option(USE_CPU "Whether to build the CPU driver." OFF)
 if (USE_CPU)
     add_compile_definitions(USE_CPU=1)
-    add_library(${KAAPI_NAME}_driver_cpu SHARED src/device/driver_cpu.cc)
-    target_link_libraries(${KAAPI_NAME} PRIVATE ${KAAPI_NAME}_driver_cpu)
-    install(TARGETS ${KAAPI_NAME}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    add_library(${KAAPI}_driver_cpu SHARED src/device/driver_cpu.cc)
+    target_link_libraries(${KAAPI} PRIVATE ${KAAPI}_driver_cpu)
+    install(TARGETS ${KAAPI}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # CUDA
@@ -128,23 +128,23 @@ endif()
 ##########
 
 # KAAPI Lib
-add_library(${KAAPI_NAME} SHARED ${SOURCE_FILES})
+add_library(${KAAPI} SHARED ${SOURCE_FILES})
 
 if (${HWLOC_FOUND})
-    target_link_libraries(${KAAPI_NAME} PRIVATE ${HWLOC_LIBRARIES})
+    target_link_libraries(${KAAPI} PRIVATE ${HWLOC_LIBRARIES})
 endif()
 
 # IF USING CUDA
 if (${CUDA_RT_FOUND})
 
     # Cuda driver
-    add_library(${KAAPI_NAME}_driver_cuda SHARED src/device/driver_cuda.cc)
+    add_library(${KAAPI}_driver_cuda SHARED src/device/driver_cuda.cc)
     if (${HWLOC_FOUND})
-        target_link_libraries(${KAAPI_NAME}_driver_cuda PRIVATE ${HWLOC_LIBRARIES})
+        target_link_libraries(${KAAPI}_driver_cuda PRIVATE ${HWLOC_LIBRARIES})
     endif()
-    target_link_libraries(${KAAPI_NAME}_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    target_link_libraries(${KAAPI_NAME} PRIVATE ${KAAPI_NAME}_driver_cuda)
-
+    target_link_libraries(${KAAPI}_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${KAAPI} PRIVATE ${KAAPI}_driver_cuda)
+    install(TARGETS ${KAAPI}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # Include directory
@@ -152,18 +152,19 @@ include_directories(include/)
 include_directories(src/)
 
 # Installation
-install(TARGETS ${KAAPI_NAME} ${KAAPI_NAME}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS ${KAAPI} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
-    target_compile_options(${KAAPI_NAME} PRIVATE ${STRICT_OPTIONS})
+    target_compile_options(${KAAPI} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_RT_FOUND})
-        target_compile_options(${KAAPI_NAME}_driver_cuda PRIVATE ${STRICT_OPTIONS})
+        target_compile_options(${KAAPI}_driver_cuda PRIVATE ${STRICT_OPTIONS})
     endif()
 endif()
 
 ################
 # Sub projects #
 ################
-# add_subdirectory(tests/)
+add_subdirectory(tests/)
+enable_testing()
