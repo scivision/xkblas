@@ -13,7 +13,7 @@
 
 # include <kaapi/runtime.h>
 # include <kaapi/device/thread-producer.hpp>
-# include <kaapi/sync/alignedas.h>
+# include <kaapi/memory/alignedas.h>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;

@@ -14,7 +14,7 @@
 #ifndef __THREAD_HPP__
 # define __THREAD_HPP__
 
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 
 # include <stddef.h>
 # include <stdint.h>

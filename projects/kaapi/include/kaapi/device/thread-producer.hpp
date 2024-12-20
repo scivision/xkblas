@@ -21,7 +21,7 @@
 # include <kaapi/device/thread.hpp>
 # include <kaapi/logger/todo.h>
 # include <kaapi/runtime.h>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 
 /**
  *  This class represents an ptr user thread, that is producing tasks

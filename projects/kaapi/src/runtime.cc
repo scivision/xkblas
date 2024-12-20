@@ -16,7 +16,7 @@
 # include <kaapi/logger/logger.h>
 # include <kaapi/device/driver.h>
 # include <kaapi/device/thread-producer.hpp>
-# include <kaapi/sync/alignedas.h>
+# include <kaapi/memory/alignedas.h>
 # include <kaapi/sync/spinlock.h>
 
 # include <atomic>

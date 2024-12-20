@@ -15,7 +15,7 @@
 # define __DEPENDENCY_TREE_HPP__
 
 # include <kaapi/device/task.hpp>
-# include <kaapi/sync/khp-tree.hpp>
+# include <kaapi/memory/khp-tree.hpp>
 
 # include <array>
 # include <unordered_map>

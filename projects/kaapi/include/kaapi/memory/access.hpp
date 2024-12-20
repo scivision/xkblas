@@ -14,9 +14,9 @@
 #ifndef __ACCESS_HPP__
 # define __ACCESS_HPP__
 
-# include <kaapi/sync/access-mode.h>
-# include <kaapi/sync/cube.hpp>
-# include <kaapi/sync/matrix-tile.h>
+# include <kaapi/memory/access-mode.h>
+# include <kaapi/memory/cube.hpp>
+# include <kaapi/memory/matrix-tile.h>
 
 /**
  *  We assume col major, dim 0 is for rows; dim 1 is for cols.

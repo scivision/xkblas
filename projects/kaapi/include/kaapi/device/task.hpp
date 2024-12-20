@@ -24,8 +24,8 @@
 # include <kaapi/device/task-format.h>
 # include <kaapi/logger/logger.h>
 # include <kaapi/logger/todo.h>
-# include <kaapi/sync/access.hpp>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/access.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 # include <kaapi/sync/spinlock.h>
 
 # define TASK_MAX_ACCESSES          3

@@ -24,7 +24,7 @@
 # include <kaapi/logger/logger.h>
 # include <kaapi/logger/todo.h>
 # include <kaapi/min-max.h>
-# include <kaapi/sync/access.hpp>
+# include <kaapi/memory/access.hpp>
 # include <kaapi/sync/alignedas.h>
 # include <kaapi/sync/cache-line-size.hpp>
 

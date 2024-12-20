@@ -15,7 +15,7 @@
 # define __MEMORY_ACCESS_HPP__
 
 # include <kaapi/device/memory-view.hpp>
-# include <kaapi/sync/access.hpp>
+# include <kaapi/memory/access.hpp>
 
 /* a memory access */
 template<int K>

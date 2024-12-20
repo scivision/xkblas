@@ -14,7 +14,7 @@
 #ifndef __MEMORY_VIEW_HPP__
 # define __MEMORY_VIEW_HPP__
 
-# include <kaapi/sync/matrix-tile.h>
+# include <kaapi/memory/matrix-tile.h>
 
 # include <vector>
 

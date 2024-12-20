@@ -17,7 +17,7 @@
 # include <kaapi/callback.h>
 # include <kaapi/device/task.hpp>
 # include <kaapi/logger/todo.h>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 # include <kaapi/sync/mutex.h>
 
 # include <functional>

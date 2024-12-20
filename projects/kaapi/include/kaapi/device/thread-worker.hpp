@@ -17,7 +17,7 @@
 # include <kaapi/device/naive-queue.hpp>
 # include <kaapi/device/task.hpp>
 # include <kaapi/device/thread.hpp>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 
 /* maximum number of workers */
 # define KAAPI_WORKERS_MAX 8

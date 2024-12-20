@@ -57,14 +57,6 @@ using namespace std::placeholders;
 # include <ostream>
 # include <iostream>
 
-# ifndef MIN
-#  define MIN(X, Y) ((Y) < (X) ? (Y) : (X))
-# endif /* MIN */
-
-# ifndef MAX
-#  define MAX(X, Y) ((X) < (Y) ? (Y) : (X))
-# endif /* MAX */
-
 #ifdef DEBUG
 # undef DEBUG
 # define DEBUG(...)             \
@@ -90,6 +82,7 @@ twopow(int n)
     return (1 << n);
 }
 
+# include <kaapi/min-max.h>
 # include <kaapi/sync/color.h>
 # include <kaapi/sync/direction.h>
 

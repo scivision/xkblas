@@ -15,17 +15,17 @@
 # define __MEMORY_TREE_HPP__
 
 # include <kaapi/device/consts.h>
-# include <kaapi/device/device.h>
 # include <kaapi/device/device-memory.h>
+# include <kaapi/device/device.h>
 # include <kaapi/device/driver.h>
 # include <kaapi/device/stream-instruction-submit.h>
 # include <kaapi/device/task.hpp>
 # include <kaapi/logger/logger.h>
 # include <kaapi/logger/todo.h>
 # include <kaapi/sync/bits.h>
+# include <kaapi/memory/khp-tree.hpp>
 # include <kaapi/sync/lockable.hpp>
-# include <kaapi/sync/matrix-tile.h>
-# include <kaapi/sync/khp-tree.hpp>
+# include <kaapi/memory/matrix-tile.h>
 
 # include <algorithm>  // std::sort
 # include <cstdint>

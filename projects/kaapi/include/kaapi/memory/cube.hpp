@@ -15,8 +15,8 @@
 # define __INTERVALS_HPP__
 
 # include <kaapi/min-max.h>
-# include <kaapi/sync/matrix-tile.h>
-# include <kaapi/sync/interval.hpp>
+# include <kaapi/memory/matrix-tile.h>
+# include <kaapi/memory/interval.hpp>
 
 # include <cassert>
 # include <cstdlib>

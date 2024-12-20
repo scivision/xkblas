@@ -21,7 +21,7 @@
 # include <kaapi/device/task.hpp>
 # include <kaapi/device/thread-worker.hpp>
 # include <kaapi/logger/todo.h>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <kaapi/memory/cache-line-size.hpp>
 # include <kaapi/sync/mutex.h>
 
 typedef enum    kaapi_device_state_t : uint8_t
