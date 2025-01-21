@@ -116,6 +116,17 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
 }
 */
 
+void xkblas_memset(void* ptr, int val, size_t count)
+{
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_memset( ptr, val, count );
+}
+
 #if defined(KAAPI_UNIFIED)
 //kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
 void (*_last_free_to_use)(void*) = NULL;

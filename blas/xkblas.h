@@ -438,6 +438,7 @@ extern uint64_t xkblas_elapsedns(void);
 */
 extern double xkblas_elapsedtime(void);
 
+extern void xkblas_memset(void*,int,size_t);
 
 #include "zxkblas.h"
 #include "cxkblas.h"

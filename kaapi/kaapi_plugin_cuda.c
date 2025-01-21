@@ -2469,6 +2469,21 @@ KAAPI_PLUGIN_ENTRYPOINT(get_gpublas_handle)(kaapi_device_t* dev)
 #endif
 }
 
+__thread cudaStream_t  local_thread_stream = NULL;
+void init_local_thread_stream()
+{
+	cudaStreamCreateWithFlags( &local_thread_stream, cudaStreamNonBlocking );
+}
+
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(memset)( void* ptr, int val, size_t count )
+{
+	if(local_thread_stream == NULL)
+		init_local_thread_stream();
+
+	cudaMemsetAsync( ptr, val, count, local_thread_stream );
+	cudaStreamSynchronize( local_thread_stream );
+}
 
 #if KAAPI_USE_DYNLOADER==0
   /* */
@@ -2504,5 +2519,6 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (malloc_unified);
   EP (free_unified);
 #endif //defined(KAAPI_UNIFIED)
+  EP (memset);
 }
 #endif

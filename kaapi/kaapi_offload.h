@@ -275,7 +275,9 @@ typedef struct kaapi_driver {
 		void (*f_malloc_unified)(void**,size_t);
 		void (*f_free_unified)(void*);
 #endif //defined(KAAPI_UNIFIED)
- 
+
+    void (*f_memset)(void*,int,size_t);
+
     /* linked list of all drivers */
     struct kaapi_driver* next;
 
