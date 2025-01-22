@@ -2630,3 +2630,100 @@ const char* get_xkblas_info(void)
   return buffer; 
 }
 
+/*
+ * Unified work buffer implementation (should be moved in kaapi)
+ */
+pthread_mutex_t work_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  work_buffer_cond  = PTHREAD_COND_INITIALIZER;
+struct memory_segment {
+	size_t    size;
+	int       state;
+	uintptr_t ptr;
+	struct memory_segment* prev;
+	struct memory_segment* next;
+	struct memory_segment* freelink;
+}
+#define MAIN_STATE 0x2
+#define FREE_STATE 0x1
+
+struct memory_segment* free_segment_list = NULL;
+struct memory_segment* used_segment_list_start = NULL;
+struct memory_segment* used_segment_list_stop  = NULL;
+
+void* xkblas_get_work_pos(size_t size)
+{
+	size = (size + 7UL) & ~7UL; // Why do we align ?
+	if( size < sizeof(struct memory_segment) )
+	{
+		size = sizeof(struct memory_segment);
+	}
+
+	pthread_mutex_lock( work_buffer_mutex );
+	if( no_chunk_available )
+	{
+		// Allocate ?? We do not want to do this
+	}
+
+	while(1)
+	{
+		struct memory_segment* curr = free_segment_list;
+		struct memory_segment* prevfree = 0;
+		while (curr)
+		{ // HEAP_FIRST_FIT
+			size_t curr_size = curr->size;
+			if( curr_size >= size )
+			{
+				if( curr_size - size > sizeof(struct memory_segment) )
+				{
+					struct memory_segment* remainder = malloc(sizeof(kaapi_alloc_chunk_t));
+					remainder->device_ptr = size + curr->device_ptr;
+					remainder->size       = (curr_size - size);
+					remainder->state      = FREE_STATE;
+					remainder->ptr        = size + curr->ptr;
+					remainder->prev       = curr;
+					remainder->next       = curr->next;
+					if(curr->next) curr->next->prev = remainder;
+					curr->next            = remainder;
+					curr->size            = size;
+
+					remainder->freelink = curr->freelink;
+					curr->freelink = remainder;
+				}
+				break;
+			}
+			prevfree = curr;
+			curr = curr->freelink;
+		}
+		if(curr != 0)
+		{
+			if (prevfree) prevfree->freelink = curr->freelink;
+			else free_segment_list = curr->freelink;
+			curr->state &= ~FREE_STATE;
+			curr->freelink = NULL;
+			pthread_mutex_unlock( &work_buffer_mutex );
+			return (void*) curr->ptr;
+		}
+		// Nothing found, so we wait for the next free
+		pthread_cond_wait( &work_buffer_cond, &work_buffer_mutex );
+	}
+	//pthread_mutex_unlock( work_buffer_mutex );
+	//return NULL; // I want to wait for an available space instead of returning 
+}
+
+void xkblas_free_work_pos( void* ptr )
+{
+	pthread_mutex_lock( &work_buffer_mutex );
+	
+	pthread_mutex_unlock( &work_buffer_mutex );
+}
+
+/*
+void xkblas_register_work_buffer( void* ptr, size_t size )
+void xkblas_unregister_work_buffer( void* ptr )
+*/
+
+
+
+
+
+
