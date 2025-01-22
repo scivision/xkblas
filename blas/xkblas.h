@@ -442,7 +442,7 @@ extern void xkblas_memset(void*,int,size_t);
 
 extern void  xkblas_register_work_buffer( void*, size_t );
 extern void  xkblas_unregister_work_buffer( void* );
-extern void* xkblas_get_work_pos();
+extern void* xkblas_get_work_pos(size_t);
 extern void  xkblas_free_work_pos( void* );
 
 

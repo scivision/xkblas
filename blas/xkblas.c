@@ -2647,8 +2647,9 @@ struct memory_segment {
 #define FREE_STATE 0x1
 
 struct memory_segment* free_segment_list = NULL;
-struct memory_segment* used_segment_list_start = NULL;
-struct memory_segment* used_segment_list_stop  = NULL;
+// I think the first_segment will never be removed => this is ok
+struct memory_segment* first_segment = NULL;
+size_t total_size = 0;
 
 void* xkblas_get_work_pos(size_t size)
 {
@@ -2656,6 +2657,11 @@ void* xkblas_get_work_pos(size_t size)
 	if( size < sizeof(struct memory_segment) )
 	{
 		size = sizeof(struct memory_segment);
+	}
+
+	if(total_size < size)
+	{ // Needed size is greater than available one
+		exit(1);
 	}
 
 	pthread_mutex_lock( work_buffer_mutex );
@@ -2713,15 +2719,132 @@ void* xkblas_get_work_pos(size_t size)
 void xkblas_free_work_pos( void* ptr )
 {
 	pthread_mutex_lock( &work_buffer_mutex );
-	
+	// Step 1: find the associated segment
+	struct memory_segment* curr = first_segment;
+	while(curr)
+	{
+		if(curr->ptr == (uintptr_t) ptr)
+		{
+			break;
+		}
+		if((uintptr_t) curr->ptr > ptr)
+		{
+			curr = NULL;
+			break;
+		}
+	}
+	if(curr == NULL || curr->freelist != NULL)
+	{ // curr does not exist or is already free
+		exit(1); // TODO clean this
+	}
+
+	// Step 2: free it
+	int todel = 0;
+	struct memory_segment* next_seg = curr->next;
+	if(next_seg && (next_seg->state & FREE_STATE))
+	{ // Merge both
+		next_seg->prev = curr->prev;
+		if(curr->prev)
+			curr->prev->next = next_seg;
+		next_seg->size += curr->size;
+		next_seg->ptr = curr->ptr;
+		todel = 1;
+	}
+
+	struct memory_segment* prev_seg = curr->prev;
+	if(prev_seg)
+	{
+		if(prev_seg->state & FREE_STATE)
+		{
+			if(todel)
+			{
+				prev_seg->size += next_seg->size;
+				prev_seg->next  = next_seg->next;
+				if(next_seg->next) next_seg->next->prev = prev_seg;
+				prev_seg->freelink = next_seg->freelink;
+				free(next_seg); // WTF ???
+			}
+			else
+			{
+				prev_seg->next = curr->next;
+				if(curr->next) curr->next->prev = prev_seg;
+				prev_seg->size += curr->size;
+				todel = 1;
+			}
+		}
+		else if(!todel)
+		{
+			while((prev_seq != 0) && !(prev_seq-state & FREE_STATE))
+			{
+				prev_seq = prev_seq->prev;
+			}
+			if(prev_seq == 0)
+			{
+				curr->freelink = free_chunk_list;
+				free_chunk_list = curr;
+			}
+			else
+			{
+				curr->freelink = prev_seg->freelink;
+				prev_seg->freelink = curr;
+			}
+		}
+	}
+	else if(!todel)
+	{
+		curr->freelink = free_chunk_list;
+		free_chunk_list = curr;
+	}
+
+	pthread_cond_broadcast( &work_buffer_cond );
+	pthread_mutex_unlock( &work_buffer_mutex );
+	if(todel)
+		free(chunk);
+}
+
+void xkblas_register_work_buffer( void* ptr, size_t size )
+{
+	pthread_mutex_lock( &work_buffer_mutex );
+	if( first_segment != NULL )
+	{ // Something is already registered
+		exit(1);	
+	}
+
+	total_size = size;
+	struct memory_segment* seg = (struct memory_segment*) malloc( sizeof(struct memory_segment) );
+	seg->size  = size;
+	seg->state = FREE_STATE;
+	seg->ptr   = ptr;
+	seg->prev  = NULL;
+	seg->next  = NULL;
+	seg->freelink = NULL;
+
+	free_segment_list = seg;
+	first_segment = seg;
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
 
-/*
-void xkblas_register_work_buffer( void* ptr, size_t size )
 void xkblas_unregister_work_buffer( void* ptr )
-*/
+{
+	pthread_mutex_lock( &work_buffer_mutex );
+	if( ptr != first_segment->ptr )
+	{ // Well ...
+		exit(1);
+	}
 
+	struct memory_segment* curr = first_segment;
+	while(curr)
+	{
+		struct memory_segment* next = curr->next;
+		free(curr);
+		curr = next;
+	}
+	free_segment_list = NULL;
+	first_segment = NULL;
+	total_size = 0;
+
+	pthread_mutex_unlock( &work_buffer_mutex );
+}
 
 
 
