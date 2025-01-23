@@ -2160,6 +2160,7 @@ KAAPI_PLUGIN_ENTRYPOINT(device_create)(kaapi_driver_t* driver, int dev)
 }
 
 
+
 /*
 */
 KAAPI_CLASS_ENTRYPOINT int 
@@ -2485,6 +2486,25 @@ KAAPI_PLUGIN_ENTRYPOINT(memset)( void* ptr, int val, size_t count )
 	cudaStreamSynchronize( local_thread_stream );
 }
 
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(advise_gpu)(void* ptr,size_t size)
+{
+	struct cudaMemLocation loc;
+	loc.type = cudaMemLocationTypeDevice;
+	loc.id = 0;
+	cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc );
+	// TODO check error
+}
+
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(advise_cpu)(void* ptr,size_t size)
+{
+	struct cudaMemLocation loc;
+	loc.type = cudaMemLocationTypeHost;
+	loc.id = 0;
+	cudaMemAdvise_v2(ptr, size, cudaMemAdviseUnsetPreferredLocation, loc);
+}
+
 #if KAAPI_USE_DYNLOADER==0
   /* */
 #define EP(func)                                                     \
@@ -2520,5 +2540,7 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (free_unified);
 #endif //defined(KAAPI_UNIFIED)
   EP (memset);
+  EP (advise_gpu);
+  EP (advise_cpu);
 }
 #endif

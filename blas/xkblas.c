@@ -2642,7 +2642,7 @@ struct memory_segment {
 	struct memory_segment* prev;
 	struct memory_segment* next;
 	struct memory_segment* freelink;
-}
+};
 #define MAIN_STATE 0x2
 #define FREE_STATE 0x1
 
@@ -2664,11 +2664,11 @@ void* xkblas_get_work_pos(size_t size)
 		exit(1);
 	}
 
-	pthread_mutex_lock( work_buffer_mutex );
-	if( no_chunk_available )
-	{
+	pthread_mutex_lock( &work_buffer_mutex );
+	//if( no_chunk_available )
+	//{
 		// Allocate ?? We do not want to do this
-	}
+	//}
 
 	while(1)
 	{
@@ -2681,8 +2681,8 @@ void* xkblas_get_work_pos(size_t size)
 			{
 				if( curr_size - size > sizeof(struct memory_segment) )
 				{
-					struct memory_segment* remainder = malloc(sizeof(kaapi_alloc_chunk_t));
-					remainder->device_ptr = size + curr->device_ptr;
+					struct memory_segment* remainder = malloc(sizeof(struct memory_segment));
+					remainder->ptr        = size + curr->ptr;
 					remainder->size       = (curr_size - size);
 					remainder->state      = FREE_STATE;
 					remainder->ptr        = size + curr->ptr;
@@ -2733,7 +2733,7 @@ void xkblas_free_work_pos( void* ptr )
 			break;
 		}
 	}
-	if(curr == NULL || curr->freelist != NULL)
+	if(curr == NULL || curr->freelink != NULL)
 	{ // curr does not exist or is already free
 		exit(1); // TODO clean this
 	}
@@ -2774,14 +2774,14 @@ void xkblas_free_work_pos( void* ptr )
 		}
 		else if(!todel)
 		{
-			while((prev_seq != 0) && !(prev_seq-state & FREE_STATE))
+			while((prev_seg != 0) && !(prev_seg->state & FREE_STATE))
 			{
-				prev_seq = prev_seq->prev;
+				prev_seg = prev_seg->prev;
 			}
-			if(prev_seq == 0)
+			if(prev_seg == 0)
 			{
-				curr->freelink = free_chunk_list;
-				free_chunk_list = curr;
+				curr->freelink = free_segment_list;
+				free_segment_list = curr;
 			}
 			else
 			{
@@ -2792,14 +2792,14 @@ void xkblas_free_work_pos( void* ptr )
 	}
 	else if(!todel)
 	{
-		curr->freelink = free_chunk_list;
-		free_chunk_list = curr;
+		curr->freelink = free_segment_list;
+		free_segment_list = curr;
 	}
 
 	pthread_cond_broadcast( &work_buffer_cond );
 	pthread_mutex_unlock( &work_buffer_mutex );
 	if(todel)
-		free(chunk);
+		free(curr);
 }
 
 void xkblas_register_work_buffer( void* ptr, size_t size )
@@ -2822,6 +2822,17 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 	free_segment_list = seg;
 	first_segment = seg;
 	pthread_mutex_unlock( &work_buffer_mutex );
+
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_advise_gpu( ptr, size);
+	driver->f_memset( ptr, 0, size );
+	driver->f_memset( ptr, 0, size );
+    	//void (*f_advise_cpu)(void*,size_t);
 }
 
 void xkblas_unregister_work_buffer( void* ptr )
