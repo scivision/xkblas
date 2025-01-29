@@ -2641,7 +2641,8 @@ struct memory_segment {
 	uintptr_t ptr;
 	struct memory_segment* prev;
 	struct memory_segment* next;
-	struct memory_segment* freelink;
+	struct memory_segment* free_next;
+	struct memory_segment* free_prev;
 };
 #define MAIN_STATE 0x2
 #define FREE_STATE 0x1
@@ -2653,67 +2654,61 @@ size_t total_size = 0;
 
 void* xkblas_get_work_pos(size_t size)
 {
-	size = (size + 7UL) & ~7UL; // Why do we align ?
-	if( size < sizeof(struct memory_segment) )
-	{
-		size = sizeof(struct memory_segment);
-	}
-
+	if( size == 0 )
+		return NULL;
+	size = (size + 7UL) & ~7UL; // Align
+				    
 	if(total_size < size)
 	{ // Needed size is greater than available one
+		printf("[XKBLAS] needed size %ld is greater than available one %ld\n", size, total_size);
 		exit(1);
 	}
 
-	pthread_mutex_lock( &work_buffer_mutex );
-	//if( no_chunk_available )
-	//{
-		// Allocate ?? We do not want to do this
-	//}
-
+	pthread_mutex_lock( &work_buffer_mutex );	
 	while(1)
-	{
+	{ // We wait until data are available
 		struct memory_segment* curr = free_segment_list;
-		struct memory_segment* prevfree = 0;
-		while (curr)
-		{ // HEAP_FIRST_FIT
+	  	while(curr)
+		{
 			size_t curr_size = curr->size;
 			if( curr_size >= size )
-			{
-				if( curr_size - size > sizeof(struct memory_segment) )
+			{ // We have enought space to work here
+				if( curr_size - size > 0 )
 				{
+					// create remainder
 					struct memory_segment* remainder = malloc(sizeof(struct memory_segment));
-					remainder->ptr        = size + curr->ptr;
-					remainder->size       = (curr_size - size);
-					remainder->state      = FREE_STATE;
-					remainder->ptr        = size + curr->ptr;
-					remainder->prev       = curr;
-					remainder->next       = curr->next;
+					remainder->ptr  = curr->ptr + size;
+					remainder->size = curr_size - size;
+				        remainder->state = FREE_STATE;
+					remainder->prev = curr;
+					remainder->next = curr->next;
 					if(curr->next) curr->next->prev = remainder;
-					curr->next            = remainder;
-					curr->size            = size;
+					remainder->free_next = curr->free_next;
+					remainder->free_prev = curr;
+					if(remainder->free_next) remainder->free_next->free_prev = remainder;
 
-					remainder->freelink = curr->freelink;
-					curr->freelink = remainder;
+					// update curr
+					curr->next = remainder;
+					curr->size = size;
+					curr->free_next = remainder;
 				}
 				break;
 			}
-			prevfree = curr;
-			curr = curr->freelink;
+			curr = curr->free_next;	
 		}
-		if(curr != 0)
-		{
-			if (prevfree) prevfree->freelink = curr->freelink;
-			else free_segment_list = curr->freelink;
+		if(curr)
+		{ // We got a valid free segment, we need to update his status
 			curr->state &= ~FREE_STATE;
-			curr->freelink = NULL;
+			if(curr->free_next) curr->free_next->free_prev = curr->free_prev;
+			if(curr->free_prev) curr->free_prev->free_next = curr->free_next;
+			else free_segment_list = curr->free_next; // In this case, curr is the first free segment
+			curr->free_next = NULL;
+			curr->free_prev = NULL;
 			pthread_mutex_unlock( &work_buffer_mutex );
-			return (void*) curr->ptr;
+			return (void*) curr->ptr;	
 		}
-		// Nothing found, so we wait for the next free
 		pthread_cond_wait( &work_buffer_cond, &work_buffer_mutex );
 	}
-	//pthread_mutex_unlock( work_buffer_mutex );
-	//return NULL; // I want to wait for an available space instead of returning 
 }
 
 void xkblas_free_work_pos( void* ptr )
@@ -2721,8 +2716,10 @@ void xkblas_free_work_pos( void* ptr )
 	pthread_mutex_lock( &work_buffer_mutex );
 	// Step 1: find the associated segment
 	struct memory_segment* curr = first_segment;
+	printf("Want to free %p\n", ptr);
 	while(curr)
 	{
+		printf("Check %p %p %d\n", curr, curr->ptr, curr->state);
 		if(curr->ptr == (uintptr_t) ptr)
 		{
 			break;
@@ -2733,73 +2730,46 @@ void xkblas_free_work_pos( void* ptr )
 			break;
 		}
 	}
-	if(curr == NULL || curr->freelink != NULL)
+	if(curr == NULL || (curr->state & FREE_STATE))
 	{ // curr does not exist or is already free
+	        printf("Curr err %p\n", curr);
 		exit(1); // TODO clean this
 	}
 
 	// Step 2: free it
-	int todel = 0;
+	curr->state = FREE_STATE;
+	
 	struct memory_segment* next_seg = curr->next;
-	if(next_seg && (next_seg->state & FREE_STATE))
-	{ // Merge both
-		next_seg->prev = curr->prev;
-		if(curr->prev)
-			curr->prev->next = next_seg;
-		next_seg->size += curr->size;
-		next_seg->ptr = curr->ptr;
-		todel = 1;
+	if( next_seg && (next_seg->state & FREE_STATE) )
+	{ // We should merge -> prev is always conserved
+		curr->size += next_seg->size;
+		curr->next = next_seg->next;
+		if(curr->next) curr->next->prev = curr;
+
+		curr->free_next = next_seg->free_next;
+		if(curr->free_next) curr->free_next->free_prev = curr;
+		curr->free_prev = next_seg->free_prev;
+		if(curr->free_prev) curr->free_prev->free_next = curr;
+		else free_segment_list = curr;
+
+		free(next_seg);	
 	}
 
 	struct memory_segment* prev_seg = curr->prev;
-	if(prev_seg)
-	{
-		if(prev_seg->state & FREE_STATE)
-		{
-			if(todel)
-			{
-				prev_seg->size += next_seg->size;
-				prev_seg->next  = next_seg->next;
-				if(next_seg->next) next_seg->next->prev = prev_seg;
-				prev_seg->freelink = next_seg->freelink;
-				free(next_seg); // WTF ???
-			}
-			else
-			{
-				prev_seg->next = curr->next;
-				if(curr->next) curr->next->prev = prev_seg;
-				prev_seg->size += curr->size;
-				todel = 1;
-			}
-		}
-		else if(!todel)
-		{
-			while((prev_seg != 0) && !(prev_seg->state & FREE_STATE))
-			{
-				prev_seg = prev_seg->prev;
-			}
-			if(prev_seg == 0)
-			{
-				curr->freelink = free_segment_list;
-				free_segment_list = curr;
-			}
-			else
-			{
-				curr->freelink = prev_seg->freelink;
-				prev_seg->freelink = curr;
-			}
-		}
-	}
-	else if(!todel)
-	{
-		curr->freelink = free_segment_list;
-		free_segment_list = curr;
-	}
+	if( prev_seg && (prev_seg->state & FREE_STATE) )
+	{ // We should merge -> prev is always conserved
+		prev_seg->size += curr->size;
+		prev_seg->next = curr->next;
+		if(prev_seg->next) prev_seg->next->prev = prev_seg;
 
+		prev_seg->free_next = curr->free_next;
+		if(prev_seg->free_next) prev_seg->free_next->free_prev = prev_seg;
+
+		free(curr);
+	}
+	
 	pthread_cond_broadcast( &work_buffer_cond );
 	pthread_mutex_unlock( &work_buffer_mutex );
-	if(todel)
-		free(curr);
 }
 
 void xkblas_register_work_buffer( void* ptr, size_t size )
@@ -2814,10 +2784,11 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 	struct memory_segment* seg = (struct memory_segment*) malloc( sizeof(struct memory_segment) );
 	seg->size  = size;
 	seg->state = FREE_STATE;
-	seg->ptr   = ptr;
+	seg->ptr   = (uintptr_t) ptr;
 	seg->prev  = NULL;
 	seg->next  = NULL;
-	seg->freelink = NULL;
+	seg->free_next = NULL;
+	seg->free_prev = NULL;
 
 	free_segment_list = seg;
 	first_segment = seg;
@@ -2829,17 +2800,22 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 #if KAAPI_USE_HIP
 	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
+	printf("set gpu work %ld\n", size);
 	driver->f_advise_gpu( ptr, size);
+	printf("advise ok\n");
 	driver->f_memset( ptr, 0, size );
+	printf("memset 1 ok\n");
 	driver->f_memset( ptr, 0, size );
+	printf("memset 2 ok\n");
     	//void (*f_advise_cpu)(void*,size_t);
 }
 
 void xkblas_unregister_work_buffer( void* ptr )
 {
 	pthread_mutex_lock( &work_buffer_mutex );
-	if( ptr != first_segment->ptr )
+	if( ((uintptr_t) ptr) != first_segment->ptr )
 	{ // Well ...
+	        printf("Try to unregister another ptr than registered one\n");
 		exit(1);
 	}
 
