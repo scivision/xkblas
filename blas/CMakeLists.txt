@@ -217,6 +217,7 @@ else()
             ${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
             ${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
           )
+	        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch=native")
           set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
           cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
         endif()
