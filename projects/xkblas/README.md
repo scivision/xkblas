@@ -1,4 +1,4 @@
 # Example build
 ```
-cmake ../ -DUSE_MKL=on -DKAAPI=$KAAPI_HOME -DCMAKE_BUILD_TYPE=Debug
+cmake ../ -DUSE_MKL=on -DXKRT=$XKRT_HOME -DCMAKE_BUILD_TYPE=Debug
 ```

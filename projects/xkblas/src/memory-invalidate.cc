@@ -11,11 +11,11 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <kaapi/kaapi.h>
+# include <xkrt/xkrt.h>
 
 extern "C"
 void
 xkblas_memory_invalidate_caches(void)
 {
-    return kaapi_memory_invalidate();
+    return xkrt_memory_invalidate();
 }

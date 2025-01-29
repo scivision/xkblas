@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <kaapi/logger/todo.h>
+# include <xkrt/logger/todo.h>
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 
 # if USE_CUDA

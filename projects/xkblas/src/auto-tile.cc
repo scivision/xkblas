@@ -13,8 +13,8 @@
 
 # include "xkblas/kernel-type.h"
 
-# include <kaapi/runtime.h>
-# include <kaapi/logger/logger.h>
+# include <xkrt/runtime.h>
+# include <xkrt/logger/logger.h>
 
 # include <assert.h>
 # include <math.h>
@@ -25,11 +25,11 @@ xkblas_kernel_auto_tile(
     int * args,
     size_t * ts
 ) {
-    kaapi_runtime_t * runtime = kaapi_runtime_get();
+    xkrt_runtime_t * runtime = xkrt_runtime_get();
     assert(runtime);
 
     const int ngpus        = runtime->drivers.devices.n;
-    const int nstream_kern = runtime->conf.device.offloader.streams[KAAPI_STREAM_TYPE_KERN].n;
+    const int nstream_kern = runtime->conf.device.offloader.streams[XKRT_STREAM_TYPE_KERN].n;
 
     size_t ts_auto = 0;
     switch (kernel)

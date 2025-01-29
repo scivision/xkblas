@@ -13,13 +13,13 @@
 
 # include "conf.h"
 
-# include <kaapi/logger/logger.h>
+# include <xkrt/logger/logger.h>
 
 # include <assert.h>
 # include <stdlib.h>
 # include <string.h>
 
-# pragma message(TODO "Add a conf interface in kaapi and push xkblas conf into it")
+# pragma message(TODO "Add a conf interface in xkrt and push xkblas conf into it")
 
 void
 xkblas_init_conf(xkblas_conf_t * conf)

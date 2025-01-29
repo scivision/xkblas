@@ -19,8 +19,8 @@
 #  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
 # endif
 
-# include <kaapi/kaapi.h>
-# include <kaapi/sync/spinlock.h>
+# include <xkrt/xkrt.h>
+# include <xkrt/sync/spinlock.h>
 
 # include <atomic>
 # include <stdlib.h>
@@ -54,7 +54,7 @@ extern "C"
 int
 xkblas_init(void)
 {
-    kaapi_init();
+    xkrt_init();
 
     xkblas_context_t * context = xkblas_context_get();
     if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
@@ -76,7 +76,7 @@ extern "C"
 void
 xkblas_deinit(void)
 {
-    kaapi_deinit();
+    xkrt_deinit();
 
     xkblas_context_t * context = xkblas_context_get();
     if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
@@ -100,5 +100,5 @@ extern "C"
 void
 xkblas_sync(void)
 {
-    kaapi_sync();
+    xkrt_sync();
 }

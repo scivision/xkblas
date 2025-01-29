@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <kaapi/kaapi.h>
+# include <xkrt/xkrt.h>
 
 extern "C"
 void
@@ -21,5 +21,5 @@ xkblas_memory_coherent_async(
     void * ptr, int ld,
     unsigned int sizeof_type
 ) {
-    return kaapi_memory_coherent_async(uplo, memflag, m, n, ptr, ld, sizeof_type);
+    return xkrt_memory_coherent_async(uplo, memflag, m, n, ptr, ld, sizeof_type);
 }

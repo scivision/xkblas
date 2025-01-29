@@ -1,0 +1,6 @@
+#ifndef __XKRT_VERSION_H__
+# define __XKRT_VERSION_H__
+
+# define XKRT_VERSION_GITHASH "£GIT_HASH"
+
+#endif /* __XKRT_VERSION_H__ */

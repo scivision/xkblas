@@ -15,8 +15,8 @@
 # include "xkblas/xkblas.h"
 # include "xkblas/kernel-type.h"
 
-# include <kaapi/kaapi.h>
-# include <kaapi/logger/logger.h>
+# include <xkrt/xkrt.h>
+# include <xkrt/logger/logger.h>
 
 # include <assert.h>
 
@@ -31,7 +31,7 @@ extern "C"
 int
 xkblas_get_ngpus(int * count)
 {
-    return kaapi_get_ngpus(count);
+    return xkrt_get_ngpus(count);
 }
 
 extern "C"

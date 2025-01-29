@@ -16,7 +16,7 @@
 
 # include "conf.h"
 
-# include <kaapi/sync/spinlock.h>
+# include <xkrt/sync/spinlock.h>
 
 # include <atomic>
 # include <stdint.h>

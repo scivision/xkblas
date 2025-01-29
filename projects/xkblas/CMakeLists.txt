@@ -101,15 +101,15 @@ option(STRICT "Enable strict compilation mode" OFF)
 ###############
 
 # ptr lib deps
-option(KAAPI "The path to the sync library" OFF)
-if (KAAPI)
-    message(STATUS "Using KAAPI at '${KAAPI}'")
-    include_directories(${KAAPI}/include)
+option(XKRT "The path to the sync library" OFF)
+if (XKRT)
+    message(STATUS "Using XKRT at '${XKRT}'")
+    include_directories(${XKRT}/include)
 else()
-    message(FATAL_ERROR "Please set '-DKAAPI=path/to/ptr'")
+    message(FATAL_ERROR "Please set '-DXKRT=path/to/ptr'")
 endif()
-message(STATUS "Found KAAPI: ${KAAPI}")
-include_directories("${KAAPI}/include")
+message(STATUS "Found XKRT: ${XKRT}")
+include_directories("${XKRT}/include")
 
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
@@ -155,7 +155,7 @@ endif()
 
 # XKBLAS Lib
 add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
-target_link_libraries(${XKBLAS_NAME} PRIVATE ${KAAPI}/lib/libkaapi.so)
+target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKRT}/lib/libxkrt.so)
 
 if (${HWLOC_FOUND})
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${HWLOC_LIBRARIES})

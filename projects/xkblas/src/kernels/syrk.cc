@@ -17,14 +17,14 @@
 # include "context.h"
 # include "xkblas/kernel-type.h"
 
-# include <kaapi/device/task-launcher.h>
-# include <kaapi/device/thread-producer.hpp>
-# include <kaapi/logger/logger.h>
-# include <kaapi/logger/todo.h>
-# include <kaapi/min-max.h>
-# include <kaapi/memory/access.hpp>
-# include <kaapi/sync/alignedas.h>
-# include <kaapi/sync/cache-line-size.hpp>
+# include <xkrt/device/task-launcher.h>
+# include <xkrt/device/thread-producer.hpp>
+# include <xkrt/logger/logger.h>
+# include <xkrt/logger/todo.h>
+# include <xkrt/min-max.h>
+# include <xkrt/memory/access.hpp>
+# include <xkrt/sync/alignedas.h>
+# include <xkrt/sync/cache-line-size.hpp>
 
 # include <cassert>
 
@@ -339,7 +339,7 @@ xkblas_£syrk_async(
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if USE_CUDA
-#  include <kaapi/device/cublas-helper.h>
+#  include <xkrt/device/cublas-helper.h>
 
 static void
 body_cuda(void * vlauncher)
@@ -383,7 +383,7 @@ body_cuda(void * vlauncher)
         (const CU_TYPE *) &args->beta,
         (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
     );
-    kaapi_cublas_status_check(res);
+    xkrt_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* USE_CUDA */
@@ -407,10 +407,10 @@ register_£syrk_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
 # ifdef USE_CPU
-    format.f[KAAPI_DRIVER_TYPE_CPU] = body_cpu;
+    format.f[XKRT_DRIVER_TYPE_CPU] = body_cpu;
 # endif /* USE_CPU */
 # ifdef USE_CUDA
-    format.f[KAAPI_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
 # endif /* USE_CUDA */
     snprintf(format.label, sizeof(format.label), "£syrk");
     format.target = TASK_FORMAT_TARGET_DRIVER;
