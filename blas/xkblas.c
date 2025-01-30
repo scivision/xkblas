@@ -2716,10 +2716,8 @@ void xkblas_free_work_pos( void* ptr )
 	pthread_mutex_lock( &work_buffer_mutex );
 	// Step 1: find the associated segment
 	struct memory_segment* curr = first_segment;
-	printf("Want to free %p\n", ptr);
 	while(curr)
 	{
-		printf("Check %p %p %d\n", curr, curr->ptr, curr->state);
 		if(curr->ptr == (uintptr_t) ptr)
 		{
 			break;
