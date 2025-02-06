@@ -13,7 +13,7 @@ main(void)
     task_format_id_t EMPTY;
     {
         task_format_t format;
-        memset(&format, 0, sizeof(task_format_id_t));
+        memset(&format, 0, sizeof(task_format_t));
         EMPTY = task_format_create(&format);
     }
     assert(EMPTY);

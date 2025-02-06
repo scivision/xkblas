@@ -63,12 +63,9 @@ endif()
 ###############
 
 # HWLOC
-option(USE_HWLOC "Whether to build the NVIDIA GPU driver." ON)
-if (USE_HWLOC)
-    find_package(HWLOC REQUIRED)
-    include_directories(${HWLOC_INCLUDE_DIRS})
-    message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
-endif()
+find_package(HWLOC REQUIRED)
+include_directories(${HWLOC_INCLUDE_DIRS})
+message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 
 # HOST DRIVER
 option(USE_CPU "Whether to build the CPU driver." OFF)
@@ -80,26 +77,22 @@ if (USE_CPU)
 endif()
 
 # CUDA
-option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
+option(USE_CUDA "Whether to build the CUDA driver." ON)
 if (USE_CUDA)
     add_compile_definitions(USE_CUDA=1)
-    find_package(CUDA REQUIRED)
-    find_package(CUDA_RT)
-    if (NOT ${CUDA_RT_FOUND})
-        message(FATAL_ERROR "Xkblas could not find CUDA_RT.")
-    endif()
-    include_directories("${CUDA_INCLUDE_DIRS}")
-    message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
+
+    find_package(CUDA_RT REQUIRED)
+    include_directories("${CUDA_RT_INCLUDE_DIRS}")
+    message(STATUS "Found Cuda: ${CUDA_RT_INCLUDE_DIRS}")
 
     find_package(CUBLAS REQUIRED)
-    if (NOT ${CUBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas could not find CUBLAS.")
-    endif()
+    include_directories("${CUBLAS_INCLUDE_DIRS}")
+    message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
 
 endif()
 
 # HIP
-option(USE_HIP "Whether to build the AMD GPU driver." OFF)
+option(USE_HIP "Whether to build the HIP driver." OFF)
 if (USE_HIP)
 
     add_compile_definitions(USE_HIP=1)
@@ -118,10 +111,20 @@ if (USE_HIP)
 
 endif()
 
-if (USE_CUDA AND USE_HIP)
-    message(STATUS "Enabling both CUDA and HIP is experimental, what kind of machine are you running on ?")
-endif()
+# Level Zero
+option(USE_LEVEL_ZERO "Whether to build the Level Zero driver." ON)
+if (USE_LEVEL_ZERO)
+    add_compile_definitions(USE_LEVEL_ZERO=1)
 
+    find_package(LEVEL_ZERO REQUIRED)
+    include_directories("${LEVEL_ZERO_INCLUDE_DIRS}")
+    message(STATUS "Found Cuda: ${LEVEL_ZERO_INCLUDE_DIRS}")
+
+    #    find_package(CLBLAS REQUIRED)
+    #    include_directories("${CLBLAS_INCLUDE_DIRS}")
+    #    message(STATUS "Found clblas: ${CLBLAS_INCLUDE_DIRS}")
+
+endif()
 
 ##########
 # XKRT #
@@ -139,12 +142,18 @@ if (${CUDA_RT_FOUND})
 
     # Cuda driver
     add_library(${XKRT}_driver_cuda SHARED src/device/driver_cuda.cc)
-    if (${HWLOC_FOUND})
-        target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES})
-    endif()
-    target_link_libraries(${XKRT}_driver_cuda PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
     install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif()
+
+# IF USING LEVEL ZERO
+if (${LEVEL_ZERO_FOUND})
+
+    # Level zero driver
+    add_library(${XKRT}_driver_level_zero SHARED src/device/driver_level_zero.cc)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_level_zero)
+    install(TARGETS ${XKRT}_driver_level_zero LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # Include directory

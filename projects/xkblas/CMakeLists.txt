@@ -100,16 +100,10 @@ option(STRICT "Enable strict compilation mode" OFF)
 # DEPENDENCES #
 ###############
 
-# ptr lib deps
-option(XKRT "The path to the sync library" OFF)
-if (XKRT)
-    message(STATUS "Using XKRT at '${XKRT}'")
-    include_directories(${XKRT}/include)
-else()
-    message(FATAL_ERROR "Please set '-DXKRT=path/to/ptr'")
-endif()
-message(STATUS "Found XKRT: ${XKRT}")
-include_directories("${XKRT}/include")
+# XK Runtime
+find_package(XKRT REQUIRED)
+message(STATUS "Found XKRT: ${XKRT_INCLUDE_DIRS}")
+include_directories("${XKRT_INCLUDE_DIRS}")
 
 # CUDA
 option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)

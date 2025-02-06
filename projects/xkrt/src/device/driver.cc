@@ -31,11 +31,15 @@ xkrt_driver_init(xkrt_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 {
     xkrt_driver_t * driver = drivers->list + driver_id;
 
-    LOGGER_INFO("Loading driver '%s'", driver->f_get_name());
     assert(driver->f_init);
 
+    const char * driver_name = driver->f_get_name();
     if (driver->f_init())
+    {
+        LOGGER_INFO("Failed to load driver `%s`", driver_name);
         return ;
+    }
+    LOGGER_INFO("Loading driver `%s`", driver_name);
 
     assert(driver->f_get_ndevices_max);
     int n_devices_max = driver->f_get_ndevices_max();

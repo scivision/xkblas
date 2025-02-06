@@ -63,9 +63,9 @@ xkrt_stream_instruction_submit_kernel(
     xkrt_stream_t * stream;
     xkrt_stream_instruction_t * instr;
     device->offloader.instruction_new(
-        XKRT_STREAM_TYPE_KERN,        /* IN */
+        XKRT_STREAM_TYPE_KERN,          /* IN */
         &stream,                        /* OUT */
-        XKRT_STREAM_INSTR_TYPE_KERN,  /* IN */
+        XKRT_STREAM_INSTR_TYPE_KERN,    /* IN */
         &instr,                         /* OUT */
         callback
     );
