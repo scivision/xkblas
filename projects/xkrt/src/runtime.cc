@@ -11,6 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkrt/hwloc.h>
 # include <xkrt/runtime.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
@@ -27,7 +28,9 @@
 //  Runtime initialization  //
 //////////////////////////////
 
-// singleton of runtime runtime
+hwloc_topology_t XKRT_HWLOC_TOPOLOGY;
+
+// singleton of runtime
 xkrt_runtime_t *
 xkrt_runtime_get(void)
 {
@@ -57,13 +60,16 @@ extern "C"
 int
 xkrt_init(void)
 {
-    LOGGER_INFO("Initializing Xkblas");
+    LOGGER_INFO("Initializing XKRT");
 
     xkrt_runtime_t * runtime = xkrt_runtime_get();
     if (runtime->state.current == XKRT_RUNTIME_DEINITIALIZED)
     {
         SPINLOCK_LOCK(runtime->state.spinlock);
         {
+            hwloc_topology_init(&XKRT_HWLOC_TOPOLOGY);
+            hwloc_topology_load(XKRT_HWLOC_TOPOLOGY);
+
             if (runtime->state.current == XKRT_RUNTIME_DEINITIALIZED)
             {
                 // load
@@ -86,7 +92,7 @@ extern "C"
 int
 xkrt_deinit(void)
 {
-    LOGGER_INFO("Deinitializing Xkblas");
+    LOGGER_INFO("Deinitializing XKRT");
 
 # if USE_STATS == 1
     xkrt_stats_report();
@@ -101,6 +107,7 @@ xkrt_deinit(void)
             {
                 xkrt_drivers_deinit(&runtime->drivers);
                 runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
+                hwloc_topology_destroy(XKRT_HWLOC_TOPOLOGY);
             }
         }
         SPINLOCK_UNLOCK(runtime->state.spinlock);
@@ -124,7 +131,7 @@ extern "C"
 int
 xkrt_sync(void)
 {
-    LOGGER_INFO("Synchronizing Xkblas");
+    LOGGER_INFO("Synchronizing XKRT");
 
     xkrt_runtime_t * runtime = xkrt_runtime_get();
     assert(runtime);
@@ -162,7 +169,7 @@ retry:
     }
 
     /* all threads completed :-) */
-    LOGGER_INFO("Synchronized Xkblas");
+    LOGGER_INFO("Synchronized XKRT");
 
 # if 0
 # if !defined(NDEBUG)

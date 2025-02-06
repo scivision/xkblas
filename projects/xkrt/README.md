@@ -2,7 +2,7 @@
 - `XKRT_HELP` - shows a helper with available environment variables
 
 # BUILD EXAMPLE
-Must have hwloc installed
+Must have hwloc installed and be sure your `CMAKE_PREFIX_PATH` points to where libs are installed
 ```bash
 mkdir build-debug
 cd build-debug

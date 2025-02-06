@@ -13,6 +13,7 @@
 
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CUDA_ ## N
 
+# include <xkrt/hwloc.h>
 # include <xkrt/runtime.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/device/cublas-helper.h>
@@ -114,13 +115,6 @@ __get_device_cuda_id(int device_driver_id)
     return DEVICE_CUDA_ID[device_driver_id];
 }
 
-/* initialization synchronization */
-static bool INITIALIZED = false;
-static xkrt_mutex_t DRIVER_MUTEX = XKRT_MUTEX_INITIALIZER;
-
-/* hwloc topology */
-static hwloc_topology_t TOPOLOGY;
-
 static
 uint64_t cuda_get_free_mem(int device_driver_id)
 {
@@ -142,7 +136,7 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
     return (unsigned int)device_count;
 }
 
-// NVLINK TOPOLOGY
+// NVLINK XKRT_HWLOC_TOPOLOGY
 
 /* cuda_perf_topo[i,j] returns the perf_rank of the communication link between
    device.
@@ -245,51 +239,34 @@ __get_gpu_topo(void)
 static int
 XKRT_DRIVER_ENTRYPOINT(init)(void)
 {
-    XKRT_MUTEX_LOCK(DRIVER_MUTEX);
+    int ndevices_max;
+    cudaError_t err = cudaGetDeviceCount(&ndevices_max);
+    if (err)
+        return 1;
+
+    memset(DEVICE_CUDA_ID, -1, sizeof(DEVICE_CUDA_ID));
+
+    for (int i = 0 ; i < XKRT_DEVICES_MAX ; ++i)
     {
-        if (INITIALIZED)
-        {
-            XKRT_MUTEX_UNLOCK(DRIVER_MUTEX);
-            return 0;
-        }
-
-        int ndevices_max;
-        cudaError_t err = cudaGetDeviceCount(&ndevices_max);
-        if (err)
-        {
-            XKRT_MUTEX_UNLOCK(DRIVER_MUTEX);
-            return 1;
-        }
-
-        memset(DEVICE_CUDA_ID, -1, sizeof(DEVICE_CUDA_ID));
-
-        for (int i = 0 ; i < XKRT_DEVICES_MAX ; ++i)
-        {
-            xkrt_device_cuda_t * device = __get_device_cuda(i);
-            assert(device);
-            device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
-        }
-
-        # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
-        xkrt_runtime_t * context = xkrt_runtime_get();
-        uint32_t ngpus = MIN(ndevices_max, context->conf.ngpus);
-        uint32_t gpuset = context->conf.gpu_set;
-        for (int i = 0; i < ngpus ; ++i)
-        {
-            int idx = __builtin_ffs((unsigned int)gpuset);
-            assert(idx != 0);
-            --idx;
-            gpuset &= ~(1<<idx);
-            __set_device_cuda_id(i, idx);
-        }
-
-        hwloc_topology_init(&TOPOLOGY);
-        hwloc_topology_load(TOPOLOGY);
-        __get_gpu_topo();
-
-        INITIALIZED = true;
+        xkrt_device_cuda_t * device = __get_device_cuda(i);
+        assert(device);
+        device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
     }
-    XKRT_MUTEX_UNLOCK(DRIVER_MUTEX);
+
+    # pragma message(TODO "What is the point of 'gpuset' ? Keep it ? or rely on 'CUDA_VISIBLE_DEVICES' instead ?")
+    xkrt_runtime_t * context = xkrt_runtime_get();
+    uint32_t ngpus = MIN(ndevices_max, context->conf.ngpus);
+    uint32_t gpuset = context->conf.gpu_set;
+    for (int i = 0; i < ngpus ; ++i)
+    {
+        int idx = __builtin_ffs((unsigned int)gpuset);
+        assert(idx != 0);
+        --idx;
+        gpuset &= ~(1<<idx);
+        __set_device_cuda_id(i, idx);
+    }
+
+    __get_gpu_topo();
 
     return 0;
 }
@@ -297,19 +274,6 @@ XKRT_DRIVER_ENTRYPOINT(init)(void)
 static void
 XKRT_DRIVER_ENTRYPOINT(finalize)(void)
 {
-    if (!INITIALIZED)
-    {
-        XKRT_MUTEX_LOCK(DRIVER_MUTEX);
-        {
-            if (!INITIALIZED)
-                LOGGER_FATAL("Finalize CUDA driver before initializing...");
-        }
-        XKRT_MUTEX_UNLOCK(DRIVER_MUTEX);
-    }
-
-    assert(INITIALIZED);
-    INITIALIZED = 0;
-    hwloc_topology_destroy(TOPOLOGY);
 }
 
 static const char *
@@ -321,18 +285,15 @@ XKRT_DRIVER_ENTRYPOINT(get_name)(void)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_driver_id)
 {
-    if (schedset == NULL)
-        return EINVAL;
-
     assert(device_driver_id >= 0);
     assert(device_driver_id < XKRT_DEVICES_MAX);
     assert(__get_device_cuda_id(device_driver_id) != -1);
 
     hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-    HWLOC_SAFE_CALL(hwloc_cudart_get_device_cpuset(TOPOLOGY, __get_device_cuda_id(device_driver_id), cpuset));
+    HWLOC_SAFE_CALL(hwloc_cudart_get_device_cpuset(XKRT_HWLOC_TOPOLOGY, __get_device_cuda_id(device_driver_id), cpuset));
 
     CPU_ZERO(schedset);
-    HWLOC_SAFE_CALL(hwloc_cpuset_to_glibc_sched_affinity(TOPOLOGY, cpuset, schedset, sizeof(cpu_set_t)));
+    HWLOC_SAFE_CALL(hwloc_cpuset_to_glibc_sched_affinity(XKRT_HWLOC_TOPOLOGY, cpuset, schedset, sizeof(cpu_set_t)));
 
     hwloc_bitmap_free(cpuset);
 
@@ -342,7 +303,6 @@ XKRT_DRIVER_ENTRYPOINT(device_set_cpuset)(cpu_set_t * schedset, int device_drive
 static xkrt_device_t *
 XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_id)
 {
-    assert(INITIALIZED);
     assert(device_driver_id >= 0 && device_driver_id < XKRT_DEVICES_MAX);
 
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
@@ -355,8 +315,6 @@ XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_
 static void
 XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 {
-    assert(INITIALIZED);
-
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
     assert(device->inherited.state == XKRT_DEVICE_STATE_CREATE);
@@ -402,8 +360,6 @@ XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
 {
-    assert(INITIALIZED);
-
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
     CUDA_SAFE_CALL(cudaSetDevice(__get_device_cuda_id(device_driver_id)));
 
@@ -780,9 +736,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity
 ) {
-    cudaError_t res;
-    assert(INITIALIZED == true);
-
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_cuda_t) + capacity * sizeof(cudaEvent_t));
     assert(mem);
 

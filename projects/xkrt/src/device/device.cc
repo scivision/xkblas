@@ -320,6 +320,8 @@ xkrt_device_create(
         LOGGER_FATAL("Too many devices. Increase 'XKRT_DEVICES_MAX' and recompile Xkblas");
 
     xkrt_driver_t * driver = drivers->list + driver_id;
+    assert(driver->f_device_create);
+
     xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
     assert(device);
 

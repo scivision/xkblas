@@ -31,19 +31,21 @@ xkrt_driver_init(xkrt_drivers_t * drivers, uint8_t driver_id, uint8_t ngpus)
 {
     xkrt_driver_t * driver = drivers->list + driver_id;
 
-    assert(driver->f_init);
-
-    const char * driver_name = driver->f_get_name();
-    if (driver->f_init())
-    {
-        LOGGER_INFO("Failed to load driver `%s`", driver_name);
-        return ;
-    }
+    const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
     LOGGER_INFO("Loading driver `%s`", driver_name);
 
+    assert(driver->f_init);
+    if (driver->f_init())
+    {
+        LOGGER_WARN("Failed to load");
+        return ;
+    }
+
     assert(driver->f_get_ndevices_max);
-    int n_devices_max = driver->f_get_ndevices_max();
-    int n_devices = MIN(ngpus, n_devices_max);
+    unsigned int n_devices_max = driver->f_get_ndevices_max();
+    LOGGER_DEBUG("Found %u devices", n_devices_max);
+
+    unsigned int n_devices = MIN(ngpus, n_devices_max);
     if (n_devices < 1)
         return ;
     driver->ndevices_targeted = n_devices;
@@ -125,6 +127,16 @@ xkrt_drivers_init(xkrt_drivers_t * drivers, uint8_t ngpus)
     extern void XKRT_DRIVER_TYPE_CUDA_get_driver(xkrt_driver_t *);
     loaders[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_get_driver;
 # endif /* USE_CUDA */
+
+# if USE_HIP
+    extern void XKRT_DRIVER_TYPE_HIP_get_driver(xkrt_driver_t *);
+    loaders[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_get_driver;
+# endif /* USE_HIP */
+
+# if USE_ZE
+    extern void XKRT_DRIVER_TYPE_ZE_get_driver(xkrt_driver_t *);
+    loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_get_driver;
+# endif /* USE_ZE */
 
     uint8_t i;
     for (i = 0 ; i < XKRT_DRIVER_TYPE_MAX && drivers->devices.n < ngpus ; ++i)
@@ -271,7 +283,7 @@ xkrt_driver_t *
 xkrt_driver_get(xkrt_driver_type_t type)
 {
     xkrt_runtime_t * context = xkrt_runtime_get();
-    return context->drivers.list + XKRT_DRIVER_TYPE_CUDA;
+    return context->drivers.list + type;
 }
 
 xkrt_device_t *

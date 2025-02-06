@@ -112,13 +112,13 @@ if (USE_HIP)
 endif()
 
 # Level Zero
-option(USE_LEVEL_ZERO "Whether to build the Level Zero driver." ON)
-if (USE_LEVEL_ZERO)
-    add_compile_definitions(USE_LEVEL_ZERO=1)
+option(USE_ZE "Whether to build the Level Zero driver." ON)
+if (USE_ZE)
+    add_compile_definitions(USE_ZE=1)
 
-    find_package(LEVEL_ZERO REQUIRED)
-    include_directories("${LEVEL_ZERO_INCLUDE_DIRS}")
-    message(STATUS "Found Cuda: ${LEVEL_ZERO_INCLUDE_DIRS}")
+    find_package(ZE REQUIRED)
+    include_directories("${ZE_INCLUDE_DIRS}")
+    message(STATUS "Found Cuda: ${ZE_INCLUDE_DIRS}")
 
     #    find_package(CLBLAS REQUIRED)
     #    include_directories("${CLBLAS_INCLUDE_DIRS}")
@@ -148,12 +148,11 @@ if (${CUDA_RT_FOUND})
 endif()
 
 # IF USING LEVEL ZERO
-if (${LEVEL_ZERO_FOUND})
-
+if (${ZE_FOUND})
     # Level zero driver
-    add_library(${XKRT}_driver_level_zero SHARED src/device/driver_level_zero.cc)
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_level_zero)
-    install(TARGETS ${XKRT}_driver_level_zero LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    add_library(${XKRT}_driver_ze SHARED src/device/driver_ze.cc)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
+    install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # Include directory
