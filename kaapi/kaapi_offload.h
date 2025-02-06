@@ -278,6 +278,7 @@ typedef struct kaapi_driver {
 
     /* direct access to some specific functions */
     void (*f_memset)(void*,int,size_t);
+    void (*f_memcpy)(void*,void*,size_t);
     void (*f_advise_gpu)(void*,size_t);
     void (*f_advise_cpu)(void*,size_t);
 

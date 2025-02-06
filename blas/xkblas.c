@@ -127,6 +127,17 @@ void xkblas_memset(void* ptr, int val, size_t count)
 	driver->f_memset( ptr, val, count );
 }
 
+void xkblas_memcpy(void* dst, void* src, size_t count)
+{
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_memcpy( dst, src, count );
+}
+
 #if defined(KAAPI_UNIFIED)
 //kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
 void (*_last_free_to_use)(void*) = NULL;
@@ -2652,6 +2663,129 @@ struct memory_segment* free_segment_list = NULL;
 struct memory_segment* first_segment = NULL;
 size_t total_size = 0;
 
+//#define DEBUG_SEG 1
+
+void coherency_check()
+{
+	struct memory_segment* first_free = NULL;
+	struct memory_segment* curr = first_segment;
+	while( curr )
+	{
+		// Common
+		//size_t    size;
+		//int       state;
+		if( curr->prev != NULL )
+		{
+			if( curr->prev->ptr >= curr->ptr )
+			{
+				printf("[SEG][%p] %p invalid prev ptr\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+			if( curr->prev->next != curr )
+			{
+				printf("[SEG][%p] %p invalid prev next\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+		}	
+		else
+		{
+			if( curr->free_prev != NULL )
+			{
+				printf("[SEG][%p] %p invalid free prev after no next\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+		}
+		if( curr->next != NULL )
+		{
+			if( curr->next->ptr <= curr->ptr )
+			{
+				printf("[SEG][%p] %p invalid next ptr\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+			if( curr->next->prev != curr )
+			{
+				printf("[SEG][%p] %p invalid next prev\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+		}
+		else
+		{
+			if( curr->free_next != NULL )
+			{
+				printf("[SEG][%p] %p invalid free next after no next\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+		}
+
+		if( curr->state & FREE_STATE )
+		{ // Free segment
+			if( curr->free_prev != NULL )
+			{
+				if( curr->free_prev->ptr >= curr->ptr )
+				{
+					printf("[SEG][%p] %p invalid free prev ptr\n\n\n\n", pthread_self(), curr);
+					exit(1);
+				}
+				if( curr->free_prev->free_next != curr )
+				{
+					printf("[SEG][%p] %p invalid free prev next\n\n\n\n", pthread_self(), curr);
+					exit(1);
+				}
+			}
+			else
+			{
+				if( curr != free_segment_list )
+				{
+					printf("[SEG][%p] %p invalid free segment list\n\n\n\n", pthread_self(), curr);
+					exit(1);
+				}
+			}	
+			if( curr->free_next != NULL )
+			{
+				if( curr->free_next->ptr <= curr->ptr )
+				{
+					printf("[SEG][%p] %p invalid free next ptr\n\n\n\n", pthread_self(), curr);
+					exit(1);
+				}
+				if( curr->free_next->free_prev != curr )
+				{
+					printf("[SEG][%p] %p invalid free next prev\n\n\n\n", pthread_self(), curr);
+					exit(1);
+				}
+			}
+			
+		}
+		else
+		{ // Non-free segment
+			if( curr->free_prev != NULL )
+			{
+				printf("[SEG][%p] %p invalid free prev\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}	
+			if( curr->free_next != NULL )
+			{
+				printf("[SEG][%p] %p invalid free next\n\n\n\n", pthread_self(), curr);
+				exit(1);
+			}
+		}
+	
+		curr = curr->next;
+	}
+	printf("[SEG][%p] Coherency check ok\n", pthread_self());
+}
+
+void print_segments()
+{
+	printf("[SEG][%p] free_start %p\n", pthread_self(), free_segment_list);
+	struct memory_segment* curr = first_segment;
+	while( curr )
+	{
+		printf("[SEG][%p]   seg: %p, %p[%p] -> %p (%p,%p,%p), %d\n", pthread_self(), curr, curr->ptr, curr->size, curr->next, curr->prev, curr->free_prev, curr->free_next, curr->state);
+		curr = curr->next;
+	}
+	coherency_check();
+}
+
 void* xkblas_get_work_pos(size_t size)
 {
 	if( size == 0 )
@@ -2664,7 +2798,9 @@ void* xkblas_get_work_pos(size_t size)
 		exit(1);
 	}
 
+	//printf("[LOC][%p] xkblas_mutex_lock %p (alloc)\n", pthread_self(), &work_buffer_mutex);
 	pthread_mutex_lock( &work_buffer_mutex );	
+	//printf("[LOC][%p] xkblas_mutex_lock %p (alloc) -- locked\n", pthread_self(), &work_buffer_mutex);
 	while(1)
 	{ // We wait until data are available
 		struct memory_segment* curr = free_segment_list;
@@ -2704,16 +2840,32 @@ void* xkblas_get_work_pos(size_t size)
 			else free_segment_list = curr->free_next; // In this case, curr is the first free segment
 			curr->free_next = NULL;
 			curr->free_prev = NULL;
+#if defined(DEBUG_SEG)
+			printf("[SEG][%p] allocate %p\n", pthread_self(), (void*) curr->ptr);
+			print_segments();
+			printf("[SEG]\n");
+#endif
+			//printf("[LOC][%p] xkblas_mutex_unlock %p\n", pthread_self(), &work_buffer_mutex);
 			pthread_mutex_unlock( &work_buffer_mutex );
 			return (void*) curr->ptr;	
 		}
+		//printf("[LOC][%p] xkblas_cond_wait %p,%p\n", pthread_self(), &work_buffer_cond, &work_buffer_mutex);
 		pthread_cond_wait( &work_buffer_cond, &work_buffer_mutex );
+		//printf("[LOC][%p] xkblas_cond_wait %p,%p -- liberated\n", pthread_self(), &work_buffer_cond, &work_buffer_mutex);
 	}
 }
 
 void xkblas_free_work_pos( void* ptr )
 {
+	//printf("[LOC][%p] xkblas_mutex_lock %p (free)\n", pthread_self(), &work_buffer_mutex);
 	pthread_mutex_lock( &work_buffer_mutex );
+	//printf("[LOC][%p] xkblas_mutex_lock %p (free) -- locked\n", pthread_self(), &work_buffer_mutex);
+	
+#if defined(DEBUG_SEG)
+	printf("[SEG][%p] will free %p\n", pthread_self(), ptr);
+	print_segments();
+#endif
+
 	// Step 1: find the associated segment
 	struct memory_segment* curr = first_segment;
 	while(curr)
@@ -2727,16 +2879,19 @@ void xkblas_free_work_pos( void* ptr )
 			curr = NULL;
 			break;
 		}
+		curr = curr->next;
 	}
 	if(curr == NULL || (curr->state & FREE_STATE))
 	{ // curr does not exist or is already free
-	        printf("Curr err %p\n", curr);
+	        printf("[SEG][%p] Curr err %p\n", pthread_self(), curr);
 		exit(1); // TODO clean this
 	}
 
 	// Step 2: free it
 	curr->state = FREE_STATE;
-	
+
+	int inserted = 0;
+
 	struct memory_segment* next_seg = curr->next;
 	if( next_seg && (next_seg->state & FREE_STATE) )
 	{ // We should merge -> prev is always conserved
@@ -2750,7 +2905,9 @@ void xkblas_free_work_pos( void* ptr )
 		if(curr->free_prev) curr->free_prev->free_next = curr;
 		else free_segment_list = curr;
 
-		free(next_seg);	
+		free(next_seg);
+
+		inserted = 1;	
 	}
 
 	struct memory_segment* prev_seg = curr->prev;
@@ -2760,13 +2917,69 @@ void xkblas_free_work_pos( void* ptr )
 		prev_seg->next = curr->next;
 		if(prev_seg->next) prev_seg->next->prev = prev_seg;
 
-		prev_seg->free_next = curr->free_next;
-		if(prev_seg->free_next) prev_seg->free_next->free_prev = prev_seg;
+		if( inserted == 1 )
+		{
+			prev_seg->free_next = curr->free_next;
+			if(prev_seg->free_next) prev_seg->free_next->free_prev = prev_seg;
+		}
 
 		free(curr);
+
+		inserted = 1;
+	}
+
+	if( inserted == 0 )
+	{
+		if( free_segment_list == NULL )
+		{
+			free_segment_list = curr; // No free segments available
+		}
+		else
+		{
+			struct memory_segment* last_free_curr = NULL;
+			struct memory_segment* free_curr = free_segment_list;
+			while( free_curr )
+			{
+				if(free_curr->ptr > curr->ptr)
+					break;
+				last_free_curr = free_curr;
+				free_curr = free_curr->free_next;
+			}
+
+			if( last_free_curr == NULL )
+			{ // We have the first free segment
+				curr->free_next = free_segment_list;
+				curr->free_prev = NULL;
+				free_segment_list = curr;
+			}
+			else
+			{
+				curr->free_prev = last_free_curr;
+				curr->free_next = free_curr;
+			}
+			if(curr->free_prev) curr->free_prev->free_next = curr;
+			if(curr->free_next) curr->free_next->free_prev = curr;
+		}
+		//if( free_curr == NULL )
+		//{ // We can't found a free segment after this one
+		//	if( last_free_curr == NULL )
+		//	{ // their is not free segment (should not happen)
+		//		free_segment_list = curr;
+		//	}
+		//	else
+		//	{
+		//	}
+		//}
 	}
 	
+	//printf("[LOC][%p] xkblas_cond_broadcast %p\n", pthread_self(), &work_buffer_cond);
 	pthread_cond_broadcast( &work_buffer_cond );
+	//printf("[LOC][%p] xkblas_mutex_unlock %p\n", pthread_self(), &work_buffer_mutex);
+#if defined(DEBUG_SEG)
+	printf("[SEG][%p] After free:\n", pthread_self());
+	print_segments();
+	printf("[SEG] \n");
+#endif
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
 
@@ -2808,6 +3021,17 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
     	//void (*f_advise_cpu)(void*,size_t);
 }
 
+void xkblas_bind_cpu( void* ptr, size_t size )
+{
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_advise_cpu( ptr, size);
+}
+
 void xkblas_unregister_work_buffer( void* ptr )
 {
 	pthread_mutex_lock( &work_buffer_mutex );
@@ -2830,7 +3054,6 @@ void xkblas_unregister_work_buffer( void* ptr )
 
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
-
 
 
 
