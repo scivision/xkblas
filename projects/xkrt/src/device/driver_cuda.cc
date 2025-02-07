@@ -352,7 +352,6 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
 {
-    device->state = XKRT_DEVICE_STATE_DESTROY;
     free(device);
     return 0;
 }
@@ -406,7 +405,7 @@ XKRT_DRIVER_ENTRYPOINT(get_source)(
     return (xkrt_device_global_id_t) (__random_set_bit(bitfield) - 1);
 }
 
-/* Called on all devices of the driver after they have been initialized */
+/* Called for each device of the driver once they all have been initialized */
 static int
 XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 {
@@ -811,7 +810,7 @@ _print_mask(char * buffer, ssize_t size, uint64_t v)
 const char *
 XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 {
-    static char buffer[256];
+    static char buffer[512];
     static char buf1[16];
     static char buf2[16];
     static char buf3[16];

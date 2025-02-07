@@ -303,7 +303,7 @@ xkrt_device_init(
     device->offloader.init(&(context->conf.device.offloader), driver->f_stream_create);
 
     /* attach current thread to the device */
-    if (driver->f_device_attach(device->driver_id))
+    if (driver->f_device_attach && driver->f_device_attach(device->driver_id))
         LOGGER_FATAL("Could not attach to device %d of driver %s", device->driver_id, driver->f_get_name());
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);

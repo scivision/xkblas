@@ -11,6 +11,8 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+// TODO : this is out of date. Regnerate this file automatically from the cuda driver
+
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CUDA_ ## N
 
 # include <conf/conf.h>
