@@ -14,17 +14,20 @@
 #ifndef __XKRT_H__
 # define __XKRT_H__
 
-// TODO : xkrt public API
 
+// TODO : this include the whole world, this is bad
+# include <xkrt/runtime.h>
+
+// xkrt public API
 extern "C" {
 
-    int xkrt_init(void);
-    int xkrt_deinit(void);
-    int xkrt_sync(void);
+    int xkrt_init(xkrt_runtime_t * runtime);
+    int xkrt_deinit(xkrt_runtime_t * runtime);
+    int xkrt_sync(xkrt_runtime_t * runtime);
 
-    void xkrt_memory_invalidate(void);
-    void xkrt_memory_coherent_async(int uplo, int memflag, int m, int n, void * addr, int ld, unsigned int sizeof_type);
-    int xkrt_get_ngpus(int * count);
+    void xkrt_memory_invalidate(xkrt_runtime_t * runtime);
+    void xkrt_memory_coherent_async(xkrt_runtime_t * runtime, int uplo, int memflag, int m, int n, void * addr, int ld, unsigned int sizeof_type);
+    int xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count);
 };
 
 #endif /* __XKRT_H__ */

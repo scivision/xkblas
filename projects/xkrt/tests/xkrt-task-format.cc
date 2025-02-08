@@ -1,5 +1,5 @@
 # include <xkrt/xkrt.h>
-# include <xkrt/device/task-format.h>
+# include <xkrt/task/task-format.h>
 
 # include <assert.h>
 # include <string.h>
@@ -7,18 +7,19 @@
 int
 main(void)
 {
-    assert(xkrt_init() == 0);
+    xkrt_runtime_t runtime;
+    assert(xkrt_init(&runtime) == 0);
 
     // create an empty task format
     task_format_id_t EMPTY;
     {
         task_format_t format;
         memset(&format, 0, sizeof(task_format_t));
-        EMPTY = task_format_create(&format);
+        EMPTY = task_format_create(&(runtime.task_formats), &format);
     }
     assert(EMPTY);
 
-    assert(xkrt_deinit() == 0);
+    assert(xkrt_deinit(&runtime) == 0);
 
     return 0;
 }

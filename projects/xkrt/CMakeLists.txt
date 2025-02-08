@@ -14,22 +14,21 @@ project(${XKRT})
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-version-always-run.h
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
-    ${CMAKE_SOURCE_DIR}/src/device/device.cc
-    ${CMAKE_SOURCE_DIR}/src/device/driver.cc
-    ${CMAKE_SOURCE_DIR}/src/device/offloader.cc
-    ${CMAKE_SOURCE_DIR}/src/device/stream-instruction-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/device/stream.cc
-    ${CMAKE_SOURCE_DIR}/src/device/task-format.cc
-    ${CMAKE_SOURCE_DIR}/src/device/task.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread-producer.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread-worker.cc
-    ${CMAKE_SOURCE_DIR}/src/device/thread.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/device.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/offloader.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/stream.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/thread-producer.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/thread-worker.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
+    ${CMAKE_SOURCE_DIR}/src/driver/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
-    ${CMAKE_SOURCE_DIR}/src/device/memory-coherent.cc
-    ${CMAKE_SOURCE_DIR}/src/device/memory-invalidate.cc
-    ${CMAKE_SOURCE_DIR}/src/device/memory-register.cc
-    ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
+    ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
+    ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
+    ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
 )
 
 # XKRT version
@@ -53,7 +52,7 @@ endif()
 ################
 option(USE_STATS "Whether to compile the built-in stat system." ON)
 if (USE_STATS)
-    LIST(APPEND SOURCE_FILES src/stats/stats.cc)
+    LIST(APPEND SOURCE_FILES src/stats.cc)
     add_compile_definitions(USE_STATS=1)
     message(STATUS "Using built-in stats system")
 endif()
@@ -71,7 +70,7 @@ message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 option(USE_CPU "Whether to build the CPU driver." OFF)
 if (USE_CPU)
     add_compile_definitions(USE_CPU=1)
-    add_library(${XKRT}_driver_cpu SHARED src/device/driver_cpu.cc)
+    add_library(${XKRT}_driver_cpu SHARED src/driver/driver_cpu.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cpu)
     install(TARGETS ${XKRT}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
@@ -141,7 +140,7 @@ endif()
 if (${CUDA_RT_FOUND})
 
     # Cuda driver
-    add_library(${XKRT}_driver_cuda SHARED src/device/driver_cuda.cc)
+    add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
     target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
     install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
@@ -150,7 +149,7 @@ endif()
 # IF USING LEVEL ZERO
 if (${ZE_FOUND})
     # Level zero driver
-    add_library(${XKRT}_driver_ze SHARED src/device/driver_ze.cc)
+    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()

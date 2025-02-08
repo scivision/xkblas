@@ -1,27 +1,34 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   callback.h                                                        */
+/*   task-launcher.h                                                          */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/19 11:29:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKRT_CALLBACK_H__
-# define __XKRT_CALLBACK_H__
+#ifndef __TASK_LAUNCHER_H__
+# define __TASK_LAUNCHER_H__
 
-# define XKRT_CALLBACK_ARGS_MAX 5
+# include <xkrt/task/task.hpp>
+# include <xkrt/task/task-format.h>
 
-typedef struct  xkrt_callback_t
+typedef struct  task_launcher_t
 {
-    void (*func)(const void * [XKRT_CALLBACK_ARGS_MAX]);
-    const void * args[XKRT_CALLBACK_ARGS_MAX];
-}               xkrt_callback_t;
+    /* the task to launch */
+    const Task * task;
 
-# define xkrt_callback_raise(c) (c.func(c.args))
+    /* the target func to use in the format */
+    task_format_target_t target;
 
-# endif /* __XKRT_CALLBACK_H__ */
+    // TODO : bad design
+    /* task argument */
+    void * handle;
+
+}               task_launcher_t;
+
+#endif /* __TASK_LAUNCHER_H__ */

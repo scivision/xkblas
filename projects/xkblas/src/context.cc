@@ -38,7 +38,8 @@ xkblas_context_get(void)
         .state = {
             .spinlock = 0,
             .current = { XKBLAS_CONTEXT_DEINITIALIZED }
-        }
+        },
+        .runtime
     };
 
     return &context;
@@ -54,9 +55,11 @@ extern "C"
 int
 xkblas_init(void)
 {
-    xkrt_init();
-
     xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    xkrt_init(&(context->runtime));
+
     if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
     {
         SPINLOCK_LOCK(context->state.spinlock);
@@ -76,9 +79,9 @@ extern "C"
 void
 xkblas_deinit(void)
 {
-    xkrt_deinit();
-
     xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
     if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
     {
         SPINLOCK_LOCK(context->state.spinlock);
@@ -90,6 +93,8 @@ xkblas_deinit(void)
         }
         SPINLOCK_UNLOCK(context->state.spinlock);
     }
+
+    xkrt_deinit(&(context->runtime));
 }
 
 //////////////////////////////
@@ -100,5 +105,8 @@ extern "C"
 void
 xkblas_sync(void)
 {
-    xkrt_sync();
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    xkrt_sync(&(context->runtime));
 }

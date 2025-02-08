@@ -4,6 +4,7 @@
 int
 main(void)
 {
-    assert(xkrt_init() == 0);
+    xkrt_runtime_t runtime;
+    assert(xkrt_init(&runtime) == 0);
     return 0;
 }

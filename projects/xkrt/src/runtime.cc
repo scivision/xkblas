@@ -11,12 +11,11 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/hwloc.h>
 # include <xkrt/runtime.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
-# include <xkrt/device/driver.h>
-# include <xkrt/device/thread-producer.hpp>
+# include <xkrt/driver/driver.h>
+# include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/memory/alignedas.h>
 # include <xkrt/sync/spinlock.h>
 
@@ -28,99 +27,50 @@
 //  Runtime initialization  //
 //////////////////////////////
 
-hwloc_topology_t XKRT_HWLOC_TOPOLOGY;
-
-// singleton of runtime
-xkrt_runtime_t *
-xkrt_runtime_get(void)
-{
-    # pragma message(TODO "Optimize this default conf")
-
-    static xkrt_runtime_t runtime = {
-        .state = {
-            .spinlock = 0,
-            .current = { XKRT_RUNTIME_DEINITIALIZED }
-        },
-        .conf = {},
-        .memory_coherent_worker_thread = nullptr,
-        // .memtrees = std::vector<MemoryTree *>(),
-        .drivers = {}
-    };
-
-    return &runtime;
-}
-
 static inline void
-xkrt_task_format_register(void)
+xkrt_task_format_register(xkrt_runtime_t * runtime)
 {
-    xkrt_memory_coherent_async_register_format();
+    task_formats_init(&(runtime->task_formats));
+    xkrt_memory_coherent_async_register_format(runtime);
 }
 
 extern "C"
 int
-xkrt_init(void)
+xkrt_init(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Initializing XKRT");
 
-    xkrt_runtime_t * runtime = xkrt_runtime_get();
-    if (runtime->state.current == XKRT_RUNTIME_DEINITIALIZED)
-    {
-        SPINLOCK_LOCK(runtime->state.spinlock);
-        {
-            hwloc_topology_init(&XKRT_HWLOC_TOPOLOGY);
-            hwloc_topology_load(XKRT_HWLOC_TOPOLOGY);
+    memset(runtime, 0, sizeof(xkrt_runtime_t));
+    runtime->state.spinlock = 0;
+    runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
+    runtime->memory_coherent_worker_thread = nullptr;
 
-            if (runtime->state.current == XKRT_RUNTIME_DEINITIALIZED)
-            {
-                // load
-                xkrt_init_conf(&(runtime->conf));
-#if USE_STATS == 1
-                xkrt_stats_init(&(runtime->stats));
-#endif // USE_STATS == 1
-                xkrt_task_format_register();
-                xkrt_memory_coherent_async_worker_thread_init(runtime);
-                xkrt_drivers_init(&(runtime->drivers), runtime->conf.ngpus);
-                runtime->state.current = XKRT_RUNTIME_INITIALIZED;
-            }
-        }
-        SPINLOCK_UNLOCK(runtime->state.spinlock);
-    }
+    // load
+    xkrt_init_conf(&(runtime->conf));
+    xkrt_task_format_register(runtime);
+    xkrt_memory_coherent_async_worker_thread_init(runtime);
+    xkrt_drivers_init(&(runtime->drivers), runtime->conf.device.ngpus, xkrt_device_thread_main, runtime);
+    runtime->state.current = XKRT_RUNTIME_INITIALIZED;
+
     return 0;
 }
 
 extern "C"
 int
-xkrt_deinit(void)
+xkrt_deinit(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Deinitializing XKRT");
+    assert(runtime);
+    assert(runtime->state.current == XKRT_RUNTIME_INITIALIZED);
 
-# if USE_STATS == 1
-    xkrt_stats_report();
+# if USE_STATS
+    xkrt_runtime_stats_report(runtime);
 # endif // USE_STATS == 1
 
-    xkrt_runtime_t * runtime = xkrt_runtime_get();
-    if (runtime->state.current == XKRT_RUNTIME_INITIALIZED)
-    {
-        SPINLOCK_LOCK(runtime->state.spinlock);
-        {
-            if (runtime->state.current == XKRT_RUNTIME_INITIALIZED)
-            {
-                xkrt_drivers_deinit(&runtime->drivers);
-                runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
-                hwloc_topology_destroy(XKRT_HWLOC_TOPOLOGY);
-            }
-        }
-        SPINLOCK_UNLOCK(runtime->state.spinlock);
-    }
-    return 0;
-}
+    xkrt_drivers_deinit(&runtime->drivers);
+    runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
 
-/* legacy compatibility (deprecated) */
-extern "C"
-void
-xkrt_finalize(void)
-{
-    xkrt_deinit();
+    return 0;
 }
 
 //////////////////////////////
@@ -129,11 +79,10 @@ xkrt_finalize(void)
 
 extern "C"
 int
-xkrt_sync(void)
+xkrt_sync(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Synchronizing XKRT");
 
-    xkrt_runtime_t * runtime = xkrt_runtime_get();
     assert(runtime);
 
     /* other threads */
@@ -201,12 +150,9 @@ retry:
 
 extern "C"
 int
-xkrt_get_ngpus(int * count)
+xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count)
 {
     assert(count);
-
-    xkrt_runtime_t * runtime = xkrt_runtime_get();
-    assert(runtime);
 
     *count = 0;
     for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)

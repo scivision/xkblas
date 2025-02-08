@@ -17,7 +17,7 @@
 # include <stdint.h>
 
 # include <xkrt/logger/todo.h>
-# include <xkrt/device/stream.h>
+# include <xkrt/driver/stream.h>
 
 # pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 
@@ -44,7 +44,9 @@ typedef struct  xkrt_conf_offloader_t
 
 typedef struct  xkrt_conf_device_t
 {
-    xkrt_conf_offloader_t offloader;
+    float gpu_mem_percent;              /* % of gpu memory to allocate initially */
+    uint8_t ngpus;                      /* number of GPU for this node */
+    xkrt_conf_offloader_t offloader;    /* offloader conf */
 
 }               xkrt_conf_device_t;
 
@@ -52,15 +54,8 @@ typedef struct  xkrt_conf_device_t
 
 typedef struct  xkrt_conf_s
 {
-    uint64_t    stackblocsize;      /* default stack bloc size */
-    uint8_t     ngpus;              /* number of GPU for this node */
-    uint32_t    gpu_set;            /* GPU to use */
-    float       gpu_mem_percent;    /* % of gpu memory to allocate initially */
-
-    xkrt_conf_device_t device;    /* device conf */
-
+    xkrt_conf_device_t device;      /* device conf */
     bool merge_transfers;           /* attempt to merge continuous memory to a single transfer */
-
 }               xkrt_conf_t;
 
 void xkrt_init_conf(xkrt_conf_t * conf);

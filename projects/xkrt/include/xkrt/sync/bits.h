@@ -14,7 +14,7 @@
 #ifndef __BITS_H__
 # define __BITS_H__
 
-# include <xkrt/device/consts.h>
+# include <xkrt/consts.h>
 
 /* utility: return the index+1 of random bit set to '1' */
 static inline xkrt_device_global_id_t

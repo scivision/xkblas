@@ -83,6 +83,7 @@ twopow(int n)
 }
 
 # include <xkrt/min-max.h>
+# include <xkrt/memory/cube.hpp>
 # include <xkrt/sync/color.h>
 # include <xkrt/sync/direction.h>
 

@@ -1,27 +1,26 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   callback.h                                                        */
+/*   driver-type.h                                                            */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:47 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __XKRT_CALLBACK_H__
-# define __XKRT_CALLBACK_H__
+#ifndef __DRIVER_TYPE_H__
+# define __DRIVER_TYPE_H__
 
-# define XKRT_CALLBACK_ARGS_MAX 5
-
-typedef struct  xkrt_callback_t
+typedef enum    xkrt_driver_type_t : uint8_t
 {
-    void (*func)(const void * [XKRT_CALLBACK_ARGS_MAX]);
-    const void * args[XKRT_CALLBACK_ARGS_MAX];
-}               xkrt_callback_t;
+    XKRT_DRIVER_TYPE_HOST = 0,  // cpu driver
+    XKRT_DRIVER_TYPE_CUDA = 1,  // cuda devices driver
+    XKRT_DRIVER_TYPE_HIP  = 2,  // hip devices driver
+    XKRT_DRIVER_TYPE_ZE   = 3,  // level zero devices driver
+    XKRT_DRIVER_TYPE_MAX  = 4
+}               xkrt_driver_type_t;
 
-# define xkrt_callback_raise(c) (c.func(c.args))
-
-# endif /* __XKRT_CALLBACK_H__ */
+#endif /* __DRIVER_TYPE_H__ */

@@ -16,7 +16,7 @@
 
 // Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
-xkrt_runtime_submit_task(xkrt_runtime_t * context, Task * task)
+xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
 {
     assert(task->state.value == TASK_STATE_READY);
 
@@ -35,13 +35,13 @@ xkrt_runtime_submit_task(xkrt_runtime_t * context, Task * task)
         // instead simply just the 'predecessor -> successor' relationship -
         // and register the 'predecessor' device for the ocr access
         assert(task->ocr_access_index >= 0 && task->ocr_access_index < task->naccesses);
-        const Access * access = task->accesses + task->ocr_access_index;
+        Access * access = task->accesses + task->ocr_access_index;
         assert(access);
 
-        MemoryTree * memtree = context->get_memory_tree(access->host_view.ld, access->host_view.sizeof_type);
-        assert(memtree);
+        MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
+        assert(memcontroller);
 
-        const xkrt_device_global_id_bitfield_t owners = memtree->who_owns(access);
+        const xkrt_device_global_id_bitfield_t owners = memcontroller->who_owns(access);
         if (owners)
             device_id = (xkrt_device_global_id_t) __random_set_bit(owners) - 1;
     }
@@ -58,20 +58,20 @@ xkrt_runtime_submit_task(xkrt_runtime_t * context, Task * task)
     {
         while (1)
         {
-            device_id = context->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = device_id % context->drivers.devices.n;
-            if (context->drivers.devices.list[device_id])
+            device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
+            device_id = device_id % runtime->drivers.devices.n;
+            if (runtime->drivers.devices.list[device_id])
                 break ;
         }
     }
 
     if (worker == nullptr)
     {
-        assert((device_id >= 0 && device_id < context->drivers.devices.n) || device_id == HOST_DEVICE_GLOBAL_ID);
+        assert((device_id >= 0 && device_id < runtime->drivers.devices.n) || device_id == HOST_DEVICE_GLOBAL_ID);
         if (device_id == HOST_DEVICE_GLOBAL_ID)
-            worker = context->memory_coherent_worker_thread;
+            worker = runtime->memory_coherent_worker_thread;
         else
-            worker = context->drivers.devices.list[device_id]->thread;
+            worker = runtime->drivers.devices.list[device_id]->thread;
     }
 
     LOGGER_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);

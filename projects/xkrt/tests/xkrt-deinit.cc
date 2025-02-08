@@ -4,12 +4,13 @@
 int
 main(void)
 {
-    assert(xkrt_deinit() == 0);
+    xkrt_runtime_t runtime;
+    assert(xkrt_deinit(&runtime) == 0);
 
-    assert(xkrt_init() == 0);
-    assert(xkrt_deinit() == 0);
+    assert(xkrt_init(&runtime) == 0);
+    assert(xkrt_deinit(&runtime) == 0);
 
-    assert(xkrt_deinit() == 0);
+    assert(xkrt_deinit(&runtime) == 0);
 
     return 0;
 }

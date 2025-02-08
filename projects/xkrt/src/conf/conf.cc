@@ -11,6 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkrt/min-max.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
 
@@ -49,48 +50,14 @@ __parse_nstreams(xkrt_conf_t * conf, char const * value)
 static void
 __parse_ngpus(xkrt_conf_t * conf, char const * value)
 {
-    conf->ngpus = value ? (uint8_t) atoi(value) : 1;
-}
-
-static void
-__parse_gpuset(xkrt_conf_t * conf, char const * value)
-{
-    if (value)
-    {
-        unsigned int gpuset = atoi(value);
-        if (__builtin_popcount(gpuset) < conf->ngpus)
-            conf->ngpus = (uint8_t) __builtin_popcount(gpuset);
-        else if (conf->ngpus ==0)
-            gpuset = 0;
-        else
-        {
-            /* take only the first ngpus bits to 1 in gpuset */
-            int tmp = gpuset;
-            int idx = 0;
-            for (int i=0; i<conf->ngpus; ++i)
-            {
-                idx = __builtin_ffs((unsigned int)tmp);
-                assert( idx != 0);
-                --idx;
-                tmp &= ~(1<<idx);
-            }
-            /* here idx == index of the ngpus bits to 1 in gpuset */
-            gpuset &= ((1<<(1+idx))-1);
-        }
-        conf->gpu_set = gpuset;
-        assert(__builtin_popcount(conf->gpu_set)  == conf->ngpus);
-    }
-    else
-    {
-        conf->gpu_set = (1 << conf->ngpus) - 1;
-    }
+    conf->device.ngpus = value ? (uint8_t) atoi(value) : 1;
 }
 
 static void
 __parse_gpu_mem_percent(xkrt_conf_t * conf, char const * value)
 {
     if (value)
-        conf->gpu_mem_percent = (float) atof(value);
+        conf->device.gpu_mem_percent = (float) atof(value);
 }
 
 static void
@@ -121,7 +88,6 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,    "Merge memory transfers over continuous virtual memory"},
     {"XKRT_PRECISION",            NULL,                       NULL},
     {"XKRT_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
-    {"XKRT_GPUSET",               __parse_gpuset,             "A bitmask representing GPUs to use"},
     {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,    "%% of total memory to allocate initially per GPU (in ]0..100["},
     {"XKRT_NSTREAMS",             __parse_nstreams,           "Number of concurrent kernel streams per GPU"},
     {"XKRT_NKERNELS",             __parse_nkernels,           "Number of concurrent kernels per stream"},
@@ -146,11 +112,8 @@ void
 xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
-    conf->stackblocsize     = (uint64_t)-1;
-    conf->ngpus             = (uint8_t)-1;
-    conf->gpu_set           = (uint32_t) ~0;
-    conf->gpu_mem_percent   = (float) 92.0;
-    conf->merge_transfers   = false;
+    conf->device.ngpus              = (uint8_t)-1;
+    conf->device.gpu_mem_percent    = (float) 92.0;
 
     //////////////////
     //  KERNEL CONF //
@@ -161,13 +124,13 @@ xkrt_init_conf(xkrt_conf_t * conf)
     conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = 8;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 0;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 64;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 0;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 64;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 0;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 64;
 
     //////////////////
     //  DEVICE CONF //
