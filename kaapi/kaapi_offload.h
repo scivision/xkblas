@@ -281,6 +281,8 @@ typedef struct kaapi_driver {
     void (*f_memcpy)(void*,void*,size_t);
     void (*f_advise_gpu)(void*,size_t);
     void (*f_advise_cpu)(void*,size_t);
+    void (*f_host_register_direct)(void*,size_t);
+    void (*f_host_unregister_direct)(void*);
 
     /* linked list of all drivers */
     struct kaapi_driver* next;

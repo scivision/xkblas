@@ -115,6 +115,28 @@ uint64_t xkblas_register_memory_async( void* ptr, size_t sz )
   return 0;
 }
 */
+void xkblas_host_register_direct(void* ptr,size_t size)
+{
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_host_register_direct( ptr, size );
+	
+}
+
+void xkblas_host_unregister_direct(void* ptr)
+{
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_host_unregister_direct( ptr );
+}
 
 void xkblas_memset(void* ptr, int val, size_t count)
 {
@@ -3054,7 +3076,5 @@ void xkblas_unregister_work_buffer( void* ptr )
 
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
-
-
 
 

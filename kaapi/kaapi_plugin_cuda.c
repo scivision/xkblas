@@ -958,6 +958,7 @@ void* kaapi_cuda_register_thread(void* dummy )
 	  loc.type = cudaMemLocationTypeDevice;
 	  loc.id = 0;
 	  err = cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
+	  //err = cudaMemPrefetchAsync( req.ptr, req.size, 0, NULL );
 #endif //defined(KAAPI_UNIFIED)
 
 #if !defined(KAAPI_UNIFIED)
@@ -978,6 +979,7 @@ void* kaapi_cuda_register_thread(void* dummy )
 	  loc.id = 0;
 	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
 	  //cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc);
+	  //err = cudaMemPrefetchAsync( req.ptr, req.size, cudaCpuDeviceId, NULL );
 #endif //defined(KAAPI_UNIFIED)
 
 #if !defined(KAAPI_UNIFIED)
@@ -2516,6 +2518,28 @@ KAAPI_PLUGIN_ENTRYPOINT(advise_cpu)(void* ptr,size_t size)
 	cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc);
 }
 
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(host_register_direct)(void* ptr,size_t size)
+{
+	//struct cudaMemLocation loc;
+	//loc.type = cudaMemLocationTypeHost;
+	//loc.id = 0;
+	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseUnsetPreferredLocation, loc);
+	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc);
+        cudaHostRegister(ptr, size, cudaHostRegisterPortable);
+}
+
+KAAPI_CLASS_ENTRYPOINT void 
+KAAPI_PLUGIN_ENTRYPOINT(host_unregister_direct)(void* ptr)
+{
+	//struct cudaMemLocation loc;
+	//loc.type = cudaMemLocationTypeHost;
+	//loc.id = 0;
+	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseUnsetPreferredLocation, loc);
+	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc);
+        cudaHostUnregister(ptr);
+}
+
 #if KAAPI_USE_DYNLOADER==0
   /* */
 #define EP(func)                                                     \
@@ -2554,5 +2578,7 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (memcpy);
   EP (advise_gpu);
   EP (advise_cpu);
+  EP (host_register_direct);
+  EP (host_unregister_direct);
 }
 #endif
