@@ -67,9 +67,9 @@ include_directories(${HWLOC_INCLUDE_DIRS})
 message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 
 # HOST DRIVER
-option(USE_CPU "Whether to build the CPU driver." OFF)
-if (USE_CPU)
-    add_compile_definitions(USE_CPU=1)
+option(USE_HOST "Whether to build the HOST driver." OFF)
+if (USE_HOST)
+    add_compile_definitions(USE_HOST=1)
     add_library(${XKRT}_driver_cpu SHARED src/driver/driver_cpu.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cpu)
     install(TARGETS ${XKRT}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)

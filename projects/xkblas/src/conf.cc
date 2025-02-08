@@ -19,8 +19,6 @@
 # include <stdlib.h>
 # include <string.h>
 
-# pragma message(TODO "Add a conf interface in xkrt and push xkblas conf into it")
-
 void
 xkblas_init_conf(xkblas_conf_t * conf)
 {

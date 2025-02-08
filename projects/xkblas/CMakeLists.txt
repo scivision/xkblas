@@ -105,43 +105,13 @@ find_package(XKRT REQUIRED)
 message(STATUS "Found XKRT: ${XKRT_INCLUDE_DIRS}")
 include_directories("${XKRT_INCLUDE_DIRS}")
 
-# CUDA
-option(USE_CUDA "Whether to build the NVIDIA GPU driver." ON)
-if (USE_CUDA)
-    add_compile_definitions(USE_CUDA=1)
-    find_package(CUDA REQUIRED)
-    find_package(CUDA_RT)
-    if (NOT ${CUDA_RT_FOUND})
-        message(FATAL_ERROR "Xkblas could not find CUDA_RT.")
-    endif()
-    include_directories("${CUDA_INCLUDE_DIRS}")
-    message(STATUS "Found Cuda: ${CUDA_INCLUDE_DIRS}")
+find_package(CUBLAS)
+if (${CUBLAS_FOUND})
+    include_directories("${CUBLAS_INCLUDE_DIRS}")
+    message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
+else()
+    message(STATUS "Cublas not found")
 endif()
-
-# HIP
-option(USE_HIP "Whether to build the AMD GPU driver." OFF)
-if (USE_HIP)
-
-    add_compile_definitions(USE_HIP=1)
-    find_package(HIP REQUIRED)
-    if (NOT ${HIP_FOUND})
-        message(FATAL_ERROR "Xkblas could not find HIP.")
-    endif()
-    include_directories("${HIP_INCLUDE_DIRS}")
-    message(STATUS "Found HIP: ${HIP_LIBRARIES}")
-
-    find_package(HIPBLAS)
-    if (NOT ${HIPBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas could not find HIPBLAS.")
-    endif()
-    message(STATUS "Found HIPBLAS: ${HIPBLAS_LIBRARIES}")
-
-endif()
-
-if (USE_CUDA AND USE_HIP)
-    message(STATUS "Enabling both CUDA and HIP is experimental, what kind of machine are you running on ?")
-endif()
-
 
 ##########
 # XKBLAS #
@@ -151,20 +121,16 @@ endif()
 add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
 target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKRT}/lib/libxkrt.so)
 
-if (${HWLOC_FOUND})
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${HWLOC_LIBRARIES})
+if (${CUBLAS_FOUND})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
 endif()
 
-# IF USING CUDA
-if (${CUDA_RT_FOUND})
-
-    # Cuda kernels
-    set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
-    cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
-    install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-
-endif()
+# Cuda kernels
+find_package(CUDA)
+set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
+cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
+target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 # Include directory
 include_directories(include/)

@@ -20,6 +20,8 @@
 void
 xkblas_kernel_auto_tile(
     xkblas_kernel_type_t kernel,
+    const int ngpus,
+    const int nstream_kern,
     int * args,
     size_t * bs
 );

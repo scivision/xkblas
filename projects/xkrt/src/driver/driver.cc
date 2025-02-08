@@ -153,10 +153,10 @@ xkrt_drivers_init(
     void (*loaders[XKRT_DRIVER_TYPE_MAX])(xkrt_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
-# if USE_CPU
-    extern void XKRT_DRIVER_CPU_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_CPU] = XKRT_DRIVER_CPU_get_driver;
-# endif /* USE_CPU */
+# if USE_HOST
+    extern void XKRT_DRIVER_HOST_get_driver(xkrt_driver_t *);
+    loaders[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_get_driver;
+# endif /* USE_HOST */
 
 # if USE_CUDA
     extern void XKRT_DRIVER_TYPE_CUDA_get_driver(xkrt_driver_t *);

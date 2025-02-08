@@ -31,7 +31,10 @@ extern "C"
 int
 xkblas_get_ngpus(int * count)
 {
-    return xkrt_get_ngpus(count);
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    return xkrt_get_ngpus(&(context->runtime), count);
 }
 
 extern "C"

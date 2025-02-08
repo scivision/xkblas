@@ -16,6 +16,7 @@
 
 # include "conf.h"
 
+# include <xkrt/xkrt.h>
 # include <xkrt/sync/spinlock.h>
 
 # include <atomic>
@@ -29,7 +30,7 @@ typedef enum    xkblas_context_state_t : uint8_t
 
 typedef struct  xkblas_context_t
 {
-    /* context state */
+    xkrt_runtime_t runtime;
     struct {
         spinlock_t spinlock;
         volatile std::atomic<xkblas_context_state_t> current;

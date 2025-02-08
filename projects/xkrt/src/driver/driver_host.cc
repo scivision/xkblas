@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_CPU_ ## N
+# define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_HOST_ ## N
 
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/device.h>
@@ -32,8 +32,8 @@ typedef struct  xkrt_device_host_t
 }               xkrt_device_host_t;
 
 /* the host devices (should be '1' - using >1 for debug purposes when no cuda/gpu available :-) */
-# define N_CPU_DEVICES 1
-static xkrt_device_host_t DEVICES[N_CPU_DEVICES];
+# define N_HOST_DEVICES 1
+static xkrt_device_host_t DEVICES[N_HOST_DEVICES];
 
 /* initialization synchronization */
 static bool INITIALIZED = false;
@@ -42,7 +42,7 @@ static xkrt_mutex_t DRIVER_MUTEX = XKRT_MUTEX_INITIALIZER;
 static unsigned int
 XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
-    return N_CPU_DEVICES;
+    return N_HOST_DEVICES;
 }
 
 static int
@@ -76,7 +76,7 @@ XKRT_DRIVER_ENTRYPOINT(finalize)(void)
         XKRT_MUTEX_LOCK(DRIVER_MUTEX);
         {
             if (!INITIALIZED)
-                LOGGER_FATAL("Finalize CUDA driver before initializing...");
+                LOGGER_FATAL("Finalize HOST driver before initializing...");
         }
         XKRT_MUTEX_UNLOCK(DRIVER_MUTEX);
     }

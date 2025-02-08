@@ -1,25 +1,34 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   memory-invalidate.cc                                                     */
+/*   xkrt-support.h                                                          */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:35:17 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2024/12/19 21:50:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/xkrt.h>
-    # include "context.h"
+#ifndef __XKRT_SUPPORT_H__
+# define __XKRT_SUPPORT_H__
 
-extern "C"
-void
-xkblas_memory_invalidate_caches(void)
-{
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
+# if USE_HOST
+#  define XKRT_SUPPORT_HOST
+# endif /* USE_HOST */
 
-    return xkrt_memory_invalidate(&(context->runtime));
-}
+# if USE_CUDA
+#  define XKRT_SUPPORT_CUDA
+# endif /* USE_CUDA */
+
+# if USE_HIP
+#  define XKRT_SUPPORT_HIP
+# endif /* USE_HIP */
+
+
+# if USE_ZE
+#  define XKRT_SUPPORT_ZE
+# endif /* USE_ZE */
+
+#endif /* __XKRT_SUPPORT_H__ */
