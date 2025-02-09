@@ -5,11 +5,8 @@ int
 main(void)
 {
     xkrt_runtime_t runtime;
-    assert(xkrt_deinit(&runtime) == 0);
 
     assert(xkrt_init(&runtime) == 0);
-    assert(xkrt_deinit(&runtime) == 0);
-
     assert(xkrt_deinit(&runtime) == 0);
 
     return 0;

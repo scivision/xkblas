@@ -17,14 +17,13 @@
 # include "auto-tile.h"
 # include "xkblas/kernel-type.h"
 
-# include <xkrt/device/task-launcher.h>
-# include <xkrt/device/thread-producer.hpp>
+# include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/sync/alignedas.h>
-# include <xkrt/sync/cache-line-size.hpp>
+# include <xkrt/memory/alignedas.h>
+# include <xkrt/memory/cache-line-size.hpp>
 
 # include <cassert>
 
@@ -76,7 +75,7 @@ xkblas_£copyscale_tile_async(
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "copyscale(D=(%d,%d) ; L=(%d,%d) ; U=(%d,%d))", Dm, Dn, Lm, Ln, Um, Un);
+    snprintf(task->label, sizeof(task->label), "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
     # endif /* NDEBUG */
 
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
@@ -90,7 +89,7 @@ xkblas_£copyscale_tile_async(
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
-    thread->commit(task);
+    context->runtime.commit(task);
 
     return 0;
 }
@@ -186,8 +185,9 @@ xkblas_£copyscale_async(
     return 0;
 }
 
-# if USE_CUDA
-#  include <xkrt/device/cublas-helper.h>
+# if XKRT_SUPPORT_CUDA
+#  include <xkrt/driver/cublas-helper.h>
+#  include <xkrt/driver/driver-cuda.h>
 
 extern "C"
 int
@@ -201,13 +201,16 @@ cuda_£copyscale(
 );
 
 static void
-body_cuda(void * vlauncher)
+body_cuda(void * ihandle, void * vargs)
 {
-    task_launcher_t * launcher = (task_launcher_t *) vlauncher;
-    assert(launcher);
+    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+    assert(stream);
 
-    cublasStatus_t res;
-    cublasHandle_t handle = (cublasHandle_t) launcher->handle;
+    cudaStream_t cuda_stream = stream->cu.handle.high;
+    assert(handle);
+
+    Task * task = (Task *) vargs;
+    assert(task);
 
     const Access * D = launcher->task->accesses + 0;
     const Access * L = launcher->task->accesses + 1;
@@ -216,14 +219,9 @@ body_cuda(void * vlauncher)
     assert(D->device_view.addr % D->host_view.sizeof_type == 0);
     assert(L->device_view.addr % L->host_view.sizeof_type == 0);
     assert(U->device_view.addr % U->host_view.sizeof_type == 0);
-    assert(handle);
 
     args_t * args = (args_t *) (launcher->task + 1);
     assert(args);
-
-    cudaStream_t cuda_stream;
-    res = cublasGetStream( (cublasHandle_t) handle, &cuda_stream );
-    xkrt_cublas_status_check(res);
 
     cuda_£copyscale(
         cuda_stream,
@@ -235,9 +233,9 @@ body_cuda(void * vlauncher)
     );
 }
 
-# endif /* USE_CUDA */
+# endif /* XKRT_SUPPORT_CUDA */
 
-/* CPU driver */
+/* HOST driver */
 extern "C"
 int
 xkblas_£copyscale_native(
@@ -278,7 +276,7 @@ xkblas_£copyscale_native(
     return 0;
 }
 
-# ifdef USE_CPU
+# ifdef XKRT_SUPPORT_HOST
 
 static void
 body_cpu(void * args)
@@ -287,7 +285,7 @@ body_cpu(void * args)
     xkblas_zcopyscale_native(...);
 }
 
-# endif /* USE_CPU */
+# endif /* XKRT_SUPPORT_HOST */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -299,13 +297,14 @@ register_£copyscale_format(void)
     task_format_t format;
     memset(&format, 0, sizeof(task_format_t));
 
-# ifdef USE_CPU
-    format.f[XKRT_DRIVER_TYPE_CPU] = body_cpu;
-# endif /* USE_CPU */
-# ifdef USE_CUDA
+    # if XKRT_SUPPORT_HOST
+    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    # endif /* XKRT_SUPPORT_HOST */
+
+    # if XKRT_SUPPORT_CUDA
     format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
-# endif /* USE_CUDA */
+    # endif /* XKRT_SUPPORT_CUDA */
+
     snprintf(format.label, sizeof(format.label), "£copyscale");
-    format.target = TASK_FORMAT_TARGET_DRIVER;
-    format_id = task_format_create(&format);
+    format_id = xkblas_task_format_create(&format);
 }

@@ -11,9 +11,9 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include "context.h"
 # include "xkblas/kernel-type.h"
 
-# include <xkrt/runtime.h>
 # include <xkrt/logger/logger.h>
 
 # include <assert.h>
@@ -22,11 +22,15 @@
 void
 xkblas_kernel_auto_tile(
     xkblas_kernel_type_t kernel,
-    const int ngpus,
-    const int nstream_kern,
     int * args,
     size_t * ts
 ) {
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    const int ngpus        = context->runtime.drivers.devices.n;
+    const int nstream_kern = context->runtime.conf.device.offloader.streams[XKRT_STREAM_TYPE_KERN].n;
+
     size_t ts_auto = 0;
     switch (kernel)
     {

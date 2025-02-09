@@ -38,24 +38,6 @@ xkrt_device_stream_instruction_submit(
     xkrt_stream_t * stream,
     xkrt_stream_instruction_t * instr
 ) {
-    # if 0 && USE_STATS
-    stats->streams[stream->type].instructions[instr->type].launched;
-
-    switch (instr->type)
-    {
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
-        {
-            stats->streams[stream->type].transfered += instr->copy.host_view.size();
-            break ;
-        }
-
-        default:
-            break ;
-    }
-    # endif /* USE_STATS */
 
     /* commit instruction to the stream */
     stream->commit(instr);
@@ -71,15 +53,10 @@ xkrt_device_stream_instruction_submit(
 void
 xkrt_device_stream_instruction_submit_kernel(
     xkrt_device_t * device,
-    Task * task,
+    void (*launch)(void * handle, void * vargs),
+    void * vargs,
     const xkrt_callback_t & callback
 ) {
-    # ifndef NDEBUG
-    LOGGER_INFO("Task `%s` is ready for kernel execution", task->label);
-    # endif /* NDEBUG */
-
-    // assert(ThreadWorker::self() == device->thread);
-
     /* create a new instruction and retrieve its offload stream */
     xkrt_stream_t * stream;
     xkrt_stream_instruction_t * instr;
@@ -95,9 +72,8 @@ xkrt_device_stream_instruction_submit_kernel(
     assert(stream->is_locked());
 
     /* create a new kernel instruction */
-    instr->kern.args = task;
-    instr->kern.launch = NULL;
-    LOGGER_FATAL("Set the task kernel here");
+    instr->kern.launch = launch;
+    instr->kern.vargs = vargs;
 
     xkrt_device_stream_instruction_submit(device, stream, instr);
 }

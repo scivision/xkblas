@@ -24,8 +24,6 @@
 # include <xkrt/driver/device.h>
 # include <xkrt/driver/driver-type.h>
 # include <xkrt/driver/stream.h>
-# include <xkrt/task/task.hpp>
-# include <xkrt/driver/task-launcher.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mutex.h>
 
@@ -166,11 +164,10 @@ void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
     uint8_t ngpus,
-    void (*routine)(void * args, uint8_t driver_id, uint8_t device_driver_id),
-    void * args
+    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
+    void * vargs
 );
 void xkrt_drivers_deinit(xkrt_drivers_t * drivers);
-void xkrt_drivers_enqueue(xkrt_drivers_t * drivers, Task * task);
 
 /* set the initial free block to the ptr device allocator (TODO: maybe
  * change that to some 'add_block' instead to add several blocks) */

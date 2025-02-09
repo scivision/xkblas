@@ -13,6 +13,7 @@ project(${XKRT})
 
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-version-always-run.h
+    ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-support-always-run.h
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
@@ -37,6 +38,14 @@ add_custom_command(
         ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-version-always-run.h # set invalid name so its always generated
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
+)
+
+# XKRT support
+add_custom_command(
+    OUTPUT
+        ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-support-always-run.h # set invalid name so its always generated
+    COMMAND
+        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -87,26 +96,6 @@ if (USE_CUDA)
     find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
     message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
-
-endif()
-
-# HIP
-option(USE_HIP "Whether to build the HIP driver." OFF)
-if (USE_HIP)
-
-    add_compile_definitions(USE_HIP=1)
-    find_package(HIP REQUIRED)
-    if (NOT ${HIP_FOUND})
-        message(FATAL_ERROR "Xkblas could not find HIP.")
-    endif()
-    include_directories("${HIP_INCLUDE_DIRS}")
-    message(STATUS "Found HIP: ${HIP_LIBRARIES}")
-
-    find_package(HIPBLAS)
-    if (NOT ${HIPBLAS_FOUND})
-        message(FATAL_ERROR "Xkblas could not find HIPBLAS.")
-    endif()
-    message(STATUS "Found HIPBLAS: ${HIPBLAS_LIBRARIES}")
 
 endif()
 

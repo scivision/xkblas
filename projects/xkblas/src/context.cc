@@ -107,3 +107,14 @@ xkblas_sync(void)
 
     xkrt_sync(&(context->runtime));
 }
+
+/////////////////////////////////////////////
+// Dirty stuff so it compiles without changing the rest of the world //
+/////////////////////////////////////////////
+task_format_id_t
+xkblas_task_format_create(task_format_t * format)
+{
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+    return task_format_create(&(context->runtime.task_formats), format);
+}

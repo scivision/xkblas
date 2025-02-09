@@ -9,7 +9,7 @@
 static int r = 0;
 
 static void
-func(void * args)
+func(void * handle, void * args)
 {
     r = 1;
 }
@@ -34,15 +34,14 @@ main(void)
     ThreadProducer * thread = ThreadProducer::self();
     assert(thread);
 
+    // Submit the task
     const size_t task_size = sizeof(Task);
     Task * task = (Task *) thread->allocate(task_size);
-    {
-        new(task) Task(FORMAT, UNSPECIFIED_TASK_ACCESS, HOST_DEVICE_GLOBAL_ID);
-        assert(thread->commit(task) == TASK_STATE_READY);
-        xkrt_runtime_submit_task(&runtime, task);
-    }
+    new(task) Task(FORMAT, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    runtime.commit(task);
 
-    // Submit the task
+    // wait
+    assert(xkrt_sync(&runtime) == 0);
 
     // deinit has an implicit taskwait
     assert(xkrt_deinit(&runtime) == 0);

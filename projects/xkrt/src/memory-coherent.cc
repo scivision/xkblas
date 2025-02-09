@@ -69,20 +69,23 @@ body_memory_coherent_async_fetch_callback(
     assert(self);
 
     // unpack stuff
-    ThreadWorker * worker = (ThreadWorker *) args[0];
+    xkrt_runtime_t * runtime = (xkrt_runtime_t *) args[0];
+    assert(runtime);
+
+    ThreadWorker * worker = (ThreadWorker *) args[1];
     assert(worker);
 
     // self is a device thread, worker is the asynchronous coherent copy thread
     assert(self != worker);
 
-    Task * parent = (Task *) args[1];
+    Task * parent = (Task *) args[2];
     assert(parent);
 
     // one fetched completed, notify the parent
     if (parent->fetched() == TASK_STATE_DATA_FETCHED)
-        worker->complete(parent);
+        runtime->complete(parent);
 
-    fetch_list_t * list = (fetch_list_t *) args[2];
+    fetch_list_t * list = (fetch_list_t *) args[3];
     assert(list);
 
     if (list->fetched() == 0)
@@ -90,13 +93,10 @@ body_memory_coherent_async_fetch_callback(
 }
 
 static void
-body_memory_coherent_async_fetch(void * vlauncher)
+body_memory_coherent_async_fetch(void * handle, void * vargs)
 {
     // unpack stuff
-    const task_launcher_t * launcher = (task_launcher_t *) vlauncher;
-    assert(launcher);
-
-    const Task * task = launcher->task;
+    const Task * task = (const Task *) vargs;
     assert(task);
 
     const args_fetch_t * args = (args_fetch_t *) (task + 1);
@@ -123,12 +123,13 @@ body_memory_coherent_async_fetch(void * vlauncher)
     assert(worker != ThreadWorker::self());
 
     // submit fetch - with a callback doing parent->fetched() on completion
-    static_assert(XKRT_CALLBACK_ARGS_MAX >= 1);
+    static_assert(XKRT_CALLBACK_ARGS_MAX >= 4);
     xkrt_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
-    callback.args[0] = worker;
-    callback.args[1] = parent;
-    callback.args[2] = list;
+    callback.args[0] = runtime;
+    callback.args[1] = worker;
+    callback.args[2] = parent;
+    callback.args[3] = list;
 
     xkrt_device_t * device = runtime->device_get(fetch->src_device_global_id);
     assert(device);
@@ -205,10 +206,10 @@ xkrt_memory_coherent_async_worker_thread_work(
     // avoid early completion
     current->fetching();
 
-    // launch each fetch
     ThreadProducer * producer = ThreadProducer::self();
     assert(producer);
 
+    // launch each fetch
     for (uint32_t i = 0 ; i < list->n ; ++i)
     {
         current->fetching();
@@ -235,13 +236,13 @@ xkrt_memory_coherent_async_worker_thread_work(
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);
-        if (producer->commit(task) == TASK_STATE_READY)
-            xkrt_runtime_submit_task(runtime, task);
+
+        runtime->commit(task);
     }
 
     // if early-completion happened
     if (current->fetched() == TASK_STATE_DATA_FETCHED)
-        thread->complete(current);
+        runtime->complete(current);
 }
 
 /////////////////////////////
@@ -374,8 +375,7 @@ xkrt_memory_coherent_async(
                 strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
                 #endif /* NDEBUG */
 
-                if (thread->commit(task) == TASK_STATE_READY)
-                    xkrt_runtime_submit_task(runtime, task);
+                runtime->commit(task);
             }
         }
     }

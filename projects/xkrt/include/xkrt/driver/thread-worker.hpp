@@ -60,8 +60,19 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
         /* pop a task */
         Task * pop(void);
 
-        /* move the wait counter */
-        void complete(Task * task);
+        /**
+         * Complete the given task, that is:
+         *  - callback with any successors that are now ready
+         *  - then move the wait counter
+         */
+        template <void (*callback)(Task * task, void * vargs)>
+        void
+        complete(Task * task, void * vargs)
+        {
+            task->complete<callback>(vargs);    /* this may 'push' tasks, incrementing 'wc' */
+            writemem_barrier();                 /* membarrier to avoid 'wc' being decremented before the previous line increment */
+            ThreadWorker::move_wc(-1);
+        }
 
         /* return true if the wait counter is '0' */
         bool completed(void) const;

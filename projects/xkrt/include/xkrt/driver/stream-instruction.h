@@ -43,8 +43,8 @@ typedef struct xkrt_stream_instruction_barrier_t
 /* io instruction kernel : to launch kernel on the device */
 typedef struct  xkrt_stream_instruction_kernel_t
 {
-    void (*launch)(void * handle, void * args);
-    void * args;
+    void (*launch)(void * stream, void * vargs);
+    void * vargs;
 }               xkrt_stream_instruction_kernel_t;
 
 /* An PTR I/O instruction */

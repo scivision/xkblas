@@ -14,21 +14,8 @@
 #ifndef __XKRT_SUPPORT_H__
 # define __XKRT_SUPPORT_H__
 
-# if USE_HOST
-#  define XKRT_SUPPORT_HOST
-# endif /* USE_HOST */
-
-# if USE_CUDA
-#  define XKRT_SUPPORT_CUDA
-# endif /* USE_CUDA */
-
-# if USE_HIP
-#  define XKRT_SUPPORT_HIP
-# endif /* USE_HIP */
-
-
-# if USE_ZE
-#  define XKRT_SUPPORT_ZE
-# endif /* USE_ZE */
+# define XKRT_SUPPORT_HOST  0
+# define XKRT_SUPPORT_CUDA  1
+# define XKRT_SUPPORT_ZE    1
 
 #endif /* __XKRT_SUPPORT_H__ */

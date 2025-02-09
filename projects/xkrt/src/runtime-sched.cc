@@ -16,6 +16,7 @@
 # include <xkrt/driver/device.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
+# include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/driver/thread-worker.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -354,12 +355,12 @@ xkrt_device_thread_main_loop(
 
 /* Main entry thread created per device */
 void
-xkrt_device_thread_main(void * vruntime, uint8_t driver_id, uint8_t device_driver_id)
+xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id)
 {
     # pragma message(TODO "Implement device thread")
 
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) vruntime;
-    xkrt_driver_t * driver = runtime->drivers.list + driver_id;
+    xkrt_driver_t * driver = runtime->drivers.list + driver_type;
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
@@ -369,9 +370,10 @@ xkrt_device_thread_main(void * vruntime, uint8_t driver_id, uint8_t device_drive
     xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
     assert(device);
 
-    device->state     = XKRT_DEVICE_STATE_CREATE;
-    device->driver_id = device_driver_id;
-    device->global_id = runtime->drivers.devices.n.fetch_add(1, std::memory_order_seq_cst);
+    device->state       = XKRT_DEVICE_STATE_CREATE;
+    device->driver_type = driver_type;
+    device->driver_id   = device_driver_id;
+    device->global_id   = runtime->drivers.devices.n.fetch_add(1, std::memory_order_seq_cst);
 
     runtime->drivers.devices.list[device->global_id] = device;
 
@@ -434,25 +436,17 @@ xkrt_device_thread_main(void * vruntime, uint8_t driver_id, uint8_t device_drive
 // Task execution //
 ////////////////////
 
-/* callback after the task kernel executed */
-static inline void
-xkrt_device_task_executed(
-    Task * task
-) {
-    assert(task);
-
-    ThreadWorker * thread = ThreadWorker::self();
-    assert(thread);
-
-    thread->complete(task);
-}
-
 static void
 xkrt_device_task_executed_callback(
     const void * args[XKRT_CALLBACK_ARGS_MAX]
 ) {
-    assert(args[0]);
-    xkrt_device_task_executed((Task *) args[0]);
+    xkrt_runtime_t * runtime = (xkrt_runtime_t *) args[0];
+    assert(runtime);
+
+    Task * task = (Task *) args[1];
+    assert(task);
+
+    runtime->complete(task);
 }
 
 /**
@@ -467,12 +461,14 @@ xkrt_device_task_execute(
     xkrt_device_t * device,
     Task * task
 ) {
-    assert(XKRT_CALLBACK_ARGS_MAX >= 1);
+    # ifndef NDEBUG
+    LOGGER_INFO("Task `%s` is ready for kernel execution", task->label);
+    # endif /* NDEBUG */
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
     {
-        xkrt_device_task_executed(task);
+        runtime->complete(task);
     }
     else
     {
@@ -507,9 +503,8 @@ xkrt_device_task_execute(
         /* running a host task */
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
-            task_launcher_t launcher = { .task = task, .handle = NULL };
-            format->f[targetfmt](&launcher);
-            xkrt_device_task_executed(task);
+            format->f[targetfmt](NULL, task);
+            runtime->complete(task);
         }
         /* running a device task */
         else
@@ -518,11 +513,14 @@ xkrt_device_task_execute(
              * driver on kernel completion test success */
             xkrt_callback_t callback;
             callback.func    = xkrt_device_task_executed_callback;
-            callback.args[0] = task;
+            callback.args[0] = runtime;
+            callback.args[1] = task;
+            assert(XKRT_CALLBACK_ARGS_MAX >= 2);
 
-            // TODO pass format here
-            xkrt_device_stream_instruction_submit_kernel(device, task, callback);
-            if (device->thread == ThreadWorker::self())
+            /* submit kernel launch instruction */
+            xkrt_device_stream_instruction_submit_kernel(device, format->f[targetfmt], task, callback);
+
+            if (device->thread == ThreadWorker::self()) // TODO : explain why this
                 device->offloader.launch_ready_instructions(XKRT_STREAM_TYPE_KERN);
             /* else kernel launch will be called asynchronously */
         }
@@ -603,16 +601,6 @@ xkrt_runtime_t::memory_deallocate(
 }
 
 void
-xkrt_runtime_t::submit_kernel(
-    const xkrt_device_global_id_t device_global_id,
-    Task * task,
-    const xkrt_callback_t & callback
-) {
-    xkrt_device_t * device = this->device_get(device_global_id);
-    xkrt_device_stream_instruction_submit_kernel(device, task, callback);
-}
-
-void
 xkrt_runtime_t::submit_copy(
     const xkrt_device_global_id_t   device_global_id,
     const memory_view_t           & host_view,
@@ -633,4 +621,35 @@ xkrt_runtime_t::task_execute(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_device_task_execute(this, device, task);
+}
+
+/////////////////////////////////////////////
+
+static inline void
+enqueue_ready_task(Task * task, void * vargs)
+{
+    xkrt_runtime_submit_task((xkrt_runtime_t *) vargs, task);
+}
+
+void
+xkrt_runtime_t::commit(Task * task)
+{
+    ThreadProducer * producer = ThreadProducer::self();
+    assert(producer);
+    producer->commit<enqueue_ready_task>(task, this);
+}
+
+void
+xkrt_runtime_t::complete(Task * task)
+{
+    assert(task);
+
+    # ifndef NDEBUG
+    LOGGER_INFO("Task `%s` completed", task->label);
+    # endif /* NDEBUG */
+
+    ThreadWorker * thread = ThreadWorker::self();
+    assert(thread);
+
+    thread->complete<enqueue_ready_task>(task, this);
 }

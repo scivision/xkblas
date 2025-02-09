@@ -57,7 +57,7 @@ typedef enum    task_format_target_t : uint8_t
 typedef struct  task_format_t
 {
     /* kernel launch */
-    void (*f[TASK_FORMAT_FUNC_MAX])(void * args);
+    void (*f[TASK_FORMAT_FUNC_MAX])(void * handle, void * args);
 
     /* a label */
     char label[16];

@@ -19,14 +19,13 @@
 
 # include "xkblas/kernel-type.h"
 
-# include <xkrt/device/task-launcher.h>
-# include <xkrt/device/thread-producer.hpp>
+# include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/sync/alignedas.h>
-# include <xkrt/sync/cache-line-size.hpp>
+# include <xkrt/memory/alignedas.h>
+# include <xkrt/memory/cache-line-size.hpp>
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
@@ -87,7 +86,7 @@ xkblas_£gemmt_tile_async(
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
+    snprintf(task->label, sizeof(task->label), "gemm(A=(%zu,%zu) ; B=(%zu,%zu) ; C=(%zu,%zu))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
@@ -109,7 +108,7 @@ xkblas_£gemmt_tile_async(
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
-    thread->commit(task);
+    context->runtime.commit(task);
 
     return 0;
 }
@@ -318,40 +317,35 @@ xkblas_£gemmt_async(
     return 0;
 }
 
-
-# if USE_HIP
-
-static inline void
-body_hip(void * vlauncher)
-{
-}
-# endif /* USE_HIP */
-
-# if USE_CUDA
-#  include <xkrt/device/cublas-helper.h>
+# if XKRT_SUPPORT_CUDA
+#  include <xkrt/driver/cublas-helper.h>
+#  include <xkrt/driver/driver-cuda.h>
 
 static void
-body_cuda(void * vlauncher)
+body_cuda(void * ihandle, void * vargs)
 {
-    task_launcher_t * launcher = (task_launcher_t *) vlauncher;
-    assert(launcher);
+    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+    assert(stream);
 
-    cublasStatus_t res;
-    cublasHandle_t handle = (cublasHandle_t) launcher->handle;
+    cublasHandle_t handle = stream->cu.blas.handle;
+    assert(handle);
 
-    const Access * A = launcher->task->accesses + 0;
-    const Access * B = launcher->task->accesses + 1;
-    const Access * C = launcher->task->accesses + 2;
+    Task * task = (Task *) vargs;
+    assert(task);
+
+    const Access * A = task->accesses + 0;
+    const Access * B = task->accesses + 1;
+    const Access * C = task->accesses + 2;
 
     assert(A->device_view.addr % A->host_view.sizeof_type == 0);
     assert(B->device_view.addr % B->host_view.sizeof_type == 0);
     assert(C->device_view.addr % C->host_view.sizeof_type == 0);
 
-    args_t * args = (args_t *) (launcher->task + 1);
+    args_t * args = (args_t *) (task + 1);
     assert(args);
 
     # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasGemm(m=%d, n=%d, k=%d, A=%p, lda=%d, B=%p, ldb=%d, C=%p, ldc=%d) on task=`%s`",
+    LOGGER_INFO("Calling cublasGemmt(m=%zu, n=%zu, k=%zu, A=%p, lda=%zu, B=%p, ldb=%zu, C=%p, ldc=%zu) on task=`%s`",
         args->n, args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,
@@ -362,12 +356,6 @@ body_cuda(void * vlauncher)
         launcher->task->label
     );
     #endif /* NDEBUG */
-
-    # if 0
-    assert(handle);
-    res = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
-    assert(res == CUBLAS_STATUS_SUCCESS);
-    # endif
 
     res = cublas££gemm(
         handle,
@@ -382,14 +370,15 @@ body_cuda(void * vlauncher)
     xkrt_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
-# endif /* USE_CUDA */
+# endif /* XKRT_SUPPORT_CUDA */
 
+# if XKRT_SUPPORT_HOST
 static void
 body_cpu(void * args)
 {
     LOGGER_DEBUG("Executing a gemm on cpu");
 }
-
+# endif /* XKRT_SUPPORT_HOST */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -401,21 +390,14 @@ register_£gemmt_format(void)
     task_format_t format;
     memset(&format, 0, sizeof(task_format_t));
 
-    # pragma message(TODO "Use templated function to generate code instead of dupplicating HIP/Cuda kernels")
+    # if XKRT_SUPPORT_HOST
+    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    # endif /* XKRT_SUPPORT_HOST */
 
-    # if USE_CPU
-    format.f[XKRT_DRIVER_TYPE_CPU]    = body_cpu;
-    # endif /* USE_CPU */
-
-    # if USE_CUDA
-    format.f[XKRT_DRIVER_TYPE_CUDA]   = body_cuda;
-    # endif /* USE_CUDA */
-
-    # if USE_HIP
-    format.f[XKRT_DRIVER_TYPE_HIP]    = body_hip;
-    # endif /* USE_HIP */
+    # if XKRT_SUPPORT_CUDA
+    format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
+    # endif /* XKRT_SUPPORT_CUDA */
 
     snprintf(format.label, sizeof(format.label), "£gemmt");
-    format.target = TASK_FORMAT_TARGET_DRIVER;
-    format_id = task_format_create(&format);
+    format_id = xkblas_task_format_create(&format);
 }

@@ -14,9 +14,10 @@
 # include <xkrt/logger/todo.h>
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 
-# if USE_CUDA
+    # include <xkrt/xkrt-support.h>
+# if XKRT_SUPPORT_CUDA
 #  include <cuda_runtime.h>
-# endif /* USE_CUDA */
+# endif /* XKRT_SUPPORT_CUDA */
 
 # include <assert.h>
 # include <stddef.h>
@@ -26,9 +27,7 @@ extern "C"
 void *
 xkblas_host_alloc(size_t size)
 {
-    # if USE_HIP
-    #   error "Implement me"
-    # elif USE_CUDA
+    # if XKRT_SUPPORT_CUDA
     void * ptr;
     int err = cudaHostAlloc(&ptr, size, cudaHostAllocPortable);
     assert(err == cudaSuccess);
@@ -49,9 +48,7 @@ extern "C"
 void
 xkblas_host_free(void * ptr, size_t size)
 {
-    # if USE_HIP
-    #   error "Implement me"
-    # elif USE_CUDA
+    # if XKRT_SUPPORT_CUDA
     int err = cudaFreeHost(ptr);
     assert(err == cudaSuccess);
     # else

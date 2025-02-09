@@ -126,11 +126,14 @@ if (${CUBLAS_FOUND})
 endif()
 
 # Cuda kernels
-find_package(CUDA)
-set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
-cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
-target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
-install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+option(ENABLE_CU "Enable the compilation of custom cuda kernels" ON)
+if (ENABLE_CU)
+    find_package(CUDA)
+    set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
+    cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+    install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif()
 
 # Include directory
 include_directories(include/)
@@ -143,9 +146,6 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
-    if (${CUDA_RT_FOUND})
-        target_compile_options(${XKBLAS_NAME}_kernels_cuda PRIVATE ${STRICT_OPTIONS})
-    endif()
 endif()
 
 ################

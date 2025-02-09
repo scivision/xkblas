@@ -56,12 +56,19 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
     // fallback to round robin if no devices found
     if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID)
     {
-        while (1)
+        if (runtime->drivers.devices.n)
         {
-            device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
-            device_id = device_id % runtime->drivers.devices.n;
-            if (runtime->drivers.devices.list[device_id])
-                break ;
+            while (1)
+            {
+                device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
+                device_id = device_id % runtime->drivers.devices.n;
+                if (runtime->drivers.devices.list[device_id])
+                    break ;
+            }
+        }
+        else
+        {
+            LOGGER_FATAL("No device to schedule the task");
         }
     }
 

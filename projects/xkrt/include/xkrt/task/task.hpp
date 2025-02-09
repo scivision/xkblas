@@ -192,8 +192,9 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         /* Return the 'TASK_STATE_READY' if the task is now ready */
+        template <void (*callback)(KTask * task, void * vargs)>
         inline task_state_t
-        commit(void)
+        commit(void * vargs)
         {
             assert(this->state.value == TASK_STATE_ALLOCATED);
             if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
@@ -201,6 +202,7 @@ class alignas(CACHE_LINE_SIZE) KTask
                 LOGGER_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
                 xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
+                callback(this, vargs);
                 return TASK_STATE_READY;
             }
             return TASK_STATE_ALLOCATED;
@@ -233,8 +235,9 @@ class alignas(CACHE_LINE_SIZE) KTask
             return TASK_STATE_DATA_FETCHING;
         }
 
+        template<void (*callback)(KTask * task, void * vargs)>
         inline void
-        complete(void)
+        complete(void * vargs)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
@@ -246,7 +249,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             SPINLOCK_UNLOCK(this->state.lock);
 
             for (Edge & edge : this->edges)
-                edge.successor->commit();
+                edge.successor->template commit<callback>(vargs);
         }
 };
 

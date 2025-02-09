@@ -53,4 +53,6 @@ void xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context)
 void xkblas_memory_coherent_async_register_format(void);
 # endif
 
+task_format_id_t xkblas_task_format_create(task_format_t * format);
+
 #endif /* __CONTEXT_H__ */

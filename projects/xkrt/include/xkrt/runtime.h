@@ -74,7 +74,6 @@ typedef struct  xkrt_runtime_t
     xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
     /* submissions */
-    void submit_kernel(const xkrt_device_global_id_t device_global_id, Task * task, const xkrt_callback_t & callback);
     void submit_copy(
         const xkrt_device_global_id_t   device_global_id,
         const memory_view_t           & host_view,
@@ -91,6 +90,10 @@ typedef struct  xkrt_runtime_t
     );
 
     //////////////////////////////////////////////////////////////////////////////////////////////
+    // UTILITIES FOR TASK SCHEDULING
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    void commit(Task * task);
+    void complete(Task * task);
 
 }               xkrt_runtime_t;
 
@@ -102,7 +105,7 @@ void xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime);
 void xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
-void xkrt_device_thread_main(void * vruntime, uint8_t driver_id, uint8_t device_driver_id);
+void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
 
 /* must be call once task accesses were all fetched */
 void xkrt_device_task_execute(
@@ -110,9 +113,6 @@ void xkrt_device_task_execute(
     xkrt_device_t * device,
     Task * task
 );
-
-/* launch a kernel */
-int xkrt_task_launch(xkrt_runtime_t * runtime, task_launcher_t * launcher);
 
 # if USE_STATS
 /* report some stats about the runtime */

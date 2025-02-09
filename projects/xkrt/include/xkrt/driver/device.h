@@ -59,7 +59,8 @@ int xkrt_device_poll(xkrt_device_t * device);
 
 void xkrt_device_stream_instruction_submit_kernel(
     xkrt_device_t * device,
-    Task * task,
+    void (*launch)(void * handle, void * vargs),
+    void * vargs,
     const xkrt_callback_t & callback
 );
 

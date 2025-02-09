@@ -12,6 +12,7 @@
 /* ************************************************************************** */
 
 # include <assert.h>
+# include <unistd.h>
 
 # include "common/impl.hpp"
 
@@ -93,8 +94,6 @@ impl_t::syrk(
         C, ldc
     );
 }
-
-
 
 void
 impl_t::trsm(

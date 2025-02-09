@@ -17,14 +17,13 @@
 # include "context.h"
 # include "xkblas/kernel-type.h"
 
-# include <xkrt/device/task-launcher.h>
-# include <xkrt/device/thread-producer.hpp>
+# include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/sync/alignedas.h>
-# include <xkrt/sync/cache-line-size.hpp>
+# include <xkrt/memory/alignedas.h>
+# include <xkrt/memory/cache-line-size.hpp>
 
 # include <cassert>
 
@@ -85,7 +84,7 @@ xkblas_£trsm_tile_async(
     new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "trsm(A=(%d,%d) ; B=(%d,%d))",
+    snprintf(task->label, sizeof(task->label), "trsm(A=(%zu,%zu) ; B=(%zu,%zu))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
     # endif /* NDEBUG */
 
@@ -105,7 +104,7 @@ xkblas_£trsm_tile_async(
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
-    thread->commit(task);
+    context->runtime.commit(task);
 
     return 0;
 }
@@ -518,27 +517,33 @@ xkblas_£trsm_async(
 
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
-# if USE_CUDA
-#  include <xkrt/device/cublas-helper.h>
+# if XKRT_SUPPORT_CUDA
+#  include <xkrt/driver/cublas-helper.h>
+#  include <xkrt/driver/driver-cuda.h>
 
 static void
-body_cuda(void * vlauncher)
+body_cuda(void * ihandle, void * vargs)
 {
-    task_launcher_t * launcher = (task_launcher_t *) vlauncher;
-    assert(launcher);
+    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+    assert(stream);
 
-    cublasHandle_t handle = (cublasHandle_t) launcher->handle;
+    cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 
-    args_t * args = (args_t *) (launcher->task + 1);
-    // assert(args->transA == CblasNoTrans);
-    // assert(args->side   == CblasLeft);
+    Task * task = (Task *) vargs;
+    assert(task);
 
-    const Access * A = launcher->task->accesses + 0;
-    const Access * B = launcher->task->accesses + 1;
+    const Access * A = task->accesses + 0;
+    const Access * B = task->accesses + 1;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(B->device_view.addr % B->host_view.sizeof_type == 0);
+
+    args_t * args = (args_t *) (task + 1);
+    assert(args);
 
     # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%d, B=%p, ldb=%d) on task=`%s`",
+    LOGGER_INFO("Calling cublasTrsm(side=%zu, uplo=%zu, transA=%zu, diag=%zu, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%zu, B=%p, ldb=%zu) on task=`%s`",
         args->side, args->uplo,
         args->transA, args->diag,
         args->alpha,
@@ -562,15 +567,15 @@ body_cuda(void * vlauncher)
     xkrt_cublas_status_check(res);
     assert(res == CUBLAS_STATUS_SUCCESS);
 }
-# endif /* USE_CUDA */
+# endif /* XKRT_SUPPORT_CUDA */
 
-# ifdef USE_CPU
+# ifdef XKRT_SUPPORT_HOST
 static void
 body_cpu(void * args)
 {
     LOGGER_DEBUG("Executing a trsm on cpu");
 }
-# endif /* USE_CPU */
+# endif /* XKRT_SUPPORT_HOST */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -582,13 +587,14 @@ register_£trsm_format(void)
     task_format_t format;
     memset(&format, 0, sizeof(task_format_t));
 
-# ifdef USE_CPU
-    format.f[XKRT_DRIVER_TYPE_CPU] = body_cpu;
-# endif /* USE_CPU */
-# ifdef USE_CUDA
+    # if XKRT_SUPPORT_HOST
+    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    # endif /* XKRT_SUPPORT_HOST */
+
+    # if XKRT_SUPPORT_CUDA
     format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
-# endif /* USE_CUDA */
+    # endif /* XKRT_SUPPORT_CUDA */
+
     snprintf(format.label, sizeof(format.label), "£trsm");
-    format.target = TASK_FORMAT_TARGET_DRIVER;
-    format_id = task_format_create(&format);
+    format_id = xkblas_task_format_create(&format);
 }
