@@ -22,13 +22,13 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/driver/thread-producer.cc
     ${CMAKE_SOURCE_DIR}/src/driver/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
 )
 

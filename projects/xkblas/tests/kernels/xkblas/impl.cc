@@ -44,8 +44,8 @@ impl_t::deinit(void)
 uintptr_t
 impl_t::alloc(size_t size)
 {
-    // return (uintptr_t) xkblas_host_alloc(size);
-    return (uintptr_t) xkblas_malloc(size);
+    return (uintptr_t) xkblas_host_alloc(size);
+    // return (uintptr_t) xkblas_malloc(size);
 }
 
 /* wait for kernels completion */

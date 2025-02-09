@@ -425,8 +425,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_register)(
     void * ptr,
     uint64_t size
 ) {
-    CUDA_SAFE_CALL(cudaHostRegister(ptr, size, cudaHostRegisterPortable));
-    return 0;
+    int err = cudaHostRegister(ptr, size, cudaHostRegisterPortable);
+    return err;
 }
 
 static int
@@ -435,9 +435,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
     uint64_t size
 ) {
     (void) size;
-
-    CUDA_SAFE_CALL(cudaHostUnregister(ptr));
-    return 0;
+    int err = cudaHostUnregister(ptr);
+    return err;
 }
 
 static int

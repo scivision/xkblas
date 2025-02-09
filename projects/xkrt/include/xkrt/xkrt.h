@@ -27,6 +27,9 @@ extern "C" {
 
     void xkrt_memory_invalidate(xkrt_runtime_t * runtime);
     void xkrt_memory_coherent_async(xkrt_runtime_t * runtime, int uplo, int memflag, int m, int n, void * addr, int ld, unsigned int sizeof_type);
+    int xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, uint64_t size);
+    int xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, uint64_t size);
+
     int xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count);
 };
 

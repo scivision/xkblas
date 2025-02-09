@@ -14,53 +14,62 @@
 # include <xkrt/logger/todo.h>
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 
-    # include <xkrt/xkrt-support.h>
+# include <xkrt/xkrt.h>
+# include <xkrt/xkrt-support.h>
 # if XKRT_SUPPORT_CUDA
 #  include <cuda_runtime.h>
 # endif /* XKRT_SUPPORT_CUDA */
+# include <xkrt/logger/logger.h>
 
 # include <assert.h>
 # include <stddef.h>
 # include <stdlib.h>
 
-extern "C"
-void *
-xkblas_host_alloc(size_t size)
-{
-    # if XKRT_SUPPORT_CUDA
-    void * ptr;
-    int err = cudaHostAlloc(&ptr, size, cudaHostAllocPortable);
-    assert(err == cudaSuccess);
-    return ptr;
-    # else
-    return malloc(size);
-    # endif
-}
+# include "context.h"
 
 extern "C"
 void *
 xkblas_malloc(size_t size)
 {
-    return xkblas_host_alloc(size);
-}
-
-extern "C"
-void
-xkblas_host_free(void * ptr, size_t size)
-{
-    # if XKRT_SUPPORT_CUDA
-    int err = cudaFreeHost(ptr);
-    assert(err == cudaSuccess);
-    # else
-    free(ptr);
-    # endif
+    return malloc(size);
 }
 
 extern "C"
 void
 xkblas_free(void * ptr, size_t size)
 {
-    return xkblas_host_free(ptr, size);
+    (void) size;
+    free(ptr);
+}
+
+extern "C"
+void *
+xkblas_host_alloc(size_t size)
+{
+    void * ptr = xkblas_malloc(size);
+    if (ptr == NULL)
+        return NULL;
+
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    xkrt_runtime_t * runtime = &(context->runtime);
+    xkrt_memory_register(runtime, ptr, size);
+
+    return ptr;
+}
+
+extern "C"
+void
+xkblas_host_free(void * ptr, size_t size)
+{
+    xkblas_context_t * context = xkblas_context_get();
+    assert(context);
+
+    xkrt_runtime_t * runtime = &(context->runtime);
+    xkrt_memory_unregister(runtime, ptr, size);
+
+    xkblas_free(ptr, size);
 }
 
 // Added symbols for compatibility with previous version and unified version
