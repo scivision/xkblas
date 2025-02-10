@@ -65,9 +65,9 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
          *  - callback with any successors that are now ready
          *  - then move the wait counter
          */
-        template <void (*callback)(Task * task, void * vargs)>
+        template <void (*callback)(void * vargs, Task * task)>
         void
-        complete(Task * task, void * vargs)
+        complete(void * vargs, Task * task)
         {
             task->complete<callback>(vargs);    /* this may 'push' tasks, incrementing 'wc' */
             writemem_barrier();                 /* membarrier to avoid 'wc' being decremented before the previous line increment */

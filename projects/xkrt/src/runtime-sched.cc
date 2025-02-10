@@ -617,7 +617,7 @@ xkrt_runtime_t::task_execute(
 /////////////////////////////////////////////
 
 static inline void
-enqueue_ready_task(Task * task, void * vargs)
+enqueue(void * vargs, Task * task)
 {
     xkrt_runtime_submit_task((xkrt_runtime_t *) vargs, task);
 }
@@ -625,9 +625,10 @@ enqueue_ready_task(Task * task, void * vargs)
 void
 xkrt_runtime_t::commit(Task * task)
 {
-    ThreadProducer * producer = ThreadProducer::self();
-    assert(producer);
-    producer->commit<enqueue_ready_task>(task, this);
+    ThreadProducer * thread = ThreadProducer::self();
+    assert(thread);
+
+    thread->commit<enqueue>(this, task);
 }
 
 void
@@ -642,5 +643,5 @@ xkrt_runtime_t::complete(Task * task)
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread);
 
-    thread->complete<enqueue_ready_task>(task, this);
+    thread->complete<enqueue>(this, task);
 }

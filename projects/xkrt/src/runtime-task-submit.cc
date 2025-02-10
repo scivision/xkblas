@@ -14,7 +14,6 @@
 # include <xkrt/runtime.h>
 # include <xkrt/sync/bits.h>
 
-// Warning: this is called by a ThreadProducer - to enqueue a task in a ThreadWorker
 void
 xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
 {

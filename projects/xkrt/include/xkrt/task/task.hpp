@@ -183,7 +183,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         /* Return the 'TASK_STATE_READY' if the task is now ready */
-        template <void (*callback)(KTask * task, void * vargs)>
+        template <void (*callback)(void * vargs, KTask * task)>
         inline task_state_t
         commit(void * vargs)
         {
@@ -192,7 +192,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 LOGGER_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
-                callback(this, vargs);
+                callback(vargs, this);
                 return TASK_STATE_READY;
             }
             return TASK_STATE_ALLOCATED;
@@ -223,7 +223,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             return TASK_STATE_DATA_FETCHING;
         }
 
-        template<void (*callback)(KTask * task, void * vargs)>
+        template<void (*callback)(void * vargs, KTask * task)>
         inline void
         complete(void * vargs)
         {

@@ -236,7 +236,6 @@ xkrt_memory_coherent_async_worker_thread_work(
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);
-
         runtime->commit(task);
     }
 

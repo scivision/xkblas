@@ -98,9 +98,9 @@ class alignas(CACHE_LINE_SIZE) ThreadProducer : public Thread
             }
         }
 
-        template <void (*callback)(Task * task, void * vargs)>
+        template <void (*callback)(void * vargs, Task * task)>
         inline task_state_t
-        commit(Task * task, void * vargs)
+        commit(void * vargs, Task * task)
         {
             # ifndef NDEBUG
             tasks.push_back(task);
