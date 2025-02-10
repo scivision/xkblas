@@ -622,11 +622,9 @@ cuda_stream_instructions_progress(
                     CUDA_SAFE_CALL(cudaGetLastError());
                     CUDA_SAFE_CALL(cudaEventQuery(stream->cu.events.end[idx]));
 
-                    # pragma message(TODO "Why pthread_yield here ?")
                     if (res == cudaErrorNotReady)
                     {
-                        // LOGGER_DEBUG("Not ready, yielding");
-                        pthread_yield();
+                        sched_yield();
                     }
                     else
                     {
@@ -673,7 +671,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) mem;
 
     /*************************/
-    /* init ptr stream */
+    /* init xkrt stream */
     /*************************/
     xkrt_stream_init(
         (xkrt_stream_t *) stream,
@@ -688,7 +686,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     /*************************/
 
     /* events */
-    stream->cu.events.end = (cudaEvent_t *) (mem + sizeof(xkrt_stream_cuda_t));
+    stream->cu.events.end = (cudaEvent_t *) (stream + 1);
     stream->cu.events.capacity = capacity;
 
     cudaError_t err;

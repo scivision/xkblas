@@ -227,7 +227,6 @@ main_gemm(char ** args)
     {
         //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
-            impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
             printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
@@ -245,6 +244,7 @@ main_gemm(char ** args)
                 int r = gemm_cmp(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
                 printf("Result is %12s with trans (%s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", TRANS_STR[t1], TRANS_STR[t2]);
             }
+            impl.reset();
         }
     }
 

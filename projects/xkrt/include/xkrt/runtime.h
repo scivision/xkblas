@@ -32,7 +32,6 @@ typedef enum    xkrt_runtime_state_t : uint8_t
 
 typedef struct  xkrt_runtime_t
 {
-    /* runtime state */
     struct {
         spinlock_t spinlock;
         volatile std::atomic<xkrt_runtime_state_t> current;
@@ -114,9 +113,7 @@ void xkrt_device_task_execute(
     Task * task
 );
 
-# if USE_STATS
 /* report some stats about the runtime */
 void xkrt_runtime_stats_report(xkrt_runtime_t * runtime);
-# endif /* USE_STATS */
 
 #endif /* __XKRT_RUNTIME_H__ */

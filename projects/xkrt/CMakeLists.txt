@@ -45,7 +45,7 @@ add_custom_command(
     OUTPUT
         ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-support-always-run.h # set invalid name so its always generated
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE}
+    python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_STATS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -62,7 +62,6 @@ endif()
 option(USE_STATS "Whether to compile the built-in stat system." ON)
 if (USE_STATS)
     LIST(APPEND SOURCE_FILES src/stats.cc)
-    add_compile_definitions(USE_STATS=1)
     message(STATUS "Using built-in stats system")
 endif()
 
@@ -78,7 +77,6 @@ message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 # HOST DRIVER
 option(USE_HOST "Whether to build the HOST driver." OFF)
 if (USE_HOST)
-    add_compile_definitions(USE_HOST=1)
     add_library(${XKRT}_driver_cpu SHARED src/driver/driver_cpu.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cpu)
     install(TARGETS ${XKRT}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
@@ -87,7 +85,6 @@ endif()
 # CUDA
 option(USE_CUDA "Whether to build the CUDA driver." ON)
 if (USE_CUDA)
-    add_compile_definitions(USE_CUDA=1)
 
     find_package(CUDA_RT REQUIRED)
     include_directories("${CUDA_RT_INCLUDE_DIRS}")
@@ -102,7 +99,6 @@ endif()
 # Level Zero
 option(USE_ZE "Whether to build the Level Zero driver." ON)
 if (USE_ZE)
-    add_compile_definitions(USE_ZE=1)
 
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")

@@ -63,10 +63,7 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     assert(runtime);
     assert(runtime->state.current == XKRT_RUNTIME_INITIALIZED);
 
-# if USE_STATS
     xkrt_runtime_stats_report(runtime);
-# endif // USE_STATS == 1
-
     xkrt_drivers_deinit(&runtime->drivers);
     runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
 

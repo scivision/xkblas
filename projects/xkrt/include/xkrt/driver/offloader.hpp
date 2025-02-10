@@ -51,11 +51,11 @@ class Offloader
 
         /* create a new instruction on the given stream type, and return the instruction and the assigned stream for execution */
         void instruction_new(
-            const xkrt_stream_type_t stype,               /* IN  */
-                  xkrt_stream_t ** stream,                /* OUT */
-            const xkrt_stream_instruction_type_t itype,   /* IN  */
-                  xkrt_stream_instruction_t ** instr,     /* OUT */
-            const xkrt_callback_t & callback       /* IN */
+            const xkrt_stream_type_t stype,                 /* IN  */
+                  xkrt_stream_t ** stream,                  /* OUT */
+            const xkrt_stream_instruction_type_t itype,     /* IN  */
+                  xkrt_stream_instruction_t ** instr,       /* OUT */
+            const xkrt_callback_t & callback                /* IN */
         );
 
         /* TODO */

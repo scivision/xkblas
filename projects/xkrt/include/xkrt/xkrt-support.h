@@ -14,8 +14,16 @@
 #ifndef __XKRT_SUPPORT_H__
 # define __XKRT_SUPPORT_H__
 
+/* If the runtime was compiled with HOST kernel execution support */
 # define XKRT_SUPPORT_HOST  0
+
+/* If the runtime was compiled with Mvidia's CUDA support */
 # define XKRT_SUPPORT_CUDA  1
+
+/* If the runtime was compiled with Intel's Level Zero support */
 # define XKRT_SUPPORT_ZE    1
+
+/* If the kernel was compiled with run-time statistics enabled */
+# define XKRT_SUPPORT_STATS 1
 
 #endif /* __XKRT_SUPPORT_H__ */

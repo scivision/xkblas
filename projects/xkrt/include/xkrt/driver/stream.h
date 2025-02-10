@@ -14,8 +14,10 @@
 #ifndef __STREAM_HPP__
 # define __STREAM_HPP__
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/stream-instruction.h>
 # include <xkrt/driver/stream-type.h>
+# include <xkrt/stats/stats.h>
 # include <xkrt/sync/lockable.hpp>
 
 /* counter for the stream queues */
@@ -76,6 +78,16 @@ class xkrt_stream_t : public Lockable
 
         /* the first event in the pending queue before which all events are completed */
         volatile xkrt_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
+
+        # if XKRT_SUPPORT_STATS
+        struct {
+            struct {
+                stats_int_t commited;
+                stats_int_t completed;
+            } instructions[XKRT_STREAM_INSTR_TYPE_MAX];
+            stats_int_t transfered;
+        } stats;
+        # endif /* XKRT_SUPPORT_STATS */
 
     public:
 

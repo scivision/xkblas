@@ -49,9 +49,8 @@ typedef enum    task_format_target_t : uint8_t
 {
     TASK_FORMAT_TARGET_HOST  = 0,
     TASK_FORMAT_TARGET_CUDA  = 1,
-    TASK_FORMAT_TARGET_HIP   = 2,
-    TASK_FORMAT_TARGET_ZE    = 3,
-    TASK_FORMAT_TARGET_MAX   = 4
+    TASK_FORMAT_TARGET_ZE    = 2,
+    TASK_FORMAT_TARGET_MAX   = 3
 }               task_format_target_t;
 
 typedef struct  task_format_t

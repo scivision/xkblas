@@ -21,6 +21,7 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mem.h>
+# include <xkrt/stats/stats.h>
 
 # include <cassert>
 # include <cstring>
@@ -42,11 +43,8 @@ xkrt_device_memory_reset(xkrt_device_t * device)
     memcpy(chunk0, &(device->memdev.chunk0), sizeof(xkrt_area_chunk_t));
     device->memdev.free_chunk_list = chunk0;
 
-    # if 0 && USE_STATS
-    xkrt_stats_t * stats = xkrt_stats_get();
-    stats->memory.freed += stats->memory.allocated.currently;
-    stats->memory.allocated.currently = 0;
-    # endif /* USE_STATS */
+    XKRT_STATS_INCR(device->stats.memory.freed, device->stats.memory.allocated.currently);
+    XKRT_STATS_SET(device->stats.memory.allocated.currently, 0);
 }
 
 void
@@ -148,11 +146,8 @@ xkrt_memory_deallocate(
     }
     XKRT_MUTEX_UNLOCK(device->memdev.lock);
 
-    # if 0 && USE_STATS
-    xkrt_stats_t * stats = xkrt_stats_get();
-    stats->memory.freed += chunk->size;
-    stats->memory.allocated.currently -= chunk->size;
-    # endif /* USE_STATS */
+    XKRT_STATS_INCR(device->stats.memory.freed, chunk->size);
+    XKRT_STATS_DECR(device->stats.memory.allocated.currently, chunk->size);
 
     if (delete_chunk)
         free(chunk);
@@ -227,14 +222,11 @@ xkrt_memory_allocate(
 
     XKRT_MUTEX_UNLOCK( device->memdev.lock );
 
-    # if 0 && USE_STATS
     if (curr)
     {
-        xkrt_stats_t * stats = xkrt_stats_get();
-        stats->memory.allocated.total     += size;
-        stats->memory.allocated.currently += size;
+        XKRT_STATS_INCR(device->stats.memory.allocated.total,       size);
+        XKRT_STATS_INCR(device->stats.memory.allocated.currently,   size);
     }
-    # endif /* USE_STATS */
 
     return curr;
 }
@@ -487,7 +479,6 @@ xkrt_device_task_execute(
 
             CASE(HOST)
             CASE(CUDA)
-            CASE(HIP)
             CASE(ZE)
 
             default:

@@ -11,6 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/min-max.h>
@@ -153,25 +154,20 @@ xkrt_drivers_init(
     void (*loaders[XKRT_DRIVER_TYPE_MAX])(xkrt_driver_t *);
     memset(loaders, 0, sizeof(loaders));
 
-# if USE_HOST
+# if XKRT_SUPPORT_HOST
     extern void XKRT_DRIVER_HOST_get_driver(xkrt_driver_t *);
     loaders[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_get_driver;
-# endif /* USE_HOST */
+# endif /* XKRT_SUPPORT_HOST */
 
-# if USE_CUDA
+# if XKRT_SUPPORT_CUDA
     extern void XKRT_DRIVER_TYPE_CUDA_get_driver(xkrt_driver_t *);
     loaders[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_get_driver;
-# endif /* USE_CUDA */
+# endif /* XKRT_SUPPORT_CUDA */
 
-# if USE_HIP
-    extern void XKRT_DRIVER_TYPE_HIP_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_get_driver;
-# endif /* USE_HIP */
-
-# if USE_ZE
+# if XKRT_SUPPORT_ZE
     extern void XKRT_DRIVER_TYPE_ZE_get_driver(xkrt_driver_t *);
     loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_get_driver;
-# endif /* USE_ZE */
+# endif /* XKRT_SUPPORT_ZE */
 
     uint8_t total_gpus = 0;
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)

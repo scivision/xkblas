@@ -17,13 +17,13 @@
 # include <stdint.h>    /* uint64_t */
 
 # include <xkrt/driver/offloader.hpp>
-# include <xkrt/task/task.hpp>
 # include <xkrt/driver/driver-type.h>
 # include <xkrt/driver/thread-worker.hpp>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/area.h>
 # include <xkrt/memory/cache-line-size.hpp>
 # include <xkrt/sync/mutex.h>
+# include <xkrt/task/task.hpp>
 
 typedef enum    xkrt_device_state_t : uint8_t
 {
@@ -52,6 +52,18 @@ typedef struct  xkrt_device_t
     std::atomic<uint8_t> state;         /* xkrt_device_state_t */
     ThreadWorker * thread;              /* the device worker thread */
     xkrt_area_t memdev;                 /* memory area, only 1 per device */
+
+    # if XKRT_SUPPORT_STATS
+    struct {
+        struct {
+            stats_int_t freed;
+            struct {
+                stats_int_t total;
+                stats_int_t currently;
+            } allocated;
+        } memory;
+    } stats;
+    # endif /* XKRT_SUPPORT_STATS */
 
 }               xkrt_device_t;
 

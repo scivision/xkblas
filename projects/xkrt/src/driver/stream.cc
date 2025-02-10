@@ -105,6 +105,7 @@ xkrt_stream_init(
     );
 
     stream->ok_p = 0;
+    memset(&(stream->stats), 0, sizeof(stream->stats));
 }
 
 void
@@ -136,6 +137,15 @@ xkrt_stream_t::instruction_new(
 void
 xkrt_stream_t::complete(const xkrt_stream_instruction_counter_t i)
 {
+    xkrt_stream_instruction_t * instr = this->pending.instr + (i % this->pending.capacity);
+    assert(instr);
+
+    if (instr->callback.func)
+        instr->callback.func(instr->callback.args);
+
+    ++this->pending.pos.r;
+
+    XKRT_STATS_INCR(this->stats.instructions[instr->type].completed, 1);
 }
 
 int
@@ -148,6 +158,8 @@ xkrt_stream_t::commit(xkrt_stream_instruction_t * instr)
             this->ready.size(), this->pending.size());
 
     ++this->ready.pos.w;
+
+    XKRT_STATS_INCR(this->stats.instructions[instr->type].commited, 1);
 
     return 0;
 }
@@ -239,16 +251,7 @@ xkrt_stream_t::progress_pending_instructions(int blocking)
     assert((err == 0) || (err == EINPROGRESS));
 
     for (xkrt_stream_instruction_counter_t p = this->pending.pos.r ; p < this->ok_p ; ++p)
-    {
-        // complete instruction
-        xkrt_stream_instruction_t * instr = this->pending.instr + (p % this->pending.capacity);
-        assert(instr);
-
-        if (instr->callback.func)
-            instr->callback.func(instr->callback.args);
-
-        ++this->pending.pos.r;
-    }
+        this->complete(p);
 
     return err;
 }

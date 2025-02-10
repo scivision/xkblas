@@ -67,13 +67,6 @@ task_state_to_str(task_state_t state)
     }
 }
 
-// TODO
-# if USE_STATS
-#  define xkrt_stats_task_state_incr(fmtid, state)
-# else
-#  define xkrt_stats_task_state_incr(...)
-# endif /* USE_STATS */
-
 template <int K>
 class alignas(CACHE_LINE_SIZE) KTask
 {
@@ -155,13 +148,11 @@ class alignas(CACHE_LINE_SIZE) KTask
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");
             # endif /* NDEBUG */
-            xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_ALLOCATED);
         }
 
         virtual ~KTask()
         {
             this->state.value = TASK_STATE_DEALLOCATED;
-            xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_DEALLOCATED);
         }
 
     public:
@@ -201,7 +192,6 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 LOGGER_DEBUG_TASK("State of task `%s` changed to ready", this->label);
                 this->state.value = TASK_STATE_READY;
-                xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_READY);
                 callback(this, vargs);
                 return TASK_STATE_READY;
             }
@@ -216,7 +206,6 @@ class alignas(CACHE_LINE_SIZE) KTask
                 assert(this->state.value == TASK_STATE_READY);
                 LOGGER_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHING;
-                xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHING);
             }
         }
 
@@ -228,7 +217,6 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 LOGGER_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
                 this->state.value = TASK_STATE_DATA_FETCHED;
-                xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_DATA_FETCHED);
                 return TASK_STATE_DATA_FETCHED;
             }
 
@@ -244,7 +232,6 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 this->state.value = TASK_STATE_COMPLETED;
                 LOGGER_DEBUG_TASK("State of task `%s` changed to completed", this->label);
-                xkrt_stats_task_state_incr(this->fmtid, TASK_STATE_COMPLETED);
             }
             SPINLOCK_UNLOCK(this->state.lock);
 

@@ -124,13 +124,13 @@ xkrt_init_conf(xkrt_conf_t * conf)
     conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = 8;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 64;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 8;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 64;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 8;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].n = 2;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 64;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 8;
 
     //////////////////
     //  DEVICE CONF //

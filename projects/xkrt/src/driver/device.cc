@@ -167,4 +167,6 @@ xkrt_device_stream_instruction_submit_copy(
     instr->copy.src_device_view = src_device_view;
 
     xkrt_device_stream_instruction_submit(device, stream, instr);
+
+    XKRT_STATS_INCR(stream->stats.transfered, host_view.size());
 }
