@@ -17,6 +17,7 @@
 # include "context.h"
 # include "xkblas/kernel-type.h"
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -369,11 +370,11 @@ body_cuda(void * ihandle, void * vargs)
         A->device_view.ld,
         (void *) C->device_view.addr,
         C->device_view.ld,
-        launcher->task->label
+        task->label
     );
     #endif /* NDEBUG */
 
-    res = cublas££syrk(
+    cublasStatus_t res = cublas££syrk(
         handle,
         cblas2cublas_uplo(args->uplo), cblas2cublas_op(args->trans),
         (int) args->n, (int) args->k,

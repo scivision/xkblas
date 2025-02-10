@@ -17,6 +17,7 @@
 # include "context.h"
 # include "xkblas/kernel-type.h"
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -543,14 +544,14 @@ body_cuda(void * ihandle, void * vargs)
     assert(args);
 
     # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasTrsm(side=%zu, uplo=%zu, transA=%zu, diag=%zu, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%zu, B=%p, ldb=%zu) on task=`%s`",
+    LOGGER_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%zu, B=%p, ldb=%zu) on task=`%s`",
         args->side, args->uplo,
         args->transA, args->diag,
         args->alpha,
         args->m, args->n,
-        (void *) A->device_view.addr, (int) A->device_view.ld,
-        (void *) B->device_view.addr, (int) B->device_view.ld,
-        launcher->task->label
+        (void *) A->device_view.addr, A->device_view.ld,
+        (void *) B->device_view.addr, B->device_view.ld,
+        task->label
     );
     #endif /* NDEBUG */
 

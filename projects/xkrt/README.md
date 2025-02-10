@@ -6,7 +6,7 @@ Must have hwloc installed and be sure your `CMAKE_PREFIX_PATH` points to where l
 ```bash
 mkdir build-debug
 cd build-debug
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkblas/v2/debug-light -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_HOST=off -DUSE_CUDA=on -DUSE_HIP=off -DUSE_LEVEL_ZERO=on -DUSE_MKL=on -DENABLE_HEAVY_DEBUG=off ../
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkblas/v2/debug-light -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_HOST=off -DUSE_CUDA=on -DUSE_HIP=off -DUSE_ZE=on -DUSE_MKL=on -DENABLE_HEAVY_DEBUG=off ../
 ```
 
 # PERFORMANCE IDEA

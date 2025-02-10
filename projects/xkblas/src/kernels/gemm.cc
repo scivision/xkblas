@@ -18,6 +18,7 @@
 
 # include "xkblas/kernel-type.h"
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>

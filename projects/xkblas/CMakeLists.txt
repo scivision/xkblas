@@ -128,11 +128,13 @@ endif()
 # Cuda kernels
 option(ENABLE_CU "Enable the compilation of custom cuda kernels" ON)
 if (ENABLE_CU)
-    find_package(CUDA)
-    set_source_files_properties(CUDA_SOURCES, PROPERTIES LANGUAGE CUDA)
-    cuda_add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+    enable_language(CUDA)
+    set_source_files_properties(${CUDA_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
+    add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
+    set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
     install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
 endif()
 
 # Include directory

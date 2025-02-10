@@ -17,6 +17,7 @@
 # include "auto-tile.h"
 # include "xkblas/kernel-type.h"
 
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -207,20 +208,20 @@ body_cuda(void * ihandle, void * vargs)
     assert(stream);
 
     cudaStream_t cuda_stream = stream->cu.handle.high;
-    assert(handle);
+    assert(cuda_stream);
 
     Task * task = (Task *) vargs;
     assert(task);
 
-    const Access * D = launcher->task->accesses + 0;
-    const Access * L = launcher->task->accesses + 1;
-    const Access * U = launcher->task->accesses + 2;
+    const Access * D = task->accesses + 0;
+    const Access * L = task->accesses + 1;
+    const Access * U = task->accesses + 2;
 
     assert(D->device_view.addr % D->host_view.sizeof_type == 0);
     assert(L->device_view.addr % L->host_view.sizeof_type == 0);
     assert(U->device_view.addr % U->host_view.sizeof_type == 0);
 
-    args_t * args = (args_t *) (launcher->task + 1);
+    args_t * args = (args_t *) (task + 1);
     assert(args);
 
     cuda_£copyscale(
@@ -276,7 +277,7 @@ xkblas_£copyscale_native(
     return 0;
 }
 
-# ifdef XKRT_SUPPORT_HOST
+# if XKRT_SUPPORT_HOST
 
 static void
 body_cpu(void * args)

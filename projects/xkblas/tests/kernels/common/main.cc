@@ -223,9 +223,9 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 0;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -239,7 +239,6 @@ main_gemm(char ** args)
             impl.wait();
             uint64_t tf = get_nanotime();
             printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-
             if (!SKIP_CHECK)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
