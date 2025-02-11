@@ -38,9 +38,9 @@ typedef struct  xkrt_area_chunk_t
     uintptr_t device_ptr;                   /* position of memory in device */
     size_t size;                            /* size of the segment in byte */
     int state;                              /* state of the chunk */
-    struct xkrt_area_chunk_t * prev;     /* previous chunk in double chained list */
-    struct xkrt_area_chunk_t * next;     /* next chunk in double chained list */
-    struct xkrt_area_chunk_t * freelink; /* next freechunk in the chained list */
+    struct xkrt_area_chunk_t * prev;        /* previous chunk in double chained list */
+    struct xkrt_area_chunk_t * next;        /* next chunk in double chained list */
+    struct xkrt_area_chunk_t * freelink;    /* next freechunk in the chained list */
     int use_counter;                        /* used in the memory-tree to count how many blocks relies on that allocation chunk */
 }               xkrt_area_chunk_t;
 

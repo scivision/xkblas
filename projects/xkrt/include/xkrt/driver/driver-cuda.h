@@ -30,7 +30,7 @@ typedef struct  xkrt_stream_cuda_t
         } handle;
 
         struct {
-            cudaEvent_t * end;
+            cudaEvent_t * buffer;
             xkrt_stream_instruction_counter_t capacity;
         } events;
 

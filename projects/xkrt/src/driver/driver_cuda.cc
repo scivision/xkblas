@@ -476,7 +476,7 @@ cuda_stream_instructions_launch(
 
             xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
             assert(stream->cu.events.capacity == istream->pending.capacity);
-            cudaError_t err = cudaEventRecord(stream->cu.events.end[wp], stream->cu.handle.high);
+            cudaError_t err = cudaEventRecord(stream->cu.events.buffer[wp], stream->cu.handle.high);
             assert(err == cudaSuccess);
 
             # if 0
@@ -561,7 +561,7 @@ cuda_stream_instructions_launch(
             CUDA_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
 
             xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
-            CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.end[wp], handle));
+            CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[wp], handle));
 
             return EINPROGRESS;
         }
@@ -620,7 +620,7 @@ cuda_stream_instructions_progress(
                 for (int i = 0 ; i < 16 ; ++i)
                 {
                     CUDA_SAFE_CALL(cudaGetLastError());
-                    CUDA_SAFE_CALL(cudaEventQuery(stream->cu.events.end[idx]));
+                    CUDA_SAFE_CALL(cudaEventQuery(stream->cu.events.buffer[idx]));
 
                     if (res == cudaErrorNotReady)
                     {
@@ -686,12 +686,12 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     /*************************/
 
     /* events */
-    stream->cu.events.end = (cudaEvent_t *) (stream + 1);
+    stream->cu.events.buffer = (cudaEvent_t *) (stream + 1);
     stream->cu.events.capacity = capacity;
 
     cudaError_t err;
     for (int i = 0 ; i < capacity ; ++i)
-        CUDA_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.end + i, cudaEventDisableTiming));
+        CUDA_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.buffer + i, cudaEventDisableTiming));
 
     /* streams */
     int leastPriority, greatestPriority;

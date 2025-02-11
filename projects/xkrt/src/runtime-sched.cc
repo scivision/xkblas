@@ -29,7 +29,6 @@
 
 # pragma message(TODO "Move these initializer into class member functions")
 
-
 ///////////////////////
 //  MEMORY ALLOCATOR //
 ///////////////////////
@@ -69,7 +68,6 @@ xkrt_memory_deallocate(
     xkrt_device_t * device,
     xkrt_area_chunk_t * chunk
 ) {
-
     bool delete_chunk = false;
 
     XKRT_MUTEX_LOCK(device->memdev.lock);
@@ -637,7 +635,7 @@ xkrt_runtime_t::complete(Task * task)
     assert(task);
 
     # ifndef NDEBUG
-    LOGGER_INFO("Task `%s` completed", task->label);
+    LOGGER_INFO("task `%s` completed", task->label);
     # endif /* NDEBUG */
 
     ThreadWorker * thread = ThreadWorker::self();

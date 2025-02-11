@@ -46,13 +46,12 @@ dump_matrix_diff(
     const BLAS_INT n,
     const BLAS_INT ld
 ) {
-    if (m <= 32 && n <= 32)
+    if (m <= 64 && n <= 64)
     {
         printf("---- %s ----\n", label);
         for (int j = 0 ; j < m ; ++j)
             for (int i = 0 ; i < n ; ++i)
-                printf("%4.8f%c", A[i*ld+j] - B[i*ld+j], (i == n-1) ? '\n' : ' ');
-
+                printf("%4.0f%c", A[i*ld+j] - B[i*ld+j], (i == n-1) ? '\n' : ' ');
     }
 }
 
