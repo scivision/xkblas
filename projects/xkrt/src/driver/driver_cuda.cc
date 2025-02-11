@@ -606,7 +606,6 @@ cuda_stream_instructions_progress(
     {
         const xkrt_stream_instruction_counter_t idx = okp % istream->pending.capacity;
         xkrt_stream_instruction_t * instr = istream->pending.instr + idx;
-        cudaError_t res = cudaSuccess;
 
         switch (instr->type)
         {
@@ -620,19 +619,20 @@ cuda_stream_instructions_progress(
                 for (int i = 0 ; i < 16 ; ++i)
                 {
                     CUDA_SAFE_CALL(cudaGetLastError());
-                    CUDA_SAFE_CALL(cudaEventQuery(stream->cu.events.buffer[idx]));
+                    cudaError_t res = cudaEventQuery(stream->cu.events.buffer[idx]);
 
                     if (res == cudaErrorNotReady)
                     {
                         sched_yield();
                     }
-                    else
+                    else if (res == cudaSuccess)
                     {
-                        assert(res == cudaSuccess);
                         if (prev_okp + 1 == (int64_t) okp)
                             ++prev_okp;
                         break ;
                     }
+                    else
+                        LOGGER_FATAL("Error querying event");
                 }
             } /* intentionally fallthrough */
 

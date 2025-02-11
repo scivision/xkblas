@@ -108,18 +108,16 @@ extern volatile uint64_t LOGGER_LAST_TIME;
 # define CUDA_SAFE_CALL(X)                                                          \
     do {                                                                            \
         cudaError_t r = X;                                                          \
-        if (r != cudaSuccess && r != cudaErrorNotReady)                             \
+        if (r != cudaSuccess)                                                       \
             LOGGER_FATAL("`%s` failed with `%s` (%d)", #X, cudaGetErrorName(r), r); \
     } while (0)
 
 # define ZE_SAFE_CALL(X)                                        \
     do {                                                        \
         ze_result_t r = X;                                      \
-        if (r != ZE_RESULT_SUCCESS && r != ZE_RESULT_NOT_READY) \
+        if (r != ZE_RESULT_SUCCESS)                             \
             LOGGER_FATAL("`%s` failed with err=%d", #X, r);     \
     } while (0)
-
-
 
 # define HWLOC_SAFE_CALL(X)                                 \
     do {                                                    \
