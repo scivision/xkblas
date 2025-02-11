@@ -119,9 +119,9 @@ do {                                                                    \
 template<int K, typename T, bool CUT>
 class KHPTree {
 
-    using Cube = KCube<K>;
-
     public:
+
+        using Cube = KCube<K>;
 
         class Node {
 
@@ -1093,7 +1093,7 @@ class KHPTree {
                     // J c I
                     else
                     {
-                        assert(K == 1 || K == 2);
+                        // assert(K == 1 || K == 2);
 
                         class ReinsertCube {
                             public:
