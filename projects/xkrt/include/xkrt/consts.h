@@ -17,6 +17,9 @@
 /* maximum number of devices in total */
 # define XKRT_DEVICES_MAX (8)
 
+/* maximum number of performance ranks between devices. */
+# define XKRT_DEVICES_PERF_RANK_MAX (4)
+
 typedef uint8_t xkrt_device_global_id_t;
 static_assert(XKRT_DEVICES_MAX <= (1UL << (sizeof(xkrt_device_global_id_t)*8)));
 

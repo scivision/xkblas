@@ -20,6 +20,7 @@
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/memory/coherency-controller.hpp>
+# include <xkrt/router-random.hpp>
 # include <xkrt/sync/spinlock.h>
 
 # include <hwloc.h>
@@ -32,16 +33,8 @@ typedef enum    xkrt_runtime_state_t : uint8_t
 
 typedef struct  xkrt_runtime_t
 {
-    struct {
-        spinlock_t spinlock;
-        volatile std::atomic<xkrt_runtime_state_t> current;
-    } state;
-
-    /* user conf */
-    xkrt_conf_t conf;
-
-    /* worker thread to copy data asynchronously */
-    ThreadWorker * memory_coherent_worker_thread;
+    /* runtime state */
+    std::atomic<xkrt_runtime_state_t> state;
 
     /* driver list */
     xkrt_drivers_t drivers;
@@ -51,6 +44,15 @@ typedef struct  xkrt_runtime_t
 
     /* memory controller for coherency */
     std::vector<MemoryCoherencyController *> memcontrollers;
+
+    /* worker thread to copy data asynchronously */
+    ThreadWorker * memory_coherent_worker_thread;
+
+    /* user conf */
+    xkrt_conf_t conf;
+
+    /* memory router */
+    RouterRandom router;
 
     /* get a memory controller for the given ld/type size */
     MemoryCoherencyController * get_or_insert_memory_controller(const size_t ld, const size_t sizeof_type);
@@ -68,11 +70,7 @@ typedef struct  xkrt_runtime_t
     /* deallocate the given chunk */
     void memory_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
 
-    /* get device/driver */
-    xkrt_driver_t * driver_get(const xkrt_driver_type_t type);
-    xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
-
-    /* submissions */
+     /* submissions */
     void submit_copy(
         const xkrt_device_global_id_t   device_global_id,
         const memory_view_t           & host_view,
@@ -91,6 +89,12 @@ typedef struct  xkrt_runtime_t
     //////////////////////////////////////////////////////////////////////////////////////////////
     // UTILITIES FOR TASK SCHEDULING
     //////////////////////////////////////////////////////////////////////////////////////////////
+
+    /* get device/driver */
+    xkrt_driver_t * driver_get(const xkrt_driver_type_t type);
+    xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
+
+    /* task managment */
     void commit(Task * task);
     void complete(Task * task);
 

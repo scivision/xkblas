@@ -19,14 +19,13 @@
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
-# include <xkrt/memory/khp-tree.hpp>
 # include <xkrt/memory/coherency-controller.hpp>
+# include <xkrt/memory/khp-tree.hpp>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/lockable.hpp>
 
 # include <xkrt/runtime.h>              // this should gtfo
 # include <xkrt/memory/area.h>          // this should gtfo
-# include <xkrt/memory/matrix-tile.h>   // this should gtfo
 # include <xkrt/driver/driver.h>        // this should gtfo
 # include <xkrt/task/task.hpp>          // this should gtfo
 
@@ -729,6 +728,9 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         /* the runtime so the tree can launch data movements */
         xkrt_runtime_t * runtime;
 
+        /* the router */
+        Router * router;
+
         /* the ld used in that memory tree */
         const size_t ld;
 
@@ -821,7 +823,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             LOGGER_DEBUG("Task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
-                // xkrt_device_task_execute(fetch->dst_device_global_id, task);
                 runtime->task_execute(task, fetch->dst_device_global_id);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
@@ -905,28 +906,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                 list->fetched();
             }
-        }
-
-        //////////////////////////////////////
-        //  DECIDE SRC DEVICE WHEN FETCHING //
-        //////////////////////////////////////
-
-        /**
-         *  Get the 'best' device that should transfer data.
-         *  - xkrt_device_global_id_t - the dst
-         *  - xkrt_device_global_id_bitfield_t - valid sources
-         */
-        static inline xkrt_device_global_id_t
-        fetch_get_source(
-            xkrt_device_global_id_t dst_device_global_id,
-            xkrt_device_global_id_bitfield_t srcs_valid
-        ) {
-            LOGGER_WARN("WARNING !! BEST DEVICE NOT IMPLEMENTED");
-            xkrt_device_global_id_t src = -1; // driver->f_get_source(dst_device_global_id, srcs_valid);
-            if (src == -1)
-                src = (xkrt_device_global_id_t) (__builtin_ffs(srcs_valid) - 1);
-            assert(src >= 0);
-            return src;
         }
 
         ////////////////////////////////////////////////////////////
@@ -1460,7 +1439,7 @@ next_view:
                         partite.dst_view = dst_allocation_view->view;
 
                         /* get a valid source */
-                        xkrt_device_global_id_t src = fetch_get_source(device_global_id, partite.block->valid);
+                        xkrt_device_global_id_t src = this->runtime->router.get_source(device_global_id, partite.block->valid);
                         assert(partite.block->valid & (1 << src));
 
                         /* Get the first valid allocation on that device */
@@ -1490,7 +1469,7 @@ next_view:
                         partite.must_fetch = false;
 
                         /* one device is already fetching, add a D2D forward callback */
-                        xkrt_device_global_id_t fetching = fetch_get_source(device_global_id, partite.block->fetching);
+                        xkrt_device_global_id_t fetching = this->runtime->router.get_source(device_global_id, partite.block->fetching);
                         assert(0 <= fetching && fetching < XKRT_DEVICES_MAX);
                         assert(partite.block->fetching & (1 << fetching));
 

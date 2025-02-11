@@ -319,8 +319,9 @@ xkblas_£gemmt_async(
 }
 
 # if XKRT_SUPPORT_CUDA
-#  include <xkrt/driver/cublas-helper.h>
+#  include <xkblas/cblas-to-cublas.h>
 #  include <xkrt/driver/driver-cuda.h>
+#  include <xkrt/driver/cublas-helper.h>
 
 static void
 body_cuda(void * ihandle, void * vargs)

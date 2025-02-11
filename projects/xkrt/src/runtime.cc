@@ -41,16 +41,13 @@ xkrt_init(xkrt_runtime_t * runtime)
     LOGGER_INFO("Initializing XKRT");
 
     memset(runtime, 0, sizeof(xkrt_runtime_t));
-    runtime->state.spinlock = 0;
-    runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
-    runtime->memory_coherent_worker_thread = nullptr;
 
     // load
     xkrt_init_conf(&(runtime->conf));
     xkrt_task_format_register(runtime);
     xkrt_memory_coherent_async_worker_thread_init(runtime);
     xkrt_drivers_init(&(runtime->drivers), runtime->conf.device.ngpus, xkrt_device_thread_main, runtime);
-    runtime->state.current = XKRT_RUNTIME_INITIALIZED;
+    runtime->state = XKRT_RUNTIME_INITIALIZED;
 
     return 0;
 }
@@ -61,11 +58,11 @@ xkrt_deinit(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Deinitializing XKRT");
     assert(runtime);
-    assert(runtime->state.current == XKRT_RUNTIME_INITIALIZED);
+    assert(runtime->state == XKRT_RUNTIME_INITIALIZED);
 
     xkrt_runtime_stats_report(runtime);
     xkrt_drivers_deinit(&runtime->drivers);
-    runtime->state.current = XKRT_RUNTIME_DEINITIALIZED;
+    runtime->state = XKRT_RUNTIME_DEINITIALIZED;
 
     return 0;
 }
