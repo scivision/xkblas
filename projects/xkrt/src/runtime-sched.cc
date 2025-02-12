@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   device.cc                                                                */
+/*   runtime-sched.cc                                                         */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,9 +11,11 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+// TODO : split this file, its a trashbin atm
+
 # include <xkrt/memory-tree.hpp>
 # include <xkrt/runtime.h>
-# include <xkrt/driver/device.h>
+# include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/driver/thread-producer.hpp>
@@ -28,206 +30,6 @@
 # include <cerrno>
 
 # pragma message(TODO "Move these initializer into class member functions")
-
-///////////////////////
-//  MEMORY ALLOCATOR //
-///////////////////////
-
-void
-xkrt_device_memory_reset(xkrt_device_t * device)
-{
-    # pragma message(TODO "This is leaking")
-    xkrt_area_chunk_t * chunk0 = (xkrt_area_chunk_t *) malloc(sizeof(xkrt_area_chunk_t));
-    assert(chunk0);
-    memcpy(chunk0, &(device->memdev.chunk0), sizeof(xkrt_area_chunk_t));
-    device->memdev.free_chunk_list = chunk0;
-
-    XKRT_STATS_INCR(device->stats.memory.freed, device->stats.memory.allocated.currently);
-    XKRT_STATS_SET(device->stats.memory.allocated.currently, 0);
-}
-
-void
-xkrt_device_memory_set_chunk0(
-    xkrt_device_t * device,
-    uintptr_t device_ptr,
-    size_t size
-) {
-    device->memdev.chunk0.device_ptr    = device_ptr;
-    device->memdev.chunk0.size          = size;
-    device->memdev.chunk0.state         = XKRT_ALLOC_CHUNK_STATE_FREE;
-    device->memdev.chunk0.prev          = NULL;
-    device->memdev.chunk0.next          = NULL;
-    device->memdev.chunk0.freelink      = NULL;
-    device->memdev.chunk0.use_counter   = 0;
-
-    xkrt_device_memory_reset(device);
-}
-
-void
-xkrt_memory_deallocate(
-    xkrt_device_t * device,
-    xkrt_area_chunk_t * chunk
-) {
-    bool delete_chunk = false;
-
-    XKRT_MUTEX_LOCK(device->memdev.lock);
-    {
-        chunk->state = XKRT_ALLOC_CHUNK_STATE_FREE;
-        chunk->use_counter = 0;
-
-        /* can we merge chunk into next_chunk ? */
-        xkrt_area_chunk_t * next_chunk = chunk->next;
-        if (next_chunk && next_chunk->state == XKRT_ALLOC_CHUNK_STATE_FREE)
-        {
-            next_chunk->prev = chunk->prev;
-            if (chunk->prev)
-                chunk->prev->next = next_chunk;
-            next_chunk->size += chunk->size;
-            assert(next_chunk->device_ptr > chunk->device_ptr);
-            next_chunk->device_ptr = chunk->device_ptr;
-            delete_chunk = true;
-        }
-
-        xkrt_area_chunk_t * prev_chunk = chunk->prev;
-        if (prev_chunk)
-        {
-            /*  if prev_chunk is a free chunk and 'delete_chunk' is true,
-             *  then we have to merge prev and next */
-            if (prev_chunk->state == XKRT_ALLOC_CHUNK_STATE_FREE)
-            {
-                if (delete_chunk)
-                {
-                    assert(prev_chunk->device_ptr < chunk->device_ptr);
-                    assert(prev_chunk->device_ptr < next_chunk->device_ptr);
-
-                    prev_chunk->size += next_chunk->size;
-                    prev_chunk->next = next_chunk->next;
-                    if (next_chunk->next)
-                        next_chunk->next->prev = prev_chunk;
-                    prev_chunk->freelink = next_chunk->freelink;
-                    free(next_chunk);
-                }
-                else
-                {
-                    /* merge chunk into prev_chunk */
-                    assert(prev_chunk->device_ptr < chunk->device_ptr);
-                    prev_chunk->next = chunk->next;
-                    if (chunk->next)
-                        chunk->next->prev = prev_chunk;
-                    prev_chunk->size += chunk->size;
-                    delete_chunk = true;
-                }
-            }
-            else if (!delete_chunk)
-            {
-                /* free_chunk_list is ordered by increasing adress: search form prev the previous bloc */
-                while (prev_chunk && prev_chunk->state != XKRT_ALLOC_CHUNK_STATE_FREE)
-                    prev_chunk = prev_chunk->prev;
-
-                if (!prev_chunk)
-                {
-                    chunk->freelink = device->memdev.free_chunk_list;
-                    device->memdev.free_chunk_list = chunk;
-                }
-                else
-                {
-                    chunk->freelink = prev_chunk->freelink;
-                    prev_chunk->freelink = chunk;
-                }
-            }
-        }
-        else if (!delete_chunk)
-        {
-            chunk->freelink = device->memdev.free_chunk_list;
-            device->memdev.free_chunk_list = chunk;
-        }
-    }
-    XKRT_MUTEX_UNLOCK(device->memdev.lock);
-
-    XKRT_STATS_INCR(device->stats.memory.freed, chunk->size);
-    XKRT_STATS_DECR(device->stats.memory.allocated.currently, chunk->size);
-
-    if (delete_chunk)
-        free(chunk);
-}
-
-xkrt_area_chunk_t *
-xkrt_memory_allocate(
-    xkrt_device_t * device,
-    size_t size
-) {
-    /* adapted from xkrt_memory_alloc */
-
-    /* align data */
-    size = (size + 7UL) & ~7UL;
-
-    XKRT_MUTEX_LOCK(device->memdev.lock);
-
-    /* best fit strategy */
-    xkrt_area_chunk_t * curr = device->memdev.free_chunk_list;
-    xkrt_area_chunk_t * prevfree = NULL;
-    size_t min_size = 0;
-    xkrt_area_chunk_t * min_size_curr = NULL;
-    xkrt_area_chunk_t * min_size_prevfree = NULL;
-
-    while (curr)
-    {
-        size_t curr_size = curr->size;
-        if (curr_size >= size)
-        {
-            // TODO : check original code, seems it does not check the min...
-            min_size = curr_size;
-            min_size_curr = curr;
-            min_size_prevfree = prevfree;
-        }
-        prevfree = curr;
-        curr = curr->freelink;
-    }
-
-    curr = min_size_curr;
-    prevfree = min_size_prevfree;
-
-    /* split chunk */
-    if ((curr != NULL) && (min_size - size >= (size_t)(0.5*(double)size)))
-    {
-        size_t curr_size = curr->size;
-        xkrt_area_chunk_t * remainder = (xkrt_area_chunk_t *) malloc(sizeof(xkrt_area_chunk_t));
-        remainder->device_ptr   = size + curr->device_ptr;
-        remainder->size         = (curr_size - size);
-        remainder->state        = XKRT_ALLOC_CHUNK_STATE_FREE;
-        remainder->use_counter  = 0;
-        remainder->prev         = curr;
-        remainder->next         = curr->next;
-        remainder->freelink     = curr->freelink;
-
-        /* link remainder segment after curr */
-        if (curr->next)
-            curr->next->prev = remainder;
-        curr->next = remainder;
-        curr->size = size;
-        curr->freelink = remainder;
-    }
-
-    if (curr != NULL)
-    {
-        if (prevfree)
-            prevfree->freelink = curr->freelink;
-        else
-            device->memdev.free_chunk_list = curr->freelink;
-        curr->state = XKRT_ALLOC_CHUNK_STATE_ALLOCATED;
-        curr->freelink = NULL;
-    }
-
-    XKRT_MUTEX_UNLOCK( device->memdev.lock );
-
-    if (curr)
-    {
-        XKRT_STATS_INCR(device->stats.memory.allocated.total,       size);
-        XKRT_STATS_INCR(device->stats.memory.allocated.currently,   size);
-    }
-
-    return curr;
-}
 
 ///////////////////////////
 // DEVICE INITIALIZATION //
@@ -304,13 +106,6 @@ xkrt_device_prepare_task(
     }
 }
 
-static inline void
-xkrt_device_progress(xkrt_device_t * device)
-{
-    int err = xkrt_device_poll(device);
-    assert((err == 0) || (err == EINPROGRESS));
-}
-
 /* main loop for the thread responsible the passed device */
 static inline int
 xkrt_device_thread_main_loop(
@@ -328,10 +123,10 @@ xkrt_device_thread_main_loop(
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
     {
         Task * task;
-        while ((task = worker->pop()) == NULL && device->offloader.is_empty(XKRT_STREAM_TYPE_ALL))
+        while ((task = worker->pop()) == NULL && device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
             worker->pause();
 
-        xkrt_device_progress(device);
+        device->offloader_poll();
         if (task)
             xkrt_device_prepare_task(runtime, device, task);
     }
@@ -360,33 +155,34 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
     assert(device);
 
+    // initialize device attributes
     device->state       = XKRT_DEVICE_STATE_CREATE;
     device->driver_type = driver_type;
     device->driver_id   = device_driver_id;
     device->global_id   = runtime->drivers.devices.n.fetch_add(1, std::memory_order_seq_cst);
-
-    runtime->drivers.devices.list[device->global_id] = device;
+    device->conf        = &(runtime->conf.device);
+    XKRT_MUTEX_INIT(device->area.lock);
 
     // register worker thread
     ThreadWorker::init();
     device->thread = ThreadWorker::self();
     assert(device->thread);
 
-    // init device
+    // register device to the driver list
+    runtime->drivers.devices.list[device->global_id] = device;
 
-    /* initialize by the driver */
+    // init device by the driver
     driver->f_device_init(device->driver_id);
 
-    /* init offloader */
-    device->offloader.init(&(runtime->conf.device.offloader), driver->f_stream_create);
+    // initialize offloader
+    device->offloader_init(driver->f_stream_create);
 
-    /* attach current thread to the device */
+    // attach current thread to the device (cuda state machine...)
     if (driver->f_device_attach)
         if (driver->f_device_attach(device->driver_id))
             LOGGER_FATAL("Could not attach to device %d of driver %s", device->driver_id, driver->f_get_name());
 
     /* init memory */
-    XKRT_MUTEX_INIT(device->memdev.lock);
 
     /* get total memory and allocate chunk0 */
     assert(driver->f_memory_info);
@@ -396,7 +192,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     assert(driver->f_memory_alloc);
     const void * device_ptr = driver->f_memory_alloc(device->driver_id, size);
-    xkrt_device_memory_set_chunk0(device, (uintptr_t) device_ptr, size);
+    device->memory_set_chunk0((uintptr_t) device_ptr, size);
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);
     device->state = XKRT_DEVICE_STATE_INIT;
@@ -507,20 +303,13 @@ xkrt_device_task_execute(
             assert(XKRT_CALLBACK_ARGS_MAX >= 2);
 
             /* submit kernel launch instruction */
-            xkrt_device_stream_instruction_submit_kernel(device, format->f[targetfmt], task, callback);
+            device->offloader_stream_instruction_submit_kernel(format->f[targetfmt], task, callback);
 
             if (device->thread == ThreadWorker::self()) // TODO : explain why this
-                device->offloader.launch_ready_instructions(XKRT_STREAM_TYPE_KERN);
+                device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
             /* else kernel launch will be called asynchronously */
         }
     }
-}
-
-static inline void
-xkrt_device_wait(xkrt_device_t * device)
-{
-    LOGGER_DEBUG("Waiting for device %d...", device->global_id);
-    device->offloader.progress_pending_instructions(XKRT_STREAM_TYPE_ALL, true);
 }
 
 ///////////////
@@ -576,7 +365,7 @@ xkrt_runtime_t::memory_allocate(
     const size_t size
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
-    return xkrt_memory_allocate(device, size);
+    return device->memory_allocate(size);
 }
 
 void
@@ -585,7 +374,7 @@ xkrt_runtime_t::memory_deallocate(
     xkrt_area_chunk_t * chunk
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
-    return xkrt_memory_deallocate(device, chunk);
+    return device->memory_deallocate(chunk);
 
 }
 
@@ -600,7 +389,7 @@ xkrt_runtime_t::submit_copy(
     const xkrt_callback_t         & callback
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
-    xkrt_device_stream_instruction_submit_copy(device, host_view, dst_device_global_id, dst_device_view, src_device_global_id, src_device_view, callback);
+    device->offloader_stream_instruction_submit_copy(host_view, dst_device_global_id, dst_device_view, src_device_global_id, src_device_view, callback);
 }
 
 void

@@ -25,7 +25,7 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
         assert(device);
 
         // device memory
-        xkrt_device_memory_reset(device);
+        device->memory_reset();
 
         // worker thread memory
         ThreadWorker * worker = device->thread;

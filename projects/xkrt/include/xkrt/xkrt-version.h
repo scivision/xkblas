@@ -1,6 +1,6 @@
 #ifndef __XKRT_VERSION_H__
 # define __XKRT_VERSION_H__
 
-# define XKRT_VERSION_GITHASH "v0.5.0-357-gcc7519f-dirty"
+# define XKRT_VERSION_GITHASH "v0.5.0-359-g3d7927b-dirty"
 
 #endif /* __XKRT_VERSION_H__ */

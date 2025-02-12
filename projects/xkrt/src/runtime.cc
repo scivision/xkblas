@@ -95,7 +95,7 @@ retry:
     for (int i = 0 ; i < ndevices ; ++i)
     {
         xkrt_device_t * device = runtime->drivers.devices.list[i];
-        if (!device->offloader.is_empty(XKRT_STREAM_TYPE_ALL))
+        if (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
             ++wc_global;
         wc_global += device->thread->wc;
     }

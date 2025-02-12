@@ -18,7 +18,7 @@
 # include <xkrt/runtime.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/cublas-helper.h>
-# include <xkrt/driver/device.h>
+# include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/logger/logger.h>
@@ -34,14 +34,22 @@
 # include <cstdint>
 # include <cerrno>
 
+// TODO : can be make this member of a 'xkrt_driver_ze_t' ?  most likely yes,
+// but cuda state machine would make it hard to maintain for cuda as well. Keep
+// them as global variable for now, there should only be 1 instances of a
+// driver right now
+
+static ze_driver_handle_t   ze_drivers[XKRT_DEVICES_MAX];
+static ze_context_handle_t  ze_contextes[XKRT_DEVICES_MAX];
+
 typedef struct  xkrt_device_ze_t
 {
     xkrt_device_t inherited;
 
     ze_driver_handle_t      ze_driver;
+    ze_context_handle_t     ze_context;
     ze_device_handle_t      ze_device;
     ze_device_properties_t  ze_properties;
-    ze_context_handle_t     ze_context;
 
 }               xkrt_device_ze_t;
 
@@ -73,42 +81,40 @@ XKRT_DRIVER_ENTRYPOINT(init)(void)
 
     // get all drivers
     uint32_t ze_n_drivers = XKRT_DEVICES_MAX; // i believe Intel API ndriver <= ndevices ?
-    ze_driver_handle_t ze_drivers[XKRT_DEVICES_MAX];
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, ze_drivers));
 
     // get all device handles per driver
-    for (unsigned int i = 0 ; i < ze_n_drivers && ze_n_devices < XKRT_DEVICES_MAX ; ++i)
+    for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < XKRT_DEVICES_MAX ; ++ze_driver_id)
     {
+        // Create context for driver
+        ze_context_desc_t desc = {ZE_STRUCTURE_TYPE_CONTEXT_DESC, nullptr, 0};
+        ZE_SAFE_CALL(zeContextCreate(ze_drivers[ze_driver_id], &desc, ze_contextes + ze_driver_id));
+
         // get devices handles
         uint32_t ndevices = XKRT_DEVICES_MAX - ze_n_devices;
         ze_device_handle_t ze_devices[XKRT_DEVICES_MAX];
-        ZE_SAFE_CALL(zeDeviceGet(ze_drivers[i], &ndevices, ze_devices));
+        ZE_SAFE_CALL(zeDeviceGet(ze_drivers[ze_driver_id], &ndevices, ze_devices));
         assert(ze_n_devices + ndevices <= XKRT_DEVICES_MAX);
 
         // ensure we do not overflow if assertions are off
         if (ze_n_devices + ndevices > XKRT_DEVICES_MAX)
             ndevices = XKRT_DEVICES_MAX - ze_n_devices;
 
-        // Create context for driver
-        ze_context_handle_t ze_context;
-        ze_context_desc_t desc = {ZE_STRUCTURE_TYPE_CONTEXT_DESC, nullptr, 0};
-        ZE_SAFE_CALL(zeContextCreate(ze_drivers[i], &desc, &ze_context));
-
         // setup xkrt devices
-        for (unsigned int j = 0 ; j < ndevices ; ++j)
+        for (unsigned int ze_driver_device_id = 0 ; ze_driver_device_id < ndevices ; ++ze_driver_device_id)
         {
-            unsigned int device_driver_id = ze_n_devices + j;
+            unsigned int device_driver_id = ze_n_devices + ze_driver_device_id;
 
             xkrt_device_ze_t * device = DEVICES + device_driver_id;
-            device->ze_driver = ze_drivers[i];
-            device->ze_device = ze_devices[j];
+            device->ze_driver = ze_drivers[ze_driver_id];
+            device->ze_device = ze_devices[ze_driver_device_id];
 
             // get device properties
             device->ze_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
             ZE_SAFE_CALL(zeDeviceGetProperties(device->ze_device, &device->ze_properties));
 
             // set context
-            device->ze_context = ze_context;
+            device->ze_context = ze_contextes[ze_driver_id];
         }
 
         ze_n_devices += ndevices;
@@ -225,6 +231,14 @@ typedef struct  xkrt_stream_ze_t
 {
     xkrt_stream_t super;
 
+    // TODO : do we want to share command lists between streams as the Intel
+    // API allow it ? I am not seeing it a practical use case here
+    struct {
+        struct {
+            ze_command_list_handle_t list;
+            ze_command_queue_handle_t queue;
+        } command;
+    } ze;
 }               xkrt_stream_ze_t;
 
 static int
@@ -310,14 +324,33 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     xkrt_stream_t * istream,
     int blocking
 ) {
+    assert(istream);
+
+    xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
+
+    LOGGER_FATAL("IMPL ME");
+
+    # if 0
+    if (blocking)
+    {
+        CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
+        CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
+        istream->ok_p = istream->pending.pos.w;
+        return 0;
+    }
+    # endif
+
     return 0;
 }
 
 static xkrt_stream_t *
 XKRT_DRIVER_ENTRYPOINT(stream_create)(
+    xkrt_device_t * idevice,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity
 ) {
+    assert(idevice);
+
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_ze_t));
     assert(mem);
 
@@ -333,6 +366,12 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch),
         XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)
     );
+
+    LOGGER_FATAL("IMPL ME");
+    xkrt_device_ze_t * device = (xkrt_device_ze_t *) idevice;
+    ze_command_list_desc_t desc;
+    ze_command_list_handle_t handle;
+    ZE_SAFE_CALL(zeCommandListCreate(device->ze_context, device->ze_device, &desc, &handle));
 
     # if 0
     /***********************/

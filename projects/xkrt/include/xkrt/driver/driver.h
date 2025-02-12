@@ -21,7 +21,7 @@
 # include <stdint.h>    /* uint64_t */
 
 # include <xkrt/consts.h>
-# include <xkrt/driver/device.h>
+# include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver-type.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/logger/todo.h>
@@ -92,7 +92,7 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
 
     /* alllocate and initialize a stream */
-    xkrt_stream_t * (*f_stream_create)(xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity);
+    xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity);
 
     /* deallocate a stream */
     void (*f_stream_delete)(xkrt_stream_t * istream);
@@ -168,20 +168,5 @@ xkrt_drivers_init(
     void * vargs
 );
 void xkrt_drivers_deinit(xkrt_drivers_t * drivers);
-
-/* set the initial free block to the ptr device allocator (TODO: maybe
- * change that to some 'add_block' instead to add several blocks) */
-void xkrt_device_memory_set_chunk0(xkrt_device_t * device, uintptr_t device_ptr, size_t size
-);
-
-/* allocate memory on the passed device */
-xkrt_area_chunk_t * xkrt_memory_allocate(
-    xkrt_driver_t * driver,
-    xkrt_device_t * device,
-    size_t size
-);
-
-/* release the memory chunk */
-void xkrt_memory_deallocate(xkrt_device_t * device, xkrt_area_chunk_t * chunk);
 
 #endif /* __DRIVER_H__ */

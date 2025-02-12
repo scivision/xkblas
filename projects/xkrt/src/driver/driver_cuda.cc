@@ -15,7 +15,7 @@
 
 # include <xkrt/runtime.h>
 # include <xkrt/driver/cublas-helper.h>
-# include <xkrt/driver/device.h>
+# include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/driver-cuda.h>
 # include <xkrt/driver/stream.h>
@@ -581,12 +581,9 @@ cuda_stream_instructions_progress(
     int blocking
 ) {
     assert(istream);
+    assert(istream->pending.pos.r < istream->pending.pos.w);
 
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
-
-    /* no pending instructions */
-    if (istream->pending.pos.r == istream->pending.pos.w)
-        return 0;
 
     if (blocking)
     {
@@ -599,7 +596,7 @@ cuda_stream_instructions_progress(
     /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
     xkrt_stream_instruction_counter_t     size = istream->pending.pos.w - istream->pending.pos.r;
     xkrt_stream_instruction_counter_t      okp = istream->ok_p;
-    int64_t                             prev_okp = ((int64_t) okp) - 1;
+    int64_t                           prev_okp = ((int64_t) okp) - 1;
     assert(prev_okp < (int64_t) okp);
 
     while (okp < istream->pending.pos.w)
@@ -662,9 +659,12 @@ cuda_stream_instructions_progress(
 
 static xkrt_stream_t *
 XKRT_DRIVER_ENTRYPOINT(stream_create)(
+    xkrt_device_t * device,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity
 ) {
+    assert(device);
+
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_cuda_t) + capacity * sizeof(cudaEvent_t));
     assert(mem);
 

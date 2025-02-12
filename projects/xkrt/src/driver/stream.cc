@@ -247,8 +247,12 @@ xkrt_stream_t::progress_pending_instructions(int blocking)
     assert(this->pending.pos.r <= this->pending.pos.w);
     assert(this->f_instructions_progress);
 
-    int err = this->f_instructions_progress(this, blocking);
-    assert((err == 0) || (err == EINPROGRESS));
+    int err = 0;
+    if (this->pending.pos.r < this->pending.pos.w)
+    {
+        err = this->f_instructions_progress(this, blocking);
+        assert((err == 0) || (err == EINPROGRESS));
+    }
 
     for (xkrt_stream_instruction_counter_t p = this->pending.pos.r ; p < this->ok_p ; ++p)
         this->complete(p);

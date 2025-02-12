@@ -100,9 +100,9 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
         {
             stats_int_t transfered = 0;
 
-            for (int stream_id = 0 ; stream_id < device->offloader.count[stype] ; ++stream_id)
+            for (int stream_id = 0 ; stream_id < device->count[stype] ; ++stream_id)
             {
-                xkrt_stream_t * stream = device->offloader.streams[stype][stream_id];
+                xkrt_stream_t * stream = device->streams[stype][stream_id];
 
                 for (int instr_type = 0 ; instr_type < XKRT_STREAM_INSTR_TYPE_MAX ; ++instr_type)
                 {
@@ -114,7 +114,7 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
 
             char buffer[128];
             human_readable_size(buffer, sizeof(buffer), transfered.load());
-            LOGGER_WARN("    `%4s` - with %u streams - transfered %s", xkrt_stream_type_to_str((xkrt_stream_type_t) stype), device->offloader.count[stype], buffer);
+            LOGGER_WARN("    `%4s` - with %u streams - transfered %s", xkrt_stream_type_to_str((xkrt_stream_type_t) stype), device->count[stype], buffer);
         }
 
         LOGGER_WARN("  Instructions");

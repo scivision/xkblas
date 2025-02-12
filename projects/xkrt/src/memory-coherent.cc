@@ -140,8 +140,7 @@ body_memory_coherent_async_fetch(void * handle, void * vargs)
 
     /* launch asynchronous copy */
     memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
-    xkrt_device_stream_instruction_submit_copy(
-        device,
+    device->offloader_stream_instruction_submit_copy(
         fetch->host_view,
         HOST_DEVICE_GLOBAL_ID,
         host_replicate_view,
