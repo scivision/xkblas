@@ -53,7 +53,7 @@ typedef struct  xkrt_driver_t
     ///////////////////////
     //  DRIVER LIFECYCLE //
     ///////////////////////
-    int (*f_init)(void);
+    int (*f_init)(unsigned int ngpus);
     void (*f_finalize)(void);
 
     /////////////////////////////////

@@ -136,7 +136,8 @@ typedef struct  xkrt_device_t
     int offloader_stream_instructions_launch(const xkrt_stream_type_t stype);
 
     /* progress pending instructions in streams of the given type. If blocking is true, also waits for the completion of pending instructions */
-    int offloader_stream_instructions_progress(const xkrt_stream_type_t stype, const bool blocking);
+    template <bool blocking>
+    int offloader_stream_instructions_progress(const xkrt_stream_type_t stype);
 
     /* create a new instruction and lock the stream */
     void offloader_stream_instruction_new(

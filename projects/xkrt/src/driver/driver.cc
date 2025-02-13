@@ -60,7 +60,7 @@ xkrt_driver_init(
     LOGGER_INFO("Loading driver `%s`", driver_name);
 
     assert(driver->f_init);
-    if (driver->f_init())
+    if (driver->f_init(ngpus))
     {
         LOGGER_WARN("Failed to load");
         return ;

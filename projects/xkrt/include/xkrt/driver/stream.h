@@ -68,16 +68,16 @@ class xkrt_stream_t : public Lockable
         int (*f_instruction_launch)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr);
 
         /* progress a stream instruction */
-        int (*f_instructions_progress)(xkrt_stream_t * stream, int blocking);
+        int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx);
+
+        /* wait for all instructions completion on a stream */
+        int (*f_instructions_wait)(xkrt_stream_t * stream);
 
         /* queue for ready instruction */
         xkrt_stream_instruction_queue_t ready;
 
         /* queue for pending instructions to progress */
         xkrt_stream_instruction_queue_t pending;
-
-        /* the first event in the pending queue before which all events are completed */
-        volatile xkrt_stream_instruction_counter_t ok_p __attribute__((aligned(CACHE_LINE_SIZE)));
 
         # if XKRT_SUPPORT_STATS
         struct {
@@ -107,7 +107,13 @@ class xkrt_stream_t : public Lockable
         int launch_ready_instructions(void);
 
         /* progress pending instructions */
-        int progress_pending_instructions(int blocking);
+        int progress_pending_instructions(void);
+
+        /* (internal) complete all instructions to 'ok_p' */
+        void complete_instructions(const xkrt_stream_instruction_counter_t ok_p);
+
+        /* wait for completion of all pending instructions */
+        void wait_pending_instructions(void);
 
         /* return true if the stream is full of instructions, false otherwise */
         int is_full(void) const;
@@ -123,7 +129,8 @@ void xkrt_stream_init(
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity,
     int (*f_instruction_launch)(xkrt_stream_t *, xkrt_stream_instruction_t *),
-    int (*f_instructions_progress)(xkrt_stream_t * stream, int blocking)
+    int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
+    int (*f_instructions_wait)(xkrt_stream_t * stream)
 );
 
 void xkrt_stream_deinit(xkrt_stream_t * stream);

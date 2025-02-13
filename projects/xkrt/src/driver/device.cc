@@ -50,7 +50,6 @@ xkrt_device_t::memory_set_chunk0(
     this->memory_reset();
 }
 
-
 void
 xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
 {
@@ -320,10 +319,10 @@ xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t sty
     return err;
 }
 
+template <bool blocking>
 int
 xkrt_device_t::offloader_stream_instructions_progress(
-    const xkrt_stream_type_t stype,
-    const bool blocking
+    const xkrt_stream_type_t stype
 ) {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
 
@@ -344,7 +343,13 @@ xkrt_device_t::offloader_stream_instructions_progress(
             xkrt_stream_instruction_counter_t n;
             do {
                 stream->lock();
-                err = stream->progress_pending_instructions(blocking);
+                if (blocking)
+                {
+                    stream->wait_pending_instructions();
+                    err= 0;
+                }
+                else
+                    err = stream->progress_pending_instructions();
                 stream->unlock();
                 n = stream->pending.size();
             } while (n > this->conf->offloader.streams[s].concurrency);
@@ -393,7 +398,7 @@ xkrt_device_t::offloader_poll(void)
     err = this->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_ALL);
     assert((err == 0) || (err == EINPROGRESS));
 
-    err = this->offloader_stream_instructions_progress(XKRT_STREAM_TYPE_ALL, false);
+    err = this->offloader_stream_instructions_progress<false>(XKRT_STREAM_TYPE_ALL);
     assert((err == 0) || (err == EINPROGRESS));
 
     return err;

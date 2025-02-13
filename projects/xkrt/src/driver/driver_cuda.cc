@@ -196,14 +196,15 @@ __get_gpu_topo(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(void)
+XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
 {
     int ndevices_max;
     cudaError_t err = cudaGetDeviceCount(&ndevices_max);
     if (err)
         return 1;
 
-    for (int i = 0 ; i < XKRT_DEVICES_MAX ; ++i)
+    assert(ngpus < XKRT_DEVICES_MAX);
+    for (int i = 0 ; i < ngpus ; ++i)
     {
         xkrt_device_cuda_t * device = __get_device_cuda(i);
         assert(device);
@@ -451,17 +452,6 @@ cuda_stream_instructions_launch(
 
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_BARRIER):
-        {
-            cudaError_t res;
-            res = cudaStreamSynchronize(stream->cu.handle.high);
-            assert(res == cudaSuccess);
-            res = cudaStreamSynchronize(stream->cu.handle.low);
-            assert(res == cudaSuccess);
-            ++istream->ok_p;
-            return 0;
-        }
-
         case (XKRT_STREAM_INSTR_TYPE_KERN):
         {
             assert(istream->type == XKRT_STREAM_TYPE_KERN);
@@ -574,84 +564,57 @@ cuda_stream_instructions_launch(
     LOGGER_FATAL("Unreachable code");
 }
 
-/* increase ok_p without calling callback */
 static inline int
-cuda_stream_instructions_progress(
-    xkrt_stream_t * istream,
-    int blocking
+cuda_stream_instructions_wait(
+    xkrt_stream_t * istream
 ) {
     assert(istream);
     assert(istream->pending.pos.r < istream->pending.pos.w);
 
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
 
-    if (blocking)
+    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
+    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
+
+    return 0;
+}
+
+static inline int
+cuda_stream_instructions_progress(
+    xkrt_stream_t * istream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
+    assert(istream);
+    assert(istream->pending.pos.r < istream->pending.pos.w);
+
+    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
+
+    switch (instr->type)
     {
-        CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
-        CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
-        istream->ok_p = istream->pending.pos.w;
-        return 0;
-    }
-
-    /* istream->ok_p is past the last ok pending request: test from ok_p to pos_wp */
-    xkrt_stream_instruction_counter_t     size = istream->pending.pos.w - istream->pending.pos.r;
-    xkrt_stream_instruction_counter_t      okp = istream->ok_p;
-    int64_t                           prev_okp = ((int64_t) okp) - 1;
-    assert(prev_okp < (int64_t) okp);
-
-    while (okp < istream->pending.pos.w)
-    {
-        const xkrt_stream_instruction_counter_t idx = okp % istream->pending.capacity;
-        xkrt_stream_instruction_t * instr = istream->pending.instr + idx;
-
-        switch (instr->type)
+        case (XKRT_STREAM_INSTR_TYPE_KERN):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
-            case (XKRT_STREAM_INSTR_TYPE_KERN):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+            /* poll events */
+            for (int i = 0 ; i < 16 ; ++i)
             {
-                /* poll events */
-                for (int i = 0 ; i < 16 ; ++i)
-                {
-                    CUDA_SAFE_CALL(cudaGetLastError());
-                    cudaError_t res = cudaEventQuery(stream->cu.events.buffer[idx]);
-
-                    if (res == cudaErrorNotReady)
-                    {
-                        sched_yield();
-                    }
-                    else if (res == cudaSuccess)
-                    {
-                        if (prev_okp + 1 == (int64_t) okp)
-                            ++prev_okp;
-                        break ;
-                    }
-                    else
-                        LOGGER_FATAL("Error querying event");
-                }
-            } /* intentionally fallthrough */
-
-            case (XKRT_STREAM_INSTR_TYPE_BARRIER):
-            {
-                ++okp;
-                break ;
+                CUDA_SAFE_CALL(cudaGetLastError());
+                cudaError_t res = cudaEventQuery(stream->cu.events.buffer[idx]);
+                if (res == cudaErrorNotReady)
+                    sched_yield();
+                else if (res == cudaSuccess)
+                    return 0;
+                else
+                    LOGGER_FATAL("Error querying event");
             }
-
-            default:
-            {
-                LOGGER_FATAL("Wrong instruction");
-            }
+            break ;
         }
-    }
 
-    /* all events have been tested, test the prev_okp has been incremented */
-    okp = istream->ok_p;
-    if (prev_okp != (((int64_t) okp) - 1))
-    {
-        istream->ok_p = (xkrt_stream_instruction_counter_t) (prev_okp + 1);
-        return 0;
+        default:
+            LOGGER_FATAL("Wrong instruction");
     }
 
     return EINPROGRESS;
@@ -678,7 +641,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         type,
         capacity,
         cuda_stream_instructions_launch,
-        cuda_stream_instructions_progress
+        cuda_stream_instructions_progress,
+        cuda_stream_instructions_wait
     );
 
     /*************************/

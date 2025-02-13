@@ -46,7 +46,9 @@ xkrt_init(xkrt_runtime_t * runtime)
     xkrt_init_conf(&(runtime->conf));
     xkrt_task_format_register(runtime);
     xkrt_memory_coherent_async_worker_thread_init(runtime);
-    xkrt_drivers_init(&(runtime->drivers), runtime->conf.device.ngpus, xkrt_device_thread_main, runtime);
+
+    const uint8_t ngpus = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus);
+    xkrt_drivers_init(&(runtime->drivers), ngpus, xkrt_device_thread_main, runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
     return 0;

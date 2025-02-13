@@ -113,7 +113,7 @@ xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
     conf->device.ngpus              = (uint8_t)-1;
-    conf->device.gpu_mem_percent    = (float) 92.0;
+    conf->device.gpu_mem_percent    = (float) 50.0;
 
     //////////////////
     //  KERNEL CONF //

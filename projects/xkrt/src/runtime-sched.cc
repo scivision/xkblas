@@ -192,6 +192,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     assert(driver->f_memory_alloc);
     const void * device_ptr = driver->f_memory_alloc(device->driver_id, size);
+    assert(device_ptr);
     device->memory_set_chunk0((uintptr_t) device_ptr, size);
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);

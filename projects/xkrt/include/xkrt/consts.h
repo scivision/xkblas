@@ -15,7 +15,7 @@
 # define __CONSTS_H__
 
 /* maximum number of devices in total */
-# define XKRT_DEVICES_MAX (8)
+# define XKRT_DEVICES_MAX (16)
 
 /* maximum number of performance ranks between devices. */
 # define XKRT_DEVICES_PERF_RANK_MAX (4)

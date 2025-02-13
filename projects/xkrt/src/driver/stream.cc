@@ -53,8 +53,6 @@ xkrt_stream_instruction_type_to_str(xkrt_stream_instruction_type_t type)
              return "COPY_D2H";
          case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
              return "COPY_D2D";
-         case (XKRT_STREAM_INSTR_TYPE_BARRIER):
-             return "BARRIER";
          case (XKRT_STREAM_INSTR_TYPE_KERN):
              return "KERN";
         default:
@@ -81,13 +79,15 @@ xkrt_stream_init(
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity,
     int (*f_instruction_launch)   (xkrt_stream_t *, xkrt_stream_instruction_t *),
-    int (*f_instructions_progress)(xkrt_stream_t *, int)
+    int (*f_instructions_progress)(xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
+    int (*f_instructions_wait)(xkrt_stream_t *)
 ) {
     stream->type = type;
     stream->spinlock = SPINLOCK_INITIALIZER;
 
     stream->f_instruction_launch    = f_instruction_launch;
     stream->f_instructions_progress = f_instructions_progress;
+    stream->f_instructions_wait     = f_instructions_wait;
 
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_instruction_t) * capacity * 2);
     assert(mem);
@@ -104,7 +104,6 @@ xkrt_stream_init(
         capacity
     );
 
-    stream->ok_p = 0;
     memset(&(stream->stats), 0, sizeof(stream->stats));
 }
 
@@ -137,15 +136,6 @@ xkrt_stream_t::instruction_new(
 void
 xkrt_stream_t::complete(const xkrt_stream_instruction_counter_t i)
 {
-    xkrt_stream_instruction_t * instr = this->pending.instr + (i % this->pending.capacity);
-    assert(instr);
-
-    if (instr->callback.func)
-        instr->callback.func(instr->callback.args);
-
-    ++this->pending.pos.r;
-
-    XKRT_STATS_INCR(this->stats.instructions[instr->type].completed, 1);
 }
 
 int
@@ -238,8 +228,40 @@ xkrt_stream_t::launch_ready_instructions(void)
     return err;
 }
 
+// complete all instructions to 'ok_p'
+void
+xkrt_stream_t::complete_instructions(const xkrt_stream_instruction_counter_t ok_p)
+{
+    assert(this->pending.pos.r < ok_p);
+    assert(ok_p <= this->pending.pos.w);
+    for (xkrt_stream_instruction_counter_t p = this->pending.pos.r ; p < ok_p ; ++p)
+    {
+        xkrt_stream_instruction_t * instr = this->pending.instr + (p % this->pending.capacity);
+        assert(instr);
+
+        if (instr->callback.func)
+            instr->callback.func(instr->callback.args);
+
+        XKRT_STATS_INCR(this->stats.instructions[instr->type].completed, 1);
+    }
+    this->pending.pos.r = ok_p;
+}
+
+void
+xkrt_stream_t::wait_pending_instructions(void)
+{
+    assert(this->pending.pos.r <= this->pending.pos.w);
+    assert(this->f_instructions_progress);
+
+    if (this->pending.pos.r < this->pending.pos.w)
+    {
+        this->f_instructions_wait(this);
+        this->complete_instructions(this->pending.pos.w);
+    }
+}
+
 int
-xkrt_stream_t::progress_pending_instructions(int blocking)
+xkrt_stream_t::progress_pending_instructions(void)
 {
     // LOGGER_DEBUG("Progressing pending instructions of stream %p of type `%s` (%d pending)",
     //         this, xkrt_stream_type_to_str(this->type), this->pending.size());
@@ -247,15 +269,34 @@ xkrt_stream_t::progress_pending_instructions(int blocking)
     assert(this->pending.pos.r <= this->pending.pos.w);
     assert(this->f_instructions_progress);
 
-    int err = 0;
-    if (this->pending.pos.r < this->pending.pos.w)
+    // empty stream
+    if (this->pending.pos.r == this->pending.pos.w)
+        return 0;
+
+    int err;
+    xkrt_stream_instruction_counter_t size = this->pending.pos.w - this->pending.pos.r;
+    xkrt_stream_instruction_counter_t p    = this->pending.pos.r;
+    xkrt_stream_instruction_counter_t okp  = this->pending.pos.r - 1;
+
+    while (p < this->pending.pos.w)
     {
-        err = this->f_instructions_progress(this, blocking);
+        const xkrt_stream_instruction_counter_t idx = p % this->pending.capacity;
+        xkrt_stream_instruction_t * instr = this->pending.instr + idx;
+
+        err = this->f_instructions_progress(this, instr, idx);
         assert((err == 0) || (err == EINPROGRESS));
+
+        if (err == 0)
+            if (okp + 1 == p)
+                ++okp;
+
+        ++p;
     }
 
-    for (xkrt_stream_instruction_counter_t p = this->pending.pos.r ; p < this->ok_p ; ++p)
-        this->complete(p);
+    /* all events have been tested, test if ok_p has been incremented meaning
+     * that some instructions completed */
+    if (okp != this->pending.pos.r - 1)
+        this->complete_instructions((xkrt_stream_instruction_counter_t) (okp + 1));
 
     return err;
 }
