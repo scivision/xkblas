@@ -284,7 +284,12 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
         {
-            LOGGER_FATAL("Not implemented");
+            assert(istream->type == XKRT_STREAM_TYPE_KERN);
+            assert(stream->ze.command.list);
+
+            xkrt_stream_instruction_kernel_t * op = &instr->kern;
+            op->launch(istream, op->vargs);
+
             return EINPROGRESS;
 
         } /* XKRT_STREAM_INSTR_TYPE_KERN */

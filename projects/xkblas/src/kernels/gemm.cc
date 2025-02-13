@@ -376,11 +376,52 @@ body_cuda(void * ihandle, void * vargs)
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
+# if XKRT_SUPPORT_ZE
+
+// see https://github.com/intel/pti-gpu/blob/70ad37f50fe660781483ddeadf4d2167fc792c08/samples/ze_gemm/main.cc#L127
+
+# include <xkrt/driver/driver-ze.h>
+# include <xkrt/driver/driver-ze-blas.h>
+# include <xkrt/logger/logger-ze.h>
+
+static void
+body_ze(void * ihandle, void * vargs)
+{
+    LOGGER_FATAL("In kernel impl");
+
+    // unpack arguments
+    xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) ihandle;
+    assert(stream);
+
+    Task * task = (Task *) vargs;
+    assert(task);
+
+    const Access * A = task->accesses + 0;
+    const Access * B = task->accesses + 1;
+    const Access * C = task->accesses + 2;
+
+    args_t * args = (args_t *) (task + 1);
+    assert(args);
+
+    xkrt_driver_ze_blas_££gemm(
+        stream,
+        args->transA, args->transB,
+        args->m, args->n, args->k,
+       &args->alpha,
+        A->device_view.addr, A->device_view.ld,
+        B->device_view.addr, B->device_view.ld,
+       &args->beta,
+        C->device_view.addr, C->device_view.ld
+    );
+}
+
+# endif
+
 # if XKRT_SUPPORT_HOST
 static void
 body_cpu(void * args)
 {
-    LOGGER_DEBUG("Executing a gemm on cpu");
+    LOGGER_FATAL("Executing a gemm on cpu");
 }
 # endif /* XKRT_SUPPORT_HOST */
 
@@ -401,6 +442,10 @@ register_£gemm_format(void)
     # if XKRT_SUPPORT_CUDA
     format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
     # endif /* XKRT_SUPPORT_CUDA */
+
+    # if XKRT_SUPPORT_ZE
+    format.f[XKRT_DRIVER_TYPE_ZE] = body_ze;
+    # endif /* XKRT_SUPPORT_ZE */
 
     snprintf(format.label, sizeof(format.label), "£gemm");
     format_id = xkblas_task_format_create(&format);

@@ -12,8 +12,7 @@ project(${XKRT})
 ###############
 
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-version-always-run.h
-    ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-support-always-run.h
+    always-run
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
@@ -34,7 +33,7 @@ SET(SOURCE_FILES
 # XKRT version
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-version-always-run.h # set invalid name so its always generated
+        always-run  # set invalid name so its always generated
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
 )
@@ -42,7 +41,7 @@ add_custom_command(
 # XKRT support
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/xkrt/xkrt-support-always-run.h # set invalid name so its always generated
+        always-run  # set invalid name so its always generated
     COMMAND
     python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_STATS}
 )
@@ -132,8 +131,8 @@ endif()
 
 # IF USING LEVEL ZERO
 if (${ZE_FOUND})
-    # Level zero driver
-    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
+    # Level Zero driver
+    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc src/driver/driver_ze.cc src/driver/driver_ze_blas.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()

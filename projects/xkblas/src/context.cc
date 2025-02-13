@@ -13,12 +13,6 @@
 
 # include "context.h"
 
-# if __has_include("kernels/generated/kernel-task-format-register.h")
-#  include "kernels/generated/kernel-task-format-register.h"
-# else
-#  error "Please run 'python3 generate.py' in the 'kernels/' directory to generate source files"
-# endif
-
 # include <xkrt/xkrt.h>
 # include <xkrt/sync/spinlock.h>
 
@@ -44,11 +38,7 @@ xkblas_context_get(void)
     return &context;
 }
 
-static inline void
-xkblas_task_format_register(void)
-{
-    # include "kernels/generated/kernel-task-format-register.cc"
-}
+void xkblas_task_format_register(void);
 
 extern "C"
 int

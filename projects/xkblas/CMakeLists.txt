@@ -8,43 +8,63 @@ project(${XKBLAS_NAME})
 
 message(STATUS "TODO: automate kernel files in the build")
 
-SET(XKBLAS_KERNELS_SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ccopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/cgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/cgemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csymm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csyr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/csyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ctrmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ctrsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dcopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dgemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsymm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsyr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dsyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dtrmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dtrsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/scopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/sgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/sgemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssymm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssyr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ssyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/strmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/strsm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zcopyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zgemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zgemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsymm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsyr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zsyrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ztrmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ztrsm.cc
+SET(XKBLAS_KERNELS
+    copyscale
+    gemm
+    gemmt
+    symm
+    syr2k
+    syrk
+    trmm
+    trsm
 )
 
+SET(XKBLAS_KERNELS_PRECISIONS s c d z)
+
+# Generation of source files foreach kernels and precision
+SET(XKBLAS_KERNELS_SOURCE_FILES)
+foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
+
+    # .cc source fles for each precision
+    foreach(kernel IN LISTS XKBLAS_KERNELS)
+        list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generated/${precision}${kernel}.cc)
+        add_custom_command(
+            OUTPUT
+                ${CMAKE_SOURCE_DIR}/src/kernels/generated/${precision}${kernel}.cc
+            COMMAND
+                python3 ${CMAKE_SOURCE_DIR}/src/kernels/generators/generate-cc.py ${CMAKE_SOURCE_DIR} ${kernel} ${precision}
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/src/kernels/${kernel}.cc
+        )
+    endforeach()
+
+    # header files for each precision
+    list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/include/xkblas/${precision}kernels.h)
+    add_custom_command(
+        OUTPUT
+            ${CMAKE_SOURCE_DIR}/include/xkblas/${precision}kernels.h
+        COMMAND
+            python3 ${CMAKE_SOURCE_DIR}/src/kernels/generators/generate-h.py ${CMAKE_SOURCE_DIR} ${precision}
+        DEPENDS
+            ${CMAKE_SOURCE_DIR}/src/kernels/kernels.h
+    )
+
+endforeach()
+
+
+# TODO : this is always run for now, couldnt find a way to set a proper dependency
+add_custom_command(
+    OUTPUT
+        ${CMAKE_SOURCE_DIR}/src/kernels/generated/kernel-task-format-register.cc
+    COMMAND
+        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generators/generate-task-format.py ${CMAKE_SOURCE_DIR} '${XKBLAS_KERNELS}' '${XKBLAS_KERNELS_PRECISIONS}'
+    DEPENDS
+        always-run
+)
+list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generated/kernel-task-format-register.cc)
+
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h
+    always-run
     ${CMAKE_SOURCE_DIR}/src/auto-tile.cc
     ${CMAKE_SOURCE_DIR}/src/conf.cc
     ${CMAKE_SOURCE_DIR}/src/context.cc
@@ -62,36 +82,12 @@ SET(CUDA_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/kernels/generated/zcopyscale.cu
 )
 
-SET(XKBLAS_KERNELS_SOURCE_FILES_DEPS
-    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/copyscale.cu
-    ${CMAKE_SOURCE_DIR}/src/kernels/gemm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/gemmt.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/generate.py
-    ${CMAKE_SOURCE_DIR}/src/kernels/kernel.h
-    ${CMAKE_SOURCE_DIR}/src/kernels/symm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/syr2k.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/syrk.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/trmm.cc
-    ${CMAKE_SOURCE_DIR}/src/kernels/trsm.cc
-)
-
 # XKBLAS version
 add_custom_command(
     OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/xkblas-version-always-run.h # set invalid name so its always generated
+        always-run
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkblas xkblas-version
-)
-
-add_custom_command(
-    OUTPUT
-        ${XKBLAS_KERNELS_SOURCE_FILES}
-        ${CUDA_SOURCE_FILES}
-    COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/src/kernels/generate.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_SOURCE_DIR}/include
-    DEPENDS
-        ${XKBLAS_KERNELS_SOURCE_FILES_DEPS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)

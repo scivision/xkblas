@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   kernel.h                                                                 */
+/*   kernels.h                                                                */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,95 +11,95 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __dKERNEL_H__
-# define __dKERNEL_H__
+#ifndef __£KERNEL_H__
+# define __£KERNEL_H__
 
 # ifdef __cplusplus
 extern "C" {
 # endif /* __cplusplus */
 
     int
-    xkblas_dgemm_async(
+    xkblas_£gemm_async(
         int transA, int transB,
         int m, int n, int k,
-        const double * alpha,
-        const double * A, int lda,
-        const double * B, int ldb,
-        const double * beta,
-              double * C, int ldc
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * B, int ldb,
+        const TYPE * beta,
+              TYPE * C, int ldc
     );
 
     int
-    xkblas_dsyrk_async(
+    xkblas_£syrk_async(
         int uplo, int trans,
         int n, int k,
-        const double * alpha,
-        const double * A, int lda,
-        const double * beta,
-              double * C, int ldc
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * beta,
+              TYPE * C, int ldc
     );
 
     int
-    xkblas_dtrsm_async(
+    xkblas_£trsm_async(
         int side, int uplo,
         int transA, int diag,
         int m, int n,
-        const double * alpha,
-        const double * A, int lda,
-              double * B, int ldb
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+              TYPE * B, int ldb
     );
 
     int
-    xkblas_dcopyscale_async(
+    xkblas_£copyscale_async(
         int m, int n,
         int should_copy, int * IW,
-        const double * D, int ldd,
-              double * L, int ldl,
-              double * U, int ldu
+        const TYPE * D, int ldd,
+              TYPE * L, int ldl,
+              TYPE * U, int ldu
     );
 
     int
-    xkblas_dgemmt_async(
+    xkblas_£gemmt_async(
         int uplo,
         int transA, int transB,
         int n, int k,
-        const double * alpha,
-        const double * A, int lda,
-        const double * B, int ldb,
-        const double * beta,
-              double * C, int ldc
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * B, int ldb,
+        const TYPE * beta,
+              TYPE * C, int ldc
     );
 
     int
-    xkblas_dtrmm_async(
+    xkblas_£trmm_async(
         int side, int uplo,
         int transA, int diag,
         int m, int n,
-        const double * alpha,
-        const double * A, int lda,
-              double * B, int ldb
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+              TYPE * B, int ldb
     );
 
     int
-    xkblas_dsyr2k_async(
+    xkblas_£syr2k_async(
         int uplo, int trans,
         int n, int k,
-        const double * alpha,
-        const double * A, int lda,
-        const double * B, int ldb,
-        const double * beta,
-              double * C, int ldc
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * B, int ldb,
+        const TYPE * beta,
+              TYPE * C, int ldc
     );
 
     int
-    xkblas_dsymm_async(
+    xkblas_£symm_async(
         int side, int uplo,
         int m, int n,
-        const double * alpha,
-        const double * A, int lda,
-        const double * B, int ldb,
-        const double * beta,
-              double * C, int ldc
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * B, int ldb,
+        const TYPE * beta,
+              TYPE * C, int ldc
     );
 
 # ifdef __cplusplus
@@ -107,4 +107,4 @@ extern "C" {
 # endif /* __cplusplus */
 
 
-#endif /* __dKERNEL_H__ */
+#endif /* __£KERNEL_H__ */

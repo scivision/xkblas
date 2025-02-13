@@ -24,7 +24,7 @@
 # include <xkrt/sync/mutex.h>
 
 # include <cuda_runtime.h>
-# include <cublas_v2.h>
+# include <cublas_v2.h>         // TODO : should cublas be part of xkrt's driver ? or as part of xkblas ?
 # include <hwloc.h>
 # include <hwloc/cuda.h>
 # include <hwloc/cudart.h>
@@ -458,7 +458,6 @@ cuda_stream_instructions_launch(
             assert(stream->cu.handle.high);
             assert(stream->cu.blas.handle);
 
-            // TODO : pass the 'stream->cu' structure instead of the cublas handler
             xkrt_stream_instruction_kernel_t * op = &instr->kern;
             op->launch(istream, op->vargs);
 
