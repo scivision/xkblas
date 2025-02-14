@@ -21,18 +21,11 @@ typedef struct  xkrt_stream_cl_t
 {
     xkrt_stream_t super;
 
-    # if 0
     struct {
-        struct {
-            ze_command_list_handle_t list;
-        } command;
-        struct {
-            ze_event_pool_handle_t  pool;
-            ze_event_handle_t     * list;
-        } events;
-    } ze;
-    # endif
-
+        cl_command_queue queue;
+        cl_event * events;
+        cl_context context;
+    } cl;
 }               xkrt_stream_cl_t;
 
 #endif /* __DRIVER_CL_H__ */

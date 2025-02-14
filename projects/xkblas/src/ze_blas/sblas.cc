@@ -105,7 +105,6 @@ ze_blas_sgemm(
     const xkrt_stream_instruction_counter_t wp = stream->super.pending.pos.w % stream->super.pending.capacity;
     ze_event_handle_t ze_event_handle = stream->ze.events.list[wp];
 
-
     LOGGER_FATAL("TODO");
 
     # if 0

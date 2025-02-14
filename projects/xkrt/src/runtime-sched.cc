@@ -173,6 +173,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     // init device by the driver
     driver->f_device_init(device->driver_id);
+    LOGGER_INFO("%s", driver->f_device_info(device_driver_id));
 
     // initialize offloader
     device->offloader_init(driver->f_stream_create);
@@ -209,8 +210,6 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     // can now commit my device
     xkrt_device_commit(driver, device);
     ++driver->ndevices_commited;
-
-    LOGGER_INFO("%s", driver->f_device_info(device_driver_id));
 
     /* infinite loop with the device context */
     int err = xkrt_device_thread_main_loop(runtime, device);

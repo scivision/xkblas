@@ -48,6 +48,7 @@ typedef struct  xkrt_device_cl_t
 
     struct {
         cl_device_id id;
+        cl_context context;
     } cl;
 }               xkrt_device_cl_t;
 
@@ -61,6 +62,15 @@ device_cl_get(int device_driver_id)
     assert(device_driver_id >= 0);
     assert(device_driver_id < cl_n_devices);
     return DEVICES + device_driver_id;
+}
+
+static void xkrt_cl_pfn_notify(
+    const char * errinfo,
+    const void * private_info,
+    size_t cb,
+    void * user_data
+) {
+    LOGGER_ERROR("CL Error occured `%s`", errinfo);
 }
 
 static int
@@ -77,20 +87,31 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
 
     for (cl_uint i = 0; i < cl_n_platforms; ++i)
     {
+        // retrieve cl device ids
         cl_device_id * devices = cl_devices + cl_n_devices;
         cl_uint ndevices = ngpus - cl_n_devices;
         int err = clGetDeviceIDs(cl_platforms[i], CL_DEVICE_TYPE_GPU, ndevices, devices, &ndevices);
         if (err == CL_DEVICE_NOT_FOUND)
             continue ;
         CL_SAFE_CALL(err);
-
         assert(0 <= ndevices);
         assert(ndevices <= ngpus - cl_n_devices);
+
+        // create a context for all these platform devices
+        err;
+        const cl_context_properties properties[] = {
+            CL_CONTEXT_PLATFORM,
+            (cl_context_properties)cl_platforms[i],
+            0 // end of properties
+        };
+        cl_context context = clCreateContext(properties, ndevices, devices, xkrt_cl_pfn_notify, NULL, &err);
+        CL_SAFE_CALL(err);
 
         for (cl_uint j = 0; j < ndevices ; ++j)
         {
             xkrt_device_cl_t * device = DEVICES + cl_n_devices;
             device->cl.id = devices[j];
+            device->cl.context = context;
             ++cl_n_devices;
         }
     }
@@ -138,21 +159,7 @@ XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
     assert(device->inherited.state == XKRT_DEVICE_STATE_DEALLOCATED);
 
-    # if 0
-    // query number of command queue groups
-    CL_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->cl_device, &device->ncommandqueuegroups, NULL));
-    assert(device->ncommandqueuegroups);
-
-    // query each group
-    device->cl_command_queue_group_properties = (cl_command_queue_group_properties_t *) malloc(sizeof(cl_command_queue_group_properties_t) * device->ncommandqueuegroups);
-    assert(device->cl_command_queue_group_properties);
-    CL_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->cl_device, &device->ncommandqueuegroups, device->cl_command_queue_group_properties));
-
-    device->cl_command_queue_group_used = new std::atomic<cl_uint>[device->ncommandqueuegroups];
-    assert(device->cl_command_queue_group_used);
-    for (cl_uint i = 0 ; i < device->ncommandqueuegroups ; ++i)
-        device->cl_command_queue_group_used[i].store(0);
-    # endif
+    // nothing to do
 
     return (xkrt_device_t *) device;
 }
@@ -185,139 +192,31 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
+    char name[64];
+    CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_NAME, sizeof(name), name, NULL));
+
+    char vendor[64];
+    CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL));
+
+    cl_ulong max_mem_alloc_size;
+    CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_mem_alloc_size, NULL));
+
     snprintf(
         buffer,
         sizeof(buffer),
-        "XKRT device %d - OpenCL device %d",
+        "XKRT device %d - OpenCL device %d - named %s of vendor %s - max-mem-alloc-size=%.2lfGB",
         device_driver_id,
-        device->cl.id
+        device->cl.id,
+        name,
+        vendor,
+        max_mem_alloc_size / 1e9
     );
     return buffer;
 }
 
-# if 0
-
-// TODO : can be make this member of a 'xkrt_driver_cl_t' ?  most likely yes,
-// but cuda state machine would make it hard to maintain for cuda as well. Keep
-// them as global variable for now, there should only be 1 instances of a
-// driver right now
-
-static cl_driver_handle_t   cl_drivers[XKRT_DEVICES_MAX];
-static cl_context_handle_t  cl_contextes[XKRT_DEVICES_MAX];
-
-typedef struct  xkrt_device_cl_t
-{
-    xkrt_device_t inherited;
-
-    cl_driver_handle_t      cl_driver;
-    cl_context_handle_t     cl_context;
-    cl_device_handle_t      cl_device;
-    cl_device_properties_t  cl_device_properties;
-
-    // number of command queue group
-    cl_uint ncommandqueuegroups;
-
-    // per command queue group property
-    cl_command_queue_group_properties_t * cl_command_queue_group_properties;
-
-    // per command queue number of queue used
-    std::atomic<cl_uint>               * cl_command_queue_group_used;
-
-}               xkrt_device_cl_t;
-
-static xkrt_device_cl_t DEVICES[XKRT_DEVICES_MAX];
-static cl_uint cl_n_devices = 0;
-
-
-
-// set to '1' if Intel's subdevices should be mapped to a single xkrt device
-// if '0', then Intel's devices are mapped
-# define SUBDEVICE_TO_XKRT_DEVICE 1
-
-static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
-{
-    assert(0 < ngpus);
-    assert(ngpus <= XKRT_DEVICES_MAX);
-
-    # pragma message(TODO "We initialize all Intel drivers and devices here. Maybe make this a bit more lazy")
-
-    // zeInit got deprecated, use other ifdef depending on version
-    # if 1
-    const cl_init_flags_t flags = CL_INIT_FLAG_GPU_ONLY;
-    const cl_result_t r = zeInit(flags);
-    # else
-    cl_init_driver_type_desc_t desc = {CL_STRUCTURE_TYPE_INIT_DRIVER_TYPE_DESC};
-    desc.pNext = nullptr;
-    desc.driverType = CL_INIT_FLAG_GPU_ONLY;
-    cl_uint driverCount = 0;
-    const cl_result_t r = zeInitDrivers(&driverCount, nullptr, &desc);
-    # endif
-
-    if (r != CL_RESULT_SUCCESS)
-        return 1;
-
-    // get all drivers
-    cl_uint cl_n_drivers = ngpus; // i believe Intel API ensure at least 1 gpu per driver ?
-    CL_SAFE_CALL(zeDriverGet(&cl_n_drivers, cl_drivers));
-
-    // get all device handles per driver
-    for (unsigned int cl_driver_id = 0 ; cl_driver_id < cl_n_drivers && cl_n_devices < ngpus ; ++cl_driver_id)
-    {
-        // Create context for driver
-        cl_context_desc_t cl_context_desc = {
-            .stype = CL_STRUCTURE_TYPE_CONTEXT_DESC,
-            .pNext = NULL,
-            .flags = CL_CONTEXT_FLAG_TBD
-        };
-        CL_SAFE_CALL(zeContextCreate(cl_drivers[cl_driver_id], &cl_context_desc, cl_contextes + cl_driver_id));
-
-        // get devices handles
-        cl_uint ndevices = ngpus - cl_n_devices;
-        cl_device_handle_t cl_devices[XKRT_DEVICES_MAX];
-        CL_SAFE_CALL(zeDeviceGet(cl_drivers[cl_driver_id], &ndevices, cl_devices));
-
-        for (unsigned int i = 0 ; i < ndevices ; ++i)
-        {
-            cl_device_handle_t cl_device = cl_devices[i];
-
-            # if SUBDEVICE_TO_XKRT_DEVICE
-            cl_device_handle_t cl_subdevices[XKRT_DEVICES_MAX];
-            cl_uint nsubdevices = ngpus - cl_n_devices;
-            zeDeviceGetSubDevices(cl_device, &nsubdevices, cl_subdevices);
-
-            for (unsigned int j = 0; j < nsubdevices ; ++j)
-            {
-                cl_device_handle_t cl_device = cl_subdevices[j];
-            # endif
-
-                xkrt_device_cl_t * device = DEVICES + cl_n_devices;
-
-                // save handles
-                device->cl_context = cl_contextes[cl_driver_id];
-                device->cl_driver  = cl_drivers[cl_driver_id];
-                device->cl_device  = cl_device;
-
-                // get subdevice properties
-                device->cl_device_properties.stype = CL_STRUCTURE_TYPE_DEVICE_PROPERTIES;
-                CL_SAFE_CALL(zeDeviceGetProperties(device->cl_device, &device->cl_device_properties));
-
-                if (++cl_n_devices == ngpus)
-                    return 0;
-
-            # if SUBDEVICE_TO_XKRT_DEVICE
-            }
-            # endif
-        }
-    }
-
-    return 0;
-}
-
-
-////////////////
+////////////
 // STREAM //
-/////////////
+////////////
 
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
@@ -329,14 +228,13 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     assert(istream->is_locked());
     const xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
-    cl_event_handle_t cl_event_handle = stream->ze.events.list[wp];
+    cl_event event = stream->cl.events[wp];
 
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
         {
             assert(istream->type == XKRT_STREAM_TYPE_KERN);
-            assert(stream->ze.command.list);
 
             xkrt_stream_instruction_kernel_t * op = &instr->kern;
             op->launch(istream, op->vargs);
@@ -351,14 +249,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
             void * dst          = (void *) instr->copy.dst_device_view.addr;
-            sicl_t dst_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
+            size_t dst_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
             const void * src    = (const void *) instr->copy.src_device_view.addr;
-            sicl_t src_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+            size_t src_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
 
-            // assume col major for ze - if not, need to do some shit here
+            // assume col major - if not, need to do some shit here
             assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
-            const sicl_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            const sicl_t height = instr->copy.host_view.n;
+            const size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
+            const size_t height = instr->copy.host_view.n;
             assert(width >= 0);
             assert(height >= 0);
 
@@ -366,46 +264,42 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             {
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
                 {
-                    const cl_uint dst_slice_pitch = 0;
-                    const cl_copy_region_t dst_region = {
-                        .originX = 0,
-                        .originY = 0,
-                        .originZ = 0,
-                        .width   = (cl_uint) width,
-                        .height  = (cl_uint) height,
-                        .depth   = 0
-                    };
+                    // TODO : how to send memory from 'dst' that points on the device ?
+                    // this code is wrong
+                    int err;
+                    cl_mem dst_buffer = clCreateBuffer(stream->cl.context, CL_MEM_READ_WRITE, width*height, dst, &err);
+                    CL_SAFE_CALL(err);
 
-                    const cl_uint src_slice_pitch = 0;
-                    const cl_copy_region_t src_region = {
-                        .originX = 0,
-                        .originY = 0,
-                        .originZ = 0,
-                        .width   = (cl_uint) width,
-                        .height  = (cl_uint) height,
-                        .depth   = 0
-                    };
+                    cl_bool blocking_write = 0;
 
-                    const cl_uint num_wait_events = 0;
-                    cl_event_handle_t * wait_events = NULL;
+                    const size_t dst_origin[] = {0, 0, 0};
+                    const size_t src_origin[] = {0, 0, 0};
+                    const size_t region[]     = {width, height, 1};
+
+                    const size_t dst_slice_pitch = 0;
+                    const size_t src_slice_pitch = 0;
+
+                    cl_uint num_events_in_wait_list = 0;
+                    const cl_event * event_wait_list = NULL;
 
                     CL_SAFE_CALL(
-                        zeCommandListAppendMemoryCopyRegion(
-                            stream->ze.command.list,
-                            dst,
-                           &dst_region,
+                        clEnqueueWriteBufferRect(
+                            stream->cl.queue,
+                            dst_buffer,
+                            blocking_write,
+                            dst_origin,
+                            src_origin,
+                            region,
                             dst_pitch,
                             dst_slice_pitch,
-                            src,
-                           &src_region,
                             src_pitch,
                             src_slice_pitch,
-                            cl_event_handle,
-                            num_wait_events,
-                            wait_events
+                            src,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                           &event
                         )
                     );
-
                     break ;
                 }
 
@@ -445,9 +339,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_wait)(
     xkrt_stream_t * istream
 ) {
     xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) istream;
+    assert(stream);
 
-    const uint64_t timeout = 0;
-    CL_SAFE_CALL(zeCommandListHostSynchronize(stream->ze.command.list, timeout));
+    CL_SAFE_CALL(clFinish(stream->cl.queue));
     return 0;
 }
 
@@ -470,6 +364,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
+            LOGGER_FATAL("IMPL ME");
+            # if 0
             cl_result_t res;
 
             /* poll event */
@@ -483,6 +379,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
                 else
                     LOGGER_FATAL("Error querying event");
             }
+            # endif
 
             return EINPROGRESS;
         }
@@ -494,50 +391,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     return EINPROGRESS;
 }
 
-template<typename T>
-static inline bool
-f_equals(
-    const T & x,
-    const T & y
-) {
-    return x == y ? true : false;
-}
-
-template<typename T>
-static inline bool
-f_and(
-    const T & x,
-    const T & y
-) {
-    return x & y ? true : false;
-}
-
-// return the next command queue group to use
-template <typename T, bool (*f)(const T & x, const T & y)>
-static inline cl_uint
-device_command_queue_group_next(
-    xkrt_device_cl_t * device,
-    const cl_command_queue_group_property_flag_t & flag
-) {
-    cl_uint ordinal_with_least_queues = UINT32_MAX;
-    cl_uint min_queues = UINT32_MAX;
-
-    for (cl_uint i = 0; i < device->ncommandqueuegroups; ++i)
-    {
-        cl_command_queue_group_properties_t * properties = device->cl_command_queue_group_properties + i;
-        if (f((const cl_command_queue_group_property_flag_t &) properties->flags, flag))
-        {
-            const cl_uint used = device->cl_command_queue_group_used[i].load();
-            if (used < min_queues)
-            {
-                min_queues = used;
-                ordinal_with_least_queues = i;
-            }
-        }
-    }
-
-    return ordinal_with_least_queues;
-}
 
 static xkrt_stream_t *
 XKRT_DRIVER_ENTRYPOINT(stream_create)(
@@ -547,7 +400,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 ) {
     assert(idevice);
 
-    uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_cl_t));
+    uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_cl_t) + sizeof(cl_event) * capacity);
     assert(mem);
 
     xkrt_stream_init(
@@ -562,99 +415,32 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     xkrt_device_cl_t * device = (xkrt_device_cl_t *) idevice;
     xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) mem;
 
-    // convert xkrt stream type to a command queue group flag
-    cl_command_queue_group_property_flag_t flag;
-    switch (type)
-    {
-        case (XKRT_STREAM_TYPE_H2D):
-        case (XKRT_STREAM_TYPE_D2H):
-        case (XKRT_STREAM_TYPE_D2D):
-        {
-            flag = CL_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COPY;
-            break ;
-        }
+    // TODO : no control over the queue type with OpenCL
+    (void) type;
 
-        case (XKRT_STREAM_TYPE_KERN):
-        {
-            flag = CL_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
-            break ;
-        }
-
-        default:
-            LOGGER_FATAL("Unknown stream type");
-    }
-
-    // create command queue
-    cl_uint ordinal = device_command_queue_group_next<cl_command_queue_group_property_flag_t, f_equals>(device, flag);
-    if (ordinal == UINT32_MAX)
-    {
-        ordinal = device_command_queue_group_next<cl_command_queue_group_property_flag_t, f_and>(device, flag);
-        if (ordinal == UINT32_MAX)
-            LOGGER_FATAL("No command queue group available for stream");
-    }
-
-    // retrieve group properties
-    const cl_command_queue_group_properties_t * properties = device->cl_command_queue_group_properties + ordinal;
-    cl_uint index = device->cl_command_queue_group_used[ordinal].fetch_add(1) % properties->numQueues;
-
-    // get the next command queue index to use in the group
-    const cl_command_queue_desc_t cl_command_queue_desc = {
-        .stype      = CL_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
-        .pNext      = NULL,
-        .ordinal    = ordinal,
-        .index      = index,
-        .flags      = CL_COMMAND_QUEUE_FLAG_EXPLICIT_ONLY,      // TODO : i think we want explicit ?
-        .mode       = CL_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
-        .priority   = CL_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW    // TODO : maybe do one queue for each priority in 'device->cl_device_properties.maxCommandQueuePriority'
+    // create a queue
+    const cl_queue_properties properties[] = {
+        CL_QUEUE_PROPERTIES,
+        CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL_QUEUE_ON_DEVICE,    // not sure why we must specify 'CL_QUEUE_ON_DEVICE' ?
+        CL_QUEUE_SIZE,
+        CL_DEVICE_QUEUE_ON_DEVICE_PREFERRED_SIZE,                       // default parameter
+        0                                                               // end of properties
     };
-    # if 0
-    CL_SAFE_CALL(
-        zeCommandQueueCreate(
-            device->cl_context,
-            device->cl_device,
-           &cl_command_queue_desc,
-           &stream->ze.command.queue
-        )
-    );
-    # endif
+    int err;
+    stream->cl.queue = clCreateCommandQueueWithProperties(device->cl.context, device->cl.id, 0, &err);
+    CL_SAFE_CALL(err);
 
-    // create command list
-    # if 0
-    cl_command_list_desc_t cl_command_list_desc = {
-        .stype = CL_STRUCTURE_TYPE_COMMAND_LIST_DESC,
-        .pNext = NULL,
-        .commandQueueGroupOrdinal = ordinal,
-        .flags = CL_COMMAND_LIST_FLAG_RELAXED_ORDERING | CL_COMMAND_LIST_FLAG_MAXIMICL_THROUGHPUT
-    };
-    # endif
-    CL_SAFE_CALL(
-        zeCommandListCreateImmediate(
-            device->cl_context,
-            device->cl_device,
-           &cl_command_queue_desc,
-           &stream->ze.command.list
-        )
-    );
-
-    // create event pool and events
-    const cl_event_pool_desc_t cl_event_pool_desc = {
-        .stype  = CL_STRUCTURE_TYPE_EVENT_POOL_DESC,
-        .pNext  = NULL,
-        .flags  = CL_EVENT_POOL_FLAG_HOST_VISIBLE,
-        .count  = capacity
-    };
-    const cl_uint ndevices = 1;
-    CL_SAFE_CALL(zeEventPoolCreate(device->cl_context, &cl_event_pool_desc, ndevices, &device->cl_device, &stream->ze.events.pool));
-
-    cl_event_desc_t event_desc = {
-        .stype  = CL_STRUCTURE_TYPE_EVENT_DESC,
-        .signal = CL_EVENT_SCOPE_FLAG_HOST,
-        .wait   = CL_EVENT_SCOPE_FLAG_HOST
-    };
-    stream->ze.events.list = (cl_event_handle_t *) malloc(sizeof(cl_event_handle_t) * capacity);
-    assert(stream->ze.events.list);
+    // create events
+    stream->cl.events = (cl_event *) (stream + 1);
     for (xkrt_stream_instruction_counter_t i = 0 ; i < capacity ; ++i)
-        CL_SAFE_CALL(zeEventCreate(stream->ze.events.pool, &event_desc, stream->ze.events.list + i));
+    {
+        int err;
+        stream->cl.events[i] = clCreateUserEvent(device->cl.context, &err);
+        CL_SAFE_CALL(err);
+    }
+
+    // save context for later buffer use
+    stream->cl.context = device->cl.context;
 
     return (xkrt_stream_t *) stream;
 }
@@ -664,6 +450,12 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
     xkrt_stream_t * istream
 ) {
     xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) istream;
+
+    for (xkrt_stream_instruction_counter_t i = 0 ; i < istream->pending.capacity ; ++i)
+        CL_SAFE_CALL(clReleaseEvent(stream->cl.events[i]));
+
+    CL_SAFE_CALL(clReleaseCommandQueue(stream->cl.queue));
+
     free(stream);
 }
 
@@ -672,98 +464,24 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
 ////////////
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const sicl_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
-
-    # if 0
-    const cl_device_mem_alloc_desc_t device_desc = {
-        .stype = CL_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
-        .pNext = NULL,
-        .flags = 0,
-        .ordinal = 0
-    };
-    const sicl_t alignment = 8;
-    void * device_ptr = NULL;
-    CL_SAFE_CALL(zeMemAllocDevice(device->cl_context, &device_desc, size, alignment, device->cl_device, &device_ptr));
-    CL_SAFE_CALL(zeContextMakeMemoryResident(device->cl_context, device->cl_device, device_ptr, size));
-    # else
-
-    // Query page size for our allocation
-    sicl_t pagesize;
-    CL_SAFE_CALL(
-        zeVirtualMemQueryPageSize(
-            device->cl_context,
-            device->cl_device,
-            size,
-           &pagesize
-        )
-    );
-
-    // Align size and reserve virtual address space.
-    const sicl_t reserve_size = size + (pagesize - (size % pagesize));
-    void * device_ptr = NULL;
-    CL_SAFE_CALL(
-        zeVirtualMemReserve(
-            device->cl_context,
-            NULL,
-            reserve_size,
-           &device_ptr
-        )
-    );
-    assert(device_ptr);
-
-    // Create physical memory
-    cl_physical_mem_desc_t cl_physical_mem_desc = {
-        .stype = CL_STRUCTURE_TYPE_PHYSICAL_MEM_DESC,
-        .pNext = NULL,
-        .flags = CL_PHYSICAL_MEM_FLAG_TBD,
-        .size  = reserve_size
-    };
-    cl_physical_mem_handle_t cl_physical_mem_handle;
-    CL_SAFE_CALL(
-        zePhysicalMemCreate(
-            device->cl_context,
-            device->cl_device,
-           &cl_physical_mem_desc,
-           &cl_physical_mem_handle
-        )
-    );
-
-    // Map virtual to physical memory
-    const cl_memory_access_attribute_t cl_memory_access_attribute = CL_MEMORY_ACCESS_ATTRIBUTE_READWRITE;
-    const sicl_t offset = 0;
-    CL_SAFE_CALL(
-        zeVirtualMemMap(
-            device->cl_context,
-            device_ptr,
-            size,
-            cl_physical_mem_handle,
-            offset,
-            cl_memory_access_attribute
-        )
-    );
-    # endif
-
-    CL_SAFE_CALL(
-        zeContextMakeMemoryResident(
-            device->cl_context,
-            device->cl_device,
-            device_ptr, size
-        )
-    );
-
-    return device_ptr;
+    int err;
+    void * ptr = clCreateBuffer(device->cl.context, CL_MEM_READ_WRITE, size, NULL, &err);
+    CL_SAFE_CALL(err);
+    return ptr;
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, sicl_t * total)
+XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, size_t * total)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
-    *total = device->cl_device_properties.maxMemAllocSize;
-}
 
-# endif /* 0 */
+    cl_ulong max_mem_alloc_size;
+    CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_mem_alloc_size, NULL));
+    *total = (size_t) max_mem_alloc_size;
+}
 
 //////////////////////////
 // Routine registration //
@@ -782,18 +500,19 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     EP(device_create);
     EP(device_destroy);
     EP(device_init);
-    // EP(device_attach);   // no "state machine" with level zero, no need to attach to a device
+    // EP(device_attach);   // no "state machine" with opencl, no need to attach to a device
     EP(device_commit);
     EP(device_info);
 
-# if 0
     EP(memory_alloc);
     EP(memory_info);
-    // EP(memory_register);
-    // EP(memory_unregister);
 
     EP(stream_create);
     EP(stream_delete);
+
+# if 0
+    // EP(memory_register);
+    // EP(memory_unregister);
 
     // EP(get_source);
 
