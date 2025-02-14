@@ -11,12 +11,12 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include "xkblas/cblas.h"
 # include "xkblas/xkblas.h"
 
 # include <assert.h>
 # include <stdlib.h>
 # include <stdint.h>
-# include <cblas.h>
 
 # if 1
 # include "xkblas/skernels.h"

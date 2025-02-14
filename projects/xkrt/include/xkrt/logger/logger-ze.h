@@ -1,5 +1,5 @@
 # ifndef __LOGGER_ZE_H__
-#  define __LOGER_ZE_H__
+#  define __LOGGER_ZE_H__
 
 #  include <xkrt/logger/logger.h>
 #  include <ze_api.h>

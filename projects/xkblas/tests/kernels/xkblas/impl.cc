@@ -17,7 +17,7 @@
 # include "common/impl.hpp"
 
 # include <xkblas/xkblas.h>
-# include <xkblas/kernels.h>
+# include <xkblas/skernels.h>
 
 /* Implementation name */
 const char *

@@ -11,14 +11,18 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <cblas.h>
+# include <xkrt/xkrt-support.h>
+
+# if XKRT_SUPPORT_ZE
+#  include <xkrt/driver/driver-ze.h>
+#  include <xkrt/logger/logger-ze.h>
+#  include <sycl/sycl.hpp>
+#  include <oneapi/mkl.hpp>
+# endif /* XKRT_SUPPORT_ZE */
 
 # include "auto-tile.h"
 # include "context.h"
 
-# include "xkblas/kernel-type.h"
-
-# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -29,6 +33,9 @@
 # include <xkrt/xkrt-support.h>
 
 # include <cassert>
+
+# include "xkblas/kernel-type.h"
+# include "xkblas/cblas.h"
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
@@ -378,12 +385,6 @@ body_cuda(void * ihandle, void * vargs)
 
 # if XKRT_SUPPORT_ZE
 
-// see https://github.com/intel/pti-gpu/blob/70ad37f50fe660781483ddeadf4d2167fc792c08/samples/ze_gemm/main.cc#L127
-
-# include <xkrt/driver/driver-ze.h>
-# include <xkrt/driver/driver-ze-blas.h>
-# include <xkrt/logger/logger-ze.h>
-
 static void
 body_ze(void * ihandle, void * vargs)
 {
@@ -403,8 +404,30 @@ body_ze(void * ihandle, void * vargs)
     args_t * args = (args_t *) (task + 1);
     assert(args);
 
-    xkrt_driver_ze_blas_££gemm(
-        stream,
+    // TODO : having to use sycl here is super ugly, but Intel do not seems to
+    // provide the kernels direcly, so we could pass them via a
+    // zeCommandListAdKernelLaunch - or even to simply call a gemm with a command list/queue
+
+    // Retrieve the Level Zero context and device from the command list
+    ze_context_handle_t ze_context;
+    ze_device_handle_t ze_device;
+    ZE_SAFE_CALL(zeCommandListGetContextHandle(stream->ze.command.list, &ze_context));
+    ZE_SAFE_CALL(zeCommandListGetDeviceHandle(stream->ze.command.list, &ze_device));
+
+    // Create SYCL platform and device from Level Zero context and device
+    sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
+    sycl::device sycl_device = sycl::device::ext_oneapi_from_ze_device(ze_device);
+
+    // Create SYCL context from SYCL device
+    sycl::context sycl_context(sycl_device);
+
+    // Create SYCL queue from SYCL context and Level Zero command list
+    sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
+
+    # if 0
+    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::standard;
+    oneapi::mkl::blas::column_major::gemm(
+        sycl_queue,
         args->transA, args->transB,
         args->m, args->n, args->k,
        &args->alpha,
@@ -413,6 +436,9 @@ body_ze(void * ihandle, void * vargs)
        &args->beta,
         C->device_view.addr, C->device_view.ld
     );
+    # endif
+
+    // TODO ; need an event
 }
 
 # endif

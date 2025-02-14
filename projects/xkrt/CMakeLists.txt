@@ -36,14 +36,8 @@ add_custom_command(
         always-run  # set invalid name so its always generated
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-)
-
-# XKRT support
-add_custom_command(
-    OUTPUT
-        always-run  # set invalid name so its always generated
     COMMAND
-    python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_STATS}
+        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_CL} ${USE_STATS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -100,11 +94,17 @@ if (USE_ZE)
 
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
-    message(STATUS "Found Cuda: ${ZE_INCLUDE_DIRS}")
+    message(STATUS "Found ZE: ${ZE_INCLUDE_DIRS}")
 
-    #    find_package(CLBLAS REQUIRED)
-    #    include_directories("${CLBLAS_INCLUDE_DIRS}")
-    #    message(STATUS "Found clblas: ${CLBLAS_INCLUDE_DIRS}")
+endif()
+
+# OpenCL
+option(USE_CL "Whether to build the OpenCL driver." ON)
+if (USE_CL)
+
+    find_package(CL REQUIRED)
+    include_directories("${CL_INCLUDE_DIRS}")
+    message(STATUS "Found OpenCL: ${CL_INCLUDE_DIRS}")
 
 endif()
 
@@ -121,8 +121,6 @@ endif()
 
 # IF USING CUDA
 if (${CUDA_RT_FOUND})
-
-    # Cuda driver
     add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
     target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
@@ -131,10 +129,16 @@ endif()
 
 # IF USING LEVEL ZERO
 if (${ZE_FOUND})
-    # Level Zero driver
-    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc src/driver/driver_ze.cc src/driver/driver_ze_blas.cc)
+    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+endif()
+
+# IF USING CL
+if (${CL_FOUND})
+    add_library(${XKRT}_driver_cl SHARED src/driver/driver_cl.cc)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl)
+    install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 # Include directory

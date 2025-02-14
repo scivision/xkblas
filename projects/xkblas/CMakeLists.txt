@@ -8,18 +8,9 @@ project(${XKBLAS_NAME})
 
 message(STATUS "TODO: automate kernel files in the build")
 
-SET(XKBLAS_KERNELS
-    copyscale
-    gemm
-    gemmt
-    symm
-    syr2k
-    syrk
-    trmm
-    trsm
-)
-
+SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
 SET(XKBLAS_KERNELS_PRECISIONS s c d z)
+#SET(XKBLAS_KERNELS_PRECISIONS s)
 
 # Generation of source files foreach kernels and precision
 SET(XKBLAS_KERNELS_SOURCE_FILES)
@@ -50,7 +41,6 @@ foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
     )
 
 endforeach()
-
 
 # TODO : this is always run for now, couldnt find a way to set a proper dependency
 add_custom_command(
@@ -129,8 +119,44 @@ if (ENABLE_CU)
     add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
     set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
     install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+endif()
+
+option(ENABLE_ZE_BLAS "Enable the compilation of Level Zero BLAS" ON)
+if (ENABLE_ZE_BLAS)
+
+    # set sources
+    SET(XKBLAS_ZE_BLAS_SOURCE_FILES)
+    foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
+        list(APPEND XKBLAS_ZE_BLAS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/ze_blas/${precision}blas.cc ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_${precision}blas.h)
+
+        add_custom_command(
+            OUTPUT
+                ${CMAKE_SOURCE_DIR}/src/ze_blas/${precision}blas.cc
+            COMMAND
+                python3 ${CMAKE_SOURCE_DIR}/src/ze_blas/generator.py ${CMAKE_SOURCE_DIR} ${precision}
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/src/ze_blas/blas.cc
+        )
+
+        add_custom_command(
+            OUTPUT
+                ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_${precision}blas.h
+            COMMAND
+                python3 ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/generator.py ${CMAKE_SOURCE_DIR} ${precision}
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_blas.template
+        )
+    endforeach()
+
+    add_compile_definitions(XKBLAS_SUPPORT_ZE_BLAS=1)
+    add_library(${XKBLAS_NAME}_kernels_ze SHARED ${XKBLAS_ZE_BLAS_SOURCE_FILES})
+    install(TARGETS ${XKBLAS_NAME}_kernels_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_ze)
+
+    # current impl relies on sycl ... :-(
+    target_compile_options(${XKBLAS_NAME}_kernels_ze PRIVATE -fsycl)
+
 endif()
 
 # Include directory

@@ -14,8 +14,8 @@
 #ifndef __CBLAS_TO_CUBLAS_H__
 # define __CBLAS_TO_CUBLAS_H__
 
-# include <cblas.h>
 # include <cublas_v2.h>
+# include "xkblas/cblas.h"
 
 static inline cublasOperation_t
 cblas2cublas_op(int trans)

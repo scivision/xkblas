@@ -59,8 +59,7 @@ xkrt_driver_init(
     const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
     LOGGER_INFO("Loading driver `%s`", driver_name);
 
-    assert(driver->f_init);
-    if (driver->f_init(ngpus))
+    if (driver->f_init == NULL || driver->f_init(ngpus))
     {
         LOGGER_WARN("Failed to load");
         return ;
@@ -168,6 +167,11 @@ xkrt_drivers_init(
     extern void XKRT_DRIVER_TYPE_ZE_get_driver(xkrt_driver_t *);
     loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_get_driver;
 # endif /* XKRT_SUPPORT_ZE */
+
+# if XKRT_SUPPORT_CL
+    extern void XKRT_DRIVER_TYPE_CL_get_driver(xkrt_driver_t *);
+    loaders[XKRT_DRIVER_TYPE_CL] = XKRT_DRIVER_TYPE_CL_get_driver;
+# endif /* XKRT_SUPPORT_CL */
 
     uint8_t total_gpus = 0;
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)

@@ -3,8 +3,8 @@
 import os
 import sys
 
-if len(sys.argv) != 7:
-    print("usage: {} [DST-DIR] [DST-FILE] [USE_HOST] [USE_CUDA] [USE_ZE] [USE_STATS]".format(sys.argv[0]))
+if len(sys.argv) != 8:
+    print("usage: {} [DST-DIR] [DST-FILE] [USE_HOST] [USE_CUDA] [USE_ZE] [USE_CL] [USE_STATS]".format(sys.argv[0]))
     sys.exit(0)
 
 dstdir=sys.argv[1]
@@ -23,8 +23,9 @@ def cmake_option_convert(opt):
 use_host=cmake_option_convert(sys.argv[3])
 use_cuda=cmake_option_convert(sys.argv[4])
 use_ze=cmake_option_convert(sys.argv[5])
-use_stats=cmake_option_convert(sys.argv[6])
-cmd('sed -e "s/__XKRT_SUPPORT_HOST_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CUDA_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZE_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_STATS_VALUE__/{}/g" {}/{}.template > {}/{}-tmp.h'.format(use_host, use_cuda, use_ze, use_stats, dstdir, dstfile, dstdir, dstfile))
+use_opencl=cmake_option_convert(sys.argv[6])
+use_stats=cmake_option_convert(sys.argv[7])
+cmd('sed -e "s/__XKRT_SUPPORT_HOST_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CUDA_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZE_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CL_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_STATS_VALUE__/{}/g" {}/{}.template > {}/{}-tmp.h'.format(use_host, use_cuda, use_ze, use_opencl, use_stats, dstdir, dstfile, dstdir, dstfile))
 
 
 if cmd("test -f {}/{}.h".format(dstdir, dstfile)) or cmd("diff {}/{}.h {}/{}-tmp.h".format(dstdir, dstfile, dstdir, dstfile)):

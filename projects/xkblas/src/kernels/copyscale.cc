@@ -11,11 +11,10 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <cblas.h>
-
 # include "context.h"
 # include "auto-tile.h"
 # include "xkblas/kernel-type.h"
+# include "xkblas/cblas.h"
 
 # include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread-producer.hpp>

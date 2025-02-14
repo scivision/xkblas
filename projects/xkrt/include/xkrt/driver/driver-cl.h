@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver_ze.h                                                              */
+/*   driver-cl.h                                                              */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,16 +11,17 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __DRIVER_ZE_H__
-# define __DRIVER_ZE_H__
+#ifndef __DRIVER_CL_H__
+# define __DRIVER_CL_H__
 
 # include <xkrt/driver/stream.h>
-# include <ze_api.h>
+# include <CL/cl.h>
 
-typedef struct  xkrt_stream_ze_t
+typedef struct  xkrt_stream_cl_t
 {
     xkrt_stream_t super;
 
+    # if 0
     struct {
         struct {
             ze_command_list_handle_t list;
@@ -30,7 +31,8 @@ typedef struct  xkrt_stream_ze_t
             ze_event_handle_t     * list;
         } events;
     } ze;
+    # endif
 
-}               xkrt_stream_ze_t;
+}               xkrt_stream_cl_t;
 
-#endif /* __DRIVER_ZE_H__ */
+#endif /* __DRIVER_CL_H__ */

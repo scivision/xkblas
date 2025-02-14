@@ -1,4 +1,4 @@
-#ifndef CBLAS_H
+#if !defined(CBLAS_H) && !defined(__MKL_CBLAS_H__)
 #define CBLAS_H
 #include <stddef.h>
 
