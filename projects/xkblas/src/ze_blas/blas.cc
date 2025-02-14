@@ -40,6 +40,7 @@ ze_blas_load(
     assert(*module == NULL);
     assert(src);
 
+    # if 0
     ze_context_handle_t ze_context;
     ZE_SAFE_CALL(zeCommandListGetContextHandle(stream->ze.command.list, &ze_context));
 
@@ -50,7 +51,7 @@ ze_blas_load(
         binary.data(), nullptr, nullptr};
     ze_module_handle_t module = nullptr;
     status = zeModuleCreate(context, device, &module_desc, &module, nullptr);
-
+    # endif
     LOGGER_FATAL("TODO");
 }
 
@@ -69,10 +70,10 @@ ze_blas_load_ensure(
 //////////
 
 ze_module_handle_t GEMM_NAIVE_MODULE = NULL;
-const char * GEMM_NAIVE_SRC = SOURCE_CODE(
+const char * ££GEMM_NAIVE_SRC = SOURCE_CODE(
     __kernel
     void
-    GEMM_NAIVE_SRC(
+    ££GEMM_NAIVE_SRC(
         int m, int n, int k,
         const TYPE alpha,
         __global const TYPE * A, int lda,
@@ -100,7 +101,7 @@ ze_blas_£gemm(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
-    ze_blas_load_ensure(stream, &GEMM_NAIVE_MODULE, GEMM_NAIVE_SRC);
+    ze_blas_load_ensure(stream, &GEMM_NAIVE_MODULE, ££GEMM_NAIVE_SRC);
 
     const xkrt_stream_instruction_counter_t wp = stream->super.pending.pos.w % stream->super.pending.capacity;
     ze_event_handle_t ze_event_handle = stream->ze.events.list[wp];

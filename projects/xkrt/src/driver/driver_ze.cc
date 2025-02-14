@@ -271,14 +271,13 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkrt_stream_t * istream,
-    xkrt_stream_instruction_t * instr
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
 ) {
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
     assert(stream);
 
-    assert(istream->is_locked());
-    const xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
-    ze_event_handle_t ze_event_handle = stream->ze.events.list[wp];
+    ze_event_handle_t ze_event_handle = stream->ze.events.list[idx];
 
     switch (instr->type)
     {
@@ -428,7 +427,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
                 if (res == ZE_RESULT_NOT_READY)
                     sched_yield();
                 else if (res == ZE_RESULT_SUCCESS)
-                    return res;
+                    return 0;
                 else
                     LOGGER_FATAL("Error querying event");
             }

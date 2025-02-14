@@ -78,7 +78,7 @@ xkrt_stream_init(
     xkrt_stream_t * stream,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity,
-    int (*f_instruction_launch)   (xkrt_stream_t *, xkrt_stream_instruction_t *),
+    int (*f_instruction_launch)   (xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
     int (*f_instructions_progress)(xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
     int (*f_instructions_wait)(xkrt_stream_t *)
 ) {
@@ -181,7 +181,7 @@ xkrt_stream_t::launch_ready_instructions(void)
         );
 
         assert(this->f_instruction_launch);
-        err = this->f_instruction_launch(this, instr);
+        err = this->f_instruction_launch(this, instr, p);
 
         switch (err)
         {

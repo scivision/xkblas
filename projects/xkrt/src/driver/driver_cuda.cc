@@ -443,12 +443,13 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
 static int
 cuda_stream_instructions_launch(
     xkrt_stream_t * istream,
-    xkrt_stream_instruction_t * instr
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
 ) {
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
     assert(stream);
 
-    assert(istream->is_locked());
+    cudaEvent_t event = stream->cu.events.buffer[idx];
 
     switch (instr->type)
     {
@@ -461,11 +462,7 @@ cuda_stream_instructions_launch(
             xkrt_stream_instruction_kernel_t * op = &instr->kern;
             op->launch(istream, op->vargs);
 
-            # pragma message(TODO "Add support for end event records")
-
-            xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
-            assert(stream->cu.events.capacity == istream->pending.capacity);
-            cudaError_t err = cudaEventRecord(stream->cu.events.buffer[wp], stream->cu.handle.high);
+            cudaError_t err = cudaEventRecord(event, stream->cu.handle.high);
             assert(err == cudaSuccess);
 
             # if 0
@@ -548,9 +545,7 @@ cuda_stream_instructions_launch(
             LOGGER_INFO("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
             CUDA_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
-
-            xkrt_stream_instruction_counter_t wp = istream->pending.pos.w % istream->pending.capacity;
-            CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[wp], handle));
+            CUDA_SAFE_CALL(cudaEventRecord(event, handle));
 
             return EINPROGRESS;
         }
@@ -704,26 +699,16 @@ const char *
 XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 {
     static char buffer[512];
-    static char buf1[16];
-    static char buf2[16];
-    static char buf3[16];
 
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
     assert(device);
 
-    buf1[10] = 0;
-    buf2[10] = 0;
-    buf3[10] = 0;
-    _print_mask(buf1, 10, device->affinity[0]);
-    _print_mask(buf2, 10, device->affinity[1]);
-    _print_mask(buf3, 10, device->affinity[2]);
-    snprintf(buffer, 256, "%s, cuda device: %i, pci: %02x:%02x, %.2f (GB), affinity: %s,%s,%s",
+    snprintf(buffer, 256, "%s, cuda device: %i, pci: %02x:%02x, %.2f (GB)",
         device->prop.name,
         device->inherited.global_id,
         device->prop.pciBusID,
         device->prop.pciDeviceID,
-        ((double)device->mem_total)/1024.0/1024.0/1024.0,
-        buf1, buf2, buf3
+        ((double)device->mem_total)/1e9
     );
     return buffer;
 }

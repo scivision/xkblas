@@ -88,9 +88,7 @@ typedef struct  xkrt_device_t
     // MEMORY MANAGMENT //
     //////////////////////
 
-    // TODO : ALLOW MULTIPLE AREAS PER DEVICE
-
-    /* memory areas of that device (only 1 for now) */
+    /* memory areas of that device */
     xkrt_area_t area;
 
     /* allocate memory */
