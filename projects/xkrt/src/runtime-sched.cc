@@ -273,6 +273,7 @@ xkrt_device_task_execute(
             CASE(HOST)
             CASE(CUDA)
             CASE(ZE)
+            CASE(CL)
 
             default:
                 LOGGER_FATAL("Invalid device driver type");

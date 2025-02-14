@@ -143,13 +143,15 @@ xkrt_stream_t::commit(xkrt_stream_instruction_t * instr)
 {
     assert(instr);
 
-    LOGGER_DEBUG("commiting an instruction of type `%s` (%d ready, %d pending)`",
-            xkrt_stream_instruction_type_to_str(instr->type),
-            this->ready.size(), this->pending.size());
-
     ++this->ready.pos.w;
-
     XKRT_STATS_INCR(this->stats.instructions[instr->type].commited, 1);
+
+    LOGGER_DEBUG(
+        "Commited an instruction of type `%s` (%d ready, %d pending)`",
+        xkrt_stream_instruction_type_to_str(instr->type),
+        this->ready.size(),
+        this->pending.size()
+    );
 
     return 0;
 }

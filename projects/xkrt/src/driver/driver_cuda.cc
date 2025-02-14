@@ -562,10 +562,8 @@ static inline int
 cuda_stream_instructions_wait(
     xkrt_stream_t * istream
 ) {
-    assert(istream);
-    assert(istream->pending.pos.r < istream->pending.pos.w);
-
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
+    assert(stream);
 
     CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
     CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
@@ -579,10 +577,8 @@ cuda_stream_instructions_progress(
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
-    assert(istream);
-    assert(istream->pending.pos.r < istream->pending.pos.w);
-
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
+    assert(stream);
 
     switch (instr->type)
     {

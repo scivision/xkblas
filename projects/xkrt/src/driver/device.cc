@@ -375,15 +375,7 @@ xkrt_device_t::offloader_stream_next(xkrt_stream_type_t stype)
 
         default:
         {
-            /* TODO : could be relaxed ? and maybe even non atomic, as it is
-             * only call by the device thread */
-            int snext = this->next[stype].fetch_add(1, std::memory_order_seq_cst) % count;
-
-            LOGGER_DEBUG("instruction_new on stream type %d - count is %d - returning %d",
-                    stype, count, snext);
-
-            // TODO : track pending instr here ?
-
+            int snext = this->next[stype].fetch_add(1, std::memory_order_relaxed) % count;
             return this->streams[stype][snext];
         }
     }

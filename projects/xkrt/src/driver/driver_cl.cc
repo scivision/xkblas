@@ -225,9 +225,8 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
     snprintf(
         buffer,
         sizeof(buffer),
-        "XKRT device %d - OpenCL device %d - named %s of vendor %s - max-mem-alloc-size=%.2lfGB",
+        "XKRT device %d named %s of vendor %s - max-mem-alloc-size=%.2lfGB",
         device_driver_id,
-        device->cl.id,
         name,
         vendor,
         max_mem_alloc_size / 1e9
@@ -248,8 +247,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) istream;
     assert(stream);
 
-    assert(istream->is_locked());
-    cl_event event = stream->cl.events[idx];
+    cl_event * event = stream->cl.events + idx;
 
     switch (instr->type)
     {
@@ -288,7 +286,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     // TODO : how to send memory from 'dst' that points on the device ?
                     // this code is wrong
                     cl_mem dst_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, dst);
-                    cl_bool blocking_write = 0;
+                    cl_bool blocking_write = CL_FALSE;
 
                     const size_t dst_origin[] = {0, 0, 0};
                     const size_t src_origin[] = {0, 0, 0};
@@ -315,10 +313,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                             src,
                             num_events_in_wait_list,
                             event_wait_list,
-                           &event
+                            event
                         )
                     );
 
+                    // that flush may be unnecessary
                     CL_SAFE_CALL(clFlush(stream->cl.queue));
 
                     break ;

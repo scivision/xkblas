@@ -180,7 +180,7 @@ xkrt_drivers_init(
         if (loader)
         {
             loader(drivers->list + driver_type);
-            xkrt_driver_init(drivers, ngpus, routine, args, (xkrt_driver_type_t) driver_type);
+            xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);
             total_gpus += drivers->devices.n;
             assert(total_gpus <= ngpus);
             if (total_gpus == ngpus)
