@@ -9,7 +9,7 @@
 static int r = 0;
 
 static void
-func(void * handle, void * args)
+func(Task * task)
 {
     r = 1;
 }
@@ -25,7 +25,7 @@ main(void)
     {
         task_format_t format;
         memset(&format, 0, sizeof(task_format_t));
-        format.f[TASK_FORMAT_TARGET_HOST] = func;
+        format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) func;
         FORMAT = task_format_create(&(runtime.task_formats), &format);
     }
     assert(FORMAT);

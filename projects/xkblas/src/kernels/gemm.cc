@@ -329,19 +329,21 @@ xkblas_£gemm_async(
 
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cblas-to-cublas.h>
+#  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
-#  include <xkrt/driver/cublas-helper.h>
 
 static void
-body_cuda(void * ihandle, void * vargs)
-{
-    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+body_cuda(
+    xkrt_stream_cuda_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
     assert(stream);
 
     cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 
-    Task * task = (Task *) vargs;
+    Task * task = (Task *) instr->kern.vargs;
     assert(task);
 
     const Access * A = task->accesses + 0;
@@ -368,18 +370,18 @@ body_cuda(void * ihandle, void * vargs)
     );
     #endif /* NDEBUG */
 
-    cublasStatus_t res = cublas££gemm(
-        handle,
-        cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
-        (int) args->m, (int) args->n, (int) args->k,
-        (const CU_TYPE *) &args->alpha,
-        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
-        (const CU_TYPE *) B->device_view.addr, (int) B->device_view.ld,
-        (const CU_TYPE *) &args->beta,
-        (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
+    XKBLAS_CUBLAS_CALL(
+        cublas££gemm(
+            handle,
+            cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
+            (int) args->m, (int) args->n, (int) args->k,
+            (const CU_TYPE *) &args->alpha,
+            (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+            (const CU_TYPE *) B->device_view.addr, (int) B->device_view.ld,
+            (const CU_TYPE *) &args->beta,
+            (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
+        )
     );
-    xkrt_cublas_status_check(res);
-    assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
@@ -443,6 +445,33 @@ body_ze(void * ihandle, void * vargs)
 
 # endif
 
+# if XKRT_SUPPORT_CL
+
+#  include <xkrt/driver/driver-cl.h>
+
+static void
+body_cl(void * ihandle, void * vargs)
+{
+    // unpack arguments
+    xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) ihandle;
+    assert(stream);
+
+    Task * task = (Task *) vargs;
+    assert(task);
+
+    const Access * A = task->accesses + 0;
+    const Access * B = task->accesses + 1;
+    const Access * C = task->accesses + 2;
+
+    args_t * args = (args_t *) (task + 1);
+    assert(args);
+
+    // TODO ; need an event
+    LOGGER_FATAL("In kernel impl");
+}
+
+# endif /* XKRT_SUPPORT_CL */
+
 # if XKRT_SUPPORT_HOST
 static void
 body_cpu(void * args)
@@ -462,16 +491,20 @@ register_£gemm_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
     # if XKRT_SUPPORT_HOST
-    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
     # endif /* XKRT_SUPPORT_CUDA */
 
     # if XKRT_SUPPORT_ZE
-    format.f[XKRT_DRIVER_TYPE_ZE] = body_ze;
+    format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
     # endif /* XKRT_SUPPORT_ZE */
+
+    # if XKRT_SUPPORT_CL
+    format.f[XKRT_DRIVER_TYPE_CL] = (task_format_func_t) body_cl;
+    # endif /* XKRT_SUPPORT_CL */
 
     snprintf(format.label, sizeof(format.label), "£gemm");
     format_id = xkblas_task_format_create(&format);

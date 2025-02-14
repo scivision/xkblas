@@ -14,12 +14,13 @@
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CUDA_ ## N
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/cublas-helper.h>
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/driver-cuda.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/logger/logger.h>
+# include <xkrt/logger/logger-cu.h>
+# include <xkrt/logger/logger-cublas.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
 
@@ -79,10 +80,10 @@ __get_device_cuda(int device_driver_id)
 static
 uint64_t cuda_get_free_mem(int device_driver_id)
 {
-    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
 
     uint64_t free, total;
-    CUDA_SAFE_CALL(cudaMemGetInfo(&free, &total));
+    CU_SAFE_CALL(cudaMemGetInfo(&free, &total));
 
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
     device->free_mem = (size_t)free;
@@ -93,7 +94,7 @@ static unsigned int
 XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
     int device_count = 0;
-    CUDA_SAFE_CALL(cudaGetDeviceCount(&device_count));
+    CU_SAFE_CALL(cudaGetDeviceCount(&device_count));
     return (unsigned int)device_count;
 }
 
@@ -111,7 +112,7 @@ static uint64_t *   cuda_perf_device    = 0;
 static void
 __get_gpu_topo(void)
 {
-    CUDA_SAFE_CALL(cudaGetDeviceCount(&cuda_device_count));
+    CU_SAFE_CALL(cudaGetDeviceCount(&cuda_device_count));
     if (cuda_device_count == 0)
         return;
 
@@ -135,7 +136,7 @@ __get_gpu_topo(void)
                 int perf_rank = 0;
                 int access_supported = 0;
 
-                CUDA_SAFE_CALL(
+                CU_SAFE_CALL(
                     cudaDeviceGetP2PAttribute(
                         &access_supported,
                         cudaDevP2PAttrAccessSupported,
@@ -145,7 +146,7 @@ __get_gpu_topo(void)
 
                 if (access_supported)
                 {
-                    CUDA_SAFE_CALL(
+                    CU_SAFE_CALL(
                         cudaDeviceGetP2PAttribute(
                             &perf_rank,
                             cudaDevP2PAttrPerformanceRank,
@@ -264,8 +265,8 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
     assert(device->inherited.state == XKRT_DEVICE_STATE_CREATE);
 
     struct cudaDeviceProp prop;
-    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
-    CUDA_SAFE_CALL(cudaGetDeviceProperties(&prop, device_driver_id));
+    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CU_SAFE_CALL(cudaGetDeviceProperties(&prop, device_driver_id));
 
     device->prop.pciBusID = prop.pciBusID;
     device->prop.pciDeviceID = prop.pciDeviceID;
@@ -287,7 +288,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 
     /* allocate memory into an initial chunk */
     void * device_ptr;
-    CUDA_SAFE_CALL(cudaMalloc((void **) &device_ptr, size));
+    CU_SAFE_CALL(cudaMalloc((void **) &device_ptr, size));
     return device_ptr;
 }
 
@@ -296,7 +297,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, size_t * total)
 {
     (void) device_driver_id;
     size_t free;
-    CUDA_SAFE_CALL(cudaMemGetInfo(&free, total));
+    CU_SAFE_CALL(cudaMemGetInfo(&free, total));
 }
 
 static int
@@ -310,7 +311,7 @@ static int
 XKRT_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
 {
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
-    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
     return 0;
 }
 
@@ -392,7 +393,7 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         else
         {
             int access;
-            CUDA_SAFE_CALL(cudaDeviceCanAccessPeer(&access, device_driver_id, other_device_driver_id));
+            CU_SAFE_CALL(cudaDeviceCanAccessPeer(&access, device_driver_id, other_device_driver_id));
 
             if (access)
             {
@@ -453,42 +454,6 @@ cuda_stream_instructions_launch(
 
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_KERN):
-        {
-            assert(istream->type == XKRT_STREAM_TYPE_KERN);
-            assert(stream->cu.handle.high);
-            assert(stream->cu.blas.handle);
-
-            xkrt_stream_instruction_kernel_t * op = &instr->kern;
-            op->launch(istream, op->vargs);
-
-            cudaError_t err = cudaEventRecord(event, stream->cu.handle.high);
-            assert(err == cudaSuccess);
-
-            # if 0
-            /* coherency check: ensure that all access device pointer are on
-             * the device executing the kernel */
-            # ifndef NDEBUG
-            Task * task = (Task *) op->args;
-            cudaPointerAttributes attr;
-            for (int i = 0 ; i < task->naccesses ; ++i)
-            {
-                Access * access = task->accesses + i;
-                assert(access);
-
-                int device;
-                cudaGetDevice(&device);
-                cudaPointerGetAttributes(&attr, (const void *) access->device_view.addr);
-                assert(attr.device == device);
-                assert(attr.type == cudaMemoryTypeDevice);
-            }
-            # endif /* NDEBUG */
-            # endif
-
-            return EINPROGRESS;
-
-        } /* XKRT_STREAM_INSTR_TYPE_KERN */
-
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
@@ -544,8 +509,8 @@ cuda_stream_instructions_launch(
 
             LOGGER_INFO("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
-            CUDA_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
-            CUDA_SAFE_CALL(cudaEventRecord(event, handle));
+            CU_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
+            CU_SAFE_CALL(cudaEventRecord(event, handle));
 
             return EINPROGRESS;
         }
@@ -565,8 +530,8 @@ cuda_stream_instructions_wait(
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
     assert(stream);
 
-    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
-    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
+    CU_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
+    CU_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
 
     return 0;
 }
@@ -591,7 +556,7 @@ cuda_stream_instructions_progress(
             /* poll events */
             for (int i = 0 ; i < 16 ; ++i)
             {
-                CUDA_SAFE_CALL(cudaGetLastError());
+                CU_SAFE_CALL(cudaGetLastError());
                 cudaError_t res = cudaEventQuery(stream->cu.events.buffer[idx]);
                 if (res == cudaErrorNotReady)
                     sched_yield();
@@ -645,23 +610,18 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 
     cudaError_t err;
     for (int i = 0 ; i < capacity ; ++i)
-        CUDA_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.buffer + i, cudaEventDisableTiming));
+        CU_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.buffer + i, cudaEventDisableTiming));
 
     /* streams */
     int leastPriority, greatestPriority;
-    CUDA_SAFE_CALL(cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
-    CUDA_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.high, cudaStreamNonBlocking, greatestPriority));
-    CUDA_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.low, cudaStreamNonBlocking, leastPriority));
+    CU_SAFE_CALL(cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
+    CU_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.high, cudaStreamNonBlocking, greatestPriority));
+    CU_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.low, cudaStreamNonBlocking, leastPriority));
 
     if (type == XKRT_STREAM_TYPE_KERN)
     {
-        cublasStatus_t cres = cublasCreate(&stream->cu.blas.handle);
-        xkrt_cublas_status_check(cres);
-        assert(cres == CUBLAS_STATUS_SUCCESS);
-
-        cres = cublasSetStream(stream->cu.blas.handle, stream->cu.handle.high);
-        xkrt_cublas_status_check(cres);
-        assert(cres == CUBLAS_STATUS_SUCCESS);
+        CUBLAS_SAFE_CALL(cublasCreate(&stream->cu.blas.handle));
+        CUBLAS_SAFE_CALL(cublasSetStream(stream->cu.blas.handle, stream->cu.handle.high));
     }
     else
     {

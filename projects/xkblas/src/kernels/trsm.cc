@@ -515,23 +515,23 @@ xkblas_£trsm_async(
     return 0;
 }
 
-# pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
-
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cblas-to-cublas.h>
+#  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
-#  include <xkrt/driver/cublas-helper.h>
 
 static void
-body_cuda(void * ihandle, void * vargs)
-{
-    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+body_cuda(
+    xkrt_stream_cuda_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
     assert(stream);
 
     cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 
-    Task * task = (Task *) vargs;
+    Task * task = (Task *) instr->kern.vargs;
     assert(task);
 
     const Access * A = task->accesses + 0;
@@ -555,18 +555,17 @@ body_cuda(void * ihandle, void * vargs)
     );
     #endif /* NDEBUG */
 
-    cublasStatus_t res;
-    res = cublas££trsm(
-        handle,
-        cblas2cublas_side(args->side), cblas2cublas_uplo(args->uplo),
-        cblas2cublas_op(args->transA), cblas2cublas_diag(args->diag),
-        (int) args->m, (int) args->n,
-        (const CU_TYPE *) &(args->alpha),
-        (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
-              (CU_TYPE *) B->device_view.addr, (int) B->device_view.ld
+    XKBLAS_CUBLAS_CALL(
+        cublas££trsm(
+            handle,
+            cblas2cublas_side(args->side), cblas2cublas_uplo(args->uplo),
+            cblas2cublas_op(args->transA), cblas2cublas_diag(args->diag),
+            (int) args->m, (int) args->n,
+            (const CU_TYPE *) &(args->alpha),
+            (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+                  (CU_TYPE *) B->device_view.addr, (int) B->device_view.ld
+        )
     );
-    xkrt_cublas_status_check(res);
-    assert(res == CUBLAS_STATUS_SUCCESS);
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
@@ -589,11 +588,11 @@ register_£trsm_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
     # if XKRT_SUPPORT_HOST
-    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
     # endif /* XKRT_SUPPORT_CUDA */
 
     snprintf(format.label, sizeof(format.label), "£trsm");

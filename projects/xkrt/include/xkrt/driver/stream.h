@@ -20,9 +20,6 @@
 # include <xkrt/stats/stats.h>
 # include <xkrt/sync/lockable.hpp>
 
-/* counter for the stream queues */
-typedef uint32_t xkrt_stream_instruction_counter_t;
-
 class xkrt_stream_instruction_queue_t
 {
     public:

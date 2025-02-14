@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   cublas-helper.h                                                          */
+/*   logger-cublas.h                                                          */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,17 +11,15 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __CUBLAS_HELPER_H__
-# define __CUBLAS_HELPER_H__
+#ifndef __LOGGER_CUBLAS_H__
+# define __LOGGER_CUBLAS_H__
 
+# include <xkrt/logger/logger.h>
 # include <cublas_v2.h>
 
-static inline void
-xkrt_cublas_status_check(cublasStatus_t status)
+static const char *
+cublas_error_to_str(cublasStatus_t status)
 {
-    if (status == CUBLAS_STATUS_SUCCESS)
-        return ;
-
     # if CUBLAS_VER_MAJOR < 12
     static const char * names[] = {
         "SUCCESS",                  /*  0 */
@@ -43,12 +41,17 @@ xkrt_cublas_status_check(cublasStatus_t status)
         "LICENSE_ERROR",            /* 16 */
     };
     const char * name  = (status >= 0 && status <= 16) ? names[status] : NULL;
-    const char * descr = NULL;
     # else
     const char * name  = cublasGetStatusName(status);
-    const char * descr = cublasGetStatusString(status);
     # endif /* CUBLAS_VER_MAJOR */
-    LOGGER_FATAL("cuBlas error `%s` occured - %s", name, descr);
+    return name;
 }
 
-#endif /* __CUBLAS_HELPER_H__ */
+# define CUBLAS_SAFE_CALL(X)                                                                \
+    do {                                                                                    \
+        cublasStatus_t r = X;                                                               \
+        if (r != CUBLAS_STATUS_SUCCESS)                                                     \
+            LOGGER_FATAL("`%s` failed with err=%s (%d)", #X, cublas_error_to_str(r), r);    \
+    } while (0)
+
+#endif /* __LOGGER_CUBLAS_H__ */

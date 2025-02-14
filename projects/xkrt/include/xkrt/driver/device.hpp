@@ -151,7 +151,7 @@ typedef struct  xkrt_device_t
 
     /* submit a kernel execution instruction */
     void offloader_stream_instruction_submit_kernel(
-        void (*launch)(void * handle, void * vargs),
+        void (*launch)(void * istream, void * instr, xkrt_stream_instruction_counter_t idx),
         void * vargs,
         const xkrt_callback_t & callback
     );

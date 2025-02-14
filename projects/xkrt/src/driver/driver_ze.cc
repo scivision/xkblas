@@ -17,7 +17,6 @@
 
 # include <xkrt/runtime.h>
 # include <xkrt/conf/conf.h>
-# include <xkrt/driver/cublas-helper.h>
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver-ze.h>
 # include <xkrt/driver/driver.h>
@@ -281,18 +280,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_KERN):
-        {
-            assert(istream->type == XKRT_STREAM_TYPE_KERN);
-            assert(stream->ze.command.list);
-
-            xkrt_stream_instruction_kernel_t * op = &instr->kern;
-            op->launch(istream, op->vargs);
-
-            return EINPROGRESS;
-
-        } /* XKRT_STREAM_INSTR_TYPE_KERN */
-
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):

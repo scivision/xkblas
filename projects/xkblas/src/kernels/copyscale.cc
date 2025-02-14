@@ -187,6 +187,7 @@ xkblas_£copyscale_async(
 
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cblas-to-cublas.h>
+#  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
 
 extern "C"
@@ -201,15 +202,17 @@ cuda_£copyscale(
 );
 
 static void
-body_cuda(void * ihandle, void * vargs)
-{
-    xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) ihandle;
+body_cuda(
+    xkrt_stream_cuda_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
     assert(stream);
 
     cudaStream_t cuda_stream = stream->cu.handle.high;
     assert(cuda_stream);
 
-    Task * task = (Task *) vargs;
+    Task * task = (Task *) instr->kern.vargs;
     assert(task);
 
     const Access * D = task->accesses + 0;
@@ -231,6 +234,8 @@ body_cuda(void * ihandle, void * vargs)
         (      CU_TYPE *) L->device_view.addr, (int) L->device_view.ld,
         (      CU_TYPE *) U->device_view.addr, (int) U->device_view.ld
     );
+
+    XKBLAS_CUBLAS_CALL_POST();
 }
 
 # endif /* XKRT_SUPPORT_CUDA */
@@ -298,11 +303,11 @@ register_£copyscale_format(void)
     memset(&format, 0, sizeof(task_format_t));
 
     # if XKRT_SUPPORT_HOST
-    format.f[XKRT_DRIVER_TYPE_HOST] = body_cpu;
+    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format.f[XKRT_DRIVER_TYPE_CUDA] = body_cuda;
+    format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
     # endif /* XKRT_SUPPORT_CUDA */
 
     snprintf(format.label, sizeof(format.label), "£copyscale");

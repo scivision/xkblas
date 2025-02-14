@@ -183,16 +183,18 @@ xkrt_stream_t::launch_ready_instructions(void)
         );
 
         assert(this->f_instruction_launch);
-        err = this->f_instruction_launch(this, instr, p);
+        if (instr->type == XKRT_STREAM_INSTR_TYPE_KERN)
+        {
+            err = EINPROGRESS;
+            instr->kern.launch(this, instr, p);
+        }
+        else
+            err = this->f_instruction_launch(this, instr, p);
 
         switch (err)
         {
             case (0):
-            {
-                /* no error */
-                LOGGER_DEBUG("Instruction completed");
                 break ;
-            }
 
             case (EINPROGRESS):
             {

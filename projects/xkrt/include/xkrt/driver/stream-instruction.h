@@ -23,6 +23,9 @@
 
 # include <functional>
 
+/* counter for the stream queues */
+typedef uint32_t xkrt_stream_instruction_counter_t;
+
 /* io instruction to move data between devices */
 typedef struct  xkrt_stream_instruction_copy_t
 {
@@ -43,7 +46,7 @@ typedef struct xkrt_stream_instruction_barrier_t
 /* io instruction kernel : to launch kernel on the device */
 typedef struct  xkrt_stream_instruction_kernel_t
 {
-    void (*launch)(void * stream, void * vargs);
+    void (*launch)(void * istream, void * instr, xkrt_stream_instruction_counter_t idx);
     void * vargs;
 }               xkrt_stream_instruction_kernel_t;
 

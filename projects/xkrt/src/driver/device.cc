@@ -457,7 +457,7 @@ try_instruction_new:
 
 void
 xkrt_device_t::offloader_stream_instruction_submit_kernel(
-    void (*launch)(void * handle, void * vargs),
+    void (*launch)(void * istream, void * instr, xkrt_stream_instruction_counter_t idx),
     void * vargs,
     const xkrt_callback_t & callback
 ) {
@@ -466,9 +466,9 @@ xkrt_device_t::offloader_stream_instruction_submit_kernel(
     xkrt_stream_instruction_t * instr;
     this->offloader_stream_instruction_new(
         XKRT_STREAM_TYPE_KERN,          /* IN */
-        &stream,                        /* OUT */
+       &stream,                         /* OUT */
         XKRT_STREAM_INSTR_TYPE_KERN,    /* IN */
-        &instr,                         /* OUT */
+       &instr,                          /* OUT */
         callback
     );
     assert(stream);

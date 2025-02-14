@@ -93,12 +93,8 @@ body_memory_coherent_async_fetch_callback(
 }
 
 static void
-body_memory_coherent_async_fetch(void * handle, void * vargs)
+body_memory_coherent_async_fetch(Task * task)
 {
-    // unpack stuff
-    const Task * task = (const Task *) vargs;
-    assert(task);
-
     const args_fetch_t * args = (args_fetch_t *) (task + 1);
     assert(args);
 
@@ -397,7 +393,7 @@ xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime)
     {
         task_format_t format;
         memset(format.f, 0, sizeof(format.f));
-        format.f[TASK_FORMAT_TARGET_HOST] = body_memory_coherent_async_fetch;
+        format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_coherent_async_fetch;
         snprintf(format.label, sizeof(format.label), "coherent_fetch");
         TASK_FORMAT_COHERENT_ASYNC_FETCH = task_format_create(&(runtime->task_formats), &format);
     }

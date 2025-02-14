@@ -105,13 +105,6 @@ extern volatile uint64_t LOGGER_LAST_TIME;
 # endif
 # define LOGGER_FATAL(...) LOGGER_PRINT(LOGGER_PRINT_FATAL_ID, __VA_ARGS__)
 
-# define CUDA_SAFE_CALL(X)                                                          \
-    do {                                                                            \
-        cudaError_t r = X;                                                          \
-        if (r != cudaSuccess)                                                       \
-            LOGGER_FATAL("`%s` failed with `%s` (%d)", #X, cudaGetErrorName(r), r); \
-    } while (0)
-
 # define HWLOC_SAFE_CALL(X)                                 \
     do {                                                    \
         int r = X;                                          \

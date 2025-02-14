@@ -288,7 +288,7 @@ xkrt_device_task_execute(
         /* running a host task */
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
-            format->f[targetfmt](NULL, task);
+            ((void (*)(Task *)) format->f[targetfmt])(task);
             runtime->complete(task);
         }
         /* running a device task */
@@ -303,7 +303,11 @@ xkrt_device_task_execute(
             assert(XKRT_CALLBACK_ARGS_MAX >= 2);
 
             /* submit kernel launch instruction */
-            device->offloader_stream_instruction_submit_kernel(format->f[targetfmt], task, callback);
+            device->offloader_stream_instruction_submit_kernel(
+                (void (*)(void *, void *, xkrt_stream_instruction_counter_t)) format->f[targetfmt],
+                task,
+                callback
+            );
 
             if (device->thread == ThreadWorker::self()) // TODO : explain why this
                 device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);

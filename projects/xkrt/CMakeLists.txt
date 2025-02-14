@@ -57,6 +57,29 @@ if (USE_STATS)
     message(STATUS "Using built-in stats system")
 endif()
 
+########
+# XKRT #
+########
+
+# XKRT Lib
+add_library(${XKRT} SHARED ${SOURCE_FILES})
+
+# Include directory
+include_directories(include/)
+include_directories(src/)
+
+# Installation
+install(TARGETS ${XKRT} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
+
+if (STRICT)
+    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
+    target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
+    if (${CUDA_RT_FOUND})
+        target_compile_options(${XKRT}_driver_cuda PRIVATE ${STRICT_OPTIONS})
+    endif()
+endif()
+
 ###############
 # DEPENDENCES #
 ###############
@@ -65,6 +88,7 @@ endif()
 find_package(HWLOC REQUIRED)
 include_directories(${HWLOC_INCLUDE_DIRS})
 message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
+target_link_libraries(${XKRT} PRIVATE ${HWLOC_LIBRARIES})
 
 # HOST DRIVER
 option(USE_HOST "Whether to build the HOST driver." OFF)
@@ -86,6 +110,11 @@ if (USE_CUDA)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
     message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
 
+    add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
+    target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
+    install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+
 endif()
 
 # Level Zero
@@ -95,6 +124,10 @@ if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
     message(STATUS "Found ZE: ${ZE_INCLUDE_DIRS}")
+
+    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
+    install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -106,55 +139,10 @@ if (USE_CL)
     include_directories("${CL_INCLUDE_DIRS}")
     message(STATUS "Found OpenCL: ${CL_INCLUDE_DIRS}")
 
-endif()
-
-##########
-# XKRT #
-##########
-
-# XKRT Lib
-add_library(${XKRT} SHARED ${SOURCE_FILES})
-
-if (${HWLOC_FOUND})
-    target_link_libraries(${XKRT} PRIVATE ${HWLOC_LIBRARIES})
-endif()
-
-# IF USING CUDA
-if (${CUDA_RT_FOUND})
-    add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
-    target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
-    install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-endif()
-
-# IF USING LEVEL ZERO
-if (${ZE_FOUND})
-    add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
-    install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-endif()
-
-# IF USING CL
-if (${CL_FOUND})
     add_library(${XKRT}_driver_cl SHARED src/driver/driver_cl.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl)
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-endif()
 
-# Include directory
-include_directories(include/)
-include_directories(src/)
-
-# Installation
-install(TARGETS ${XKRT} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
-
-if (STRICT)
-    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
-    target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
-    if (${CUDA_RT_FOUND})
-        target_compile_options(${XKRT}_driver_cuda PRIVATE ${STRICT_OPTIONS})
-    endif()
 endif()
 
 ################
