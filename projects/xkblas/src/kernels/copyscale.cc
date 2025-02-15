@@ -186,7 +186,6 @@ xkblas_£copyscale_async(
 }
 
 # if XKRT_SUPPORT_CUDA
-#  include <xkblas/cblas-to-cublas.h>
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
 

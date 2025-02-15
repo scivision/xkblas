@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   cblas-to-cublas.h                                                        */
+/*   clblast-helper.h                                                          */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,59 +11,62 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __CBLAS_TO_CUBLAS_H__
-# define __CBLAS_TO_CUBLAS_H__
+#ifndef __CLBLAST_HELPER_H__
+# define __CLBLAST_HELPER_H__
 
-# include <cublas_v2.h>
+# include <xkrt/logger/logger-cu.h>
+# include <xkrt/logger/logger-clblast.h>
+
 # include "xkblas/cblas.h"
+# include <clblast.h>
 
-static inline cublasOperation_t
-cblas2cublas_op(int trans)
+static inline CLBlastTranspose
+cblas2clblast_op(int trans)
 {
     switch (trans)
     {
-        case CblasNoTrans:      return CUBLAS_OP_N;
-        case CblasTrans:        return CUBLAS_OP_T;
-        case CblasConjTrans:    return CUBLAS_OP_C;
+        case CblasNoTrans:      return CLBlastTransposeNo;
+        case CblasTrans:        return CLBlastTransposeYes;
+        case CblasConjTrans:    return CLBlastTransposeConjugate;
     }
     LOGGER_FATAL("Unknown trans code");
     abort();
 }
 
-static inline cublasSideMode_t
-cblas2cublas_side(int side)
+static inline CLBlastSide
+cblas2clblast_side(int side)
 {
     switch (side)
     {
-        case CblasLeft:     return CUBLAS_SIDE_LEFT;
-        case CblasRight:    return CUBLAS_SIDE_RIGHT;
+        case CblasLeft:     return CLBlastSideLeft;
+        case CblasRight:    return CLBlastSideRight;
     }
     LOGGER_FATAL("Unknown side code");
     abort();
 }
 
 static inline
-cublasFillMode_t cblas2cublas_uplo( int uplo )
+CLBlastTriangle cblas2clblast_uplo(int uplo)
 {
     switch (uplo)
     {
-        case CblasUpper:    return CUBLAS_FILL_MODE_UPPER;
-        case CblasLower:    return CUBLAS_FILL_MODE_LOWER;
+        case CblasUpper:    return CLBlastTriangleUpper;
+        case CblasLower:    return CLBlastTriangleLower;
     }
     LOGGER_FATAL("Unknown uplo code");
     abort();
 }
 
 static inline
-cublasDiagType_t cblas2cublas_diag(int diag)
+CLBlastDiagonal cblas2clblast_diag(int diag)
 {
     switch (diag)
     {
-        case CblasNonUnit:  return CUBLAS_DIAG_NON_UNIT;
-        case CblasUnit:     return CUBLAS_DIAG_UNIT;
+        case CblasNonUnit:  return CLBlastDiagonalNonUnit;
+        case CblasUnit:     return CLBlastDiagonalUnit;
     }
     LOGGER_FATAL("Unknown diag code");
     abort();
 }
 
-#endif /* __CBLAS_TO_CUBLAS_H__ */
+#endif /* __CLBLAST_HELPER_H__ */

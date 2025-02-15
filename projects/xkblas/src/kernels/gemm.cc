@@ -328,7 +328,6 @@ xkblas_£gemm_async(
 }
 
 # if XKRT_SUPPORT_CUDA
-#  include <xkblas/cblas-to-cublas.h>
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
 
@@ -356,19 +355,6 @@ body_cuda(
 
     args_t * args = (args_t *) (task + 1);
     assert(args);
-
-    # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasGemm(m=%zu, n=%zu, k=%zu, A=%p, lda=%zu, B=%p, ldb=%zu, C=%p, ldc=%zu) on task=`%s`",
-        args->m, args->n, args->k,
-        (void *) A->device_view.addr,
-        A->device_view.ld,
-        (void *) B->device_view.addr,
-        B->device_view.ld,
-        (void *) C->device_view.addr,
-        C->device_view.ld,
-        task->label
-    );
-    #endif /* NDEBUG */
 
     XKBLAS_CUBLAS_CALL(
         cublas££gemm(
@@ -448,15 +434,17 @@ body_ze(void * ihandle, void * vargs)
 # if XKRT_SUPPORT_CL
 
 #  include <xkrt/driver/driver-cl.h>
+#  include <xkblas/clblast-helper.h>
 
 static void
-body_cl(void * ihandle, void * vargs)
-{
-    // unpack arguments
-    xkrt_stream_cl_t * stream = (xkrt_stream_cl_t *) ihandle;
+body_cl(
+    xkrt_stream_cl_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
     assert(stream);
 
-    Task * task = (Task *) vargs;
+    Task * task = (Task *) instr->kern.vargs;
     assert(task);
 
     const Access * A = task->accesses + 0;
@@ -466,8 +454,28 @@ body_cl(void * ihandle, void * vargs)
     args_t * args = (args_t *) (task + 1);
     assert(args);
 
-    // TODO ; need an event
-    LOGGER_FATAL("In kernel impl");
+    cl_mem a_buffer, b_buffer, c_buffer;
+    size_t a_offset, b_offset, c_offset;
+    xkrt_driver_cl_get_buffer_and_offset(stream->device, A->device_view.addr, &a_buffer, &a_offset);
+    xkrt_driver_cl_get_buffer_and_offset(stream->device, B->device_view.addr, &b_buffer, &b_offset);
+    xkrt_driver_cl_get_buffer_and_offset(stream->device, C->device_view.addr, &c_buffer, &c_offset);
+
+    const CLBlastLayout layout = CLBlastLayoutRowMajor;
+
+    CLBLAST_SAFE_CALL(
+        CLBlast££gemm(
+            layout,
+            cblas2clblast_op(args->transA), cblas2clblast_op(args->transB),
+            args->m, args->n, args->k,
+            args->alpha,
+            a_buffer, a_offset, A->device_view.ld,
+            b_buffer, b_offset, B->device_view.ld,
+            args->beta,
+            c_buffer, c_offset, C->device_view.ld,
+           &stream->cl.queue,
+            stream->cl.events + idx
+        )
+    );
 }
 
 # endif /* XKRT_SUPPORT_CL */

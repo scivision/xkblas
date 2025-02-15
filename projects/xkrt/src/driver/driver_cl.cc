@@ -51,34 +51,71 @@ device_cl_get(int device_driver_id)
     return DEVICES + device_driver_id;
 }
 
-// convert a virtual address to an OpenCL sub buffer
-static inline cl_mem
-XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(
+// retrieve the buffer and the offset in it of the given pointer
+static inline xkrt_device_cl_buffer_t *
+XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(
     xkrt_device_cl_t * device,
-    void * ptr
+    uintptr_t addr
 ) {
-    uintptr_t addr = (uintptr_t) ptr;
-
     // find which 'xkrt_device_cl_buffer_t' holds the virtual address
     for (int i = 0 ; i < device->memory.nbuffers ; ++i)
     {
         xkrt_device_cl_buffer_t * buffer = device->memory.buffers + i;
         if (buffer->addr <= addr && addr < buffer->addr + buffer->size)
-        {
-            // Create a sub-buffer from the large buffer
-            size_t offset = addr - buffer->addr;
-            cl_buffer_region region;
-            region.origin = offset;
-            region.size = buffer->size - offset;
-
-            int err;
-            cl_mem mem = clCreateSubBuffer(buffer->cl.mem, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
-            CL_SAFE_CALL(err);
-
-            return mem;
-        }
+            return buffer;
     }
-    return NULL;
+    LOGGER_FATAL("Passed an invalid address");
+}
+
+// convert a virtual address to an OpenCL sub buffer
+static inline cl_mem
+XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(
+    xkrt_device_cl_t * device,
+    const void * ptr,
+    int mode
+) {
+    uintptr_t addr = (uintptr_t) ptr;
+    xkrt_device_cl_buffer_t * buffer = XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(device, addr);
+
+    // Create a sub-buffer from the large buffer
+    size_t offset = addr - buffer->addr;
+    cl_buffer_region region;
+    region.origin = offset;
+    region.size = buffer->size - offset;
+
+    int err;
+    cl_mem mem = clCreateSubBuffer(buffer->cl.mem, mode, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+    CL_SAFE_CALL(err);
+
+    return mem;
+}
+
+void
+xkrt_driver_cl_get_buffer_and_offset(
+    xkrt_device_cl_t * device,
+    uintptr_t addr,
+    cl_mem * mem,
+    size_t * offset
+) {
+    xkrt_device_cl_buffer_t * buffer = XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(device, addr);
+    *mem = buffer->cl.mem;
+    *offset = addr - buffer->addr;
+}
+
+void
+xkrt_driver_cl_get_buffer_and_offset_2D(
+    xkrt_device_cl_t * device,
+    uintptr_t addr,
+    size_t ld,
+    cl_mem * mem,
+    size_t * offset
+) {
+    xkrt_device_cl_buffer_t * buffer = XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(device, addr);
+    *mem = buffer->cl.mem;
+
+    offset[0] = 0;
+    offset[1] = 0;
+    LOGGER_FATAL("Not implemented");
 }
 
 static void xkrt_cl_pfn_notify(
@@ -130,7 +167,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
 
             // initialize device virtual memory
             device->memory.nbuffers = 0;
-            device->memory.head = 0x1611;
+            device->memory.head = 0x1611 + 0x2023 + 2508;  // = 16,384 for alignment
             if (++cl_n_devices >= ngpus)
                 return 0;
         }
@@ -267,30 +304,29 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             assert(width >= 0);
             assert(height >= 0);
 
+            const cl_bool blocking = CL_FALSE;
+
+            size_t dst_origin[] = {0, 0, 0};
+            size_t src_origin[] = {0, 0, 0};
+            const size_t region[]     = {width, height, 1};
+
+            const size_t dst_slice_pitch = 0;
+            const size_t src_slice_pitch = 0;
+
+            cl_uint num_events_in_wait_list = 0;
+            const cl_event * event_wait_list = NULL;
+
             switch (instr->type)
             {
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
                 {
-                    // TODO : how to send memory from 'dst' that points on the device ?
-                    // this code is wrong
-                    cl_mem dst_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, dst);
-                    cl_bool blocking_write = CL_FALSE;
-
-                    const size_t dst_origin[] = {0, 0, 0};
-                    const size_t src_origin[] = {0, 0, 0};
-                    const size_t region[]     = {width, height, 1};
-
-                    const size_t dst_slice_pitch = 0;
-                    const size_t src_slice_pitch = 0;
-
-                    cl_uint num_events_in_wait_list = 0;
-                    const cl_event * event_wait_list = NULL;
+                    cl_mem dst_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, dst, CL_MEM_WRITE_ONLY);
 
                     CL_SAFE_CALL(
                         clEnqueueWriteBufferRect(
                             stream->cl.queue,
                             dst_buffer,
-                            blocking_write,
+                            blocking,
                             dst_origin,
                             src_origin,
                             region,
@@ -304,15 +340,32 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                             event
                         )
                     );
-
-                    // that flush may be unnecessary
-                    CL_SAFE_CALL(clFlush(stream->cl.queue));
-
                     break ;
                 }
 
                 case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
                 {
+                    cl_mem src_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, src, CL_MEM_READ_ONLY);
+
+                    CL_SAFE_CALL(
+                        clEnqueueReadBufferRect(
+                            stream->cl.queue,
+                            src_buffer,
+                            blocking,
+                            src_origin,
+                            dst_origin,
+                            region,
+                            src_pitch,
+                            src_slice_pitch,
+                            dst_pitch,
+                            dst_slice_pitch,
+                            dst,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                            event
+                        )
+                    );
+
                     break ;
                 }
 
@@ -330,6 +383,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     break ;
                 }
             }
+            // that flush may be unnecessary
+            CL_SAFE_CALL(clFlush(stream->cl.queue));
 
             return EINPROGRESS;
         }

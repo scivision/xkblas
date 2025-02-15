@@ -59,4 +59,14 @@ typedef struct  xkrt_stream_cl_t
 
 }               xkrt_stream_cl_t;
 
+/* cl works on 'cl_mem' buffers and do not support pointer arithmetic directly
+ * on these, so this routine returns the buffer and the offset for the given
+ * addr */
+void xkrt_driver_cl_get_buffer_and_offset(
+    xkrt_device_cl_t * device,
+    uintptr_t addr,
+    cl_mem * mem,
+    size_t * offset
+);
+
 #endif /* __DRIVER_CL_H__ */

@@ -338,7 +338,6 @@ xkblas_£syrk_async(
 # pragma message(TODO "The current design has the following flaws: (1) per-driver routine should be implemented in the driver(so they can be loaded dynamically), (2) there is yet another global 'task format' variable and (3) task format must be explicitely registered")
 
 # if XKRT_SUPPORT_CUDA
-#  include <xkblas/cblas-to-cublas.h>
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cuda.h>
 
