@@ -444,6 +444,9 @@ body_cl(
 ) {
     assert(stream);
 
+    xkrt_device_cl_t * device = stream->device;
+    assert(device);
+
     Task * task = (Task *) instr->kern.vargs;
     assert(task);
 
@@ -454,11 +457,17 @@ body_cl(
     args_t * args = (args_t *) (task + 1);
     assert(args);
 
-    cl_mem a_buffer, b_buffer, c_buffer;
-    size_t a_offset, b_offset, c_offset;
-    xkrt_driver_cl_get_buffer_and_offset(stream->device, A->device_view.addr, &a_buffer, &a_offset);
-    xkrt_driver_cl_get_buffer_and_offset(stream->device, B->device_view.addr, &b_buffer, &b_offset);
-    xkrt_driver_cl_get_buffer_and_offset(stream->device, C->device_view.addr, &c_buffer, &c_offset);
+    int mode = CL_MEM_READ_WRITE;
+    cl_mem a_buffer = xkrt_driver_cl_get_subbuffer(device, (const void *) A->device_view.addr, mode);
+    cl_mem b_buffer = xkrt_driver_cl_get_subbuffer(device, (const void *) B->device_view.addr, mode);
+    cl_mem c_buffer = xkrt_driver_cl_get_subbuffer(device, (const void *) C->device_view.addr, mode);
+    size_t a_offset = 0, b_offset = 0, c_offset = 0;
+
+    # if 0
+    xkrt_driver_cl_get_buffer_and_offset(device, A->device_view.addr, &a_buffer, &a_offset);
+    xkrt_driver_cl_get_buffer_and_offset(device, B->device_view.addr, &b_buffer, &b_offset);
+    xkrt_driver_cl_get_buffer_and_offset(device, C->device_view.addr, &c_buffer, &c_offset);
+    # endif
 
     const CLBlastLayout layout = CLBlastLayoutRowMajor;
 

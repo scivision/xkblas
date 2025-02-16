@@ -69,4 +69,11 @@ void xkrt_driver_cl_get_buffer_and_offset(
     size_t * offset
 );
 
+cl_mem
+xkrt_driver_cl_get_subbuffer(
+    xkrt_device_cl_t * device,
+    const void * ptr,
+    int mode
+);
+
 #endif /* __DRIVER_CL_H__ */

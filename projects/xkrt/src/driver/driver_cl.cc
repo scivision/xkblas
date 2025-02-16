@@ -68,8 +68,8 @@ XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(
 }
 
 // convert a virtual address to an OpenCL sub buffer
-static inline cl_mem
-XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(
+cl_mem
+xkrt_driver_cl_get_subbuffer(
     xkrt_device_cl_t * device,
     const void * ptr,
     int mode
@@ -320,7 +320,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             {
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
                 {
-                    cl_mem dst_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, dst, CL_MEM_WRITE_ONLY);
+                    cl_mem dst_buffer = xkrt_driver_cl_get_subbuffer(stream->device, dst, CL_MEM_WRITE_ONLY);
 
                     CL_SAFE_CALL(
                         clEnqueueWriteBufferRect(
@@ -345,7 +345,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
                 case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
                 {
-                    cl_mem src_buffer = XKRT_DRIVER_ENTRYPOINT(buffer_from_addr)(stream->device, src, CL_MEM_READ_ONLY);
+                    cl_mem src_buffer = xkrt_driver_cl_get_subbuffer(stream->device, src, CL_MEM_READ_ONLY);
 
                     CL_SAFE_CALL(
                         clEnqueueReadBufferRect(
