@@ -15,6 +15,7 @@
 # define __STREAM_INSTRUCTION_H__
 
 # include <xkrt/callback.h>
+# include <xkrt/consts.h>
 # include <xkrt/driver/memory-view.hpp>
 # include <xkrt/driver/stream-instruction-type.h>
 # include <xkrt/logger/todo.h>
@@ -30,7 +31,11 @@ typedef uint32_t xkrt_stream_instruction_counter_t;
 typedef struct  xkrt_stream_instruction_copy_t
 {
     memory_view_t host_view;
+
+    xkrt_device_global_id_t dst_device_global_id;
     memory_replicate_view_t dst_device_view;
+
+    xkrt_device_global_id_t src_device_global_id;
     memory_replicate_view_t src_device_view;
 
 }               xkrt_stream_instruction_copy_t;

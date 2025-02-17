@@ -43,12 +43,24 @@ static cl_device_id cl_devices[XKRT_DEVICES_MAX];
 static xkrt_device_cl_t DEVICES[XKRT_DEVICES_MAX];
 static cl_uint cl_n_devices = 0;
 
+static xkrt_device_cl_t * DEVICES_FROM_GLOBAL_ID[XKRT_DEVICES_MAX];
+
 static xkrt_device_cl_t *
 device_cl_get(int device_driver_id)
 {
     assert(device_driver_id >= 0);
     assert(device_driver_id < cl_n_devices);
     return DEVICES + device_driver_id;
+}
+
+static xkrt_device_cl_t *
+device_cl_get_from_global(xkrt_device_global_id_t device_global_id)
+{
+    assert(device_global_id >= 0);
+    assert(device_global_id < XKRT_DEVICES_MAX);
+    xkrt_device_cl_t * device = DEVICES_FROM_GLOBAL_ID[device_global_id];
+    assert(device);
+    return device;
 }
 
 // retrieve the buffer and the offset in it of the given pointer
@@ -69,7 +81,7 @@ XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(
 
 // convert a virtual address to an OpenCL sub buffer
 cl_mem
-xkrt_driver_cl_get_subbuffer(
+xkrt_driver_cl_create_subbuffer(
     xkrt_device_cl_t * device,
     const void * ptr,
     int mode
@@ -106,16 +118,21 @@ void
 xkrt_driver_cl_get_buffer_and_offset_2D(
     xkrt_device_cl_t * device,
     uintptr_t addr,
-    size_t ld,
+    size_t pitch,
     cl_mem * mem,
     size_t * offset
 ) {
     xkrt_device_cl_buffer_t * buffer = XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(device, addr);
     *mem = buffer->cl.mem;
 
-    offset[0] = 0;
-    offset[1] = 0;
-    LOGGER_FATAL("Not implemented");
+    // with 0 <= offset[0] < pitch - we have
+    //    addr                = buffer->addr + offset[0] + offset[1] * pitch;
+    // => addr - buffer->addr =                offset[0] + offset[1] * pitch;
+    // => offset[0] = (addr - buffer->addr) % pitch
+    // => offset[1] = (addr - buffer->addr) / pitch
+
+    offset[0] = (addr - buffer->addr) % pitch;
+    offset[1] = (addr - buffer->addr) / pitch;
 }
 
 static void xkrt_cl_pfn_notify(
@@ -225,7 +242,8 @@ static void
 XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 {
     // TODO : move some stuff from driver init to here
-    (void) device_driver_id;
+    xkrt_device_cl_t * device = device_cl_get(device_driver_id);
+    DEVICES_FROM_GLOBAL_ID[device->inherited.global_id] = device;
 }
 
 static int
@@ -292,10 +310,10 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
-            void * dst          = (void *) instr->copy.dst_device_view.addr;
-            size_t dst_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
-            const void * src    = (const void *) instr->copy.src_device_view.addr;
-            size_t src_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+            void * dst              = (void *) instr->copy.dst_device_view.addr;
+            size_t dst_row_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
+            const void * src        = (const void *) instr->copy.src_device_view.addr;
+            size_t src_row_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
 
             // assume col major - if not, need to do some shit here
             assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
@@ -320,7 +338,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             {
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
                 {
-                    cl_mem dst_buffer = xkrt_driver_cl_get_subbuffer(stream->device, dst, CL_MEM_WRITE_ONLY);
+                    // cl_mem dst_buffer = xkrt_driver_cl_create_subbuffer(stream->device, dst, CL_MEM_WRITE_ONLY);
+                    cl_mem dst_buffer;
+                    xkrt_driver_cl_get_buffer_and_offset_2D(stream->device, (uintptr_t) dst, dst_row_pitch, &dst_buffer, dst_origin);
 
                     CL_SAFE_CALL(
                         clEnqueueWriteBufferRect(
@@ -330,9 +350,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                             dst_origin,
                             src_origin,
                             region,
-                            dst_pitch,
+                            dst_row_pitch,
                             dst_slice_pitch,
-                            src_pitch,
+                            src_row_pitch,
                             src_slice_pitch,
                             src,
                             num_events_in_wait_list,
@@ -345,7 +365,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
                 case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
                 {
-                    cl_mem src_buffer = xkrt_driver_cl_get_subbuffer(stream->device, src, CL_MEM_READ_ONLY);
+                    // cl_mem src_buffer = xkrt_driver_cl_create_subbuffer(stream->device, src, CL_MEM_READ_ONLY);
+                    cl_mem src_buffer;
+                    xkrt_driver_cl_get_buffer_and_offset_2D(stream->device, (uintptr_t) src, src_row_pitch, &src_buffer, src_origin);
 
                     CL_SAFE_CALL(
                         clEnqueueReadBufferRect(
@@ -355,9 +377,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                             src_origin,
                             dst_origin,
                             region,
-                            src_pitch,
+                            src_row_pitch,
                             src_slice_pitch,
-                            dst_pitch,
+                            dst_row_pitch,
                             dst_slice_pitch,
                             dst,
                             num_events_in_wait_list,
@@ -365,17 +387,45 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                             event
                         )
                     );
-
                     break ;
                 }
 
                 case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
                 {
+                    xkrt_device_cl_t * src_device = device_cl_get_from_global(instr->copy.src_device_global_id);
+                    cl_mem src_buffer = xkrt_driver_cl_create_subbuffer(src_device, src, CL_MEM_READ_ONLY);
+
+                    xkrt_device_cl_t * dst_device = device_cl_get_from_global(instr->copy.dst_device_global_id);
+                    cl_mem dst_buffer = xkrt_driver_cl_create_subbuffer(dst_device, dst, CL_MEM_WRITE_ONLY);
+
+                    CL_SAFE_CALL(
+                        clEnqueueCopyBufferRect(
+                            stream->cl.queue,
+                            src_buffer,
+                            dst_buffer,
+                            src_origin,
+                            dst_origin,
+                            region,
+                            src_row_pitch,
+                            src_slice_pitch,
+                            dst_row_pitch,
+                            dst_slice_pitch,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                            event
+                        )
+                    );
+
+                    // TODO : release sub-buffer or use offsets instead
+
                     break ;
                 }
 
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
+                {
+                    LOGGER_FATAL("Not implemented");
                     return ENOSYS;
+                }
 
                 default:
                 {

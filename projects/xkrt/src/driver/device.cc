@@ -565,11 +565,12 @@ xkrt_device_t::offloader_stream_instruction_submit_copy(
     assert(instr);
 
     /* create a new copy instruction */
-    instr->copy.host_view       = host_view;
-    instr->copy.dst_device_view = dst_device_view;
-    instr->copy.src_device_view = src_device_view;
+    instr->copy.host_view               = host_view;
+    instr->copy.dst_device_global_id    = dst_device_global_id;
+    instr->copy.dst_device_view         = dst_device_view;
+    instr->copy.src_device_view         = src_device_view;
+    instr->copy.src_device_global_id    = src_device_global_id;
 
     this->offloader_stream_instruction_commit(stream, instr);
-
     XKRT_STATS_INCR(stream->stats.transfered, host_view.size());
 }

@@ -70,10 +70,27 @@ void xkrt_driver_cl_get_buffer_and_offset(
 );
 
 cl_mem
-xkrt_driver_cl_get_subbuffer(
+xkrt_driver_cl_create_subbuffer(
     xkrt_device_cl_t * device,
     const void * ptr,
     int mode
+);
+
+void
+xkrt_driver_cl_get_buffer_and_offset(
+    xkrt_device_cl_t * device,
+    uintptr_t addr,
+    cl_mem * mem,
+    size_t * offset
+);
+
+void
+xkrt_driver_cl_get_buffer_and_offset_2D(
+    xkrt_device_cl_t * device,
+    uintptr_t addr,
+    size_t pitch,
+    cl_mem * mem,
+    size_t * offset
 );
 
 #endif /* __DRIVER_CL_H__ */
