@@ -12,11 +12,16 @@ SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
 #SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 SET(XKBLAS_KERNELS_PRECISIONS s)
 
+# custom kernels
+SET(XKBLAS_CUDA_KERNELS copyscale)
+
 # Generation of source files foreach kernels and precision
 SET(XKBLAS_KERNELS_SOURCE_FILES)
+SET(XKBLAS_CUDA_KERNELS_SOURCE_FILES)
+
+# .cc source fles for each precision
 foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
 
-    # .cc source fles for each precision
     foreach(kernel IN LISTS XKBLAS_KERNELS)
         list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generated/${precision}${kernel}.cc)
         add_custom_command(
@@ -39,6 +44,19 @@ foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
         DEPENDS
             ${CMAKE_SOURCE_DIR}/src/kernels/kernels.h
     )
+
+    # custom cuda kernels
+    foreach(kernel IN LISTS XKBLAS_CUDA_KERNELS)
+        list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generated/${precision}${kernel}.cu)
+        add_custom_command(
+            OUTPUT
+                ${CMAKE_SOURCE_DIR}/src/kernels/generated/${precision}${kernel}.cu
+            COMMAND
+                python3 ${CMAKE_SOURCE_DIR}/src/kernels/generators/generate-cu.py ${CMAKE_SOURCE_DIR} ${kernel} ${precision}
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/src/kernels/${kernel}.cu
+        )
+    endforeach()
 
 endforeach()
 
@@ -65,15 +83,6 @@ SET(SOURCE_FILES
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 
-SET(CUDA_SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/scopyscale.cu
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/ccopyscale.cu
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/dcopyscale.cu
-    ${CMAKE_SOURCE_DIR}/src/kernels/generated/zcopyscale.cu
-)
-
-option(STRICT "Enable strict compilation mode" OFF)
-
 ###############
 # DEPENDENCES #
 ###############
@@ -83,7 +92,7 @@ find_package(XKRT REQUIRED)
 message(STATUS "Found XKRT: ${XKRT_INCLUDE_DIRS}")
 include_directories("${XKRT_INCLUDE_DIRS}")
 
-#########
+##########
 # XKBLAS #
 ##########
 
@@ -99,6 +108,7 @@ include_directories(src/)
 install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
+option(STRICT "Enable strict compilation mode" OFF)
 if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
@@ -121,14 +131,14 @@ endif()
 option(ENABLE_CU "Enable the compilation of custom cuda kernels" ON)
 if (ENABLE_CU)
     enable_language(CUDA)
-    set_source_files_properties(${CUDA_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
-    add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${CUDA_SOURCE_FILES})
+    set_source_files_properties(${XKBLAS_CUDA_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
+    add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${XKBLAS_CUDA_KERNELS_SOURCE_FILES})
     set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
     install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
 endif()
 
-find_package(CLBLAST REQUIRED)
+find_package(CLBLAST)
 if (${CLBLAST_FOUND})
     include_directories("${CLBLAST_INCLUDE_DIRS}")
     message(STATUS "Found CLBlast: ${CLBLAST_INCLUDE_DIRS}")
