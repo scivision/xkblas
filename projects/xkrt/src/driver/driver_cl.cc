@@ -292,9 +292,17 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        {
+            LOGGER_FATAL("impl me");
+            break ;
+        }
+
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             const uintptr_t dst     = instr->copy.dst_device_view.addr;
             size_t dst_row_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
@@ -322,7 +330,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             switch (instr->type)
             {
-                case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
+                case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
                 {
                     cl_mem dst_buffer;
                     xkrt_driver_cl_get_buffer_and_offset_2D(stream->device, (uintptr_t) dst, dst_row_pitch, &dst_buffer, dst_origin);
@@ -348,7 +356,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     break ;
                 }
 
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
                 {
                     cl_mem src_buffer;
                     xkrt_driver_cl_get_buffer_and_offset_2D(stream->device, (uintptr_t) src, src_row_pitch, &src_buffer, src_origin);
@@ -374,7 +382,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     break ;
                 }
 
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
                 {
                     cl_mem src_buffer;
                     xkrt_device_cl_t * src_device = device_cl_get_from_addr(src);

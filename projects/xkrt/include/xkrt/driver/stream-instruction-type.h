@@ -16,12 +16,19 @@
 
 typedef enum    xkrt_stream_instruction_type_t
 {
-    XKRT_STREAM_INSTR_TYPE_COPY_H2H = 0,
-    XKRT_STREAM_INSTR_TYPE_COPY_H2D = 1,
-    XKRT_STREAM_INSTR_TYPE_COPY_D2H = 2,
-    XKRT_STREAM_INSTR_TYPE_COPY_D2D = 3,
-    XKRT_STREAM_INSTR_TYPE_KERN     = 4,
-    XKRT_STREAM_INSTR_TYPE_MAX      = 5,
+    XKRT_STREAM_INSTR_TYPE_KERN         = 0,
+
+    XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D  = 1,
+    XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D  = 2,
+    XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D  = 3,
+    XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D  = 4,
+
+    XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D  = 5,
+    XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D  = 6,
+    XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D  = 7,
+    XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D  = 8,
+
+    XKRT_STREAM_INSTR_TYPE_MAX          = 9
 }               xkrt_stream_instruction_type_t;
 
 const char * xkrt_stream_instruction_type_to_str(xkrt_stream_instruction_type_t type);

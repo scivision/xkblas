@@ -1,21 +1,23 @@
 # include <iostream>
 # include "noop-khp-tree.hpp"
 
-# define K 2
+# define K 4
 
 int
 main(void)
 {
     NoopKHPTree<K> tree;
 
-    int x0, x1, y0, y1;
-    std::cout << "Enter rectangles in format (x0, x1, y0, y1) or press CTRL+D to stop:" << std::endl;
+    int x0, x1, y0, y1, z0, z1, w0, w1;
+    std::cout << "Enter rectangles in format `x0 x1 y0 y1 z0 z1 w0 w1` or press CTRL+D to stop:" << std::endl;
     std::cout << "> ";
-    while (std::cin >> x0 >> x1 >> y0 >> y1)
+    while (std::cin >> x0 >> x1 >> y0 >> y1 >> z0 >> z1 >> w0 >> w1)
     {
         const Interval list[K] = {
+            Interval(x0, x1),
             Interval(y0, y1),
-            Interval(x0, x1)
+            Interval(z0, z1),
+            Interval(w0, w1),
         };
         KCube<K> cube(list);
         unused_type_t t;

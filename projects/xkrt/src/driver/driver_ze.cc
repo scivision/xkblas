@@ -278,23 +278,42 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     ze_event_handle_t ze_event_handle = stream->ze.events.list[idx];
 
+          void * dst    = (      void *) instr->copy.dst_device_view.addr;
+    const void * src    = (const void *) instr->copy.src_device_view.addr;
+
+    const uint32_t num_wait_events = 0;
+    ze_event_handle_t * wait_events = NULL;
+
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
         {
-            void * dst          = (void *) instr->copy.dst_device_view.addr;
-            size_t dst_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
-            const void * src    = (const void *) instr->copy.src_device_view.addr;
-            size_t src_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+            const size_t size = instr->copy.size;
+            ZE_SAFE_CALL(
+                zeCommandListAppendMemoryCopyRegion(
+                    stream->ze.command.list,
+                    dst,
+                    src,
+                    size,
+                    ze_event_handle,
+                    num_wait_events,
+                    wait_events
+                )
+            );
+            break ;
+        }
 
-            // assume col major for ze - if not, need to do some shit here
-            assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
+        {
+            const size_t dst_pitch = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
+            const size_t src_pitch = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+
             const size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
             const size_t height = instr->copy.host_view.n;
-            assert(width >= 0);
-            assert(height >= 0);
 
             const uint32_t dst_slice_pitch = 0;
             const ze_copy_region_t dst_region = {
@@ -316,41 +335,22 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 .depth   = 0
             };
 
-            const uint32_t num_wait_events = 0;
-            ze_event_handle_t * wait_events = NULL;
-
-            switch (instr->type)
-            {
-                case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
-                {
-                    ZE_SAFE_CALL(
-                        zeCommandListAppendMemoryCopyRegion(
-                            stream->ze.command.list,
-                            dst,
-                           &dst_region,
-                            dst_pitch,
-                            dst_slice_pitch,
-                            src,
-                           &src_region,
-                            src_pitch,
-                            src_slice_pitch,
-                            ze_event_handle,
-                            num_wait_events,
-                            wait_events
-                        )
-                    );
-
-                    break ;
-                }
-
-                default:
-                {
-                    LOGGER_FATAL("instr->type got modified, something went really wrong");
-                    break ;
-                }
-            }
+            ZE_SAFE_CALL(
+                zeCommandListAppendMemoryCopyRegion(
+                    stream->ze.command.list,
+                    dst,
+                   &dst_region,
+                    dst_pitch,
+                    dst_slice_pitch,
+                    src,
+                   &src_region,
+                    src_pitch,
+                    src_slice_pitch,
+                    ze_event_handle,
+                    num_wait_events,
+                    wait_events
+                )
+            );
 
             return EINPROGRESS;
         }

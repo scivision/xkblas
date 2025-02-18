@@ -12,6 +12,7 @@
 /* ************************************************************************** */
 
 # include <xkrt/driver/device.hpp>
+# include <type_traits>
 
 //////////////////////
 // MEMORY MANAGMENT //
@@ -482,63 +483,79 @@ xkrt_device_t::offloader_stream_instruction_submit_kernel(
     this->offloader_stream_instruction_commit(stream, instr);
 }
 
-# pragma message(TODO "using a full 'host_view' here is overkill, only needing (sizeof_type, n, m) i believe")
+template <typename HOST_VIEW_T, typename DEVICE_VIEW_T>
 void
 xkrt_device_t::offloader_stream_instruction_submit_copy(
-    const memory_view_t           & host_view,
+    const HOST_VIEW_T             & host_view,
     const xkrt_device_global_id_t   dst_device_global_id,
-    const memory_replicate_view_t & dst_device_view,
+    const DEVICE_VIEW_T           & dst_device_view,
     const xkrt_device_global_id_t   src_device_global_id,
-    const memory_replicate_view_t & src_device_view,
+    const DEVICE_VIEW_T           & src_device_view,
     const xkrt_callback_t         & callback
 ) {
-    // assert(ThreadWorker::self() == device->thread);
     assert(this->global_id == dst_device_global_id || this->global_id == src_device_global_id);
 
-    assert(dst_device_view.addr);
-    assert(dst_device_view.ld);
+    // whether 1D or 2D
+    # define IS_1D (std::is_same<HOST_VIEW_T, size_t>()        && std::is_same<DEVICE_VIEW_T, uintptr_t>())
+    # define IS_2D (std::is_same<HOST_VIEW_T, memory_view_t>() && std::is_same<DEVICE_VIEW_T, memory_replicate_view_t>())
+    static_assert(IS_1D || IS_2D);
 
-    assert(src_device_view.addr);
-    assert(src_device_view.ld);
-
-    /* find the type of copy instruction */
     xkrt_stream_instruction_type_t itype;
-    if (src_device_global_id == HOST_DEVICE_GLOBAL_ID)
-    {
-        if (dst_device_global_id == HOST_DEVICE_GLOBAL_ID)
-            itype = XKRT_STREAM_INSTR_TYPE_COPY_H2H;
-        else
-            itype = XKRT_STREAM_INSTR_TYPE_COPY_H2D;
+    const int src_is_host = (src_device_global_id == HOST_DEVICE_GLOBAL_ID) ? 1 : 0;
+    const int dst_is_host = (dst_device_global_id == HOST_DEVICE_GLOBAL_ID) ? 1 : 0;
+
+    if constexpr(IS_1D) {
+        assert(host_view);
+        assert(dst_device_view);
+        assert(src_device_view);
+        itype = ( src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D :
+                ( src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D :
+                (!src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D :
+                (!src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D;
     }
-    else
-    {
-        if (dst_device_global_id == HOST_DEVICE_GLOBAL_ID)
-            itype = XKRT_STREAM_INSTR_TYPE_COPY_D2H;
-        else
-            itype = XKRT_STREAM_INSTR_TYPE_COPY_D2D;
+
+    if constexpr(IS_2D) {
+        assert(host_view.m);
+        assert(host_view.n);
+        assert(host_view.sizeof_type);
+
+        assert(dst_device_view.addr);
+        assert(dst_device_view.ld);
+
+        assert(src_device_view.addr);
+        assert(src_device_view.ld);
+
+        itype = ( src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D :
+                ( src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D :
+                (!src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D :
+                (!src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D;
     }
 
     /* find the type of stream to use */
     xkrt_stream_type_t stype;
     switch(itype)
     {
-        # pragma message(TODO "No H2H streams, do we want one ? Currently using H2D stream for H2H copies, mimicing original ptr")
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
+        # pragma message(TODO "No H2H streams, do we want one ? Currently using H2D stream for H2H copies")
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
         {
             assert(this->global_id == dst_device_global_id);
             stype = XKRT_STREAM_TYPE_H2D;
             break ;
         }
 
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         {
             assert(this->global_id == src_device_global_id);
             stype = XKRT_STREAM_TYPE_D2H;
             break ;
         }
 
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             stype = XKRT_STREAM_TYPE_D2D;
             break ;
@@ -554,21 +571,22 @@ xkrt_device_t::offloader_stream_instruction_submit_copy(
     /* create a new instruction and retrieve its offload stream */
     xkrt_stream_t * stream;
     xkrt_stream_instruction_t * instr;
-    this->offloader_stream_instruction_new(
-        stype,      /* IN */
-        &stream,    /* OUT */
-        itype,      /* IN */
-        &instr,     /* OUT */
-        callback
-    );
+    this->offloader_stream_instruction_new(stype, &stream, itype, &instr, callback);
     assert(stream);
     assert(instr);
 
     /* create a new copy instruction */
-    instr->copy.host_view               = host_view;
-    instr->copy.dst_device_view         = dst_device_view;
-    instr->copy.src_device_view         = src_device_view;
+    if constexpr (IS_1D) {
+        instr->copy.size        = host_view;
+    } else if constexpr (IS_2D) {
+        instr->copy.m           = host_view.m;
+        instr->copy.n           = host_view.n;
+        instr->copy.sizeof_type = host_view.sizeof_type;
+    }
+
+    instr->copy.dst_device_view  = dst_device_view;
+    instr->copy.src_device_view  = src_device_view;
 
     this->offloader_stream_instruction_commit(stream, instr);
-    XKRT_STATS_INCR(stream->stats.transfered, host_view.size());
+    XKRT_STATS_INCR(stream->stats.transfered, m * n * sizeof_type);
 }

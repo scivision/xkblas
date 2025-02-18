@@ -1585,7 +1585,9 @@ next_view:
             /* launch asynchronous copy */
             this->runtime->submit_copy(
                 device_global_id,
-                fetch->host_view,
+                fetch->host_view.m,
+                fetch->host_view.n,
+                fetch->host_view.sizeof_type,
                 fetch->dst_device_global_id,
                 fetch->dst_view,
                 fetch->src_device_global_id,

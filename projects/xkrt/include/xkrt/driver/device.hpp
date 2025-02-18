@@ -156,18 +156,16 @@ typedef struct  xkrt_device_t
         const xkrt_callback_t & callback
     );
 
-    // TODO : template the memcpy with the view
-
-    /* submit a memory copy instruction */
+    /* 2D copy */
+    template <typename HOST_VIEW_T, typename DEVICE_VIEW_T>
     void offloader_stream_instruction_submit_copy(
-        const memory_view_t           & host_view,
+        const HOST_VIEW_T             & host_view,
         const xkrt_device_global_id_t   dst_device_global_id,
-        const memory_replicate_view_t & dst_device_view,
+        const DEVICE_VIEW_T           & dst_device_view,
         const xkrt_device_global_id_t   src_device_global_id,
-        const memory_replicate_view_t & src_device_view,
+        const DEVICE_VIEW_T           & src_device_view,
         const xkrt_callback_t         & callback
     );
-
 }               xkrt_device_t;
 
 #endif /* __DEVICE_HPP__ */

@@ -452,56 +452,75 @@ cuda_stream_instructions_launch(
 
     cudaEvent_t event = stream->cu.events.buffer[idx];
 
+    // get transfer type
+    cudaMemcpyKind kind;
+    cudaStream_t handle;
+
     switch (instr->type)
     {
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
         {
-            void * dst          = (void *) instr->copy.dst_device_view.addr;
-            size_t dpitch       = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
-            const void * src    = (const void *) instr->copy.src_device_view.addr;
-            size_t spitch       = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+            kind = cudaMemcpyHostToDevice;
+            handle = stream->cu.handle.high;
+            break ;
+        }
 
-            // assume col major for cuda - if not, need to do some shit here
-            assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
-            size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            size_t height = instr->copy.host_view.n;
-            assert(width >= 0);
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        {
+            kind = cudaMemcpyDeviceToHost;
+            handle = stream->cu.handle.high;
+            break ;
+        }
+
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
+        {
+            kind = cudaMemcpyDeviceToDevice;
+            handle = stream->cu.handle.low;
+            break ;
+        }
+
+        default:
+        {
+            LOGGER_FATAL("instr->type invalid");
+            break ;
+        }
+    }
+
+    switch (instr->type)
+    {
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        {
+                  void * dst    = (      void *) instr->copy.dst_device_view.addr;
+            const void * src    = (const void *) instr->copy.src_device_view.addr;
+            const size_t count  = instr->copy.size;
             assert(height >= 0);
 
-            cudaMemcpyKind kind;
-            cudaStream_t handle;
+            LOGGER_DEBUG("cudaMemcpyAsync(dst=%p, src=%p, count=%zu, kind=%s",
+                    dst, src, count, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
+            CU_SAFE_CALL(cudaMemcpyAsync(dst, src, count, kind, handle));
+            CU_SAFE_CALL(cudaEventRecord(event, handle));
 
-            switch (instr->type)
-            {
-                case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-                {
-                    kind = cudaMemcpyHostToDevice;
-                    handle = stream->cu.handle.high;
-                    break ;
-                }
+            return EINPROGRESS;
+        }
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
+        {
+            void * dst          = (void *) instr->copy.dst_device_view.addr;
+            size_t dpitch       = instr->copy.dst_device_view.ld * instr->copy.sizeof_type;
+            const void * src    = (const void *) instr->copy.src_device_view.addr;
+            size_t spitch       = instr->copy.src_device_view.ld * instr->copy.sizeof_type;
 
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-                {
-                    kind = cudaMemcpyDeviceToHost;
-                    handle = stream->cu.handle.high;
-                    break ;
-                }
-
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
-                {
-                    kind = cudaMemcpyDeviceToDevice;
-                    handle = stream->cu.handle.low;
-                    break ;
-                }
-
-                default:
-                {
-                    LOGGER_FATAL("instr->type got modified, something went really wrong");
-                    break ;
-                }
-            }
+            // assume col major for cuda - if not, need to do some shit here
+            size_t width  = instr->copy.m * instr->copy.sizeof_type;
+            size_t height = instr->copy.n;
+            assert(width >= 0);
+            assert(height >= 0);
 
             LOGGER_DEBUG("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");

@@ -30,7 +30,12 @@ typedef uint32_t xkrt_stream_instruction_counter_t;
 /* io instruction to move data between devices */
 typedef struct  xkrt_stream_instruction_copy_t
 {
-    memory_view_t host_view;
+    union {
+        size_t m;
+        size_t size;
+    };
+    size_t n;
+    size_t sizeof_type;
     memory_replicate_view_t dst_device_view;
     memory_replicate_view_t src_device_view;
 
@@ -58,9 +63,9 @@ typedef struct  xkrt_stream_instruction_t
     xkrt_callback_t callback;
     union
     {
-        xkrt_stream_instruction_copy_t    copy;
-        xkrt_stream_instruction_kernel_t  kern;
-        xkrt_stream_instruction_barrier_t barrier;
+        xkrt_stream_instruction_copy_t      copy;
+        xkrt_stream_instruction_kernel_t    kern;
+        xkrt_stream_instruction_barrier_t   barrier;
     };
 
 }               xkrt_stream_instruction_t;

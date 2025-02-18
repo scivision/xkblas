@@ -385,7 +385,9 @@ xkrt_runtime_t::memory_deallocate(
 void
 xkrt_runtime_t::submit_copy(
     const xkrt_device_global_id_t   device_global_id,
-    const memory_view_t           & host_view,
+    const size_t                    m,
+    const size_t                    n,
+    const size_t                    sizeof_type,
     const xkrt_device_global_id_t   dst_device_global_id,
     const memory_replicate_view_t & dst_device_view,
     const xkrt_device_global_id_t   src_device_global_id,
@@ -393,7 +395,39 @@ xkrt_runtime_t::submit_copy(
     const xkrt_callback_t         & callback
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
-    device->offloader_stream_instruction_submit_copy(host_view, dst_device_global_id, dst_device_view, src_device_global_id, src_device_view, callback);
+    device->offloader_stream_instruction_submit_copy(
+        m,
+        n,
+        sizeof_type,
+        dst_device_global_id,
+        dst_device_view,
+        src_device_global_id,
+        src_device_view,
+        callback
+    );
+}
+
+void
+xkrt_runtime_t::submit_copy(
+    const xkrt_device_global_id_t   device_global_id,
+    const size_t                    n,
+    const size_t                    sizeof_type,
+    const xkrt_device_global_id_t   dst_device_global_id,
+    const uintptr_t                 dst_device_addr,
+    const xkrt_device_global_id_t   src_device_global_id,
+    const uintptr_t                 src_device_addr,
+    const xkrt_callback_t         & callback
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    device->offloader_stream_instruction_submit_copy(
+        n,
+        sizeof_type,
+        dst_device_global_id,
+        dst_device_addr,
+        src_device_global_id,
+        src_device_addr,
+        callback
+    );
 }
 
 void
