@@ -183,13 +183,30 @@ xkrt_stream_t::launch_ready_instructions(void)
         );
 
         assert(this->f_instruction_launch);
-        if (instr->type == XKRT_STREAM_INSTR_TYPE_KERN)
+        switch (instr->type)
         {
-            err = EINPROGRESS;
-            instr->kern.launch(this, instr, p);
+            case (XKRT_STREAM_INSTR_TYPE_KERN):
+            {
+                err = EINPROGRESS;
+                instr->kern.launch(this, instr, p);
+                break ;
+            }
+
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
+            {
+                LOGGER_FATAL("Not implemented");
+                break ;
+            }
+
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+            default:
+            {
+                err = this->f_instruction_launch(this, instr, p);
+                break ;
+            }
         }
-        else
-            err = this->f_instruction_launch(this, instr, p);
 
         switch (err)
         {

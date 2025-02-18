@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:54:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/17 23:30:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,11 +31,7 @@ typedef uint32_t xkrt_stream_instruction_counter_t;
 typedef struct  xkrt_stream_instruction_copy_t
 {
     memory_view_t host_view;
-
-    xkrt_device_global_id_t dst_device_global_id;
     memory_replicate_view_t dst_device_view;
-
-    xkrt_device_global_id_t src_device_global_id;
     memory_replicate_view_t src_device_view;
 
 }               xkrt_stream_instruction_copy_t;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:57:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/17 23:06:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -455,7 +455,6 @@ cuda_stream_instructions_launch(
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
@@ -497,9 +496,6 @@ cuda_stream_instructions_launch(
                     break ;
                 }
 
-                case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-                    return ENOSYS;
-
                 default:
                 {
                     LOGGER_FATAL("instr->type got modified, something went really wrong");
@@ -507,7 +503,7 @@ cuda_stream_instructions_launch(
                 }
             }
 
-            LOGGER_INFO("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
+            LOGGER_DEBUG("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
             CU_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
             CU_SAFE_CALL(cudaEventRecord(event, handle));
@@ -549,7 +545,6 @@ cuda_stream_instructions_progress(
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {

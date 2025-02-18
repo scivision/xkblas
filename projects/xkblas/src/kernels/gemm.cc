@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 19:56:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/17 23:07:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -81,7 +81,7 @@ xkblas_£gemm_tile_async(
     const TYPE * beta,
           TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
-    LOGGER_INFO("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
+    LOGGER_DEBUG("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
 
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);
@@ -322,7 +322,7 @@ xkblas_£gemm_async(
     # undef B
     # undef C
 
-    LOGGER_INFO("GEMM dependency graph submitted");
+    LOGGER_DEBUG("GEMM dependency graph submitted");
 
     return 0;
 }
@@ -467,7 +467,7 @@ body_cl(
     b_offset /= sizeof(TYPE);
     c_offset /= sizeof(TYPE);
 
-    const CLBlastLayout layout = CLBlastLayoutRowMajor;
+    const CLBlastLayout layout = CLBlastLayoutColMajor;
 
     CLBLAST_SAFE_CALL(
         CLBlast££gemm(

@@ -281,7 +281,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {
@@ -297,33 +296,35 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             assert(width >= 0);
             assert(height >= 0);
 
+            const uint32_t dst_slice_pitch = 0;
+            const ze_copy_region_t dst_region = {
+                .originX = 0,
+                .originY = 0,
+                .originZ = 0,
+                .width   = (uint32_t) width,
+                .height  = (uint32_t) height,
+                .depth   = 0
+            };
+
+            const uint32_t src_slice_pitch = 0;
+            const ze_copy_region_t src_region = {
+                .originX = 0,
+                .originY = 0,
+                .originZ = 0,
+                .width   = (uint32_t) width,
+                .height  = (uint32_t) height,
+                .depth   = 0
+            };
+
+            const uint32_t num_wait_events = 0;
+            ze_event_handle_t * wait_events = NULL;
+
             switch (instr->type)
             {
                 case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
                 {
-                    const uint32_t dst_slice_pitch = 0;
-                    const ze_copy_region_t dst_region = {
-                        .originX = 0,
-                        .originY = 0,
-                        .originZ = 0,
-                        .width   = (uint32_t) width,
-                        .height  = (uint32_t) height,
-                        .depth   = 0
-                    };
-
-                    const uint32_t src_slice_pitch = 0;
-                    const ze_copy_region_t src_region = {
-                        .originX = 0,
-                        .originY = 0,
-                        .originZ = 0,
-                        .width   = (uint32_t) width,
-                        .height  = (uint32_t) height,
-                        .depth   = 0
-                    };
-
-                    const uint32_t num_wait_events = 0;
-                    ze_event_handle_t * wait_events = NULL;
-
                     ZE_SAFE_CALL(
                         zeCommandListAppendMemoryCopyRegion(
                             stream->ze.command.list,
@@ -343,19 +344,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
                     break ;
                 }
-
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-                {
-                    break ;
-                }
-
-                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
-                {
-                    break ;
-                }
-
-                case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-                    return ENOSYS;
 
                 default:
                 {
@@ -401,7 +389,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
         {

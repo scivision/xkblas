@@ -2,9 +2,9 @@
 "
 " HOW TO USE
 "   copy `stdheader.vim` to `$HOME/.vim/plugin`
-"   set `NAME` environment variable
-"   set `MAIL` environment variable
-"   press `F2` while in a file
+"   set `NAME` environment variable or g:name vim variable
+"   set `MAIL` environment variable or g:mail vim variable
+"   press `F2` while in a file to generate the header the first time
 
 let s:asciiart = [
      \"              ",

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:57:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/17 23:08:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,6 +22,8 @@ extern "C" {
     # include <string.h>
     # include <time.h>
 };
+
+# include <xkblas/flops.h>
 
 # include "common/blas.h"
 # include "common/blas-version.h"
@@ -63,7 +65,7 @@ static const char * TRANS_STR[N_CBLAS_TRANSPOSE] = { "N", "T", "H" };
 //////////////////////
 
 static void
-prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld, bool fill = true)
+prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
 {
     /* allocate matrices */
     const size_t s = sizeof(TYPE);
@@ -94,9 +96,8 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld, bool fill = true)
         matrices[i] = M;
     }
 
-    /* initialize matrices */
-    if (fill)
-        FILL((TYPE *)mem, memsize/s);
+    // if (!SKIP_CHECK)
+    //     FILL((TYPE *)mem, memsize/s);
 }
 
 // GEMM - GEMM //
@@ -204,21 +205,23 @@ main_gemm(char ** args)
     # define CImpl ((TYPE *)matrices[4])
     prepare_n_matrices(matrices, 5, ld);
 
-    # if 1
-    alpha = (TYPE) 1.0;
-    beta  = (TYPE) 1.0;
-    memset(A, 0, ld * ld * sizeof(TYPE));
-    memset(B, 0, ld * ld * sizeof(TYPE));
-    memset(C, 0, ld * ld * sizeof(TYPE));
-    for (int i = 0 ; i < ld ; ++i)
+    // for small matrices
+    if (m <= 64)
     {
-        B[i * ld + i] = 1.0;
-        for (int j = 0 ; j < ld ; ++j)
+        alpha = (TYPE) 1.0;
+        beta  = (TYPE) 1.0;
+        memset(A, 0, ld * ld * sizeof(TYPE));
+        memset(B, 0, ld * ld * sizeof(TYPE));
+        memset(C, 0, ld * ld * sizeof(TYPE));
+        for (int i = 0 ; i < ld ; ++i)
         {
-            A[i * ld + j] = i * j;
+            B[i * ld + i] = 1.0;
+            for (int j = 0 ; j < ld ; ++j)
+            {
+                A[i * ld + j] = i * j;
+            }
         }
     }
-    # endif
 
     int t1 = 0;
     int t2 = 0;
@@ -237,7 +240,9 @@ main_gemm(char ** args)
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
-            printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+            printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
+                    (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
+            );
             if (!SKIP_CHECK)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
@@ -499,7 +504,7 @@ main_mumps(char ** args)
         # define L  ((TYPE *)matrices[1])
         # define U  ((TYPE *)matrices[2])
         # define G  ((TYPE *)matrices[3])
-        prepare_n_matrices(matrices, 4, ld, false);
+        prepare_n_matrices(matrices, 4, ld);
 
         impl.reset();
         impl.set_tile(ts);
