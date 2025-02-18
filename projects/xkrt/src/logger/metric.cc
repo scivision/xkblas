@@ -1,0 +1,70 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   metric.cc                                                                */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2025/02/18 15:09:41 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2025/02/18 15:26:29 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: CeCILL 2.1                                                      */
+/*                                                                            */
+/* ************************************************************************** */
+
+# include <xkrt/logger/metric.h>
+# include <time.h>
+# include <stdio.h>
+
+extern "C"
+uint64_t
+xkrt_get_nanotime(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)(ts.tv_sec * 1000000000) + (uint64_t) ts.tv_nsec;
+}
+
+extern "C"
+void
+xkrt_metric_byte(char * buffer, int bufsize, size_t nbytes)
+{
+    const char * suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
+    int i = 0;
+    double size = (double) nbytes;
+    while (size >= 1024 && i < sizeof(suffixes) / sizeof(*suffixes))
+    {
+        size /= 1024;
+        i++;
+    }
+    snprintf(buffer, bufsize, "%.2lf%s", size, suffixes[i]);
+}
+
+extern "C"
+void
+xkrt_metric_time(char * buffer, int bufsize, size_t ns)
+{
+    const char * suffixes[] = {"ns", "us", "ms", "s"};
+    int i = 0;
+    double size = (double) ns;
+    while (size >= 1000 && i < sizeof(suffixes) / sizeof(*suffixes))
+    {
+        size /= 1000;
+        i++;
+    }
+    snprintf(buffer, bufsize, "%.2lf%s", size, suffixes[i]);
+}
+
+extern "C"
+void
+xkrt_metric_bandwidth(char * buffer, int bufsize, size_t byte_per_sec)
+{
+    const char * suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
+    int i = 0;
+    double size = (double) byte_per_sec;
+    while (size >= 1024 && i < sizeof(suffixes) / sizeof(*suffixes))
+    {
+        size /= 1024;
+        i++;
+    }
+    snprintf(buffer, bufsize, "%.2lf%s/s", size, suffixes[i]);
+}

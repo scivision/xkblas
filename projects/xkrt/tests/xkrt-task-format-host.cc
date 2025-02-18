@@ -38,7 +38,7 @@ main(void)
     const size_t task_size = sizeof(Task);
     Task * task = (Task *) thread->allocate(task_size);
     new(task) Task(FORMAT, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
-    runtime.commit(task);
+    runtime.task_commit(task);
 
     // wait
     assert(xkrt_sync(&runtime) == 0);

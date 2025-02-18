@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 21:02:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,6 +13,8 @@
 
 #ifndef __CONSTS_H__
 # define __CONSTS_H__
+
+#  include <stdint.h>
 
 /* maximum number of devices in total */
 # define XKRT_DEVICES_MAX (16)

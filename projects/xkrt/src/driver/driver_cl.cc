@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:59:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 20:57:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -304,15 +304,15 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
-            const uintptr_t dst     = instr->copy.dst_device_view.addr;
-            size_t dst_row_pitch    = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
-            const uintptr_t src     = instr->copy.src_device_view.addr;
-            size_t src_row_pitch    = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+            const uintptr_t dst     = instr->copy.D2.dst_device_view.addr;
+            const uintptr_t src     = instr->copy.D2.src_device_view.addr;
+
+            size_t dst_row_pitch    = instr->copy.D2.dst_device_view.ld * instr->copy.D2.sizeof_type;
+            size_t src_row_pitch    = instr->copy.D2.src_device_view.ld * instr->copy.D2.sizeof_type;
 
             // assume col major - if not, need to do some shit here
-            assert(instr->copy.host_view.order == MATRIX_COLMAJOR);
-            const size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            const size_t height = instr->copy.host_view.n;
+            const size_t width  = instr->copy.D2.m * instr->copy.D2.sizeof_type;
+            const size_t height = instr->copy.D2.n;
             assert(width >= 0);
             assert(height >= 0);
 
@@ -459,10 +459,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             /* poll event */
             for (int i = 0 ; i < 16 ; ++i)

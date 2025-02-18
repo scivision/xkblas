@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:04:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 21:06:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -101,7 +101,7 @@ xkrt_runtime_stats_device_report(xkrt_runtime_t * runtime, device_stats_t * stat
     for (int instr_type = 0 ; instr_type < XKRT_STREAM_INSTR_TYPE_MAX ; ++instr_type)
     {
         LOGGER_WARN(
-            "    `%8s` - commited %6zu - completed %6zu",
+            "    `%12s` - commited %6zu - completed %6zu",
             xkrt_stream_instruction_type_to_str((xkrt_stream_instruction_type_t) instr_type),
             stats->instructions[instr_type].commited.load(),
             stats->instructions[instr_type].completed.load()

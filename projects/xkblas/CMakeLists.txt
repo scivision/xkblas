@@ -98,7 +98,7 @@ include_directories("${XKRT_INCLUDE_DIRS}")
 
 # XKBLAS Lib
 add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES})
-target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKRT}/lib/libxkrt.so)
+target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKRT_LIBRARIES})
 
 # Include directory
 include_directories(include/)

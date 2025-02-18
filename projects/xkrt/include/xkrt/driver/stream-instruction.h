@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:30:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 20:56:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -28,16 +28,28 @@
 typedef uint32_t xkrt_stream_instruction_counter_t;
 
 /* io instruction to move data between devices */
-typedef struct  xkrt_stream_instruction_copy_t
+typedef struct  xkrt_stream_instruction_copy_1D_t
 {
-    union {
-        size_t m;
-        size_t size;
-    };
+    size_t size;
+    uintptr_t dst_device_addr;
+    uintptr_t src_device_addr;
+
+}               xkrt_stream_instruction_copy_1D_t;
+
+typedef struct  xkrt_stream_instruction_copy_2D_t
+{
+    size_t m;
     size_t n;
     size_t sizeof_type;
     memory_replicate_view_t dst_device_view;
     memory_replicate_view_t src_device_view;
+
+}               xkrt_stream_instruction_copy_2D_t;
+
+typedef struct  xkrt_stream_instruction_copy_t
+{
+    xkrt_stream_instruction_copy_1D_t D1;
+    xkrt_stream_instruction_copy_2D_t D2;
 
 }               xkrt_stream_instruction_copy_t;
 

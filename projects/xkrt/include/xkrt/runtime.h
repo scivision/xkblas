@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:11:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:13:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -64,18 +64,25 @@ typedef struct  xkrt_runtime_t
     /// and the runtime 'xkrt_device_t' structures
     //////////////////////////////////////////////////////////////////////////////////////////////
 
-    /* allocate memory onto the given device */
-    xkrt_area_chunk_t * memory_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
+    ////////////////////
+    // DATA MOVEMENTS //
+    ////////////////////
 
-    /* deallocate the given chunk */
-    void memory_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
-
-     /* 2D copy */
-    void submit_copy(
+    /* Submit a copy instruction to a stream of the device */
+    void copy(
         const xkrt_device_global_id_t   device_global_id,
-        const size_t                    m,
-        const size_t                    n,
-        const size_t                    sizeof_type,
+        const size_t                    size,
+        const xkrt_device_global_id_t   dst_device_global_id,
+        const uintptr_t                 dst_device_addr,
+        const xkrt_device_global_id_t   src_device_global_id,
+        const uintptr_t                 src_device_addr,
+        const xkrt_callback_t         & callback
+    );
+
+    /* Submit a copy instruction to a stream of the device */
+    void copy(
+        const xkrt_device_global_id_t   device_global_id,
+        const memory_view_t           & host_view,
         const xkrt_device_global_id_t   dst_device_global_id,
         const memory_replicate_view_t & dst_device_view,
         const xkrt_device_global_id_t   src_device_global_id,
@@ -83,22 +90,48 @@ typedef struct  xkrt_runtime_t
         const xkrt_callback_t         & callback
     );
 
-    void task_execute(
-        Task * task,
-        const xkrt_device_global_id_t device_global_id
-    );
+    ////////////
+    // MEMORY //
+    ////////////
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    // UTILITIES FOR TASK SCHEDULING
-    //////////////////////////////////////////////////////////////////////////////////////////////
+    /* allocate memory onto the given device */
+    xkrt_area_chunk_t * memory_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
 
-    /* get device/driver */
+    /* deallocate the given chunk */
+    void memory_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
+
+    /////////////////////
+    // SYNCHRONIZATION //
+    /////////////////////
+
+    /* wait until all instructions of the devices completed */
+    void wait_device(xkrt_device_global_id_t device_global_id);
+
+    /* wait for all pending instructions and tasks to complete */
+    void wait(void);
+
+    /////////////
+    // TASKING //
+    /////////////
+
+    /* Enqueue a ready task to the given device */
+    void task_submit(Task * task, const xkrt_device_global_id_t device_global_id);
+
+    /* Commit a task - so it may be schedule from now once its dependences completed */
+    void task_commit(Task * task);
+
+    /* Complete a task */
+    void task_complete(Task * task);
+
+    ///////////////
+    // UTILITIES //
+    ///////////////
+
+    /* get driver */
     xkrt_driver_t * driver_get(const xkrt_driver_type_t type);
-    xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
-    /* task managment */
-    void commit(Task * task);
-    void complete(Task * task);
+    /* get device */
+    xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
 }               xkrt_runtime_t;
 

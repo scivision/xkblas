@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:06:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 20:57:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -495,10 +495,10 @@ cuda_stream_instructions_launch(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
         {
-                  void * dst    = (      void *) instr->copy.dst_device_view.addr;
-            const void * src    = (const void *) instr->copy.src_device_view.addr;
-            const size_t count  = instr->copy.size;
-            assert(height >= 0);
+                  void * dst    = (      void *) instr->copy.D1.dst_device_addr;
+            const void * src    = (const void *) instr->copy.D1.src_device_addr;
+            const size_t count  = instr->copy.D1.size;
+            assert(count > 0);
 
             LOGGER_DEBUG("cudaMemcpyAsync(dst=%p, src=%p, count=%zu, kind=%s",
                     dst, src, count, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
@@ -511,14 +511,15 @@ cuda_stream_instructions_launch(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
-            void * dst          = (void *) instr->copy.dst_device_view.addr;
-            size_t dpitch       = instr->copy.dst_device_view.ld * instr->copy.sizeof_type;
-            const void * src    = (const void *) instr->copy.src_device_view.addr;
-            size_t spitch       = instr->copy.src_device_view.ld * instr->copy.sizeof_type;
+                  void * dst = (      void *) instr->copy.D2.dst_device_view.addr;
+            const void * src = (const void *) instr->copy.D2.src_device_view.addr;
+
+            size_t dpitch = instr->copy.D2.dst_device_view.ld * instr->copy.D2.sizeof_type;
+            size_t spitch = instr->copy.D2.src_device_view.ld * instr->copy.D2.sizeof_type;
 
             // assume col major for cuda - if not, need to do some shit here
-            size_t width  = instr->copy.m * instr->copy.sizeof_type;
-            size_t height = instr->copy.n;
+            size_t width  = instr->copy.D2.m * instr->copy.D2.sizeof_type;
+            size_t height = instr->copy.D2.n;
             assert(width >= 0);
             assert(height >= 0);
 
@@ -563,9 +564,14 @@ cuda_stream_instructions_progress(
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             /* poll events */
             for (int i = 0 ; i < 16 ; ++i)

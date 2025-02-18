@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:23:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:17:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -83,7 +83,7 @@ body_memory_coherent_async_fetch_callback(
 
     // one fetched completed, notify the parent
     if (parent->fetched() == TASK_STATE_DATA_FETCHED)
-        runtime->complete(parent);
+        runtime->task_complete(parent);
 
     fetch_list_t * list = (fetch_list_t *) args[3];
     assert(list);
@@ -127,16 +127,10 @@ body_memory_coherent_async_fetch(Task * task)
     callback.args[2] = parent;
     callback.args[3] = list;
 
-    xkrt_device_t * device = runtime->device_get(fetch->src_device_global_id);
-    assert(device);
-    assert(fetch->src_device_global_id == device->global_id);
-
-    // the current task must be executing on the device's thread for that fetch
-    assert(device->thread == ThreadWorker::self());
-
     /* launch asynchronous copy */
     memory_replicate_view_t host_replicate_view(fetch->host_view.begin_addr(), fetch->host_view.ld);
-    device->offloader_stream_instruction_submit_copy(
+    runtime->copy(
+        fetch->src_device_global_id,
         fetch->host_view,
         HOST_DEVICE_GLOBAL_ID,
         host_replicate_view,
@@ -231,12 +225,12 @@ xkrt_memory_coherent_async_worker_thread_work(
         #endif /* NDEBUG */
 
         producer->resolve<0>(task);
-        runtime->commit(task);
+        runtime->task_commit(task);
     }
 
     // if early-completion happened
     if (current->fetched() == TASK_STATE_DATA_FETCHED)
-        runtime->complete(current);
+        runtime->task_complete(current);
 }
 
 /////////////////////////////
@@ -369,7 +363,7 @@ xkrt_memory_coherent_async(
                 strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
                 #endif /* NDEBUG */
 
-                runtime->commit(task);
+                runtime->task_commit(task);
             }
         }
     }

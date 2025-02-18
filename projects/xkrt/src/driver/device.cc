@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:46:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:40:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -266,7 +266,7 @@ xkrt_device_t::offloader_streams_are_empty(const xkrt_stream_type_t stype) const
 {
     int err = 0;
 
-    unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
     unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
@@ -283,7 +283,7 @@ xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t sty
 
     int err = 0;
 
-    unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                      0 : stype;
+    unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
     unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
     {
@@ -481,112 +481,4 @@ xkrt_device_t::offloader_stream_instruction_submit_kernel(
     instr->kern.vargs = vargs;
 
     this->offloader_stream_instruction_commit(stream, instr);
-}
-
-template <typename HOST_VIEW_T, typename DEVICE_VIEW_T>
-void
-xkrt_device_t::offloader_stream_instruction_submit_copy(
-    const HOST_VIEW_T             & host_view,
-    const xkrt_device_global_id_t   dst_device_global_id,
-    const DEVICE_VIEW_T           & dst_device_view,
-    const xkrt_device_global_id_t   src_device_global_id,
-    const DEVICE_VIEW_T           & src_device_view,
-    const xkrt_callback_t         & callback
-) {
-    assert(this->global_id == dst_device_global_id || this->global_id == src_device_global_id);
-
-    // whether 1D or 2D
-    # define IS_1D (std::is_same<HOST_VIEW_T, size_t>()        && std::is_same<DEVICE_VIEW_T, uintptr_t>())
-    # define IS_2D (std::is_same<HOST_VIEW_T, memory_view_t>() && std::is_same<DEVICE_VIEW_T, memory_replicate_view_t>())
-    static_assert(IS_1D || IS_2D);
-
-    xkrt_stream_instruction_type_t itype;
-    const int src_is_host = (src_device_global_id == HOST_DEVICE_GLOBAL_ID) ? 1 : 0;
-    const int dst_is_host = (dst_device_global_id == HOST_DEVICE_GLOBAL_ID) ? 1 : 0;
-
-    if constexpr(IS_1D) {
-        assert(host_view);
-        assert(dst_device_view);
-        assert(src_device_view);
-        itype = ( src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D :
-                ( src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D :
-                (!src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D :
-                (!src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D;
-    }
-
-    if constexpr(IS_2D) {
-        assert(host_view.m);
-        assert(host_view.n);
-        assert(host_view.sizeof_type);
-
-        assert(dst_device_view.addr);
-        assert(dst_device_view.ld);
-
-        assert(src_device_view.addr);
-        assert(src_device_view.ld);
-
-        itype = ( src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D :
-                ( src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D :
-                (!src_is_host &&  dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D :
-                (!src_is_host && !dst_is_host) ? XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D;
-    }
-
-    /* find the type of stream to use */
-    xkrt_stream_type_t stype;
-    switch(itype)
-    {
-        # pragma message(TODO "No H2H streams, do we want one ? Currently using H2D stream for H2H copies")
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
-        {
-            assert(this->global_id == dst_device_global_id);
-            stype = XKRT_STREAM_TYPE_H2D;
-            break ;
-        }
-
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
-        {
-            assert(this->global_id == src_device_global_id);
-            stype = XKRT_STREAM_TYPE_D2H;
-            break ;
-        }
-
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
-        {
-            stype = XKRT_STREAM_TYPE_D2D;
-            break ;
-        }
-
-        default:
-        {
-            LOGGER_FATAL("Impossible occured");
-            break ;
-        }
-    }
-
-    /* create a new instruction and retrieve its offload stream */
-    xkrt_stream_t * stream;
-    xkrt_stream_instruction_t * instr;
-    this->offloader_stream_instruction_new(stype, &stream, itype, &instr, callback);
-    assert(stream);
-    assert(instr);
-
-    /* create a new copy instruction */
-    if constexpr (IS_1D) {
-        instr->copy.size        = host_view;
-    } else if constexpr (IS_2D) {
-        instr->copy.m           = host_view.m;
-        instr->copy.n           = host_view.n;
-        instr->copy.sizeof_type = host_view.sizeof_type;
-    }
-
-    instr->copy.dst_device_view  = dst_device_view;
-    instr->copy.src_device_view  = src_device_view;
-
-    this->offloader_stream_instruction_commit(stream, instr);
-    XKRT_STATS_INCR(stream->stats.transfered, m * n * sizeof_type);
 }

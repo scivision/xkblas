@@ -57,7 +57,7 @@ main(void)
     }
 
     // submit it to the runtime
-    runtime.commit(task);
+    runtime.task_commit(task);
 
     // wait
     assert(xkrt_sync(&runtime) == 0);

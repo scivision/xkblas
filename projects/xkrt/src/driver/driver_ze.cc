@@ -1,11 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver_level_zero.cc                                                     */
+/*   driver_ze.cc                                                             */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:57:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 21:47:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -278,9 +278,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     ze_event_handle_t ze_event_handle = stream->ze.events.list[idx];
 
-          void * dst    = (      void *) instr->copy.dst_device_view.addr;
-    const void * src    = (const void *) instr->copy.src_device_view.addr;
-
     const uint32_t num_wait_events = 0;
     ze_event_handle_t * wait_events = NULL;
 
@@ -290,9 +287,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
         {
-            const size_t size = instr->copy.size;
+                  void * dst    = (      void *) instr->copy.D1.dst_device_addr;
+            const void * src    = (const void *) instr->copy.D1.src_device_addr;
+            const size_t size   = instr->copy.D1.size;
             ZE_SAFE_CALL(
-                zeCommandListAppendMemoryCopyRegion(
+                zeCommandListAppendMemoryCopy(
                     stream->ze.command.list,
                     dst,
                     src,
@@ -302,18 +301,21 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     wait_events
                 )
             );
-            break ;
+            return EINPROGRESS;
         }
 
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
-            const size_t dst_pitch = instr->copy.dst_device_view.ld * instr->copy.host_view.sizeof_type;
-            const size_t src_pitch = instr->copy.src_device_view.ld * instr->copy.host_view.sizeof_type;
+                  void * dst    = (      void *) instr->copy.D2.dst_device_view.addr;
+            const void * src    = (const void *) instr->copy.D2.src_device_view.addr;
 
-            const size_t width  = instr->copy.host_view.m * instr->copy.host_view.sizeof_type;
-            const size_t height = instr->copy.host_view.n;
+            const size_t dst_pitch = instr->copy.D2.dst_device_view.ld * instr->copy.D2.sizeof_type;
+            const size_t src_pitch = instr->copy.D2.src_device_view.ld * instr->copy.D2.sizeof_type;
+
+            const size_t width  = instr->copy.D2.m * instr->copy.D2.sizeof_type;
+            const size_t height = instr->copy.D2.n;
 
             const uint32_t dst_slice_pitch = 0;
             const ze_copy_region_t dst_region = {
@@ -388,9 +390,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_KERN):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+        case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             ze_result_t res;
 

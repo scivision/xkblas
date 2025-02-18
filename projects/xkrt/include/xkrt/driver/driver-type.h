@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 14:59:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,6 +13,8 @@
 
 #ifndef __DRIVER_TYPE_H__
 # define __DRIVER_TYPE_H__
+
+# include <stdint.h>
 
 typedef enum    xkrt_driver_type_t : uint8_t
 {
@@ -22,5 +24,8 @@ typedef enum    xkrt_driver_type_t : uint8_t
     XKRT_DRIVER_TYPE_CL     = 3,  // opencl driver
     XKRT_DRIVER_TYPE_MAX    = 4
 }               xkrt_driver_type_t;
+
+extern "C"
+int xkrt_support_driver(xkrt_driver_type_t driver_type);
 
 #endif /* __DRIVER_TYPE_H__ */

@@ -1,0 +1,6 @@
+#ifndef __XKBM_VERSION_H__
+# define __XKBM_VERSION_H__
+
+# define XKBM_VERSION_GITHASH "£GIT_HASH"
+
+#endif /* __XKBM_VERSION_H__ */

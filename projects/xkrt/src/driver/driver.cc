@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:01:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 14:54:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -208,4 +208,28 @@ void
 xkrt_drivers_deinit(xkrt_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
+}
+
+
+extern "C"
+int
+xkrt_support_driver(xkrt_driver_type_t driver_type)
+{
+    switch (driver_type)
+    {
+        case (XKRT_DRIVER_TYPE_HOST):
+            return XKRT_SUPPORT_HOST;
+
+        case (XKRT_DRIVER_TYPE_CUDA):
+            return XKRT_SUPPORT_CUDA;
+
+        case (XKRT_DRIVER_TYPE_ZE):
+            return XKRT_SUPPORT_ZE;
+
+        case (XKRT_DRIVER_TYPE_CL):
+            return XKRT_SUPPORT_CL;
+
+        default:
+            return 0;
+    }
 }

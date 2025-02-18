@@ -21,6 +21,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/driver/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
+    ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc

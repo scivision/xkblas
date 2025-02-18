@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 22:27:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:14:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -823,7 +823,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             LOGGER_DEBUG("Task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
             if (task->fetched() == TASK_STATE_DATA_FETCHED)
             {
-                runtime->task_execute(task, fetch->dst_device_global_id);
+                runtime->task_submit(task, fetch->dst_device_global_id);
                 # pragma message(TODO "Here, we are not polling the offloader kernel streams... Do we want to ?")
             }
         }
@@ -1583,11 +1583,9 @@ next_view:
             callback.args[3] = (void *) i;
 
             /* launch asynchronous copy */
-            this->runtime->submit_copy(
+            this->runtime->copy(
                 device_global_id,
-                fetch->host_view.m,
-                fetch->host_view.n,
-                fetch->host_view.sizeof_type,
+                fetch->host_view,
                 fetch->dst_device_global_id,
                 fetch->dst_view,
                 fetch->src_device_global_id,

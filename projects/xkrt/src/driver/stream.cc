@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:58:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:54:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,18 +25,12 @@ xkrt_stream_type_to_str(xkrt_stream_type_t type)
 {
     switch (type)
     {
-        case (XKRT_STREAM_TYPE_H2D):
-            return "H2D";
-        case (XKRT_STREAM_TYPE_D2H):
-            return "D2H";
-        case (XKRT_STREAM_TYPE_D2D):
-            return "D2D";
-        case (XKRT_STREAM_TYPE_KERN):
-            return "KERN";
-        case (XKRT_STREAM_TYPE_ALL):
-            return "ALL";
-        default:
-          return NULL;
+        case (XKRT_STREAM_TYPE_H2D):    return "H2D";
+        case (XKRT_STREAM_TYPE_D2H):    return "D2H";
+        case (XKRT_STREAM_TYPE_D2D):    return "D2D";
+        case (XKRT_STREAM_TYPE_KERN):   return "KERN";
+        case (XKRT_STREAM_TYPE_ALL):    return "ALL";
+        default:                        return NULL;
     }
 }
 
@@ -45,18 +39,16 @@ xkrt_stream_instruction_type_to_str(xkrt_stream_instruction_type_t type)
 {
      switch (type)
      {
-         case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
-             return "COPY_H2H";
-         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-             return "COPY_H2D";
-         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-             return "COPY_D2H";
-         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
-             return "COPY_D2D";
-         case (XKRT_STREAM_INSTR_TYPE_KERN):
-             return "KERN";
-        default:
-             return NULL;
+         case (XKRT_STREAM_INSTR_TYPE_KERN):        return "KERN";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D): return "COPY_H2H_1D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D): return "COPY_H2D_1D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D): return "COPY_D2H_1D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D): return "COPY_D2D_1D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D): return "COPY_H2H_2D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D): return "COPY_H2D_2D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D): return "COPY_D2H_2D";
+         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D): return "COPY_D2D_2D";
+         default:                                   return NULL;
     }
 }
 
@@ -170,12 +162,12 @@ xkrt_stream_t::launch_ready_instructions(void)
     {
         /* retrieve the next instruction to launch at index 'p' */
         xkrt_stream_instruction_counter_t p = this->ready.pos.r % this->ready.capacity;
-        ++this->ready.pos.r;
 
         xkrt_stream_instruction_t * instr = this->ready.instr + p;
         assert(instr);
 
-        LOGGER_DEBUG("Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
+        LOGGER_DEBUG(
+            "Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
             xkrt_stream_instruction_type_to_str(instr->type),
             this,
             xkrt_stream_type_to_str(this->type),
@@ -192,15 +184,19 @@ xkrt_stream_t::launch_ready_instructions(void)
                 break ;
             }
 
-            case (XKRT_STREAM_INSTR_TYPE_COPY_H2H):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_1D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2H_2D):
             {
                 LOGGER_FATAL("Not implemented");
                 break ;
             }
 
-            case (XKRT_STREAM_INSTR_TYPE_COPY_H2D):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_D2H):
-            case (XKRT_STREAM_INSTR_TYPE_COPY_D2D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
+            case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
             default:
             {
                 err = this->f_instruction_launch(this, instr, p);
@@ -211,7 +207,10 @@ xkrt_stream_t::launch_ready_instructions(void)
         switch (err)
         {
             case (0):
+            {
+                LOGGER_FATAL("Instructions completing early not supported");
                 break ;
+            }
 
             case (EINPROGRESS):
             {
@@ -234,7 +233,7 @@ xkrt_stream_t::launch_ready_instructions(void)
 
             case (ENOSYS):
             {
-                LOGGER_IMPL("Instruction `%s` not implemented",
+                LOGGER_FATAL("Instruction `%s` not implemented",
                         xkrt_stream_instruction_type_to_str(instr->type));
                 break ;
             }
@@ -244,7 +243,10 @@ xkrt_stream_t::launch_ready_instructions(void)
                 LOGGER_FATAL("Unknown error after decoding instruction");
             }
         }
-    }
+
+        ++this->ready.pos.r;
+
+    } /* while (!this->ready.is_empty()) */
 
     return err;
 }
@@ -264,6 +266,13 @@ xkrt_stream_t::complete_instructions(const xkrt_stream_instruction_counter_t ok_
             instr->callback.func(instr->callback.args);
 
         XKRT_STATS_INCR(this->stats.instructions[instr->type].completed, 1);
+
+        LOGGER_DEBUG(
+            "Completed instruction `%s` on stream %p of type `%s`",
+            xkrt_stream_instruction_type_to_str(instr->type),
+            this,
+            xkrt_stream_type_to_str(this->type)
+        );
     }
     this->pending.pos.r = ok_p;
 }

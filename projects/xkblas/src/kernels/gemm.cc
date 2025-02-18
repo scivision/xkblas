@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:07:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 21:05:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,8 +16,6 @@
 # if XKRT_SUPPORT_ZE
 #  include <xkrt/driver/driver-ze.h>
 #  include <xkrt/logger/logger-ze.h>
-#  include <sycl/sycl.hpp>
-#  include <oneapi/mkl.hpp>
 # endif /* XKRT_SUPPORT_ZE */
 
 # include "auto-tile.h"
@@ -378,6 +376,7 @@ body_ze(void * ihandle, void * vargs)
 {
     LOGGER_FATAL("In kernel impl");
 
+    # if 0
     // unpack arguments
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) ihandle;
     assert(stream);
@@ -425,7 +424,7 @@ body_ze(void * ihandle, void * vargs)
         C->device_view.addr, C->device_view.ld
     );
     # endif
-
+    # endif
     // TODO ; need an event
 }
 

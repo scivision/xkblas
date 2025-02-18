@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:00:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 22:37:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -37,7 +37,7 @@ class xkrt_stream_instruction_queue_t
         int
         is_full(void) const
         {
-            return (this->pos.w - this->pos.r >= this->capacity);
+            return (this->pos.w - this->pos.r == this->capacity);
         }
 
         int
