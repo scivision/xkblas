@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:01:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:57:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,14 +34,35 @@ __parse_merge_transfers(xkrt_conf_t * conf, char const * value)
 }
 
 static void
-__parse_nkernels(xkrt_conf_t * conf, char const * value)
+__parse_nkernels_per_stream(xkrt_conf_t * conf, char const * value)
 {
     if (value)
         conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = (uint8_t) MAX(atoi(value), 1);
 }
 
 static void
-__parse_nstreams(xkrt_conf_t * conf, char const * value)
+__parse_nstreams_h2d(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].n = (uint8_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_nstreams_d2h(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].n = (uint8_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_nstreams_d2d(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].n = (uint8_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_nstreams_kern(xkrt_conf_t * conf, char const * value)
 {
     if (value)
         conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].n = (uint8_t) MAX(atoi(value), 1);
@@ -70,6 +91,12 @@ __parse_offloader_capacity(xkrt_conf_t * conf, char const * value)
     }
 }
 
+static void
+__parse_stats(xkrt_conf_t * conf, char const * value)
+{
+    conf->report_stats_on_deinit = value ? atoi(value) : 0;
+}
+
 void __parse_help(xkrt_conf_t * conf, char const * value);
 
 extern char ** environ;
@@ -89,11 +116,15 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_PRECISION",            NULL,                       NULL},
     {"XKRT_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
     {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,    "%% of total memory to allocate initially per GPU (in ]0..100["},
-    {"XKRT_NSTREAMS",             __parse_nstreams,           "Number of concurrent kernel streams per GPU"},
-    {"XKRT_NKERNELS",             __parse_nkernels,           "Number of concurrent kernels per stream"},
+    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,       "Number of concurrent H2D streams per GPU"},
+    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,       "Number of concurrent D2H streams per GPU"},
+    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,       "Number of concurrent D2D streams per GPU"},
+    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,      "Number of concurrent kernel streams per GPU"},
+    {"XKRT_NKERNELS_PER_STREAM",  __parse_nkernels_per_stream,"Number of concurrent kernels per stream"},
     {"XKRT_CACHE_LIMIT",          NULL,                       NULL},
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity, "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                       NULL},
+    {"XKRT_STATS",                __parse_stats,              "Boolean to dump stats on deinit"},
     {NULL,                       NULL,                       NULL}
 };
 
@@ -112,6 +143,7 @@ void
 xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
+    conf->report_stats_on_deinit    = 0;
     conf->device.ngpus              = (uint8_t)-1;
     conf->device.gpu_mem_percent    = (float) 50.0;
 

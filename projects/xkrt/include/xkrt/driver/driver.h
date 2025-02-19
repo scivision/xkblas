@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 23:19:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -83,7 +83,7 @@ typedef struct  xkrt_driver_t
     //  MEMORY MANAGEMENT         //
     ////////////////////////////////
     void * (*f_memory_alloc)(int device_driver_id, const size_t size);
-    void (*f_memory_info)(int device_driver_id, size_t * total);
+    void (*f_memory_info)(int device_driver_id, xkrt_device_memory_info_t * info);
     int (*f_memory_register)(void * ptr, uint64_t size);
     int (*f_memory_unregister)(void * ptr, uint64_t size);
 

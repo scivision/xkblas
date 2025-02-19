@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:39:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:31:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -87,6 +87,9 @@ class alignas(CACHE_LINE_SIZE) ThreadWorker : public Thread
 
         /* number of uncompleted tasks */
         int32_t wc;
+
+        /* the cpuset of that worker */
+        cpu_set_t cpuset;
 
     private:
 

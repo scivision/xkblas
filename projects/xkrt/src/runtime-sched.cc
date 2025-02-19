@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:24:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:44:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -168,6 +168,9 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     device->thread = ThreadWorker::self();
     assert(device->thread);
 
+    // register affinity
+    xkrt_runtime_t::thread_getaffinity(device->thread->cpuset);
+
     // register device to the driver list
     runtime->drivers.devices.list[device->global_id] = device;
 
@@ -187,9 +190,9 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     /* get total memory and allocate chunk0 */
     assert(driver->f_memory_info);
-    size_t total;
-    driver->f_memory_info(device->driver_id, &total);
-    const size_t size = (size_t) ((double)total * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
+    xkrt_device_memory_info_t info;
+    driver->f_memory_info(device->driver_id, &info);
+    const size_t size = (size_t) ((double)info.capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
 
     assert(driver->f_memory_alloc);
     const void * device_ptr = driver->f_memory_alloc(device->driver_id, size);
@@ -379,7 +382,17 @@ xkrt_runtime_t::memory_deallocate(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     return device->memory_deallocate(chunk);
+}
 
+void
+xkrt_runtime_t::memory_info(
+    const xkrt_device_global_id_t device_global_id,
+    xkrt_device_memory_info_t * info
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    assert(driver->f_memory_info);
+    driver->f_memory_info(device->driver_id, info);
 }
 
 void
@@ -468,9 +481,22 @@ xkrt_runtime_t::task_complete(Task * task)
 void
 xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 {
-    xkrt_device_t * device = this->device_get(device_global_id);
+    const xkrt_device_t * device = this->device_get(device_global_id);
     LOGGER_DEBUG("Waiting for device `%u`", device_global_id);
     while (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
         usleep(1);
     LOGGER_DEBUG("Waited for device `%u`", device_global_id);
+}
+
+void
+xkrt_runtime_t::thread_setaffinity(cpu_set_t & cpuset)
+{
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+    for (int ii = 0; ii < 10; ++ii) sched_yield();
+}
+
+void
+xkrt_runtime_t::thread_getaffinity(cpu_set_t & cpuset)
+{
+    pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 }

@@ -5,13 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 14:54:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:44:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/xkrt-support.h>
+# include <xkrt/runtime.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/min-max.h>
@@ -34,16 +35,15 @@ static void *
 trampoline(void * vargs)
 {
     xkrt_driver_device_thread_arg_t * args = (xkrt_driver_device_thread_arg_t *) vargs;
-    args->routine(args->vargs, args->driver_type, args->device_driver_type);
-    free(args);
-    return NULL;
-}
+    assert(args);
 
-static inline void
-bindto(cpu_set_t * cpuset)
-{
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset);
-    for (int ii=0; ii<10; ++ii) sched_yield();
+    // launch thread
+    args->routine(args->vargs, args->driver_type, args->device_driver_type);
+
+    // release memory
+    free(args);
+
+    return NULL;
 }
 
 static void
@@ -76,7 +76,7 @@ xkrt_driver_init(
 
     # pragma message(TODO "Move that to the 'Thread' interfaces")
     cpu_set_t save_schedset;
-    pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
+    xkrt_runtime_t::thread_getaffinity(save_schedset);
 
     hwloc_topology_t topology;
     hwloc_topology_init(&topology);
@@ -107,7 +107,8 @@ xkrt_driver_init(
             }
         }
 
-        bindto(&schedset);
+        // bind the current thread before allocating
+        xkrt_runtime_t::thread_setaffinity(schedset);
 
         // start the device thread
         xkrt_driver_device_thread_arg_t * arg = (xkrt_driver_device_thread_arg_t *) malloc(sizeof(xkrt_driver_device_thread_arg_t));
@@ -128,7 +129,7 @@ xkrt_driver_init(
     }
 
     // move back the current thread to its initial cpu set
-    bindto(&save_schedset);
+    xkrt_runtime_t::thread_setaffinity(save_schedset);
 
     hwloc_topology_destroy(topology);
 }
@@ -217,19 +218,10 @@ xkrt_support_driver(xkrt_driver_type_t driver_type)
 {
     switch (driver_type)
     {
-        case (XKRT_DRIVER_TYPE_HOST):
-            return XKRT_SUPPORT_HOST;
-
-        case (XKRT_DRIVER_TYPE_CUDA):
-            return XKRT_SUPPORT_CUDA;
-
-        case (XKRT_DRIVER_TYPE_ZE):
-            return XKRT_SUPPORT_ZE;
-
-        case (XKRT_DRIVER_TYPE_CL):
-            return XKRT_SUPPORT_CL;
-
-        default:
-            return 0;
+        case (XKRT_DRIVER_TYPE_HOST):   return XKRT_SUPPORT_HOST;
+        case (XKRT_DRIVER_TYPE_CUDA):   return XKRT_SUPPORT_CUDA;
+        case (XKRT_DRIVER_TYPE_ZE):     return XKRT_SUPPORT_ZE;
+        case (XKRT_DRIVER_TYPE_CL):     return XKRT_SUPPORT_CL;
+        default:                        return 0;
     }
 }

@@ -41,9 +41,9 @@ struct  time_array_t
     }
 
     template <void (*REPORT_ELEMENT)(size_t, size_t, size_t, size_t) = report_element_default>
-    inline void report(void)
+    inline void report(const int nelements = N_ELEMENTS)
     {
-        for (size_t i = 0 ; i < N_ELEMENTS ; ++i)
+        for (size_t i = 0 ; i < nelements ; ++i)
         {
             qsort(this->values[i], N_ITERS, sizeof(size_t), size_t_cmp);
             size_t min = this->values[i][0];

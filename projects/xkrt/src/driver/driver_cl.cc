@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 20:57:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 23:19:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -589,13 +589,13 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, size_t * total)
+XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, xkrt_device_memory_info_t * info)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
     cl_ulong max_mem_alloc_size;
     CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_mem_alloc_size, NULL));
-    *total = (size_t) max_mem_alloc_size;
+    info->capacity = (size_t) max_mem_alloc_size;
 }
 
 static int

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:44:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/18 23:27:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -40,6 +40,14 @@ typedef enum    xkrt_device_state_t : uint8_t
     XKRT_DEVICE_STATE_DESTROYED   = 10
 
 }               xkrt_device_state_t;
+
+/* Memory info of a device */
+typedef struct  xkrt_device_memory_info_t
+{
+    /* total device capacity */
+    size_t capacity;
+
+}               xkrt_device_memory_info_t;
 
 /* A device virtualize a ressource with its one address space and
    a communication stream between host and the ressource */
@@ -82,7 +90,6 @@ typedef struct  xkrt_device_t
         } memory;
     } stats;
     # endif /* XKRT_SUPPORT_STATS */
-
 
     //////////////////////
     // MEMORY MANAGMENT //
@@ -264,7 +271,6 @@ typedef struct  xkrt_device_t
         }
 
         this->offloader_stream_instruction_commit(stream, instr);
-        LOGGER_INFO("Stream empty ? %p %d", stream, stream->is_empty());
 
         # undef IS_1D
         # undef IS_2D

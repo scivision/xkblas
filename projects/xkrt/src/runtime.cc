@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:09:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:54:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,7 +62,8 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     assert(runtime);
     assert(runtime->state == XKRT_RUNTIME_INITIALIZED);
 
-    xkrt_runtime_stats_report(runtime);
+    if (runtime->conf.report_stats_on_deinit)
+        xkrt_runtime_stats_report(runtime);
     xkrt_drivers_deinit(&runtime->drivers);
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
 

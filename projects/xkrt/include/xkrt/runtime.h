@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:13:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:24:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -100,15 +100,15 @@ typedef struct  xkrt_runtime_t
     /* deallocate the given chunk */
     void memory_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
 
+    /* retrieve device memory information */
+    void memory_info(const xkrt_device_global_id_t device_global_id, xkrt_device_memory_info_t * info);
+
     /////////////////////
     // SYNCHRONIZATION //
     /////////////////////
 
     /* wait until all instructions of the devices completed */
     void wait_device(xkrt_device_global_id_t device_global_id);
-
-    /* wait for all pending instructions and tasks to complete */
-    void wait(void);
 
     /////////////
     // TASKING //
@@ -122,6 +122,16 @@ typedef struct  xkrt_runtime_t
 
     /* Complete a task */
     void task_complete(Task * task);
+
+    ///////////////
+    // THREADING //
+    ///////////////
+
+    /* Retrieve the cpuset of the calling thread */
+    static void thread_getaffinity(cpu_set_t & cpuset);
+
+    /* Bind the calling thread to the given cpu set */
+    static void thread_setaffinity(cpu_set_t & cpuset);
 
     ///////////////
     // UTILITIES //

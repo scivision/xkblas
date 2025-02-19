@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 21:47:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 00:58:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -170,7 +170,7 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
         sizeof(buffer),
         "Level Zero device %d - %s with %d slices of %d subslices of %d EUs of "
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
-        "timer resolution of %luns",
+        "timer resolution of %luns - uuid[0] = %x",
         device_driver_id,
         device->ze_device_properties.name,
         device->ze_device_properties.numSlices,
@@ -179,7 +179,8 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
         device->ze_device_properties.numThreadsPerEU,
         device->ze_device_properties.maxMemAllocSize / 1e9,
         device->ze_device_properties.coreClockRate / 1e3,
-        device->ze_device_properties.timerResolution
+        device->ze_device_properties.timerResolution,
+        device->ze_device_properties.uuid.id[ZE_MAX_DEVICE_UUID_SIZE - 1]
     );
     return buffer;
 }
@@ -605,14 +606,14 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
-    # if 0
+    # if 1
     const ze_device_mem_alloc_desc_t device_desc = {
         .stype = ZE_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
         .pNext = NULL,
         .flags = 0,
-        .ordinal = 0
+        .ordinal = 0    // device memory ordinal (should be here where we see HBM/DRAM)
     };
-    const size_t alignment = 8;
+    const size_t alignment = 4 * sizeof(double);
     void * device_ptr = NULL;
     ZE_SAFE_CALL(zeMemAllocDevice(device->ze_context, &device_desc, size, alignment, device->ze_device, &device_ptr));
     ZE_SAFE_CALL(zeContextMakeMemoryResident(device->ze_context, device->ze_device, device_ptr, size));
@@ -686,10 +687,10 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, size_t * total)
+XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, xkrt_device_memory_info_t * info)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    *total = device->ze_device_properties.maxMemAllocSize;
+    info->capacity = device->ze_device_properties.maxMemAllocSize;
 }
 
 //////////////////////////
