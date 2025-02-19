@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:44:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:15:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -139,6 +139,7 @@ void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
     uint8_t ngpus,
+    int drivers_mask,
     void (*routine)(void * args, xkrt_driver_type_t driver_type, uint8_t device_driver_type),
     void * args
 ) {
@@ -177,8 +178,9 @@ xkrt_drivers_init(
     uint8_t total_gpus = 0;
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
+        // TODO : do not load if conf
         void (*loader)(xkrt_driver_t *) = loaders[driver_type];
-        if (loader)
+        if (drivers_mask & (1 << driver_type) && loader)
         {
             loader(drivers->list + driver_type);
             xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);

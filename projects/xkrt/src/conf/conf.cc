@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:57:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:08:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -97,6 +97,12 @@ __parse_stats(xkrt_conf_t * conf, char const * value)
     conf->report_stats_on_deinit = value ? atoi(value) : 0;
 }
 
+static void
+__parse_drivers(xkrt_conf_t * conf, char const * value)
+{
+    conf->drivers_mask = value ? atoi(value) : ~0;
+}
+
 void __parse_help(xkrt_conf_t * conf, char const * value);
 
 extern char ** environ;
@@ -125,6 +131,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity, "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                       NULL},
     {"XKRT_STATS",                __parse_stats,              "Boolean to dump stats on deinit"},
+    {"XKRT_DRIVERS",              __parse_drivers,            "A bitmask to set enabled drivers"},
     {NULL,                       NULL,                       NULL}
 };
 

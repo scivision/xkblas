@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:54:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:16:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,7 +48,7 @@ xkrt_init(xkrt_runtime_t * runtime)
     xkrt_memory_coherent_async_worker_thread_init(runtime);
 
     const uint8_t ngpus = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus);
-    xkrt_drivers_init(&(runtime->drivers), ngpus, xkrt_device_thread_main, runtime);
+    xkrt_drivers_init(&(runtime->drivers), ngpus, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
     return 0;
