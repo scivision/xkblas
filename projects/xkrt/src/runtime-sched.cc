@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:44:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 16:46:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -385,6 +385,14 @@ xkrt_runtime_t::memory_deallocate(
 }
 
 void
+xkrt_runtime_t::memory_deallocate_all(
+    const xkrt_device_global_id_t device_global_id
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    return device->memory_reset();
+}
+
+void
 xkrt_runtime_t::memory_info(
     const xkrt_device_global_id_t device_global_id,
     xkrt_device_memory_info_t * info
@@ -482,10 +490,8 @@ void
 xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 {
     const xkrt_device_t * device = this->device_get(device_global_id);
-    LOGGER_DEBUG("Waiting for device `%u`", device_global_id);
     while (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-        usleep(1);
-    LOGGER_DEBUG("Waited for device `%u`", device_global_id);
+        usleep(5);
 }
 
 void

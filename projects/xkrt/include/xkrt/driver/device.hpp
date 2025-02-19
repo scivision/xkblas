@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 23:27:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 16:10:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -142,7 +142,42 @@ typedef struct  xkrt_device_t
 
     /* progress pending instructions in streams of the given type. If blocking is true, also waits for the completion of pending instructions */
     template <bool blocking>
-    int offloader_stream_instructions_progress(const xkrt_stream_type_t stype);
+    int
+    offloader_stream_instructions_progress(
+        const xkrt_stream_type_t stype
+    ) {
+        int err = 0;
+        unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
+        unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
+        for (unsigned int s = bgn ; s < end ; ++s)
+        {
+            for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+            {
+                xkrt_stream_t * stream = this->streams[s][i];
+                assert(stream);
+
+                if (stream->pending.is_empty())
+                    continue ;
+
+                xkrt_stream_instruction_counter_t n;
+                do {
+                    stream->lock();
+                    if (blocking)
+                    {
+                        stream->wait_pending_instructions();
+                        err = 0;
+                    }
+                    else
+                        err = stream->progress_pending_instructions();
+                    stream->unlock();
+                    n = stream->pending.size();
+                } while (n > this->conf->offloader.streams[s].concurrency);
+                assert(err == 0 || err == EINPROGRESS);
+            }
+        }
+
+        return 0;
+    }
 
     /* create a new instruction and lock the stream */
     void offloader_stream_instruction_new(

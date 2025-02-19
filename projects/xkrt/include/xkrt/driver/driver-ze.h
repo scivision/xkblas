@@ -1,11 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver_ze.h                                                              */
+/*   driver-ze.h                                                              */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 14:39:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,5 +32,25 @@ typedef struct  xkrt_stream_ze_t
     } ze;
 
 }               xkrt_stream_ze_t;
+
+typedef struct  xkrt_device_ze_t
+{
+    xkrt_device_t inherited;
+
+    ze_driver_handle_t      ze_driver;
+    ze_context_handle_t     ze_context;
+    ze_device_handle_t      ze_device;
+    ze_device_properties_t  ze_device_properties;
+
+    // number of command queue group
+    uint32_t ncommandqueuegroups;
+
+    // per command queue group property
+    ze_command_queue_group_properties_t * ze_command_queue_group_properties;
+
+    // per command queue number of queue used
+    std::atomic<uint32_t>               * ze_command_queue_group_used;
+
+}               xkrt_device_ze_t;
 
 #endif /* __DRIVER_ZE_H__ */

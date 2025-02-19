@@ -102,7 +102,7 @@ cuda_benchmarks_register_memory(void)
                     unregister_time.set(i, iter, tf - t0);
                 }
 
-                xkbm_free(hostmem);
+                xkbm_free(hostmem, size);
             }
         }
 

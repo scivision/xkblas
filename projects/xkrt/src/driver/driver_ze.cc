@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:58:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 17:24:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,26 +42,6 @@
 
 static ze_driver_handle_t   ze_drivers[XKRT_DEVICES_MAX];
 static ze_context_handle_t  ze_contextes[XKRT_DEVICES_MAX];
-
-typedef struct  xkrt_device_ze_t
-{
-    xkrt_device_t inherited;
-
-    ze_driver_handle_t      ze_driver;
-    ze_context_handle_t     ze_context;
-    ze_device_handle_t      ze_device;
-    ze_device_properties_t  ze_device_properties;
-
-    // number of command queue group
-    uint32_t ncommandqueuegroups;
-
-    // per command queue group property
-    ze_command_queue_group_properties_t * ze_command_queue_group_properties;
-
-    // per command queue number of queue used
-    std::atomic<uint32_t>               * ze_command_queue_group_used;
-
-}               xkrt_device_ze_t;
 
 static xkrt_device_ze_t DEVICES[XKRT_DEVICES_MAX];
 static uint32_t ze_n_devices = 0;
@@ -170,7 +150,7 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
         sizeof(buffer),
         "Level Zero device %d - %s with %d slices of %d subslices of %d EUs of "
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
-        "timer resolution of %luns - uuid[0] = %x",
+        "timer resolution of %luns - deviceId(pci)=%d - uuid[%d]=%x",
         device_driver_id,
         device->ze_device_properties.name,
         device->ze_device_properties.numSlices,
@@ -180,6 +160,8 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
         device->ze_device_properties.maxMemAllocSize / 1e9,
         device->ze_device_properties.coreClockRate / 1e3,
         device->ze_device_properties.timerResolution,
+        device->ze_device_properties.deviceId,
+        ZE_MAX_DEVICE_UUID_SIZE - 1,
         device->ze_device_properties.uuid.id[ZE_MAX_DEVICE_UUID_SIZE - 1]
     );
     return buffer;
@@ -279,8 +261,13 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
     ze_event_handle_t ze_event_handle = stream->ze.events.list[idx];
 
+    // TODO : try zeCommandListAppendEventReset and see if it reduces latency
+    ZE_SAFE_CALL(zeEventHostReset(ze_event_handle));
+
     const uint32_t num_wait_events = 0;
     ze_event_handle_t * wait_events = NULL;
+
+    int err = EINPROGRESS;
 
     switch (instr->type)
     {
@@ -302,7 +289,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     wait_events
                 )
             );
-            return EINPROGRESS;
+            break ;
         }
 
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
@@ -354,16 +341,17 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     wait_events
                 )
             );
-
-            return EINPROGRESS;
+            break ;
         }
 
         default:
             return EINVAL;
     }
 
-    /* unreachable code */
-    LOGGER_FATAL("Unreachable code");
+    // TODO : how to use this ?
+    // ZE_SAFE_CALL(zeCommandListAppendEventReset(stream->ze.command.list, ze_event_handle));
+
+    return err;
 }
 
 static int
@@ -616,8 +604,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
     const size_t alignment = 4 * sizeof(double);
     void * device_ptr = NULL;
     ZE_SAFE_CALL(zeMemAllocDevice(device->ze_context, &device_desc, size, alignment, device->ze_device, &device_ptr));
-    ZE_SAFE_CALL(zeContextMakeMemoryResident(device->ze_context, device->ze_device, device_ptr, size));
     # else
+
+    // TODO : cannot select memory ordinal with virtual/physical memory API
 
     // Query page size for our allocation
     size_t pagesize;

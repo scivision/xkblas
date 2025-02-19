@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 21:06:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 15:02:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -94,7 +94,7 @@ xkrt_runtime_stats_device_report(xkrt_runtime_t * runtime, device_stats_t * stat
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
         human_readable_size(buffer, sizeof(buffer), stats->streams[stype].transfered.load());
-        LOGGER_WARN("    `%4s` - with %u streams - transfered %s", xkrt_stream_type_to_str((xkrt_stream_type_t) stype), stats->streams[stype].n.load(), buffer);
+        LOGGER_WARN("    `%4s` - with %2u streams - transfered %s", xkrt_stream_type_to_str((xkrt_stream_type_t) stype), stats->streams[stype].n.load(), buffer);
     }
 
     LOGGER_WARN("  Instructions");

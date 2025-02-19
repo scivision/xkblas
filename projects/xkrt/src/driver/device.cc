@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:40:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 16:08:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -320,47 +320,6 @@ xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t sty
     return err;
 }
 
-template <bool blocking>
-int
-xkrt_device_t::offloader_stream_instructions_progress(
-    const xkrt_stream_type_t stype
-) {
-    # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
-
-    int err = 0;
-
-    unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
-    unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
-    for (unsigned int s = bgn ; s < end ; ++s)
-    {
-        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
-        {
-            xkrt_stream_t * stream = this->streams[s][i];
-            assert(stream);
-
-            if (stream->pending.is_empty())
-                continue ;
-
-            xkrt_stream_instruction_counter_t n;
-            do {
-                stream->lock();
-                if (blocking)
-                {
-                    stream->wait_pending_instructions();
-                    err= 0;
-                }
-                else
-                    err = stream->progress_pending_instructions();
-                stream->unlock();
-                n = stream->pending.size();
-            } while (n > this->conf->offloader.streams[s].concurrency);
-            assert(err == 0 || err == EINPROGRESS);
-        }
-    }
-
-    return 0;
-}
-
 xkrt_stream_t *
 xkrt_device_t::offloader_stream_next(xkrt_stream_type_t stype)
 {
@@ -402,7 +361,7 @@ xkrt_device_t::offloader_poll(void)
 ////////////////////////////
 
 /* commit a stream instruction and wakeup thread */
-inline void
+void
 xkrt_device_t::offloader_stream_instruction_commit(
     xkrt_stream_t * stream,
     xkrt_stream_instruction_t * instr
