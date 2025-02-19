@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 16:45:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:51:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,6 +19,7 @@
 
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver.h>
+# include <xkrt/thread/thread.h>
 # include <xkrt/memory/coherency-controller.hpp>
 # include <xkrt/router-random.hpp>
 # include <xkrt/sync/spinlock.h>
@@ -106,6 +107,12 @@ typedef struct  xkrt_runtime_t
     /* retrieve device memory information */
     void memory_info(const xkrt_device_global_id_t device_global_id, xkrt_device_memory_info_t * info);
 
+    /* allocate memory onto the host using the given driver */
+    void * memory_allocate_host(const xkrt_device_global_id_t device_global_id, const size_t size);
+
+    /* deallocate memory onto the host using the given driver */
+    void memory_deallocate_host(const xkrt_device_global_id_t device_global_id, void * mem, const size_t size);
+
     /////////////////////
     // SYNCHRONIZATION //
     /////////////////////
@@ -135,6 +142,21 @@ typedef struct  xkrt_runtime_t
 
     /* Bind the calling thread to the given cpu set */
     static void thread_setaffinity(cpu_set_t & cpuset);
+
+    /* create a new thread team */
+    void team_create(xkrt_team_t * team);
+
+    /* wait until all threads called the barrier */
+    void team_barrier(xkrt_team_t * team);
+
+    /* wait until all threads finished and destroy the team */
+    void team_join(xkrt_team_t * team);
+
+    /* start a critical section */
+    void team_critical_begin(xkrt_team_t * team);
+
+    /* end a critical section */
+    void team_critical_end(xkrt_team_t * team);
 
     ///////////////
     // UTILITIES //

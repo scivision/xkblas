@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 23:20:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:36:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -204,7 +204,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
     if (err)
         return 1;
 
-    assert(ngpus < XKRT_DEVICES_MAX);
+    assert(ngpus <= XKRT_DEVICES_MAX);
     for (int i = 0 ; i < ngpus ; ++i)
     {
         xkrt_device_cuda_t * device = __get_device_cuda(i);
@@ -428,8 +428,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_register)(
     void * ptr,
     uint64_t size
 ) {
-    int err = cudaHostRegister(ptr, size, cudaHostRegisterPortable);
-    return err;
+    CU_SAFE_CALL(cudaHostRegister(ptr, size, cudaHostRegisterPortable));
+    return 0;
 }
 
 static int
@@ -438,8 +438,30 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
     uint64_t size
 ) {
     (void) size;
-    int err = cudaHostUnregister(ptr);
-    return err;
+    CU_SAFE_CALL(cudaHostUnregister(ptr));
+    return 0;
+}
+
+static void *
+XKRT_DRIVER_ENTRYPOINT(memory_alloc_host)(
+    int device_driver_id,
+    uint64_t size
+) {
+    (void) device_driver_id;
+    void * ptr;
+    CU_SAFE_CALL(cudaMallocHost(&ptr, size));
+    return ptr;
+}
+
+static void
+XKRT_DRIVER_ENTRYPOINT(memory_dealloc_host)(
+    int device_driver_id,
+    void * mem,
+    uint64_t size
+) {
+    (void) device_driver_id;
+    (void) size;
+    CU_SAFE_CALL(cudaFreeHost(mem));
 }
 
 static int
@@ -711,6 +733,8 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     EP(memory_info);
     EP(memory_register);
     EP(memory_unregister);
+    EP(memory_alloc_host);
+    EP(memory_dealloc_host);
 
     EP(stream_create);
     EP(stream_delete);

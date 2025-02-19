@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 00:57:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:09:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -57,6 +57,7 @@ typedef struct  xkrt_conf_s
     xkrt_conf_device_t device;      /* device conf */
     bool merge_transfers;           /* attempt to merge continuous memory to a single transfer */
     bool report_stats_on_deinit;    /* report stats on deinit */
+    int drivers_mask;               /* bitmask to enable/disable drivers */
 }               xkrt_conf_t;
 
 void xkrt_init_conf(xkrt_conf_t * conf);

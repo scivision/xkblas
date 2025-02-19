@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 23:19:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:37:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -84,8 +84,10 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
     void * (*f_memory_alloc)(int device_driver_id, const size_t size);
     void (*f_memory_info)(int device_driver_id, xkrt_device_memory_info_t * info);
-    int (*f_memory_register)(void * ptr, uint64_t size);
-    int (*f_memory_unregister)(void * ptr, uint64_t size);
+    int (*f_memory_register)(void * mem, uint64_t size);
+    int (*f_memory_unregister)(void * mem, uint64_t size);
+    void * (*f_memory_alloc_host)(int device_driver_id, const size_t size);
+    void (*f_memory_dealloc_host)(int device_driver_id, void * mem, const size_t size);
 
     ////////////////////////////////
     //  DRIVER STREAM MANAGEMENT  //
@@ -99,39 +101,6 @@ typedef struct  xkrt_driver_t
 
 		/* get best source for data movement, return global_id */
     xkrt_device_global_id_t (*f_get_source)(xkrt_device_global_id_t dst_global_id, xkrt_device_global_id_bitfield_t valid);
-
-    ///////////////////////
-    //  UNUSED YET       //
-    ///////////////////////
-
-
-    # if 0
-    /* test completion of asynchronous host_register operation.
-       Argument is the handle returned by host_register (if != -1).
-       If flag == 0, then the operation is a non blocking test that allows
-       to test progression of pinning.
-       If flag == 1, then the operation blocks the caller until the request
-       has been completed.
-       If flag == 2, then the operation blocks the caller until all previous
-       requests have been completed.
-       Return values are:
-       - 0 non error or the test operation complets
-       - EINVAL: invalid handle
-       - EINPROGESS: request not yet completed
-       */
-    int  (*f_host_register_testwait)(uint64_t handle, int flag);
-
-    /* Memory unregistration of host memory: asynchronous version */
-    uint64_t  (*f_host_unregister)(
-        void * ptr, uint64_t sz,
-        xkrt_stream_instruction_callback_t callback,
-        void * arg0, void * arg1, void * arg2
-    );
-
-    /* GPU blas support */
-    void* (*f_get_gpublas_handle)(xkrt_device_t*);
-
-    # endif
 
 }               xkrt_driver_t;
 
@@ -164,6 +133,7 @@ void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
     uint8_t ngpus,
+    int drivers_mask,
     void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * vargs
 );

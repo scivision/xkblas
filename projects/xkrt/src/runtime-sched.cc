@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 16:46:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 21:10:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -403,6 +403,39 @@ xkrt_runtime_t::memory_info(
     driver->f_memory_info(device->driver_id, info);
 }
 
+void *
+xkrt_runtime_t::memory_allocate_host(
+    const xkrt_device_global_id_t device_global_id,
+    const size_t size
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_memory_alloc_host)
+        return driver->f_memory_alloc_host(device->driver_id, size);
+    else
+    {
+        LOGGER_WARN("Driver `%s` does not implement memory_alloc_host", driver->f_get_name());
+        return malloc(size);
+    }
+}
+
+void
+xkrt_runtime_t::memory_deallocate_host(
+    const xkrt_device_global_id_t device_global_id,
+    void * mem,
+    const size_t size
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_memory_dealloc_host)
+        driver->f_memory_dealloc_host(device->driver_id, mem, size);
+    else
+    {
+        LOGGER_WARN("Driver `%s` does not implement memory_dealloc_host", driver->f_get_name());
+        free(mem);
+    }
+}
+
 void
 xkrt_runtime_t::copy(
     const xkrt_device_global_id_t   device_global_id,
@@ -446,6 +479,18 @@ xkrt_runtime_t::copy(
 }
 
 void
+xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
+{
+    const xkrt_device_t * device = this->device_get(device_global_id);
+    while (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
+        usleep(5);
+}
+
+//////////
+// TASK //
+//////////
+
+void
 xkrt_runtime_t::task_submit(
     Task * task,
     const xkrt_device_global_id_t device_global_id
@@ -453,8 +498,6 @@ xkrt_runtime_t::task_submit(
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_device_task_execute(this, device, task);
 }
-
-/////////////////////////////////////////////
 
 static inline void
 enqueue(void * vargs, Task * task)
@@ -486,23 +529,3 @@ xkrt_runtime_t::task_complete(Task * task)
     thread->complete<enqueue>(this, task);
 }
 
-void
-xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
-{
-    const xkrt_device_t * device = this->device_get(device_global_id);
-    while (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-        usleep(5);
-}
-
-void
-xkrt_runtime_t::thread_setaffinity(cpu_set_t & cpuset)
-{
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-    for (int ii = 0; ii < 10; ++ii) sched_yield();
-}
-
-void
-xkrt_runtime_t::thread_getaffinity(cpu_set_t & cpuset)
-{
-    pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-}

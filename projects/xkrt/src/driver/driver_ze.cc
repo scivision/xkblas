@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 17:24:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 20:43:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -682,6 +682,35 @@ XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, xkrt_device_memory_inf
     info->capacity = device->ze_device_properties.maxMemAllocSize;
 }
 
+static void *
+XKRT_DRIVER_ENTRYPOINT(memory_alloc_host)(
+    int device_driver_id,
+    uint64_t size
+) {
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    const ze_host_mem_alloc_desc_t host_desc = {
+        .stype = ZE_STRUCTURE_TYPE_HOST_MEM_ALLOC_DESC,
+        .pNext = NULL,
+        .flags = 0
+        // .flags = ZE_HOST_MEM_ALLOC_FLAG_BIAS_CACHED | ZE_HOST_MEM_ALLOC_FLAG_BIAS_INITIAL_PLACEMENT | ZE_HOST_MEM_ALLOC_FLAG_BIAS_WRITE_COMBINED
+    };
+    void * ptr;
+    ZE_SAFE_CALL(zeMemAllocHost(device->ze_context, &host_desc, size, 64, (void **) &ptr));
+    return ptr;
+}
+
+static void
+XKRT_DRIVER_ENTRYPOINT(memory_dealloc_host)(
+    int device_driver_id,
+    void * mem,
+    uint64_t size
+) {
+    (void) size;
+
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    ZE_SAFE_CALL(zeMemFree(device->ze_context, mem));
+}
+
 //////////////////////////
 // Routine registration //
 //////////////////////////
@@ -707,6 +736,8 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     EP(memory_info);
     // EP(memory_register);
     // EP(memory_unregister);
+    EP(memory_alloc_host);
+    EP(memory_dealloc_host);
 
     EP(stream_create);
     EP(stream_delete);
