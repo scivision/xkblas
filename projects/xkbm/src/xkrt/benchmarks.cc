@@ -13,12 +13,6 @@
 
 static xkrt_runtime_t runtime;
 
-////////////////
-// H2D or D2H //
-////////////////
-
-# include <sys/mman.h>
-
 static void
 pp_int_3bw(size_t i, size_t min, size_t med, size_t max)
 {
@@ -29,23 +23,164 @@ pp_int_3bw(size_t i, size_t min, size_t med, size_t max)
     LOGGER_INFO("%10lu | %10s | %10s | %10s", i, buffer[0], buffer[1], buffer[2]);
 }
 
+static void
+pp_1byte_3time(size_t i, size_t min, size_t med, size_t max)
+{
+    char buffer[4][64];
+    xkrt_metric_byte(buffer[0], sizeof(buffer[0]), ((size_t) 1) << i);
+    xkrt_metric_time(buffer[1], sizeof(buffer[1]), min);
+    xkrt_metric_time(buffer[2], sizeof(buffer[2]), med);
+    xkrt_metric_time(buffer[3], sizeof(buffer[3]), max);
+    LOGGER_INFO("%12s | %12s | %12s | %12s", buffer[0], buffer[1], buffer[2], buffer[3]);
+}
+
+////////////////
+// alloc host //
+////////////////
+
+typedef enum    alloc_mode_t
+{
+    SYSTEM,
+    DRIVER
+}               alloc_mode_t;
+
+template<alloc_mode_t mode, bool touch>
+static void *
+xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+{
+    xkrt_team_t * team = (xkrt_team_t *) vargs;
+
+    time_array_t<34, 5> time_alloc;
+    time_array_t<34, 5> time_dealloc;
+
+    runtime.team_critical_begin(team);
+    for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
+    {
+        for (int i = 0 ; i < time_alloc.nelements ; ++i)
+        {
+            const size_t size = ((size_t) 1) << i;
+            void * ptr = NULL;
+
+            // alloc
+            {
+                uint64_t t0 = xkrt_get_nanotime();
+                {
+                    if constexpr(mode == SYSTEM)
+                        ptr = malloc(size);
+                    else
+                        ptr = runtime.memory_allocate_host(device_global_id, size);
+
+                    if constexpr(touch)
+                        xkbm_mem_touch(ptr, size);
+
+                    if (ptr == NULL)
+                        break ;
+                }
+                uint64_t tf = xkrt_get_nanotime();
+                time_alloc.set(i, iter, tf - t0);
+            }
+
+            assert(ptr);
+
+            // dealloc
+            {
+                uint64_t t0 = xkrt_get_nanotime();
+                {
+                    if constexpr(mode == SYSTEM)
+                        free(ptr);
+                    else
+                        runtime.memory_deallocate_host(device_global_id, ptr, size);
+                }
+                uint64_t tf = xkrt_get_nanotime();
+                time_dealloc.set(i, iter, tf - t0);
+            }
+        }
+    }
+    runtime.team_critical_end(team);
+
+    LOGGER_INFO("---- Device %u (alloc) ----", device_global_id);
+    time_alloc.report<pp_1byte_3time>();
+
+    LOGGER_INFO("---- Device %u (dealloc) ----", device_global_id);
+    time_dealloc.report<pp_1byte_3time>();
+
+    return NULL;
+}
+
+template <alloc_mode_t mode, bool touch>
+static void
+xkrt_benchmarks_alloc_run(void)
+{
+    xkrt_team_t team;
+    team.desc.routine = xkrt_benchmarks_alloc_run_thread<mode, touch>;
+    team.desc.args    = &team;
+    team.desc.devices = XKRT_DEVICES_MASK_ALL;
+
+    runtime.team_create(&team);
+    runtime.team_join(&team);
+}
+
+static benchmark_node_t xkrt_benchmarks_alloc_system = {
+    .name = "alloc-host-system-touch",
+    .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_alloc_run<SYSTEM, true>,
+    .enabled = 1
+};
+
+static benchmark_node_t xkrt_benchmarks_alloc_system_notouch = {
+    .name = "alloc-host-system-no-touch",
+    .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_alloc_run<SYSTEM, false>,
+    .enabled = 1
+};
+
+static benchmark_node_t xkrt_benchmarks_alloc_driver = {
+    .name = "alloc-host-driver-touch",
+    .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_alloc_run<DRIVER, true>,
+    .enabled = 1
+};
+
+static benchmark_node_t xkrt_benchmarks_alloc_driver_notouch = {
+    .name = "alloc-host-driver-no-touch",
+    .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_alloc_run<DRIVER, false>,
+    .enabled = 1
+};
+
+////////////////
+// H2D or D2H //
+////////////////
+
 typedef enum    direction_t
 {
     H2D,
     D2H
 }               direction_t;
 
-typedef struct  bench_args_t
+typedef struct  bench_tranfer_args_t
 {
     xkrt_team_t * team;
     time_array_t<XKRT_DEVICES_MAX, 3> * time;
-}               bench_args_t;
+}               bench_tranfer_args_t;
 
 template <direction_t direction, int nchunks>
 static void *
 xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
 {
-    bench_args_t * args = (bench_args_t *) vargs;
+    bench_tranfer_args_t * args = (bench_tranfer_args_t *) vargs;
     xkrt_team_t * team = args->team;
     time_array_t<XKRT_DEVICES_MAX, 3> * time = args->time;
 
@@ -127,7 +262,7 @@ template <direction_t direction>
 static void
 xkrt_benchmarks_mem_run(void)
 {
-    bench_args_t args;
+    bench_tranfer_args_t args;
     time_array_t<XKRT_DEVICES_MAX, 3> time;
     xkrt_team_t team = {
         .desc = {
@@ -154,7 +289,7 @@ static benchmark_node_t xkrt_benchmarks_h2d = {
     .children = { NULL },
     .nchildren = 0,
     .run = xkrt_benchmarks_mem_run<H2D>,
-    .enabled = 1
+    .enabled = 0
 };
 
 static benchmark_node_t xkrt_benchmarks_d2h = {
@@ -164,7 +299,7 @@ static benchmark_node_t xkrt_benchmarks_d2h = {
     .children = { NULL },
     .nchildren = 0,
     .run = xkrt_benchmarks_mem_run<D2H>,
-    .enabled = 1
+    .enabled = 0
 };
 
 ///////////////////
@@ -185,6 +320,10 @@ void
 xkrt_benchmark_push(benchmark_node_t * parent)
 {
     benchmark_push_children(parent, &xkrt_benchmarks);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
     benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
     benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
 }
