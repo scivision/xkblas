@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 16:08:57 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 16:11:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -235,7 +235,7 @@ xkrt_device_t::offloader_init(
     memset(this->next, 0, sizeof(this->next));
 
     /* count total number of stream */
-    uint16_t cnt = 0;
+    int cnt = 0;
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = this->conf->offloader.streams[stype].n;

@@ -42,7 +42,7 @@ class RouterRandom : public Router
     # endif /* 0 */
 
             /* get any random device */
-            return __random_set_bit(valid) - 1;
+            return (xkrt_device_global_id_t) (__random_set_bit(valid) - 1);
         }
 
 };

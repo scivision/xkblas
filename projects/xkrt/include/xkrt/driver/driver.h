@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 20:37:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 16:21:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -132,7 +132,7 @@ typedef struct  xkrt_drivers_t
 void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
-    uint8_t ngpus,
+    int ngpus,
     int drivers_mask,
     void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * vargs

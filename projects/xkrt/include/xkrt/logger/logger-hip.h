@@ -1,32 +1,27 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver-type.h                                                            */
+/*   logger-hip.h                                                             */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:33:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 15:56:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __DRIVER_TYPE_H__
-# define __DRIVER_TYPE_H__
+#ifndef __LOGGER_HIP_H__
+# define __LOGGER_HIP_H__
 
-# include <stdint.h>
+# include <xkrt/logger/logger.h>
+# include <hip/hip_runtime.h>
 
-typedef enum    xkrt_driver_type_t : uint8_t
-{
-    XKRT_DRIVER_TYPE_HOST   = 0,  // cpu driver
-    XKRT_DRIVER_TYPE_CUDA   = 1,  // cuda devices driver
-    XKRT_DRIVER_TYPE_ZE     = 2,  // level zero devices driver
-    XKRT_DRIVER_TYPE_CL     = 3,  // opencl driver
-    XKRT_DRIVER_TYPE_HIP    = 4,  // hip driver
-    XKRT_DRIVER_TYPE_MAX    = 5
-}               xkrt_driver_type_t;
+# define HIP_SAFE_CALL(X)                                                           \
+    do {                                                                            \
+        hipError_t r = X;                                                           \
+        if (r != hipSuccess)                                                        \
+            LOGGER_FATAL("`%s` failed with `%s` (%d)", #X, hipGetErrorName(r), r);  \
+    } while (0)
 
-extern "C"
-int xkrt_support_driver(xkrt_driver_type_t driver_type);
-
-#endif /* __DRIVER_TYPE_H__ */
+#endif /* __LOGGER_HIP_H__ */

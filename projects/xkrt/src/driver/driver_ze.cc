@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 20:43:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/19 21:25:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -521,11 +521,12 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         .pNext      = NULL,
         .ordinal    = ordinal,
         .index      = index,
-        .flags      = ZE_COMMAND_QUEUE_FLAG_EXPLICIT_ONLY,      // TODO : i think we want explicit ?
+        .flags      = ZE_COMMAND_QUEUE_FLAG_EXPLICIT_ONLY,
         .mode       = ZE_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
         .priority   = ZE_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW    // TODO : maybe do one queue for each priority in 'device->ze_device_properties.maxCommandQueuePriority'
     };
-    # if 0
+
+    # if 0 /* use a command list and command queue */
     ZE_SAFE_CALL(
         zeCommandQueueCreate(
             device->ze_context,
@@ -534,17 +535,15 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
            &stream->ze.command.queue
         )
     );
-    # endif
 
     // create command list
-    # if 0
     ze_command_list_desc_t ze_command_list_desc = {
         .stype = ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC,
         .pNext = NULL,
         .commandQueueGroupOrdinal = ordinal,
         .flags = ZE_COMMAND_LIST_FLAG_RELAXED_ORDERING | ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT
     };
-    # endif
+    # else /* use command list immediate */
     ZE_SAFE_CALL(
         zeCommandListCreateImmediate(
             device->ze_context,
@@ -553,6 +552,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
            &stream->ze.command.list
         )
     );
+    # endif
 
     // create event pool and events
     const ze_event_pool_desc_t ze_event_pool_desc = {

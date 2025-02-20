@@ -26,6 +26,8 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/xkrt/benchmarks.cc
 )
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 # XKBM version
 add_custom_command(
     OUTPUT

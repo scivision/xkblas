@@ -89,7 +89,6 @@ endif()
 # HWLOC
 find_package(HWLOC REQUIRED)
 include_directories(${HWLOC_INCLUDE_DIRS})
-message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 target_link_libraries(${XKRT} PRIVATE ${HWLOC_LIBRARIES})
 
 # HOST DRIVER
@@ -106,16 +105,31 @@ if (USE_CUDA)
 
     find_package(CUDA_RT REQUIRED)
     include_directories("${CUDA_RT_INCLUDE_DIRS}")
-    message(STATUS "Found Cuda: ${CUDA_RT_INCLUDE_DIRS}")
 
     find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
-    message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
     target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
     install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+
+endif()
+
+# HIP
+option(USE_HIP "Whether to build the HIP driver." ON)
+if (USE_HIP)
+
+    find_package(HIP REQUIRED)
+    include_directories("${HIP_INCLUDE_DIRS}")
+
+    # find_package(CUBLAS REQUIRED)
+    # include_directories("${CUBLAS_INCLUDE_DIRS}")
+
+    add_library(${XKRT}_driver_hip SHARED src/driver/driver_hip.cc)
+    target_link_libraries(${XKRT}_driver_hip PRIVATE ${HWLOC_LIBRARIES} ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_hip)
+    install(TARGETS ${XKRT}_driver_hip LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -125,7 +139,6 @@ if (USE_ZE)
 
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
-    message(STATUS "Found ZE: ${ZE_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
@@ -139,7 +152,6 @@ if (USE_CL)
 
     find_package(CL REQUIRED)
     include_directories("${CL_INCLUDE_DIRS}")
-    message(STATUS "Found OpenCL: ${CL_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_cl SHARED src/driver/driver_cl.cc)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl)

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:04:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 16:16:28 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,7 +42,9 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
 
         const xkrt_device_global_id_bitfield_t owners = memcontroller->who_owns(access);
         if (owners)
-            device_id = (xkrt_device_global_id_t) __random_set_bit(owners) - 1;
+        {
+            device_id = (xkrt_device_global_id_t) (__random_set_bit(owners) - 1);
+        }
     }
 
     // if a target device is set
