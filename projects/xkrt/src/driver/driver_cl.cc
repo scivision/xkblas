@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 23:19:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:37:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -201,7 +201,7 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_set_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
+XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
@@ -561,7 +561,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
 ////////////
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
@@ -589,7 +589,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, xkrt_device_memory_info_t * info)
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
@@ -603,6 +603,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_register)(
     void * ptr,
     uint64_t size
 ) {
+    LOGGER_WARN("OpenCL driver has no support for memory regsiter");
     return 0;
 }
 
@@ -611,6 +612,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
     void * ptr,
     uint64_t size
 ) {
+    LOGGER_WARN("OpenCL driver has no support for memory regsiter");
     return 0;
 }
 
@@ -620,35 +622,36 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
 void
 XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
 {
-    # define EP(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
+    # define REGISTER(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
 
-    EP(init);
-    EP(finalize);
-    EP(get_name);
-    EP(get_ndevices_max);
-    EP(device_set_cpuset);
+    REGISTER(init);
+    REGISTER(finalize);
 
-    EP(device_create);
-    EP(device_destroy);
-    EP(device_init);
-    // EP(device_attach);   // no "state machine" with opencl, no need to attach to a device
-    EP(device_commit);
-    EP(device_info);
+    REGISTER(get_name);
+    REGISTER(get_ndevices_max);
 
-    EP(memory_alloc);
-    EP(memory_info);
+    REGISTER(device_create);
+    REGISTER(device_init);
+    REGISTER(device_commit);
+    REGISTER(device_destroy);
 
-    EP(stream_create);
-    EP(stream_delete);
+    // REGISTER(device_attach);
+    REGISTER(device_info);
 
-# if 0
-    EP(memory_register);
-    EP(memory_unregister);
+    REGISTER(memory_device_info);
+    REGISTER(memory_device_allocate);
+    // REGISTER(memory_device_deallocate);
+    // REGISTER(memory_host_allocate);
+    // REGISTER(memory_host_deallocate);
+    // REGISTER(memory_host_register);
+    // REGISTER(memory_host_unregister);
+    // REGISTER(memory_unified_allocate);
+    // REGISTER(memory_unified_deallocate);
 
+    REGISTER(device_cpuset);
 
-    // EP(get_source);
+    REGISTER(stream_create);
+    REGISTER(stream_delete);
 
-    # undef EP
-
-# endif /* 0 */
+    # undef REGISTER
 }

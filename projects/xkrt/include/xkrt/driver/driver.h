@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:21:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:34:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,7 +47,6 @@ typedef struct  xkrt_driver_t
     //  DRIVER META DATA //
     ///////////////////////
     const char   *(*f_get_name)(void);          /* name of the driver (human-readable) */
-    unsigned int (*f_get_flags)(void);          /* flags: not really used */
     unsigned int (*f_get_ndevices_max)(void);   /* return the number of devices available to the driver */
 
     ///////////////////////
@@ -57,24 +56,23 @@ typedef struct  xkrt_driver_t
     void (*f_finalize)(void);
 
     /////////////////////////////////
-    //  DRIVER DEVICES MANAGEMENT  //
+    //  DEVICES MANAGEMENT         //
     /////////////////////////////////
 
-    /* Set the cpuset of the attr for creating the thread that will manage the device dev */
-    int (*f_device_set_cpuset)(hwloc_topology_t, cpu_set_t*, int);
-
-    /* create device object and initialize device_driver_id field with argument */
+    /* Create a device for the given driver id */
     xkrt_device_t * (*f_device_create)(xkrt_driver_t *, int);
+
+    /* initialize device */
+    void (*f_device_init)(int device_driver_id);
+
+    /* commit device (called once all devices of that driver had been initialized) */
+    int (*f_device_commit)(int device_driver_id);
+
+    /* Release a device */
     int (*f_device_destroy)(xkrt_device_t*);
 
-    /* initialize device fields, especially with virtual functions */
-    void (*f_device_init)(int device_driver_id);
-    int (*f_device_commit)(int device_driver_id);
-    void (*f_device_finalize)(xkrt_device_t*);
-
-    /* consider device as the current device */
+    /* consider device as the current device - see cudaSetDevice */
     int (*f_device_attach)(int device_driver_id);
-    int (*f_device_detach)(xkrt_device_t*);
 
     /* get device infos */
     const char * (*f_device_info)(int device_driver_id);
@@ -82,15 +80,35 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
     //  MEMORY MANAGEMENT         //
     ////////////////////////////////
-    void * (*f_memory_alloc)(int device_driver_id, const size_t size);
-    void (*f_memory_info)(int device_driver_id, xkrt_device_memory_info_t * info);
-    int (*f_memory_register)(void * mem, uint64_t size);
-    int (*f_memory_unregister)(void * mem, uint64_t size);
-    void * (*f_memory_alloc_host)(int device_driver_id, const size_t size);
-    void (*f_memory_dealloc_host)(int device_driver_id, void * mem, const size_t size);
+
+    /* retrieve memory infos */
+    void   (*f_memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info);
+
+    /* allocate device memory */
+    void * (*f_memory_device_allocate)(int device_driver_id, const size_t size);
+    void   (*f_memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size);
+
+    /* allocate host memory */
+    void * (*f_memory_host_allocate)(int device_driver_id, const size_t size);
+    void   (*f_memory_host_deallocate)(int device_driver_id, void * mem, const size_t size);
+
+    /* allocate unified memory */
+    void * (*f_memory_unified_allocate)(int device_driver_id, const size_t size);
+    void   (*f_memory_unified_deallocate)(int device_driver_id, void * mem, const size_t size);
+
+    /* register host memory */
+    int    (*f_memory_host_register)(void * mem, uint64_t size);
+    int    (*f_memory_host_unregister)(void * mem, uint64_t size);
+
+    ///////////////
+    // THREADING //
+    ///////////////
+
+    /* Get a cpuset of cpus with the best affinity for the given device */
+    int (*f_device_cpuset)(hwloc_topology_t, cpu_set_t*, int);
 
     ////////////////////////////////
-    //  DRIVER STREAM MANAGEMENT  //
+    // STREAM MANAGEMENT          //
     ////////////////////////////////
 
     /* alllocate and initialize a stream */
@@ -99,15 +117,18 @@ typedef struct  xkrt_driver_t
     /* deallocate a stream */
     void (*f_stream_delete)(xkrt_stream_t * istream);
 
-		/* get best source for data movement, return global_id */
-    xkrt_device_global_id_t (*f_get_source)(xkrt_device_global_id_t dst_global_id, xkrt_device_global_id_bitfield_t valid);
+    ////////////////////
+    //  P2P TRANSFERS //
+    ////////////////////
+
+    // TODO
 
 }               xkrt_driver_t;
 
 void * xkrt_device_thread_main(void * a);
 
 /* one function per task per driver */
-static_assert(XKRT_DRIVER_TYPE_MAX <= TASK_FORMAT_FUNC_MAX);
+static_assert(XKRT_DRIVER_TYPE_MAX <= TASK_FORMAT_TARGET_MAX);
 
 typedef struct  xkrt_drivers_t
 {

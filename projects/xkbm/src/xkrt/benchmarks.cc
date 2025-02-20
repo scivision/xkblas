@@ -98,10 +98,12 @@ xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void 
     }
     runtime.team_critical_end(team);
 
-    LOGGER_INFO("---- Device %u (alloc) ----", device_global_id);
+    const char * smode  = (mode == DRIVER) ? "driver" : "system";
+    const char * stouch =            touch ? "touch" : "notouch";
+    LOGGER_INFO("---- Device %u (alloc with %s and %s) ----", device_global_id, smode, stouch);
     time_alloc.report<pp_1byte_3time>();
 
-    LOGGER_INFO("---- Device %u (dealloc) ----", device_global_id);
+    LOGGER_INFO("---- Device %u (dealloc with %s and %s) ----", device_global_id, smode, stouch);
     time_dealloc.report<pp_1byte_3time>();
 
     return NULL;
@@ -120,7 +122,7 @@ xkrt_benchmarks_alloc_run(void)
     runtime.team_join(&team);
 }
 
-static benchmark_node_t xkrt_benchmarks_alloc_system = {
+static benchmark_node_t xkrt_benchmarks_alloc_system_touch = {
     .name = "alloc-host-system-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
     .parent = NULL,
@@ -140,7 +142,7 @@ static benchmark_node_t xkrt_benchmarks_alloc_system_notouch = {
     .enabled = 1
 };
 
-static benchmark_node_t xkrt_benchmarks_alloc_driver = {
+static benchmark_node_t xkrt_benchmarks_alloc_driver_touch = {
     .name = "alloc-host-driver-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
     .parent = NULL,
@@ -157,6 +159,68 @@ static benchmark_node_t xkrt_benchmarks_alloc_driver_notouch = {
     .children = { NULL },
     .nchildren = 0,
     .run = xkrt_benchmarks_alloc_run<DRIVER, false>,
+    .enabled = 1
+};
+
+//////////////////////////////////////////////
+
+static void *
+xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+{
+    xkrt_team_t * team = (xkrt_team_t *) vargs;
+
+    time_array_t<34, 5> time_alloc;
+    uint64_t t0, tf;
+
+    for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
+    {
+        for (int i = 0 ; i < time_alloc.nelements ; ++i)
+        {
+            const size_t size = ((size_t) 1) << i;
+            void * ptr = NULL;
+
+            runtime.team_barrier(team);
+            if (device_global_id == 0)
+                t0 = xkrt_get_nanotime();
+
+            ptr = runtime.memory_allocate_host(device_global_id, size);
+            if (ptr == NULL)
+                break ;
+
+            runtime.team_barrier(team);
+            if (device_global_id == 0)
+                tf = xkrt_get_nanotime();
+
+            time_alloc.set(i, iter, tf - t0);
+            runtime.memory_deallocate_host(device_global_id, ptr, size);
+        }
+    }
+
+    if (device_global_id == 0)
+        time_alloc.report<pp_1byte_3time>();
+
+    return NULL;
+}
+
+static void
+xkrt_benchmarks_alloc_parallel_run(void)
+{
+    xkrt_team_t team;
+    team.desc.routine = xkrt_benchmarks_alloc_parallel_run_thread,
+    team.desc.args    = &team;
+    team.desc.devices = XKRT_DEVICES_MASK_ALL;
+
+    runtime.team_create(&team);
+    runtime.team_join(&team);
+}
+
+static benchmark_node_t xkrt_benchmarks_alloc_driver_notouch_parallel = {
+    .name = "alloc-host-driver-no-touch-parallel",
+    .desc = "Time (allocation) of host memory using the driver host-allocator in parallel on every devices",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_alloc_parallel_run,
     .enabled = 1
 };
 
@@ -289,7 +353,7 @@ static benchmark_node_t xkrt_benchmarks_h2d = {
     .children = { NULL },
     .nchildren = 0,
     .run = xkrt_benchmarks_mem_run<H2D>,
-    .enabled = 0
+    .enabled = 1
 };
 
 static benchmark_node_t xkrt_benchmarks_d2h = {
@@ -299,7 +363,7 @@ static benchmark_node_t xkrt_benchmarks_d2h = {
     .children = { NULL },
     .nchildren = 0,
     .run = xkrt_benchmarks_mem_run<D2H>,
-    .enabled = 0
+    .enabled = 1
 };
 
 ///////////////////
@@ -320,12 +384,13 @@ void
 xkrt_benchmark_push(benchmark_node_t * parent)
 {
     benchmark_push_children(parent, &xkrt_benchmarks);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_touch);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_touch);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch_parallel);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
 }
 
 void

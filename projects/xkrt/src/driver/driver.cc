@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:33:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:30:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -90,8 +90,8 @@ xkrt_driver_init(
 
         // move the current thread to the device cpu set
         cpu_set_t schedset;
-        assert(driver->f_device_set_cpuset);
-        int err = driver->f_device_set_cpuset(topology, &schedset, i);
+        assert(driver->f_device_cpuset);
+        int err = driver->f_device_cpuset(topology, &schedset, i);
         if (err)
         {
             LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);

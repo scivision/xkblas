@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:25:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:44:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -27,12 +27,9 @@ xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
     for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
     {
         xkrt_driver_t * driver = runtime->drivers.list + driver_id;
-        if (!driver->f_memory_register)
-        {
-            if (driver->f_get_name)
-                LOGGER_WARN("Driver `%s` does not implement memory register", driver->f_get_name());
-        }
-        else if (driver->f_memory_register(ptr, size))
+        if (!driver->f_memory_host_register)
+            LOGGER_WARN("Driver `%u` does not implement memory register", driver_id);
+        else if (driver->f_memory_host_register(ptr, size))
             LOGGER_ERROR("Could not register memory for driver `%s`", driver->f_get_name());
     }
     return 0;
@@ -45,12 +42,9 @@ xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
     for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
     {
         xkrt_driver_t * driver = runtime->drivers.list + driver_id;
-        if (!driver->f_memory_unregister)
-        {
-            if (driver->f_get_name)
-                LOGGER_WARN("Driver `%s` does not implement memory unregister", driver->f_get_name());
-        }
-        else if (driver->f_memory_unregister(ptr, size))
+        if (!driver->f_memory_host_unregister)
+            LOGGER_WARN("Driver `%u` does not implement memory unregister", driver_id);
+        else if (driver->f_memory_host_unregister(ptr, size))
             LOGGER_ERROR("Could not unregister memory for driver `%s`", driver->f_get_name());
     }
     return 0;

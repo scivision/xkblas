@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 15:58:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:37:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -229,7 +229,7 @@ XKRT_DRIVER_ENTRYPOINT(get_name)(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_set_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
+XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
 {
     assert(device_driver_id >= 0);
     assert(device_driver_id < XKRT_DEVICES_MAX);
@@ -282,18 +282,23 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 }
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_alloc)(int device_driver_id, const size_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size)
 {
-    (void) device_driver_id;
-
-    /* allocate memory into an initial chunk */
+    // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
     void * device_ptr;
-    CU_SAFE_CALL(cudaMalloc((void **) &device_ptr, size));
+    CU_SAFE_CALL(cudaMalloc(&device_ptr, size));
     return device_ptr;
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_info)(int device_driver_id, xkrt_device_memory_info_t * info)
+XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size)
+{
+    // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CU_SAFE_CALL(cudaFree(ptr));
+}
+
+static void
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info)
 {
     (void) device_driver_id;
     size_t free, total;
@@ -424,7 +429,7 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(memory_register)(
+XKRT_DRIVER_ENTRYPOINT(memory_host_register)(
     void * ptr,
     uint64_t size
 ) {
@@ -433,7 +438,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_register)(
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
+XKRT_DRIVER_ENTRYPOINT(memory_host_unregister)(
     void * ptr,
     uint64_t size
 ) {
@@ -443,7 +448,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
 }
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_alloc_host)(
+XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
     int device_driver_id,
     uint64_t size
 ) {
@@ -455,7 +460,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_alloc_host)(
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_dealloc_host)(
+XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
     int device_driver_id,
     void * mem,
     uint64_t size
@@ -716,29 +721,36 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 void
 XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
 {
-    # define EP(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
+    # define REGISTER(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
 
-    EP(init);
-    EP(finalize);
-    EP(get_name);
-    EP(get_ndevices_max);
-    EP(device_set_cpuset);
-    EP(device_create);
-    EP(device_destroy);
-    EP(device_init);
-    EP(device_attach);
-    EP(device_commit);
-    EP(device_info);
+    REGISTER(init);
+    REGISTER(finalize);
 
-    EP(memory_alloc);
-    EP(memory_info);
-    EP(memory_register);
-    EP(memory_unregister);
-    EP(memory_alloc_host);
-    EP(memory_dealloc_host);
+    REGISTER(get_name);
+    REGISTER(get_ndevices_max);
 
-    EP(stream_create);
-    EP(stream_delete);
+    REGISTER(device_create);
+    REGISTER(device_init);
+    REGISTER(device_commit);
+    REGISTER(device_destroy);
 
-    # undef EP
+    REGISTER(device_attach);
+    REGISTER(device_info);
+
+    REGISTER(memory_device_info);
+    REGISTER(memory_device_allocate);
+    REGISTER(memory_device_deallocate);
+    REGISTER(memory_host_allocate);
+    REGISTER(memory_host_deallocate);
+    REGISTER(memory_host_register);
+    REGISTER(memory_host_unregister);
+    // REGISTER(memory_unified_allocate);
+    // REGISTER(memory_unified_deallocate);
+
+    REGISTER(device_cpuset);
+
+    REGISTER(stream_create);
+    REGISTER(stream_delete);
+
+    # undef REGISTER
 }

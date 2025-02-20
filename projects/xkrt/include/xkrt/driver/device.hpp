@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 16:10:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:31:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,10 +34,7 @@ typedef enum    xkrt_device_state_t : uint8_t
     XKRT_DEVICE_STATE_RUNNING     = 4,
     XKRT_DEVICE_STATE_STOP        = 5,
     XKRT_DEVICE_STATE_STOPPED     = 6,
-    XKRT_DEVICE_STATE_FINALISE    = 7,
-    XKRT_DEVICE_STATE_FINALIZED   = 8,
-    XKRT_DEVICE_STATE_DESTROY     = 9,
-    XKRT_DEVICE_STATE_DESTROYED   = 10
+    XKRT_DEVICE_STATE_DESTROYED   = 7
 
 }               xkrt_device_state_t;
 

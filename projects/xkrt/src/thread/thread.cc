@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 21:08:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 20:03:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,6 +51,24 @@ trampoline(void * vargs)
     return NULL;
 }
 
+static inline int
+team_barrier_fetch(xkrt_team_t * team, int delta)
+{
+    int n = team->priv.barrier.n.fetch_sub(delta, std::memory_order_relaxed) - delta;
+    assert(n >= 0);
+    if (n == 0)
+    {
+        team->priv.barrier.n.store(team->priv.nthreads, std::memory_order_seq_cst);
+        ++team->priv.barrier.version;
+        pthread_mutex_lock(&team->priv.barrier.mtx);
+        {
+            pthread_cond_broadcast(&team->priv.barrier.cond);
+        }
+        pthread_mutex_unlock(&team->priv.barrier.mtx);
+    }
+    return n;
+}
+
 void
 xkrt_runtime_t::team_create(xkrt_team_t * team)
 {
@@ -61,8 +79,19 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     // set all to zero
     memset(&team->priv, 0, sizeof(team->priv));
 
+    // store the number of threads
+    int max_nthreads = this->drivers.devices.n;
+    int nthreads = this->drivers.devices.n;
+
+    // init barrier - max_threads + 1 to avoid early barrier release
+    team->priv.barrier.n.store(max_nthreads + 1, std::memory_order_seq_cst);
+    pthread_mutex_init(&team->priv.barrier.mtx, NULL);
+    pthread_cond_init(&team->priv.barrier.cond, NULL);
+
+    // init critical
+    pthread_mutex_init(&team->priv.critical.mtx, NULL);
+
     // fork 1 thread per device
-    team->priv.nthreads = this->drivers.devices.n;
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < this->drivers.devices.n ; ++device_global_id)
     {
         if (team->desc.devices & (1 << device_global_id))
@@ -71,7 +100,7 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
             if (device == NULL)
             {
                 team->priv.threads[device_global_id].state = XKRT_THREAD_UNINITIALIZED;
-                --team->priv.nthreads;
+                --nthreads;
                 continue ;
             }
             team->priv.threads[device_global_id].state = XKRT_THREAD_INITIALIZED;
@@ -86,33 +115,20 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
         }
     }
 
-    // init barrier
-    team->priv.barrier.n.store(team->priv.nthreads, std::memory_order_seq_cst);
-    pthread_mutex_init(&team->priv.barrier.mtx, NULL);
-    pthread_cond_init(&team->priv.barrier.cond, NULL);
-
-    // init critical
-    pthread_mutex_init(&team->priv.critical.mtx, NULL);
-
-    // restore callnig thread cpu set
+    // restore calling thread cpu set
     xkrt_runtime_t::thread_setaffinity(save_set);
+
+    // decrement barrier
+    team->priv.nthreads = nthreads;
+    mem_barrier();
+    team_barrier_fetch(team, 1 + (max_nthreads - nthreads));
 }
 
 void
 xkrt_runtime_t::team_barrier(xkrt_team_t * team)
 {
     int old_version = team->priv.barrier.version;
-    if (team->priv.barrier.n.fetch_sub(1, std::memory_order_relaxed) == 1)
-    {
-        team->priv.barrier.n.store(team->priv.nthreads, std::memory_order_seq_cst);
-        ++team->priv.barrier.version;
-        pthread_mutex_lock(&team->priv.barrier.mtx);
-        {
-            pthread_cond_broadcast(&team->priv.barrier.cond);
-        }
-        pthread_mutex_unlock(&team->priv.barrier.mtx);
-    }
-    else
+    if (team_barrier_fetch(team, 1))
     {
         while (old_version == team->priv.barrier.version)
         {

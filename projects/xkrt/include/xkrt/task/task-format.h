@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 17:56:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,16 +42,14 @@ enum task_kern_precision_t : uint8_t
 
 # endif
 
-/* maximum number of function version per task */
-# define TASK_FORMAT_FUNC_MAX 4
-
 typedef enum    task_format_target_t : uint8_t
 {
     TASK_FORMAT_TARGET_HOST  = 0,
     TASK_FORMAT_TARGET_CUDA  = 1,
     TASK_FORMAT_TARGET_ZE    = 2,
     TASK_FORMAT_TARGET_CL    = 3,
-    TASK_FORMAT_TARGET_MAX   = 4
+    TASK_FORMAT_TARGET_HIP   = 4,
+    TASK_FORMAT_TARGET_MAX   = 5
 }               task_format_target_t;
 
 typedef void (*task_format_func_t)();
@@ -59,7 +57,7 @@ typedef void (*task_format_func_t)();
 typedef struct  task_format_t
 {
     /* task launch */
-    task_format_func_t f[TASK_FORMAT_FUNC_MAX];
+    task_format_func_t f[TASK_FORMAT_TARGET_MAX];
 
     /* a label */
     char label[16];

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 21:16:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 21:43:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -189,13 +189,13 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     /* init memory */
 
     /* get total memory and allocate chunk0 */
-    assert(driver->f_memory_info);
+    assert(driver->f_memory_device_info);
     xkrt_device_memory_info_t info;
-    driver->f_memory_info(device->driver_id, &info);
+    driver->f_memory_device_info(device->driver_id, &info);
     const size_t size = (size_t) ((double)info.capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
 
-    assert(driver->f_memory_alloc);
-    const void * device_ptr = driver->f_memory_alloc(device->driver_id, size);
+    assert(driver->f_memory_device_allocate);
+    const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size);
     device->memory_set_chunk0((uintptr_t) device_ptr, size);
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);
@@ -399,8 +399,8 @@ xkrt_runtime_t::memory_info(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_driver_t * driver = this->driver_get(device->driver_type);
-    assert(driver->f_memory_info);
-    driver->f_memory_info(device->driver_id, info);
+    assert(driver->f_memory_device_info);
+    driver->f_memory_device_info(device->driver_id, info);
 }
 
 void *
@@ -410,8 +410,8 @@ xkrt_runtime_t::memory_allocate_host(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_driver_t * driver = this->driver_get(device->driver_type);
-    if (driver->f_memory_alloc_host)
-        return driver->f_memory_alloc_host(device->driver_id, size);
+    if (driver->f_memory_host_allocate)
+        return driver->f_memory_host_allocate(device->driver_id, size);
     else
     {
         LOGGER_WARN("Driver `%s` does not implement memory_alloc_host", driver->f_get_name());
@@ -427,8 +427,8 @@ xkrt_runtime_t::memory_deallocate_host(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_driver_t * driver = this->driver_get(device->driver_type);
-    if (driver->f_memory_dealloc_host)
-        driver->f_memory_dealloc_host(device->driver_id, mem, size);
+    if (driver->f_memory_host_deallocate)
+        driver->f_memory_host_deallocate(device->driver_id, mem, size);
     else
     {
         LOGGER_WARN("Driver `%s` does not implement memory_dealloc_host", driver->f_get_name());
