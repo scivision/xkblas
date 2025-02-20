@@ -2521,23 +2521,67 @@ KAAPI_PLUGIN_ENTRYPOINT(advise_cpu)(void* ptr,size_t size)
 KAAPI_CLASS_ENTRYPOINT void 
 KAAPI_PLUGIN_ENTRYPOINT(host_register_direct)(void* ptr,size_t size)
 {
-	//struct cudaMemLocation loc;
-	//loc.type = cudaMemLocationTypeHost;
-	//loc.id = 0;
-	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseUnsetPreferredLocation, loc);
-	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc);
         cudaHostRegister(ptr, size, cudaHostRegisterPortable);
 }
 
 KAAPI_CLASS_ENTRYPOINT void 
 KAAPI_PLUGIN_ENTRYPOINT(host_unregister_direct)(void* ptr)
 {
-	//struct cudaMemLocation loc;
-	//loc.type = cudaMemLocationTypeHost;
-	//loc.id = 0;
-	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseUnsetPreferredLocation, loc);
-	//cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetPreferredLocation, loc);
         cudaHostUnregister(ptr);
+}
+
+// TODO clean this, temporary
+extern void cuda_sniv12(cudaStream_t,float*,float*,int*,int,int,int,int,int,int);
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(sniv12_sync)( int nrows, int nass1, int nelim,
+								int* IW, 
+								float* A, int nfront,
+								float* A_SON, int ncols, int cb_compressed )
+{
+	if(local_thread_stream == NULL)
+		init_local_thread_stream();
+
+	cuda_sniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
+  cudaStreamSynchronize( local_thread_stream );
+}
+extern void cuda_dniv12(cudaStream_t,double*,double*,int*,int,int,int,int,int,int);
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(dniv12_sync)( int nrows, int nass1, int nelim,
+								int* IW, 
+								double* A, int nfront,
+								double* A_SON, int ncols, int cb_compressed )
+{
+	if(local_thread_stream == NULL)
+		init_local_thread_stream();
+
+	cuda_dniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
+  cudaStreamSynchronize( local_thread_stream );
+}
+extern void cuda_cniv12(cudaStream_t,cuComplex*,cuComplex*,int*,int,int,int,int,int,int);
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(cniv12_sync)( int nrows, int nass1, int nelim,
+								int* IW, 
+								Complex32_t* A, int nfront,
+								Complex32_t* A_SON, int ncols, int cb_compressed )
+{
+	if(local_thread_stream == NULL)
+		init_local_thread_stream();
+
+	cuda_cniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
+  cudaStreamSynchronize( local_thread_stream );
+}
+extern void cuda_zniv12(cudaStream_t,cuDoubleComplex*,cuDoubleComplex*,int*,int,int,int,int,int,int);
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(zniv12_sync)( int nrows, int nass1, int nelim,
+								int* IW, 
+								Complex64_t* A, int nfront,
+								Complex64_t* A_SON, int ncols, int cb_compressed )
+{
+	if(local_thread_stream == NULL)
+		init_local_thread_stream();
+
+	cuda_zniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
+  cudaStreamSynchronize( local_thread_stream );
 }
 
 #if KAAPI_USE_DYNLOADER==0
@@ -2580,5 +2624,10 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (advise_cpu);
   EP (host_register_direct);
   EP (host_unregister_direct);
+
+	EP (sniv12_sync);
+	EP (dniv12_sync);
+	EP (cniv12_sync);
+	EP (zniv12_sync);
 }
 #endif

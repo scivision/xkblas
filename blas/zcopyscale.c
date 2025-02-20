@@ -285,3 +285,21 @@ extern int xkblas_zcopyscale_native(
 
 	return 0;
 }
+
+int xkblas_zniv12_sync(
+	int nrows,
+	int nass1, int nelim,
+	int* IW,
+	Complex64_t* A, int nfront,
+	Complex64_t* A_SON, int ncols, int cb_compressed)
+{
+				// c'est sale
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+	driver->f_zniv12_sync( nrows, nass1, nelim, IW, A, nfront, A_SON, ncols, cb_compressed );
+	return 0;
+}

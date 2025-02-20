@@ -451,7 +451,6 @@ extern void xkblas_bind_cpu(void*, size_t);
 extern void xkblas_host_register_direct(void*,size_t);
 extern void xkblas_host_unregister_direct(void*);
 
-
 #include "zxkblas.h"
 #include "cxkblas.h"
 #include "dxkblas.h"
