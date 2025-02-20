@@ -201,7 +201,7 @@ __global__ void kernel_zniv12_c( cuDoubleComplex* A, cuDoubleComplex* A_SON, int
 	// Block of size 1024x1x1 grid of size nfront/1024x1024x1
 	cooperative_groups::thread_block block_group = cooperative_groups::this_thread_block();
 	__shared__ cuDoubleComplex SA[1024];
-	int min_id = start[blockIdx.x];
+	int min_id = start[blockIdx.x];		// Load should be ~ok but still multiples times
 	
 	uint64_t x = blockDim.x * blockIdx.x + threadIdx.x;
 	uint64_t y = blockIdx.y; // => i
@@ -209,11 +209,18 @@ __global__ void kernel_zniv12_c( cuDoubleComplex* A, cuDoubleComplex* A_SON, int
 	if( min_id == -1 )
 		return; // This block have nothing to process
 
+	// Debug steps:
+	// - I assume this load can lead to performance issues
+	// 3 - May be double checked with nsys-compute
+	// 1 - Preload IW on the GPU to reduce the overhead
+	// 2 - Make blocs work on multiple rows
+	// => IW[y] is loaded nfront/blockDim.x times => approx: nrows * nfront/blockDim.x loads of the distant cache page...
+	uint64_t ay = IW[y] - 1; // Load is ineficient -> one block load one value (probably distant)
 
 	// Load
 	if(x < nfront)
 	{
-		SA[threadIdx.x] = A[ x + ((uint64_t) (IW[y]-1)) * nfront ];
+		SA[threadIdx.x] = A[ x + ay * nfront ];
 	}
 	block_group.sync();
 
@@ -224,17 +231,17 @@ __global__ void kernel_zniv12_c( cuDoubleComplex* A, cuDoubleComplex* A_SON, int
 		int j = min_id + threadIdx.x;
 		if( j <= y )
 		{
-			int apos = (IW[ j ]-1) - blockDim.x * blockIdx.x;
+			int apos = (IW[ j ]-1) - blockDim.x * blockIdx.x;  // This load should be ok
 			int id_son; 
-			if( cb_compressed != 0 )
+			if( cb_compressed != 0 )		// Write different kernels for compressed and uncompressed
 				id_son = (y*(y+1))/2 + j;
 			else
 				id_son = (y * ncols) + j;
 #if (PRECISION_s == 1) || (PRECISION_d == 1)
-	SA[apos] += A_SON[ id_son ];
+			SA[apos] += A_SON[ id_son ]; // This load should be ok
 #else
-	SA[apos].x += A_SON[ id_son ].x;
-	SA[apos].y += A_SON[ id_son ].y;
+			SA[apos].x += A_SON[ id_son ].x; // More tricky but should not be so bad
+			SA[apos].y += A_SON[ id_son ].y;
 #endif
 		}
 	}
@@ -243,7 +250,7 @@ __global__ void kernel_zniv12_c( cuDoubleComplex* A, cuDoubleComplex* A_SON, int
 	block_group.sync();
 	if(x < nfront)
 	{
-		A[ x + ((uint64_t) (IW[y]-1)) * nfront ] = SA[threadIdx.x];
+		A[ x + ay * nfront ] = SA[threadIdx.x]; // This load should be ok
 	}
 }
 
@@ -270,7 +277,6 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 	dim3 B = { 32, 32, 1 }; // Bloc shape
 	dim3 G = { (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z }; // Grid
 	kernel_zniv12<<<G,B,0,cuda_stream>>>( A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
-
 #endif	
 	//printf("nrows %d ncols %d nfront %d\n", nrows, ncols, nfront);
 	/*
