@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 22:36:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 04:43:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -78,8 +78,6 @@ extern "C"
 int
 xkrt_sync(xkrt_runtime_t * runtime)
 {
-    LOGGER_INFO("Synchronizing XKRT");
-
     assert(runtime);
 
     /* other threads */
@@ -113,9 +111,6 @@ retry:
         usleep(5);    // TODO : pthread cond instead ? or maybe workstealing
         goto retry;
     }
-
-    /* all threads completed :-) */
-    LOGGER_INFO("Synchronized XKRT");
 
 # if 0
 # if !defined(NDEBUG)

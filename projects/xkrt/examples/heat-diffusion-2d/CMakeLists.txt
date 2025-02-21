@@ -34,6 +34,10 @@ target_link_libraries(${HEAT_NAME} PRIVATE ${XKRT_LIBRARIES})
 # Cuda kernels
 option(ENABLE_CU "Enable the compilation of cuda kernels" ON)
 if (ENABLE_CU)
+    find_package(CUDA_RT REQUIRED)
+    include_directories("${CUDA_RT_INCLUDE_DIRS}")
+    target_link_libraries(${HEAT_NAME} PRIVATE ${CUDA_RT_LIBRARIES})
+
     enable_language(CUDA)
     set_source_files_properties(${HEAT_CUDA_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
     add_library(${HEAT_NAME}_kernels_cuda SHARED ${HEAT_CUDA_KERNELS_SOURCE_FILES})
