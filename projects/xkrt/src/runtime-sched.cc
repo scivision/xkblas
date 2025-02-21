@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:43:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 01:12:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -404,7 +404,7 @@ xkrt_runtime_t::memory_info(
 }
 
 void *
-xkrt_runtime_t::memory_allocate_host(
+xkrt_runtime_t::memory_host_allocate(
     const xkrt_device_global_id_t device_global_id,
     const size_t size
 ) {
@@ -420,7 +420,7 @@ xkrt_runtime_t::memory_allocate_host(
 }
 
 void
-xkrt_runtime_t::memory_deallocate_host(
+xkrt_runtime_t::memory_host_deallocate(
     const xkrt_device_global_id_t device_global_id,
     void * mem,
     const size_t size

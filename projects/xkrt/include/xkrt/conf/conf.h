@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 20:09:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 22:36:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,7 +45,7 @@ typedef struct  xkrt_conf_offloader_t
 typedef struct  xkrt_conf_device_t
 {
     float gpu_mem_percent;              /* % of gpu memory to allocate initially */
-    uint8_t ngpus;                      /* number of GPU for this node */
+    int ngpus;                          /* number of GPU for this node */
     xkrt_conf_offloader_t offloader;    /* offloader conf */
 
 }               xkrt_conf_device_t;

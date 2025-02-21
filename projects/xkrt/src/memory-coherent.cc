@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:17:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/20 22:01:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -313,7 +313,7 @@ xkrt_memory_coherent_async(
     xkrt_runtime_t * runtime,
     int uplo, int memflag,
     int m, int n,
-    void * xkrt, int ld,
+    void * ptr, int ld,
     unsigned int sizeof_type
 ) {
     LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
@@ -324,7 +324,7 @@ xkrt_memory_coherent_async(
 
     /* create an access, and retrieve all tasks that are in conflict */
     std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> conflicts;
-    const Access access(MATRIX_COLMAJOR, xkrt, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    const Access access(MATRIX_COLMAJOR, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
     DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
     assert(deptree);

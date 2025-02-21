@@ -68,7 +68,7 @@ xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void 
                     if constexpr(mode == SYSTEM)
                         ptr = malloc(size);
                     else
-                        ptr = runtime.memory_allocate_host(device_global_id, size);
+                        ptr = runtime.memory_host_allocate(device_global_id, size);
 
                     if constexpr(touch)
                         xkbm_mem_touch(ptr, size);
@@ -89,7 +89,7 @@ xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void 
                     if constexpr(mode == SYSTEM)
                         free(ptr);
                     else
-                        runtime.memory_deallocate_host(device_global_id, ptr, size);
+                        runtime.memory_host_deallocate(device_global_id, ptr, size);
                 }
                 uint64_t tf = xkrt_get_nanotime();
                 time_dealloc.set(i, iter, tf - t0);
@@ -183,7 +183,7 @@ xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_
             if (device_global_id == 0)
                 t0 = xkrt_get_nanotime();
 
-            ptr = runtime.memory_allocate_host(device_global_id, size);
+            ptr = runtime.memory_host_allocate(device_global_id, size);
             if (ptr == NULL)
                 break ;
 
@@ -192,7 +192,7 @@ xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_
                 tf = xkrt_get_nanotime();
 
             time_alloc.set(i, iter, tf - t0);
-            runtime.memory_deallocate_host(device_global_id, ptr, size);
+            runtime.memory_host_deallocate(device_global_id, ptr, size);
         }
     }
 
@@ -264,7 +264,7 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
         LOGGER_FATAL("Out of device memory");
 
     // host allocation
-    void * host_mem = runtime.memory_allocate_host(device_global_id, size);
+    void * host_mem = runtime.memory_host_allocate(device_global_id, size);
     xkbm_mem_touch(host_mem, size);
 
     // wait for all devices to allocate
@@ -317,7 +317,7 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
 
     // device
     runtime.memory_deallocate_all(device_global_id);
-    runtime.memory_deallocate_host(device_global_id, host_mem, size);
+    runtime.memory_host_deallocate(device_global_id, host_mem, size);
 
     return NULL;
 }
