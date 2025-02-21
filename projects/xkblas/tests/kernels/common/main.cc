@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/17 23:08:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 20:47:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -96,8 +96,7 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
         matrices[i] = M;
     }
 
-    // if (!SKIP_CHECK)
-    //     FILL((TYPE *)mem, memsize/s);
+    FILL((TYPE *)mem, memsize/s);
 }
 
 // GEMM - GEMM //
@@ -218,13 +217,13 @@ main_gemm(char ** args)
             B[i * ld + i] = 1.0;
             for (int j = 0 ; j < ld ; ++j)
             {
-                A[i * ld + j] = i * j;
+                A[i * ld + j] = (7 * i * j) % 13;
             }
         }
     }
 
     int t1 = 0;
-    int t2 = 0;
+    int t2 = 1;
 
     //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {

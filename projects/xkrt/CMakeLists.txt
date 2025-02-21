@@ -26,6 +26,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-distribute.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc

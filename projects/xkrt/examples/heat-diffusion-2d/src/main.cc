@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 07:07:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 20:22:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -54,7 +54,7 @@ export_to_vtk(TYPE * g, const char * filename, int step)
 
     for (int j = 0; j < NY; j++)
         for (int i = 0; i < NX; i++)
-            fprintf(file, "%.2f\n", GRID(g, i, j));
+            fprintf(file, "%.2f\n", GRID(g, i, j, LD));
 
     fclose(file);
 }
@@ -79,7 +79,7 @@ typedef struct  args_t
 # include <xkrt/driver/driver-cuda.h>
 # include <xkrt/logger/logger-cu.h>
 
-extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, TYPE * dst, int tile_x, int tile_y);
+extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y);
 
 static void
 body_cuda(
@@ -87,19 +87,31 @@ body_cuda(
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
-    assert(stream);
-
     Task * task = (Task *) instr->kern.vargs;
-    assert(task);
-
     args_t * args = (args_t *) (task + 1);
-    assert(args);
 
-    const Access * src = task->accesses + 0;
-    const Access * dst = task->accesses + 1;
+    const Access * a_src = task->accesses + 0;
+    const Access * a_dst = task->accesses + 1;
 
+    TYPE * src = (TYPE *) a_src->device_view.addr;
+    TYPE * dst = (TYPE *) a_dst->device_view.addr;
+    const size_t ld_src = a_src->device_view.ld;
+    const size_t ld_dst = a_dst->device_view.ld;
+
+    // offset boundary access so the kernel receive the correct pointer
+    if (args->tile_x == 0)
+        dst = dst - 1;
+    if (args->tile_y == 0)
+        dst = dst - ld_dst;
+
+    // submit kernel
     cudaStream_t custream = stream->cu.handle.high;
-    diffusion_cuda(custream, (TYPE *) src->device_view.addr, (TYPE *) dst->device_view.addr, args->tile_x, args->tile_y);
+    diffusion_cuda(
+        custream,
+        src, ld_src,
+        dst, ld_dst,
+        args->tile_x, args->tile_y
+    );
     CU_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], custream));
 }
 # endif /* XKRT_SUPPORT_CUDA */
@@ -111,36 +123,13 @@ update_cpu(TYPE * src, TYPE * dst)
     {
         for (int j = 1; j < NY - 1; j++)
         {
-            GRID(dst, i, j) = GRID(src, i, j) + ALPHA * DT / (DX * DY) * (
-                (GRID(src, i+1,   j) - 2 * GRID(src, i, j) + GRID(src, i-1,   j)) / (DX * DX) +
-                (GRID(src,   i, j+1) - 2 * GRID(src, i, j) + GRID(src,   i, j-1)) / (DY * DY)
+            GRID(dst, i, j, LD) = GRID(src, i, j, LD) + ALPHA * DT / (DX * DY) * (
+                (GRID(src, i+1,   j, LD) - 2 * GRID(src, i, j, LD) + GRID(src, i-1,   j, LD)) / (DX * DX) +
+                (GRID(src,   i, j+1, LD) - 2 * GRID(src, i, j, LD) + GRID(src,   i, j-1, LD)) / (DY * DY)
             );
         }
     }
 }
-
-# if XKRT_SUPPORT_HOST
-static void
-body_cpu(
-    xkrt_stream_t * stream,
-    xkrt_stream_instruction_t * instr,
-    xkrt_stream_instruction_counter_t idx
-) {
-    Task * task = (Task *) instr->kern.vargs;
-    assert(task);
-
-    args_t * args = (args_t *) (task + 1);
-    assert(args);
-
-    Access * a_src = task->accesses + 0;
-    Access * a_dst = task->accesses + 1;
-
-    TYPE * src = (TYPE *) a_src->device_view.addr;
-    TYPE * dst = (TYPE *) a_dst->device_view.addr;
-
-    update_cpu(src, dst);
-}
-# endif /* XKRT_SUPPORT_HOST */
 
 static void
 setup_tasks(void)
@@ -148,15 +137,15 @@ setup_tasks(void)
     task_format_t format;
     memset(&format, 0, sizeof(task_format_t));
 
-    # if XKRT_SUPPORT_HOST
-    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
-    # endif /* XKRT_SUPPORT_HOST */
-
     # if XKRT_SUPPORT_CUDA
     format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
     # endif /* XKRT_SUPPORT_CUDA */
 
     # if 0
+    # if XKRT_SUPPORT_HOST
+    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
+    # endif /* XKRT_SUPPORT_HOST */
+
     # if XKRT_SUPPORT_ZE
     format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
     # endif /* XKRT_SUPPORT_ZE */
@@ -183,7 +172,7 @@ initialize(TYPE * grid1, TYPE * grid2)
         for (int j = 0; j < NY; j++)
         {
             const int temp = (i == 0 || i == NX - 1 || j == 0 || j == NY - 1) ? TEMPERATURE_BOUNDARY : TEMPERATURE_INITIAL;
-            GRID(grid1, i, j) = GRID(grid2, i, j) = temp;
+            GRID(grid1, i, j, LD) = GRID(grid2, i, j, LD) = temp;
         }
     }
 }
@@ -206,17 +195,38 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
     new(args) args_t(src, dst, tile_x, tile_y);
 
-    const int  x = tile_x * TS;
-    const int  y = tile_y * TS;
-    const int ld = NX;
+    const int ntx = NUM_OF_TILES(NX, TS);
+    const int nty = NUM_OF_TILES(NY, TS);
 
-    // TODO : dependences are wrong, fix me
+    const int x = (tile_x * TS);
+    const int y = (tile_y * TS);
+
     # define NACCESSES 2
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, src, ld, x, y, TS, TS, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, ld, x, y, TS, TS, sizeof(TYPE), ACCESS_MODE_RW);
+    {
+        const int x0 = MAX(x-1, 0);
+        const int y0 = MAX(y-1, 0);
+        const int x1 = MIN(x+TS+1, NX);
+        const int y1 = MIN(y+TS+1, NY);
+        const int sx = x1 - x0;
+        const int sy = y1 - y0;
+        new(task->accesses + 0) Access(MATRIX_COLMAJOR, src, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
+    }
+    {
+        const int x0 = MAX(x, 1);
+        const int y0 = MAX(y, 1);
+        const int x1 = MIN(x+TS, NX-1);
+        const int y1 = MIN(y+TS, NY-1);
+        const int sx = x1 - x0;
+        const int sy = y1 - y0;
+        new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_RW);
+    }
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
+
+    # ifndef NDEBUG
+    snprintf(task->label, sizeof(task->label), "diffusion(%d, %d)", tile_x, tile_y);
+    # endif
 
     runtime.task_commit(task);
 }
@@ -225,9 +235,39 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
 static void
 update(TYPE * src, TYPE * dst)
 {
-    for (int tile_x = 0; tile_x < NX / TS; ++tile_x)
-        for (int tile_y = 0; tile_y < NY / TS; ++tile_y)
+    # if 1
+    update_tile(src, dst, 1, 0);
+    # elif 0
+    const int ntx = NUM_OF_TILES(NX, TS);
+    const int nty = NUM_OF_TILES(NY, TS);
+    for (int tile_x = 0; tile_x < ntx; ++tile_x)
+        for (int tile_y = 0; tile_y < nty; ++tile_y)
             update_tile(src, dst, tile_x, tile_y);
+    # else
+    update_cpu(src, dst);
+    # endif
+
+}
+
+static void
+maybe_export(int step, TYPE * grid)
+{
+    if (step % (N_STEP / N_VTK) == 0)
+    {
+        // Create a cohrency task, to gather data back from gpus
+        int uplo = 0, memflag = 0;
+        xkrt_memory_coherent_async(&runtime, uplo, memflag, NX, NY, grid, LD, sizeof(TYPE));
+
+        // TODO : instead of a sync+coherent, maybe make a host task that reads data
+        // Wait for the completion of all tasks
+        xkrt_sync(&runtime);
+
+        // Export frame
+        char filename[50];
+        int frame = step / (N_STEP / N_VTK);
+        snprintf(filename, sizeof(filename), "temperature_grid_%03d.vtk", frame);
+        export_to_vtk(grid, filename, frame);
+    }
 }
 
 //////////
@@ -242,11 +282,23 @@ main(void)
     setup_tasks();
 
     // Allocate memory for the temperature grids on the CPU
-    TYPE * grid1 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * sizeof(TYPE));
-    TYPE * grid2 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * sizeof(TYPE));
+    const size_t s = sizeof(TYPE);
+    # if 1
+    const uintptr_t alignon = NX * s;
+    const uintptr_t   mem   = (uintptr_t) runtime.memory_host_allocate(0, 2 * NX * NY * s + alignon);
+    TYPE * grid1 = (TYPE *) (mem + (alignon - (mem % alignon)) + 0 * s * (NX * NY));
+    TYPE * grid2 = (TYPE *) (mem + (alignon - (mem % alignon)) + 1 * s * (NX * NY));
+    # else
+    TYPE * grid1 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * s);
+    TYPE * grid2 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * s);
+    # endif
 
     // Set initial conditions
     initialize(grid1, grid2);
+
+    // Create tasks to distribute memory
+    runtime.memory_distribute_cyclic_2D_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE));
+    runtime.memory_distribute_cyclic_2D_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE));
 
     // Time stepping
     for (int step = 0; step < N_STEP; ++step)
@@ -256,21 +308,7 @@ main(void)
         TYPE * dst = (step % 2 == 0) ? grid2 : grid1;
 
         // Export every other frames
-        if (step % (N_STEP / N_VTK) == 0)
-        {
-            // Create a cohrency task, to gather data back from gpus
-            int uplo = 0, memflag = 0, ld = NX;
-            xkrt_memory_coherent_async(&runtime, uplo, memflag, NX, NY, dst, ld, sizeof(TYPE));
-
-            // Wait for the completion of all tasks
-            xkrt_sync(&runtime);
-
-            // Export frame
-            char filename[50];
-            int frame = step / (N_STEP / N_VTK);
-            snprintf(filename, sizeof(filename), "temperature_grid_%03d.vtk", frame);
-            export_to_vtk(dst, filename, frame);
-        }
+        maybe_export(step, dst);
 
         // Update
         update(src, dst);

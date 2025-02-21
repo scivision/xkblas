@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 14:39:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 20:37:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,6 +14,7 @@
 #ifndef __DRIVER_ZE_H__
 # define __DRIVER_ZE_H__
 
+# include <xkrt/driver/device.hpp>
 # include <xkrt/driver/stream.h>
 # include <ze_api.h>
 

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:14:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 18:00:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,13 +48,13 @@
 
 # pragma message(TODO "'fetch' implementation could be optimize by reducing critical sections")
 
-# pragma message(TODO "merge 'Replicate' on continuous "   \
+# pragma message(TODO "merge 'Replicate' on continuous "        \
         "memory addresses - for now, just perform one data "    \
         "transfer per block")
 
 # pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
 
-# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (4)
+# define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (8)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
 
 typedef uint8_t memory_allocation_view_id_t;
@@ -1256,7 +1256,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
                 const uint8_t allocation_view_id = replicate.nallocations++;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
-                    LOGGER_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile PTR");
+                    LOGGER_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile");
 
                 /* allocate the view of that block in the allocation */
                 MemoryReplicateAllocationView * r = new MemoryReplicateAllocationView(chunk, begin_addr, ld);

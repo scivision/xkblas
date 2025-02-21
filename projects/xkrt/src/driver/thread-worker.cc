@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:59:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 17:55:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -85,7 +85,6 @@ ThreadWorker::pause(void)
         this->sleep.sleeping = true;
         while (this->sleep.sleeping)
         {
-            LOGGER_DEBUG("Thread paused");
             pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
         }
     }
@@ -100,7 +99,6 @@ ThreadWorker::wakeup(void)
     {
         this->sleep.sleeping = false;
         pthread_cond_signal(&this->sleep.cond);
-        LOGGER_DEBUG("Thread woke up");
     }
     pthread_mutex_unlock(&this->sleep.lock);
 }

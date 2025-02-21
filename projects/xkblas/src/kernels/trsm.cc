@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 20:00:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 20:35:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -104,7 +104,7 @@ xkblas_£trsm_tile_async(
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
-    context->runtime.commit(task);
+    context->runtime.task_commit(task);
 
     return 0;
 }

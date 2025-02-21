@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 06:21:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 20:00:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -13,19 +13,26 @@
 
 # include <heat/consts.h>
 
+#  define DTS (TS/2)
+static_assert(DTS <= TS);
+static_assert(TS % DTS == 0);
+
 /* A naive kernel to update the grid */
 __global__
 void
-diffusion_cuda_kernel(TYPE * src, TYPE * dst, int tile_x, int tile_y)
+diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x + tile_x * TS;
-    int j = blockIdx.y * blockDim.y + threadIdx.y + tile_y * TS;
+    const int li = blockIdx.x * blockDim.x + threadIdx.x;
+    const int lj = blockIdx.y * blockDim.y + threadIdx.y;
+    const int  i = tile_x * TS + li;
+    const int  j = tile_y * TS + lj;
 
+    // boundary conditions fixed
     if (i > 0 && i < NX - 1 && j > 0 && j < NY - 1)
     {
-        GRID(dst, i, j) = GRID(src, i, j) + ALPHA * DT / (DX * DY) * (
-                (GRID(src, i+1,   j) - 2 * GRID(src, i, j) + GRID(src, i-1,   j)) / (DX * DX) +
-                (GRID(src,   i, j+1) - 2 * GRID(src, i, j) + GRID(src,   i, j-1)) / (DY * DY)
+        GRID(dst, li, lj, ld_dst) = GRID(src, li, lj, ld_src) + ALPHA * DT / (DX * DY) * (
+                (GRID(src, li+1,   lj, ld_src) - 2 * GRID(src, li, lj, ld_src) + GRID(src, li-1,   lj, ld_src)) / (DX * DX) +
+                (GRID(src,   li, lj+1, ld_src) - 2 * GRID(src, li, lj, ld_src) + GRID(src,   li, lj-1, ld_src)) / (DY * DY)
             );
     }
 }
@@ -35,10 +42,21 @@ diffusion_cuda_kernel(TYPE * src, TYPE * dst, int tile_x, int tile_y)
 
 extern "C"
 void
-diffusion_cuda(cudaStream_t stream, TYPE * src, TYPE * dst, int tile_x, int tile_y)
-{
-    dim3 blockDim(TS, TS);
-    dim3 gridDim((NX + blockDim.x - 1) / blockDim.x, (NY + blockDim.y - 1) / blockDim.y);
+diffusion_cuda(
+    cudaStream_t stream,
+    TYPE * src, int ld_src,
+    TYPE * dst, int ld_dst,
+    int tile_x, int tile_y
+) {
+    // how many threads we need
+    dim3 T = {TS, TS, 1};
 
-    diffusion_cuda_kernel<<<gridDim, blockDim, 0, stream>>>(src, dst, tile_x, tile_y);
+    // block dim
+    dim3 B(DTS, DTS, 1);
+
+    // grid
+    dim3 G((T.x + B.x - 1) / B.x,  (T.y + B.y - 1) / B.y, 1);
+
+    // kernel launch
+    diffusion_cuda_kernel<<<G, B, 0, stream>>>(src, ld_src, dst, ld_dst, tile_x, tile_y);
 }

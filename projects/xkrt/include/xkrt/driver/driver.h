@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:34:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/21 17:54:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -128,7 +128,7 @@ typedef struct  xkrt_driver_t
 void * xkrt_device_thread_main(void * a);
 
 /* one function per task per driver */
-static_assert(XKRT_DRIVER_TYPE_MAX <= TASK_FORMAT_TARGET_MAX);
+static_assert((uint8_t)XKRT_DRIVER_TYPE_MAX <= (uint8_t)TASK_FORMAT_TARGET_MAX);
 
 typedef struct  xkrt_drivers_t
 {
