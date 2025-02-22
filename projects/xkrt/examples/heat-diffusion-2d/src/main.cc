@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:22:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 01:38:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -59,6 +59,37 @@ export_to_vtk(TYPE * g, const char * filename, int step)
     fclose(file);
 }
 
+static void
+export_to_vtk(int frame, TYPE * grid)
+{
+    // Export frame
+    char filename[50];
+    snprintf(filename, sizeof(filename), "temperature_grid_%03d.vtk", frame);
+    export_to_vtk(grid, filename, frame);
+}
+
+static void
+maybe_export(int step, TYPE * grid)
+{
+    if (N_VTK)
+    {
+        if (step % (N_STEP / N_VTK) == 0)
+        {
+            // Create a cohrency task, to gather data back from gpus
+            int uplo = 0, memflag = 0;
+            xkrt_memory_coherent_async(&runtime, uplo, memflag, NX, NY, grid, LD, sizeof(TYPE));
+
+            // TODO : instead of a sync+coherent, maybe make a host task that reads data
+            // Wait for the completion of all tasks
+            xkrt_sync(&runtime);
+
+            // export grid
+            int frame = step / (N_STEP / N_VTK);
+            export_to_vtk(frame, grid);
+        }
+    }
+}
+
 ///////////////
 // XKRT TASK //
 ///////////////
@@ -101,8 +132,13 @@ body_cuda(
     // offset boundary access so the kernel receive the correct pointer
     if (args->tile_x == 0)
         dst = dst - 1;
+    else
+        src = src + 1;
+
     if (args->tile_y == 0)
         dst = dst - ld_dst;
+    else
+        src = src + ld_src;
 
     // submit kernel
     cudaStream_t custream = stream->cu.handle.high;
@@ -219,7 +255,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
         const int y1 = MIN(y+TS, NY-1);
         const int sx = x1 - x0;
         const int sy = y1 - y0;
-        new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_RW);
+        new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_W);
     }
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
@@ -236,8 +272,6 @@ static void
 update(TYPE * src, TYPE * dst)
 {
     # if 1
-    update_tile(src, dst, 1, 0);
-    # elif 0
     const int ntx = NUM_OF_TILES(NX, TS);
     const int nty = NUM_OF_TILES(NY, TS);
     for (int tile_x = 0; tile_x < ntx; ++tile_x)
@@ -247,27 +281,6 @@ update(TYPE * src, TYPE * dst)
     update_cpu(src, dst);
     # endif
 
-}
-
-static void
-maybe_export(int step, TYPE * grid)
-{
-    if (step % (N_STEP / N_VTK) == 0)
-    {
-        // Create a cohrency task, to gather data back from gpus
-        int uplo = 0, memflag = 0;
-        xkrt_memory_coherent_async(&runtime, uplo, memflag, NX, NY, grid, LD, sizeof(TYPE));
-
-        // TODO : instead of a sync+coherent, maybe make a host task that reads data
-        // Wait for the completion of all tasks
-        xkrt_sync(&runtime);
-
-        // Export frame
-        char filename[50];
-        int frame = step / (N_STEP / N_VTK);
-        snprintf(filename, sizeof(filename), "temperature_grid_%03d.vtk", frame);
-        export_to_vtk(grid, filename, frame);
-    }
 }
 
 //////////
@@ -307,11 +320,13 @@ main(void)
         TYPE * src = (step % 2 == 0) ? grid1 : grid2;
         TYPE * dst = (step % 2 == 0) ? grid2 : grid1;
 
-        // Export every other frames
-        maybe_export(step, dst);
-
         // Update
         update(src, dst);
+        if (step % (N_STEP / 10) == 0)
+            LOGGER_WARN("Progress: %.2lf%%", step / (double)N_STEP*100);
+
+        // Export every other frames
+        maybe_export(step, dst);
     }
 
     // Finish remaining tasks

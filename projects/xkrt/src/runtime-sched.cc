@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 17:27:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 01:41:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -72,10 +72,8 @@ xkrt_device_prepare_task(
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
 
-    # ifndef NDEBUG
-    LOGGER_INFO("Scheduling task `%s` of format `%d` on device %d",
+    LOGGER_DEBUG("Scheduling task `%s` of format `%d` on device %d",
             task->label, task->fmtid, device->global_id);
-    # endif /* NDEBUG */
 
     /* increase task 'fetching' counter so it does not get ready early
      * (eg before we processed all accesses bellow) */
@@ -250,9 +248,7 @@ xkrt_device_task_execute(
     xkrt_device_t * device,
     Task * task
 ) {
-    # ifndef NDEBUG
-    LOGGER_INFO("Task `%s` is ready for kernel execution", task->label);
-    # endif /* NDEBUG */
+    LOGGER_DEBUG("Task `%s` is ready for kernel execution", task->label);
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)

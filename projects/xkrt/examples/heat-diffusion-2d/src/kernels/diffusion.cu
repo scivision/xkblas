@@ -5,15 +5,17 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:00:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 00:23:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <heat/consts.h>
+# include <xkrt/min-max.h>
 
-#  define DTS (TS/2)
+// Number of threads per block line
+#  define DTS (MIN(32, TS))
 static_assert(DTS <= TS);
 static_assert(TS % DTS == 0);
 
@@ -27,6 +29,7 @@ diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x
     const int  i = tile_x * TS + li;
     const int  j = tile_y * TS + lj;
 
+    # if 1
     // boundary conditions fixed
     if (i > 0 && i < NX - 1 && j > 0 && j < NY - 1)
     {
@@ -35,6 +38,9 @@ diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x
                 (GRID(src,   li, lj+1, ld_src) - 2 * GRID(src, li, lj, ld_src) + GRID(src,   li, lj-1, ld_src)) / (DY * DY)
             );
     }
+    # else
+    GRID(dst, li, lj, ld_dst) = GRID(src, li, lj, ld_src);
+    # endif
 }
 
 # include <xkrt/driver/driver-cuda.h>
@@ -48,7 +54,7 @@ diffusion_cuda(
     TYPE * dst, int ld_dst,
     int tile_x, int tile_y
 ) {
-    // how many threads we need
+    // how many threads we need in total
     dim3 T = {TS, TS, 1};
 
     // block dim
