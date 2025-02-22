@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 01:36:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 02:17:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -19,7 +19,7 @@
 ////////////////////
 
 /* type to use for the temperature */
-#  define TYPE double
+#  define TYPE float
 
 /* Number of timesteps */
 #  define N_STEP 1000
@@ -32,7 +32,6 @@
 
 /* Boundary conditions (°C) */
 #  define TEMPERATURE_BOUNDARY 100
-#  define TEMPERATURE_INITIAL    0
 
 //////////////////////////////////////////////////
 // YOU CAN CHANGE BUT BE CAUTIOUS FOR STABILITY //
@@ -46,7 +45,7 @@
 //      );
 
 /* Number of points per dimension in the grid */
-#  define NX 4096
+#  define NX (16384)
 #  define NY NX
 
 /* Size of a cell (m) */
@@ -57,7 +56,7 @@
 #  define DT (0.5*(DX*DX * DY*DY) / (2*ALPHA*(DX*DX + DY*DY)))
 
 /* Tile size for distributing across gpus */
-#  define TS (1024)
+#  define TS (8192)
 
 //////////////////////////////////////////
 //  INFERED FROM CONSTS (do not modify) //

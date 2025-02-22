@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 01:41:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 02:13:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -446,6 +446,19 @@ xkrt_runtime_t::memory_distribute_cyclic_2D_async(
 }
 
 void
+xkrt_runtime_t::memory_distribute_cyclic_2D_halo_async(
+    matrix_order_t order,
+    void * ptr,
+    size_t ld,
+    size_t m, size_t n,
+    size_t mb, size_t nb,
+    size_t sizeof_type,
+    size_t hx, size_t hy
+) {
+    xkrt_memory_distribute_cyclic_2D_halo_async(this, order, ptr, ld, m, n, mb, nb, sizeof_type, hx, hy);
+}
+
+void
 xkrt_runtime_t::copy(
     const xkrt_device_global_id_t   device_global_id,
     const memory_view_t           & host_view,
@@ -528,9 +541,7 @@ xkrt_runtime_t::task_complete(Task * task)
 {
     assert(task);
 
-    # ifndef NDEBUG
-    LOGGER_INFO("task `%s` completed", task->label);
-    # endif /* NDEBUG */
+    LOGGER_DEBUG("task `%s` completed", task->label);
 
     ThreadWorker * thread = ThreadWorker::self();
     assert(thread);

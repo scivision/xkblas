@@ -5,13 +5,14 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 01:38:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 02:21:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/xkrt.h>
+# include <xkrt/logger/metric.h>
 # include <xkrt/driver/thread-producer.hpp>
 
 # include <stdio.h>
@@ -203,14 +204,24 @@ setup_tasks(void)
 static void
 initialize(TYPE * grid1, TYPE * grid2)
 {
-    for (int i = 0; i < NX; i++)
+    LOGGER_WARN("Initializing grid on the host");
+
+    memset(grid1, 0, NX*NY*sizeof(TYPE));
+    memset(grid2, 0, NX*NY*sizeof(TYPE));
+
+    for (int i = 0; i < NX; ++i)
     {
-        for (int j = 0; j < NY; j++)
-        {
-            const int temp = (i == 0 || i == NX - 1 || j == 0 || j == NY - 1) ? TEMPERATURE_BOUNDARY : TEMPERATURE_INITIAL;
-            GRID(grid1, i, j, LD) = GRID(grid2, i, j, LD) = temp;
-        }
+        GRID(grid1, i,    0, LD) = GRID(grid2, i,    0, LD) = TEMPERATURE_BOUNDARY;
+        GRID(grid1, i, NY-1, LD) = GRID(grid2, i, NY-1, LD) = TEMPERATURE_BOUNDARY;
     }
+
+    for (int i = 0; i < NY; ++i)
+    {
+        GRID(grid1,    0, i, LD) = GRID(grid2,    0, i, LD) = TEMPERATURE_BOUNDARY;
+        GRID(grid1, NX-1, i, LD) = GRID(grid2, NX-1, i, LD) = TEMPERATURE_BOUNDARY;
+    }
+
+    LOGGER_WARN("Initialized grid on the host");
 }
 
 /* Submit a tile */
@@ -240,21 +251,21 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     # define NACCESSES 2
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     {
-        const int x0 = MAX(x-1, 0);
-        const int y0 = MAX(y-1, 0);
-        const int x1 = MIN(x+TS+1, NX);
-        const int y1 = MIN(y+TS+1, NY);
-        const int sx = x1 - x0;
-        const int sy = y1 - y0;
+        const ssize_t x0 = MAX(x-1, 0);
+        const ssize_t y0 = MAX(y-1, 0);
+        const ssize_t x1 = MIN(x+TS+1, NX);
+        const ssize_t y1 = MIN(y+TS+1, NY);
+        const  size_t sx = x1 - x0;
+        const  size_t sy = y1 - y0;
         new(task->accesses + 0) Access(MATRIX_COLMAJOR, src, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
     }
     {
-        const int x0 = MAX(x, 1);
-        const int y0 = MAX(y, 1);
-        const int x1 = MIN(x+TS, NX-1);
-        const int y1 = MIN(y+TS, NY-1);
-        const int sx = x1 - x0;
-        const int sy = y1 - y0;
+        const ssize_t x0 = MAX(x, 1);
+        const ssize_t y0 = MAX(y, 1);
+        const ssize_t x1 = MIN(x+TS, NX-1);
+        const ssize_t y1 = MIN(y+TS, NY-1);
+        const  size_t sx = x1 - x0;
+        const  size_t sy = y1 - y0;
         new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_W);
     }
     thread->resolve<NACCESSES>(task);
@@ -310,8 +321,10 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
-    runtime.memory_distribute_cyclic_2D_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE));
-    runtime.memory_distribute_cyclic_2D_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE));
+    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+
+    uint64_t t0 = xkrt_get_nanotime();
 
     // Time stepping
     for (int step = 0; step < N_STEP; ++step)
@@ -328,6 +341,9 @@ main(void)
         // Export every other frames
         maybe_export(step, dst);
     }
+
+    uint64_t tf = xkrt_get_nanotime();
+    LOGGER_WARN("Took %.2lf s", (tf-t0)/1e9);
 
     // Finish remaining tasks
     xkrt_sync(&runtime);

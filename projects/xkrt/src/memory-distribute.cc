@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 17:29:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/22 02:19:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,13 +18,14 @@ static task_format_id_t TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC;
 
 extern "C"
 void
-xkrt_memory_distribute_cyclic_2D_async(
+xkrt_memory_distribute_cyclic_2D_halo_async(
     xkrt_runtime_t * runtime,
     matrix_order_t order,
     void * ptr, size_t ld,
     size_t m, size_t n,
     size_t mb, size_t nb,
-    size_t sizeof_type
+    size_t sizeof_type,
+    size_t hx, size_t hy
 ) {
     ThreadProducer * thread = ThreadProducer::self();
     assert(thread);
@@ -36,11 +37,8 @@ xkrt_memory_distribute_cyclic_2D_async(
 
     for (size_t tm = 0; tm < mt; ++tm)
     {
-        size_t bs_m = (tm == mt-1) ? (m-tm*mb) : mb;
         for (size_t tn = 0; tn < nt; ++tn)
         {
-            size_t bs_n = (tn == nt-1) ? (n-tn*nb) : nb;
-
             const uint64_t task_size = sizeof(Task);
             uint8_t * mem = thread->allocate(task_size);
             assert(mem);
@@ -50,7 +48,17 @@ xkrt_memory_distribute_cyclic_2D_async(
 
             # define NACCESSES 1
             static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-            new(task->accesses + 0) Access(order, ptr, ld, tm*mb, tn*nb, bs_m, bs_n, sizeof_type, ACCESS_MODE_R);
+            {
+                const ssize_t  x = tm * mb;
+                const ssize_t  y = tn * nb;
+                const ssize_t x0 = MAX(x-ox, 0);
+                const ssize_t y0 = MAX(y-oy, 0);
+                const ssize_t x1 = MIN(x+mb+ox, m);
+                const ssize_t y1 = MIN(y+nb+oy, n);
+                const  size_t sx = x1 - x0;
+                const  size_t sy = y1 - y0;
+                new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
+            }
             thread->resolve<NACCESSES>(task);
             # undef NACCESSES
 
@@ -63,6 +71,19 @@ xkrt_memory_distribute_cyclic_2D_async(
             device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
         }
     }
+}
+
+extern "C"
+void
+xkrt_memory_distribute_cyclic_2D_async(
+    xkrt_runtime_t * runtime,
+    matrix_order_t order,
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t mb, size_t nb,
+    size_t sizeof_type
+){
+    xkrt_memory_distribute_cyclic_2D_halo_async(runtime, order, ptr, ld, m, n, mb, nb, sizeof_type, 0, 0);
 }
 
 //////////////////////////
