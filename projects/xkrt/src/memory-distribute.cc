@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 02:19:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 05:41:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,10 +51,10 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
             {
                 const ssize_t  x = tm * mb;
                 const ssize_t  y = tn * nb;
-                const ssize_t x0 = MAX(x-ox, 0);
-                const ssize_t y0 = MAX(y-oy, 0);
-                const ssize_t x1 = MIN(x+mb+ox, m);
-                const ssize_t y1 = MIN(y+nb+oy, n);
+                const ssize_t x0 = MAX(x-(ssize_t)hx, 0);
+                const ssize_t y0 = MAX(y-(ssize_t)hy, 0);
+                const ssize_t x1 = MIN(x+mb+hx, m);
+                const ssize_t y1 = MIN(y+nb+hy, n);
                 const  size_t sx = x1 - x0;
                 const  size_t sy = y1 - y0;
                 new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
