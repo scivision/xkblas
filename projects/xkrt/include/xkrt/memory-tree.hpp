@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 18:00:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 16:51:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -35,10 +35,9 @@
 
 /*
  *  Set to '1' to enable the following heuristic :
- *      If some memory is not valid on any devices, but a device A is already fetching it from the host,
- *      then if a device B wants to fetch concurrently, it does not perform
- *      another H2D transfer but instead waits for 'A' to receive that will
- *      trigger a D2D from A to B
+ *      If some memory is not valid on any devices, but a device A is already
+ *      fetching it, then if a device B wants to fetch concurrently, it defer
+ *      the fetch to a D2D A->B submitted when A fetched.
  *
  *  Set to '0' so multiple H2D are submitted concurrently
  */
@@ -1056,15 +1055,29 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 xkrt_device_global_id_t src = (xkrt_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
                 assert(src >= 0);
 
-                // Get the first valid allocation on that device
+                // Get a valid allocation on that device
                 MemoryReplicate & src_replicate = partite.block->replicates[src];
                 assert(src_replicate.nallocations > 0);
                 assert(src_replicate.valid);
 
+                # if 0
+                // Heuristic : get the first valid
                 const memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
                 assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
+                # else
+                // Heuristic: use the largest valid allocation on that device to reduce D2D copies later
+                memory_allocation_view_id_t src_allocation_view_id = 0;
+                for (memory_allocation_view_id_t allocation_view_id = 1 ; allocation_view_id < src_replicate.nallocations ; ++allocation_view_id)
+                {
+                    const MemoryReplicateAllocationView * src_allocation_view = src_replicate.allocations[src_allocation_view_id];
+                    const MemoryReplicateAllocationView *     allocation_view = src_replicate.allocations[allocation_view_id];
+                    if (src_allocation_view->chunk->size < allocation_view->chunk->size)
+                        src_allocation_view_id = allocation_view_id;
+                }
+                # endif
 
                 // retrieve and set src view infos
+                assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
                 MemoryReplicateAllocationView * src_allocation_view = src_replicate.allocations[src_allocation_view_id];
                 assert(src_allocation_view);
 
@@ -1481,6 +1494,7 @@ next_view:
 
                         memory_allocation_view_id_t fetching_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(fetching_replicate.fetching) - 1);
                         assert(0 <= fetching_allocation_view_id && fetching_allocation_view_id < fetching_replicate.nallocations);
+                        assert(fetching_replicate.fetching & (1 << fetching_allocation_view_id));
 
                         MemoryReplicateAllocationView * fetching_allocation_view = fetching_replicate.allocations[fetching_allocation_view_id];
                         assert(fetching_allocation_view);
@@ -1574,7 +1588,7 @@ next_view:
             fetch_t * fetch = list->fetches + i;
 
             /* callback setup */
-            assert(XKRT_CALLBACK_ARGS_MAX >= 3);
+            assert(XKRT_CALLBACK_ARGS_MAX >= 4);
             xkrt_callback_t callback;
             callback.func = fetch_callback;
             callback.args[0] = this->runtime;
@@ -1844,6 +1858,7 @@ next_view:
                 {
                     const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << search.device_global_id);
                     MemoryReplicate & replicate = node->block.replicates[search.device_global_id];
+                    assert(replicate.nallocations);
 
                     /* for each allocation of that block */
                     for (memory_allocation_view_id_t allocation_view_id = 0 ; allocation_view_id < replicate.nallocations ; ++allocation_view_id)
@@ -1903,6 +1918,7 @@ next_view:
                 }
             }
         }
+
         Node *
         new_node(
             Search & search,

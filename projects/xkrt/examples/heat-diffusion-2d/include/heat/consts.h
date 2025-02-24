@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 05:43:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 16:41:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -26,6 +26,7 @@
 
 /* Number of vtk images to generate */
 #  define N_VTK MIN(0, N_STEP)
+//#  define N_VTK MIN(10, N_STEP)
 
 /* Thermal diffusivity */
 #  define ALPHA (1.11e-4)

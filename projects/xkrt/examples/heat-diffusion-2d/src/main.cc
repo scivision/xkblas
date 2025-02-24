@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 02:24:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 16:52:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -321,8 +321,14 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
+    # if 1
     runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
     runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+    # elif 0
+    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 0, 0);
+    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 0, 0);
+    # else
+    # endif
 
     uint64_t t0 = xkrt_get_nanotime();
 

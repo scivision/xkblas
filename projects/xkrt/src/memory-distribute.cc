@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 05:41:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 17:01:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,43 +32,73 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
 
     xkrt_device_global_id_t device_global_id = 0;
 
-    const size_t mt = NUM_OF_TILES(m, mb);
-    const size_t nt = NUM_OF_TILES(n, nb);
-
-    for (size_t tm = 0; tm < mt; ++tm)
+    // If there is only 1 device, just send one big access - which allows a
+    // single buffer on the device with a LD large enough for all future tasks
+    // However, means any tasks on a subdomain cannot start until all the data had been transfered...
+    // What do we want here ?
+    if (runtime->drivers.devices.n == 1)
     {
-        for (size_t tn = 0; tn < nt; ++tn)
+        const uint64_t task_size = sizeof(Task);
+        uint8_t * mem = thread->allocate(task_size);
+        assert(mem);
+
+        Task * task = reinterpret_cast<Task *>  (mem + 0);
+        new(task) Task(TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+
+        # define NACCESS 1
+        static_assert(NACCESS <= TASK_MAX_ACCESSES);
         {
-            const uint64_t task_size = sizeof(Task);
-            uint8_t * mem = thread->allocate(task_size);
-            assert(mem);
+            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+        }
+        thread->resolve<NACCESS>(task);
+        # undef NACCESS
 
-            Task * task = reinterpret_cast<Task *>  (mem + 0);
-            new(task) Task(TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+        #ifndef ndebug
+        snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
+        #endif /* ndebug */
 
-            # define NACCESSES 1
-            static_assert(NACCESSES <= TASK_MAX_ACCESSES);
+        runtime->task_commit(task);
+    }
+    else
+    {
+        const size_t mt = NUM_OF_TILES(m, mb);
+        const size_t nt = NUM_OF_TILES(n, nb);
+
+        for (size_t tm = 0; tm < mt; ++tm)
+        {
+            for (size_t tn = 0; tn < nt; ++tn)
             {
-                const ssize_t  x = tm * mb;
-                const ssize_t  y = tn * nb;
-                const ssize_t x0 = MAX(x-(ssize_t)hx, 0);
-                const ssize_t y0 = MAX(y-(ssize_t)hy, 0);
-                const ssize_t x1 = MIN(x+mb+hx, m);
-                const ssize_t y1 = MIN(y+nb+hy, n);
-                const  size_t sx = x1 - x0;
-                const  size_t sy = y1 - y0;
-                new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
+                const uint64_t task_size = sizeof(Task);
+                uint8_t * mem = thread->allocate(task_size);
+                assert(mem);
+
+                Task * task = reinterpret_cast<Task *>  (mem + 0);
+                new(task) Task(TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+
+                # define NACCESS 1
+                static_assert(NACCESS <= TASK_MAX_ACCESSES);
+                {
+                    const ssize_t  x = tm * mb;
+                    const ssize_t  y = tn * nb;
+                    const ssize_t x0 = MAX(x-(ssize_t)hx, 0);
+                    const ssize_t y0 = MAX(y-(ssize_t)hy, 0);
+                    const ssize_t x1 = MIN(x+mb+hx, m);
+                    const ssize_t y1 = MIN(y+nb+hy, n);
+                    const  size_t sx = x1 - x0;
+                    const  size_t sy = y1 - y0;
+                    new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
+                }
+                thread->resolve<NACCESS>(task);
+                # undef NACCESS
+
+                #ifndef ndebug
+                snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
+                #endif /* ndebug */
+
+                runtime->task_commit(task);
+
+                device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
             }
-            thread->resolve<NACCESSES>(task);
-            # undef NACCESSES
-
-            #ifndef NDEBUG
-            snprintf(task->label, sizeof(task->label), "distribute_cyclic_2D_async");
-            #endif /* NDEBUG */
-
-            runtime->task_commit(task);
-
-            device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
         }
     }
 }
