@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 17:54:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 21:35:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -82,11 +82,11 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
 
     /* retrieve memory infos */
-    void   (*f_memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info);
+    void   (*f_memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories);
 
     /* allocate device memory */
-    void * (*f_memory_device_allocate)(int device_driver_id, const size_t size);
-    void   (*f_memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size);
+    void * (*f_memory_device_allocate)(int device_driver_id, const size_t size, int area_idx);
+    void   (*f_memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx);
 
     /* allocate host memory */
     void * (*f_memory_host_allocate)(int device_driver_id, const size_t size);

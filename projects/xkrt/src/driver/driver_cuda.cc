@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:37:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 21:36:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -282,8 +282,10 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 }
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size, int area_idx)
 {
+    assert(area_idx == 0);
+
     // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
     void * device_ptr;
     CU_SAFE_CALL(cudaMalloc(&device_ptr, size));
@@ -291,19 +293,23 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
+    assert(area_idx == 0);
     // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
     CU_SAFE_CALL(cudaFree(ptr));
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info)
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
 {
-    (void) device_driver_id;
+    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+
     size_t free, total;
     CU_SAFE_CALL(cudaMemGetInfo(&free, &total));
-    info->capacity = total;
+    info[0].capacity = total;
+    strncpy(info[0].name, "(null)", sizeof(info[0].name));
+    *nmemories = 1;
 }
 
 static int

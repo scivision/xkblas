@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:37:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 18:18:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,6 +43,12 @@ typedef struct  xkrt_device_ze_t
     ze_device_handle_t      ze_device;
     ze_device_properties_t  ze_device_properties;
 
+    // memory properties
+    struct {
+        uint32_t pcount;
+        ze_device_memory_properties_t ze_properties[XKRT_DEVICE_MEMORIES_MAX];
+    } memory;
+
     // number of command queue group
     uint32_t ncommandqueuegroups;
 
@@ -51,6 +57,7 @@ typedef struct  xkrt_device_ze_t
 
     // per command queue number of queue used
     std::atomic<uint32_t>               * ze_command_queue_group_used;
+
 
 }               xkrt_device_ze_t;
 

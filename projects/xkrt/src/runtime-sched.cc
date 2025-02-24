@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 02:13:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 21:38:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -160,7 +160,6 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     device->driver_id   = device_driver_id;
     device->global_id   = runtime->drivers.devices.n.fetch_add(1, std::memory_order_seq_cst);
     device->conf        = &(runtime->conf.device);
-    XKRT_MUTEX_INIT(device->area.lock);
 
     // register worker thread
     ThreadWorker::init();
@@ -189,13 +188,19 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     /* get total memory and allocate chunk0 */
     assert(driver->f_memory_device_info);
-    xkrt_device_memory_info_t info;
-    driver->f_memory_device_info(device->driver_id, &info);
-    const size_t size = (size_t) ((double)info.capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
+    driver->f_memory_device_info(device->driver_id, device->memories, &device->nmemories);
+    assert(device->nmemories > 0);
+    for (int i = 0 ; i < device->nmemories ; ++i)
+    {
+        xkrt_device_memory_info_t * info = device->memories + i;
 
-    assert(driver->f_memory_device_allocate);
-    const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size);
-    device->memory_set_chunk0((uintptr_t) device_ptr, size);
+        XKRT_MUTEX_INIT(info->area.lock);
+        const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
+
+        assert(driver->f_memory_device_allocate);
+        const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size, i);
+        device->memory_set_chunk0((uintptr_t) device_ptr, size, i);
+    }
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);
     device->state = XKRT_DEVICE_STATE_INIT;
@@ -387,17 +392,6 @@ xkrt_runtime_t::memory_deallocate_all(
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     return device->memory_reset();
-}
-
-void
-xkrt_runtime_t::memory_info(
-    const xkrt_device_global_id_t device_global_id,
-    xkrt_device_memory_info_t * info
-) {
-    xkrt_device_t * device = this->device_get(device_global_id);
-    xkrt_driver_t * driver = this->driver_get(device->driver_type);
-    assert(driver->f_memory_device_info);
-    driver->f_memory_device_info(device->driver_id, info);
 }
 
 void *

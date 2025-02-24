@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 02:05:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 18:43:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -103,9 +103,6 @@ typedef struct  xkrt_runtime_t
 
     /* dealloacte all memory previously allocated on the device */
     void memory_deallocate_all(const xkrt_device_global_id_t device_global_id);
-
-    /* retrieve device memory information */
-    void memory_info(const xkrt_device_global_id_t device_global_id, xkrt_device_memory_info_t * info);
 
     /* allocate memory onto the host using the given driver */
     void * memory_host_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);

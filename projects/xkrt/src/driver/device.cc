@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:11:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 18:41:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,9 +19,9 @@
 //////////////////////
 
 void
-xkrt_device_t::memory_reset(void)
+xkrt_device_t::memory_reset_on(int area_idx)
 {
-    xkrt_area_t * area = &(this->area);
+    xkrt_area_t * area = &(this->memories[area_idx].area);
 
     # pragma message(TODO "This is leaking")
     xkrt_area_chunk_t * chunk0 = (xkrt_area_chunk_t *) malloc(sizeof(xkrt_area_chunk_t));
@@ -34,11 +34,19 @@ xkrt_device_t::memory_reset(void)
 }
 
 void
+xkrt_device_t::memory_reset(void)
+{
+    for (int i = 0 ; i < this->nmemories ; ++i)
+        this->memory_reset_on(i);
+}
+
+void
 xkrt_device_t::memory_set_chunk0(
     uintptr_t device_ptr,
-    size_t size
+    size_t size,
+    int area_idx
 ) {
-    xkrt_area_t * area = &(this->area);
+    xkrt_area_t * area = &(this->memories[area_idx].area);
 
     area->chunk0.device_ptr    = device_ptr;
     area->chunk0.size          = size;
@@ -48,15 +56,17 @@ xkrt_device_t::memory_set_chunk0(
     area->chunk0.freelink      = NULL;
     area->chunk0.use_counter   = 0;
 
-    this->memory_reset();
+    this->memory_reset_on(area_idx);
 }
 
 void
 xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
 {
-    bool delete_chunk = false;
+    assert(chunk->area_idx >= 0);
+    assert(chunk->area_idx < this->nmemories);
+    xkrt_area_t * area = &(this->memories[chunk->area_idx].area);
 
-    xkrt_area_t * area = &(this->area);
+    bool delete_chunk = false;
     XKRT_MUTEX_LOCK(area->lock);
     {
         chunk->state = XKRT_ALLOC_CHUNK_STATE_FREE;
@@ -139,14 +149,17 @@ xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
 }
 
 xkrt_area_chunk_t *
-xkrt_device_t::memory_allocate(const size_t user_size)
+xkrt_device_t::memory_allocate_on(const size_t user_size, int area_idx)
 {
+    /* retrieve area */
+    assert(area_idx >= 0);
+    assert(area_idx < this->nmemories);
+    xkrt_area_t * area = &(this->memories[area_idx].area);
+
     /* align data */
     const size_t size = (user_size + 7UL) & ~7UL;
-
     xkrt_area_chunk_t * curr;
 
-    xkrt_area_t * area = &(this->area);
     XKRT_MUTEX_LOCK(area->lock);
     {
         /* best fit strategy */
@@ -213,13 +226,27 @@ xkrt_device_t::memory_allocate(const size_t user_size)
 
     if (curr)
     {
+        curr->area_idx = area_idx;
         XKRT_STATS_INCR(this->stats.memory.allocated.total,       size);
         XKRT_STATS_INCR(this->stats.memory.allocated.currently,   size);
     }
 
     return curr;
+
 }
 
+xkrt_area_chunk_t *
+xkrt_device_t::memory_allocate(const size_t user_size)
+{
+    /* Heuristic: allocate on device's memory with increasing index order */
+    for (int i = 0 ; i < this->nmemories ; ++i)
+    {
+        xkrt_area_chunk_t * chunk = this->memory_allocate_on(user_size, i);
+        if (chunk)
+            return chunk;
+    }
+    return NULL;
+}
 
 ///////////////////////
 // STREAM MANAGEMENT //

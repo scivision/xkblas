@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/19 18:50:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 17:37:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,9 @@
 
 /* maximum number of devices in total */
 # define XKRT_DEVICES_MAX (16)
+
+/* maximum number of memory per device */
+# define XKRT_DEVICE_MEMORIES_MAX (2)
 
 /* maximum number of performance ranks between devices. */
 # define XKRT_DEVICES_PERF_RANK_MAX (4)

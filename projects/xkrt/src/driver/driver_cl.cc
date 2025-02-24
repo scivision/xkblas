@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:37:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 21:37:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -561,8 +561,10 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
 ////////////
 
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size)
+XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size, int area_idx)
 {
+    assert(area_idx == 0);
+
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
     if (device->memory.nbuffers >= XKRT_DRIVER_CL_MAX_BUFFERS)
@@ -589,13 +591,15 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t * info)
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
 {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
     cl_ulong max_mem_alloc_size;
     CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_mem_alloc_size, NULL));
-    info->capacity = (size_t) max_mem_alloc_size;
+    info[0].capacity = (size_t) max_mem_alloc_size;
+    strncpy(info[0].name, "(null)", sizeof(info[0].name));
+    *nmemories = 1;
 }
 
 static int
@@ -640,6 +644,7 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
 
     REGISTER(memory_device_info);
     REGISTER(memory_device_allocate);
+    // REGISTER(memory_device_allocate_on);
     // REGISTER(memory_device_deallocate);
     // REGISTER(memory_host_allocate);
     // REGISTER(memory_host_deallocate);

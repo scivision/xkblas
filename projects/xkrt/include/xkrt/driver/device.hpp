@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:31:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 18:42:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,8 +41,14 @@ typedef enum    xkrt_device_state_t : uint8_t
 /* Memory info of a device */
 typedef struct  xkrt_device_memory_info_t
 {
-    /* total device capacity */
+    /* memory capacity */
     size_t capacity;
+
+    /* memory name */
+    char name[32];
+
+    /* the area of that memory */
+    xkrt_area_t area;
 
 }               xkrt_device_memory_info_t;
 
@@ -63,7 +69,7 @@ typedef struct  xkrt_device_t
     /* driver device id in [0..ngpus_for_device] */
     uint8_t driver_id;
 
-    /* global device id in [0, XKRT_DEVICES_MAX[ - host is a virtual device of id 'XKRT_DEVICES_MAX'*/
+    /* global device id in [0, XKRT_DEVICES_MAX[ - host is a virtual device of id 'XKRT_DEVICES_MAX' */
     xkrt_device_global_id_t global_id;
 
     /* the device state */
@@ -92,8 +98,12 @@ typedef struct  xkrt_device_t
     // MEMORY MANAGMENT //
     //////////////////////
 
-    /* memory areas of that device */
-    xkrt_area_t area;
+    /* memory areas of that device - sorted by performance */
+    xkrt_device_memory_info_t memories[XKRT_DEVICE_MEMORIES_MAX];
+    int nmemories;
+
+    /* allocate memory on a specific area */
+    xkrt_area_chunk_t * memory_allocate_on(const size_t size, int area_idx);
 
     /* allocate memory */
     xkrt_area_chunk_t * memory_allocate(const size_t size);
@@ -101,11 +111,14 @@ typedef struct  xkrt_device_t
     /* deallocate the given chunk */
     void memory_deallocate(xkrt_area_chunk_t * chunk);
 
-    /* free all memory of every areas of that device, resetting their state to chunk0 */
+    /* free all memory of every area of that device, resetting their state to chunk0 */
     void memory_reset(void);
 
-    /* set the chunk0 of the device memory area*/
-    void memory_set_chunk0(uintptr_t device_ptr, size_t size);
+    /* free all memory of the given area of that device, resetting their state to chunk0 */
+    void memory_reset_on(int area_idx);
+
+    /* set chunk0 of an area */
+    void memory_set_chunk0(uintptr_t device_ptr, size_t size, int area_idx);
 
     ///////////////////////
     // STREAM MANAGEMENT //

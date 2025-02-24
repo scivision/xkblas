@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:00:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/24 17:51:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,6 +42,7 @@ typedef struct  xkrt_area_chunk_t
     struct xkrt_area_chunk_t * next;        /* next chunk in double chained list */
     struct xkrt_area_chunk_t * freelink;    /* next freechunk in the chained list */
     int use_counter;                        /* used in the memory-tree to count how many blocks relies on that allocation chunk */
+    int area_idx;                           /* memory area index in the device (TODO: bad design) */
 }               xkrt_area_chunk_t;
 
 /* The device memory with allocation information */
