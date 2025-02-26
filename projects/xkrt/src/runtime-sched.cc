@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 16:05:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 16:23:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -144,7 +144,9 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     # pragma message(TODO "Implement device thread")
 
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) vruntime;
-    xkrt_driver_t * driver = runtime->drivers.list + driver_type;
+    assert(runtime);
+
+    xkrt_driver_t * driver = runtime->driver_get(driver_type);
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
@@ -169,8 +171,11 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     // register affinity
     xkrt_runtime_t::thread_getaffinity(device->thread->cpuset);
 
-    // register device to the driver list
+    // register device to the global list
     runtime->drivers.devices.list[device->global_id] = device;
+
+    // register device to the driver list
+    driver->devices[device_driver_id] = device;
 
     // init device by the driver
     driver->f_device_init(device->driver_id);
@@ -314,8 +319,10 @@ xkrt_device_task_execute(
                 callback
             );
 
+            # if 0
             if (device->thread == ThreadWorker::self()) // TODO : explain why this
                 device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
+            # endif
             /* else kernel launch will be called asynchronously */
         }
     }
@@ -331,7 +338,7 @@ xkrt_runtime_t::driver_get(
 ) {
     assert(type >= 0);
     assert(type < XKRT_DRIVER_TYPE_MAX);
-    return this->drivers.list + type;
+    return this->drivers.list[type];
 }
 
 xkrt_device_t *

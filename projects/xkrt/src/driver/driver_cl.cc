@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 21:37:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 05:06:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -623,10 +623,13 @@ XKRT_DRIVER_ENTRYPOINT(memory_unregister)(
 //////////////////////////
 // Routine registration //
 //////////////////////////
-void
-XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
+xkrt_driver_t *
+XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    # define REGISTER(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
+    xkrt_driver_cl_t * driver = (xkrt_driver_cl_t *) malloc(sizeof(xkrt_driver_cl_t));
+    assert(driver);
+
+    # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)
 
     REGISTER(init);
     REGISTER(finalize);
@@ -659,4 +662,6 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     REGISTER(stream_delete);
 
     # undef REGISTER
+
+    return (xkrt_driver_t *) driver;
 }

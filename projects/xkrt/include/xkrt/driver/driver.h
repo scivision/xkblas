@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 21:35:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 15:47:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,10 +29,16 @@
 
 # include <hwloc.h>
 
+typedef void * xkrt_driver_module_t;
+typedef void * xkrt_driver_module_fn_t;
+
 typedef struct  xkrt_driver_t
 {
     /* type */
     xkrt_driver_type_t type;
+
+    /* devices */
+    xkrt_device_t * devices[XKRT_DEVICES_MAX];
 
     /* number of devices targeted, used in initialization */
     volatile std::atomic<int> ndevices_targeted;
@@ -42,6 +48,10 @@ typedef struct  xkrt_driver_t
 
     /* number of devices in the COMMIT state */
     volatile std::atomic<int> ndevices_commited;
+
+    /////////////////////////////////////
+    //  API TO IMPLEMENT BY THE DRIVER //
+    /////////////////////////////////////
 
     ///////////////////////
     //  DRIVER META DATA //
@@ -123,9 +133,19 @@ typedef struct  xkrt_driver_t
 
     // TODO
 
+    /////////////
+    // MODULES //
+    /////////////
+    xkrt_driver_module_t    (*f_module_load)(int device_driver_id, uint8_t * bin, size_t binsize);
+    void                    (*f_module_unload)(xkrt_driver_module_t module);
+    xkrt_driver_module_fn_t (*f_module_get_fn)(xkrt_driver_module_t module, const char * name);
+
 }               xkrt_driver_t;
 
 void * xkrt_device_thread_main(void * a);
+
+extern "C"
+xkrt_device_t * xkrt_driver_device_get(xkrt_driver_t * driver, xkrt_device_global_id_t driver_device_id);
 
 /* one function per task per driver */
 static_assert((uint8_t)XKRT_DRIVER_TYPE_MAX <= (uint8_t)TASK_FORMAT_TARGET_MAX);
@@ -133,7 +153,7 @@ static_assert((uint8_t)XKRT_DRIVER_TYPE_MAX <= (uint8_t)TASK_FORMAT_TARGET_MAX);
 typedef struct  xkrt_drivers_t
 {
     /* list of drivers */
-    xkrt_driver_t list[XKRT_DRIVER_TYPE_MAX];
+    xkrt_driver_t * list[XKRT_DRIVER_TYPE_MAX];
 
     struct {
 

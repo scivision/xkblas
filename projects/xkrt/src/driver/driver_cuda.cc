@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 19:21:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 15:33:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -84,10 +84,10 @@ __get_device_cuda(int device_driver_id)
 static
 uint64_t cuda_get_free_mem(int device_driver_id)
 {
-    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
 
     uint64_t free, total;
-    CU_SAFE_CALL(cudaMemGetInfo(&free, &total));
+    CUDA_SAFE_CALL(cudaMemGetInfo(&free, &total));
 
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
     device->free_mem = (size_t)free;
@@ -98,7 +98,7 @@ static unsigned int
 XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
     int device_count = 0;
-    CU_SAFE_CALL(cudaGetDeviceCount(&device_count));
+    CUDA_SAFE_CALL(cudaGetDeviceCount(&device_count));
     return (unsigned int)device_count;
 }
 
@@ -116,7 +116,7 @@ static uint64_t *   cuda_perf_device    = NULL;
 static void
 __get_gpu_topo(void)
 {
-    CU_SAFE_CALL(cudaGetDeviceCount(&cuda_device_count));
+    CUDA_SAFE_CALL(cudaGetDeviceCount(&cuda_device_count));
     if (cuda_device_count == 0)
         return;
 
@@ -140,7 +140,7 @@ __get_gpu_topo(void)
                 int perf_rank = 0;
                 int access_supported = 0;
 
-                CU_SAFE_CALL(
+                CUDA_SAFE_CALL(
                     cudaDeviceGetP2PAttribute(
                         &access_supported,
                         cudaDevP2PAttrAccessSupported,
@@ -150,7 +150,7 @@ __get_gpu_topo(void)
 
                 if (access_supported)
                 {
-                    CU_SAFE_CALL(
+                    CUDA_SAFE_CALL(
                         cudaDeviceGetP2PAttribute(
                             &perf_rank,
                             cudaDevP2PAttrPerformanceRank,
@@ -269,8 +269,8 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
     assert(device->inherited.state == XKRT_DEVICE_STATE_CREATE);
 
     struct cudaDeviceProp prop;
-    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
-    CU_SAFE_CALL(cudaGetDeviceProperties(&prop, device_driver_id));
+    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CUDA_SAFE_CALL(cudaGetDeviceProperties(&prop, device_driver_id));
 
     device->prop.pciBusID = prop.pciBusID;
     device->prop.pciDeviceID = prop.pciDeviceID;
@@ -290,9 +290,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 {
     assert(area_idx == 0);
 
-    // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    // CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
     void * device_ptr;
-    CU_SAFE_CALL(cudaMalloc(&device_ptr, size));
+    CUDA_SAFE_CALL(cudaMalloc(&device_ptr, size));
     return device_ptr;
 }
 
@@ -300,17 +300,17 @@ static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
     assert(area_idx == 0);
-    // CU_SAFE_CALL(cudaSetDevice(device_driver_id));
-    CU_SAFE_CALL(cudaFree(ptr));
+    // CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CUDA_SAFE_CALL(cudaFree(ptr));
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
 {
-    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
 
     size_t free, total;
-    CU_SAFE_CALL(cudaMemGetInfo(&free, &total));
+    CUDA_SAFE_CALL(cudaMemGetInfo(&free, &total));
     info[0].capacity = total;
     strncpy(info[0].name, "(null)", sizeof(info[0].name));
     *nmemories = 1;
@@ -327,7 +327,7 @@ static int
 XKRT_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
 {
     xkrt_device_cuda_t * device = __get_device_cuda(device_driver_id);
-    CU_SAFE_CALL(cudaSetDevice(device_driver_id));
+    CUDA_SAFE_CALL(cudaSetDevice(device_driver_id));
     return 0;
 }
 
@@ -409,7 +409,7 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         else
         {
             int access;
-            CU_SAFE_CALL(cudaDeviceCanAccessPeer(&access, device_driver_id, other_device_driver_id));
+            CUDA_SAFE_CALL(cudaDeviceCanAccessPeer(&access, device_driver_id, other_device_driver_id));
 
             if (access)
             {
@@ -443,7 +443,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_register)(
     void * ptr,
     uint64_t size
 ) {
-    CU_SAFE_CALL(cudaHostRegister(ptr, size, cudaHostRegisterPortable));
+    CUDA_SAFE_CALL(cudaHostRegister(ptr, size, cudaHostRegisterPortable));
     return 0;
 }
 
@@ -453,7 +453,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_unregister)(
     uint64_t size
 ) {
     (void) size;
-    CU_SAFE_CALL(cudaHostUnregister(ptr));
+    CUDA_SAFE_CALL(cudaHostUnregister(ptr));
     return 0;
 }
 
@@ -464,8 +464,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
 ) {
     (void) device_driver_id;
     void * ptr;
-    CU_SAFE_CALL(cudaHostAlloc(&ptr, size, cudaHostRegisterPortable));
-    // CU_SAFE_CALL(cudaHostAlloc(&ptr, size, cudaHostRegisterPortable | cudaHostAllocWriteCombined));
+    CUDA_SAFE_CALL(cudaHostAlloc(&ptr, size, cudaHostRegisterPortable));
+    // CUDA_SAFE_CALL(cudaHostAlloc(&ptr, size, cudaHostRegisterPortable | cudaHostAllocWriteCombined));
     return ptr;
 }
 
@@ -477,7 +477,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
 ) {
     (void) device_driver_id;
     (void) size;
-    CU_SAFE_CALL(cudaFreeHost(mem));
+    CUDA_SAFE_CALL(cudaFreeHost(mem));
 }
 
 static int
@@ -541,8 +541,8 @@ cuda_stream_instructions_launch(
 
             LOGGER_DEBUG("cudaMemcpyAsync(dst=%p, src=%p, count=%zu, kind=%s",
                     dst, src, count, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
-            CU_SAFE_CALL(cudaMemcpyAsync(dst, src, count, kind, handle));
-            CU_SAFE_CALL(cudaEventRecord(event, handle));
+            CUDA_SAFE_CALL(cudaMemcpyAsync(dst, src, count, kind, handle));
+            CUDA_SAFE_CALL(cudaEventRecord(event, handle));
 
             return EINPROGRESS;
         }
@@ -564,8 +564,8 @@ cuda_stream_instructions_launch(
 
             LOGGER_DEBUG("cudaMemcpy2DAsync(dst=%p, dpitch=%zu, src=%p, spitch=%zu, width=%zu, height=%zu, kind=%s",
                     dst, dpitch, src, spitch, width, height, (kind == cudaMemcpyDeviceToDevice) ? "D2D" : (kind == cudaMemcpyDeviceToHost) ? "D2H" : (kind == cudaMemcpyHostToDevice) ? "H2D" : "?");
-            CU_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
-            CU_SAFE_CALL(cudaEventRecord(event, handle));
+            CUDA_SAFE_CALL(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, handle));
+            CUDA_SAFE_CALL(cudaEventRecord(event, handle));
 
             return EINPROGRESS;
         }
@@ -585,8 +585,8 @@ cuda_stream_instructions_wait(
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
     assert(stream);
 
-    CU_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
-    CU_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
+    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.high));
+    CUDA_SAFE_CALL(cudaStreamSynchronize(stream->cu.handle.low));
 
     return 0;
 }
@@ -615,7 +615,7 @@ cuda_stream_instructions_progress(
             /* poll events */
             for (int i = 0 ; i < 16 ; ++i)
             {
-                CU_SAFE_CALL(cudaGetLastError());
+                CUDA_SAFE_CALL(cudaGetLastError());
                 cudaError_t res = cudaEventQuery(stream->cu.events.buffer[idx]);
                 if (res == cudaErrorNotReady)
                     sched_yield();
@@ -669,13 +669,13 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 
     cudaError_t err;
     for (int i = 0 ; i < capacity ; ++i)
-        CU_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.buffer + i, cudaEventDisableTiming));
+        CUDA_SAFE_CALL(cudaEventCreateWithFlags(stream->cu.events.buffer + i, cudaEventDisableTiming));
 
     /* streams */
     int leastPriority, greatestPriority;
-    CU_SAFE_CALL(cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
-    CU_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.high, cudaStreamNonBlocking, greatestPriority));
-    CU_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.low, cudaStreamNonBlocking, leastPriority));
+    CUDA_SAFE_CALL(cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
+    CUDA_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.high, cudaStreamNonBlocking, greatestPriority));
+    CUDA_SAFE_CALL(cudaStreamCreateWithPriority(&stream->cu.handle.low, cudaStreamNonBlocking, leastPriority));
 
     if (type == XKRT_STREAM_TYPE_KERN)
     {
@@ -697,8 +697,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
     xkrt_stream_cuda_t * stream = (xkrt_stream_cuda_t *) istream;
     if (stream->cu.blas.handle)
         cublasDestroy(stream->cu.blas.handle);
-    CU_SAFE_CALL(cudaStreamDestroy(stream->cu.handle.high));
-    CU_SAFE_CALL(cudaStreamDestroy(stream->cu.handle.low));
+    CUDA_SAFE_CALL(cudaStreamDestroy(stream->cu.handle.high));
+    CUDA_SAFE_CALL(cudaStreamDestroy(stream->cu.handle.low));
     free(stream);
 }
 
@@ -728,10 +728,45 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
     return buffer;
 }
 
+# if 0
+xkrt_driver_module_t
+XKRT_DRIVER_ENTRYPOINT(module_load)(
+    int device_driver_id,
+    uint8_t * bin,
+    size_t binsize
+) {
+    xkrt_driver_module_t module = NULL;
+    CU_SAFE_CALL(cuModuleLoadData((CUmodule *) &module, bin));
+    assert(module);
+    return module;
+}
+
 void
-XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
+XKRT_DRIVER_ENTRYPOINT(module_unload)(
+    xkrt_driver_module_t module
+) {
+    CU_SAFE_CALL(cuModuleUnload((CUmodule) module));
+}
+
+xkrt_driver_module_fn_t
+XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
+    xkrt_driver_module_t module,
+    const char * name
+) {
+    xkrt_driver_module_fn_t fn = NULL;
+    CU_SAFE_CALL(cuModuleGetFunction((CUfunction *) &fn, (CUmodule) module, name));
+    assert(fn);
+    return fn;
+}
+# endif
+
+xkrt_driver_t *
+XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    # define REGISTER(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
+    xkrt_driver_cuda_t * driver = (xkrt_driver_cuda_t *) malloc(sizeof(xkrt_driver_cuda_t));
+    assert(driver);
+
+    # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)
 
     REGISTER(init);
     REGISTER(finalize);
@@ -762,5 +797,13 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     REGISTER(stream_create);
     REGISTER(stream_delete);
 
+# if 0
+    REGISTER(module_load);
+    REGISTER(module_unload);
+    REGISTER(module_get_fn);
+# endif
+
     # undef REGISTER
+
+    return (xkrt_driver_t *) driver;
 }

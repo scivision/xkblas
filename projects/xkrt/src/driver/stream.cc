@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:54:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 17:13:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -96,7 +96,9 @@ xkrt_stream_init(
         capacity
     );
 
+    # if XKRT_SUPPORT_STATS
     memset(&(stream->stats), 0, sizeof(stream->stats));
+    # endif /* XKRT_SUPPORT_STATS */
 }
 
 void

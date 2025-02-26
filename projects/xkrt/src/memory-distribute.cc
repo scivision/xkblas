@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 16:02:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 17:13:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -46,9 +46,9 @@ xkrt_memory_distribute_packed_2D_async(
         thread->resolve<NACCESS>(task);
         # undef NACCESS
 
-        #ifndef ndebug
+        #ifndef NDEBUG
         snprintf(task->label, sizeof(task->label), "distribute_packed_2d_async");
-        #endif /* ndebug */
+        #endif /* NDEBUG */
 
         runtime->task_commit(task);
     }
@@ -109,9 +109,9 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
             thread->resolve<NACCESS>(task);
             # undef NACCESS
 
-            #ifndef ndebug
+            #ifndef NDEBUG
             snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
-            #endif /* ndebug */
+            #endif /* NDEBUG */
 
             runtime->task_commit(task);
 

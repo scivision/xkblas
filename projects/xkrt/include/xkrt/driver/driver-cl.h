@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 04:53:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -58,6 +58,11 @@ typedef struct  xkrt_stream_cl_t
     xkrt_device_cl_t * device;
 
 }               xkrt_stream_cl_t;
+
+typedef struct  xkrt_driver_cl_t
+{
+    xkrt_driver_t super;
+}               xkrt_driver_cl_t;
 
 /* cl works on 'cl_mem' buffers and do not support pointer arithmetic directly
  * on these, so this routine returns the buffer and the offset for the given

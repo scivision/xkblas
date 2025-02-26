@@ -2,6 +2,7 @@
 #  define __TIME_H__
 
 # include <stdint.h>
+# include <math.h>
 # include <time.h>
 # include <functional>
 
@@ -40,7 +41,7 @@ struct  time_array_t
         this->values[element][iter] = value;
     }
 
-    template <void (*REPORT_ELEMENT)(size_t, size_t, size_t, size_t) = report_element_default>
+    template <void (*REPORT_ELEMENT)(size_t, size_t, size_t) = report_element_default>
     inline void report(const int nelements = N_ELEMENTS)
     {
         for (size_t i = 0 ; i < nelements ; ++i)
@@ -49,7 +50,19 @@ struct  time_array_t
             size_t min = this->values[i][0];
             size_t med = this->values[i][N_ITERS / 2];
             size_t max = this->values[i][N_ITERS - 1];
-            REPORT_ELEMENT(i, min, med, max);
+
+            size_t avg = 0;
+            for (int j = 0 ; j < N_ITERS ; ++j)
+                avg += this->values[i][j];
+            avg = avg / N_ITERS;
+
+            size_t variance = 0;
+            for (int j = 0 ; j < N_ITERS ; ++j)
+                variance += (this->values[i][j] - avg) * (this->values[i][j] - avg);
+            variance = variance / N_ITERS;
+
+            size_t stdev = sqrt(variance);
+            REPORT_ELEMENT(i, avg, stdev);
         }
     }
 };

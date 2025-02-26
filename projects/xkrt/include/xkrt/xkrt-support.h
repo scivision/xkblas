@@ -24,12 +24,12 @@
 # define XKRT_SUPPORT_ZE    1
 
 /* If the runtime was compiled with SYCL support (for Level Zero interop and mkl) */
-# define XKRT_SUPPORT_ZE    1
+# define XKRT_SUPPORT_SYCL  1
 
 /* If the kernel was compiled with OpenCL support */
 # define XKRT_SUPPORT_CL 1
 
 /* If the kernel was compiled with run-time statistics enabled */
-# define XKRT_SUPPORT_STATS 1
+# define XKRT_SUPPORT_STATS 0
 
 #endif /* __XKRT_SUPPORT_H__ */

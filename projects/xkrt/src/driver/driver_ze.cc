@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 21:38:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 16:29:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -364,7 +364,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_wait)(
 ) {
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
 
-    const uint64_t timeout = 0;
+    const uint64_t timeout = UINT64_MAX;
     ZE_SAFE_CALL(zeCommandListHostSynchronize(stream->ze.command.list, timeout));
     return 0;
 }
@@ -403,7 +403,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
                 else if (res == ZE_RESULT_SUCCESS)
                     return 0;
                 else
-                    LOGGER_FATAL("Error querying event");
+                    ZE_SAFE_CALL(res);
             }
 
             return EINPROGRESS;
@@ -728,13 +728,65 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
     ZE_SAFE_CALL(zeMemFree(device->ze_context, mem));
 }
 
+xkrt_driver_module_t
+XKRT_DRIVER_ENTRYPOINT(module_load)(
+    int device_driver_id,
+    uint8_t * bin,
+    size_t binsize
+) {
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    ze_module_desc_t desc = {
+        .stype = ZE_STRUCTURE_TYPE_MODULE_DESC,
+        .pNext = NULL,
+        .format = ZE_MODULE_FORMAT_IL_SPIRV,
+        .inputSize = binsize,
+        .pInputModule = bin,
+        .pBuildFlags = NULL,
+        .pConstants = NULL
+    };
+
+    // TODO : build log
+    xkrt_driver_module_t module = NULL;
+    ZE_SAFE_CALL(zeModuleCreate(device->ze_context, device->ze_device, &desc, (ze_module_handle_t *) &module, NULL));
+    assert(module);
+
+    return module;
+}
+
+void
+XKRT_DRIVER_ENTRYPOINT(module_unload)(
+    xkrt_driver_module_t module
+) {
+    ZE_SAFE_CALL(zeModuleDestroy((ze_module_handle_t) module));
+}
+
+xkrt_driver_module_fn_t
+XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
+    xkrt_driver_module_t module,
+    const char * name
+) {
+    xkrt_driver_module_fn_t fn = NULL;
+    ze_kernel_desc_t desc = {
+        .stype = ZE_STRUCTURE_TYPE_KERNEL_DESC,
+        .pNext = NULL,
+        .flags = ZE_KERNEL_FLAG_FORCE_RESIDENCY,
+        .pKernelName = "empty_kernel"
+    };
+    ZE_SAFE_CALL(zeKernelCreate((ze_module_handle_t) module, &desc, (ze_kernel_handle_t *) &fn));
+    assert(fn);
+    return fn;
+}
+
 //////////////////////////
 // Routine registration //
 //////////////////////////
-void
-XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
+xkrt_driver_t *
+XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    # define REGISTER(func) driver->f_##func = XKRT_DRIVER_ENTRYPOINT(func)
+    xkrt_driver_ze_t * driver = (xkrt_driver_ze_t *) malloc(sizeof(xkrt_driver_ze_t));
+    assert(driver);
+
+    # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)
 
     REGISTER(init);
     REGISTER(finalize);
@@ -765,7 +817,13 @@ XKRT_DRIVER_ENTRYPOINT(get_driver)(xkrt_driver_t * driver)
     REGISTER(stream_create);
     REGISTER(stream_delete);
 
+    REGISTER(module_load);
+    REGISTER(module_unload);
+    REGISTER(module_get_fn);
+
     # undef REGISTER
+
+    return (xkrt_driver_t *) driver;
 }
 
 // TODO : if we were to impl specific kernelsm thats how you launch

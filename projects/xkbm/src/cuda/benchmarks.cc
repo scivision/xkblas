@@ -12,6 +12,7 @@
 # include <xkbm/team.h>
 # include <xkbm/time.h>
 # include <xkbm/combinator.h>
+# include <xkbm/pp.h>
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/logger-cu.h>
@@ -37,35 +38,14 @@
 /////////////////////
 
 static void
-pp_1byte_3time(size_t i, size_t min, size_t med, size_t max)
-{
-    char buffer[4][64];
-    xkrt_metric_byte(buffer[0], sizeof(buffer[0]), ((size_t) 1) << i);
-    xkrt_metric_time(buffer[1], sizeof(buffer[1]), min);
-    xkrt_metric_time(buffer[2], sizeof(buffer[2]), med);
-    xkrt_metric_time(buffer[3], sizeof(buffer[3]), max);
-    LOGGER_INFO("%12s | %12s | %12s | %12s", buffer[0], buffer[1], buffer[2], buffer[3]);
-}
-
-static void
-pp_int_3bw(size_t i, size_t min, size_t med, size_t max)
-{
-    char buffer[3][64];
-    xkrt_metric_bandwidth(buffer[0], sizeof(buffer[0]), min);
-    xkrt_metric_bandwidth(buffer[1], sizeof(buffer[1]), med);
-    xkrt_metric_bandwidth(buffer[2], sizeof(buffer[2]), max);
-    LOGGER_INFO("%12lu | %8s | %8s | %8s", i, buffer[0], buffer[1], buffer[2]);
-}
-
-static void
 cuda_benchmarks_register_memory(void)
 {
     // warmup
     {
         const size_t size = 1*1024*1024;
         void * hostmem = xkbm_alloc_and_touch(size);
-        CU_SAFE_CALL(cudaHostRegister(hostmem, size, cudaHostRegisterPortable));
-        CU_SAFE_CALL(cudaHostUnregister(hostmem));
+        CUDA_SAFE_CALL(cudaHostRegister(hostmem, size, cudaHostRegisterPortable));
+        CUDA_SAFE_CALL(cudaHostUnregister(hostmem));
         free(hostmem);
     }
 
@@ -97,7 +77,7 @@ cuda_benchmarks_register_memory(void)
 
                 {
                     const uint64_t t0 = xkrt_get_nanotime();
-                    CU_SAFE_CALL(cudaHostUnregister(hostmem));
+                    CUDA_SAFE_CALL(cudaHostUnregister(hostmem));
                     const uint64_t tf = xkrt_get_nanotime();
                     unregister_time.set(i, iter, tf - t0);
                 }
@@ -112,16 +92,14 @@ cuda_benchmarks_register_memory(void)
         LOGGER_INFO("----------------------------------------------------------");
         LOGGER_INFO("Register with %s", buffer);
         LOGGER_INFO("----------------------------------------------------------");
-        LOGGER_INFO("%12s | %12s | %12s | %12s", "size", "min", "med", "max");
-
-
-        register_time.report<pp_1byte_3time>();
+        LOGGER_INFO("%12s | %27s", "size", "avg +/- stdev");
+        register_time.report<pp_1byte_1time>();
 
         LOGGER_INFO("----------------------------------------------------------");
         LOGGER_INFO("Unregister with %s", buffer);
         LOGGER_INFO("----------------------------------------------------------");
-        LOGGER_INFO("%12s | %12s | %12s | %12s", "size", "min", "med", "max");
-        unregister_time.report<pp_1byte_3time>();
+        LOGGER_INFO("%12s | %25s", "size", "avg +/- stdev");
+        unregister_time.report<pp_1byte_1time>();
     }
 }
 
@@ -156,17 +134,17 @@ cuda_benchmarks_memcpy_run_thread(
     const size_t total_size = args->chunk_size * team->nthreads;
 
     void * hostptr;
-    CU_SAFE_CALL(cudaMallocHost(&hostptr, args->chunk_size));
+    CUDA_SAFE_CALL(cudaMallocHost(&hostptr, args->chunk_size));
 
     void * devptr;
-    CU_SAFE_CALL(cudaMalloc(&devptr, args->chunk_size));
+    CUDA_SAFE_CALL(cudaMalloc(&devptr, args->chunk_size));
 
     const void * src = (kind == cudaMemcpyDeviceToHost) ? devptr  : hostptr;
           void * dst = (kind == cudaMemcpyDeviceToHost) ? hostptr :  devptr;
 
     cudaStream_t stream;
     const int flags = cudaStreamNonBlocking;
-    CU_SAFE_CALL(cudaStreamCreateWithFlags(&stream, flags));
+    CUDA_SAFE_CALL(cudaStreamCreateWithFlags(&stream, flags));
 
     time_array_t<1, 3> time;
     for (int iter = 0 ; iter < time.niters ; ++iter)
@@ -177,8 +155,8 @@ cuda_benchmarks_memcpy_run_thread(
             if (tid == 0)
                 t0 = xkrt_get_nanotime();
 
-            CU_SAFE_CALL(cudaMemcpyAsync(devptr, hostptr, args->chunk_size, kind, stream));
-            CU_SAFE_CALL(cudaStreamSynchronize(stream));
+            CUDA_SAFE_CALL(cudaMemcpyAsync(devptr, hostptr, args->chunk_size, kind, stream));
+            CUDA_SAFE_CALL(cudaStreamSynchronize(stream));
         }
         xkbm_team_barrier(team);
 
@@ -190,9 +168,9 @@ cuda_benchmarks_memcpy_run_thread(
         }
     }
 
-    CU_SAFE_CALL(cudaStreamDestroy(stream));
+    CUDA_SAFE_CALL(cudaStreamDestroy(stream));
     if (tid == 0)
-        time.report<pp_int_3bw>();
+        time.report<pp_1zu_1bw>();
 }
 
 template <cudaMemcpyKind kind>
@@ -200,18 +178,18 @@ static void
 cuda_benchmarks_mem_run(void)
 {
     int ndevices;
-    CU_SAFE_CALL(cudaGetDeviceCount(&ndevices));
+    CUDA_SAFE_CALL(cudaGetDeviceCount(&ndevices));
 
     for (int devid = 0 ; devid < ndevices ; ++devid)
     {
-        CU_SAFE_CALL(cudaSetDevice(devid));
+        CUDA_SAFE_CALL(cudaSetDevice(devid));
 
         hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
         HWLOC_SAFE_CALL(hwloc_cudart_get_device_cpuset(TOPOLOGY, devid, cpuset));
         int nthreads = hwloc_bitmap_weight(cpuset);
 
         size_t free, total;
-        CU_SAFE_CALL(cudaMemGetInfo(&free, &total));
+        CUDA_SAFE_CALL(cudaMemGetInfo(&free, &total));
 
         h2d_run_args_t args = {
             .device_id  = devid,

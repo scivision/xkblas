@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 04:43:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 17:14:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,8 +62,10 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     assert(runtime);
     assert(runtime->state == XKRT_RUNTIME_INITIALIZED);
 
+    # if XKRT_SUPPORT_STATS
     if (runtime->conf.report_stats_on_deinit)
         xkrt_runtime_stats_report(runtime);
+    # endif /* XKRT_SUPPORT_STATS */
     xkrt_drivers_deinit(&runtime->drivers);
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
 
@@ -149,10 +151,8 @@ xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count)
     *count = 0;
     for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
     {
-        xkrt_driver_t * driver = runtime->drivers.list + i;
-        assert(driver);
-
-        if (driver->f_get_ndevices_max)
+        xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) i);
+        if (driver && driver->f_get_ndevices_max)
             *count += driver->f_get_ndevices_max();
     }
     return 0;

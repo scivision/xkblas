@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 00:42:07 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 15:49:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -54,7 +54,8 @@ xkrt_driver_init(
     void * vargs,
     xkrt_driver_type_t driver_type
 ) {
-    xkrt_driver_t * driver = drivers->list + driver_type;
+    xkrt_driver_t * driver = drivers->list[driver_type];
+    assert(driver);
 
     const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
     LOGGER_INFO("Loading driver `%s`", driver_name);
@@ -152,56 +153,59 @@ xkrt_drivers_init(
     drivers->devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
-    void (*loaders[XKRT_DRIVER_TYPE_MAX])(xkrt_driver_t *);
+    xkrt_driver_t * (*loaders[XKRT_DRIVER_TYPE_MAX])(void);
     memset(loaders, 0, sizeof(loaders));
 
 # if XKRT_SUPPORT_HOST
-    extern void XKRT_DRIVER_HOST_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_get_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_HOST_create_driver(void);
+    loaders[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_create_driver;
 # endif /* XKRT_SUPPORT_HOST */
 
 # if XKRT_SUPPORT_CUDA
-    extern void XKRT_DRIVER_TYPE_CUDA_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_get_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_CUDA_create_driver(void);
+    loaders[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_create_driver;
 # endif /* XKRT_SUPPORT_CUDA */
 
 # if XKRT_SUPPORT_ZE
-    extern void XKRT_DRIVER_TYPE_ZE_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_get_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_ZE_create_driver(void);
+    loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_create_driver;
 # endif /* XKRT_SUPPORT_ZE */
 
 # if XKRT_SUPPORT_CL
-    extern void XKRT_DRIVER_TYPE_CL_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_CL] = XKRT_DRIVER_TYPE_CL_get_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_CL_create_driver(void);
+    loaders[XKRT_DRIVER_TYPE_CL] = XKRT_DRIVER_TYPE_CL_create_driver;
 # endif /* XKRT_SUPPORT_CL */
 
 # if XKRT_SUPPORT_HIP
-    extern void XKRT_DRIVER_TYPE_HIP_get_driver(xkrt_driver_t *);
-    loaders[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_get_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_HIP_create_driver(void);
+    loaders[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
 # endif /* XKRT_SUPPORT_HIP */
 
     int total_gpus = 0;
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
         // TODO : do not load if conf
-        void (*loader)(xkrt_driver_t *) = loaders[driver_type];
+        xkrt_driver_t * (*loader)(void) = loaders[driver_type];
         if (drivers_mask & (1 << driver_type) && loader)
         {
-            loader(drivers->list + driver_type);
+            drivers->list[driver_type] = loader();
             xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);
             total_gpus += drivers->devices.n;
             assert(total_gpus <= ngpus);
             if (total_gpus == ngpus)
                 break ;
         }
+        else
+            drivers->list[driver_type] = NULL;
     }
 
     /* wait each thread of each device of each driver to start */
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
-        xkrt_driver_t * driver = drivers->list + driver_type;
-        while (driver->ndevices_commited < driver->ndevices_targeted)
-            mem_pause();
+        xkrt_driver_t * driver = drivers->list[driver_type];
+        if (driver)
+            while (driver->ndevices_commited < driver->ndevices_targeted)
+                mem_pause();
     }
 
     // DEBUG OUTPUT
@@ -232,4 +236,13 @@ xkrt_support_driver(xkrt_driver_type_t driver_type)
         case (XKRT_DRIVER_TYPE_CL):     return XKRT_SUPPORT_CL;
         default:                        return 0;
     }
+}
+
+extern "C"
+xkrt_device_t *
+xkrt_driver_device_get(xkrt_driver_t * driver, xkrt_device_global_id_t device_driver_id)
+{
+    assert(device_driver_id >= 0);
+    assert(device_driver_id < driver->ndevices_commited);
+    return driver->devices[device_driver_id];
 }
