@@ -23,6 +23,9 @@
 /* If the runtime was compiled with Intel's Level Zero support */
 # define XKRT_SUPPORT_ZE    1
 
+/* If the runtime was compiled with SYCL support (for Level Zero interop and mkl) */
+# define XKRT_SUPPORT_ZE    1
+
 /* If the kernel was compiled with OpenCL support */
 # define XKRT_SUPPORT_CL 1
 

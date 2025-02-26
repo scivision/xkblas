@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 18:43:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/25 16:01:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -110,7 +110,8 @@ typedef struct  xkrt_runtime_t
     /* deallocate memory onto the host using the given driver */
     void memory_host_deallocate(const xkrt_device_global_id_t device_global_id, void * mem, const size_t size);
 
-    /* create tasks to distribute memory on devices in a cyclic manner */
+    /* create tasks to distribute memory on devices */
+    void memory_distribute_packed_2D_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
     void memory_distribute_cyclic_2D_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t mb, size_t nb, size_t sizeof_type);
     void memory_distribute_cyclic_2D_halo_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t mb, size_t nb, size_t sizeof_type, size_t hx, size_t hy);
 

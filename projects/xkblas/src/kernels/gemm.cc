@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:35:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/25 15:33:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -33,7 +33,14 @@
 # include <cassert>
 
 # include "xkblas/kernel-type.h"
-# include "xkblas/cblas.h"
+
+# if XKBLAS_SUPPORT_SYCL
+#  include <sycl/sycl.hpp>
+#  include <oneapi/mkl.hpp>
+#  include <sycl/backend/level_zero.hpp>
+# else
+#  include "xkblas/cblas.h"
+# endif
 
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
@@ -374,9 +381,6 @@ body_cuda(
 static void
 body_ze(void * ihandle, void * vargs)
 {
-    LOGGER_FATAL("In kernel impl");
-
-    # if 0
     // unpack arguments
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) ihandle;
     assert(stream);
@@ -389,7 +393,44 @@ body_ze(void * ihandle, void * vargs)
     const Access * C = task->accesses + 2;
 
     args_t * args = (args_t *) (task + 1);
-    assert(args);
+
+    # if XKBLAS_SUPPORT_SYCL
+
+    // Create SYCL platform and device from Level Zero context and device
+    sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
+    sycl::device sycl_device = sycl::device::ext_oneapi_from_ze_device(ze_device);
+
+    // Create SYCL context from SYCL device
+    sycl::context sycl_context(sycl_device);
+
+    // Create SYCL queue from SYCL context and Level Zero command list
+    sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
+
+    LOGGER_FATAL("impl me");
+
+    # if 0
+    oneapi::mkl::blas::column_major::gemm(
+        sycl::_V1::queue &,
+        oneapi::mkl::transpose,
+        oneapi::mkl::transpose,
+        long, long, long,
+        oneapi::mkl::value_or_pointer<double>,
+        double const*, long, double const*, long,
+        oneapi::mkl::value_or_pointer<double>,
+        double*,
+        long, oneapi::mkl::blas::compute_mode,
+        std::vector<sycl::_V1::event, std::allocator<sycl::_V1::event> > const &
+    );
+    # endif
+
+    # else /* XKBLAS_SUPPORT_SYCL */
+    LOGGER_FATAL("no blas impl for ze");
+    # endif /* XKBLAS_SUPPORT_SYCL */
+
+
+
+    # if 0
+
 
     // TODO : having to use sycl here is super ugly, but Intel do not seems to
     // provide the kernels direcly, so we could pass them via a

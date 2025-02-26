@@ -34,6 +34,95 @@ pp_1byte_3time(size_t i, size_t min, size_t med, size_t max)
     LOGGER_INFO("%12s | %12s | %12s | %12s", buffer[0], buffer[1], buffer[2], buffer[3]);
 }
 
+///////////////////////////
+// kernel launch latency //
+///////////////////////////
+
+# if XKRT_SUPPORT_ZE
+#  include <xkrt/logger/logger-ze.h>
+#  include <xkrt/driver/driver-ze.h>
+
+ze_kernel_handle_t XKBM_ZE_KERNEL_EMPTY;
+extern const uint8_t * SPIRV_EMPTY_KERNEL;
+# endif
+
+static void
+launch(
+    void * istream,
+    void * vinstr,
+    xkrt_stream_instruction_counter_t idx
+) {
+    assert(istream);
+
+    xkrt_stream_instruction_t * instr = (xkrt_stream_instruction_t *) vinstr;
+    assert(instr);
+
+    xkrt_device_t * device = (xkrt_device_t *) instr->kern.vargs;
+    assert(device);
+
+    switch (device->driver_type)
+    {
+        # if XKRT_SUPPORT_CUDA
+        case (XKRT_DRIVER_TYPE_CUDA):
+        {
+            break ;
+        }
+        # endif
+
+        # if XKRT_SUPPORT_ZE
+        case (XKRT_DRIVER_TYPE_ZE):
+        {
+            xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
+            ze_event_handle_t * ze_event = stream->ze.events.list + idx;
+            ze_group_count_t launch_args = { 1, 1, 1 };
+            ZE_SAFE_CALL(
+                zeCommandListAppendLaunchKernel(
+                    stream->ze.command.list,
+                    XKBM_ZE_KERNEL_EMPTY,
+                   &launch_args,
+                    nullptr,
+                    0,
+                    ze_event
+                )
+            );
+            break ;
+        }
+        # endif
+
+        default:
+            LOGGER_FATAL("Something went wrong");
+    }
+}
+
+static void
+completed(const void * vargs[XKRT_CALLBACK_ARGS_MAX])
+{
+}
+
+template<bool task>
+static void
+xkrt_benchmarks_kernel_launch_latency(void)
+{
+    for (xkrt_device_global_id_t device_global_id ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
+    {
+        xkrt_device_t * device = runtime.device_get(device_global_id);
+        assert(device);
+
+        xkrt_callback_t callback = { .func = completed, .args = { device, NULL } };
+        device->offloader_stream_instruction_submit_kernel(launch, device, callback);
+    }
+}
+
+static benchmark_node_t xkrt_benchmark_kernel_launch_latency = {
+    .name = "kernel-launch-latency",
+    .desc = "Time to launch and complete a kernel",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = xkrt_benchmarks_kernel_launch_latency<false>,
+    .enabled = 1
+};
+
 ////////////////
 // alloc host //
 ////////////////
@@ -237,7 +326,6 @@ typedef enum    direction_t
 typedef struct  bench_tranfer_args_t
 {
     xkrt_team_t * team;
-    time_array_t<XKRT_DEVICES_MAX, 3> * time;
 }               bench_tranfer_args_t;
 
 template <direction_t direction, int nchunks>
@@ -246,78 +334,94 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
 {
     bench_tranfer_args_t * args = (bench_tranfer_args_t *) vargs;
     xkrt_team_t * team = args->team;
-    time_array_t<XKRT_DEVICES_MAX, 3> * time = args->time;
 
-    /////////////////////
-    // allocate memory //
-    /////////////////////
+    xkrt_device_t * device = runtime.device_get(device_global_id);
+    assert(device);
 
-    // device alocation
-    xkrt_device_memory_info_t meminfo;
-    runtime.memory_info(device_global_id, &meminfo);
-
-    const float                      f = runtime.conf.device.gpu_mem_percent / 100.0 * 0.99;
-    const size_t                  size = (meminfo.capacity * f);
-    const size_t            chunk_size = size / nchunks;
-    const xkrt_area_chunk_t    * chunk = runtime.memory_allocate(device_global_id, size);
-    if (chunk == NULL)
-        LOGGER_FATAL("Out of device memory");
-
-    // host allocation
-    void * host_mem = runtime.memory_host_allocate(device_global_id, size);
-    xkbm_mem_touch(host_mem, size);
-
-    // wait for all devices to allocate
-    runtime.team_barrier(team);
-
-    /////////////////////
-    // do the transfer //
-    /////////////////////
-
-    const xkrt_device_global_id_t src_device_global_id  = (direction == H2D) ? HOST_DEVICE_GLOBAL_ID : device_global_id;
-    const uintptr_t               src_device_mem        = (direction == H2D) ? (uintptr_t) host_mem  : chunk->device_ptr;
-    const xkrt_device_global_id_t dst_device_global_id  = (direction == H2D) ? device_global_id      : HOST_DEVICE_GLOBAL_ID;
-    const uintptr_t               dst_device_mem        = (direction == H2D) ? chunk->device_ptr     : (uintptr_t) host_mem;
-
-    const xkrt_callback_t callback = { .func = NULL };
-
-    // only 1 device at a time
-    runtime.team_critical_begin(team);
+    time_array_t<XKRT_DEVICE_MEMORIES_MAX, 3> time;
+    for (int i = 0 ; i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
-        for (int iter = 0 ; iter < time->niters ; ++iter)
+        xkrt_device_memory_info_t * meminfo = device->memories + i;
+
+        /////////////////////
+        // allocate memory //
+        /////////////////////
+
+        // device alocation
+        const float                      f = runtime.conf.device.gpu_mem_percent / 100.0 * 0.99;
+        const size_t                  size = (meminfo->capacity * f);
+        const size_t            chunk_size = size / nchunks;
+        const xkrt_area_chunk_t    * chunk = device->memory_allocate_on(size, i);
+        if (chunk == NULL)
+            LOGGER_FATAL("Out of device memory");
+
+        // host allocation
+        void * host_mem = runtime.memory_host_allocate(device_global_id, size);
+        xkbm_mem_touch(host_mem, size);
+
+        // wait for all devices to allocate
+        runtime.team_barrier(team);
+
+        /////////////////////
+        // do the transfer //
+        /////////////////////
+
+        const xkrt_device_global_id_t src_device_global_id  = (direction == H2D) ? HOST_DEVICE_GLOBAL_ID : device_global_id;
+        const uintptr_t               src_device_mem        = (direction == H2D) ? (uintptr_t) host_mem  : chunk->device_ptr;
+        const xkrt_device_global_id_t dst_device_global_id  = (direction == H2D) ? device_global_id      : HOST_DEVICE_GLOBAL_ID;
+        const uintptr_t               dst_device_mem        = (direction == H2D) ? chunk->device_ptr     : (uintptr_t) host_mem;
+
+        const xkrt_callback_t callback = { .func = NULL };
+
+        // only 1 device at a time
+        runtime.team_critical_begin(team);
         {
-            uint64_t t0 = xkrt_get_nanotime();
+            for (int iter = 0 ; iter < time.niters ; ++iter)
             {
-                for (int i = 0 ; i < nchunks ; ++i)
+                uint64_t t0 = xkrt_get_nanotime();
                 {
-                    runtime.copy(
-                        device_global_id,
-                        chunk_size,
-                        dst_device_global_id,
-                        dst_device_mem + i * chunk_size,
-                        src_device_global_id,
-                        src_device_mem + i * chunk_size,
-                        callback
-                    );
+                    for (int i = 0 ; i < nchunks ; ++i)
+                    {
+                        runtime.copy(
+                            device_global_id,
+                            chunk_size,
+                            dst_device_global_id,
+                            dst_device_mem + i * chunk_size,
+                            src_device_global_id,
+                            src_device_mem + i * chunk_size,
+                            callback
+                        );
+                    }
+                    runtime.wait_device(device_global_id);
                 }
-                runtime.wait_device(device_global_id);
+                uint64_t tf = xkrt_get_nanotime();
+
+                const size_t size = chunk_size * nchunks;
+                const size_t bw = size / ((tf - t0) / 1e9);
+                time.set(device_global_id, iter, bw);
             }
-            uint64_t tf = xkrt_get_nanotime();
-
-            const size_t size = chunk_size * nchunks;
-            const size_t bw = size / ((tf - t0) / 1e9);
-            time->set(device_global_id, iter, bw);
         }
+        runtime.team_critical_end(team);
+
+        /////////////
+        // release //
+        /////////////
+
+        // device
+        runtime.memory_deallocate_all(device_global_id);
+        runtime.memory_host_deallocate(device_global_id, host_mem, size);
+
+        //////////////////
+        // print result //
+        //////////////////
+        runtime.team_critical_begin(team);
+        {
+            LOGGER_INFO("--- Device %u ---", device_global_id);
+            LOGGER_INFO("%10s | %10s | %10s | %10s", "Memory ID", "min", "med", "max");
+            time.report<pp_int_3bw>(device->nmemories);
+        }
+        runtime.team_critical_end(team);
     }
-    runtime.team_critical_end(team);
-
-    /////////////
-    // release //
-    /////////////
-
-    // device
-    runtime.memory_deallocate_all(device_global_id);
-    runtime.memory_host_deallocate(device_global_id, host_mem, size);
 
     return NULL;
 }
@@ -327,7 +431,6 @@ static void
 xkrt_benchmarks_mem_run(void)
 {
     bench_tranfer_args_t args;
-    time_array_t<XKRT_DEVICES_MAX, 3> time;
     xkrt_team_t team = {
         .desc = {
             .routine = xkrt_benchmarks_mem_run_thread<direction, 64>,
@@ -337,13 +440,9 @@ xkrt_benchmarks_mem_run(void)
     };
 
     args.team = &team;
-    args.time = &time;
 
     runtime.team_create(args.team);
     runtime.team_join(args.team);
-
-    LOGGER_INFO("%10s | %10s | %10s | %10s", "Device", "min", "med", "max");
-    time.report<pp_int_3bw>(runtime.drivers.devices.n);
 }
 
 static benchmark_node_t xkrt_benchmarks_h2d = {
@@ -366,9 +465,9 @@ static benchmark_node_t xkrt_benchmarks_d2h = {
     .enabled = 1
 };
 
-///////////////////
-// ZE BENCHMARKS //
-///////////////////
+/////////////////////
+// XKRT BENCHMARKS //
+/////////////////////
 
 static benchmark_node_t xkrt_benchmarks = {
     .name = "xkrt",
@@ -388,7 +487,8 @@ xkrt_benchmark_push(benchmark_node_t * parent)
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_touch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch_parallel);
+    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch_parallel);
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmark_kernel_launch_latency);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
 }
@@ -397,6 +497,11 @@ void
 xkrt_benchmark_init(void)
 {
     xkrt_init(&runtime);
+
+    # if XKRT_SUPPORT_ZE
+    // TODO : get ze driver and compile kernel
+    XKBM_ZE_KERNEL_EMPTY = NULL;
+    # endif /* XKRT_SUPPORT_ZE */
 }
 
 void

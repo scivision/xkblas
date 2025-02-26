@@ -266,7 +266,7 @@ cuda_benchmark_push(benchmark_node_t * parent)
     }
 
     benchmark_push_children(parent, &cuda_benchmarks);
-    benchmark_push_children(&cuda_benchmarks, &cuda_benchmark_register_memory);
-    benchmark_push_children(&cuda_benchmarks, &cuda_benchmarks_h2d);
-    benchmark_push_children(&cuda_benchmarks, &cuda_benchmarks_d2h);
+    // benchmark_push_children(&cuda_benchmarks, &cuda_benchmark_register_memory);
+    // benchmark_push_children(&cuda_benchmarks, &cuda_benchmarks_h2d);
+    // benchmark_push_children(&cuda_benchmarks, &cuda_benchmarks_d2h);
 }

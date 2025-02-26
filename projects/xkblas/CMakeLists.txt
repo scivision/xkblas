@@ -147,42 +147,16 @@ else()
     message(STATUS "CLBlast not found")
 endif()
 
-# option(ENABLE_ZE_BLAS "Enable the compilation of Level Zero BLAS" ON)
-# if (ENABLE_ZE_BLAS)
-#
-#     # set sources
-#     SET(XKBLAS_ZE_BLAS_SOURCE_FILES)
-#     foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
-#         list(APPEND XKBLAS_ZE_BLAS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/ze_blas/${precision}blas.cc ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_${precision}blas.h)
-#
-#         add_custom_command(
-#             OUTPUT
-#                 ${CMAKE_SOURCE_DIR}/src/ze_blas/${precision}blas.cc
-#             COMMAND
-#                 python3 ${CMAKE_SOURCE_DIR}/src/ze_blas/generator.py ${CMAKE_SOURCE_DIR} ${precision}
-#             DEPENDS
-#                 ${CMAKE_SOURCE_DIR}/src/ze_blas/blas.cc
-#         )
-#
-#         add_custom_command(
-#             OUTPUT
-#                 ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_${precision}blas.h
-#             COMMAND
-#                 python3 ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/generator.py ${CMAKE_SOURCE_DIR} ${precision}
-#             DEPENDS
-#                 ${CMAKE_SOURCE_DIR}/include/xkblas/ze_blas/ze_blas.template
-#         )
-#     endforeach()
-#
-#     add_compile_definitions(XKBLAS_SUPPORT_ZE_BLAS=1)
-#     add_library(${XKBLAS_NAME}_kernels_ze SHARED ${XKBLAS_ZE_BLAS_SOURCE_FILES})
-#     install(TARGETS ${XKBLAS_NAME}_kernels_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-#     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_ze)
-#
-#     # current impl relies on sycl ... :-(
-#     target_compile_options(${XKBLAS_NAME}_kernels_ze PRIVATE -fsycl)
-#
-# endif()
+option(ENABLE_SYCL "Enable the compilation of Intel's BLAS via SYCL" ON)
+if (ENABLE_SYCL)
+
+    # set sources
+    add_compile_definitions(XKBLAS_SUPPORT_SYCL=1)
+
+    # current impl relies on sycl ... no "zeBlas" equivalent to "cuBlas" :-(
+    target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)
+
+endif()
 
 ################
 # Sub projects #

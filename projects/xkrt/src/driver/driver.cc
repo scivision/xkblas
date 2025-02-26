@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 21:30:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/26 00:42:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -216,6 +216,7 @@ void
 xkrt_drivers_deinit(xkrt_drivers_t * drivers)
 {
     # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
+    LOGGER_WARN("xkrt drivers deinit not implemented");
 }
 
 

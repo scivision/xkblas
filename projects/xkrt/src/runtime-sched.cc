@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 21:38:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/25 16:05:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -425,6 +425,17 @@ xkrt_runtime_t::memory_host_deallocate(
         LOGGER_WARN("Driver `%s` does not implement memory_dealloc_host", driver->f_get_name());
         free(mem);
     }
+}
+
+void
+xkrt_runtime_t::memory_distribute_packed_2D_async(
+    matrix_order_t order,
+    void * ptr,
+    size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    xkrt_memory_distribute_packed_2D_async(this, order, ptr, ld, m, n, sizeof_type);
 }
 
 void

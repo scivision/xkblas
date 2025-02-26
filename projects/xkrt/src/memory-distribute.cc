@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 17:01:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/25 16:02:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,49 @@
 # include <xkrt/runtime.h>
 # include <xkrt/driver/thread-producer.hpp>
 
-static task_format_id_t TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC;
+static task_format_id_t TASK_FORMAT_DISTRIBUTE_ASYNC;
+
+extern "C"
+void
+xkrt_memory_distribute_packed_2D_async(
+    xkrt_runtime_t * runtime,
+    matrix_order_t order,
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    ThreadProducer * thread = ThreadProducer::self();
+    assert(thread);
+
+    if (runtime->drivers.devices.n == 1)
+    {
+        const uint64_t task_size = sizeof(Task);
+        uint8_t * mem = thread->allocate(task_size);
+        assert(mem);
+
+        Task * task = reinterpret_cast<Task *>  (mem + 0);
+        const xkrt_device_global_id_t device_global_id = 0;
+        new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+
+        # define NACCESS 1
+        static_assert(NACCESS <= TASK_MAX_ACCESSES);
+        {
+            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+        }
+        thread->resolve<NACCESS>(task);
+        # undef NACCESS
+
+        #ifndef ndebug
+        snprintf(task->label, sizeof(task->label), "distribute_packed_2d_async");
+        #endif /* ndebug */
+
+        runtime->task_commit(task);
+    }
+    else
+    {
+        LOGGER_FATAL("Not implemented");
+    }
+}
 
 extern "C"
 void
@@ -36,69 +78,44 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
     // single buffer on the device with a LD large enough for all future tasks
     // However, means any tasks on a subdomain cannot start until all the data had been transfered...
     // What do we want here ?
-    if (runtime->drivers.devices.n == 1)
+
+    const size_t mt = NUM_OF_TILES(m, mb);
+    const size_t nt = NUM_OF_TILES(n, nb);
+
+    for (size_t tm = 0; tm < mt; ++tm)
     {
-        const uint64_t task_size = sizeof(Task);
-        uint8_t * mem = thread->allocate(task_size);
-        assert(mem);
-
-        Task * task = reinterpret_cast<Task *>  (mem + 0);
-        new(task) Task(TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
-
-        # define NACCESS 1
-        static_assert(NACCESS <= TASK_MAX_ACCESSES);
+        for (size_t tn = 0; tn < nt; ++tn)
         {
-            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
-        }
-        thread->resolve<NACCESS>(task);
-        # undef NACCESS
+            const uint64_t task_size = sizeof(Task);
+            uint8_t * mem = thread->allocate(task_size);
+            assert(mem);
 
-        #ifndef ndebug
-        snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
-        #endif /* ndebug */
+            Task * task = reinterpret_cast<Task *>  (mem + 0);
+            new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
 
-        runtime->task_commit(task);
-    }
-    else
-    {
-        const size_t mt = NUM_OF_TILES(m, mb);
-        const size_t nt = NUM_OF_TILES(n, nb);
-
-        for (size_t tm = 0; tm < mt; ++tm)
-        {
-            for (size_t tn = 0; tn < nt; ++tn)
+            # define NACCESS 1
+            static_assert(NACCESS <= TASK_MAX_ACCESSES);
             {
-                const uint64_t task_size = sizeof(Task);
-                uint8_t * mem = thread->allocate(task_size);
-                assert(mem);
-
-                Task * task = reinterpret_cast<Task *>  (mem + 0);
-                new(task) Task(TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
-
-                # define NACCESS 1
-                static_assert(NACCESS <= TASK_MAX_ACCESSES);
-                {
-                    const ssize_t  x = tm * mb;
-                    const ssize_t  y = tn * nb;
-                    const ssize_t x0 = MAX(x-(ssize_t)hx, 0);
-                    const ssize_t y0 = MAX(y-(ssize_t)hy, 0);
-                    const ssize_t x1 = MIN(x+mb+hx, m);
-                    const ssize_t y1 = MIN(y+nb+hy, n);
-                    const  size_t sx = x1 - x0;
-                    const  size_t sy = y1 - y0;
-                    new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
-                }
-                thread->resolve<NACCESS>(task);
-                # undef NACCESS
-
-                #ifndef ndebug
-                snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
-                #endif /* ndebug */
-
-                runtime->task_commit(task);
-
-                device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
+                const ssize_t  x = tm * mb;
+                const ssize_t  y = tn * nb;
+                const ssize_t x0 = MAX(x-(ssize_t)hx, 0);
+                const ssize_t y0 = MAX(y-(ssize_t)hy, 0);
+                const ssize_t x1 = MIN(x+mb+hx, m);
+                const ssize_t y1 = MIN(y+nb+hy, n);
+                const  size_t sx = x1 - x0;
+                const  size_t sy = y1 - y0;
+                new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
             }
+            thread->resolve<NACCESS>(task);
+            # undef NACCESS
+
+            #ifndef ndebug
+            snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
+            #endif /* ndebug */
+
+            runtime->task_commit(task);
+
+            device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
         }
     }
 }
@@ -126,7 +143,7 @@ xkrt_memory_distribute_async_register_format(xkrt_runtime_t * runtime)
     {
         task_format_t format;
         memset(format.f, 0, sizeof(format.f));
-        snprintf(format.label, sizeof(format.label), "distribute-cyclic-2D");
-        TASK_FORMAT_DISTRIBUTE_CYCLIC_2D_ASYNC = task_format_create(&(runtime->task_formats), &format);
+        snprintf(format.label, sizeof(format.label), "distribute-async");
+        TASK_FORMAT_DISTRIBUTE_ASYNC = task_format_create(&(runtime->task_formats), &format);
     }
 }

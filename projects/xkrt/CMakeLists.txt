@@ -40,7 +40,7 @@ add_custom_command(
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
     COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_CL} ${USE_STATS}
+        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
 )
 
 option(STRICT "Enable strict compilation mode" OFF)
@@ -145,6 +145,14 @@ if (USE_ZE)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
+endif()
+
+# SYCL
+option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" ON)
+if (USE_SYCL)
+    find_package(SYCL REQUIRED)
+    include_directories(${SYCL_INCLUDE_DIRS})
+    target_link_libraries(${XKRT} PRIVATE ${SYCL_LIBRARIES})
 endif()
 
 # OpenCL
