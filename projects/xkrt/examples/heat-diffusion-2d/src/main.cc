@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 15:59:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 18:20:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -351,10 +351,10 @@ main(void)
     }
 
     uint64_t tf = xkrt_get_nanotime();
-    LOGGER_WARN("Took %.2lf s", (tf-t0)/1e9);
 
     // Finish remaining tasks
     xkrt_sync(&runtime);
+    LOGGER_WARN("Took %.2lf s", (tf-t0)/1e9);
 
     // Deinitialize xkrt runtime
     xkrt_deinit(&runtime);

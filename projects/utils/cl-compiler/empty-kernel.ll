@@ -9,7 +9,7 @@ entry:
   ret void
 }
 
-attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) "no-trapping-math"="true" "stack-protector-buffer-size"="8" "uniform-work-group-size"="true" }
+attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) "no-trapping-math"="true" "stack-protector-buffer-size"="8" "uniform-work-group-size"="false" }
 
 !llvm.module.flags = !{!0}
 !opencl.ocl.version = !{!1}
@@ -17,6 +17,6 @@ attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memor
 !llvm.ident = !{!2}
 
 !0 = !{i32 1, !"wchar_size", i32 4}
-!1 = !{i32 1, i32 2}
+!1 = !{i32 3, i32 0}
 !2 = !{!"clang version 21.0.0git (https://github.com/llvm/llvm-project.git cd4c30bb224e432d8cd37f375c138cbaada14f6c)"}
 !3 = !{}

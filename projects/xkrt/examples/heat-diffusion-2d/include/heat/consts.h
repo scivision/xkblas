@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 16:41:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 18:29:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -66,8 +66,10 @@
 
 #  define DURATION (DT * (double) N_STEP)
 
+# ifdef __cplusplus
 static_assert((NX % TS) == 0);
 static_assert((NY % TS) == 0);
+# endif
 
 # define GRID(G, I, J, L) (G[(J)*L+(I)])
 # define LD NX

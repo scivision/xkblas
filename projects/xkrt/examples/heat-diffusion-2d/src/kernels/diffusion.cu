@@ -5,17 +5,16 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/22 02:24:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 18:30:05 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <heat/consts.h>
-# include <xkrt/min-max.h>
 
 // Number of threads per block line
-#  define DTS (MIN(32, TS))
+#  define DTS (32 < (TS) ? 32 : (TS))
 static_assert(DTS <= TS);
 static_assert(TS % DTS == 0);
 
