@@ -286,7 +286,7 @@ completed(const void * vargs[XKRT_CALLBACK_ARGS_MAX])
 
 template<bool task>
 static void
-xkrt_benchmarks_kernel_launch_latency(void)
+kernel_launch_latency_launch(benchmark_node_t * bench)
 {
     time_array_t<XKRT_DEVICES_MAX, 1001> time;
 
@@ -313,7 +313,7 @@ xkrt_benchmarks_kernel_launch_latency(void)
 }
 
 static void
-xkrt_benchmarks_kernel_launch_latency_init(void)
+kernel_launch_latency_init(void)
 {
     for (uint8_t i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
     {
@@ -345,14 +345,10 @@ xkrt_benchmarks_kernel_launch_latency_init(void)
     }
 }
 
-static benchmark_node_t xkrt_benchmark_kernel_launch_latency = {
-    .name = "kernel-launch-latency",
+static benchmark_node_t kernel_launch_latency = {
+    .name = "launch-latency",
     .desc = "Time to launch and complete a kernel",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_kernel_launch_latency<false>,
-    .enabled = 1
+    .run = kernel_launch_latency_launch<false>,
 };
 
 ////////////////
@@ -367,7 +363,7 @@ typedef enum    alloc_mode_t
 
 template<alloc_mode_t mode, bool touch>
 static void *
-xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+alloc_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
 {
     xkrt_team_t * team = (xkrt_team_t *) vargs;
 
@@ -432,10 +428,10 @@ xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void 
 
 template <alloc_mode_t mode, bool touch>
 static void
-xkrt_benchmarks_alloc_run(void)
+alloc_run(benchmark_node_t * bench)
 {
     xkrt_team_t team;
-    team.desc.routine = xkrt_benchmarks_alloc_run_thread<mode, touch>;
+    team.desc.routine = alloc_run_thread<mode, touch>;
     team.desc.args    = &team;
     team.desc.devices = XKRT_DEVICES_MASK_ALL;
 
@@ -443,50 +439,34 @@ xkrt_benchmarks_alloc_run(void)
     runtime.team_join(&team);
 }
 
-static benchmark_node_t xkrt_benchmarks_alloc_system_touch = {
-    .name = "alloc-host-system-touch",
+static benchmark_node_t system_touch = {
+    .name = "host-system-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_alloc_run<SYSTEM, true>,
-    .enabled = 1
+    .run = alloc_run<SYSTEM, true>
 };
 
-static benchmark_node_t xkrt_benchmarks_alloc_system_notouch = {
-    .name = "alloc-host-system-no-touch",
+static benchmark_node_t system_notouch = {
+    .name = "host-system-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_alloc_run<SYSTEM, false>,
-    .enabled = 1
+    .run = alloc_run<SYSTEM, false>
 };
 
-static benchmark_node_t xkrt_benchmarks_alloc_driver_touch = {
-    .name = "alloc-host-driver-touch",
+static benchmark_node_t driver_touch = {
+    .name = "host-driver-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_alloc_run<DRIVER, true>,
-    .enabled = 1
+    .run = alloc_run<DRIVER, true>,
 };
 
-static benchmark_node_t xkrt_benchmarks_alloc_driver_notouch = {
-    .name = "alloc-host-driver-no-touch",
+static benchmark_node_t driver_notouch = {
+    .name = "host-driver-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_alloc_run<DRIVER, false>,
-    .enabled = 1
+    .run = alloc_run<DRIVER, false>
 };
 
 //////////////////////////////////////////////
 
 static void *
-xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+alloc_parallel_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
 {
     xkrt_team_t * team = (xkrt_team_t *) vargs;
 
@@ -524,10 +504,10 @@ xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_
 }
 
 static void
-xkrt_benchmarks_alloc_parallel_run(void)
+alloc_parallel_run(benchmark_node_t * bench)
 {
     xkrt_team_t team;
-    team.desc.routine = xkrt_benchmarks_alloc_parallel_run_thread,
+    team.desc.routine = alloc_parallel_run_thread,
     team.desc.args    = &team;
     team.desc.devices = XKRT_DEVICES_MASK_ALL;
 
@@ -535,19 +515,123 @@ xkrt_benchmarks_alloc_parallel_run(void)
     runtime.team_join(&team);
 }
 
-static benchmark_node_t xkrt_benchmarks_alloc_driver_notouch_parallel = {
-    .name = "alloc-host-driver-no-touch-parallel",
+static benchmark_node_t driver_notouch_parallel = {
+    .name = "host-driver-no-touch-parallel",
     .desc = "Time (allocation) of host memory using the driver host-allocator in parallel on every devices",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_alloc_parallel_run,
-    .enabled = 1
+    .run = alloc_parallel_run
 };
 
-////////////////
-// H2D or D2H //
-////////////////
+//////////////////////////
+// D2D memory transfers //
+//////////////////////////
+
+template<int nchunks>
+static void *
+mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
+{
+    xkrt_team_t * team = (xkrt_team_t *) vargs;
+
+    xkrt_device_t * src_device = runtime.device_get(src_device_global_id);
+    assert(src_device);
+
+    // size of memory to transfer
+    // const size_t size = (size_t) 4 * 1024 * 1024 * 1024;
+    const size_t size = (size_t) 1024 * 1024;
+    const size_t chunk_size = size / nchunks;
+
+    // only 1 device at a time
+    runtime.team_critical_begin(team);
+    {
+        for (int i = 0 ; i < src_device->nmemories ; ++i)
+        {
+            xkrt_area_chunk_t * src_chunk = src_device->memory_allocate_on(size, i);
+            time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 3> time;
+
+            for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
+            {
+                xkrt_device_t * dst_device = runtime.device_get(dst_device_global_id);
+                assert(dst_device);
+
+                for (int j = 0 ; j < dst_device->nmemories ; ++j)
+                {
+                    xkrt_area_chunk_t * dst_chunk = dst_device->memory_allocate_on(size, j);
+                    for (int iter = -1 ; iter < time.niters ; ++iter)
+                    {
+                        /////////////////////
+                        // do the transfer //
+                        /////////////////////
+
+                        uint64_t t0 = xkrt_get_nanotime();
+                        {
+                            for (int c = 0 ; c < nchunks ; ++c)
+                            {
+                                xkrt_memory_copy_async(
+                                    &runtime,
+                                    src_device,
+                                    dst_device_global_id,
+                                    dst_chunk->device_ptr + c * chunk_size,
+                                    src_device_global_id,
+                                    src_chunk->device_ptr + c * chunk_size,
+                                    size
+                                );
+                            }
+                            xkrt_sync(&runtime);
+                        }
+                        uint64_t tf = xkrt_get_nanotime();
+
+                        if (iter >= 0)
+                        {
+                            const size_t size = chunk_size * nchunks;
+                            const size_t bw = size / ((tf - t0) / 1e9);
+                            time.set(dst_device_global_id*XKRT_DEVICE_MEMORIES_MAX+j, iter, bw);
+                        }
+
+                    } /* iter */
+
+                    dst_device->memory_reset();
+
+                } /* dst memories */
+            } /* dst device */
+
+            // print results
+            LOGGER_INFO("--- Device %u Memory %u ---", src_device_global_id, i);
+            time.report<decltype(time)::pp_1zu_1bw>("Device:Mem", src_device->nmemories);
+
+            src_device->memory_reset();
+
+        } /* src memories */
+    } /* critical */
+    runtime.team_critical_end(team);
+
+    return NULL;
+}
+
+template <int nchunks>
+static void
+mem_run_d2d(benchmark_node_t * bench)
+{
+    xkrt_team_t team = {
+        .desc = {
+            .routine = mem_run_d2d_thread<nchunks>,
+            .args    = NULL,
+            .devices = XKRT_DEVICES_MASK_ALL,
+        }
+    };
+    team.desc.args = &team;
+
+    runtime.team_create(&team);
+    runtime.team_join(&team);
+}
+
+static benchmark_node_t d2d = {
+    .name = "D2D",
+    .desc = "Device (global) memory to device (global) memory bandwidth",
+    .run = mem_run_d2d<1>
+};
+
+//////////////////////////////
+// H2D, D2H memory transfer //
+//////////////////////////////
 
 typedef enum    direction_t
 {
@@ -555,17 +639,11 @@ typedef enum    direction_t
     D2H
 }               direction_t;
 
-typedef struct  bench_tranfer_args_t
-{
-    xkrt_team_t * team;
-}               bench_tranfer_args_t;
-
 template <direction_t direction, int nchunks>
 static void *
-xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
 {
-    bench_tranfer_args_t * args = (bench_tranfer_args_t *) vargs;
-    xkrt_team_t * team = args->team;
+    xkrt_team_t * team = (xkrt_team_t *) vargs;
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
@@ -660,79 +738,106 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
 
 template <direction_t direction>
 static void
-xkrt_benchmarks_mem_run(void)
+mem_run(benchmark_node_t * bench)
 {
-    bench_tranfer_args_t args;
     xkrt_team_t team = {
         .desc = {
-            .routine = xkrt_benchmarks_mem_run_thread<direction, 1>,
-            .args    = &args,
+            .routine = mem_run_thread<direction, 1>,
+            .args    = NULL,
             .devices = XKRT_DEVICES_MASK_ALL,
         }
     };
+    team.desc.args = &team;
 
-    args.team = &team;
-
-    runtime.team_create(args.team);
-    runtime.team_join(args.team);
+    runtime.team_create(&team);
+    runtime.team_join(&team);
 }
 
-static benchmark_node_t xkrt_benchmarks_h2d = {
+static benchmark_node_t h2d = {
     .name = "H2D",
     .desc = "Host memory to device (global) memory bandwidth",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_mem_run<H2D>,
-    .enabled = 1
+    .run = mem_run<H2D>
 };
 
-static benchmark_node_t xkrt_benchmarks_d2h = {
+static benchmark_node_t d2h = {
     .name = "D2H",
     .desc = "Device (global) to host memory memory bandwidth",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = xkrt_benchmarks_mem_run<D2H>,
-    .enabled = 1
+    .run = mem_run<D2H>
 };
 
 /////////////////////
 // XKRT BENCHMARKS //
 /////////////////////
 
-static benchmark_node_t xkrt_benchmarks = {
+static benchmark_node_t kernel = {
+    .name = "kernel",
+    .desc = "Kernel-related metrics"
+};
+
+static benchmark_node_t allocation = {
+    .name = "allocation",
+    .desc = "Allocation",
+};
+
+static benchmark_node_t transfer = {
+    .name = "transfer",
+    .desc = "Transfer",
+};
+
+static benchmark_node_t memory = {
+    .name = "memory",
+    .desc = "Memory-related metrics",
+};
+
+static void
+check_devices(benchmark_node_t * bench)
+{
+    if (runtime.drivers.devices.n == 0)
+    {
+        LOGGER_WARN("No xkrt devices, disabling all tests");
+        for (int i = 0 ; i < bench->nchildren ; ++i)
+            bench->children[i]->enabled = 0;
+    }
+
+}
+
+static benchmark_node_t xkrt = {
     .name = "xkrt",
     .desc = "Metrics on XKRT-supported devices",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = NULL,
-    .enabled = 1
+    .run = check_devices
 };
 
 void
 xkrt_benchmark_push(benchmark_node_t * parent)
 {
-    benchmark_push_children(parent, &xkrt_benchmarks);
+    benchmark_push_children(parent, &xkrt);
 
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_touch);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_touch);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch_parallel);
+    # define LINK(X, Y) benchmark_push_children(&X, &Y)
 
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmark_kernel_launch_latency);
+    LINK(xkrt, kernel);
+    LINK(xkrt, memory);
 
-    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
-//    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
+    LINK(kernel, kernel_launch_latency);
+
+    LINK(memory, allocation);
+    LINK(memory, transfer);
+
+    LINK(allocation, system_touch);
+    LINK(allocation, system_notouch);
+    LINK(allocation, driver_touch);
+    LINK(allocation, driver_notouch);
+    LINK(allocation, driver_notouch_parallel);
+
+    LINK(transfer, h2d);
+    LINK(transfer, d2h);
+    LINK(transfer, d2d);
 }
 
 void
 xkrt_benchmark_init(void)
 {
     xkrt_init(&runtime);
-    xkrt_benchmarks_kernel_launch_latency_init();
+    kernel_launch_latency_init();
 }
 
 void

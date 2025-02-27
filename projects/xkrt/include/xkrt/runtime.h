@@ -41,7 +41,12 @@ typedef struct  xkrt_runtime_t
     xkrt_drivers_t drivers;
 
     /* task formats */
-    task_formats_t task_formats;
+    struct {
+        task_formats_t list;
+        task_format_id_t coherent_async;
+        task_format_id_t coherent_async_fetch;
+        task_format_id_t copy_async;
+    } formats;
 
     /* memory controller for coherency */
     std::vector<MemoryCoherencyController *> memcontrollers;

@@ -1676,7 +1676,7 @@ next_view:
                 fetch_list_t * list = this->fetch_list_from_partition(search.partition);
 
                 /* step (8) - launch transfers */
-                task->fetching((uint16_t) list->n);
+                task->fetching((task_wc_type_t) list->n);
                 this->fetch_list_launch(task, device_global_id, list);
             }
         }

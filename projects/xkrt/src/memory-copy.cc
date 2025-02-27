@@ -14,8 +14,6 @@
 # include <xkrt/runtime.h>
 # include <xkrt/driver/thread-producer.hpp>
 
-static task_format_id_t TASK_FORMAT_COPY = -1;
-
 typedef struct  copy_args_t
 {
     xkrt_device_t * device;
@@ -64,7 +62,7 @@ xkrt_memory_copy_async(
     assert(mem);
 
     Task * task = reinterpret_cast<Task *>(mem);
-    new(task) Task(TASK_FORMAT_COPY, UNSPECIFIED_TASK_ACCESS, device->global_id);
+    new(task) Task(runtime->formats.copy_async, UNSPECIFIED_TASK_ACCESS, device->global_id);
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "copy");
     # endif /* NDEBUG */
@@ -88,5 +86,5 @@ xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime)
     memset(format.f, 0, sizeof(format.f));
     format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_copy;
     snprintf(format.label, sizeof(format.label), "memory_copy");
-    TASK_FORMAT_COPY = task_format_create(&(runtime->task_formats), &format);
+    runtime->formats.copy_async = task_format_create(&(runtime->formats.list), &format);
 }

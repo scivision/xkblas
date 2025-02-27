@@ -26,7 +26,7 @@ main(void)
         task_format_t format;
         memset(&format, 0, sizeof(task_format_t));
         format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) func;
-        FORMAT = task_format_create(&(runtime.task_formats), &format);
+        FORMAT = task_format_create(&(runtime.formats.list), &format);
     }
     assert(FORMAT);
 

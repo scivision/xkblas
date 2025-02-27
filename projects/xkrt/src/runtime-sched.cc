@@ -269,7 +269,7 @@ xkrt_device_task_execute(
     else
     {
         /* retrieve task format */
-        task_format_t * format = task_format_get(&(runtime->task_formats), task->fmtid);
+        task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
         assert(format);
 
         // convert device driver type to task format target

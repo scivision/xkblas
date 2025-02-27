@@ -18,15 +18,13 @@ benchmark_run(benchmark_node_t * benchmark)
         LOGGER_INFO("----------------------------------");
         LOGGER_INFO("Running %s", recursive_name);
         LOGGER_INFO("----------------------------------");
-        benchmark->run();
+        benchmark->run(benchmark);
     }
 
-    benchmark_node_t * child;
-    int i = 0;
-    while (i < BENCHMARK_MAX_CHILDREN && (child = benchmark->children[i]))
+    for (int i = 0 ; i < benchmark->nchildren; ++i)
     {
+        benchmark_node_t * child = benchmark->children[i];
         benchmark_run(child);
-        ++i;
     }
 }
 

@@ -52,6 +52,12 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
     {
         assert(task->ocr_access_index == UNSPECIFIED_TASK_ACCESS);
         device_id = task->targeted_device_id;
+
+        // only coherent async are supported onto the host device yet
+        if (task->fmtid != runtime->formats.coherent_async)
+            LOGGER_FATAL("Offloading tasks to host not supported yet");
+        else
+            worker = runtime->memory_coherent_worker_thread;
     }
 
     // fallback to round robin if no devices found
@@ -68,18 +74,13 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
             }
         }
         else
-        {
-            LOGGER_FATAL("No device to schedule the task");
-        }
+            LOGGER_FATAL("No device to schedule tasks");
     }
 
     if (worker == nullptr)
     {
-        assert((device_id >= 0 && device_id < runtime->drivers.devices.n) || device_id == HOST_DEVICE_GLOBAL_ID);
-        if (device_id == HOST_DEVICE_GLOBAL_ID)
-            worker = runtime->memory_coherent_worker_thread;
-        else
-            worker = runtime->drivers.devices.list[device_id]->thread;
+        assert((device_id >= 0 && device_id < runtime->drivers.devices.n));
+        worker = runtime->drivers.devices.list[device_id]->thread;
     }
 
     LOGGER_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);

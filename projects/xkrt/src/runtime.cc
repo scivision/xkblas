@@ -30,7 +30,7 @@
 static inline void
 xkrt_task_format_register(xkrt_runtime_t * runtime)
 {
-    task_formats_init(&(runtime->task_formats));
+    task_formats_init(&(runtime->formats.list));
     xkrt_memory_coherent_async_register_format(runtime);
     xkrt_memory_copy_async_register_format(runtime);
 }

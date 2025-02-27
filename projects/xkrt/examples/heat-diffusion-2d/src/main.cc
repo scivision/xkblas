@@ -224,6 +224,25 @@ initialize(TYPE * grid1, TYPE * grid2)
     LOGGER_WARN("Initialized grid on the host");
 }
 
+// omp interfaces would look like
+//
+//  # pragma omp task   format(diffusion_format_id)                                     \
+//                      access(read:  matrix(colmajor, src, ld, x0, y0, sx, sy))        \
+//                      access(write: matrix(colmajor, dst, LD, x0, y0, sx, sy))
+//
+// with some
+//
+//  omp_task_format_id_t diffusion_format_id;
+//  # pragma omp task-format(diffusion_format_id) create
+//
+//  # pragma omp task-format(diffusion_format_id) target(LEVEL_ZERO)
+//      body_level_zero();  // task context is implicit, can retrieve accesses
+//
+//  # pragna omp task-format(diffusion_format_id) target(CUDA)
+//      body_cuda();
+//
+//  [...]
+
 /* Submit a tile */
 static void
 update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
@@ -261,6 +280,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     }
     {
         const ssize_t x0 = MAX(x, 1);
+
         const ssize_t y0 = MAX(y, 1);
         const ssize_t x1 = MIN(x+TS, NX-1);
         const ssize_t y1 = MIN(y+TS, NY-1);

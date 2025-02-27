@@ -57,6 +57,11 @@ xkrt_driver_init(
     xkrt_driver_t * driver = drivers->list[driver_type];
     assert(driver);
 
+    driver->type = driver_type;
+    driver->ndevices_targeted = 0;
+    driver->ndevices_inited = 0;
+    driver->ndevices_commited = 0;
+
     const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
     LOGGER_INFO("Loading driver `%s`", driver_name);
 
@@ -71,11 +76,13 @@ xkrt_driver_init(
     LOGGER_DEBUG("Found %u devices", n_devices_max);
 
     unsigned int n_devices = MIN(ngpus, n_devices_max);
-    if (n_devices < 1)
-        return ;
+
     driver->ndevices_targeted = n_devices;
     driver->ndevices_inited   = 0;
     driver->ndevices_commited = 0;
+
+    if (n_devices < 1)
+        return ;
 
     # pragma message(TODO "Move that to the 'Thread' interfaces")
     cpu_set_t save_schedset;
@@ -98,6 +105,7 @@ xkrt_driver_init(
         if (err)
         {
             LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
+            --driver->ndevices_targeted;
         }
         else
         {

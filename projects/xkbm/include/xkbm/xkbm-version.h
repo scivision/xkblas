@@ -1,6 +1,6 @@
 #ifndef __XKBM_VERSION_H__
 # define __XKBM_VERSION_H__
 
-# define XKBM_VERSION_GITHASH "v0.5.0-395-g928ae75-dirty"
+# define XKBM_VERSION_GITHASH "v0.5.0-396-gac4993b-dirty"
 
 #endif /* __XKBM_VERSION_H__ */
