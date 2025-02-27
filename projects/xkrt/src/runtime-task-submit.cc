@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:16:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:37:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,9 +42,7 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
 
         const xkrt_device_global_id_bitfield_t owners = memcontroller->who_owns(access);
         if (owners)
-        {
             device_id = (xkrt_device_global_id_t) (__random_set_bit(owners) - 1);
-        }
     }
 
     // if a target device is set
@@ -52,12 +50,6 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
     {
         assert(task->ocr_access_index == UNSPECIFIED_TASK_ACCESS);
         device_id = task->targeted_device_id;
-
-        // only coherent async are supported onto the host device yet
-        if (task->fmtid != runtime->formats.coherent_async)
-            LOGGER_FATAL("Offloading tasks to host not supported yet");
-        else
-            worker = runtime->memory_coherent_worker_thread;
     }
 
     // fallback to round robin if no devices found
@@ -75,6 +67,15 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
         }
         else
             LOGGER_FATAL("No device to schedule tasks");
+    }
+
+    // only coherent async are supported onto the host device yet
+    if (device_id == HOST_DEVICE_GLOBAL_ID)
+    {
+        if (task->fmtid == runtime->formats.coherent_async)
+            worker = runtime->memory_coherent_worker_thread;
+        else
+            LOGGER_FATAL("Offloading tasks to host not supported yet");
     }
 
     if (worker == nullptr)

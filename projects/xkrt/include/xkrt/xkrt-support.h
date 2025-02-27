@@ -18,7 +18,7 @@
 # define XKRT_SUPPORT_HOST  0
 
 /* If the runtime was compiled with Mvidia's CUDA support */
-# define XKRT_SUPPORT_CUDA  0
+# define XKRT_SUPPORT_CUDA  1
 
 /* If the runtime was compiled with Intel's Level Zero support */
 # define XKRT_SUPPORT_ZE    1

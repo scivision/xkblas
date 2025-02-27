@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 19:23:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:18:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -113,5 +113,5 @@ xkblas_task_format_create(task_format_t * format)
 {
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
-    return task_format_create(&(context->runtime.task_formats), format);
+    return task_format_create(&(context->runtime.formats.list), format);
 }

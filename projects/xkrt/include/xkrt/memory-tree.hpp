@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 16:51:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 22:54:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -40,6 +40,15 @@
  *      the fetch to a D2D A->B submitted when A fetched.
  *
  *  Set to '0' so multiple H2D are submitted concurrently
+ *
+ *  D2D forwarding makes heat 2D crash
+ *  This should be reworked to have a smarter routing mechanism too
+ *  For instance, on Aurora:
+ *      - H2D = PCIe5 = 50GB/s on 1 tile = 320GB/s if every tile are concurrently fetching
+ *      - D2D (tile interconnect) = ~200GB/s
+ *      - D2D (gpu xelink) = ~20GB/s
+ *  We need some way to decide which link to use.
+ *  For instance, MPICH does a round-robin between all links - in our case, we probably want to sature the PCI, and then forward instead
  */
 # define USE_D2D_FORWARDING 1
 

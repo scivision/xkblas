@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:24:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:43:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -20,7 +20,7 @@
 
 /**
  *  We assume col major, dim 0 is for rows; dim 1 is for cols.
- *  These variables controls how a matrix (A, m, n, LD) is converted to an
+ *  These variables controls how a matrix (A, m, n, ld) is converted to an
  *  hypercube for the xktree.
  *
  *  e.g the matrix (0, 4, 8, 8) can whether be represented as the hypercube
@@ -39,7 +39,7 @@ class access_t
     public:
 
         /* The region: a matrix tile is up to 2 cubes in an XKTree of coordinates */
-        Cube cubes[2];  /* have 1 or 2 cubes depending whether the access is aligned on LD.s or not */
+        Cube cubes[2];  /* have 1 or 2 cubes depending whether the access is aligned on ld.s or not */
 
         /* the mode */
         access_mode_t mode;
@@ -68,30 +68,30 @@ class access_t
                 const size_t  m = t.m;
                 const size_t  n = t.n;
                 const size_t  s = t.sizeof_type;
-                const size_t LD = t.ld;
-
-                # if ACCESS_FORCE_ALIGNMENT
-                assert((A % (LD * s)) + (m * s) <= LD * s);
-                # endif /* ACCESS_FORCE_ALIGNMENT */
+                const size_t ld = t.ld;
 
                 // not sure about what to do if other ordering
                 assert(t.order == MATRIX_COLMAJOR);
 
+                # if ACCESS_FORCE_ALIGNMENT
+                assert((A % (ld * s)) + (m * s) <= ld * s);
+                # endif /* ACCESS_FORCE_ALIGNMENT */
+
                 // only 1 cube is needed
-                if ((A % (LD * s)) + m * s <= LD * s)
+                if ((A % (ld * s)) + m * s <= ld * s)
                 {
                     /**
                      *        ^               y0       y1
                      *        |         |  .   .   .   .   .
                      *        |      x0 |  .   x   x   x   .
-                     *   LD.s |         |  .   x   x   x   .
+                     *   ld.s |         |  .   x   x   x   .
                      *        |         |  .   x   x   x   .
                      *        |      x1 |  .   x   x   x   .
                      *        v         v  .   .   .   .   .
                      */
-                    const uintptr_t x0 = A % (LD * s);
+                    const uintptr_t x0 = A % (ld * s);
                     const uintptr_t x1 = x0 + m * s;
-                    const uintptr_t y0 = A / (LD * s);
+                    const uintptr_t y0 = A / (ld * s);
                     const uintptr_t y1 = y0 + n;
 
                     {
@@ -117,12 +117,12 @@ class access_t
                      *      x1   v  .   x   x   x   x   .   .
                      *                 y0          y1
                      */
-                    const uintptr_t x0 = A % (LD * s);
-                    const uintptr_t x1 = LD * s;
+                    const uintptr_t x0 = A % (ld * s);
+                    const uintptr_t x1 = ld * s;
                     const uintptr_t x2 = 0;
                     const uintptr_t x3 = m*s - (x1 - x0);
 
-                    const uintptr_t y0 = A / (LD * s);
+                    const uintptr_t y0 = A / (ld * s);
                     const uintptr_t y1 = y0 + n;
                     const uintptr_t y2 = y0 + 1;
                     const uintptr_t y3 = y1 + 1;

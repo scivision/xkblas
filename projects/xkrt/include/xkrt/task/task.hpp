@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:29:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:48:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -155,17 +155,17 @@ class alignas(CACHE_LINE_SIZE) KTask
         {}
 
         KTask(
-            task_format_id_t f,             // task format to use
-            uint8_t ocr_access_index_p,     // the ocr access to use
-            uint8_t targeted_device_id_p    // targeted device
+            task_format_id_t f,
+            uint8_t ocr_access_index_p,
+            uint8_t targeted_device_id_p
         ) :
             KTask(f, ocr_access_index_p, targeted_device_id_p, 0)
         {}
 
         KTask(
-            task_format_id_t f,             // task format to use
-            uint8_t ocr_access_index_p,     // the ocr access to use
-            uint8_t targeted_device_id_p,   // targeted device
+            task_format_id_t f,
+            uint8_t ocr_access_index_p,
+            uint8_t targeted_device_id_p,
             task_flag_bitfield_t flags_p
         ) :
             fmtid(f),
@@ -181,8 +181,8 @@ class alignas(CACHE_LINE_SIZE) KTask
             edges.reserve(8);
 
             // NOT SUPPORTED YET
-            assert(!(flags & TASK_FLAG_UNDEFERED));
-            assert(!(flags & TASK_FLAG_DETACHABLE));
+            assert(!(this->flags & TASK_FLAG_UNDEFERED));
+            assert(!(this->flags & TASK_FLAG_DETACHABLE));
 
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");

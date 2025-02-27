@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 22:01:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:26:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -198,20 +198,16 @@ xkrt_memory_coherent_async_worker_thread_work(
         current->fetching();
 
         fetch_t * fetch = list->fetches + i;
+        assert(fetch->src_device_global_id != HOST_DEVICE_GLOBAL_ID);
         assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
 
-        const uint64_t task_size = sizeof(Task);
-        const uint64_t args_size = sizeof(args_fetch_t);
-        assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-        assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
-        uint8_t * mem = thread->allocate(task_size + args_size);
+        uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_fetch_t));
         assert(mem);
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);
         new(task) Task(runtime->formats.coherent_async_fetch, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
 
-        args_fetch_t  * args = reinterpret_cast<args_fetch_t *>(mem + task_size);
+        args_fetch_t  * args = reinterpret_cast<args_fetch_t *>(task + 1);
         new(args) args_fetch_t(runtime, thread, current, list, i);
 
         #ifndef NDEBUG
