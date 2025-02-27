@@ -19,7 +19,6 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/threads.cc
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
     ${CMAKE_SOURCE_DIR}/src/libnuma/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/cuda/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/hwloc/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/opencl/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
@@ -58,13 +57,11 @@ install(TARGETS ${XKBM} DESTINATION bin)
 
 # XK Runtime
 find_package(XKRT REQUIRED)
-message(STATUS "Found XKRT: ${XKRT_INCLUDE_DIRS}")
 include_directories("${XKRT_INCLUDE_DIRS}")
 target_link_libraries(${XKBM} PRIVATE ${XKRT_LIBRARIES})
 
 # HWLOC
 find_package(HWLOC REQUIRED)
-message(STATUS "Found HWLOC: ${HWLOC_INCLUDE_DIRS}")
 include_directories(${HWLOC_INCLUDE_DIRS})
 target_link_libraries(${XKBM} PRIVATE ${HWLOC_LIBRARIES})
 
@@ -72,7 +69,6 @@ target_link_libraries(${XKBM} PRIVATE ${HWLOC_LIBRARIES})
 option(USE_CUDA "Whether to build CUDA tests." ON)
 if (USE_CUDA)
     find_package(CUDA_RT REQUIRED)
-    message(STATUS "Found Cuda: ${CUDA_RT_INCLUDE_DIRS}")
     include_directories("${CUDA_RT_INCLUDE_DIRS}")
     target_link_libraries(${XKBM} PRIVATE ${CUDA_RT_LIBRARIES})
 endif()
@@ -83,5 +79,4 @@ if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
     target_link_libraries(${XKBM} PRIVATE ${ZE_LIBRARIES})
-    message(STATUS "Found ZE: ${ZE_INCLUDE_DIRS}")
 endif()

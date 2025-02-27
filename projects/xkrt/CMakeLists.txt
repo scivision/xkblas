@@ -26,6 +26,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-copy.cc
     ${CMAKE_SOURCE_DIR}/src/memory-distribute.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
@@ -166,7 +167,7 @@ if (USE_CL)
     include_directories("${CL_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_cl SHARED src/driver/driver_cl.cc)
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl ${CL_LIBRARIES})
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()

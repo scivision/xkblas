@@ -22,7 +22,7 @@
 # include <xkbm/time.h>
 
 # include <xkrt/logger/logger.h>
-# include <xkrt/logger/logger-cu.h>
+# include <xkrt/logger/logger-ze.h>
 # include <xkrt/logger/metric.h>
 
 ////////////////

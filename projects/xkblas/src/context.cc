@@ -38,6 +38,13 @@ xkblas_context_get(void)
     return &context;
 }
 
+xkrt_runtime_t *
+xkblas_xkrt_runtime_get(void)
+{
+    xkblas_context_t * context = xkblas_context_get();
+    return &(context->runtime);
+}
+
 void xkblas_task_format_register(void);
 
 extern "C"

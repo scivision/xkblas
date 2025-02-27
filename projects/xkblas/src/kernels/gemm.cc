@@ -396,18 +396,6 @@ body_ze(void * ihandle, void * vargs)
 
     # if XKBLAS_SUPPORT_SYCL
 
-    // Create SYCL platform and device from Level Zero context and device
-    sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
-    sycl::device sycl_device = sycl::device::ext_oneapi_from_ze_device(ze_device);
-
-    // Create SYCL context from SYCL device
-    sycl::context sycl_context(sycl_device);
-
-    // Create SYCL queue from SYCL context and Level Zero command list
-    sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
-
-    LOGGER_FATAL("impl me");
-
     # if 0
     oneapi::mkl::blas::column_major::gemm(
         sycl::_V1::queue &,
@@ -471,7 +459,7 @@ body_ze(void * ihandle, void * vargs)
 
 # endif
 
-# if XKRT_SUPPORT_CL
+# if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
 
 #  include <xkrt/driver/driver-cl.h>
 #  include <xkblas/clblast-helper.h>
@@ -557,7 +545,7 @@ register_£gemm_format(void)
     format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
     # endif /* XKRT_SUPPORT_ZE */
 
-    # if XKRT_SUPPORT_CL
+    # if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
     format.f[XKRT_DRIVER_TYPE_CL] = (task_format_func_t) body_cl;
     # endif /* XKRT_SUPPORT_CL */
 

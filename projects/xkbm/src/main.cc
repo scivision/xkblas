@@ -23,9 +23,9 @@ void  xkrt_benchmark_push(benchmark_node_t *);
 
 backend_t backends[] = {
     {"XKRT",    1,                  XKRT_DRIVER_TYPE_MAX , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
-    {"HWLOC",   1,                  XKRT_DRIVER_TYPE_MAX , hwloc_benchmark_push, NULL               , NULL                     },
-    {"CUDA",    XKRT_SUPPORT_CUDA,  XKRT_DRIVER_TYPE_CUDA, cuda_benchmark_push , NULL               , NULL                     },
-    {"ZE",      XKRT_SUPPORT_ZE,    XKRT_DRIVER_TYPE_ZE  , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
+    //{"ZE",      XKRT_SUPPORT_ZE,    XKRT_DRIVER_TYPE_ZE  , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
+    //{"HWLOC",   1,                  XKRT_DRIVER_TYPE_MAX , hwloc_benchmark_push, NULL               , NULL                     },
+//    {"CUDA",    XKRT_SUPPORT_CUDA,  XKRT_DRIVER_TYPE_CUDA, cuda_benchmark_push , NULL               , NULL                     },
 };
 
 benchmark_node_t xkbm = {

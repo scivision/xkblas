@@ -74,6 +74,8 @@ xkrt_driver_init(
     if (n_devices < 1)
         return ;
     driver->ndevices_targeted = n_devices;
+    driver->ndevices_inited   = 0;
+    driver->ndevices_commited = 0;
 
     # pragma message(TODO "Move that to the 'Thread' interfaces")
     cpu_set_t save_schedset;
@@ -153,42 +155,42 @@ xkrt_drivers_init(
     drivers->devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
-    xkrt_driver_t * (*loaders[XKRT_DRIVER_TYPE_MAX])(void);
-    memset(loaders, 0, sizeof(loaders));
+    xkrt_driver_t * (*creators[XKRT_DRIVER_TYPE_MAX])(void);
+    memset(creators, 0, sizeof(creators));
 
 # if XKRT_SUPPORT_HOST
     extern xkrt_driver_t * XKRT_DRIVER_HOST_create_driver(void);
-    loaders[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_create_driver;
+    creators[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_create_driver;
 # endif /* XKRT_SUPPORT_HOST */
 
 # if XKRT_SUPPORT_CUDA
     extern xkrt_driver_t * XKRT_DRIVER_TYPE_CUDA_create_driver(void);
-    loaders[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_create_driver;
+    creators[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_create_driver;
 # endif /* XKRT_SUPPORT_CUDA */
 
 # if XKRT_SUPPORT_ZE
     extern xkrt_driver_t * XKRT_DRIVER_TYPE_ZE_create_driver(void);
-    loaders[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_create_driver;
+    creators[XKRT_DRIVER_TYPE_ZE] = XKRT_DRIVER_TYPE_ZE_create_driver;
 # endif /* XKRT_SUPPORT_ZE */
 
 # if XKRT_SUPPORT_CL
     extern xkrt_driver_t * XKRT_DRIVER_TYPE_CL_create_driver(void);
-    loaders[XKRT_DRIVER_TYPE_CL] = XKRT_DRIVER_TYPE_CL_create_driver;
+    creators[XKRT_DRIVER_TYPE_CL] = XKRT_DRIVER_TYPE_CL_create_driver;
 # endif /* XKRT_SUPPORT_CL */
 
 # if XKRT_SUPPORT_HIP
     extern xkrt_driver_t * XKRT_DRIVER_TYPE_HIP_create_driver(void);
-    loaders[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
+    creators[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
 # endif /* XKRT_SUPPORT_HIP */
 
     int total_gpus = 0;
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
         // TODO : do not load if conf
-        xkrt_driver_t * (*loader)(void) = loaders[driver_type];
-        if (drivers_mask & (1 << driver_type) && loader)
+        xkrt_driver_t * (*creator)(void) = creators[driver_type];
+        if (drivers_mask & (1 << driver_type) && creator)
         {
-            drivers->list[driver_type] = loader();
+            drivers->list[driver_type] = creator();
             xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);
             total_gpus += drivers->devices.n;
             assert(total_gpus <= ngpus);
@@ -204,7 +206,7 @@ xkrt_drivers_init(
     {
         xkrt_driver_t * driver = drivers->list[driver_type];
         if (driver)
-            while (driver->ndevices_commited < driver->ndevices_targeted)
+            while (driver->ndevices_commited != driver->ndevices_targeted)
                 mem_pause();
     }
 

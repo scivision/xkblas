@@ -51,7 +51,7 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
 
 extern "C"
 void
-xkrt_memory_invalidate(xkrt_runtime_t * runtime)
+xkrt_coherency_reset(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Invalidate XKBlas devices memory");
 

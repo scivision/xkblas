@@ -198,6 +198,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     for (int i = 0 ; i < device->nmemories ; ++i)
     {
         xkrt_device_memory_info_t * info = device->memories + i;
+        LOGGER_INFO("Found memory `%s` of capacity %zuGB", info->name, info->capacity/(size_t)1e9);
 
         XKRT_MUTEX_INIT(info->area.lock);
         const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
@@ -432,42 +433,6 @@ xkrt_runtime_t::memory_host_deallocate(
         LOGGER_WARN("Driver `%s` does not implement memory_dealloc_host", driver->f_get_name());
         free(mem);
     }
-}
-
-void
-xkrt_runtime_t::memory_distribute_packed_2D_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t sizeof_type
-) {
-    xkrt_memory_distribute_packed_2D_async(this, order, ptr, ld, m, n, sizeof_type);
-}
-
-void
-xkrt_runtime_t::memory_distribute_cyclic_2D_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t mb, size_t nb,
-    size_t sizeof_type
-) {
-    xkrt_memory_distribute_cyclic_2D_async(this, order, ptr, ld, m, n, mb, nb, sizeof_type);
-}
-
-void
-xkrt_runtime_t::memory_distribute_cyclic_2D_halo_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t mb, size_t nb,
-    size_t sizeof_type,
-    size_t hx, size_t hy
-) {
-    xkrt_memory_distribute_cyclic_2D_halo_async(this, order, ptr, ld, m, n, mb, nb, sizeof_type, hx, hy);
 }
 
 void

@@ -309,12 +309,11 @@ xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime)
 
 extern "C"
 void
-xkrt_memory_coherent_async(
+xkrt_coherency_host_async(
     xkrt_runtime_t * runtime,
-    int uplo, int memflag,
-    int m, int n,
-    void * ptr, int ld,
-    unsigned int sizeof_type
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
 ) {
     LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
 

@@ -14,7 +14,6 @@
 #ifndef __CLBLAST_HELPER_H__
 # define __CLBLAST_HELPER_H__
 
-# include <xkrt/logger/logger-cu.h>
 # include <xkrt/logger/logger-clblast.h>
 
 # include "xkblas/cblas.h"

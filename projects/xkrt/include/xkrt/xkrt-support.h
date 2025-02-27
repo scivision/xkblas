@@ -18,7 +18,7 @@
 # define XKRT_SUPPORT_HOST  0
 
 /* If the runtime was compiled with Mvidia's CUDA support */
-# define XKRT_SUPPORT_CUDA  1
+# define XKRT_SUPPORT_CUDA  0
 
 /* If the runtime was compiled with Intel's Level Zero support */
 # define XKRT_SUPPORT_ZE    1
@@ -30,6 +30,6 @@
 # define XKRT_SUPPORT_CL 1
 
 /* If the kernel was compiled with run-time statistics enabled */
-# define XKRT_SUPPORT_STATS 0
+# define XKRT_SUPPORT_STATS 1
 
 #endif /* __XKRT_SUPPORT_H__ */

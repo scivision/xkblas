@@ -11,6 +11,8 @@
 # include <xkrt/runtime.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
+# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread-producer.hpp>
 
 static xkrt_runtime_t runtime;
 
@@ -19,8 +21,8 @@ static xkrt_runtime_t runtime;
 ///////////////////////////
 
 # if XKRT_SUPPORT_CUDA
-#  include <xkrt/logger/logger-ze.h>
-#  include <xkrt/driver/driver-ze.h>
+#  include <xkrt/logger/logger-cu.h>
+#  include <xkrt/driver/driver-cuda.h>
 
 const uint8_t CUBIN_EMPTY_KERNEL[] = {
     0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x33, 0x07, 0x00, 0x00, 0x00,
@@ -295,7 +297,7 @@ xkrt_benchmarks_kernel_launch_latency(void)
 
         xkrt_callback_t callback = { .func = completed, .args = { device, NULL } };
 
-        for (int iter = -30 ; iter < (int) time.niters ; ++iter)
+        for (int iter = -100 ; iter < (int) time.niters ; ++iter)
         {
             uint64_t t0 = xkrt_get_nanotime();
             device->offloader_stream_instruction_submit_kernel(launch, device, callback);
@@ -307,8 +309,7 @@ xkrt_benchmarks_kernel_launch_latency(void)
         }
     }
 
-    LOGGER_INFO("%10s | %25s", "Device ID", "avg +/- stdev");
-    time.report<pp_1zu_1time>(runtime.drivers.devices.n);
+    time.report<decltype(time)::pp_1zu_1time>("Device ID", runtime.drivers.devices.n);
 }
 
 static void
@@ -421,10 +422,10 @@ xkrt_benchmarks_alloc_run_thread(xkrt_device_global_id_t device_global_id, void 
     const char * smode  = (mode == DRIVER) ? "driver" : "system";
     const char * stouch =            touch ? "touch" : "notouch";
     LOGGER_INFO("---- Device %u (alloc with %s and %s) ----", device_global_id, smode, stouch);
-    time_alloc.report<pp_1byte_1time>();
+    time_alloc.report<decltype(time_alloc)::pp_1byte_1time>("Memory Size");
 
     LOGGER_INFO("---- Device %u (dealloc with %s and %s) ----", device_global_id, smode, stouch);
-    time_dealloc.report<pp_1byte_1time>();
+    time_dealloc.report<decltype(time_dealloc)::pp_1byte_1time>("Memory Size");
 
     return NULL;
 }
@@ -517,7 +518,7 @@ xkrt_benchmarks_alloc_parallel_run_thread(xkrt_device_global_id_t device_global_
     }
 
     if (device_global_id == 0)
-        time_alloc.report<pp_1byte_1time>();
+        time_alloc.report<decltype(time_alloc)::pp_1byte_1time>("Memory Size");
 
     return NULL;
 }
@@ -569,8 +570,8 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
 
-    time_array_t<XKRT_DEVICE_MEMORIES_MAX, 3> time;
-    for (int i = 0 ; i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+    time_array_t<XKRT_DEVICE_MEMORIES_MAX, 11> time;
+    for (int i = 0 ; i < device->nmemories ; ++i)
     {
         xkrt_device_memory_info_t * meminfo = device->memories + i;
 
@@ -602,34 +603,35 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
         const xkrt_device_global_id_t dst_device_global_id  = (direction == H2D) ? device_global_id      : HOST_DEVICE_GLOBAL_ID;
         const uintptr_t               dst_device_mem        = (direction == H2D) ? chunk->device_ptr     : (uintptr_t) host_mem;
 
-        const xkrt_callback_t callback = { .func = NULL };
-
         // only 1 device at a time
         runtime.team_critical_begin(team);
         {
-            for (int iter = 0 ; iter < time.niters ; ++iter)
+            for (int iter = -3 ; iter < time.niters ; ++iter)
             {
                 uint64_t t0 = xkrt_get_nanotime();
                 {
                     for (int i = 0 ; i < nchunks ; ++i)
                     {
-                        runtime.copy(
-                            device_global_id,
-                            chunk_size,
+                        xkrt_memory_copy_async(
+                           &runtime,
+                            device,
                             dst_device_global_id,
                             dst_device_mem + i * chunk_size,
                             src_device_global_id,
                             src_device_mem + i * chunk_size,
-                            callback
+                            size
                         );
                     }
-                    runtime.wait_device(device_global_id);
+                    xkrt_sync(&runtime);
                 }
                 uint64_t tf = xkrt_get_nanotime();
 
-                const size_t size = chunk_size * nchunks;
-                const size_t bw = size / ((tf - t0) / 1e9);
-                time.set(device_global_id, iter, bw);
+                if (iter >= 0)
+                {
+                    const size_t size = chunk_size * nchunks;
+                    const size_t bw = size / ((tf - t0) / 1e9);
+                    time.set(device_global_id, iter, bw);
+                }
             }
         }
         runtime.team_critical_end(team);
@@ -648,8 +650,7 @@ xkrt_benchmarks_mem_run_thread(xkrt_device_global_id_t device_global_id, void * 
         runtime.team_critical_begin(team);
         {
             LOGGER_INFO("--- Device %u ---", device_global_id);
-            LOGGER_INFO("%10s | %10s", "Memory ID", "avg +/- stdev");
-            time.report<pp_1zu_1bw>(device->nmemories);
+            time.report<decltype(time)::pp_1zu_1bw>("Memory ID", device->nmemories);
         }
         runtime.team_critical_end(team);
     }
@@ -664,7 +665,7 @@ xkrt_benchmarks_mem_run(void)
     bench_tranfer_args_t args;
     xkrt_team_t team = {
         .desc = {
-            .routine = xkrt_benchmarks_mem_run_thread<direction, 64>,
+            .routine = xkrt_benchmarks_mem_run_thread<direction, 1>,
             .args    = &args,
             .devices = XKRT_DEVICES_MASK_ALL,
         }
@@ -714,14 +715,17 @@ void
 xkrt_benchmark_push(benchmark_node_t * parent)
 {
     benchmark_push_children(parent, &xkrt_benchmarks);
+
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_touch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_system_notouch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_touch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch);
     // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_alloc_driver_notouch_parallel);
+
     benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmark_kernel_launch_latency);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
-    // benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
+
+    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_h2d);
+//    benchmark_push_children(&xkrt_benchmarks, &xkrt_benchmarks_d2h);
 }
 
 void

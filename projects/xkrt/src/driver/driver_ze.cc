@@ -152,7 +152,7 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
     snprintf(
         buffer,
         sizeof(buffer),
-        "Level Zero device %d - %s with %d slices of %d subslices of %d EUs of "
+        "Level Zero device %2d - %s with %d slices of %d subslices of %d EUs of "
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
         "timer resolution of %luns - deviceId(pci)=%d - uuid[%d]=%x",
         device_driver_id,

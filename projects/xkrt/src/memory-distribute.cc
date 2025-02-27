@@ -14,8 +14,6 @@
 # include <xkrt/runtime.h>
 # include <xkrt/driver/thread-producer.hpp>
 
-static task_format_id_t TASK_FORMAT_DISTRIBUTE_ASYNC;
-
 extern "C"
 void
 xkrt_memory_distribute_packed_2D_async(
@@ -36,7 +34,7 @@ xkrt_memory_distribute_packed_2D_async(
 
         Task * task = reinterpret_cast<Task *>  (mem + 0);
         const xkrt_device_global_id_t device_global_id = 0;
-        new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+        new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
 
         # define NACCESS 1
         static_assert(NACCESS <= TASK_MAX_ACCESSES);
@@ -91,7 +89,7 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
             assert(mem);
 
             Task * task = reinterpret_cast<Task *>  (mem + 0);
-            new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+            new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
 
             # define NACCESS 1
             static_assert(NACCESS <= TASK_MAX_ACCESSES);
@@ -131,19 +129,4 @@ xkrt_memory_distribute_cyclic_2D_async(
     size_t sizeof_type
 ){
     xkrt_memory_distribute_cyclic_2D_halo_async(runtime, order, ptr, ld, m, n, mb, nb, sizeof_type, 0, 0);
-}
-
-//////////////////////////
-// REGISTER TASK FORMAT //
-//////////////////////////
-
-void
-xkrt_memory_distribute_async_register_format(xkrt_runtime_t * runtime)
-{
-    {
-        task_format_t format;
-        memset(format.f, 0, sizeof(format.f));
-        snprintf(format.label, sizeof(format.label), "distribute-async");
-        TASK_FORMAT_DISTRIBUTE_ASYNC = task_format_create(&(runtime->task_formats), &format);
-    }
 }

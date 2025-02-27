@@ -63,7 +63,7 @@ endforeach()
 # TODO : this is always run for now, couldnt find a way to set a proper dependency
 add_custom_command(
     OUTPUT
-        always-run
+        ${CMAKE_SOURCE_DIR}/src/kernels/generated/kernel-task-format-register.cc
     COMMAND
         python3 ${CMAKE_SOURCE_DIR}/src/kernels/generators/generate-task-format.py ${CMAKE_SOURCE_DIR} '${XKBLAS_KERNELS}' '${XKBLAS_KERNELS_PRECISIONS}'
     COMMAND
@@ -72,7 +72,6 @@ add_custom_command(
 list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generated/kernel-task-format-register.cc)
 
 SET(SOURCE_FILES
-    always-run
     ${CMAKE_SOURCE_DIR}/src/auto-tile.cc
     ${CMAKE_SOURCE_DIR}/src/conf.cc
     ${CMAKE_SOURCE_DIR}/src/context.cc
@@ -140,11 +139,17 @@ endif()
 
 find_package(CLBLAST)
 if (${CLBLAST_FOUND})
+    add_compile_definitions(XKBLAS_SUPPORT_CLBLAST=1)
     include_directories("${CLBLAST_INCLUDE_DIRS}")
     message(STATUS "Found CLBlast: ${CLBLAST_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CLBLAST_LIBRARIES})
 else()
     message(STATUS "CLBlast not found")
+endif()
+
+find_package(ZE)
+if (${ZE_FOUND})
+    include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 
 option(ENABLE_SYCL "Enable the compilation of Intel's BLAS via SYCL" ON)
