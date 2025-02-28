@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 16:01:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 00:53:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,13 +41,18 @@ typedef struct  xkrt_runtime_t
     xkrt_drivers_t drivers;
 
     /* task formats */
-    task_formats_t task_formats;
+    struct {
+        task_formats_t list;
+        task_format_id_t coherent_async;
+        task_format_id_t coherent_async_fetch;
+        task_format_id_t copy_async;
+    } formats;
 
     /* memory controller for coherency */
     std::vector<MemoryCoherencyController *> memcontrollers;
 
     /* worker thread to copy data asynchronously */
-    ThreadWorker * memory_coherent_worker_thread;
+    Thread * memory_coherent_worker_thread;
 
     /* user conf */
     xkrt_conf_t conf;
@@ -110,11 +115,6 @@ typedef struct  xkrt_runtime_t
     /* deallocate memory onto the host using the given driver */
     void memory_host_deallocate(const xkrt_device_global_id_t device_global_id, void * mem, const size_t size);
 
-    /* create tasks to distribute memory on devices */
-    void memory_distribute_packed_2D_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
-    void memory_distribute_cyclic_2D_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t mb, size_t nb, size_t sizeof_type);
-    void memory_distribute_cyclic_2D_halo_async(matrix_order_t order, void * ptr, size_t ld, size_t m, size_t n, size_t mb, size_t nb, size_t sizeof_type, size_t hx, size_t hy);
-
     /////////////////////
     // SYNCHRONIZATION //
     /////////////////////
@@ -131,6 +131,12 @@ typedef struct  xkrt_runtime_t
 
     /* Commit a task - so it may be schedule from now once its dependences completed */
     void task_commit(Task * task);
+
+    /* Complete a task */
+    void task_executed(Task * task);
+
+    /* Complete a task */
+    void task_detachable_post(Task * task);
 
     /* Complete a task */
     void task_complete(Task * task);
@@ -178,6 +184,7 @@ void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task);
 /* memory async thread management */
 void xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime);
 void xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id);

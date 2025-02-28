@@ -20,6 +20,8 @@
 # include <xkrt/stats/stats.h>
 # include <xkrt/sync/lockable.hpp>
 
+# include <atomic>
+
 class xkrt_stream_instruction_queue_t
 {
     public:

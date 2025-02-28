@@ -5,62 +5,18 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 17:13:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:13:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread-producer.hpp>
-
-static task_format_id_t TASK_FORMAT_DISTRIBUTE_ASYNC;
+# include <xkrt/driver/thread.hpp>
 
 extern "C"
 void
-xkrt_memory_distribute_packed_2D_async(
-    xkrt_runtime_t * runtime,
-    matrix_order_t order,
-    void * ptr, size_t ld,
-    size_t m, size_t n,
-    size_t sizeof_type
-) {
-    ThreadProducer * thread = ThreadProducer::self();
-    assert(thread);
-
-    if (runtime->drivers.devices.n == 1)
-    {
-        const uint64_t task_size = sizeof(Task);
-        uint8_t * mem = thread->allocate(task_size);
-        assert(mem);
-
-        Task * task = reinterpret_cast<Task *>  (mem + 0);
-        const xkrt_device_global_id_t device_global_id = 0;
-        new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
-
-        # define NACCESS 1
-        static_assert(NACCESS <= TASK_MAX_ACCESSES);
-        {
-            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
-        }
-        thread->resolve<NACCESS>(task);
-        # undef NACCESS
-
-        #ifndef NDEBUG
-        snprintf(task->label, sizeof(task->label), "distribute_packed_2d_async");
-        #endif /* NDEBUG */
-
-        runtime->task_commit(task);
-    }
-    else
-    {
-        LOGGER_FATAL("Not implemented");
-    }
-}
-
-extern "C"
-void
-xkrt_memory_distribute_cyclic_2D_halo_async(
+xkrt_coherency_distribute_cyclic_2D_halo_async(
     xkrt_runtime_t * runtime,
     matrix_order_t order,
     void * ptr, size_t ld,
@@ -69,7 +25,7 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
     size_t sizeof_type,
     size_t hx, size_t hy
 ) {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     xkrt_device_global_id_t device_global_id = 0;
@@ -91,7 +47,7 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
             assert(mem);
 
             Task * task = reinterpret_cast<Task *>  (mem + 0);
-            new(task) Task(TASK_FORMAT_DISTRIBUTE_ASYNC, UNSPECIFIED_TASK_ACCESS, device_global_id);
+            new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
 
             # define NACCESS 1
             static_assert(NACCESS <= TASK_MAX_ACCESSES);
@@ -122,7 +78,7 @@ xkrt_memory_distribute_cyclic_2D_halo_async(
 
 extern "C"
 void
-xkrt_memory_distribute_cyclic_2D_async(
+xkrt_coherency_distribute_cyclic_2D_async(
     xkrt_runtime_t * runtime,
     matrix_order_t order,
     void * ptr, size_t ld,
@@ -130,20 +86,85 @@ xkrt_memory_distribute_cyclic_2D_async(
     size_t mb, size_t nb,
     size_t sizeof_type
 ){
-    xkrt_memory_distribute_cyclic_2D_halo_async(runtime, order, ptr, ld, m, n, mb, nb, sizeof_type, 0, 0);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(runtime, order, ptr, ld, m, n, mb, nb, sizeof_type, 0, 0);
 }
 
-//////////////////////////
-// REGISTER TASK FORMAT //
-//////////////////////////
-
+extern "C"
 void
-xkrt_memory_distribute_async_register_format(xkrt_runtime_t * runtime)
-{
+xkrt_coherency_distribute_packed_2D_halo_async(
+    xkrt_runtime_t * runtime,
+    matrix_order_t order,
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type,
+    size_t hx, size_t hy
+) {
+    Thread * thread = Thread::self();
+    assert(thread);
+
+    // if power of two
+    if (__builtin_popcount(runtime->drivers.devices.n) == 1)
     {
-        task_format_t format;
-        memset(format.f, 0, sizeof(format.f));
-        snprintf(format.label, sizeof(format.label), "distribute-async");
-        TASK_FORMAT_DISTRIBUTE_ASYNC = task_format_create(&(runtime->task_formats), &format);
+        size_t fm = 1;
+        size_t fn = 1;
+        while (fm * fn != runtime->drivers.devices.n)
+        {
+            if (fm < fn)
+                fm *= 2;
+            else
+                fn *= 2;
+        }
+
+        const size_t mb = m / fm;
+        const size_t nb = n / fn;
+
+        xkrt_coherency_distribute_cyclic_2D_halo_async(
+            runtime,
+            order,
+            ptr, ld,
+             m,  n,
+            mb, nb,
+            sizeof_type,
+            hx, hy
+        );
+        # if 0
+        const uint64_t task_size = sizeof(Task);
+        uint8_t * mem = thread->allocate(task_size);
+        assert(mem);
+
+        Task * task = reinterpret_cast<Task *>  (mem + 0);
+        const xkrt_device_global_id_t device_global_id = 0;
+        new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
+
+        # define NACCESS 1
+        static_assert(NACCESS <= TASK_MAX_ACCESSES);
+        {
+            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+        }
+        thread->resolve<NACCESS>(task);
+        # undef NACCESS
+
+        #ifndef NDEBUG
+        snprintf(task->label, sizeof(task->label), "distribute_packed_2d_async");
+        #endif /* NDEBUG */
+
+        runtime->task_commit(task);
+        # endif
     }
+    else
+    {
+        LOGGER_FATAL("Not implemented");
+    }
+}
+
+extern "C"
+void
+xkrt_coherency_distribute_packed_2D_async(
+    xkrt_runtime_t * runtime,
+    matrix_order_t order,
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    return xkrt_coherency_distribute_packed_2D_halo_async(runtime, order, ptr, ld, m, n, sizeof_type, 0, 0);
 }

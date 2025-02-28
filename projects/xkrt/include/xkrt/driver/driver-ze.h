@@ -15,6 +15,7 @@
 # define __DRIVER_ZE_H__
 
 # include <xkrt/driver/device.hpp>
+# include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
 # include <ze_api.h>
 

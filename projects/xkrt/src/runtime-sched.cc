@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 16:23:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 06:26:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,8 +19,8 @@
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
-# include <xkrt/driver/thread-producer.hpp>
-# include <xkrt/driver/thread-worker.hpp>
+# include <xkrt/driver/thread.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mem.h>
@@ -111,14 +111,14 @@ xkrt_device_thread_main_loop(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device
 ) {
-    assert(ThreadWorker::self() == device->thread);
+    assert(Thread::self() == device->thread);
     assert(device->state == XKRT_DEVICE_STATE_COMMIT);
     device->state = XKRT_DEVICE_STATE_RUNNING;
 
     # pragma message(TODO "do we really need this mem_barrier here?")
     mem_barrier();
 
-    ThreadWorker * worker = ThreadWorker::self();
+    Thread * worker = Thread::self();
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
     {
         Task * task;
@@ -164,8 +164,8 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     device->conf        = &(runtime->conf.device);
 
     // register worker thread
-    ThreadWorker::init();
-    device->thread = ThreadWorker::self();
+    Thread::init();
+    device->thread = Thread::self();
     assert(device->thread);
 
     // register affinity
@@ -198,6 +198,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     for (int i = 0 ; i < device->nmemories ; ++i)
     {
         xkrt_device_memory_info_t * info = device->memories + i;
+        LOGGER_INFO("Found memory `%s` of capacity %zuGB", info->name, info->capacity/(size_t)1e9);
 
         XKRT_MUTEX_INIT(info->area.lock);
         const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
@@ -243,7 +244,7 @@ xkrt_device_task_executed_callback(
     Task * task = (Task *) args[1];
     assert(task);
 
-    runtime->task_complete(task);
+    runtime->task_executed(task);
 }
 
 /**
@@ -260,15 +261,19 @@ xkrt_device_task_execute(
 ) {
     LOGGER_DEBUG("Task `%s` is ready for kernel execution", task->label);
 
+    Thread * thread = Thread::self();
+    Task * current = thread->current_task;
+    thread->current_task = task;
+
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
     {
-        runtime->task_complete(task);
+        runtime->task_executed(task);
     }
     else
     {
         /* retrieve task format */
-        task_format_t * format = task_format_get(&(runtime->task_formats), task->fmtid);
+        task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
         assert(format);
 
         // convert device driver type to task format target
@@ -299,13 +304,12 @@ xkrt_device_task_execute(
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
             ((void (*)(Task *)) format->f[targetfmt])(task);
-            runtime->task_complete(task);
+            runtime->task_executed(task);
         }
         /* running a device task */
         else
         {
-            /* the callback will be called asynchronously in the
-             * driver on kernel completion test success */
+            /* the task will complete in the callback called asynchronously on kernel completion */
             xkrt_callback_t callback;
             callback.func    = xkrt_device_task_executed_callback;
             callback.args[0] = runtime;
@@ -318,14 +322,10 @@ xkrt_device_task_execute(
                 task,
                 callback
             );
-
-            # if 0
-            if (device->thread == ThreadWorker::self()) // TODO : explain why this
-                device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
-            # endif
-            /* else kernel launch will be called asynchronously */
         }
     }
+
+    thread->current_task = current;
 }
 
 ///////////////
@@ -435,42 +435,6 @@ xkrt_runtime_t::memory_host_deallocate(
 }
 
 void
-xkrt_runtime_t::memory_distribute_packed_2D_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t sizeof_type
-) {
-    xkrt_memory_distribute_packed_2D_async(this, order, ptr, ld, m, n, sizeof_type);
-}
-
-void
-xkrt_runtime_t::memory_distribute_cyclic_2D_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t mb, size_t nb,
-    size_t sizeof_type
-) {
-    xkrt_memory_distribute_cyclic_2D_async(this, order, ptr, ld, m, n, mb, nb, sizeof_type);
-}
-
-void
-xkrt_runtime_t::memory_distribute_cyclic_2D_halo_async(
-    matrix_order_t order,
-    void * ptr,
-    size_t ld,
-    size_t m, size_t n,
-    size_t mb, size_t nb,
-    size_t sizeof_type,
-    size_t hx, size_t hy
-) {
-    xkrt_memory_distribute_cyclic_2D_halo_async(this, order, ptr, ld, m, n, mb, nb, sizeof_type, hx, hy);
-}
-
-void
 xkrt_runtime_t::copy(
     const xkrt_device_global_id_t   device_global_id,
     const memory_view_t           & host_view,
@@ -524,6 +488,8 @@ xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 // TASK //
 //////////
 
+// TODO : remove these, and use threads instead
+
 void
 xkrt_runtime_t::task_submit(
     Task * task,
@@ -542,21 +508,40 @@ enqueue(void * vargs, Task * task)
 void
 xkrt_runtime_t::task_commit(Task * task)
 {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
+    LOGGER_DEBUG("task `%s` commited", task->label);
     thread->commit<enqueue>(this, task);
+}
+
+void
+xkrt_runtime_t::task_executed(Task * task)
+{
+    assert(task);
+    LOGGER_DEBUG("task `%s` executed", task->label);
+    task->executed<enqueue>(this);
+}
+
+void
+xkrt_runtime_t::task_detachable_post(Task * task)
+{
+    assert(task);
+    assert(task->flags & TASK_FLAG_DETACHABLE);
+    LOGGER_DEBUG("task `%s` detachable_post", task->label);
+    task->detachable_post<enqueue>(this);
 }
 
 void
 xkrt_runtime_t::task_complete(Task * task)
 {
     assert(task);
+    assert(!(task->flags & TASK_FLAG_DETACHABLE));
 
     LOGGER_DEBUG("task `%s` completed", task->label);
 
-    ThreadWorker * thread = ThreadWorker::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
-    thread->complete<enqueue>(this, task);
+    task->complete<enqueue>(this);
 }

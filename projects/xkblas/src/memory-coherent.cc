@@ -22,7 +22,8 @@ xkblas_memory_coherent_async(
     void * ptr, int ld,
     unsigned int sizeof_type
 ) {
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-    return xkrt_memory_coherent_async(&(context->runtime), uplo, memflag, m, n, ptr, ld, sizeof_type);
+    (void) uplo;
+    (void) memflag;
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
+    return xkrt_coherency_host_async(runtime, MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);
 }

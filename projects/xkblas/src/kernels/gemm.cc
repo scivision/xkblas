@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 15:33:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:46:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -26,7 +26,6 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/memory/alignedas.h>
 # include <xkrt/memory/cache-line-size.hpp>
 # include <xkrt/xkrt-support.h>
 
@@ -42,7 +41,7 @@
 #  include "xkblas/cblas.h"
 # endif
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct  args_t
 {
     args_t(
         int transA, int transB,
@@ -61,6 +60,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     ~args_t() {}
 
+    Access accesses[3]; // A, B, C
     const int transA;
     const int transB;
     const size_t m;
@@ -69,7 +69,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     const TYPE alpha;
     const TYPE beta;
 
-} args_t;
+}               args_t;
 
 static task_format_id_t format_id;
 
@@ -88,13 +88,8 @@ xkblas_£gemm_tile_async(
 ) {
     LOGGER_DEBUG("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
 
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
-    ThreadProducer * thread = ThreadProducer::self();
-    uint8_t * mem = thread->allocate(task_size + args_size);
+    Thread * thread = Thread::self();
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
     assert(mem);
 
     // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
@@ -106,13 +101,14 @@ xkblas_£gemm_tile_async(
     snprintf(task->label, sizeof(task->label), "gemm(A=(%zd,%zd) ; B=(%zd,%zd) ; C=(%zd,%zd))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
 
-    const size_t Am = (transA == CblasNoTrans) ? m : k;
-    const size_t An = (transA == CblasNoTrans) ? k : m;
-    const size_t Bm = (transB == CblasNoTrans) ? k : n;
-    const size_t Bn = (transB == CblasNoTrans) ? n : k;
+    // TODO : there is an issue with how trans and accesses are handled
+    const size_t Am = m; // (transA == CblasNoTrans) ? m : k;
+    const size_t An = k; // (transA == CblasNoTrans) ? k : m;
+    const size_t Bm = k; // (transB == CblasNoTrans) ? k : n;
+    const size_t Bn = n; // (transB == CblasNoTrans) ? n : k;
     const size_t Cm = m;
     const size_t Cn = n;
 
@@ -396,18 +392,6 @@ body_ze(void * ihandle, void * vargs)
 
     # if XKBLAS_SUPPORT_SYCL
 
-    // Create SYCL platform and device from Level Zero context and device
-    sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
-    sycl::device sycl_device = sycl::device::ext_oneapi_from_ze_device(ze_device);
-
-    // Create SYCL context from SYCL device
-    sycl::context sycl_context(sycl_device);
-
-    // Create SYCL queue from SYCL context and Level Zero command list
-    sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
-
-    LOGGER_FATAL("impl me");
-
     # if 0
     oneapi::mkl::blas::column_major::gemm(
         sycl::_V1::queue &,
@@ -471,7 +455,7 @@ body_ze(void * ihandle, void * vargs)
 
 # endif
 
-# if XKRT_SUPPORT_CL
+# if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
 
 #  include <xkrt/driver/driver-cl.h>
 #  include <xkblas/clblast-helper.h>
@@ -557,7 +541,7 @@ register_£gemm_format(void)
     format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
     # endif /* XKRT_SUPPORT_ZE */
 
-    # if XKRT_SUPPORT_CL
+    # if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
     format.f[XKRT_DRIVER_TYPE_CL] = (task_format_func_t) body_cl;
     # endif /* XKRT_SUPPORT_CL */
 

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 18:20:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 06:15:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -13,7 +13,7 @@
 
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/metric.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -78,7 +78,7 @@ maybe_export(int step, TYPE * grid)
         {
             // Create a cohrency task, to gather data back from gpus
             int uplo = 0, memflag = 0;
-            xkrt_memory_coherent_async(&runtime, uplo, memflag, NX, NY, grid, LD, sizeof(TYPE));
+            xkrt_coherency_host_async(&runtime, MATRIX_COLMAJOR, grid, LD, NX, NY, sizeof(TYPE));
 
             // TODO : instead of a sync+coherent, maybe make a host task that reads data
             // Wait for the completion of all tasks
@@ -149,7 +149,7 @@ body_cuda(
         dst, ld_dst,
         args->tile_x, args->tile_y
     );
-    CU_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], custream));
+    CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], custream));
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
@@ -193,7 +193,7 @@ setup_tasks(void)
     # endif
 
     snprintf(format.label, sizeof(format.label), "heat-diffusion");
-    diffusion_format_id = task_format_create(&(runtime.task_formats), &format);
+    diffusion_format_id = task_format_create(&(runtime.formats.list), &format);
 }
 
 //////////////////
@@ -224,22 +224,38 @@ initialize(TYPE * grid1, TYPE * grid2)
     LOGGER_WARN("Initialized grid on the host");
 }
 
+// omp interfaces would look like
+//
+//  # pragma omp task   format(diffusion_format_id)                                     \
+//                      access(read:  matrix(colmajor, src, ld, x0, y0, sx, sy))        \
+//                      access(write: matrix(colmajor, dst, LD, x0, y0, sx, sy))
+//
+// with some
+//
+//  omp_task_format_id_t diffusion_format_id;
+//  # pragma omp task-format(diffusion_format_id) create
+//
+//  # pragma omp task-format(diffusion_format_id) target(LEVEL_ZERO)
+//      body_level_zero();  // task context is implicit, can retrieve accesses
+//
+//  # pragna omp task-format(diffusion_format_id) target(CUDA)
+//      body_cuda();
+//
+//  [...]
+
 /* Submit a tile */
 static void
 update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
 {
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-
-    ThreadProducer * thread = ThreadProducer::self();
-    uint8_t * mem = thread->allocate(task_size + args_size);
+    Thread * thread = Thread::self();
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
 
     // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
     const size_t ocr_access = 1;
     Task * task = reinterpret_cast<Task *>  (mem + 0);
     new(task) Task(diffusion_format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(src, dst, tile_x, tile_y);
 
     const int ntx = NUM_OF_TILES(NX, TS);
@@ -261,6 +277,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     }
     {
         const ssize_t x0 = MAX(x, 1);
+
         const ssize_t y0 = MAX(y, 1);
         const ssize_t x1 = MIN(x+TS, NX-1);
         const ssize_t y1 = MIN(y+TS, NY-1);
@@ -322,13 +339,15 @@ main(void)
 
     // Create tasks to distribute memory
     # if 1
-    runtime.memory_distribute_packed_2D_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE));
+    xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE), 0, 0);
     # elif 0
-    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
-    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE));
     # elif 0
-    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 0, 0);
-    runtime.memory_distribute_cyclic_2D_halo_async(MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 0, 0);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
+    # elif 0
+    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE));
+    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE));
     # else
     # endif
 

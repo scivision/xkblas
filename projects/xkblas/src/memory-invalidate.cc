@@ -18,8 +18,6 @@ extern "C"
 void
 xkblas_memory_invalidate_caches(void)
 {
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    return xkrt_memory_invalidate(&(context->runtime));
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
+    return xkrt_coherency_reset(runtime);
 }

@@ -13,6 +13,9 @@ SET(SOURCE_FILES
 SET(HEAT_CUDA_KERNELS_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/kernels/diffusion.cu
 )
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 ########
 # HEAT #
 ########

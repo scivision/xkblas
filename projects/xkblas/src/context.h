@@ -47,6 +47,9 @@ typedef struct  xkblas_context_t
 extern "C"
 xkblas_context_t * xkblas_context_get(void);
 
+extern "C"
+xkrt_runtime_t * xkblas_xkrt_runtime_get(void);
+
 # if 0
 /* memory async thread management */
 void xkblas_memory_coherent_async_worker_thread_init(xkblas_context_t * context);

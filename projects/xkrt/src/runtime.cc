@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 17:14:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:22:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,7 +15,7 @@
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/driver/driver.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/memory/alignedas.h>
 # include <xkrt/sync/spinlock.h>
 
@@ -30,8 +30,9 @@
 static inline void
 xkrt_task_format_register(xkrt_runtime_t * runtime)
 {
-    task_formats_init(&(runtime->task_formats));
+    task_formats_init(&(runtime->formats.list));
     xkrt_memory_coherent_async_register_format(runtime);
+    xkrt_memory_copy_async_register_format(runtime);
 }
 
 extern "C"
@@ -82,43 +83,43 @@ xkrt_sync(xkrt_runtime_t * runtime)
 {
     assert(runtime);
 
-    /* other threads */
-    ThreadWorker * workers[] = {
-        ThreadWorker::self(),
-        runtime->memory_coherent_worker_thread
-    };
-    const int nworkers = sizeof(workers) / sizeof(ThreadWorker *);
-    const int ndevices = runtime->drivers.devices.n;
-    int32_t wc_global;
+    Thread * thread = Thread::self();
+    assert(thread);
 
-retry:
-    wc_global = 0;
+    # define WAIT    do { if (thread->current_task->cc.load(std::memory_order_seq_cst) == 0) return 0; } while (0)
+    # define WAIT2   do { WAIT   ; WAIT   ; } while (0)
+    # define WAIT4   do { WAIT2  ; WAIT2  ; } while (0)
+    # define WAIT8   do { WAIT4  ; WAIT4  ; } while (0)
+    # define WAIT16  do { WAIT8  ; WAIT8  ; } while (0)
+    # define WAIT32  do { WAIT16 ; WAIT16 ; } while (0)
+    # define WAIT64  do { WAIT32 ; WAIT32 ; } while (0)
+    # define WAIT128 do { WAIT64 ; WAIT64 ; } while (0)
 
-    /* wait for all devices thread */
-    for (int i = 0 ; i < ndevices ; ++i)
+    // Poll 128 times first
+    mem_barrier();
+    WAIT128 ;
+
+    // Else, sleep with backoff
+    int backoff = 1024;                 // Initial backoff time in nanoseconds
+    const int max_backoff = 64 * 1024;  // Maximum backoff time in microseconds
+    assert(max_backoff < 1000000);      // nanosleep condition
+
+    struct timespec ts = { .tv_sec = 0 };
+
+    while (1)
     {
-        xkrt_device_t * device = runtime->drivers.devices.list[i];
-        if (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-            ++wc_global;
-        wc_global += device->thread->wc;
-    }
-
-    /* wait for all other threads */
-    for (ThreadWorker * & thread : workers)
-        wc_global += thread->wc;
-
-    /* if there is still work on-going */
-    if (wc_global)
-    {
-        usleep(5);    // TODO : pthread cond instead ? or maybe workstealing
-        goto retry;
+        ts.tv_nsec = backoff;
+        nanosleep(&ts, NULL);
+        if (backoff < max_backoff)
+            backoff *= 2;
+        WAIT128 ;
     }
 
 # if 0
 # if !defined(NDEBUG)
     // task dependency graph
     LOGGER_INFO("Exporting Dependency Tree...");
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     FILE * f = fopen("tasks.dot", "w");
     thread->dump_tasks(f);
     fclose(f);

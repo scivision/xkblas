@@ -15,7 +15,7 @@ main(void)
     {
         task_format_t format;
         memset(&format, 0, sizeof(task_format_t));
-        EMPTY = task_format_create(&(runtime.task_formats), &format);
+        EMPTY = task_format_create(&(runtime.formats.list), &format);
     }
     assert(EMPTY);
 

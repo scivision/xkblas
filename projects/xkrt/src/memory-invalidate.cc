@@ -12,7 +12,7 @@
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 static inline void
 xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
@@ -28,7 +28,7 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
         device->memory_reset();
 
         // worker thread memory
-        ThreadWorker * worker = device->thread;
+        Thread * worker = device->thread;
         assert(worker);
         worker->deallocate_all();
     }
@@ -37,12 +37,12 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
     # if 0
 
     // coherent worker
-    ThreadWorker * worker = runtime->memory_coherent_worker_thread;
+    Thread * worker = runtime->memory_coherent_worker_thread;
     assert(worker);
     worker->deallocate_all();
 
     // producer incoming thread
-    ThreadProducer * producer = ThreadProducer::self();
+    Thread * producer = Thread::self();
     assert(producer);
     producer->deallocate_all();
 
@@ -51,7 +51,7 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
 
 extern "C"
 void
-xkrt_memory_invalidate(xkrt_runtime_t * runtime)
+xkrt_coherency_reset(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Invalidate XKBlas devices memory");
 

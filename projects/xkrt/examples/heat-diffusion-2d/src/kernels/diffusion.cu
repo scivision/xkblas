@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 18:30:05 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 06:08:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -41,9 +41,6 @@ diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x
     GRID(dst, li, lj, ld_dst) = GRID(src, li, lj, ld_src);
     # endif
 }
-
-# include <xkrt/driver/driver-cuda.h>
-# include <xkrt/logger/logger-cu.h>
 
 extern "C"
 void

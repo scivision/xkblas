@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:29:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:27:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,9 +31,25 @@
 # define TASK_MAX_ACCESSES          3
 # define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
 
-// # define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
-# define LOGGER_DEBUG_TASK(...)
+# define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
+//# define LOGGER_DEBUG_TASK(...)
 
+/* wait counter type */
+typedef uint8_t task_wc_type_t;
+
+/* task flags */
+typedef enum    task_flags_t
+{
+    TASK_FLAG_IMPLICIT      = (1 << 0), // task is implicit
+    TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
+    TASK_FLAG_DETACHABLE    = (1 << 2), // the task completion is associated with the completion of user-defined external events
+    TASK_FLAG_MAX           = (1 << 3)
+}               task_flags_t;
+
+typedef uint8_t task_flag_bitfield_t;
+static_assert(TASK_FLAG_MAX <= 8*sizeof(task_flag_bitfield_t)); // if this fails increase 'task_flag_bitfield_t'
+
+/* task states */
 typedef enum    task_state_t : uint8_t
 {
     TASK_STATE_ALLOCATED        = 0,    // Task is allocated
@@ -88,12 +104,19 @@ class alignas(CACHE_LINE_SIZE) KTask
         }; /* Edge */
 
     public:
+
         ////////////////
         // Attributes //
         ////////////////
 
+        /* parent task */
+        KTask * parent;
+
         /* task format id */
         task_format_id_t fmtid;
+
+        /* task flags */
+        task_flag_bitfield_t flags;
 
         /* list of out-going edges */
         std::vector<Edge> edges;
@@ -111,9 +134,11 @@ class alignas(CACHE_LINE_SIZE) KTask
         xkrt_device_global_id_t targeted_device_id;
 
         /* wait counter - the task may be scheduled once it reached 0 */
-        # pragma message(TODO "Memory accesses ordering this atomic")
-        alignas(CACHE_LINE_SIZE)
-            std::atomic<uint16_t> wc;
+        # pragma message(TODO "Memory accesses ordering on this atomic")
+        std::atomic<task_wc_type_t> wc;
+
+        /* children counter - number of threads with uncompleted tasks scheduled */
+        std::atomic<uint32_t> cc;
 
         /* task state */
         struct {
@@ -127,23 +152,53 @@ class alignas(CACHE_LINE_SIZE) KTask
 
     public:
 
-        KTask() : KTask(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID) {}
+        KTask() :
+            KTask(
+                TASK_FORMAT_NULL,
+                UNSPECIFIED_TASK_ACCESS,
+                UNSPECIFIED_DEVICE_GLOBAL_ID,
+                0
+            )
+        {}
+
+        KTask(task_flag_bitfield_t flags_p) :
+            KTask(
+                TASK_FORMAT_NULL,
+                UNSPECIFIED_TASK_ACCESS,
+                UNSPECIFIED_DEVICE_GLOBAL_ID,
+                flags_p
+            )
+        {}
 
         KTask(
-            task_format_id_t f,             // task format to use
-            uint8_t ocr_access_index_p,     // the ocr access to use
-            uint8_t targeted_device_id_p    // targeted device
+            task_format_id_t f,
+            uint8_t ocr_access_index_p,
+            uint8_t targeted_device_id_p
+        ) :
+            KTask(f, ocr_access_index_p, targeted_device_id_p, 0)
+        {}
+
+        KTask(
+            task_format_id_t f,
+            uint8_t ocr_access_index_p,
+            uint8_t targeted_device_id_p,
+            task_flag_bitfield_t flags_p
         ) :
             fmtid(f),
+            flags(flags_p),
             edges(),
             accesses(),
             naccesses(0),
             ocr_access_index(ocr_access_index_p),
             targeted_device_id(targeted_device_id_p),
             wc(1),
+            cc(0),
             state({.lock=0, .value=TASK_STATE_ALLOCATED})
         {
             edges.reserve(8);
+
+            // NOT SUPPORTED YET
+            assert(!(this->flags & TASK_FLAG_UNDEFERED));
 
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");
@@ -199,7 +254,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         inline void
-        fetching(const uint16_t n = 1)
+        fetching(const task_wc_type_t n = 1)
         {
             if (this->wc.fetch_add(n, std::memory_order_seq_cst) == 0)
             {
@@ -210,7 +265,7 @@ class alignas(CACHE_LINE_SIZE) KTask
         }
 
         inline task_state_t
-        fetched(const uint16_t n = 1)
+        fetched(const task_wc_type_t n = 1)
         {
             assert(this->state.value == TASK_STATE_DATA_FETCHING);
             if (this->wc.fetch_sub(n, std::memory_order_seq_cst) == 1)
@@ -225,8 +280,31 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         template<void (*callback)(void * vargs, KTask * task)>
         inline void
+        executed(void * vargs)
+        {
+            if (this->flags & TASK_FLAG_DETACHABLE)
+                return this->detachable_post<callback>(vargs);
+            else
+                return this->complete<callback>(vargs);
+        }
+
+        template<void (*callback)(void * vargs, KTask * task)>
+        inline void
+        detachable_post(void * vargs)
+        {
+            assert(this->flags & TASK_FLAG_DETACHABLE);
+            if (this->wc.fetch_add(1, std::memory_order_relaxed) == 1)
+                return this->complete<callback>(vargs);
+        }
+
+        template<void (*callback)(void * vargs, KTask * task)>
+        inline void
         complete(void * vargs)
         {
+            assert(
+                (this->wc.load() == 0) ||
+                (this->wc.load() == 2 && (this->flags & TASK_FLAG_DETACHABLE))
+            );
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
@@ -235,9 +313,13 @@ class alignas(CACHE_LINE_SIZE) KTask
             }
             SPINLOCK_UNLOCK(this->state.lock);
 
+            assert(this->parent);
+            this->parent->cc.fetch_sub(1, std::memory_order_relaxed);
+
             for (Edge & edge : this->edges)
                 edge.successor->template commit<callback>(vargs);
         }
+
 };
 
 using Task = KTask<2>;

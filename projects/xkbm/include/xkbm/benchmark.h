@@ -11,7 +11,7 @@ typedef struct  benchmark_node_s
     struct benchmark_node_s * parent;                           /* parent node */
     struct benchmark_node_s * children[BENCHMARK_MAX_CHILDREN]; /* children nodes */
     int nchildren;                                              /* number of children nodes */
-    void (*run)(void);                                          /* run the benchmark */
+    void (*run)(struct benchmark_node_s * bench);               /* run the benchmark */
     int enabled;                                                /* if this benchmark if enabled or not */
 }               benchmark_node_t;
 

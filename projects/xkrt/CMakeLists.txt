@@ -12,13 +12,10 @@ project(${XKRT})
 ###############
 
 SET(SOURCE_FILES
-    always-run
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
     ${CMAKE_SOURCE_DIR}/src/driver/stream.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/thread-producer.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
@@ -26,6 +23,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-copy.cc
     ${CMAKE_SOURCE_DIR}/src/memory-distribute.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
@@ -35,13 +33,12 @@ SET(SOURCE_FILES
 
 # XKRT version
 add_custom_command(
-    OUTPUT
-        always-run  # set invalid name so its always generated
-    COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
+    OUTPUT  always-run
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
 )
+
+add_custom_target(${XKRT}_generated_files ALL DEPENDS always-run)
 
 option(STRICT "Enable strict compilation mode" OFF)
 
@@ -166,7 +163,7 @@ if (USE_CL)
     include_directories("${CL_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_cl SHARED src/driver/driver_cl.cc)
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl ${CL_LIBRARIES})
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()

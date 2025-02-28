@@ -91,7 +91,7 @@ xkrt_stream_init(
     );
 
     xkrt_stream_instruction_queue_init(
-        &stream->pending,
+       &stream->pending,
         mem + sizeof(xkrt_stream_instruction_t) * capacity,
         capacity
     );

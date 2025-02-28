@@ -1,7 +1,7 @@
 # include <xkrt/xkrt.h>
 # include <xkrt/task/task-format.h>
 # include <xkrt/task/task.hpp>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 # include <assert.h>
 # include <string.h>
@@ -26,12 +26,12 @@ main(void)
         task_format_t format;
         memset(&format, 0, sizeof(task_format_t));
         format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) func;
-        FORMAT = task_format_create(&(runtime.task_formats), &format);
+        FORMAT = task_format_create(&(runtime.formats.list), &format);
     }
     assert(FORMAT);
 
     // create an host task
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     // Submit the task

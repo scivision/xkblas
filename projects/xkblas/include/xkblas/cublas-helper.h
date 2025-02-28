@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/27 21:19:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -20,12 +20,12 @@
 # ifdef NDEBUG
 #  define XKBLAS_CUBLAS_CALL_POST()                                                             \
     do {                                                                                        \
-        CU_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], stream->cu.handle.high));   \
+        CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], stream->cu.handle.high)); \
     } while (0)
 # else
 #  define XKBLAS_CUBLAS_CALL_POST()                                                             \
     do {                                                                                        \
-        CU_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], stream->cu.handle.high));   \
+        CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], stream->cu.handle.high)); \
         cudaPointerAttributes attr;                                                             \
         for (int i = 0 ; i < task->naccesses ; ++i)                                             \
         {                                                                                       \
