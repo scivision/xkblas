@@ -13,7 +13,7 @@
 
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/metric.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 # include <stdio.h>
 # include <stdlib.h>

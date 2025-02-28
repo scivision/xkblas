@@ -39,4 +39,4 @@ Merge fetch operation if they are continuous in memory
 - memory ordering on atomic
 - Task descriptor size
 - xkblas (and cuda) assume col major accesses... can we manage row major too ?
-- task descriptor allocation - currently spamming 'new' and 'malloc' - use the ThreadWorker / ThreadProducer stack allocation() and deallocate-all() instead
+- task descriptor allocation - currently spamming 'new' and 'malloc' - use the ThreadWorker / Thread stack allocation() and deallocate-all() instead

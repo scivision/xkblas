@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:59:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:09:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,9 +17,44 @@
 # include <cassert>
 # include <cstring>
 
-Thread::Thread()
+thread_local Thread * __TLS;
+
+void
+Thread::init(void)
 {
-    this->capacity = THREAD_MAX_MEMORY;
+    assert(!__TLS);
+    __TLS = new Thread();
+}
+
+void
+Thread::deinit(void)
+{
+    assert(__TLS);
+    delete __TLS;
+}
+
+Thread *
+Thread::self(void)
+{
+    if (__TLS == NULL)
+        Thread::init();
+    assert(__TLS);
+    return __TLS;
+}
+
+Thread::Thread() :
+    cpuset(),
+    implicit_task(TASK_FLAG_IMPLICIT),
+    current_task(&this->implicit_task),
+    memory_stack_bottom(NULL),
+    capacity(THREAD_MAX_MEMORY),
+    queue()
+    // sleep(),
+    // deptrees()
+    # ifndef NDEBUG
+    , tasks()
+    # endif /* NDEBUG */
+{
     while (1)
     {
         this->memory_stack_bottom = (uint8_t *) malloc(this->capacity);
@@ -32,11 +67,18 @@ Thread::Thread()
     }
     this->memory_stack_ptr = this->memory_stack_bottom;
     assert(this->memory_stack_bottom);
-    memset(this->memory_stack_bottom, 0, this->capacity);
+    size_t pagesize = (size_t) getpagesize();
+    for (size_t i = 0 ; i < this->capacity ; i += pagesize)
+        this->memory_stack_bottom[i] = 42;
+
+    pthread_mutex_init(&this->sleep.lock, 0);
+    pthread_cond_init (&this->sleep.cond, 0);
+    this->sleep.sleeping = false;
 }
 
 Thread::~Thread()
 {
+    free(this->memory_stack_ptr);
 }
 
 uint8_t *
@@ -58,3 +100,72 @@ Thread::deallocate_all(void)
 {
     this->memory_stack_ptr = this->memory_stack_bottom;
 }
+
+void
+Thread::push(Task * const & task)
+{
+    this->queue.push(task);
+    this->wakeup();
+}
+
+Task *
+Thread::pop(void)
+{
+    /* this is true as we only have 1 worker per device currently */
+    assert(Thread::self() == this);
+    return this->queue.pop();
+}
+
+void
+Thread::pause(void)
+{
+    assert(Thread::self() == this);
+    pthread_mutex_lock(&this->sleep.lock);
+    {
+        this->sleep.sleeping = true;
+        while (this->sleep.sleeping)
+        {
+            pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
+        }
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
+}
+
+void
+Thread::wakeup(void)
+{
+    pthread_mutex_lock(&this->sleep.lock);
+    if (this->sleep.sleeping)
+    {
+        this->sleep.sleeping = false;
+        pthread_cond_signal(&this->sleep.cond);
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
+}
+
+# ifndef NDEBUG
+void
+Thread::report_tasks(void)
+{
+    int summary[TASK_STATE_MAX];
+    memset(summary, 0, sizeof(summary));
+
+    for (size_t i = 0 ; i < this->tasks.size() ; ++i)
+    {
+        Task * task = this->tasks[i];
+        assert(task);
+
+        LOGGER_WARN(
+            "%4lu - %12s - wc=%u - %s",
+            i, task_state_to_str(task->state.value), task->wc.load(), task->label
+        );
+
+        ++summary[task->state.value];
+    }
+
+    LOGGER_WARN("Summary");
+    for (int i = 0 ; i < TASK_STATE_MAX ; ++i)
+        LOGGER_WARN("  %12s: %6d", task_state_to_str((task_state_t)i), summary[i]);
+}
+
+# endif /* NDEBUG */

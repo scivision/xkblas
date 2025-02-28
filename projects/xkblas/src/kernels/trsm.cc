@@ -70,7 +70,7 @@ xkblas_£trsm_tile_async(
     const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
           TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
 ) {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
 
     const uint64_t task_size = sizeof(Task);
     const uint64_t args_size = sizeof(args_t);

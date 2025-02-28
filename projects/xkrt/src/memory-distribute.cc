@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 22:36:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:13:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 extern "C"
 void
@@ -25,7 +25,7 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
     size_t sizeof_type,
     size_t hx, size_t hy
 ) {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     xkrt_device_global_id_t device_global_id = 0;
@@ -99,7 +99,7 @@ xkrt_coherency_distribute_packed_2D_halo_async(
     size_t sizeof_type,
     size_t hx, size_t hy
 ) {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     // if power of two

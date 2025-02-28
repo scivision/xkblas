@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 15:33:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 00:52:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,7 +42,7 @@
 #  include "xkblas/cblas.h"
 # endif
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct  args_t
 {
     args_t(
         int transA, int transB,
@@ -61,6 +61,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 
     ~args_t() {}
 
+    Access accesses[3]; // A, B, C
     const int transA;
     const int transB;
     const size_t m;
@@ -69,7 +70,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     const TYPE alpha;
     const TYPE beta;
 
-} args_t;
+}               args_t;
 
 static task_format_id_t format_id;
 
@@ -93,7 +94,7 @@ xkblas_£gemm_tile_async(
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 

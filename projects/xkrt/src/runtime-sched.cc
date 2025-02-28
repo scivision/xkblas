@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 16:23:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:12:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,8 +19,8 @@
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
-# include <xkrt/driver/thread-producer.hpp>
-# include <xkrt/driver/thread-worker.hpp>
+# include <xkrt/driver/thread.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mem.h>
@@ -111,14 +111,14 @@ xkrt_device_thread_main_loop(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device
 ) {
-    assert(ThreadWorker::self() == device->thread);
+    assert(Thread::self() == device->thread);
     assert(device->state == XKRT_DEVICE_STATE_COMMIT);
     device->state = XKRT_DEVICE_STATE_RUNNING;
 
     # pragma message(TODO "do we really need this mem_barrier here?")
     mem_barrier();
 
-    ThreadWorker * worker = ThreadWorker::self();
+    Thread * worker = Thread::self();
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
     {
         Task * task;
@@ -164,8 +164,8 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     device->conf        = &(runtime->conf.device);
 
     // register worker thread
-    ThreadWorker::init();
-    device->thread = ThreadWorker::self();
+    Thread::init();
+    device->thread = Thread::self();
     assert(device->thread);
 
     // register affinity
@@ -321,7 +321,7 @@ xkrt_device_task_execute(
             );
 
             # if 0
-            if (device->thread == ThreadWorker::self()) // TODO : explain why this
+            if (device->thread == Thread::self()) // TODO : explain why this
                 device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
             # endif
             /* else kernel launch will be called asynchronously */
@@ -489,6 +489,8 @@ xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 // TASK //
 //////////
 
+// TODO : remove these, and use threads instead
+
 void
 xkrt_runtime_t::task_submit(
     Task * task,
@@ -507,7 +509,7 @@ enqueue(void * vargs, Task * task)
 void
 xkrt_runtime_t::task_commit(Task * task)
 {
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     thread->commit<enqueue>(this, task);
@@ -520,7 +522,7 @@ xkrt_runtime_t::task_complete(Task * task)
 
     LOGGER_DEBUG("task `%s` completed", task->label);
 
-    ThreadWorker * thread = ThreadWorker::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     thread->complete<enqueue>(this, task);

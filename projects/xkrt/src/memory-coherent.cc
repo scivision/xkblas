@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 21:26:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:01:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,7 +13,7 @@
 
 # include <xkrt/memory-tree.hpp>
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/memory/alignedas.h>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
@@ -30,7 +30,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
     xkrt_runtime_t * runtime;
 
     /* the memory coherent async thread that scheduled the 'parent' task */
-    ThreadWorker * worker;
+    Thread * worker;
 
     /* the parent task that launched the fetches on each devices */
     Task * parent;
@@ -41,7 +41,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
 
     args_fetch_t(
         xkrt_runtime_t * runtime,
-        ThreadWorker * w,
+        Thread * w,
         Task * p,
         fetch_list_t * l,
         uint32_t i
@@ -62,14 +62,14 @@ body_memory_coherent_async_fetch_callback(
     const void * args[XKRT_CALLBACK_ARGS_MAX]
 ) {
     // self
-    ThreadWorker * self = ThreadWorker::self();
+    Thread * self = Thread::self();
     assert(self);
 
     // unpack stuff
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) args[0];
     assert(runtime);
 
-    ThreadWorker * worker = (ThreadWorker *) args[1];
+    Thread * worker = (Thread *) args[1];
     assert(worker);
 
     // self is a device thread, worker is the asynchronous coherent copy thread
@@ -98,7 +98,7 @@ body_memory_coherent_async_fetch(Task * task)
     xkrt_runtime_t * runtime = args->runtime;
     assert(runtime);
 
-    const ThreadWorker * worker = args->worker;
+    const Thread * worker = args->worker;
     assert(worker);
 
     const Task * parent = args->parent;
@@ -113,7 +113,7 @@ body_memory_coherent_async_fetch(Task * task)
     assert(fetch);
 
     // worker is the memory async thread, self is the device thread
-    assert(worker != ThreadWorker::self());
+    assert(worker != Thread::self());
 
     // submit fetch - with a callback doing parent->fetched() on completion
     static_assert(XKRT_CALLBACK_ARGS_MAX >= 4);
@@ -163,12 +163,12 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 static void
 xkrt_memory_coherent_async_worker_thread_work(
     xkrt_runtime_t * runtime,
-    ThreadWorker * thread,
+    Thread * thread,
     Task * current
 ) {
     assert(runtime);
     assert(thread);
-    assert(thread == ThreadWorker::self());
+    assert(thread == Thread::self());
     assert(thread == runtime->memory_coherent_worker_thread);
     assert(current);
     assert(current->wc == 0);
@@ -189,7 +189,7 @@ xkrt_memory_coherent_async_worker_thread_work(
     // avoid early completion
     current->fetching();
 
-    ThreadProducer * producer = ThreadProducer::self();
+    Thread * producer = Thread::self();
     assert(producer);
 
     // launch each fetch
@@ -230,7 +230,7 @@ xkrt_memory_coherent_async_worker_thread_work(
 static void
 xkrt_memory_coherent_async_worker_thread_main_loop(xkrt_runtime_t * runtime)
 {
-    ThreadWorker * thread = ThreadWorker::self();
+    Thread * thread = Thread::self();
     assert(thread == runtime->memory_coherent_worker_thread);
 
     // TODO : instead, while runtime->running
@@ -251,7 +251,7 @@ xkrt_memory_coherent_async_worker_thread_main(void * arg)
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) arg;
     assert(runtime);
 
-    runtime->memory_coherent_worker_thread = ThreadWorker::self();
+    runtime->memory_coherent_worker_thread = Thread::self();
 
     unsigned int cpu, node;
     getcpu(&cpu, &node);
@@ -307,7 +307,7 @@ xkrt_coherency_host_async(
     LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
 
     // TODO : allocate instead on the worker thread ? creates a concurrency issue in the allocator though
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     /* create an access, and retrieve all tasks that are in conflict */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 21:37:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:06:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,7 +24,7 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
             (task->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID) <= 1);
 
     // Find the worker to offload the task
-    ThreadWorker * worker = nullptr;
+    Thread * worker = nullptr;
     xkrt_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
 
     // if an ocr parameter is set, retrieve the device accordingly

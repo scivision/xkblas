@@ -17,8 +17,6 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
     ${CMAKE_SOURCE_DIR}/src/driver/stream.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/thread-producer.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/thread-worker.cc
     ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc

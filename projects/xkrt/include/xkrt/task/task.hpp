@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 21:48:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:27:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -40,9 +40,10 @@ typedef uint8_t task_wc_type_t;
 /* task flags */
 typedef enum    task_flags_t
 {
-    TASK_FLAG_UNDEFERED     = (1 << 0), // suspend the current task execution until that task completed
-    TASK_FLAG_DETACHABLE    = (1 << 1), // the task completion is associated with the completion of user-defined external events
-    TASK_FLAG_MAX           = (1 << 2)
+    TASK_FLAG_IMPLICIT      = (1 << 0), // task is implicit
+    TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
+    TASK_FLAG_DETACHABLE    = (1 << 2), // the task completion is associated with the completion of user-defined external events
+    TASK_FLAG_MAX           = (1 << 3)
 }               task_flags_t;
 
 typedef uint8_t task_flag_bitfield_t;
@@ -108,6 +109,9 @@ class alignas(CACHE_LINE_SIZE) KTask
         // Attributes //
         ////////////////
 
+        /* parent task */
+        KTask * parent;
+
         /* task format id */
         task_format_id_t fmtid;
 
@@ -133,6 +137,9 @@ class alignas(CACHE_LINE_SIZE) KTask
         # pragma message(TODO "Memory accesses ordering on this atomic")
         std::atomic<uint8_t> wc;
 
+        /* children counter - number of threads with uncompleted tasks scheduled */
+        std::atomic<uint32_t> cc;
+
         /* task state */
         struct {
             spinlock_t      lock;
@@ -151,6 +158,15 @@ class alignas(CACHE_LINE_SIZE) KTask
                 UNSPECIFIED_TASK_ACCESS,
                 UNSPECIFIED_DEVICE_GLOBAL_ID,
                 0
+            )
+        {}
+
+        KTask(task_flag_bitfield_t flags_p) :
+            KTask(
+                TASK_FORMAT_NULL,
+                UNSPECIFIED_TASK_ACCESS,
+                UNSPECIFIED_DEVICE_GLOBAL_ID,
+                flags_p
             )
         {}
 
@@ -176,6 +192,7 @@ class alignas(CACHE_LINE_SIZE) KTask
             ocr_access_index(ocr_access_index_p),
             targeted_device_id(targeted_device_id_p),
             wc(1),
+            cc(0),
             state({.lock=0, .value=TASK_STATE_ALLOCATED})
         {
             edges.reserve(8);
@@ -272,6 +289,8 @@ class alignas(CACHE_LINE_SIZE) KTask
             {
                 this->state.value = TASK_STATE_COMPLETED;
                 LOGGER_DEBUG_TASK("State of task `%s` changed to completed", this->label);
+                assert(this->parent);
+                this->parent->cc.fetch_sub(1, std::memory_order_relaxed);
             }
             SPINLOCK_UNLOCK(this->state.lock);
 

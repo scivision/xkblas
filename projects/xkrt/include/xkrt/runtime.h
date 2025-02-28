@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/25 16:01:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 00:53:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -52,7 +52,7 @@ typedef struct  xkrt_runtime_t
     std::vector<MemoryCoherencyController *> memcontrollers;
 
     /* worker thread to copy data asynchronously */
-    ThreadWorker * memory_coherent_worker_thread;
+    Thread * memory_coherent_worker_thread;
 
     /* user conf */
     xkrt_conf_t conf;

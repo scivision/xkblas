@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 17:13:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:12:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 typedef struct  copy_args_t
 {
@@ -54,7 +54,7 @@ xkrt_memory_copy_async(
 ) {
     assert(device);
 
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     assert(thread);
 
     const size_t task_size = sizeof(Task) + sizeof(copy_args_t);

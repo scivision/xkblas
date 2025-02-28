@@ -77,7 +77,7 @@ xkblas_£gemmt_tile_async(
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
     assert(is_alignedas(args_size, CACHE_LINE_SIZE));
 
-    ThreadProducer * thread = ThreadProducer::self();
+    Thread * thread = Thread::self();
     uint8_t * mem = thread->allocate(task_size + args_size);
     assert(mem);
 
