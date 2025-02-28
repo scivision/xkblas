@@ -244,7 +244,7 @@ xkrt_device_task_executed_callback(
     Task * task = (Task *) args[1];
     assert(task);
 
-    runtime->task_complete(task);
+    runtime->task_executed(task);
 }
 
 /**
@@ -264,7 +264,7 @@ xkrt_device_task_execute(
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
     {
-        runtime->task_complete(task);
+        runtime->task_executed(task);
     }
     else
     {
@@ -296,17 +296,19 @@ xkrt_device_task_execute(
         if (format->f[targetfmt] == NULL)
             LOGGER_FATAL("Task got scheduled but its format has no valid function");
 
+        Thread * thread = Thread::self();
+        thread->current_task = task;
+
         /* running a host task */
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
             ((void (*)(Task *)) format->f[targetfmt])(task);
-            runtime->task_complete(task);
+            runtime->task_executed(task);
         }
         /* running a device task */
         else
         {
-            /* the callback will be called asynchronously in the
-             * driver on kernel completion test success */
+            /* the task will complete in the callback called asynchronously on kernel completion */
             xkrt_callback_t callback;
             callback.func    = xkrt_device_task_executed_callback;
             callback.args[0] = runtime;
@@ -319,12 +321,6 @@ xkrt_device_task_execute(
                 task,
                 callback
             );
-
-            # if 0
-            if (device->thread == Thread::self()) // TODO : explain why this
-                device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
-            # endif
-            /* else kernel launch will be called asynchronously */
         }
     }
 }
@@ -512,18 +508,44 @@ xkrt_runtime_t::task_commit(Task * task)
     Thread * thread = Thread::self();
     assert(thread);
 
+    LOGGER_DEBUG("task `%s` commited", task->label);
     thread->commit<enqueue>(this, task);
+}
+
+void
+xkrt_runtime_t::task_executed(Task * task)
+{
+    assert(task);
+
+    LOGGER_DEBUG("task `%s` executed", task->label);
+
+    Thread * thread = Thread::self();
+    assert(thread);
+
+    thread->executed<enqueue>(this, task);
+}
+
+void
+xkrt_runtime_t::task_detachable_post(Task * task)
+{
+    assert(task);
+    assert(task->flags & TASK_FLAG_DETACHABLE);
+
+    LOGGER_DEBUG("task `%s` detachable_post", task->label);
+
+    task->detachable_post<enqueue>(this);
 }
 
 void
 xkrt_runtime_t::task_complete(Task * task)
 {
     assert(task);
+    assert(!(task->flags & TASK_FLAG_DETACHABLE));
 
-    LOGGER_DEBUG("task `%s` completed", task->label);
+        LOGGER_DEBUG("task `%s` completed", task->label);
 
     Thread * thread = Thread::self();
     assert(thread);
 
-    thread->complete<enqueue>(this, task);
+    task->complete<enqueue>(this);
 }

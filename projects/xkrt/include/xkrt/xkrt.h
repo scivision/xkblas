@@ -107,7 +107,7 @@ extern "C" {
     /* Create a task that launches a memory copy instruction from 'src' to 'dst' into 'device' streams */
     void xkrt_memory_copy_async(
         xkrt_runtime_t              * runtime,
-        xkrt_device_t               * device,
+        const xkrt_device_global_id_t device_global_id,
         const xkrt_device_global_id_t dst_device_global_id,
         const uintptr_t               dst_device_mem,
         const xkrt_device_global_id_t src_device_global_id,

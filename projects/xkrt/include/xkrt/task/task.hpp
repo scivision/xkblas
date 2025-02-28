@@ -31,8 +31,8 @@
 # define TASK_MAX_ACCESSES          3
 # define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
 
-// # define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
-# define LOGGER_DEBUG_TASK(...)
+# define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
+//# define LOGGER_DEBUG_TASK(...)
 
 /* wait counter type */
 typedef uint8_t task_wc_type_t;
@@ -135,7 +135,7 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         /* wait counter - the task may be scheduled once it reached 0 */
         # pragma message(TODO "Memory accesses ordering on this atomic")
-        std::atomic<uint8_t> wc;
+        std::atomic<task_wc_type_t> wc;
 
         /* children counter - number of threads with uncompleted tasks scheduled */
         std::atomic<uint32_t> cc;
@@ -199,7 +199,6 @@ class alignas(CACHE_LINE_SIZE) KTask
 
             // NOT SUPPORTED YET
             assert(!(this->flags & TASK_FLAG_UNDEFERED));
-            assert(!(this->flags & TASK_FLAG_DETACHABLE));
 
             # ifndef NDEBUG
             strcpy(this->label, "(unamed task)");
@@ -281,18 +280,41 @@ class alignas(CACHE_LINE_SIZE) KTask
 
         template<void (*callback)(void * vargs, KTask * task)>
         inline void
+        executed(void * vargs)
+        {
+            if (this->flags & TASK_FLAG_DETACHABLE)
+                return this->detachable_post<callback>(vargs);
+            else
+                return this->complete<callback>(vargs);
+        }
+
+        template<void (*callback)(void * vargs, KTask * task)>
+        inline void
+        detachable_post(void * vargs)
+        {
+            assert(this->flags & TASK_FLAG_DETACHABLE);
+            if (this->wc.fetch_add(1, std::memory_order_relaxed) == 1)
+                return this->complete<callback>(vargs);
+        }
+
+        template<void (*callback)(void * vargs, KTask * task)>
+        inline void
         complete(void * vargs)
         {
-            assert(this->wc == 0);
+            assert(
+                (this->wc.load() == 0) ||
+                (this->wc.load() == 2 && (this->flags & TASK_FLAG_DETACHABLE))
+            );
             assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
             SPINLOCK_LOCK(this->state.lock);
             {
                 this->state.value = TASK_STATE_COMPLETED;
                 LOGGER_DEBUG_TASK("State of task `%s` changed to completed", this->label);
-                assert(this->parent);
-                this->parent->cc.fetch_sub(1, std::memory_order_relaxed);
             }
             SPINLOCK_UNLOCK(this->state.lock);
+
+            assert(this->parent);
+            this->parent->cc.fetch_sub(1, std::memory_order_relaxed);
 
             for (Edge & edge : this->edges)
                 edge.successor->template commit<callback>(vargs);

@@ -20,7 +20,7 @@
 # define XKRT_DEVICES_MAX (16)
 
 /* maximum number of memory per device */
-# define XKRT_DEVICE_MEMORIES_MAX (2)
+# define XKRT_DEVICE_MEMORIES_MAX (1)
 
 /* maximum number of performance ranks between devices. */
 # define XKRT_DEVICES_PERF_RANK_MAX (4)

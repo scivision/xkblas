@@ -30,7 +30,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
     xkrt_runtime_t * runtime;
 
     /* the memory coherent async thread that scheduled the 'parent' task */
-    Thread * worker;
+    Thread * thread;
 
     /* the parent task that launched the fetches on each devices */
     Task * parent;
@@ -47,7 +47,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
         uint32_t i
     ) :
         runtime(runtime),
-        worker(w),
+        thread(w),
         parent(p),
         list(l),
         fetch_idx(i)
@@ -69,11 +69,11 @@ body_memory_coherent_async_fetch_callback(
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) args[0];
     assert(runtime);
 
-    Thread * worker = (Thread *) args[1];
-    assert(worker);
+    Thread * thread = (Thread *) args[1];
+    assert(thread);
 
-    // self is a device thread, worker is the asynchronous coherent copy thread
-    assert(self != worker);
+    // self is a device thread, thread is the asynchronous coherent copy thread
+    assert(self != thread);
 
     Task * parent = (Task *) args[2];
     assert(parent);
@@ -98,8 +98,8 @@ body_memory_coherent_async_fetch(Task * task)
     xkrt_runtime_t * runtime = args->runtime;
     assert(runtime);
 
-    const Thread * worker = args->worker;
-    assert(worker);
+    const Thread * thread = args->thread;
+    assert(thread);
 
     const Task * parent = args->parent;
     assert(parent);
@@ -112,15 +112,15 @@ body_memory_coherent_async_fetch(Task * task)
     const fetch_t * fetch = list->fetches + args->fetch_idx;
     assert(fetch);
 
-    // worker is the memory async thread, self is the device thread
-    assert(worker != Thread::self());
+    // thread is the memory async thread, self is the device thread
+    assert(thread != Thread::self());
 
     // submit fetch - with a callback doing parent->fetched() on completion
     static_assert(XKRT_CALLBACK_ARGS_MAX >= 4);
     xkrt_callback_t callback;
     callback.func    = body_memory_coherent_async_fetch_callback;
     callback.args[0] = runtime;
-    callback.args[1] = worker;
+    callback.args[1] = thread;
     callback.args[2] = parent;
     callback.args[3] = list;
 
@@ -306,7 +306,7 @@ xkrt_coherency_host_async(
 ) {
     LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
 
-    // TODO : allocate instead on the worker thread ? creates a concurrency issue in the allocator though
+    // TODO : allocate instead on the thread thread ? creates a concurrency issue in the allocator though
     Thread * thread = Thread::self();
     assert(thread);
 

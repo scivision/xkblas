@@ -535,8 +535,8 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
     assert(src_device);
 
     // size of memory to transfer
-    // const size_t size = (size_t) 4 * 1024 * 1024 * 1024;
-    const size_t size = (size_t) 1024 * 1024;
+    const size_t size = (size_t) 4 * 1024 * 1024 * 1024;
+    // const size_t size = (size_t) 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
     // only 1 device at a time
@@ -555,7 +555,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
                 for (int j = 0 ; j < dst_device->nmemories ; ++j)
                 {
                     xkrt_area_chunk_t * dst_chunk = dst_device->memory_allocate_on(size, j);
-                    for (int iter = -1 ; iter < time.niters ; ++iter)
+                    for (int iter = -3 ; iter < time.niters ; ++iter)
                     {
                         /////////////////////
                         // do the transfer //
@@ -567,7 +567,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
                             {
                                 xkrt_memory_copy_async(
                                     &runtime,
-                                    src_device,
+                                    src_device_global_id,
                                     dst_device_global_id,
                                     dst_chunk->device_ptr + c * chunk_size,
                                     src_device_global_id,
@@ -595,7 +595,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
 
             // print results
             LOGGER_INFO("--- Device %u Memory %u ---", src_device_global_id, i);
-            time.report<decltype(time)::pp_1zu_1bw>("Device:Mem", src_device->nmemories);
+            time.report<decltype(time)::pp_1zu_1bw>("Device:Mem");
 
             src_device->memory_reset();
 
@@ -626,7 +626,7 @@ mem_run_d2d(benchmark_node_t * bench)
 static benchmark_node_t d2d = {
     .name = "D2D",
     .desc = "Device (global) memory to device (global) memory bandwidth",
-    .run = mem_run_d2d<1>
+    .run = mem_run_d2d<2>
 };
 
 //////////////////////////////
@@ -692,7 +692,7 @@ mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
                     {
                         xkrt_memory_copy_async(
                            &runtime,
-                            device,
+                            device_global_id,
                             dst_device_global_id,
                             dst_device_mem + i * chunk_size,
                             src_device_global_id,

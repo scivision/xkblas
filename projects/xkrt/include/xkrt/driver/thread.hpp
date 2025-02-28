@@ -133,16 +133,13 @@ class alignas(CACHE_LINE_SIZE) Thread
             return task->commit<callback>(vargs);
         }
 
-        /**
-         * Complete the given task, that is:
-         *  - callback with any successors that are now ready
-         *  - then move the wait counter
-         */
         template <void (*callback)(void * vargs, Task * task)>
         void
-        complete(void * vargs, Task * task)
+        executed(void * vargs, Task * task)
         {
-            task->complete<callback>(vargs);
+            assert(this->current_task == task);
+            task->executed<callback>(vargs);
+            this->current_task = task->parent;
         }
 
         # ifndef NDEBUG

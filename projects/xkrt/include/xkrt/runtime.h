@@ -133,6 +133,12 @@ typedef struct  xkrt_runtime_t
     void task_commit(Task * task);
 
     /* Complete a task */
+    void task_executed(Task * task);
+
+    /* Complete a task */
+    void task_detachable_post(Task * task);
+
+    /* Complete a task */
     void task_complete(Task * task);
 
     ///////////////
