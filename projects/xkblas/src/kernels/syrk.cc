@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:37:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:49:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -68,9 +68,6 @@ xkblas_£syrk_tile_async(
     const TYPE * beta,
           TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
-    assert((uintptr_t)A % lda == 0);
-    assert((uintptr_t)C % ldc == 0);
-
     LOGGER_INFO("Submitting tile C=(%zu,%zu) of size (%zu,%zu)", C_offset_m, C_offset_n, n, k);
 
     Thread * thread = Thread::self();
@@ -83,18 +80,22 @@ xkblas_£syrk_tile_async(
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
-    assert(trans == CblasNoTrans);
     snprintf(task->label, sizeof(task->label), "syrk(A=(%zu,%zu) ; C=(%zu,%zu))", A_offset_m, A_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
     args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(uplo, trans, n, k, *alpha, *beta);
 
+    const size_t Am = n; // (transA == CblasNoTrans) ? m : k;
+    const size_t An = k; // (transA == CblasNoTrans) ? k : m;
+    const size_t Cm = n;
+    const size_t Cn = n;
+
     # define NACCESSES 2
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, n, k, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, n, n, sizeof(TYPE), Cmode        );
+    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
+    new(task->accesses + 1) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        );
     thread->resolve<NACCESSES>(task);
     # undef NACCESSES
 
@@ -307,7 +308,7 @@ xkblas_£syrk_async(
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        const size_t bs_km = (tk == Amt-1) ? (Am-k*Amb) : Amb;
+                        const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 05:48:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:42:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -288,27 +288,32 @@ main_syrk(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-    memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
-
     /* run on impl */
-    printf("Running implementation...\n");
+    int t1 = 0;
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
+        if ((TRANS[t1] != CblasNoTrans) && (TRANS[t1] != CblasTrans))
+            continue ;
+
+        memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+        memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+        printf("Running implementation with (%s)\n", TRANS_STR[t1]);
         uint64_t t0 = get_nanotime();
         impl.set_tile(ts);
-        impl.syrk(uplo, trans, n, k, &alpha, A, ld, &beta, CImpl, ld);
+        impl.syrk(uplo, TRANS[t1], n, k, &alpha, A, ld, &beta, CImpl, ld);
         impl.coherent(CImpl, n, n, ld);
         uint64_t tt = get_nanotime();
         impl.wait();
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-    }
 
-    if (!SKIP_CHECK)
-    {
-        /* check correctness */
-        int r = syrk_cmp(uplo, trans, n, k, alpha, A, ld, beta, C, CRef, CImpl, ld, 1);
-        printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+        if (!SKIP_CHECK)
+        {
+            /* check correctness */
+            int r = syrk_cmp(uplo, trans, n, k, alpha, A, ld, beta, C, CRef, CImpl, ld, 1);
+            printf("Result is %s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+        }
     }
 
     # undef A
