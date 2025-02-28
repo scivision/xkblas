@@ -176,6 +176,10 @@ typedef struct  xkrt_runtime_t
     /* get device */
     xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
+    //////////////////////
+    struct xkrt_runtime_t * prev;
+    struct xkrt_runtime_t * next;
+
 }               xkrt_runtime_t;
 
 /* submit a ready task */

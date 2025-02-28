@@ -79,7 +79,7 @@ typedef struct  xkrt_driver_t
     int (*f_device_commit)(int device_driver_id);
 
     /* Release a device */
-    int (*f_device_destroy)(xkrt_device_t*);
+    int (*f_device_destroy)(int device_driver_id);
 
     /* consider device as the current device - see cudaSetDevice */
     int (*f_device_attach)(int device_driver_id);

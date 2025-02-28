@@ -22,6 +22,34 @@
 # include <atomic>
 # include <stdlib.h>
 # include <string.h>
+# include <signal.h>
+
+/////////////////////////////////////////////////////////////////////
+//  All runtimes instances, for cleaning up if crash / interupting //
+/////////////////////////////////////////////////////////////////////
+
+static struct {
+    xkrt_runtime_t * list;
+    spinlock_t lock;
+} runtimes;
+
+static void
+xkrt_runtimes_cleanup(void)
+{
+    xkrt_runtime_t * runtime = runtimes.list;
+    while (runtime)
+    {
+        xkrt_drivers_deinit(&runtime->drivers);
+        runtime = runtime->next;
+    }
+}
+
+static void
+xkrt_runtimes_cleanup_signal(int signum)
+{
+    LOGGER_WARN("Caught signal %d, cleaning up...", signum);
+    xkrt_runtimes_cleanup();
+}
 
 //////////////////////////////
 //  Runtime initialization  //
@@ -52,6 +80,24 @@ xkrt_init(xkrt_runtime_t * runtime)
     xkrt_drivers_init(&(runtime->drivers), ngpus, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
+    // register signal and exit function for cleaning up drivers
+    SPINLOCK_LOCK(runtimes.lock);
+    {
+        if (runtimes.list)
+        {
+            runtimes.list->prev = runtime;
+            runtime->next = runtimes.list;
+        }
+        else
+        {
+            signal(SIGINT,  xkrt_runtimes_cleanup_signal);
+            signal(SIGTERM, xkrt_runtimes_cleanup_signal);
+            atexit(xkrt_runtimes_cleanup);
+        }
+        runtimes.list = runtime;
+    }
+    SPINLOCK_UNLOCK(runtimes.lock);
+
     return 0;
 }
 
@@ -67,6 +113,16 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     if (runtime->conf.report_stats_on_deinit)
         xkrt_runtime_stats_report(runtime);
     # endif /* XKRT_SUPPORT_STATS */
+
+    SPINLOCK_LOCK(runtimes.lock);
+    {
+        if (runtimes.list == runtime)
+            runtimes.list = runtime->next;
+        if (runtime->next)
+            runtime->next->prev = NULL;
+    }
+    SPINLOCK_UNLOCK(runtimes.lock);
+
     xkrt_drivers_deinit(&runtime->drivers);
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
 

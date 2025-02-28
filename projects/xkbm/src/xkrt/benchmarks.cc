@@ -535,7 +535,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
     assert(src_device);
 
     // size of memory to transfer
-    const size_t size = (size_t) 4 * 1024 * 1024 * 1024;
+    const size_t size = (size_t) 8 * 1024 * 1024 * 1024;
     // const size_t size = (size_t) 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
@@ -545,7 +545,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
         for (int i = 0 ; i < src_device->nmemories ; ++i)
         {
             xkrt_area_chunk_t * src_chunk = src_device->memory_allocate_on(size, i);
-            time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 3> time;
+            time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 5> time;
 
             for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
             {
@@ -558,7 +558,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
                     if (dst_chunk == NULL)
                         LOGGER_FATAL("Device is oom");
 
-                    for (int iter = -3 ; iter < time.niters ; ++iter)
+                    for (int iter = -2 ; iter < time.niters ; ++iter)
                     {
                         /////////////////////
                         // do the transfer //
@@ -575,7 +575,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
                                     dst_chunk->device_ptr + c * chunk_size,
                                     src_device_global_id,
                                     src_chunk->device_ptr + c * chunk_size,
-                                    size
+                                    chunk_size
                                 );
                             }
                             xkrt_sync(&runtime);
@@ -597,7 +597,7 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
             } /* dst device */
 
             // print results
-            LOGGER_INFO("--- Device %u Memory %u ---", src_device_global_id, i);
+            LOGGER_INFO("### From Device %u Memory %u ###", src_device_global_id, i);
             time.report<decltype(time)::pp_1zu_1bw>("Device:Mem");
 
             src_device->memory_reset();
@@ -626,10 +626,16 @@ mem_run_d2d(benchmark_node_t * bench)
     runtime.team_join(&team);
 }
 
-static benchmark_node_t d2d = {
-    .name = "D2D",
-    .desc = "Device (global) memory to device (global) memory bandwidth",
+static benchmark_node_t d2d_1 = {
+    .name = "D2D-1",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk",
     .run = mem_run_d2d<1>
+};
+
+static benchmark_node_t d2d_16 = {
+    .name = "D2D-16",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 16 concurrent chunk",
+    .run = mem_run_d2d<16>
 };
 
 //////////////////////////////
@@ -833,7 +839,8 @@ xkrt_benchmark_push(benchmark_node_t * parent)
 
     LINK(transfer, h2d);
     LINK(transfer, d2h);
-    LINK(transfer, d2d);
+    LINK(transfer, d2d_1);
+    LINK(transfer, d2d_16);
 }
 
 void

@@ -92,7 +92,7 @@ XKRT_DRIVER_ENTRYPOINT(xkrt_buffer_from_addr)(
 }
 
 void
-xkrt_driver_cl_get_buffer_and_offset(
+xkrt_driver_cl_get_buffer_and_offset_1D(
     xkrt_device_cl_t * device,
     uintptr_t addr,
     cl_mem * mem,
@@ -234,9 +234,8 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
+XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
-    free(device);
     return 0;
 }
 
@@ -296,7 +295,93 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
         {
-            LOGGER_FATAL("impl me");
+            const uintptr_t dst = instr->copy.D1.dst_device_addr;
+            const uintptr_t src = instr->copy.D1.src_device_addr;
+            const size_t size   = instr->copy.D1.size;
+
+            const cl_bool blocking = CL_FALSE;
+
+            cl_uint num_events_in_wait_list = 0;
+            const cl_event * event_wait_list = NULL;
+
+            switch (instr->type)
+            {
+                case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
+                {
+                    cl_mem dst_buffer;
+                    size_t dst_offset;
+                    xkrt_driver_cl_get_buffer_and_offset_1D(stream->device, (uintptr_t) dst, &dst_buffer, &dst_offset);
+
+                    CL_SAFE_CALL(
+                        clEnqueueWriteBuffer(
+                            stream->cl.queue,
+                            dst_buffer,
+                            blocking,
+                            dst_offset,
+                            size,
+                            (const void *) src,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                            event
+                        )
+                    );
+                    break ;
+                }
+
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
+                {
+                    size_t src_offset;
+                    cl_mem src_buffer;
+                    xkrt_driver_cl_get_buffer_and_offset_1D(stream->device, (uintptr_t) src, &src_buffer, &src_offset);
+
+                    CL_SAFE_CALL(
+                        clEnqueueReadBuffer(
+                            stream->cl.queue,
+                            src_buffer,
+                            blocking,
+                            src_offset,
+                            size,
+                            (void *) dst,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                            event
+                        )
+                    );
+                    break ;
+                }
+
+                case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
+                {
+                    cl_mem src_buffer;
+                    size_t src_offset;
+                    xkrt_device_cl_t * src_device = device_cl_get_from_addr(src);
+                    xkrt_driver_cl_get_buffer_and_offset_1D(src_device, (uintptr_t) src, &src_buffer, &src_offset);
+
+                    cl_mem dst_buffer;
+                    size_t dst_offset;
+                    xkrt_device_cl_t * dst_device = device_cl_get_from_addr(dst);
+                    xkrt_driver_cl_get_buffer_and_offset_1D(dst_device, (uintptr_t) dst, &dst_buffer, &dst_offset);
+
+                    CL_SAFE_CALL(
+                        clEnqueueCopyBuffer(
+                            stream->cl.queue,
+                            src_buffer,
+                            dst_buffer,
+                            src_offset,
+                            dst_offset,
+                            size,
+                            num_events_in_wait_list,
+                            event_wait_list,
+                            event
+                        )
+                    );
+
+                    break ;
+                }
+
+                default:
+                    LOGGER_FATAL("unreachable");
+            }
             break ;
         }
 
@@ -419,19 +504,16 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                     break ;
                 }
             }
-
-            // that flush may be unnecessary
-            CL_SAFE_CALL(clFlush(stream->cl.queue));
-
-            return EINPROGRESS;
+            break ;
         }
 
         default:
             return EINVAL;
     }
 
-    /* unreachable code */
-    LOGGER_FATAL("Unreachable code");
+    // that flush may be unnecessary
+    CL_SAFE_CALL(clFlush(stream->cl.queue));
+    return EINPROGRESS;
 }
 
 static int

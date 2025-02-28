@@ -226,13 +226,73 @@ xkrt_drivers_init(
     assert(drivers->devices.n <= ngpus);
 }
 
+static void
+xkrt_driver_deinit(xkrt_drivers_t * drivers, uint8_t driver_type)
+{
+    xkrt_driver_t * driver = drivers->list[driver_type];
+
+    // release memory
+    if (driver->f_memory_device_deallocate)
+    {
+        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
+        {
+            xkrt_device_t * device = driver->devices[i];
+            for (int j = 0 ; j < device->nmemories ; ++j)
+            {
+                xkrt_area_t * area = &(device->memories[j].area);
+                driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.device_ptr, area->chunk0.size, j);
+            }
+        }
+    }
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_device_memory_deallocate`", driver_type);
+
+    // delete streams
+    if (driver->f_stream_delete)
+    {
+        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
+        {
+            xkrt_device_t * device = driver->devices[i];
+            for (uint8_t j = 0 ; j < XKRT_STREAM_TYPE_ALL ; ++j)
+            {
+                for (int k = 0 ; k < device->count[j] ; ++k)
+                {
+                    xkrt_stream_t * stream = device->streams[j][k];
+                    driver->f_stream_delete(stream);
+                }
+            }
+        }
+    }
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_stream_delete`", driver_type);
+
+    // delete device
+    if (driver->f_device_destroy)
+    {
+        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
+        {
+            xkrt_device_t * device = driver->devices[i];
+            driver->f_device_destroy(device->driver_id);
+        }
+    }
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_device_destroy`", driver_type);
+
+    // delete context
+    if (driver->f_finalize)
+        driver->f_finalize();
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_finalize`", driver_type);
+}
+
 void
 xkrt_drivers_deinit(xkrt_drivers_t * drivers)
 {
-    # pragma message(TODO "Implement driver_deinit - synchronize all devices threads")
-    LOGGER_WARN("xkrt drivers deinit not implemented");
+    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
+    {
+        xkrt_driver_deinit(drivers, driver_type);
+    }
 }
-
 
 extern "C"
 int
