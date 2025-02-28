@@ -555,6 +555,9 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
                 for (int j = 0 ; j < dst_device->nmemories ; ++j)
                 {
                     xkrt_area_chunk_t * dst_chunk = dst_device->memory_allocate_on(size, j);
+                    if (dst_chunk == NULL)
+                        LOGGER_FATAL("Device is oom");
+
                     for (int iter = -3 ; iter < time.niters ; ++iter)
                     {
                         /////////////////////
@@ -626,7 +629,7 @@ mem_run_d2d(benchmark_node_t * bench)
 static benchmark_node_t d2d = {
     .name = "D2D",
     .desc = "Device (global) memory to device (global) memory bandwidth",
-    .run = mem_run_d2d<2>
+    .run = mem_run_d2d<1>
 };
 
 //////////////////////////////
