@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 16:29:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 16:55:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -138,7 +138,6 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
             # endif
         }
     }
-
     return 0;
 }
 
@@ -174,7 +173,11 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 static void
 XKRT_DRIVER_ENTRYPOINT(finalize)(void)
 {
+    // TODO : zeDeinit ?
 
+    // get all device handles per driver
+    for (int i = 0 ; i < XKRT_DEVICES_MAX && ze_contextes[i] ; ++i)
+        ZE_SAFE_CALL(zeContextDestroy(ze_contextes[i]));
 }
 
 static const char *
@@ -238,6 +241,8 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    delete [] device->ze_command_queue_group_used;
     return 0;
 }
 
@@ -584,6 +589,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
     xkrt_stream_t * istream
 ) {
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
+    ZE_SAFE_CALL(zeEventPoolDestroy(stream->ze.events.pool));
+    ZE_SAFE_CALL(zeCommandListDestroy(stream->ze.command.list));
     free(stream);
 }
 

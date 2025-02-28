@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 15:33:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 16:38:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -317,9 +317,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_mem
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
+XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
-    free(device);
     return 0;
 }
 

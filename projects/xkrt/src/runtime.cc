@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:22:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 16:44:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -90,8 +90,10 @@ xkrt_init(xkrt_runtime_t * runtime)
         }
         else
         {
+            # if 0
             signal(SIGINT,  xkrt_runtimes_cleanup_signal);
             signal(SIGTERM, xkrt_runtimes_cleanup_signal);
+            # endif
             atexit(xkrt_runtimes_cleanup);
         }
         runtimes.list = runtime;

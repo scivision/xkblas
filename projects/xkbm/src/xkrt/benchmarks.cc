@@ -525,117 +525,183 @@ static benchmark_node_t driver_notouch_parallel = {
 // D2D memory transfers //
 //////////////////////////
 
-template<int nchunks>
+typedef struct  tls_t
+{
+    xkrt_team_t * team;
+    xkrt_area_chunk_t * areas[XKRT_DEVICES_MAX][XKRT_DEVICES_MAX][XKRT_DEVICE_MEMORIES_MAX][2];
+
+}               tls_t;
+
+typedef enum    parallel_mode_t
+{
+    P2P,
+    ALL,
+}               parallel_mode_t;
+
+typedef enum    dir_t
+{
+    RECV = 0,
+    SEND = 1
+}               dir_t;
+
+template<int nchunks, parallel_mode_t mode>
 static void *
 mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
 {
-    xkrt_team_t * team = (xkrt_team_t *) vargs;
+    tls_t * tls = (tls_t *) vargs;
+    assert(tls);
+
+    xkrt_team_t * team = tls->team;
 
     xkrt_device_t * src_device = runtime.device_get(src_device_global_id);
     assert(src_device);
 
+    ////////////////////////////////////
+    // Allocate memory on each device //
+    ////////////////////////////////////
+
     // size of memory to transfer
-    const size_t size = (size_t) 8 * 1024 * 1024 * 1024;
-    // const size_t size = (size_t) 1024 * 1024;
+    const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
-    // only 1 device at a time
-    runtime.team_critical_begin(team);
-    {
+    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
         for (int i = 0 ; i < src_device->nmemories ; ++i)
+            for (int j = 0 ; j < 2 ; ++j)
+                tls->areas[src_device_global_id][device_global_id][i][j] = src_device->memory_allocate_on(size, i);
+
+    runtime.team_barrier(team);
+
+    /////////////////////
+    // Do the transfer //
+    /////////////////////
+
+    if (mode == P2P)
+        runtime.team_critical_begin(team);
+
+    for (int i = 0 ; i < src_device->nmemories ; ++i)
+    {
+        time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 7> time;
+
+        for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
         {
-            xkrt_area_chunk_t * src_chunk = src_device->memory_allocate_on(size, i);
-            time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 5> time;
+            xkrt_device_t * dst_device = runtime.device_get(dst_device_global_id);
+            assert(dst_device);
 
-            for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
+            for (int j = 0 ; j < dst_device->nmemories ; ++j)
             {
-                xkrt_device_t * dst_device = runtime.device_get(dst_device_global_id);
-                assert(dst_device);
+                xkrt_area_chunk_t * src_chunk = tls->areas[src_device_global_id][dst_device_global_id][i][1];
+                assert(src_chunk);
 
-                for (int j = 0 ; j < dst_device->nmemories ; ++j)
+                xkrt_area_chunk_t * dst_chunk = tls->areas[dst_device_global_id][src_device_global_id][j][0];
+                assert(dst_chunk);
+
+                for (int iter = -3 ; iter < time.niters ; ++iter)
                 {
-                    xkrt_area_chunk_t * dst_chunk = dst_device->memory_allocate_on(size, j);
-                    if (dst_chunk == NULL)
-                        LOGGER_FATAL("Device is oom");
+                    if (mode == ALL)
+                        runtime.team_barrier(team);
 
-                    for (int iter = -2 ; iter < time.niters ; ++iter)
+                    uint64_t t0 = xkrt_get_nanotime();
                     {
-                        /////////////////////
-                        // do the transfer //
-                        /////////////////////
-
-                        uint64_t t0 = xkrt_get_nanotime();
+                        for (int c = 0 ; c < nchunks ; ++c)
                         {
-                            for (int c = 0 ; c < nchunks ; ++c)
-                            {
-                                xkrt_memory_copy_async(
-                                    &runtime,
-                                    src_device_global_id,
-                                    dst_device_global_id,
-                                    dst_chunk->device_ptr + c * chunk_size,
-                                    src_device_global_id,
-                                    src_chunk->device_ptr + c * chunk_size,
-                                    chunk_size
-                                );
-                            }
-                            xkrt_sync(&runtime);
+                            xkrt_memory_copy_async(
+                                &runtime,
+                                src_device_global_id,
+                                dst_device_global_id,
+                                dst_chunk->device_ptr + c * chunk_size,
+                                src_device_global_id,
+                                src_chunk->device_ptr + c * chunk_size,
+                                chunk_size
+                            );
                         }
-                        uint64_t tf = xkrt_get_nanotime();
+                        xkrt_sync(&runtime);
+                    }
+                    uint64_t tf = xkrt_get_nanotime();
 
-                        if (iter >= 0)
-                        {
-                            const size_t size = chunk_size * nchunks;
-                            const size_t bw = size / ((tf - t0) / 1e9);
-                            time.set(dst_device_global_id*XKRT_DEVICE_MEMORIES_MAX+j, iter, bw);
-                        }
+                    if (iter >= 0)
+                    {
+                        const size_t size = chunk_size * nchunks;
+                        const size_t bw = size / ((tf - t0) / 1e9);
+                        time.set(dst_device_global_id*XKRT_DEVICE_MEMORIES_MAX+j, iter, bw);
+                    }
+                } /* iter */
+            } /* dst memories */
+        } /* dst device */
 
-                    } /* iter */
+        if (mode == ALL)
+            runtime.team_critical_begin(team);
 
-                    dst_device->memory_reset();
+        LOGGER_INFO("### From Device %u ###", src_device_global_id, i);
+        time.report<decltype(time)::pp_1zu_1bw>("Device", runtime.drivers.devices.n);
 
-                } /* dst memories */
-            } /* dst device */
+        if (mode == ALL)
+            runtime.team_critical_end(team);
 
-            // print results
-            LOGGER_INFO("### From Device %u Memory %u ###", src_device_global_id, i);
-            time.report<decltype(time)::pp_1zu_1bw>("Device:Mem");
+    } /* src memories */
 
-            src_device->memory_reset();
+    if (mode == P2P)
+        runtime.team_critical_end(team);
 
-        } /* src memories */
-    } /* critical */
-    runtime.team_critical_end(team);
+    runtime.team_barrier(team);
+
+    //////////////////////////////////////
+    // Deallocate memory on each device //
+    //////////////////////////////////////
+
+    # if 1
+    src_device->memory_reset();
+    # else
+    for (xkrt_device_global_id_t dst_device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
+        for (int i = 0 ; i < src_device->nmemories ; ++i)
+            for (int j = 0 ; j < 2 ; ++j)
+                src_device->memory_deallocate(tls->areas[src_device_global_id][dst_device_global_id][i][j]);
+    # endif
 
     return NULL;
 }
 
-template <int nchunks>
+template <int nchunks, parallel_mode_t mode>
 static void
 mem_run_d2d(benchmark_node_t * bench)
 {
+    // TODO: Update this benchmark if GPU has several memories
+
+    tls_t tls;
     xkrt_team_t team = {
         .desc = {
-            .routine = mem_run_d2d_thread<nchunks>,
-            .args    = NULL,
+            .routine = mem_run_d2d_thread<nchunks, mode>,
+            .args    = &tls,
             .devices = XKRT_DEVICES_MASK_ALL,
         }
     };
-    team.desc.args = &team;
+    tls.team = &team;
 
     runtime.team_create(&team);
     runtime.team_join(&team);
 }
 
-static benchmark_node_t d2d_1 = {
-    .name = "D2D-1",
-    .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk",
-    .run = mem_run_d2d<1>
+static benchmark_node_t d2d_1_all = {
+    .name = "D2D-1-ALLGATHER",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent in parallel between all pair of GPUs",
+    .run = mem_run_d2d<1, ALL>
 };
 
-static benchmark_node_t d2d_16 = {
-    .name = "D2D-16",
-    .desc = "Device (global) memory to device (global) memory bandwidth - 16 concurrent chunk",
-    .run = mem_run_d2d<16>
+static benchmark_node_t d2d_16_all = {
+    .name = "D2D-16-ALLGATHER",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent in parallel between all pair of GPUs",
+    .run = mem_run_d2d<16, ALL>
+};
+
+static benchmark_node_t d2d_1_p2p = {
+    .name = "D2D-1-P2P",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent P2P a pair of GPUs after the other",
+    .run = mem_run_d2d<1, P2P>
+};
+
+static benchmark_node_t d2d_16_p2p = {
+    .name = "D2D-16-P2P",
+    .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent P2P a pair of GPUs after the other",
+    .run = mem_run_d2d<16, P2P>
 };
 
 //////////////////////////////
@@ -839,8 +905,10 @@ xkrt_benchmark_push(benchmark_node_t * parent)
 
     LINK(transfer, h2d);
     LINK(transfer, d2h);
-    LINK(transfer, d2d_1);
-    LINK(transfer, d2d_16);
+    LINK(transfer, d2d_1_p2p);
+    LINK(transfer, d2d_16_p2p);
+    LINK(transfer, d2d_1_all);
+    LINK(transfer, d2d_16_all);
 }
 
 void
