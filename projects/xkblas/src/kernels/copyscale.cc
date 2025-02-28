@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:34:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:37:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,12 +22,11 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/memory/alignedas.h>
 # include <xkrt/memory/cache-line-size.hpp>
 
 # include <cassert>
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct args_t
 {
     args_t(
         size_t m, size_t n,
@@ -60,13 +59,8 @@ xkblas_£copyscale_tile_async(
           TYPE * L, const size_t Lm, const size_t Ln, int ldl,
           TYPE * U, const size_t Um, const size_t Un, int ldu
 ) {
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(task_size + args_size);
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
     assert(mem);
 
     // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
@@ -78,7 +72,7 @@ xkblas_£copyscale_tile_async(
     snprintf(task->label, sizeof(task->label), "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
     # endif /* NDEBUG */
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(m, n, should_copy, IW);
 
     # define NACCESSES 3

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:35:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:37:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,10 +25,9 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/memory/alignedas.h>
 # include <xkrt/memory/cache-line-size.hpp>
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct args_t
 {
     args_t(
         int uplo,
@@ -72,25 +71,20 @@ xkblas_£gemmt_tile_async(
     const TYPE * beta,
           TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(task_size + args_size);
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
     assert(mem);
 
     // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
     const size_t ocr_access = 2;
-    Task * task = reinterpret_cast<Task *>  (mem + 0);
+    Task * task = reinterpret_cast<Task *>  (mem);
     new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
 
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "gemm(A=(%zu,%zu) ; B=(%zu,%zu) ; C=(%zu,%zu))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(uplo, transA, transB, n, k, *alpha, *beta);
 
     const size_t Am = (transA == CblasNoTrans) ? n : k;

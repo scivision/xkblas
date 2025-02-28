@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:36:07 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:37:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,12 +22,11 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/memory/alignedas.h>
 # include <xkrt/memory/cache-line-size.hpp>
 
 # include <cassert>
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct args_t
 {
     args_t(
         int uplo,
@@ -74,13 +73,8 @@ xkblas_£syrk_tile_async(
 
     LOGGER_INFO("Submitting tile C=(%zu,%zu) of size (%zu,%zu)", C_offset_m, C_offset_n, n, k);
 
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(task_size + args_size);
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
     assert(mem);
 
     // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
@@ -93,7 +87,7 @@ xkblas_£syrk_tile_async(
     snprintf(task->label, sizeof(task->label), "syrk(A=(%zu,%zu) ; C=(%zu,%zu))", A_offset_m, A_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(uplo, trans, n, k, *alpha, *beta);
 
     # define NACCESSES 2

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/21 20:35:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 01:37:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,12 +22,11 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
-# include <xkrt/memory/alignedas.h>
 # include <xkrt/memory/cache-line-size.hpp>
 
 # include <cassert>
 
-typedef struct alignas(CACHE_LINE_SIZE) args_t
+typedef struct args_t
 {
     args_t(
         const int side, const int uplo,
@@ -71,13 +70,7 @@ xkblas_£trsm_tile_async(
           TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
 ) {
     Thread * thread = Thread::self();
-
-    const uint64_t task_size = sizeof(Task);
-    const uint64_t args_size = sizeof(args_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
-    assert(is_alignedas(args_size, CACHE_LINE_SIZE));
-
-    uint8_t * mem  = thread->allocate(task_size + args_size);
+    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
     assert(mem);
 
     Task * task = reinterpret_cast<Task *>  (mem + 0);
@@ -88,7 +81,7 @@ xkblas_£trsm_tile_async(
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
     # endif /* NDEBUG */
 
-    args_t  * args = reinterpret_cast<args_t *>(mem + task_size);
+    args_t  * args = reinterpret_cast<args_t *>(task + 1);
     new(args) args_t(side, uplo, transA, diag, m, n, *alpha);
 
     /* TODO: block size, is that correct ? */
