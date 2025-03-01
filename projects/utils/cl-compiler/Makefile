@@ -7,6 +7,7 @@ ze:
 	cat empty-kernel.spv | xxd -p -c 12 | sed 's/../0x&, /g' > empty-kernel.spv.bytes
 
 cu:
-	nvcc -ptx empty-kernel.cu -o empty-kernel.ptx
+	nvcc -ptx empty-kernel.cu -o empty-kernel.ptx --generate-code arch=compute_50,code=sm_50
+	cat empty-kernel.ptx | xxd -p -c 12 | sed 's/../0x&, /g' > empty-kernel.ptx.bytes
 	ptxas empty-kernel.ptx -o empty-kernel.cubin
 	cat empty-kernel.cubin | xxd -p -c 12 | sed 's/../0x&, /g' > empty-kernel.cubin.bytes

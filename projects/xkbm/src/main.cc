@@ -96,7 +96,8 @@ export_conf(benchmark_node_t * bench)
 static void
 load_conf_for_bench(benchmark_node_t * bench, json & data)
 {
-    if (bench->name != data["name"])
+    const std::string name = data["name"];
+    if (strcmp(bench->name, name.c_str()))
         LOGGER_FATAL("Mismatch between conf. and program versions. Regenerate a new conf with `%s=1`", XKBM_EXPORT_CONF);
 
     bench->enabled = data["enabled"];

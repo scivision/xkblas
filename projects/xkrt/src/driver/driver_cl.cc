@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 05:06:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 00:03:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -724,7 +724,6 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
     REGISTER(device_commit);
     REGISTER(device_destroy);
 
-    // REGISTER(device_attach);
     REGISTER(device_info);
 
     REGISTER(memory_device_info);

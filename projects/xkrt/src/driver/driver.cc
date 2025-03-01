@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 16:39:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 01:21:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -172,8 +172,8 @@ xkrt_drivers_init(
 # endif /* XKRT_SUPPORT_HOST */
 
 # if XKRT_SUPPORT_CUDA
-    extern xkrt_driver_t * XKRT_DRIVER_TYPE_CUDA_create_driver(void);
-    creators[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CUDA_create_driver;
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_CU_create_driver(void);
+    creators[XKRT_DRIVER_TYPE_CUDA] = XKRT_DRIVER_TYPE_CU_create_driver;
 # endif /* XKRT_SUPPORT_CUDA */
 
 # if XKRT_SUPPORT_ZE

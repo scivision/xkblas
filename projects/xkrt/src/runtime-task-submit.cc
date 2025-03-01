@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:06:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 22:45:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -66,7 +66,7 @@ xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task)
             }
         }
         else
-            LOGGER_FATAL("No device to schedule tasks");
+            LOGGER_FATAL("No device to schedule the task");
     }
 
     // only coherent async are supported onto the host device yet

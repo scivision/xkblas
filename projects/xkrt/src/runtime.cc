@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 16:44:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 22:42:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -27,6 +27,8 @@
 /////////////////////////////////////////////////////////////////////
 //  All runtimes instances, for cleaning up if crash / interupting //
 /////////////////////////////////////////////////////////////////////
+
+// TODO : cannot do that, runtime may not be reachable memory :-(
 
 static struct {
     xkrt_runtime_t * list;
@@ -93,8 +95,8 @@ xkrt_init(xkrt_runtime_t * runtime)
             # if 0
             signal(SIGINT,  xkrt_runtimes_cleanup_signal);
             signal(SIGTERM, xkrt_runtimes_cleanup_signal);
-            # endif
             atexit(xkrt_runtimes_cleanup);
+            # endif
         }
         runtimes.list = runtime;
     }

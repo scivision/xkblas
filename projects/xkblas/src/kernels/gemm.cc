@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:46:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 01:27:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -484,9 +484,9 @@ body_cl(
     // using offsets
     cl_mem a_buffer, b_buffer, c_buffer;
     size_t a_offset, b_offset, c_offset;
-    xkrt_driver_cl_get_buffer_and_offset(device, A->device_view.addr, &a_buffer, &a_offset);
-    xkrt_driver_cl_get_buffer_and_offset(device, B->device_view.addr, &b_buffer, &b_offset);
-    xkrt_driver_cl_get_buffer_and_offset(device, C->device_view.addr, &c_buffer, &c_offset);
+    xkrt_driver_cl_get_buffer_and_offset_1D(device, A->device_view.addr, &a_buffer, &a_offset);
+    xkrt_driver_cl_get_buffer_and_offset_1D(device, B->device_view.addr, &b_buffer, &b_offset);
+    xkrt_driver_cl_get_buffer_and_offset_1D(device, C->device_view.addr, &c_buffer, &c_offset);
     a_offset /= sizeof(TYPE);
     b_offset /= sizeof(TYPE);
     c_offset /= sizeof(TYPE);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/18 15:23:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/02/28 23:02:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,6 +23,10 @@
 # include <stdint.h>
 
 extern spinlock_t LOGGER_PRINT_MTX;
+
+# ifndef LOGGER_FD
+#  define LOGGER_FD stderr
+# endif
 
 # ifndef LOGGER_HEADER
 #  define LOGGER_HEADER "LOGGER"
@@ -44,7 +48,7 @@ extern volatile double   LOGGER_TIME_ELAPSED;
 extern volatile uint64_t LOGGER_LAST_TIME;
 
 # define LOGGER_PRINT_LINE() \
-    fprintf(stderr, "%s:%d (%s)\n", __FILE__, __LINE__, __func__);
+    fprintf(LOGGER_FD, "%s:%d (%s)\n", __FILE__, __LINE__, __func__);
 
 # define LOGGER_PRINT(LVL, ...)                                                 \
     do {                                                                        \
@@ -59,7 +63,7 @@ extern volatile uint64_t LOGGER_LAST_TIME;
                 LOGGER_TIME_ELAPSED += (double) (t - LOGGER_LAST_TIME) / 1e9;   \
             LOGGER_LAST_TIME = t;                                               \
             if (isatty(STDOUT_FILENO))                                          \
-                fprintf(stdout, "[%8lf] "                                       \
+                fprintf(LOGGER_FD, "[%8lf] "                                    \
                                 "[TID=%d] "                                     \
                                 "[\033[1;37m" LOGGER_HEADER "\033[0m] "         \
                                 "[%s%s\033[0m] ",                               \
@@ -68,22 +72,22 @@ extern volatile uint64_t LOGGER_LAST_TIME;
                                 LOGGER_PRINT_COLORS[LVL],                       \
                                 LOGGER_PRINT_HEADERS[LVL]);                     \
             else                                                                \
-                fprintf(stdout, "[%8lf]"                                        \
+                fprintf(LOGGER_FD, "[%8lf]"                                     \
                                 "[TID=%d] "                                     \
                                 "[" LOGGER_HEADER "] "                          \
                                 "[%s] ",                                        \
                                 LOGGER_TIME_ELAPSED,                            \
                                 gettid(),                                       \
                                 LOGGER_PRINT_HEADERS[LVL]);                     \
-            fprintf(stdout, __VA_ARGS__);                                       \
-            fprintf(stdout, "\n");                                              \
-            fflush(stdout);                                                     \
+            fprintf(LOGGER_FD, __VA_ARGS__);                                    \
+            fprintf(LOGGER_FD, "\n");                                           \
+            fflush(LOGGER_FD);                                                  \
             SPINLOCK_UNLOCK(LOGGER_PRINT_MTX);                                  \
         }                                                                       \
         if (LVL == LOGGER_PRINT_FATAL_ID)                                       \
         {                                                                       \
             LOGGER_PRINT_LINE();                                                \
-            fflush(stderr);                                                     \
+            fflush(LOGGER_FD);                                                  \
             abort();                                                            \
         }                                                                       \
     } while (0)

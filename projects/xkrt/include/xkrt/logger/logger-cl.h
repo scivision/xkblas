@@ -1,5 +1,5 @@
-# ifndef __LOGGER_ZE_H__
-#  define __LOGGER_ZE_H__
+# ifndef __LOGGER_CL_H__
+#  define __LOGGER_CL_H__
 
 #  include <xkrt/logger/logger.h>
 #  include <CL/cl.h>

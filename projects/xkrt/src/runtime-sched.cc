@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 06:26:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 01:20:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -183,11 +183,6 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 
     // initialize offloader
     device->offloader_init(driver->f_stream_create);
-
-    // attach current thread to the device (cuda state machine...)
-    if (driver->f_device_attach)
-        if (driver->f_device_attach(device->driver_id))
-            LOGGER_FATAL("Could not attach to device %d of driver %s", device->driver_id, driver->f_get_name());
 
     /* init memory */
 

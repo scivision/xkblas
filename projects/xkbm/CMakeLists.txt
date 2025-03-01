@@ -68,9 +68,9 @@ target_link_libraries(${XKBM} PRIVATE ${HWLOC_LIBRARIES})
 # CUDA
 option(USE_CUDA "Whether to build CUDA tests." ON)
 if (USE_CUDA)
-    find_package(CUDA_RT REQUIRED)
-    include_directories("${CUDA_RT_INCLUDE_DIRS}")
-    target_link_libraries(${XKBM} PRIVATE ${CUDA_RT_LIBRARIES})
+    find_package(CUDA_DRIVER REQUIRED)
+    include_directories("${CUDA_DRIVER_INCLUDE_DIRS}")
+    target_link_libraries(${XKBM} PRIVATE ${CUDA_DRIVER_LIBRARIES})
 endif()
 
 # Level Zero

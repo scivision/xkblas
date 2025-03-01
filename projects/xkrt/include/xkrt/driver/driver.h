@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 15:47:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 00:04:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -80,9 +80,6 @@ typedef struct  xkrt_driver_t
 
     /* Release a device */
     int (*f_device_destroy)(int device_driver_id);
-
-    /* consider device as the current device - see cudaSetDevice */
-    int (*f_device_attach)(int device_driver_id);
 
     /* get device infos */
     const char * (*f_device_info)(int device_driver_id);

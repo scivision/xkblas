@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 16:27:19 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 00:04:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -304,14 +304,6 @@ static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
 {
     free(device);
-    return 0;
-}
-
-static int
-XKRT_DRIVER_ENTRYPOINT(device_attach)(int device_driver_id)
-{
-    xkrt_device_hip_t * device = __get_device_hip(device_driver_id);
-    HIP_SAFE_CALL(hipSetDevice(device_driver_id));
     return 0;
 }
 

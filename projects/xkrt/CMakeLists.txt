@@ -72,14 +72,6 @@ include_directories(src/)
 install(TARGETS ${XKRT} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
-if (STRICT)
-    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
-    target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
-    if (${CUDA_RT_FOUND})
-        target_compile_options(${XKRT}_driver_cuda PRIVATE ${STRICT_OPTIONS})
-    endif()
-endif()
-
 ###############
 # DEPENDENCES #
 ###############
@@ -101,19 +93,16 @@ endif()
 option(USE_CUDA "Whether to build the CUDA driver." ON)
 if (USE_CUDA)
 
-    find_package(CUDA_RT REQUIRED)
-    include_directories("${CUDA_RT_INCLUDE_DIRS}")
-
-    # find_package(CUDA_DRIVER REQUIRED)
-    # include_directories("${CUDA_DRIVER_INCLUDE_DIRS}")
+    find_package(CUDA_DRIVER REQUIRED)
+    include_directories("${CUDA_DRIVER_INCLUDE_DIRS}")
 
     find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
 
-    add_library(${XKRT}_driver_cuda SHARED src/driver/driver_cuda.cc)
-    target_link_libraries(${XKRT}_driver_cuda PRIVATE ${HWLOC_LIBRARIES} ${CUDA_DRIVER_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cuda)
-    install(TARGETS ${XKRT}_driver_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    add_library(${XKRT}_driver_cu SHARED src/driver/driver_cu.cc)
+    target_link_libraries(${XKRT}_driver_cu PRIVATE ${HWLOC_LIBRARIES} ${CUDA_DRIVER_LIBRARIES} ${CUBLAS_LIBRARIES})
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cu)
+    install(TARGETS ${XKRT}_driver_cu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
@@ -166,6 +155,14 @@ if (USE_CL)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl ${CL_LIBRARIES})
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
+endif()
+
+if (STRICT)
+    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
+    target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
+    if (${CUDA_DRIVER_FOUND})
+        target_compile_options(${XKRT}_driver_cu PRIVATE ${STRICT_OPTIONS})
+    endif()
 endif()
 
 ################
