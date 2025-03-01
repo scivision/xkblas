@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 23:55:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 02:38:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,9 +29,9 @@
         CUresult r = X;                                                             \
         if (r != CUDA_SUCCESS)                                                      \
         {                                                                           \
-            const char * s;                                                         \
-            cuGetErrorString(r, &s);                                                \
-            LOGGER_FATAL("`%s` failed with `%s` (%d)", #X, s, r);                   \
+            const char * _s;                                                        \
+            cuGetErrorString(r, &_s);                                               \
+            LOGGER_FATAL("`%s` failed with `%s` (%d)", #X, _s, r);                  \
         }                                                                           \
     } while (0)
 

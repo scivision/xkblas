@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 01:51:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 02:45:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -175,13 +175,13 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
         return 1;
 
     // TODO : move that to device init
-    int ndevices_max;
+    int ndevices_max = ngpus;
     err = cuDeviceGetCount(&ndevices_max);
     if (err)
         return 1;
 
     assert(ngpus <= XKRT_DEVICES_MAX);
-    for (int i = 0 ; i < ngpus ; ++i)
+    for (int i = 0 ; i < MIN(ngpus, ndevices_max) ; ++i)
     {
         xkrt_device_cu_t * device = device_cu_get(i);
         device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
@@ -750,6 +750,7 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
     uint8_t * bin,
     size_t binsize
 ) {
+    cu_set_context(device_driver_id);
     xkrt_driver_module_t module = NULL;
     CU_SAFE_CALL(cuModuleLoadData((CUmodule *) &module, bin));
     assert(module);
