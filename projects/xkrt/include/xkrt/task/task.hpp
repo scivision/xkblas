@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 06:25:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:39:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -141,7 +141,9 @@ typedef struct  task_t
     public:
 
         task_t(task_format_id_t fmtid, task_flag_bitfield_t flags) :
-            fmtid(fmtid), flags(flags), parent(NULL), cc(0) {}
+            fmtid(fmtid), flags(flags),
+            state { .lock = SPINLOCK_INITIALIZER, .value = TASK_STATE_ALLOCATED },
+            parent(NULL), cc(0) {}
 
 }               task_t;
 
@@ -482,45 +484,44 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
 
 /* mark the task as completed, and call F(..., succ) for each of its successors
  * 'succ' that are now ready */
-# define __task_complete(task, F, ...)                                              \
-    do {                                                                            \
-        assert(                                                                     \
-            task->state.value == TASK_STATE_DATA_FETCHED ||                         \
-            task->state.value == TASK_STATE_READY                                   \
-        );                                                                          \
-        if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))             \
-        {                                                                           \
-            task_det_info_t * det = TASK_DET_INFO(task);                            \
-            assert(                                                                 \
-                (det->wc.load() == 0) ||                                            \
-                (det->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))       \
-            );                                                                      \
-        }                                                                           \
-        SPINLOCK_LOCK(task->state.lock);                                            \
-        {                                                                           \
-            task->state.value = TASK_STATE_COMPLETED;                               \
-            LOGGER_DEBUG_TASK_STATE(task);                                          \
-        }                                                                           \
-        SPINLOCK_UNLOCK(task->state.lock);                                          \
-        assert(task->parent);                                                       \
-        task->parent->cc.fetch_sub(1, std::memory_order_relaxed);                   \
-        if (task->flags & TASK_FLAG_DEPENDENT)                                      \
-        {                                                                           \
-            task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
-            access_t * accesses = TASK_ACCESSES(task);                              \
-            for (uint8_t i = 0 ; i < dep->ac ; ++i)                                 \
-            {                                                                       \
-                access_t * access = accesses + i;                                   \
-                for (access_t * succ_access : access->successors)                   \
-                {                                                                   \
-                    task_t * succ = succ_access->task;                              \
-                    assert(succ->flags & TASK_FLAG_DEPENDENT);                      \
-                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);                   \
-                    if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)      \
-                        __task_ready(succ, F, __VA_ARGS__, succ);                   \
-                }                                                                   \
-            }                                                                       \
-        }                                                                           \
+# define __task_complete(task, F, ...)                                                              \
+    do {                                                                                            \
+        assert(                                                                                     \
+            task->state.value == TASK_STATE_DATA_FETCHED ||                                         \
+            task->state.value == TASK_STATE_READY                                                   \
+        );                                                                                          \
+        if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))                             \
+        {                                                                                           \
+            assert(                                                                                 \
+                ((task->flags & TASK_FLAG_DEPENDENT)  && (TASK_DEP_INFO(task)->wc.load() == 0)) ||  \
+                ((task->flags & TASK_FLAG_DETACHABLE) && (TASK_DET_INFO(task)->wc.load() == 2))     \
+            );                                                                                      \
+        }                                                                                           \
+        SPINLOCK_LOCK(task->state.lock);                                                            \
+        {                                                                                           \
+            task->state.value = TASK_STATE_COMPLETED;                                               \
+            LOGGER_DEBUG_TASK_STATE(task);                                                          \
+        }                                                                                           \
+        SPINLOCK_UNLOCK(task->state.lock);                                                          \
+        assert(task->parent);                                                                       \
+        task->parent->cc.fetch_sub(1, std::memory_order_relaxed);                                   \
+        if (task->flags & TASK_FLAG_DEPENDENT)                                                      \
+        {                                                                                           \
+            task_dep_info_t * dep = TASK_DEP_INFO(task);                                            \
+            access_t * accesses = TASK_ACCESSES(task);                                              \
+            for (uint8_t i = 0 ; i < dep->ac ; ++i)                                                 \
+            {                                                                                       \
+                access_t * access = accesses + i;                                                   \
+                for (access_t * succ_access : access->successors)                                   \
+                {                                                                                   \
+                    task_t * succ = succ_access->task;                                              \
+                    assert(succ->flags & TASK_FLAG_DEPENDENT);                                      \
+                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);                                   \
+                    if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)                      \
+                        __task_ready(succ, F, __VA_ARGS__, succ);                                   \
+                }                                                                                   \
+            }                                                                                       \
+        }                                                                                           \
     } while (0)
 
 /* mark the task as 'executed' and call F(...) if its now completed */

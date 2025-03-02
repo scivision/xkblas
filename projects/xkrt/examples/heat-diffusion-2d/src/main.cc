@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 06:15:57 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:31:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -108,22 +108,23 @@ typedef struct  args_t
 
 # if XKRT_SUPPORT_CUDA
 
-# include <xkrt/driver/driver-cuda.h>
+# include <xkrt/driver/driver-cu.h>
 # include <xkrt/logger/logger-cu.h>
 
 extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y);
 
 static void
 body_cuda(
-    xkrt_stream_cuda_t * stream,
+    xkrt_stream_cu_t * stream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
-    Task * task = (Task *) instr->kern.vargs;
-    args_t * args = (args_t *) (task + 1);
+    task_t * task = (task_t *) instr->kern.vargs;
+    args_t * args = (args_t *) TASK_ARGS(task);
 
-    const Access * a_src = task->accesses + 0;
-    const Access * a_dst = task->accesses + 1;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * a_src = accesses + 0;
+    const access_t * a_dst = accesses + 1;
 
     TYPE * src = (TYPE *) a_src->device_view.addr;
     TYPE * dst = (TYPE *) a_dst->device_view.addr;
@@ -248,15 +249,28 @@ static void
 update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
 {
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
 
-    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const size_t ocr_access = 1;
-    Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(diffusion_format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    # define AC 2
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+    constexpr size_t args_size = sizeof(args_t);
 
-    args_t  * args = reinterpret_cast<args_t *>(task + 1);
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new(task) task_t(diffusion_format_id, flags);
+
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    constexpr size_t ocr_access = 1;
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+    args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(src, dst, tile_x, tile_y);
+
+    # ifndef NDEBUG
+    snprintf(task->label, sizeof(task->label), "diffusion(%d, %d)", tile_x, tile_y);
+    # endif
 
     const int ntx = NUM_OF_TILES(NX, TS);
     const int nty = NUM_OF_TILES(NY, TS);
@@ -264,8 +278,8 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     const int x = (tile_x * TS);
     const int y = (tile_y * TS);
 
-    # define NACCESSES 2
-    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
     {
         const ssize_t x0 = MAX(x-1, 0);
         const ssize_t y0 = MAX(y-1, 0);
@@ -273,7 +287,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
         const ssize_t y1 = MIN(y+TS+1, NY);
         const  size_t sx = x1 - x0;
         const  size_t sy = y1 - y0;
-        new(task->accesses + 0) Access(MATRIX_COLMAJOR, src, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
+        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, src, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
     }
     {
         const ssize_t x0 = MAX(x, 1);
@@ -283,14 +297,10 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
         const ssize_t y1 = MIN(y+TS, NY-1);
         const  size_t sx = x1 - x0;
         const  size_t sy = y1 - y0;
-        new(task->accesses + 1) Access(MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_W);
+        new(accesses + 1) access_t(task, MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_W);
     }
-    thread->resolve<NACCESSES>(task);
-    # undef NACCESSES
-
-    # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "diffusion(%d, %d)", tile_x, tile_y);
-    # endif
+    thread->resolve<AC>(task, accesses);
+    # undef AC
 
     runtime.task_commit(task);
 }
