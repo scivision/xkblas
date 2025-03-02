@@ -9,7 +9,7 @@
 static int r = 0;
 
 static void
-func(Task * args)
+func(task_t * task)
 {
     r = 1;
 }
@@ -35,9 +35,12 @@ main(void)
     assert(thread);
 
     // Submit the task
-    const size_t task_size = sizeof(Task);
-    Task * task = (Task *) thread->allocate(task_size);
-    new(task) Task(FORMAT, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
+    constexpr size_t task_size = task_get_size(flags, 0);
+
+    task_t * task = thread->allocate_task(task_size);
+    new(task) task_t(FORMAT, flags);
+
     runtime.task_commit(task);
 
     // wait

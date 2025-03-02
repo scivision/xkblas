@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 01:10:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:57:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -79,13 +79,13 @@ class access_t
         access_t(
             task_t * task,
             const matrix_order_t & order,
-            const void * & addr,
-            const size_t & ld,
-            const ssize_t & offset_m,
-            const ssize_t & offset_n,
-            const size_t & m,
-            const size_t & n,
-            const size_t & s, // sizeof_type,
+            const void * addr,
+            const size_t ld,
+            const ssize_t offset_m,
+            const ssize_t offset_n,
+            const size_t m,
+            const size_t n,
+            const size_t s, // sizeof_type,
             access_mode_t mode
         ) :
             mode(mode),
@@ -95,6 +95,9 @@ class access_t
             host_view(order, addr, ld, offset_m, offset_n, m, n, s),
             device_view()
         {
+            /* clear preallocated empty successors */
+            successors.clear();
+
             /* use notations from the paper */
             const size_t  A = host_view.begin_addr();
 

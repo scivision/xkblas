@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 01:07:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:17:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -52,11 +52,11 @@ class alignas(CACHE_LINE_SIZE) Thread
         Thread();
         ~Thread();
 
-        /* allocates memory */
-        uint8_t * allocate(uint64_t size);
+        /* allocates a task */
+        task_t * allocate_task(const size_t size);
 
         /* free all allocated memory */
-        void deallocate_all(void);
+        void deallocate_all_tasks(void);
 
         /* Sleep the thread until signaled */
         void pause(void);
@@ -69,6 +69,22 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* pop a task */
         task_t * pop(void);
+
+        /**
+         * Retrieve or (insert and return) the dependency domain of the passed access
+         * on the currently executing task
+         */
+        inline DependencyDomain *
+        get_dependency_domain(const access_t * access)
+        {
+            DependencyDomain * domain = task_get_dependency_domain(this->current_task, access);
+            if (domain == NULL)
+            {
+                domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+                task_put_dependency_domain(this->current_task, domain);
+            }
+            return domain;
+        }
 
         /**
          * Resolve dependencies of the passed task through the domain of the
@@ -90,13 +106,7 @@ class alignas(CACHE_LINE_SIZE) Thread
             //    benefits from compile-time optimization, we force the casting to
             //    a DependencyTree, as it is the only DependencyDomain currently.
             access_t * access = accesses + 0;
-            DependencyDomain * domain = task_get_dependency_domain(task, accesses + 0);
-            if (domain == NULL)
-            {
-                domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
-                task_put_dependency_domain(task, domain);
-            }
-            DependencyTree * tree = (DependencyTree *) domain;
+            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(access);
             tree->resolve<AC>(accesses);
         }
 
@@ -118,7 +128,7 @@ class alignas(CACHE_LINE_SIZE) Thread
             assert(this->current_task);
             this->current_task->cc.fetch_add(1, std::memory_order_relaxed);
             task->parent = this->current_task;
-            __task_commit(callback, vargs, task);
+            __task_commit(task, callback, vargs, task);
         }
 
         # ifndef NDEBUG
@@ -164,7 +174,10 @@ class alignas(CACHE_LINE_SIZE) Thread
         cpu_set_t cpuset;
 
         /* the thread implicit task */
-        task_t implicit_task;
+        union {
+            task_t implicit_task;
+            char _implicit_task_buffer[task_get_size(TASK_FLAG_DOMAIN, 0)];
+        };
 
         /* the current task */
         task_t * current_task;

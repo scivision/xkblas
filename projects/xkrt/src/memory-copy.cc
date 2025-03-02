@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:12:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:38:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -79,16 +79,24 @@ xkrt_memory_copy_async(
     Thread * thread = Thread::self();
     assert(thread);
 
-    uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(copy_args_t));
-    assert(mem);
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DETACHABLE | TASK_FLAG_DEVICE;
+    constexpr size_t task_size = task_get_size(flags, 0);
+    constexpr size_t args_size = sizeof(copy_args_t);
 
-    task_t * task = reinterpret_cast<task_t *>(mem);
-    new(task) task_t(runtime->formats.copy_async, UNSPECIFIED_TASK_ACCESS, device_global_id, TASK_FLAG_DETACHABLE);
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new(task) task_t(runtime->formats.copy_async, flags);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    new (dev) task_dev_info_t(device_global_id, UNSPECIFIED_TASK_ACCESS);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
+
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "copy");
     # endif /* NDEBUG */
 
-    copy_args_t * args = (copy_args_t *) (task + 1);
+    copy_args_t * args = (copy_args_t *) TASK_ARGS(task, task_size);
     args->runtime = runtime;
     args->device_global_id = device_global_id;
     args->dst_device_global_id = dst_device_global_id;
@@ -97,7 +105,6 @@ xkrt_memory_copy_async(
     args->src_device_mem = src_device_mem;
     args->size = size;
 
-    thread->resolve<0>(task);
     runtime->task_commit(task);
 }
 

@@ -9,7 +9,7 @@
 static int r = 0;
 
 static void
-func(Task * task)
+func(task_t * task)
 {
     r = 1;
 }
@@ -34,15 +34,20 @@ main(void)
     assert(thread);
 
     // Create a task
-    const size_t task_size = sizeof(Task);
-    Task * task = (Task *) thread->allocate(task_size);
-    new(task) Task(FORMAT, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    # define NACCESSES 1
+    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_get_size(flags, NACCESSES);
+
+    task_t * task = thread->allocate_task(task_size);
+    new(task) task_t(FORMAT, flags);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
 
     // set accesses
+    access_t * accesses = TASK_ACCESSES(task);
     {
-        # define NACCESSES 1
-        static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-
         const int ld = 1024;
         int * mem = (int *) malloc(ld * ld * sizeof(int));
         const int  m = 1024;
@@ -51,8 +56,8 @@ main(void)
             for (int j = 0 ; j < m ; ++j)
                 mem[i*ld+j] = 42;
 
-        new(task->accesses + 0) Access(MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
-        thread->resolve<NACCESSES>(task);
+        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
+        thread->resolve<NACCESSES>(task, accesses);
         # undef NACCESSES
     }
 

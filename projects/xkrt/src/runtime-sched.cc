@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 00:16:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:47:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,22 +69,25 @@ xkrt_device_prepare_task(
     xkrt_device_t * device,
     task_t * task
 ) {
-    assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
+
+    assert(task->flags & TASK_FLAG_DEPENDENT);
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    assert(dep->wc == 0);
 
     LOGGER_DEBUG("Scheduling task `%s` of format `%d` on device %d",
             task->label, task->fmtid, device->global_id);
 
     /* increase task 'fetching' counter so it does not get ready early
      * (eg before we processed all accesses bellow) */
-    task->fetching();
+    __task_fetching(1, task);
 
     /* for each access */
-    assert(task->naccesses <= TASK_MAX_ACCESSES);
-    for (int i = 0 ; i < task->naccesses ; ++i)
+    assert(dep->ac <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
+    for (int i = 0 ; i < dep->ac ; ++i)
     {
-        access_t * access = task->accesses + i;
-        assert(access);
+        access_t * access = accesses + i;
 
         MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
         assert(memcontroller);
@@ -93,16 +96,9 @@ xkrt_device_prepare_task(
         memcontroller->fetch(task, access, device->global_id);
     }
 
-    /* fetch, return 'TASK_STATE_DATA_FETCHED' if the data got fetched already */
-    if (task->fetched() == TASK_STATE_DATA_FETCHED)
-    {
-        /* all data has been fetched, the task kernel is ready for execution */
-        xkrt_device_task_execute(runtime, device, task);
-    }
-    else
-    {
-        /* task will be launched in a callback while all accesses were fetched */
-    }
+    /* decrease the task 'fetching' counter to detect early-fetch completion */
+    __task_fetched(1, task, xkrt_device_task_execute, runtime, device, task);
+    /* else the task will be launched in a callback while all accesses were fetched */
 }
 
 /* main loop for the thread responsible the passed device */
@@ -254,8 +250,6 @@ xkrt_device_task_execute(
     xkrt_device_t * device,
     task_t * task
 ) {
-    LOGGER_DEBUG("task_t `%s` is ready for kernel execution", task->label);
-
     Thread * thread = Thread::self();
     task_t * current = thread->current_task;
     thread->current_task = task;
@@ -506,7 +500,6 @@ xkrt_runtime_t::task_commit(task_t * task)
     Thread * thread = Thread::self();
     assert(thread);
 
-    LOGGER_DEBUG("task `%s` commited", task->label);
     thread->commit<enqueue>(this, task);
 }
 
@@ -514,8 +507,7 @@ void
 xkrt_runtime_t::task_executed(task_t * task)
 {
     assert(task);
-    LOGGER_DEBUG("task `%s` executed", task->label);
-    task->executed<enqueue>(this);
+    __task_executed(task, xkrt_runtime_submit_task, this);
 }
 
 void
@@ -523,8 +515,7 @@ xkrt_runtime_t::task_detachable_post(task_t * task)
 {
     assert(task);
     assert(task->flags & TASK_FLAG_DETACHABLE);
-    LOGGER_DEBUG("task `%s` detachable_post", task->label);
-    task->detachable_post<enqueue>(this);
+    __task_detachable_post(task, xkrt_runtime_submit_task, this);
 }
 
 void
@@ -533,10 +524,8 @@ xkrt_runtime_t::task_complete(task_t * task)
     assert(task);
     assert(!(task->flags & TASK_FLAG_DETACHABLE));
 
-    LOGGER_DEBUG("task `%s` completed", task->label);
-
     Thread * thread = Thread::self();
     assert(thread);
 
-    task->complete<enqueue>(this);
+    __task_complete(task, xkrt_runtime_submit_task, this);
 }

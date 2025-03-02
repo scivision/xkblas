@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 01:09:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:48:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -779,10 +779,10 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             size_t capacity;
 
             /* number of 'fetches' set */
-            size_t n;
+            task_wait_counter_t n;
 
             /* number of pending fetches */
-            volatile std::atomic<size_t> pending;
+            volatile task_wait_counter_t pending;
 
             fetch_list_t(KMemoryTree * tree, fetch_t * fetches, size_t capacity) : tree(tree), fetches(fetches), capacity(capacity), n(0), pending(0) {}
             ~fetch_list_t() {}
@@ -819,8 +819,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             fetch_t * fetch,
             task_t * task
         ) {
-            LOGGER_DEBUG("task_t `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
-            __task_fetched(1, runtime->task_submit, fetch->dst_device_global_id, task);
+            LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
+            __task_fetched(1, task, runtime->task_submit, fetch->dst_device_global_id, task);
         }
 
         static void
@@ -1382,7 +1382,7 @@ next_view:
             assert(this->is_locked());
 
             // if read mode is set
-            if (access->is_r)
+            if (access->mode & ACCESS_MODE_R)
             {
                 const xkrt_device_global_id_bitfield_t dst_devbit = (1 << device_global_id);
 
@@ -1411,7 +1411,7 @@ next_view:
 
                     /* increment task fetch counter */
                     LOGGER_DEBUG(
-                        "task_t `%s` fetching one by `%s` on `%p`",
+                        "task `%s` fetching one by `%s` on `%p`",
                         task->label,
                         (dst_replicate.fetching & dst_allocbit) ? "awaiting" : "launching",
                         (void *) dst_allocation_view->view.addr
@@ -1543,7 +1543,7 @@ next_view:
             assert(this->is_locked());
 
             /* if access has a write mode, invalidate all copies */
-            if (access->is_w)
+            if (access->mode & ACCESS_MODE_W)
             {
                 const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
                 for (Partite & partite : partition.partites)
@@ -1666,7 +1666,7 @@ next_view:
             } /* this->lock(); */
             this->unlock();
 
-            if (access->is_r)
+            if (access->mode & ACCESS_MODE_R)
             {
                 /* step (7) - convert a partition to the minimum number of fetches to run */
                 fetch_list_t * list = this->fetch_list_from_partition(search.partition);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 19:34:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:40:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -79,8 +79,7 @@ body_memory_coherent_async_fetch_callback(
     assert(parent);
 
     // one fetched completed, notify the parent
-    if (parent->fetched() == TASK_STATE_DATA_FETCHED)
-        runtime->task_complete(parent);
+    __task_fetched(1, parent, runtime->task_complete, parent);
 
     fetch_list_t * list = (fetch_list_t *) args[3];
     assert(list);
@@ -144,13 +143,13 @@ body_memory_coherent_async_fetch(task_t * task)
 // args for 'runtime->coherent_async'
 typedef struct alignas(CACHE_LINE_SIZE) args_t
 {
+    access_t access;
     Cube cubes[4];
-    const size_t ld;
-    const size_t sizeof_type;
 
-    args_t(const access_t & x, const access_t & y) : ld(x.host_view.ld), sizeof_type(x.host_view.sizeof_type)
+    args_t(task_t * task, const access_t & x, const access_t & y) :
+        access(task, MATRIX_COLMAJOR, NULL, x.host_view.ld, 0, 0, 0, 0, x.host_view.sizeof_type, ACCESS_MODE_V)
     {
-        assert(x.host_view.ld == y.host_view.ld);
+        assert(x.host_view.ld          == y.host_view.ld);
         assert(x.host_view.sizeof_type == y.host_view.sizeof_type);
         access_t::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
         access_t::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
@@ -171,8 +170,9 @@ xkrt_memory_coherent_async_worker_thread_work(
     assert(thread == Thread::self());
     assert(thread == runtime->memory_coherent_worker_thread);
     assert(current);
-    assert(current->wc == 0);
     assert(current->state.value == TASK_STATE_READY);
+    assert(current->flags & TASK_FLAG_DEPENDENT);
+    assert(TASK_DEP_INFO(current)->wc == 0);
 
     LOGGER_DEBUG("Creating a coherent async fetch task");
 
@@ -180,14 +180,14 @@ xkrt_memory_coherent_async_worker_thread_work(
     assert(args);
 
     // this is ugly, result of the memorytree bad design, fix me
-    MemoryTree * memtree = (MemoryTree *) runtime->get_or_insert_memory_controller(args->ld, args->sizeof_type);
+    MemoryTree * memtree = (MemoryTree *) runtime->get_or_insert_memory_controller(args->access.host_view.ld, args->access.host_view.sizeof_type);
     assert(memtree);
 
     fetch_list_t * list = memtree->fetch_list_to_host_from_cubes<4>(args->cubes);
     assert(list);
 
     // avoid early completion
-    current->fetching();
+    __task_fetching(1, current);
 
     Thread * producer = Thread::self();
     assert(producer);
@@ -195,32 +195,34 @@ xkrt_memory_coherent_async_worker_thread_work(
     // launch each fetch
     for (uint32_t i = 0 ; i < list->n ; ++i)
     {
-        current->fetching();
+        __task_fetching(1, current);
 
         fetch_t * fetch = list->fetches + i;
         assert(fetch->src_device_global_id != HOST_DEVICE_GLOBAL_ID);
         assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
 
-        uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(args_fetch_t));
-        assert(mem);
+        constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE;
+        const size_t task_size = task_get_size(flags, 0);
+        const size_t args_size = sizeof(args_fetch_t);
 
-        task_t * task = reinterpret_cast<task_t *>  (mem + 0);
-        new(task) task_t(runtime->formats.coherent_async_fetch, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
+        task_t * task = thread->allocate_task(task_size + args_size);
+        new(task) task_t(runtime->formats.coherent_async_fetch, flags);
 
-        args_fetch_t  * args = reinterpret_cast<args_fetch_t *>(task + 1);
+        task_dev_info_t * dev = TASK_DEV_INFO(task);
+        new (dev) task_dev_info_t(fetch->src_device_global_id, UNSPECIFIED_TASK_ACCESS);
+
+        args_fetch_t * args = (args_fetch_t *) TASK_ARGS(task, task_size);
         new(args) args_fetch_t(runtime, thread, current, list, i);
 
         #ifndef NDEBUG
         snprintf(task->label, sizeof(task->label), "coherent_fetch(%p)", list);
         #endif /* NDEBUG */
 
-        producer->resolve<0>(task);
         runtime->task_commit(task);
     }
 
     // if early-completion happened
-    if (current->fetched() == TASK_STATE_DATA_FETCHED)
-        runtime->task_complete(current);
+    __task_fetched(1, current, runtime->task_complete, current);
 }
 
 /////////////////////////////
@@ -312,35 +314,41 @@ xkrt_coherency_host_async(
 
     /* create an access, and retrieve all tasks that are in conflict */
     std::vector<access_t *> conflicts;
-    const access_t access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    access_t access(NULL, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
-    DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
-    assert(deptree);
+    DependencyDomain * domain = thread->get_dependency_domain(&access);
+    assert(domain);
+
+    DependencyTree * deptree = (DependencyTree *) domain;
     deptree->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
-    /* create one task per conflict shrinking the access, responsible of fetching the chunk */
-    const uint64_t task_size = sizeof(task_t);
-    assert(is_alignedas(task_size, CACHE_LINE_SIZE));
+    /* create one task per conflict shrinking the access (stored in cubes)
+     * responsible of fetching the chunk */
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_get_size(flags, 0);
+    constexpr size_t args_size = sizeof(args_t);
 
-    for (const auto & : conflicts)
+    for (access_t * & conflict : conflicts)
     {
-        // TODO : create a dependent task
-        uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(args_t));
-        assert(mem);
+        task_t * task = thread->allocate_task(task_size + args_size);
+        new(task) task_t(runtime->formats.coherent_async, flags);
 
-        task_t * task = reinterpret_cast<task_t *>(mem);
-        new(task) task_t(runtime->formats.coherent_async, UNSPECIFIED_TASK_ACCESS, HOST_DEVICE_GLOBAL_ID);
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        new (dep) task_dep_info_t(1);
 
-        args_t  * args = reinterpret_cast<args_t *>(task + 1);
-        new (args) args_t(access, conflicting_task->accesses[access_id]);
+        /* link the virtual access to the task, so it is activated correctly
+         * when predecessors completes.  This access is virtual though, no need
+         * to fetch */
+        args_t * args = (args_t *) TASK_ARGS(task, task_size);
+        new (args) args_t(task, access, *conflict);
 
         #ifndef NDEBUG
         strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
         #endif /* NDEBUG */
 
-        deptree->precedence(conflicting_task, task);
+        deptree->precedence(conflict, &args->access);
         runtime->task_commit(task);
     }
 }

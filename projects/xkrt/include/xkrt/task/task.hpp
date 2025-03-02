@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 01:08:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 04:00:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -68,7 +68,7 @@ task_state_to_str(task_state_t state)
 # ifndef NDEBUG
 #  define LOGGER_DEBUG_TASK_STATE(task)                                                                     \
     do {                                                                                                    \
-        LOGGER_DEBUG("task_t `%s` is now in state `%s`", task->label, task_state_to_str(task->state.value)); \
+        LOGGER_DEBUG("task `%s` is now in state `%s`", task->label, task_state_to_str(task->state.value));  \
     } while (0)
 # else
 #  define LOGGER_DEBUG_TASK_STATE(task)
@@ -141,13 +141,13 @@ typedef struct  task_t
     public:
 
         task_t(task_format_id_t fmtid, task_flag_bitfield_t flags) :
-            fmtid(fmtid), flags(flags) {}
+            fmtid(fmtid), flags(flags), parent(NULL), cc(0) {}
 
 }               task_t;
 
 typedef std::atomic<uint8_t> task_wait_counter_t;
 
-# define UNSPECIFIED_TASK_ACCESS (-1)
+# define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)
 typedef uint8_t task_access_counter_t;
 # define TASK_MAX_ACCESSES (1 << 8*sizeof(task_access_counter_t))
 
@@ -173,7 +173,7 @@ typedef struct  task_dep_info_t
 typedef struct  task_det_info_t
 {
     task_wait_counter_t wc;
-
+    task_det_info_t() : wc(0) {}
 }               task_det_info_t;
 
 typedef struct  task_dev_info_t
@@ -190,8 +190,8 @@ typedef struct  task_dev_info_t
     uint8_t ocr_access_index;
 
     /* constructor */
-    task_dev_info_t(xkrt_device_global_id_t t, uint8_t ocr)
-        : targeted_device_id(t), ocr_access_index(ocr) {}
+    task_dev_info_t(xkrt_device_global_id_t target, uint8_t ocr)
+        : targeted_device_id(target), ocr_access_index(ocr) {}
 
 }               task_dev_info_t;
 
@@ -201,10 +201,13 @@ typedef struct  task_dom_info_t
     /* the dependency domains */
     std::vector<DependencyDomain *> domains;
 
+    task_dom_info_t() : domains(1) {
+        domains.clear();
+    }
 }               task_dom_info_t;
 
 /* fallback if wrong flags parameter - https://stackoverflow.com/questions/20461121/constexpr-error-at-compile-time-but-no-overhead-at-run-time */
-size_t
+static size_t
 task_get_base_size_fallback(task_flag_bitfield_t flags)
 {
     LOGGER_FATAL("Invalid task flag combination: `%u`", flags);
@@ -212,7 +215,7 @@ task_get_base_size_fallback(task_flag_bitfield_t flags)
 }
 
 /* compute the base size of a task (without arguments and private data) */
-constexpr size_t
+static constexpr size_t
 task_get_extra_size(task_flag_bitfield_t flags)
 {
     switch (flags)
@@ -265,9 +268,9 @@ task_get_extra_size(task_flag_bitfield_t flags)
 }
 
 constexpr size_t
-task_get_size(const task_flag_bitfield_t flags, const uint8_t ac, const size_t args_size)
+task_get_size(const task_flag_bitfield_t flags, const uint8_t ac)
 {
-    return sizeof(task_t) + task_get_extra_size(flags) + ac*sizeof(access_t) + args_size;
+    return sizeof(task_t) + task_get_extra_size(flags) + ac*sizeof(access_t);
 }
 
 /**
@@ -324,7 +327,13 @@ static inline access_t *
 TASK_ACCESSES(task_t * task)
 {
     // accesses must be stored right after the task struct
-    return (access_t *) (((char *) task) + task_get_extra_size(task->flags));
+    return (access_t *) (((char *) task) + sizeof(task_t) + task_get_extra_size(task->flags));
+}
+
+static inline void *
+TASK_ARGS(task_t * task, const size_t task_size)
+{
+    return (void *) (((char *) task) + task_size);
 }
 
 ///////////////////////////////////
@@ -380,27 +389,27 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
 // Methods to transition the task //
 ////////////////////////////////////
 
-/* mark the task ready and call F(args, task) */
-# define __task_ready(F, args, task)                        \
+/* mark the task ready and call F(args) */
+# define __task_ready(task, F, ...)                         \
     do {                                                    \
         assert(task->state.value == TASK_STATE_ALLOCATED);  \
         task->state.value = TASK_STATE_READY;               \
         LOGGER_DEBUG_TASK_STATE(task);                      \
-        F(args, task);                                      \
+        F(__VA_ARGS__);                                     \
     } while (0)
 
-/* commit the task and call F(args, task) if it is now ready */
-# define __task_commit(F, args, task)                                   \
+/* commit the task and call F(args) if it is now ready */
+# define __task_commit(task, F, ...)                                    \
     do {                                                                \
         assert(task->state.value == TASK_STATE_ALLOCATED);              \
         if (task->flags & TASK_FLAG_DEPENDENT)                          \
         {                                                               \
             task_dep_info_t * dep = TASK_DEP_INFO(task);                \
             if (dep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)   \
-                __task_ready(F, args, task);                            \
+                __task_ready(task, F, __VA_ARGS__);                     \
         }                                                               \
         else                                                            \
-            __task_ready(F, args, task);                                \
+            __task_ready(task, F, __VA_ARGS__);                         \
     } while (0)
 
 # define __task_fetching(n, task)                                   \
@@ -415,10 +424,9 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
         }                                                           \
     } while (0)
 
-/* notify that 'n' accesses had been fetched.
- * If all accesses were fetched, then mark the task as 'fetched' and call
- * F(args, task) */
-# define __task_fetched(n, F, args, task)                           \
+/* notify that 'n' accesses had been fetched. If all accesses were fetched,
+ * then mark the task as 'fetched' and call F(...) */
+# define __task_fetched(n, task, F, ...)                            \
     do {                                                            \
         assert(task->state.value == TASK_STATE_DATA_FETCHING);      \
         assert(task->flags & TASK_FLAG_DEPENDENT);                  \
@@ -427,30 +435,21 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
         {                                                           \
             task->state.value = TASK_STATE_DATA_FETCHED;            \
             LOGGER_DEBUG_TASK_STATE(task);                          \
-            F(args, task);                                          \
+            F(__VA_ARGS__);                                         \
         }                                                           \
     } while (0)
 
-# define __task_detachable_post(F, args, task)                      \
+# define __task_detachable_post(task, F, ...)                       \
     do {                                                            \
         assert(task->flags & TASK_FLAG_DETACHABLE);                 \
         task_dep_info_t * dep = TASK_DEP_INFO(task);                \
-        if (dep->->wc.fetch_add(1, std::memory_order_relaxed) == 1) \
-            __task_complete(F, args, task);                         \
+        if (dep->wc.fetch_add(1, std::memory_order_relaxed) == 1)   \
+            __task_complete(task, F, __VA_ARGS__);                  \
     } while (0)
 
-/* mark the task as 'executed' and call F(args, task) if its now completed */
-# define __task_executed(F, task, args)             \
-    do {                                            \
-        if (task->flags & TASK_FLAG_DETACHABLE)     \
-            __task_detachable_post(F, args, task);  \
-        else                                        \
-            __task_complete(F, args, task);         \
-    } while (0)
-
-/* mark the task as completed, and call F(args, succ) for each of its succesor
- * that is now ready */
-# define __task_complete(F, args, task)                                             \
+/* mark the task as completed, and call F(..., succ) for each of its successors
+ * 'succ' that are now ready */
+# define __task_complete(task, F, ...)                                              \
     do {                                                                            \
         assert(                                                                     \
             task->state.value == TASK_STATE_DATA_FETCHED ||                         \
@@ -460,8 +459,8 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
         {                                                                           \
             task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
             assert(                                                                 \
-                (task->wc.load() == 0) ||                                           \
-                (task->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))      \
+                (dep->wc.load() == 0) ||                                            \
+                (dep->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))       \
             );                                                                      \
         }                                                                           \
         SPINLOCK_LOCK(task->state.lock);                                            \
@@ -475,17 +474,31 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
         if (task->flags & TASK_FLAG_DEPENDENT)                                      \
         {                                                                           \
             task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
-            access_t * accesses = (access_t *) (dep + 1);                           \
-            for (uint8_t i = 0 ; i < dep->naccesses ; ++i)                          \
+            access_t * accesses = TASK_ACCESSES(task);                              \
+            for (uint8_t i = 0 ; i < dep->ac ; ++i)                                 \
             {                                                                       \
                 access_t * access = accesses + i;                                   \
-                task_t * succ = (task *) access->task;                              \
-                assert(S->flags & TASK_FLAG_DEPENDENT);                             \
-                task_dep_info_t * sdep = TASK_DEP_INFO(succ);                       \
-                if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)          \
-                    __task_ready(F, args, succ);                                    \
+                for (access_t * succ_access : access->successors)                   \
+                {                                                                   \
+                    task_t * succ = succ_access->task;                              \
+                    assert(succ->flags & TASK_FLAG_DEPENDENT);                      \
+                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);                   \
+                    if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)      \
+                        __task_ready(succ, F, __VA_ARGS__, succ);                   \
+                }                                                                   \
             }                                                                       \
         }                                                                           \
     } while (0)
+
+/* mark the task as 'executed' and call F(...) if its now completed */
+# define __task_executed(task, F, ...)                      \
+    do {                                                    \
+        if (task->flags & TASK_FLAG_DETACHABLE)             \
+            __task_detachable_post(task, F, __VA_ARGS__);   \
+        else                                                \
+            __task_complete(task, F, __VA_ARGS__);          \
+    } while (0)
+
+
 
 #endif /* __TASK_H__ */

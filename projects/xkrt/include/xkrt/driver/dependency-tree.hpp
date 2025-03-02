@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 01:13:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:36:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,7 +38,7 @@ class KDependencyTreeSearch
         access_t * access;
 
         // USED IF TYPE == SEARCH_TYPE_CONFLICTING
-        std::vector<access_t *> conflicts;
+        std::vector<access_t *> * conflicts;
 
     public:
         KDependencyTreeSearch() {}
@@ -46,7 +46,7 @@ class KDependencyTreeSearch
 
     public:
         void
-        prepare_resolve(task_t * task, access_t * access)
+        prepare_resolve(access_t * access)
         {
             this->type = SEARCH_TYPE_RESOLVE;
             this->access = access;
@@ -55,7 +55,7 @@ class KDependencyTreeSearch
         void
         prepare_conflicting(
             std::vector<access_t *> * conflicts,
-            const access_t * access
+            access_t * access
         ) {
             this->type = SEARCH_TYPE_CONFLICTING;
             this->conflicts = conflicts;
@@ -185,8 +185,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
         inline void
         conflicting(
-            std::vector<access_t *> conflicts,
-            const access_t * access
+            std::vector<access_t *> * conflicts,
+            access_t * access
         ) {
             // impl assumes this
             assert((access->mode & ACCESS_MODE_R) && !(access->mode & ACCESS_MODE_W));
@@ -263,7 +263,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
             (void) cube;
             (void) parent;
             (void) k;
-            return search.access->is_w;
+            return search.access->mode & ACCESS_MODE_W;
         }
 
         //////////////////
@@ -287,6 +287,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         static inline void
         precedence(access_t * pred, access_t * succ)
         {
+            // succ must be a dependent task and have a wc != 0 at that point
+            assert((succ->task->flags & TASK_FLAG_DEPENDENT) && TASK_DEP_INFO(succ->task)->wc > 0);
             pred->successors.push_back(succ);
             __task_precedes(pred->task, succ->task);
         }
@@ -306,10 +308,10 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
             {
                 case (Search::Type::SEARCH_TYPE_RESOLVE):
                 {
-                    if (search.access->is_w && node->last_reads.size())
+                    if ((search.access->mode & ACCESS_MODE_W) && node->last_reads.size())
                         for (access_t * pred : node->last_reads)
                             precedence(pred, search.access);
-                    else if (node->last_write.task)
+                    else if (node->last_write->task)
                         precedence(node->last_write, search.access);
 
                     break ;
@@ -317,10 +319,10 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
                 case (Search::Type::SEARCH_TYPE_CONFLICTING):
                 {
-                    if (node->last_write.task)
+                    if (node->last_write->task)
                     {
                         assert(search.conflicts);
-                        search.conflicts.push_back(node->last_write);
+                        search.conflicts->push_back(node->last_write);
                     }
 
                     break ;

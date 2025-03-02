@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 23:45:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:18:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,7 +44,7 @@ Thread::self(void)
 
 Thread::Thread() :
     cpuset(),
-    implicit_task(TASK_FORMAT_NULL, TASK_FLAG_ZERO),
+    implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
     current_task(&this->implicit_task),
     memory_stack_bottom(NULL),
     capacity(THREAD_MAX_MEMORY),
@@ -75,6 +75,8 @@ Thread::Thread() :
     pthread_cond_init (&this->sleep.cond, 0);
     this->sleep.sleeping = false;
 
+    task_dom_info_t * dom = TASK_DOM_INFO(&this->implicit_task);
+    new (dom) task_dom_info_t();
     # ifndef NDEBUG
     snprintf(this->implicit_task.label, sizeof(this->implicit_task.label), "implicit");
     # endif
@@ -85,22 +87,22 @@ Thread::~Thread()
     free(this->memory_stack_ptr);
 }
 
-uint8_t *
-Thread::allocate(uint64_t size)
+task_t *
+Thread::allocate_task(const size_t size)
 {
     # if 1
     if (this->memory_stack_ptr >= this->memory_stack_bottom + THREAD_MAX_MEMORY)
         LOGGER_FATAL("Stack overflow ! Increase `THREAD_MAX_MEMORY` and recompile");
-    uint8_t * memory = this->memory_stack_ptr;
+    task_t * task = (task_t *) this->memory_stack_ptr;
     this->memory_stack_ptr += size;
-    return memory;
+    return task;
     # else
     return (uint8_t *) malloc(size);
     # endif
 }
 
 void
-Thread::deallocate_all(void)
+Thread::deallocate_all_tasks(void)
 {
     this->memory_stack_ptr = this->memory_stack_bottom;
 }

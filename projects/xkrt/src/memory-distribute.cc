@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 00:52:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 03:39:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,12 +44,13 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
         {
             # define AC 1
             constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
-            const size_t task_size = task_get_size(flags, AC, 0);
-            uint8_t * mem = thread->allocate(task_size);
-            assert(mem);
+            constexpr size_t task_size = task_get_size(flags, AC);
 
-            task_t * task = reinterpret_cast<task_t *>  (mem + 0);
+            task_t * task = thread->allocate_task(task_size);
             new(task) task_t(TASK_FORMAT_NULL, flags);
+
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(AC);
 
             task_dev_info_t * dev = TASK_DEV_INFO(task);
             new (dev) task_dev_info_t(device_global_id, UNSPECIFIED_TASK_ACCESS);

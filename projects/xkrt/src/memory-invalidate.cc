@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:37:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 02:54:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -27,19 +27,19 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
         // device memory
         device->memory_reset();
 
-        // worker thread memory
-        Thread * worker = device->thread;
-        assert(worker);
-        worker->deallocate_all();
+        // thread thread memory
+        Thread * thread = device->thread;
+        assert(thread);
+        thread->deallocate_all_tasks();
     }
 
     # pragma message(TODO "deallocating threads memory causes error: why ?")
     # if 0
 
-    // coherent worker
-    Thread * worker = runtime->memory_coherent_worker_thread;
-    assert(worker);
-    worker->deallocate_all();
+    // coherent thread
+    Thread * thread = runtime->memory_coherent_thread_thread;
+    assert(thread);
+    thread->deallocate_all();
 
     // producer incoming thread
     Thread * producer = Thread::self();
