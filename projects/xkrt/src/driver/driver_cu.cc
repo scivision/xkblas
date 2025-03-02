@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 23:38:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:22:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -446,9 +446,6 @@ cu_stream_instructions_launch(
     CUevent event = stream->cu.events.buffer[idx];
     CUstream handle = stream->cu.handle.high;
 
-
-    CUdeviceptr src_deviceptr, dst_deviceptr;
-
     switch (instr->type)
     {
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_1D):
@@ -488,15 +485,15 @@ cu_stream_instructions_launch(
                 }
 
             }
-            CU_SAFE_CALL(cuMemcpyAsync(dst_deviceptr, src_deviceptr, count, handle));
             CU_SAFE_CALL(cuEventRecord(event, handle));
-
             return EINPROGRESS;
         }
+
         case (XKRT_STREAM_INSTR_TYPE_COPY_H2D_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
+            CUdeviceptr src_deviceptr, dst_deviceptr;
             CUmemorytype src_type, dst_type;
             void * src_host, * dst_host;
 
@@ -582,7 +579,6 @@ cu_stream_instructions_launch(
             };
             CU_SAFE_CALL(cuMemcpy2DAsync(&cpy, handle));
             CU_SAFE_CALL(cuEventRecord(event, handle));
-
             return EINPROGRESS;
         }
 

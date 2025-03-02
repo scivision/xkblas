@@ -11,8 +11,7 @@
 # include <xkrt/runtime.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
-# include <xkrt/driver/thread-producer.hpp>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 
 static xkrt_runtime_t runtime;
 

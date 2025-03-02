@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 06:05:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:25:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -475,8 +475,8 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
 # define __task_detachable_post(task, F, ...)                       \
     do {                                                            \
         assert(task->flags & TASK_FLAG_DETACHABLE);                 \
-        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
-        if (dep->wc.fetch_add(1, std::memory_order_relaxed) == 1)   \
+        task_det_info_t * det = TASK_DET_INFO(task);                \
+        if (det->wc.fetch_add(1, std::memory_order_relaxed) == 1)   \
             __task_complete(task, F, __VA_ARGS__);                  \
     } while (0)
 
@@ -490,10 +490,10 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
         );                                                                          \
         if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))             \
         {                                                                           \
-            task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
+            task_det_info_t * det = TASK_DET_INFO(task);                            \
             assert(                                                                 \
-                (dep->wc.load() == 0) ||                                            \
-                (dep->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))       \
+                (det->wc.load() == 0) ||                                            \
+                (det->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))       \
             );                                                                      \
         }                                                                           \
         SPINLOCK_LOCK(task->state.lock);                                            \
