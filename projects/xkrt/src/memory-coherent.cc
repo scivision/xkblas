@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:40:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 05:57:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -91,7 +91,7 @@ body_memory_coherent_async_fetch_callback(
 static void
 body_memory_coherent_async_fetch(task_t * task)
 {
-    const args_fetch_t * args = (args_fetch_t *) (task + 1);
+    const args_fetch_t * args = (args_fetch_t *) TASK_ARGS(task);
     assert(args);
 
     xkrt_runtime_t * runtime = args->runtime;
@@ -174,9 +174,7 @@ xkrt_memory_coherent_async_worker_thread_work(
     assert(current->flags & TASK_FLAG_DEPENDENT);
     assert(TASK_DEP_INFO(current)->wc == 0);
 
-    LOGGER_DEBUG("Creating a coherent async fetch task");
-
-    const args_t * args = (const args_t *) (current + 1);
+    const args_t * args = (const args_t *) TASK_ARGS(current);
     assert(args);
 
     // this is ugly, result of the memorytree bad design, fix me
@@ -202,7 +200,7 @@ xkrt_memory_coherent_async_worker_thread_work(
         assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
 
         constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE;
-        const size_t task_size = task_get_size(flags, 0);
+        const size_t task_size = task_compute_size(flags, 0);
         const size_t args_size = sizeof(args_fetch_t);
 
         task_t * task = thread->allocate_task(task_size + args_size);
@@ -327,7 +325,7 @@ xkrt_coherency_host_async(
     /* create one task per conflict shrinking the access (stored in cubes)
      * responsible of fetching the chunk */
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
-    constexpr size_t task_size = task_get_size(flags, 0);
+    constexpr size_t task_size = task_compute_size(flags, 0);
     constexpr size_t args_size = sizeof(args_t);
 
     for (access_t * & conflict : conflicts)
@@ -336,7 +334,7 @@ xkrt_coherency_host_async(
         new(task) task_t(runtime->formats.coherent_async, flags);
 
         task_dep_info_t * dep = TASK_DEP_INFO(task);
-        new (dep) task_dep_info_t(1);
+        new (dep) task_dep_info_t(0);
 
         /* link the virtual access to the task, so it is activated correctly
          * when predecessors completes.  This access is virtual though, no need

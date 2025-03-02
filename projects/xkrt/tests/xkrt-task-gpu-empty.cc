@@ -37,7 +37,7 @@ main(void)
     # define NACCESSES 1
     static_assert(NACCESSES <= TASK_MAX_ACCESSES);
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
-    constexpr size_t task_size = task_get_size(flags, NACCESSES);
+    constexpr size_t task_size = task_compute_size(flags, NACCESSES);
 
     task_t * task = thread->allocate_task(task_size);
     new(task) task_t(FORMAT, flags);

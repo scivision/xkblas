@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:36:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 05:17:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -125,7 +125,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
         inline void
         update_includes_nwrites(void)
         {
-            this->nwrites = this->last_write->task ? 1 : 0;
+            this->nwrites = this->last_write ? 1 : 0;
             FOREACH_CHILD_BEGIN(this, child, k, dir)
             {
                 this->nwrites += child->nwrites;
@@ -311,7 +311,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
                     if ((search.access->mode & ACCESS_MODE_W) && node->last_reads.size())
                         for (access_t * pred : node->last_reads)
                             precedence(pred, search.access);
-                    else if (node->last_write->task)
+                    else if (node->last_write)
                         precedence(node->last_write, search.access);
 
                     break ;
@@ -319,7 +319,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
                 case (Search::Type::SEARCH_TYPE_CONFLICTING):
                 {
-                    if (node->last_write->task)
+                    if (node->last_write)
                     {
                         assert(search.conflicts);
                         search.conflicts->push_back(node->last_write);

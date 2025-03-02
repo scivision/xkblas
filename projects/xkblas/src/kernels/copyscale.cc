@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:37:07 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 04:48:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,7 +17,7 @@
 # include "xkblas/cblas.h"
 
 # include <xkrt/xkrt-support.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -28,20 +28,20 @@
 
 typedef struct args_t
 {
-    args_t(
-        size_t m, size_t n,
-        int should_copy, int * IW
-    ) :
-        m(m), n(n),
-        should_copy(should_copy), IW(IW)
-    {}
+    public:
+        const size_t m;
+        const size_t n;
+        const int should_copy;
+        int * IW;
 
-    ~args_t() {}
-
-    const size_t m;
-    const size_t n;
-    const int should_copy;
-    int * IW;
+        args_t(
+            size_t m, size_t n,
+            int should_copy, int * IW
+        ) :
+            m(m), n(n),
+            should_copy(should_copy), IW(IW)
+        {}
+        ~args_t() {}
 
 } args_t;
 
@@ -60,28 +60,37 @@ xkblas_£copyscale_tile_async(
           TYPE * U, const size_t Um, const size_t Un, int ldu
 ) {
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
-    assert(mem);
 
-    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const size_t ocr_access = 1;
-    Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    # define AC 3
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+    constexpr size_t args_size = sizeof(args_t);
 
-    # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
-    # endif /* NDEBUG */
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new(task) task_t(format_id, flags);
 
-    args_t  * args = reinterpret_cast<args_t *>(task + 1);
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    constexpr size_t ocr_access = 1;
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+    args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(m, n, should_copy, IW);
 
-    # define NACCESSES 3
-    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W);
-    thread->resolve<NACCESSES>(task);
-    # undef NACCESSES
+    # ifndef NDEBUG
+    snprintf(task->label, sizeof(task->label),
+            "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
+    # endif /* NDEBUG */
+
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R);
+    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW);
+    new(accesses + 2) access_t(task, MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W);
+    thread->resolve<AC>(task, accesses);
+    # undef AC
 
     context->runtime.task_commit(task);
 
@@ -181,7 +190,7 @@ xkblas_£copyscale_async(
 
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
-#  include <xkrt/driver/driver-cuda.h>
+#  include <xkrt/driver/driver-cu.h>
 
 extern "C"
 int
@@ -196,7 +205,7 @@ cuda_£copyscale(
 
 static void
 body_cuda(
-    xkrt_stream_cuda_t * stream,
+    xkrt_stream_cu_t * stream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
@@ -205,18 +214,19 @@ body_cuda(
     cudaStream_t cuda_stream = stream->cu.handle.high;
     assert(cuda_stream);
 
-    Task * task = (Task *) instr->kern.vargs;
+    task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
 
-    const Access * D = task->accesses + 0;
-    const Access * L = task->accesses + 1;
-    const Access * U = task->accesses + 2;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * D = accesses + 0;
+    const access_t * L = accesses + 1;
+    const access_t * U = accesses + 2;
 
     assert(D->device_view.addr % D->host_view.sizeof_type == 0);
     assert(L->device_view.addr % L->host_view.sizeof_type == 0);
     assert(U->device_view.addr % U->host_view.sizeof_type == 0);
 
-    args_t * args = (args_t *) (task + 1);
+    args_t * args = (args_t *) TASK_ARGS(task);
     assert(args);
 
     cuda_£copyscale(

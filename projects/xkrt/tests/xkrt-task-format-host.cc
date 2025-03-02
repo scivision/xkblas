@@ -36,7 +36,7 @@ main(void)
 
     // Submit the task
     constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
-    constexpr size_t task_size = task_get_size(flags, 0);
+    constexpr size_t task_size = task_compute_size(flags, 0);
 
     task_t * task = thread->allocate_task(task_size);
     new(task) task_t(FORMAT, flags);

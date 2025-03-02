@@ -44,7 +44,7 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
         {
             # define AC 1
             constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
-            constexpr size_t task_size = task_get_size(flags, AC);
+            constexpr size_t task_size = task_compute_size(flags, AC);
 
             task_t * task = thread->allocate_task(task_size);
             new(task) task_t(TASK_FORMAT_NULL, flags);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:57:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 05:23:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -98,11 +98,13 @@ class access_t
             /* clear preallocated empty successors */
             successors.clear();
 
-            /* use notations from the paper */
-            const size_t  A = host_view.begin_addr();
+            if (mode == ACCESS_MODE_V)
+                return ;
 
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
+
+            const size_t A = host_view.begin_addr();
 
             # if ACCESS_FORCE_ALIGNMENT
             assert((A % (ld * s)) + (m * s) <= ld * s);

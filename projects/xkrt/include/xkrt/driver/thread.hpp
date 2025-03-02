@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:17:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 04:36:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -176,7 +176,7 @@ class alignas(CACHE_LINE_SIZE) Thread
         /* the thread implicit task */
         union {
             task_t implicit_task;
-            char _implicit_task_buffer[task_get_size(TASK_FLAG_DOMAIN, 0)];
+            char _implicit_task_buffer[task_compute_size(TASK_FLAG_DOMAIN, 0)];
         };
 
         /* the current task */

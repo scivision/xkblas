@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:37:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 04:57:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,7 +17,7 @@
 # include "xkblas/cblas.h"
 
 # include <xkrt/xkrt-support.h>
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -70,19 +70,30 @@ xkblas_£trsm_tile_async(
           TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
 ) {
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
-    assert(mem);
 
-    Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(format_id, UNSPECIFIED_TASK_ACCESS, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    # define AC 2
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+    constexpr size_t args_size = sizeof(args_t);
+
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new(task) task_t(format_id, flags);
+
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    constexpr size_t ocr_access = 1;
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+    args_t * args = (args_t *) TASK_ARGS(task, task_size);
+    new(args) args_t(side, uplo, transA, diag, m, n, *alpha);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "trsm(A=(%zu,%zu) ; B=(%zu,%zu))",
+    snprintf(task->label, sizeof(task->label),
+            "trsm(A=(%zu,%zu) ; B=(%zu,%zu))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
     # endif /* NDEBUG */
-
-    args_t  * args = reinterpret_cast<args_t *>(task + 1);
-    new(args) args_t(side, uplo, transA, diag, m, n, *alpha);
 
     /* TODO: block size, is that correct ? */
     const size_t Am = (side == CblasLeft) ? m : n;
@@ -90,12 +101,12 @@ xkblas_£trsm_tile_async(
     const size_t Bm = m;
     const size_t Bn = n;
 
-    # define NACCESSES 2
-    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_RW);
-    thread->resolve<NACCESSES>(task);
-    # undef NACCESSES
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
+    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_RW);
+    thread->resolve<AC>(task, accesses);
+    # undef AC
 
     context->runtime.task_commit(task);
 
@@ -510,11 +521,11 @@ xkblas_£trsm_async(
 
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
-#  include <xkrt/driver/driver-cuda.h>
+#  include <xkrt/driver/driver-cu.h>
 
 static void
 body_cuda(
-    xkrt_stream_cuda_t * stream,
+    xkrt_stream_cu_t * stream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
@@ -523,16 +534,17 @@ body_cuda(
     cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 
-    Task * task = (Task *) instr->kern.vargs;
+    task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
 
-    const Access * A = task->accesses + 0;
-    const Access * B = task->accesses + 1;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
 
     assert(A->device_view.addr % A->host_view.sizeof_type == 0);
     assert(B->device_view.addr % B->host_view.sizeof_type == 0);
 
-    args_t * args = (args_t *) (task + 1);
+    args_t * args = (args_t *) TASK_ARGS(task);
     assert(args);
 
     # ifndef NDEBUG

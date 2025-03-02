@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 04:00:07 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:05:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -216,7 +216,7 @@ task_get_base_size_fallback(task_flag_bitfield_t flags)
 
 /* compute the base size of a task (without arguments and private data) */
 static constexpr size_t
-task_get_extra_size(task_flag_bitfield_t flags)
+task_get_extra_size(const task_flag_bitfield_t flags)
 {
     switch (flags)
     {
@@ -257,6 +257,7 @@ task_get_extra_size(task_flag_bitfield_t flags)
         case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
             return sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.0.1.1 - dep and det shared 'wc'
 
+        // this is a constexpr, if we reach this default case, then the compiler will fail
         default:
             return task_get_base_size_fallback(flags);
 
@@ -267,8 +268,10 @@ task_get_extra_size(task_flag_bitfield_t flags)
     }
 }
 
-constexpr size_t
-task_get_size(const task_flag_bitfield_t flags, const uint8_t ac)
+/* Given flags and the number of accesses, computes (at compile-time) the size
+ * in bytes required for the task (without args_t) */
+static constexpr inline size_t
+task_compute_size(const task_flag_bitfield_t flags, const uint8_t ac)
 {
     return sizeof(task_t) + task_get_extra_size(flags) + ac*sizeof(access_t);
 }
@@ -284,21 +287,21 @@ task_get_size(const task_flag_bitfield_t flags, const uint8_t ac)
  */
 
 static inline task_dep_info_t *
-TASK_DEP_INFO(task_t * task)
+TASK_DEP_INFO(const task_t * task)
 {
     assert(task->flags & TASK_FLAG_DEPENDENT);
     return (task_dep_info_t *) (task + 1);
 }
 
 static inline task_det_info_t *
-TASK_DET_INFO(task_t * task)
+TASK_DET_INFO(const task_t * task)
 {
     assert(task->flags & TASK_FLAG_DETACHABLE);
     return (task_det_info_t *) (task + 1);
 }
 
 static inline task_dev_info_t *
-TASK_DEV_INFO(task_t * task)
+TASK_DEV_INFO(const task_t * task)
 {
     assert(  task->flags & TASK_FLAG_DEVICE);
     assert(!(task->flags & TASK_FLAG_DOMAIN));  // device tasks cannot have dependency domains
@@ -311,7 +314,7 @@ TASK_DEV_INFO(task_t * task)
 }
 
 static inline task_dom_info_t *
-TASK_DOM_INFO(task_t * task)
+TASK_DOM_INFO(const task_t * task)
 {
     assert(  task->flags & TASK_FLAG_DOMAIN);
     assert(!(task->flags & TASK_FLAG_DEVICE));  // device tasks cannot have dependency domains
@@ -323,17 +326,47 @@ TASK_DOM_INFO(task_t * task)
         return (task_dom_info_t *) (task + 1);
 }
 
-static inline access_t *
-TASK_ACCESSES(task_t * task)
+static constexpr size_t
+TASK_ACCESSES_OFFSET(const task_flag_bitfield_t flags)
 {
     // accesses must be stored right after the task struct
-    return (access_t *) (((char *) task) + sizeof(task_t) + task_get_extra_size(task->flags));
+    return sizeof(task_t) + task_get_extra_size(flags);
+}
+
+static inline access_t *
+TASK_ACCESSES(const task_t * task, const task_flag_bitfield_t flags)
+{
+    return (access_t *) (((char *) task) + TASK_ACCESSES_OFFSET(flags));
+}
+
+static inline access_t *
+TASK_ACCESSES(const task_t * task)
+{
+    return TASK_ACCESSES(task, task->flags);
 }
 
 static inline void *
-TASK_ARGS(task_t * task, const size_t task_size)
+TASK_ARGS(const task_t * task, const size_t task_size)
 {
     return (void *) (((char *) task) + task_size);
+}
+
+static inline size_t
+TASK_SIZE(const task_t * task)
+{
+    if (task->flags & TASK_FLAG_DEPENDENT)
+    {
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        return sizeof(task_t) + task_get_extra_size(task->flags) + dep->ac*sizeof(access_t);
+    }
+    else
+        return sizeof(task_t) + task_get_extra_size(task->flags);
+}
+
+static inline void *
+TASK_ARGS(const task_t * task)
+{
+    return TASK_ARGS(task, TASK_SIZE(task));
 }
 
 ///////////////////////////////////

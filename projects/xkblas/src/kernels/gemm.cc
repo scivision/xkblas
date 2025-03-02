@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 01:27:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 05:29:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,7 +21,7 @@
 # include "auto-tile.h"
 # include "context.h"
 
-# include <xkrt/driver/thread-producer.hpp>
+# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -60,7 +60,6 @@ typedef struct  args_t
 
     ~args_t() {}
 
-    Access accesses[3]; // A, B, C
     const int transA;
     const int transB;
     const size_t m;
@@ -89,20 +88,30 @@ xkblas_£gemm_tile_async(
     LOGGER_DEBUG("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
 
     Thread * thread = Thread::self();
-    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
-    assert(mem);
 
-    // const size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const size_t ocr_access = 2;
-    Task * task = reinterpret_cast<Task *>  (mem + 0);
-    new(task) Task(format_id, ocr_access, UNSPECIFIED_DEVICE_GLOBAL_ID);
+    # define AC 3
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+    constexpr size_t args_size = sizeof(args_t);
+
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new(task) task_t(format_id, flags);
+
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    constexpr size_t ocr_access = 2;
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+    args_t * args = (args_t *) TASK_ARGS(task, task_size);
+    new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "gemm(A=(%zd,%zd) ; B=(%zd,%zd) ; C=(%zd,%zd))", A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
+    snprintf(task->label, sizeof(task->label),
+            "gemm(A=(%zd,%zd) ; B=(%zd,%zd) ; C=(%zd,%zd))",
+            A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
-
-    args_t  * args = reinterpret_cast<args_t *>(task + 1);
-    new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
 
     // TODO : there is an issue with how trans and accesses are handled
     const size_t Am = m; // (transA == CblasNoTrans) ? m : k;
@@ -112,14 +121,14 @@ xkblas_£gemm_tile_async(
     const size_t Cm = m;
     const size_t Cn = n;
 
-    # define NACCESSES 3
-    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(task->accesses + 0) Access(MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 1) Access(MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_R);
-    new(task->accesses + 2) Access(MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        );
-    thread->resolve<NACCESSES>(task);
-    # undef NACCESSES
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
+    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_R);
+    new(accesses + 2) access_t(task, MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        );
+    thread->resolve<AC>(task, accesses);
+    # undef AC
 
     context->runtime.task_commit(task);
 
@@ -330,11 +339,11 @@ xkblas_£gemm_async(
 
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
-#  include <xkrt/driver/driver-cuda.h>
+#  include <xkrt/driver/driver-cu.h>
 
 static void
 body_cuda(
-    xkrt_stream_cuda_t * stream,
+    xkrt_stream_cu_t * stream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
@@ -343,18 +352,19 @@ body_cuda(
     cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 
-    Task * task = (Task *) instr->kern.vargs;
+    task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
 
-    const Access * A = task->accesses + 0;
-    const Access * B = task->accesses + 1;
-    const Access * C = task->accesses + 2;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
 
     assert(A->device_view.addr % A->host_view.sizeof_type == 0);
     assert(B->device_view.addr % B->host_view.sizeof_type == 0);
     assert(C->device_view.addr % C->host_view.sizeof_type == 0);
 
-    args_t * args = (args_t *) (task + 1);
+    args_t * args = (args_t *) TASK_ARGS(task);
     assert(args);
 
     XKBLAS_CUBLAS_CALL(
@@ -381,14 +391,15 @@ body_ze(void * ihandle, void * vargs)
     xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) ihandle;
     assert(stream);
 
-    Task * task = (Task *) vargs;
+    task_t * task = (task_t *) vargs;
     assert(task);
 
-    const Access * A = task->accesses + 0;
-    const Access * B = task->accesses + 1;
-    const Access * C = task->accesses + 2;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
 
-    args_t * args = (args_t *) (task + 1);
+    args_t * args = (args_t *) TASK_ARGS(task);
 
     # if XKBLAS_SUPPORT_SYCL
 
@@ -471,15 +482,15 @@ body_cl(
     xkrt_device_cl_t * device = stream->device;
     assert(device);
 
-    Task * task = (Task *) instr->kern.vargs;
+    task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
 
-    const Access * A = task->accesses + 0;
-    const Access * B = task->accesses + 1;
-    const Access * C = task->accesses + 2;
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
 
-    args_t * args = (args_t *) (task + 1);
-    assert(args);
+    args_t * args = (args_t *) TASK_ARGS(task);
 
     // using offsets
     cl_mem a_buffer, b_buffer, c_buffer;

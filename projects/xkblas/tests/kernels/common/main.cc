@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:42:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 05:48:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -217,7 +217,8 @@ main_gemm(char ** args)
             B[i * ld + i] = 1.0;
             for (int j = 0 ; j < ld ; ++j)
             {
-                A[i * ld + j] = (7 * i * j) % 13;
+                // A[i * ld + j] = (7 * i * j) % 13;
+                A[i * ld + j] = (i + j);
             }
         }
     }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:47:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 06:01:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,36 +69,42 @@ xkrt_device_prepare_task(
     xkrt_device_t * device,
     task_t * task
 ) {
-    assert(task->state.value == TASK_STATE_READY);
+    assert(  task->state.value == TASK_STATE_READY);
 
-    assert(task->flags & TASK_FLAG_DEPENDENT);
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    assert(dep->wc == 0);
-
-    LOGGER_DEBUG("Scheduling task `%s` of format `%d` on device %d",
+    LOGGER_DEBUG("Preparing task `%s` of format `%d` on device %d",
             task->label, task->fmtid, device->global_id);
 
-    /* increase task 'fetching' counter so it does not get ready early
-     * (eg before we processed all accesses bellow) */
-    __task_fetching(1, task);
-
-    /* for each access */
-    assert(dep->ac <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task);
-    for (int i = 0 ; i < dep->ac ; ++i)
+    if (task->flags & TASK_FLAG_DEPENDENT)
     {
-        access_t * access = accesses + i;
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        assert(TASK_DEP_INFO(task)->wc == 0);
 
-        MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
-        assert(memcontroller);
+        /* increase task 'fetching' counter so it does not get ready early
+         * (eg before we processed all accesses bellow) */
+        __task_fetching(1, task);
 
-        // TODO " pass task
-        memcontroller->fetch(task, access, device->global_id);
+        /* for each access */
+        assert(dep->ac <= TASK_MAX_ACCESSES);
+        access_t * accesses = TASK_ACCESSES(task);
+        for (int i = 0 ; i < dep->ac ; ++i)
+        {
+            access_t * access = accesses + i;
+
+            MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
+            assert(memcontroller);
+
+            // TODO " pass task
+            memcontroller->fetch(task, access, device->global_id);
+        }
+
+        /* decrease the task 'fetching' counter to detect early-fetch completion */
+        __task_fetched(1, task, xkrt_device_task_execute, runtime, device, task);
+        /* else the task will be launched in a callback while all accesses were fetched */
     }
-
-    /* decrease the task 'fetching' counter to detect early-fetch completion */
-    __task_fetched(1, task, xkrt_device_task_execute, runtime, device, task);
-    /* else the task will be launched in a callback while all accesses were fetched */
+    else
+    {
+        xkrt_device_task_execute(runtime, device, task);
+    }
 }
 
 /* main loop for the thread responsible the passed device */
