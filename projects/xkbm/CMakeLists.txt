@@ -16,7 +16,6 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/main.cc
     ${CMAKE_SOURCE_DIR}/src/benchmark.cc
     ${CMAKE_SOURCE_DIR}/src/pp.cc
-    ${CMAKE_SOURCE_DIR}/src/threads.cc
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
     ${CMAKE_SOURCE_DIR}/src/libnuma/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/hwloc/benchmarks.cc
