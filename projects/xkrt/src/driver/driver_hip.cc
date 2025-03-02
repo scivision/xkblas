@@ -138,7 +138,7 @@ __get_gpu_topo(void)
                 HIP_SAFE_CALL(
                     hipDeviceGetP2PAttribute(
                         &access_supported,
-                        hipDevP2PAttrAccessSupported,
+                        hipDevP2PAttraccess_tSupported,
                         i, j
                     )
                 );
@@ -379,12 +379,12 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         else
         {
             int access;
-            HIP_SAFE_CALL(hipDeviceCanAccessPeer(&access, device_driver_id, other_device_driver_id));
+            HIP_SAFE_CALL(hipDeviceCanaccess_tPeer(&access, device_driver_id, other_device_driver_id));
 
             if (access)
             {
-                hipError_t res = hipDeviceEnablePeerAccess(other_device_driver_id, 0);
-                if ((res == hipSuccess) || (res == hipErrorPeerAccessAlreadyEnabled))
+                hipError_t res = hipDeviceEnablePeeraccess_t(other_device_driver_id, 0);
+                if ((res == hipSuccess) || (res == hipErrorPeeraccess_tAlreadyEnabled))
                 {
                     int rank = hip_perf_topo[device_driver_id*hip_device_count+other_device_driver_id];
                     assert(rank);

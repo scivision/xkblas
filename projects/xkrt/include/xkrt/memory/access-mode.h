@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 18:30:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -27,14 +27,10 @@ access_mode_to_str(access_mode_t mode)
 {
     switch (mode)
     {
-        case (ACCESS_MODE_R):
-            return "ACCESS_MODE_R";
-        case (ACCESS_MODE_W):
-            return "ACCESS_MODE_W";
-        case (ACCESS_MODE_RW):
-            return "ACCESS_MODE_RW";
-        default:
-            return "unkn";
+        case (ACCESS_MODE_R):   return "ACCESS_MODE_R";
+        case (ACCESS_MODE_W):   return "ACCESS_MODE_W";
+        case (ACCESS_MODE_RW):  return "ACCESS_MODE_RW";
+        default:                return "ACCESS_MODE_UNKN";
     }
 }
 

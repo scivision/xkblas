@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 00:53:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 00:17:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -127,19 +127,19 @@ typedef struct  xkrt_runtime_t
     /////////////
 
     /* Enqueue a ready task to the given device */
-    void task_submit(Task * task, const xkrt_device_global_id_t device_global_id);
+    void task_submit(const xkrt_device_global_id_t device_global_id, task_t * task);
 
     /* Commit a task - so it may be schedule from now once its dependences completed */
-    void task_commit(Task * task);
+    void task_commit(task_t * task);
 
     /* Complete a task */
-    void task_executed(Task * task);
+    void task_executed(task_t * task);
 
     /* Complete a task */
-    void task_detachable_post(Task * task);
+    void task_detachable_post(task_t * task);
 
     /* Complete a task */
-    void task_complete(Task * task);
+    void task_complete(task_t * task);
 
     ///////////////
     // THREADING //
@@ -183,7 +183,7 @@ typedef struct  xkrt_runtime_t
 }               xkrt_runtime_t;
 
 /* submit a ready task */
-void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, Task * task);
+void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
 void xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime);
@@ -197,7 +197,7 @@ void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, ui
 void xkrt_device_task_execute(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device,
-    Task * task
+    task_t * task
 );
 
 /* report some stats about the runtime */

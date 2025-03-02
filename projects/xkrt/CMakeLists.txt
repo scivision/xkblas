@@ -40,8 +40,6 @@ add_custom_command(
 
 add_custom_target(${XKRT}_generated_files ALL DEPENDS always-run)
 
-option(STRICT "Enable strict compilation mode" OFF)
-
 # uncomment to disable kinterval tree heavy debug
 option(ENABLE_HEAVY_DEBUG "Heavy assertion tests in the khp-tree structure, setting this variable to 'ON' will considerably slowdown task insertion, but can help debugging the khp-trees" OFF)
 if (ENABLE_HEAVY_DEBUG)
@@ -157,6 +155,7 @@ if (USE_CL)
 
 endif()
 
+option(STRICT "Enable strict compilation mode" ON)
 if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})

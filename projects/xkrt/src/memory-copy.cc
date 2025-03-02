@@ -37,7 +37,7 @@ typedef struct  copy_args_t
 static void
 body_memory_copy_callback(const void * vargs [XKRT_CALLBACK_ARGS_MAX])
 {
-    Task * task = (Task *) vargs[0];
+    task_t * task = (task_t *) vargs[0];
     assert(task);
 
     copy_args_t * args = (copy_args_t *) (task + 1);
@@ -45,7 +45,7 @@ body_memory_copy_callback(const void * vargs [XKRT_CALLBACK_ARGS_MAX])
 }
 
 static void
-body_memory_copy(Task * task)
+body_memory_copy(task_t * task)
 {
     assert(task);
     copy_args_t * args = (copy_args_t *) (task + 1);
@@ -79,11 +79,11 @@ xkrt_memory_copy_async(
     Thread * thread = Thread::self();
     assert(thread);
 
-    uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(copy_args_t));
+    uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(copy_args_t));
     assert(mem);
 
-    Task * task = reinterpret_cast<Task *>(mem);
-    new(task) Task(runtime->formats.copy_async, UNSPECIFIED_TASK_ACCESS, device_global_id, TASK_FLAG_DETACHABLE);
+    task_t * task = reinterpret_cast<task_t *>(mem);
+    new(task) task_t(runtime->formats.copy_async, UNSPECIFIED_TASK_ACCESS, device_global_id, TASK_FLAG_DETACHABLE);
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "copy");
     # endif /* NDEBUG */

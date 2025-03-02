@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 06:25:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 01:07:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -65,10 +65,40 @@ class alignas(CACHE_LINE_SIZE) Thread
         void wakeup(void);
 
         /* push a task */
-        void push(Task * const & task);
+        void push(task_t * const & task);
 
         /* pop a task */
-        Task * pop(void);
+        task_t * pop(void);
+
+        /**
+         * Resolve dependencies of the passed task through the domain of the
+         * task currently executing
+         */
+        template <int AC>
+        inline void
+        resolve(task_t * task, access_t * accesses)
+        {
+            assert(task->flags & TASK_FLAG_DEPENDENT);
+            assert(AC > 0);
+
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(AC);
+
+            // TODO
+            // 1) we assume that all accesses use that same dependency domain
+            // 2) C++ pure virtual function cannot be templated. To still
+            //    benefits from compile-time optimization, we force the casting to
+            //    a DependencyTree, as it is the only DependencyDomain currently.
+            access_t * access = accesses + 0;
+            DependencyDomain * domain = task_get_dependency_domain(task, accesses + 0);
+            if (domain == NULL)
+            {
+                domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+                task_put_dependency_domain(task, domain);
+            }
+            DependencyTree * tree = (DependencyTree *) domain;
+            tree->resolve<AC>(accesses);
+        }
 
         /**
          *  Commit the passed task
@@ -77,51 +107,9 @@ class alignas(CACHE_LINE_SIZE) Thread
          *  A task cannot be scheduled before a 'commit' call.
          *  The task may be scheduled before this function returns
          */
-        template<int N>
+        template <void (*callback)(void * vargs, task_t * task)>
         inline void
-        resolve(Task * task)
-        {
-            task->naccesses = N;
-
-            if (N)
-            {
-                # pragma message(TODO "If we semantically force a task accesses to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
-
-                DependencyTree::Search search;
-                DependencyTree * deptrees[N];
-
-                // intersect with past tasks
-                for (int access_id = 0 ; access_id < N ; ++access_id)
-                {
-                    search.prepare_resolve(task, access_id);
-
-                    const Access * access = task->accesses + access_id;
-                    assert(access);
-
-                    deptrees[access_id] = this->get_dependency_tree_for_ld(access->host_view.ld);
-                    deptrees[access_id]->intersect(search, access->cubes[0]);
-                    deptrees[access_id]->intersect(search, access->cubes[1]);
-                }
-
-                // insert for future tasks
-                for (int access_id = 0 ; access_id < N ; ++access_id)
-                {
-                    search.prepare_resolve(task, access_id);
-
-                    const Access * access = task->accesses + access_id;
-                    assert(access);
-
-                    assert(deptrees[access_id]);
-                    deptrees[access_id]->insert(search, access->cubes[0]);
-                    deptrees[access_id]->insert(search, access->cubes[1]);
-                }
-            }
-        }
-
-
-        template <void (*callback)(void * vargs, Task * task)>
-        inline task_state_t
-        commit(void * vargs, Task * task)
+        commit(void * vargs, task_t * task)
         {
             # ifndef NDEBUG
             tasks.push_back(task);
@@ -130,9 +118,8 @@ class alignas(CACHE_LINE_SIZE) Thread
             assert(this->current_task);
             this->current_task->cc.fetch_add(1, std::memory_order_relaxed);
             task->parent = this->current_task;
-            return task->commit<callback>(vargs);
+            __task_commit(callback, vargs, task);
         }
-
 
         # ifndef NDEBUG
         void
@@ -142,36 +129,34 @@ class alignas(CACHE_LINE_SIZE) Thread
         }
 
         static void
-        dump_tasks(FILE * f, std::vector<Task *> & tasks)
+        dump_tasks(FILE * f, std::vector<task_t *> & tasks)
         {
             fprintf(f, "digraph G {\n");
-            for (Task * & task : tasks)
+            for (task_t * & task : tasks)
                 fprintf(f, "    \"%p\" [label=\"%s\"] ;\n", task, task->label);
 
-            for (Task * & pred : tasks)
-                for (Task::Edge & edge : pred->edges)
-                    fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, edge.successor);
+            for (task_t * & pred : tasks)
+            {
+                if (pred->flags & TASK_FLAG_DEPENDENT)
+                {
+                    task_dep_info_t * dep = TASK_DEP_INFO(pred);
+                    access_t * accesses = TASK_ACCESSES(pred);
+                    for (int i = 0 ; i < dep->ac ; ++i)
+                    {
+                        access_t * pred_access = accesses + i;
+                        for (access_t * succ_access : pred_access->successors)
+                        {
+                            task_t * succ = succ_access->task;
+                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
+                        }
+                    }
+                }
+            }
             fprintf(f, "}\n");
         }
 
         void report_tasks(void);
         # endif /* NDEBUG */
-
-        inline DependencyTree *
-        get_dependency_tree_for_ld(const size_t ld)
-        {
-            /* find previous deptree for that ld */
-            for (DependencyTree * deptree : this->deptrees)
-                if (deptree->ld == ld)
-                    return deptree;
-
-            /* if not found, create a new deptree */
-            DependencyTree * deptree = new DependencyTree(ld);
-            assert(deptree);
-            assert(deptree->ld == ld);
-            this->deptrees.push_back(deptree);
-            return deptree;
-        }
 
     public:
 
@@ -179,10 +164,10 @@ class alignas(CACHE_LINE_SIZE) Thread
         cpu_set_t cpuset;
 
         /* the thread implicit task */
-        Task implicit_task;
+        task_t implicit_task;
 
         /* the current task */
-        Task * current_task;
+        task_t * current_task;
 
     private:
 
@@ -196,8 +181,8 @@ class alignas(CACHE_LINE_SIZE) Thread
         size_t capacity;
 
         /* per-thread queue */
-        // Deque<Task *, THREAD_WORKER_DEQUE_CAPACITY> queue;
-        NaiveQueue<Task *> queue;
+        // Deque<task_t *, THREAD_WORKER_DEQUE_CAPACITY> queue;
+        NaiveQueue<task_t *> queue;
 
         /* lock and condition to sleep the mutex */
         struct {
@@ -210,7 +195,7 @@ class alignas(CACHE_LINE_SIZE) Thread
         std::vector<DependencyTree *> deptrees;
 
         #ifndef NDEBUG
-        std::vector<Task *> tasks;
+        std::vector<task_t *> tasks;
         #endif /* NDEBUG */
 
 

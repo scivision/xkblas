@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 01:20:38 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 00:16:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -67,7 +67,7 @@ static inline void
 xkrt_device_prepare_task(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device,
-    Task * task
+    task_t * task
 ) {
     assert(task->wc == 0);
     assert(task->state.value == TASK_STATE_READY);
@@ -83,7 +83,7 @@ xkrt_device_prepare_task(
     assert(task->naccesses <= TASK_MAX_ACCESSES);
     for (int i = 0 ; i < task->naccesses ; ++i)
     {
-        Access * access = task->accesses + i;
+        access_t * access = task->accesses + i;
         assert(access);
 
         MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
@@ -121,7 +121,7 @@ xkrt_device_thread_main_loop(
     Thread * worker = Thread::self();
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
     {
-        Task * task;
+        task_t * task;
         while ((task = worker->pop()) == NULL && device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
             worker->pause();
 
@@ -226,7 +226,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
 }
 
 ////////////////////
-// Task execution //
+// task_t execution //
 ////////////////////
 
 static void
@@ -236,7 +236,7 @@ xkrt_device_task_executed_callback(
     xkrt_runtime_t * runtime = (xkrt_runtime_t *) args[0];
     assert(runtime);
 
-    Task * task = (Task *) args[1];
+    task_t * task = (task_t *) args[1];
     assert(task);
 
     runtime->task_executed(task);
@@ -252,12 +252,12 @@ void
 xkrt_device_task_execute(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device,
-    Task * task
+    task_t * task
 ) {
-    LOGGER_DEBUG("Task `%s` is ready for kernel execution", task->label);
+    LOGGER_DEBUG("task_t `%s` is ready for kernel execution", task->label);
 
     Thread * thread = Thread::self();
-    Task * current = thread->current_task;
+    task_t * current = thread->current_task;
     thread->current_task = task;
 
     /* running an empty task */
@@ -293,12 +293,12 @@ xkrt_device_task_execute(
             targetfmt = TASK_FORMAT_TARGET_HOST;
 
         if (format->f[targetfmt] == NULL)
-            LOGGER_FATAL("Task got scheduled but its format has no valid function");
+            LOGGER_FATAL("task_t got scheduled but its format has no valid function");
 
         /* running a host task */
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
-            ((void (*)(Task *)) format->f[targetfmt])(task);
+            ((void (*)(task_t *)) format->f[targetfmt])(task);
             runtime->task_executed(task);
         }
         /* running a device task */
@@ -487,21 +487,21 @@ xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 
 void
 xkrt_runtime_t::task_submit(
-    Task * task,
-    const xkrt_device_global_id_t device_global_id
+    const xkrt_device_global_id_t device_global_id,
+    task_t * task
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
     xkrt_device_task_execute(this, device, task);
 }
 
 static inline void
-enqueue(void * vargs, Task * task)
+enqueue(void * vargs, task_t * task)
 {
     xkrt_runtime_submit_task((xkrt_runtime_t *) vargs, task);
 }
 
 void
-xkrt_runtime_t::task_commit(Task * task)
+xkrt_runtime_t::task_commit(task_t * task)
 {
     Thread * thread = Thread::self();
     assert(thread);
@@ -511,7 +511,7 @@ xkrt_runtime_t::task_commit(Task * task)
 }
 
 void
-xkrt_runtime_t::task_executed(Task * task)
+xkrt_runtime_t::task_executed(task_t * task)
 {
     assert(task);
     LOGGER_DEBUG("task `%s` executed", task->label);
@@ -519,7 +519,7 @@ xkrt_runtime_t::task_executed(Task * task)
 }
 
 void
-xkrt_runtime_t::task_detachable_post(Task * task)
+xkrt_runtime_t::task_detachable_post(task_t * task)
 {
     assert(task);
     assert(task->flags & TASK_FLAG_DETACHABLE);
@@ -528,7 +528,7 @@ xkrt_runtime_t::task_detachable_post(Task * task)
 }
 
 void
-xkrt_runtime_t::task_complete(Task * task)
+xkrt_runtime_t::task_complete(task_t * task)
 {
     assert(task);
     assert(!(task->flags & TASK_FLAG_DETACHABLE));

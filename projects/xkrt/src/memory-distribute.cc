@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:13:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 00:52:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,15 +42,19 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
     {
         for (size_t tn = 0; tn < nt; ++tn)
         {
-            const uint64_t task_size = sizeof(Task);
+            # define AC 1
+            constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
+            const size_t task_size = task_get_size(flags, AC, 0);
             uint8_t * mem = thread->allocate(task_size);
             assert(mem);
 
-            Task * task = reinterpret_cast<Task *>  (mem + 0);
-            new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
+            task_t * task = reinterpret_cast<task_t *>  (mem + 0);
+            new(task) task_t(TASK_FORMAT_NULL, flags);
 
-            # define NACCESS 1
-            static_assert(NACCESS <= TASK_MAX_ACCESSES);
+            task_dev_info_t * dev = TASK_DEV_INFO(task);
+            new (dev) task_dev_info_t(device_global_id, UNSPECIFIED_TASK_ACCESS);
+
+            access_t * accesses = TASK_ACCESSES(task);
             {
                 const ssize_t  x = tm * mb;
                 const ssize_t  y = tn * nb;
@@ -60,10 +64,10 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
                 const ssize_t y1 = MIN(y+nb+hy, n);
                 const  size_t sx = x1 - x0;
                 const  size_t sy = y1 - y0;
-                new(task->accesses + 0) Access(order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
+                new(accesses + 0) access_t(task, order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_R);
             }
-            thread->resolve<NACCESS>(task);
-            # undef NACCESS
+            thread->resolve<AC>(task, accesses);
+            # undef AC
 
             #ifndef NDEBUG
             snprintf(task->label, sizeof(task->label), "distribute_cyclic_2d_async");
@@ -128,18 +132,18 @@ xkrt_coherency_distribute_packed_2D_halo_async(
             hx, hy
         );
         # if 0
-        const uint64_t task_size = sizeof(Task);
+        const uint64_t task_size = sizeof(task_t);
         uint8_t * mem = thread->allocate(task_size);
         assert(mem);
 
-        Task * task = reinterpret_cast<Task *>  (mem + 0);
+        task_t * task = reinterpret_cast<task_t *>  (mem + 0);
         const xkrt_device_global_id_t device_global_id = 0;
-        new(task) Task(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
+        new(task) task_t(TASK_FORMAT_NULL, UNSPECIFIED_TASK_ACCESS, device_global_id);
 
         # define NACCESS 1
         static_assert(NACCESS <= TASK_MAX_ACCESSES);
         {
-            new(task->accesses + 0) Access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+            new(task->accesses + 0) access_t(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
         }
         thread->resolve<NACCESS>(task);
         # undef NACCESS

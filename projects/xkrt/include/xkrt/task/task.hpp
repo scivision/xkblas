@@ -2,25 +2,28 @@
 /*                                                                            */
 /*   task.hpp                                                                 */
 /*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:27:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 01:08:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __TASK_HPP__
-# define __TASK_HPP__
+#ifndef __TASK_H__
+# define __TASK_H__
 
+// https://stackoverflow.com/questions/45342776/how-to-include-c11-headers-when-compiling-c-with-gcc
+// cannot use <stdatomic.h> with c++
+// # include <stdatomic.h>
 # include <atomic>
-# include <cassert>
-# include <cstdint>
-# include <vector>
+
+# include <assert.h>
+# include <stdint.h>
 
 # include <xkrt/consts.h>
-# include <xkrt/driver/memory-access.hpp>
+# include <xkrt/task/dependency-domain.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
@@ -28,36 +31,15 @@
 # include <xkrt/memory/cache-line-size.hpp>
 # include <xkrt/sync/spinlock.h>
 
-# define TASK_MAX_ACCESSES          3
-# define UNSPECIFIED_TASK_ACCESS    (TASK_MAX_ACCESSES)
-
-# define LOGGER_DEBUG_TASK(...) LOGGER_DEBUG(__VA_ARGS__)
-//# define LOGGER_DEBUG_TASK(...)
-
-/* wait counter type */
-typedef uint8_t task_wc_type_t;
-
-/* task flags */
-typedef enum    task_flags_t
-{
-    TASK_FLAG_IMPLICIT      = (1 << 0), // task is implicit
-    TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
-    TASK_FLAG_DETACHABLE    = (1 << 2), // the task completion is associated with the completion of user-defined external events
-    TASK_FLAG_MAX           = (1 << 3)
-}               task_flags_t;
-
-typedef uint8_t task_flag_bitfield_t;
-static_assert(TASK_FLAG_MAX <= 8*sizeof(task_flag_bitfield_t)); // if this fails increase 'task_flag_bitfield_t'
-
 /* task states */
 typedef enum    task_state_t : uint8_t
 {
-    TASK_STATE_ALLOCATED        = 0,    // Task is allocated
-    TASK_STATE_READY            = 1,    // Task data can be fetched
-    TASK_STATE_DATA_FETCHING    = 2,    // Task data is being fetched
-    TASK_STATE_DATA_FETCHED     = 3,    // Task data is fetched, kernel can be executed
-    TASK_STATE_COMPLETED        = 4,    // Task completed, dependences can be resolved (kernel executed)
-    TASK_STATE_DEALLOCATED      = 5,    // Task is deallocated (virtual state, never set)
+    TASK_STATE_ALLOCATED        = 0,    // task_t is allocated
+    TASK_STATE_READY            = 1,    // task_t data can be fetched
+    TASK_STATE_DATA_FETCHING    = 2,    // task_t data is being fetched
+    TASK_STATE_DATA_FETCHED     = 3,    // task_t data is fetched, kernel can be executed
+    TASK_STATE_COMPLETED        = 4,    // task_t completed, dependences can be resolved (kernel executed)
+    TASK_STATE_DEALLOCATED      = 5,    // task_t is deallocated (virtual state, never set)
     TASK_STATE_MAX              = 6,
 }               task_state_t;
 
@@ -83,34 +65,41 @@ task_state_to_str(task_state_t state)
     }
 }
 
-template <int K>
-class alignas(CACHE_LINE_SIZE) KTask
+# ifndef NDEBUG
+#  define LOGGER_DEBUG_TASK_STATE(task)                                                                     \
+    do {                                                                                                    \
+        LOGGER_DEBUG("task_t `%s` is now in state `%s`", task->label, task_state_to_str(task->state.value)); \
+    } while (0)
+# else
+#  define LOGGER_DEBUG_TASK_STATE(task)
+# endif
+
+/**
+ *  Task flags. Constraints:
+ *      - cannot have both TASK_FLAG_DOMAIN and TASK_FLAG_DEVICE
+ */
+typedef enum    task_flags_t
 {
-    /* only supporting dimension K == 2 */
-    // static_assert(K == 2);
-    using Access = KMemoryAccess<K>;
+    TASK_FLAG_ZERO          = 0,
+    TASK_FLAG_DEPENDENT     = (1 << 0), // the task may have dependencies
+    TASK_FLAG_DETACHABLE    = (1 << 1), // the task completion is associated with the completion of user-defined external events
+    TASK_FLAG_DEVICE        = (1 << 2), // task task may execute on a device
+    TASK_FLAG_DOMAIN        = (1 << 3), // if this task may have dependent children tasks - in such case, it will have dependency domains
 
+    // TODO : support me in the future
+  // TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
+  // TASK_FLAG_PERSISTENT    = (1 << 5), // persistence
+
+    TASK_FLAG_MAX           = (1 << 4)
+}               task_flags_t;
+
+// if test fails increase size of 'task_flag_bitfield_t'
+typedef uint8_t task_flag_bitfield_t;
+static_assert(TASK_FLAG_MAX <= (1 << 8*sizeof(task_flag_bitfield_t)));
+
+typedef struct  task_t
+{
     public:
-
-        class Edge {
-
-            public:
-                KTask * successor;
-
-            public:
-                Edge(KTask * s) : successor(s) {}
-                virtual ~Edge() {}
-
-        }; /* Edge */
-
-    public:
-
-        ////////////////
-        // Attributes //
-        ////////////////
-
-        /* parent task */
-        KTask * parent;
 
         /* task format id */
         task_format_id_t fmtid;
@@ -118,33 +107,32 @@ class alignas(CACHE_LINE_SIZE) KTask
         /* task flags */
         task_flag_bitfield_t flags;
 
-        /* list of out-going edges */
-        std::vector<Edge> edges;
-
-        /* task accesses */
-        Access accesses[TASK_MAX_ACCESSES];
-        uint8_t naccesses;
-
-        /* execute on the device that owns a copy of the access at accesses[ocr_access_index]
-         * If 'UNSPECIFIED_TASK_ACCESS', leave the decision to the scheduler */
-        uint8_t ocr_access_index;
-
-        /* worker id on where to schedule once ready (or XKRT_DEVICES_MAX if
-         * leaving the decision to the scheduler) */
-        xkrt_device_global_id_t targeted_device_id;
-
-        /* wait counter - the task may be scheduled once it reached 0 */
-        # pragma message(TODO "Memory accesses ordering on this atomic")
-        std::atomic<task_wc_type_t> wc;
-
-        /* children counter - number of threads with uncompleted tasks scheduled */
-        std::atomic<uint32_t> cc;
-
         /* task state */
         struct {
             spinlock_t      lock;
             task_state_t    value;
         } state;
+
+        /** Tasks currently do not support 'OpenMP private data' or 'kaapi/cilk stack' */
+
+# if 1
+
+        // TODO : remove these too, we only use parent to count children for sync()
+        // but we could instead increment a uint8_t counter, where threads stealing
+        // increment on first steal, decrement when stealing fails done
+        // -> complexity goes from n of child tasks to n of threads
+
+        /* parent task */
+        task_t * parent;
+
+        /* children counter - number of threads with uncompleted tasks scheduled */
+        std::atomic<uint32_t> cc;
+
+        # else
+
+        std::atomic_uint_least8_t tc;
+
+        # endif
 
         # ifndef NDEBUG
         char label[128];
@@ -152,176 +140,352 @@ class alignas(CACHE_LINE_SIZE) KTask
 
     public:
 
-        KTask() :
-            KTask(
-                TASK_FORMAT_NULL,
-                UNSPECIFIED_TASK_ACCESS,
-                UNSPECIFIED_DEVICE_GLOBAL_ID,
-                0
-            )
-        {}
+        task_t(task_format_id_t fmtid, task_flag_bitfield_t flags) :
+            fmtid(fmtid), flags(flags) {}
 
-        KTask(task_flag_bitfield_t flags_p) :
-            KTask(
-                TASK_FORMAT_NULL,
-                UNSPECIFIED_TASK_ACCESS,
-                UNSPECIFIED_DEVICE_GLOBAL_ID,
-                flags_p
-            )
-        {}
+}               task_t;
 
-        KTask(
-            task_format_id_t f,
-            uint8_t ocr_access_index_p,
-            uint8_t targeted_device_id_p
-        ) :
-            KTask(f, ocr_access_index_p, targeted_device_id_p, 0)
-        {}
+typedef std::atomic<uint8_t> task_wait_counter_t;
 
-        KTask(
-            task_format_id_t f,
-            uint8_t ocr_access_index_p,
-            uint8_t targeted_device_id_p,
-            task_flag_bitfield_t flags_p
-        ) :
-            fmtid(f),
-            flags(flags_p),
-            edges(),
-            accesses(),
-            naccesses(0),
-            ocr_access_index(ocr_access_index_p),
-            targeted_device_id(targeted_device_id_p),
-            wc(1),
-            cc(0),
-            state({.lock=0, .value=TASK_STATE_ALLOCATED})
-        {
-            edges.reserve(8);
+# define UNSPECIFIED_TASK_ACCESS (-1)
+typedef uint8_t task_access_counter_t;
+# define TASK_MAX_ACCESSES (1 << 8*sizeof(task_access_counter_t))
 
-            // NOT SUPPORTED YET
-            assert(!(this->flags & TASK_FLAG_UNDEFERED));
+/* task dependencies infos */
+typedef struct  task_dep_info_t
+{
+    /*
+     * wait counter
+     * - if dependent task, it may be scheduled once it reached 0
+     * - if detachable task, it is completed when it reached 2
+     */
+    task_wait_counter_t wc;
 
-            # ifndef NDEBUG
-            strcpy(this->label, "(unamed task)");
-            # endif /* NDEBUG */
-        }
+    /* access counter (number of accesses) */
+    task_access_counter_t ac;
 
-        virtual ~KTask()
-        {
-            this->state.value = TASK_STATE_DEALLOCATED;
-        }
+    /* constructor, wc is initially '1' as task must be commited */
+    task_dep_info_t(task_access_counter_t ac) : wc(1), ac(ac) {}
 
-    public:
-        ////////////////////////////////////
-        // Methods to transition the task //
-        ////////////////////////////////////
+}               task_dep_info_t;
 
-        /* this task precedes the passed task */
-        inline void
-        precedes(KTask * succ)
-        {
-            assert(succ);
-            assert(this->state.value >= TASK_STATE_ALLOCATED);
-            assert(succ->state.value >= TASK_STATE_ALLOCATED);
+/* detachable counter, shared with 'task_dep_info_t' if the task is both DEPENDENT and DETACHABLE */
+typedef struct  task_det_info_t
+{
+    task_wait_counter_t wc;
 
-            if (this->state.value < TASK_STATE_COMPLETED)
-            {
-                SPINLOCK_LOCK(this->state.lock);
-                {
-                    if (this->state.value < TASK_STATE_COMPLETED)
-                    {
-                        succ->wc.fetch_add(1, std::memory_order_seq_cst);
-                        this->edges.push_back(Edge(succ));
-                    }
-                }
-                SPINLOCK_UNLOCK(this->state.lock);
-            }
-        }
+}               task_det_info_t;
 
-        /* Return the 'TASK_STATE_READY' if the task is now ready */
-        template <void (*callback)(void * vargs, KTask * task)>
-        inline task_state_t
-        commit(void * vargs)
-        {
-            assert(this->state.value == TASK_STATE_ALLOCATED);
-            if (this->wc.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
-            {
-                LOGGER_DEBUG_TASK("State of task `%s` changed to ready", this->label);
-                this->state.value = TASK_STATE_READY;
-                callback(vargs, this);
-                return TASK_STATE_READY;
-            }
-            return TASK_STATE_ALLOCATED;
-        }
+typedef struct  task_dev_info_t
+{
+    // TODO : targeted_device_id and ocr_access_index could share bits, because if 'targeted_device_id' is set, then 'ocr' is ignored
 
-        inline void
-        fetching(const task_wc_type_t n = 1)
-        {
-            if (this->wc.fetch_add(n, std::memory_order_seq_cst) == 0)
-            {
-                assert(this->state.value == TASK_STATE_READY);
-                LOGGER_DEBUG_TASK("State of task `%s` changed to fetching", this->label);
-                this->state.value = TASK_STATE_DATA_FETCHING;
-            }
-        }
+    /* worker id on where to schedule once ready (or 'UNSPECIFIED_DEVICE_GLOBAL_ID' if leaving the decision to the scheduler) */
+    xkrt_device_global_id_t targeted_device_id;
 
-        inline task_state_t
-        fetched(const task_wc_type_t n = 1)
-        {
-            assert(this->state.value == TASK_STATE_DATA_FETCHING);
-            if (this->wc.fetch_sub(n, std::memory_order_seq_cst) == 1)
-            {
-                LOGGER_DEBUG_TASK("State of task `%s` changed to fetched", this->label);
-                this->state.value = TASK_STATE_DATA_FETCHED;
-                return TASK_STATE_DATA_FETCHED;
-            }
+    // TODO : the 'ocr' field could be removed for tasks with no accesses
 
-            return TASK_STATE_DATA_FETCHING;
-        }
+    /* execute on the device that owns a copy of the access at accesses[ocr_access_index]
+     * If 'UNSPECIFIED_TASK_ACCESS', leave the decision to the scheduler */
+    uint8_t ocr_access_index;
 
-        template<void (*callback)(void * vargs, KTask * task)>
-        inline void
-        executed(void * vargs)
-        {
-            if (this->flags & TASK_FLAG_DETACHABLE)
-                return this->detachable_post<callback>(vargs);
-            else
-                return this->complete<callback>(vargs);
-        }
+    /* constructor */
+    task_dev_info_t(xkrt_device_global_id_t t, uint8_t ocr)
+        : targeted_device_id(t), ocr_access_index(ocr) {}
 
-        template<void (*callback)(void * vargs, KTask * task)>
-        inline void
-        detachable_post(void * vargs)
-        {
-            assert(this->flags & TASK_FLAG_DETACHABLE);
-            if (this->wc.fetch_add(1, std::memory_order_relaxed) == 1)
-                return this->complete<callback>(vargs);
-        }
+}               task_dev_info_t;
 
-        template<void (*callback)(void * vargs, KTask * task)>
-        inline void
-        complete(void * vargs)
-        {
-            assert(
-                (this->wc.load() == 0) ||
-                (this->wc.load() == 2 && (this->flags & TASK_FLAG_DETACHABLE))
-            );
-            assert(this->state.value == TASK_STATE_DATA_FETCHED || this->state.value == TASK_STATE_READY);
-            SPINLOCK_LOCK(this->state.lock);
-            {
-                this->state.value = TASK_STATE_COMPLETED;
-                LOGGER_DEBUG_TASK("State of task `%s` changed to completed", this->label);
-            }
-            SPINLOCK_UNLOCK(this->state.lock);
+/* info about domain of dependencies */
+typedef struct  task_dom_info_t
+{
+    /* the dependency domains */
+    std::vector<DependencyDomain *> domains;
 
-            assert(this->parent);
-            this->parent->cc.fetch_sub(1, std::memory_order_relaxed);
+}               task_dom_info_t;
 
-            for (Edge & edge : this->edges)
-                edge.successor->template commit<callback>(vargs);
-        }
+/* fallback if wrong flags parameter - https://stackoverflow.com/questions/20461121/constexpr-error-at-compile-time-but-no-overhead-at-run-time */
+size_t
+task_get_base_size_fallback(task_flag_bitfield_t flags)
+{
+    LOGGER_FATAL("Invalid task flag combination: `%u`", flags);
+    return 0;
+}
 
-};
+/* compute the base size of a task (without arguments and private data) */
+constexpr size_t
+task_get_extra_size(task_flag_bitfield_t flags)
+{
+    switch (flags)
+    {
+        /* no flags (= cilk/kaapi task) */
+        case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |              TASK_FLAG_ZERO):
+            return                            0 +                            0 +                            0 +                            0;  // 0.0.0.0
 
-using Task = KTask<2>;
+        case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
+            return                            0 +                            0 +                            0 + sizeof(task_dep_info_t);  // 0.0.0.1
 
-#endif /* __TASK_HPP__ */
+        case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
+            return                            0 +                            0 + sizeof(task_det_info_t) +                            0;  // 0.0.1.0
+
+        case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
+            return                            0 +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 0.0.1.1 - dep and det shared 'wc'
+
+        case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |               TASK_FLAG_ZERO |              TASK_FLAG_ZERO):
+            return                            0 + sizeof(task_dev_info_t) +                            0 +                            0;  // 0.1.0.0
+
+        case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
+            return                            0 + sizeof(task_dev_info_t) +                            0 + sizeof(task_dep_info_t);  // 0.1.0.1
+
+        case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
+            return                            0 + sizeof(task_dev_info_t) + sizeof(task_det_info_t) +                            0;  // 0.1.1.0
+
+        case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
+            return                            0 + sizeof(task_dev_info_t) +                          0x0 + sizeof(task_dep_info_t);  // 0.1.1.1 - dep and det shared 'wc'
+
+        case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |              TASK_FLAG_ZERO):
+            return sizeof(task_dom_info_t) +                            0 +                            0 +                            0;  // 1.0.0.0
+
+        case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
+            return sizeof(task_dom_info_t) +                            0 +                            0 + sizeof(task_dep_info_t);  // 1.0.0.1
+
+        case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
+            return sizeof(task_dom_info_t) +                            0 + sizeof(task_det_info_t) +                            0;  // 1.0.1.0
+
+        case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
+            return sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.0.1.1 - dep and det shared 'wc'
+
+        default:
+            return task_get_base_size_fallback(flags);
+
+         // return sizeof(task_t) + sizeof(task_dom_info_t) + sizeof(task_dev_info_t) +                            0 +                            0;  // 1.1.0.0 - forbidden combination
+         // return sizeof(task_t) + sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.1.0.1 - forbidden combination
+         // return sizeof(task_t) + sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.1.1.0 - forbidden combination
+         // return sizeof(task_t) + sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.1.1.1 - forbidden combination
+    }
+}
+
+constexpr size_t
+task_get_size(const task_flag_bitfield_t flags, const uint8_t ac, const size_t args_size)
+{
+    return sizeof(task_t) + task_get_extra_size(flags) + ac*sizeof(access_t) + args_size;
+}
+
+/**
+ *  In case of a task with all flags, its memory is
+ *   ________________________________________________________________________________
+ *  |                                                                                |
+ *  | task_t | task_dep_info_t | task_dev_info_t | task_dom_info_t | accesses | args |
+ *  |________________________________________________________________________________|
+ *
+ * if some flags are removed, builing blocks are removed
+ */
+
+static inline task_dep_info_t *
+TASK_DEP_INFO(task_t * task)
+{
+    assert(task->flags & TASK_FLAG_DEPENDENT);
+    return (task_dep_info_t *) (task + 1);
+}
+
+static inline task_det_info_t *
+TASK_DET_INFO(task_t * task)
+{
+    assert(task->flags & TASK_FLAG_DETACHABLE);
+    return (task_det_info_t *) (task + 1);
+}
+
+static inline task_dev_info_t *
+TASK_DEV_INFO(task_t * task)
+{
+    assert(  task->flags & TASK_FLAG_DEVICE);
+    assert(!(task->flags & TASK_FLAG_DOMAIN));  // device tasks cannot have dependency domains
+    if (task->flags & TASK_FLAG_DEPENDENT)
+        return (task_dev_info_t *) (TASK_DEP_INFO(task) + 1);
+    else if (task->flags & TASK_FLAG_DETACHABLE)
+        return (task_dev_info_t *) (TASK_DET_INFO(task) + 1);
+    else
+        return (task_dev_info_t *) (task + 1);
+}
+
+static inline task_dom_info_t *
+TASK_DOM_INFO(task_t * task)
+{
+    assert(  task->flags & TASK_FLAG_DOMAIN);
+    assert(!(task->flags & TASK_FLAG_DEVICE));  // device tasks cannot have dependency domains
+    if (task->flags & TASK_FLAG_DEPENDENT)
+        return (task_dom_info_t *) (TASK_DEP_INFO(task) + 1);
+    else if (task->flags & TASK_FLAG_DETACHABLE)
+        return (task_dom_info_t *) (TASK_DET_INFO(task) + 1);
+    else
+        return (task_dom_info_t *) (task + 1);
+}
+
+static inline access_t *
+TASK_ACCESSES(task_t * task)
+{
+    // accesses must be stored right after the task struct
+    return (access_t *) (((char *) task) + task_get_extra_size(task->flags));
+}
+
+///////////////////////////////////
+// Methods to setup dependencies //
+///////////////////////////////////
+
+/* retrieve the domain to use for the given access */
+static inline DependencyDomain *
+task_get_dependency_domain(task_t * task, const access_t * access)
+{
+    assert(task->flags & TASK_FLAG_DOMAIN);
+    task_dom_info_t * dom = TASK_DOM_INFO(task);
+
+    /* find previous deptree for that ld */
+    for (DependencyDomain * domain : dom->domains)
+        if (domain->can_resolve(access))
+            return domain;
+    return NULL;
+}
+
+static inline void
+task_put_dependency_domain(task_t * task, DependencyDomain * domain)
+{
+    assert(task->flags & TASK_FLAG_DOMAIN);
+    task_dom_info_t * dom = TASK_DOM_INFO(task);
+    dom->domains.push_back(domain);
+}
+
+/* task task precedes the passed task */
+# define __task_precedes(pred, succ)                                        \
+    do {                                                                    \
+        assert(pred);                                                       \
+        assert(succ);                                                       \
+        assert(pred->state.value >= TASK_STATE_ALLOCATED);                  \
+        assert(succ->state.value >= TASK_STATE_ALLOCATED);                  \
+        assert(pred->flags & TASK_FLAG_DEPENDENT);                          \
+        assert(succ->flags & TASK_FLAG_DEPENDENT);                          \
+        if (pred->state.value < TASK_STATE_COMPLETED)                       \
+        {                                                                   \
+            SPINLOCK_LOCK(pred->state.lock);                                \
+            {                                                               \
+                if (pred->state.value < TASK_STATE_COMPLETED)               \
+                {                                                           \
+                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);           \
+                    sdep->wc.fetch_add(1, std::memory_order_seq_cst);       \
+                }                                                           \
+            }                                                               \
+            SPINLOCK_UNLOCK(pred->state.lock);                              \
+        }                                                                   \
+    } while (0)
+
+////////////////////////////////////
+// Methods to transition the task //
+////////////////////////////////////
+
+/* mark the task ready and call F(args, task) */
+# define __task_ready(F, args, task)                        \
+    do {                                                    \
+        assert(task->state.value == TASK_STATE_ALLOCATED);  \
+        task->state.value = TASK_STATE_READY;               \
+        LOGGER_DEBUG_TASK_STATE(task);                      \
+        F(args, task);                                      \
+    } while (0)
+
+/* commit the task and call F(args, task) if it is now ready */
+# define __task_commit(F, args, task)                                   \
+    do {                                                                \
+        assert(task->state.value == TASK_STATE_ALLOCATED);              \
+        if (task->flags & TASK_FLAG_DEPENDENT)                          \
+        {                                                               \
+            task_dep_info_t * dep = TASK_DEP_INFO(task);                \
+            if (dep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)   \
+                __task_ready(F, args, task);                            \
+        }                                                               \
+        else                                                            \
+            __task_ready(F, args, task);                                \
+    } while (0)
+
+# define __task_fetching(n, task)                                   \
+    do {                                                            \
+        assert(task->flags & TASK_FLAG_DEPENDENT);                  \
+        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
+        if (dep->wc.fetch_add(n, std::memory_order_seq_cst) == 0)   \
+        {                                                           \
+            assert(task->state.value == TASK_STATE_READY);          \
+            task->state.value = TASK_STATE_DATA_FETCHING;           \
+            LOGGER_DEBUG_TASK_STATE(task);                          \
+        }                                                           \
+    } while (0)
+
+/* notify that 'n' accesses had been fetched.
+ * If all accesses were fetched, then mark the task as 'fetched' and call
+ * F(args, task) */
+# define __task_fetched(n, F, args, task)                           \
+    do {                                                            \
+        assert(task->state.value == TASK_STATE_DATA_FETCHING);      \
+        assert(task->flags & TASK_FLAG_DEPENDENT);                  \
+        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
+        if (dep->wc.fetch_sub(n, std::memory_order_seq_cst) == n)   \
+        {                                                           \
+            task->state.value = TASK_STATE_DATA_FETCHED;            \
+            LOGGER_DEBUG_TASK_STATE(task);                          \
+            F(args, task);                                          \
+        }                                                           \
+    } while (0)
+
+# define __task_detachable_post(F, args, task)                      \
+    do {                                                            \
+        assert(task->flags & TASK_FLAG_DETACHABLE);                 \
+        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
+        if (dep->->wc.fetch_add(1, std::memory_order_relaxed) == 1) \
+            __task_complete(F, args, task);                         \
+    } while (0)
+
+/* mark the task as 'executed' and call F(args, task) if its now completed */
+# define __task_executed(F, task, args)             \
+    do {                                            \
+        if (task->flags & TASK_FLAG_DETACHABLE)     \
+            __task_detachable_post(F, args, task);  \
+        else                                        \
+            __task_complete(F, args, task);         \
+    } while (0)
+
+/* mark the task as completed, and call F(args, succ) for each of its succesor
+ * that is now ready */
+# define __task_complete(F, args, task)                                             \
+    do {                                                                            \
+        assert(                                                                     \
+            task->state.value == TASK_STATE_DATA_FETCHED ||                         \
+            task->state.value == TASK_STATE_READY                                   \
+        );                                                                          \
+        if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))             \
+        {                                                                           \
+            task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
+            assert(                                                                 \
+                (task->wc.load() == 0) ||                                           \
+                (task->wc.load() == 2 && (task->flags & TASK_FLAG_DETACHABLE))      \
+            );                                                                      \
+        }                                                                           \
+        SPINLOCK_LOCK(task->state.lock);                                            \
+        {                                                                           \
+            task->state.value = TASK_STATE_COMPLETED;                               \
+            LOGGER_DEBUG_TASK_STATE(task);                                          \
+        }                                                                           \
+        SPINLOCK_UNLOCK(task->state.lock);                                          \
+        assert(task->parent);                                                       \
+        task->parent->cc.fetch_sub(1, std::memory_order_relaxed);                   \
+        if (task->flags & TASK_FLAG_DEPENDENT)                                      \
+        {                                                                           \
+            task_dep_info_t * dep = TASK_DEP_INFO(task);                            \
+            access_t * accesses = (access_t *) (dep + 1);                           \
+            for (uint8_t i = 0 ; i < dep->naccesses ; ++i)                          \
+            {                                                                       \
+                access_t * access = accesses + i;                                   \
+                task_t * succ = (task *) access->task;                              \
+                assert(S->flags & TASK_FLAG_DEPENDENT);                             \
+                task_dep_info_t * sdep = TASK_DEP_INFO(succ);                       \
+                if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)          \
+                    __task_ready(F, args, succ);                                    \
+            }                                                                       \
+        }                                                                           \
+    } while (0)
+
+#endif /* __TASK_H__ */

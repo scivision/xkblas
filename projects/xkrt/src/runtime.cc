@@ -58,7 +58,7 @@ xkrt_runtimes_cleanup_signal(int signum)
 //////////////////////////////
 
 static inline void
-xkrt_task_format_register(xkrt_runtime_t * runtime)
+task_format_register(xkrt_runtime_t * runtime)
 {
     task_formats_init(&(runtime->formats.list));
     xkrt_memory_coherent_async_register_format(runtime);
@@ -75,7 +75,7 @@ xkrt_init(xkrt_runtime_t * runtime)
 
     // load
     xkrt_init_conf(&(runtime->conf));
-    xkrt_task_format_register(runtime);
+    task_format_register(runtime);
     xkrt_memory_coherent_async_worker_thread_init(runtime);
 
     const int ngpus = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus);

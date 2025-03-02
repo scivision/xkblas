@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 01:01:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 19:34:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -33,7 +33,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
     Thread * thread;
 
     /* the parent task that launched the fetches on each devices */
-    Task * parent;
+    task_t * parent;
 
     /* the fetch to perform */
     fetch_list_t * list;
@@ -42,7 +42,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
     args_fetch_t(
         xkrt_runtime_t * runtime,
         Thread * w,
-        Task * p,
+        task_t * p,
         fetch_list_t * l,
         uint32_t i
     ) :
@@ -75,7 +75,7 @@ body_memory_coherent_async_fetch_callback(
     // self is a device thread, thread is the asynchronous coherent copy thread
     assert(self != thread);
 
-    Task * parent = (Task *) args[2];
+    task_t * parent = (task_t *) args[2];
     assert(parent);
 
     // one fetched completed, notify the parent
@@ -90,7 +90,7 @@ body_memory_coherent_async_fetch_callback(
 }
 
 static void
-body_memory_coherent_async_fetch(Task * task)
+body_memory_coherent_async_fetch(task_t * task)
 {
     const args_fetch_t * args = (args_fetch_t *) (task + 1);
     assert(args);
@@ -101,7 +101,7 @@ body_memory_coherent_async_fetch(Task * task)
     const Thread * thread = args->thread;
     assert(thread);
 
-    const Task * parent = args->parent;
+    const task_t * parent = args->parent;
     assert(parent);
 
     const fetch_list_t * list = args->list;
@@ -148,14 +148,14 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
     const size_t ld;
     const size_t sizeof_type;
 
-    args_t(const Access & x, const Access & y) : ld(x.host_view.ld), sizeof_type(x.host_view.sizeof_type)
+    args_t(const access_t & x, const access_t & y) : ld(x.host_view.ld), sizeof_type(x.host_view.sizeof_type)
     {
         assert(x.host_view.ld == y.host_view.ld);
         assert(x.host_view.sizeof_type == y.host_view.sizeof_type);
-        Access::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
-        Access::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
-        Access::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
-        Access::Cube::intersection(this->cubes + 3, x.cubes[1], y.cubes[1]);
+        access_t::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
+        access_t::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
+        access_t::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
+        access_t::Cube::intersection(this->cubes + 3, x.cubes[1], y.cubes[1]);
     }
     ~args_t() {}
 }                                       args_t;
@@ -164,7 +164,7 @@ static void
 xkrt_memory_coherent_async_worker_thread_work(
     xkrt_runtime_t * runtime,
     Thread * thread,
-    Task * current
+    task_t * current
 ) {
     assert(runtime);
     assert(thread);
@@ -201,11 +201,11 @@ xkrt_memory_coherent_async_worker_thread_work(
         assert(fetch->src_device_global_id != HOST_DEVICE_GLOBAL_ID);
         assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
 
-        uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_fetch_t));
+        uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(args_fetch_t));
         assert(mem);
 
-        Task * task = reinterpret_cast<Task *>  (mem + 0);
-        new(task) Task(runtime->formats.coherent_async_fetch, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
+        task_t * task = reinterpret_cast<task_t *>  (mem + 0);
+        new(task) task_t(runtime->formats.coherent_async_fetch, UNSPECIFIED_TASK_ACCESS, fetch->src_device_global_id);
 
         args_fetch_t  * args = reinterpret_cast<args_fetch_t *>(task + 1);
         new(args) args_fetch_t(runtime, thread, current, list, i);
@@ -236,7 +236,7 @@ xkrt_memory_coherent_async_worker_thread_main_loop(xkrt_runtime_t * runtime)
     // TODO : instead, while runtime->running
     while (1)
     {
-        Task * task;
+        task_t * task;
         while ((task = thread->pop()) == NULL)
             thread->pause();
 
@@ -311,8 +311,8 @@ xkrt_coherency_host_async(
     assert(thread);
 
     /* create an access, and retrieve all tasks that are in conflict */
-    std::unordered_map<Task *, std::array<bool, TASK_MAX_ACCESSES>> conflicts;
-    const Access access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    std::vector<access_t *> conflicts;
+    const access_t access(order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
     DependencyTree * deptree = thread->get_dependency_tree_for_ld(ld);
     assert(deptree);
@@ -321,34 +321,27 @@ xkrt_coherency_host_async(
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
     /* create one task per conflict shrinking the access, responsible of fetching the chunk */
-    const uint64_t task_size = sizeof(Task);
+    const uint64_t task_size = sizeof(task_t);
     assert(is_alignedas(task_size, CACHE_LINE_SIZE));
 
-    for (const auto & [conflicting_task, conflicting_accesses] : conflicts)
+    for (const auto & : conflicts)
     {
-        assert(conflicting_task);
-
-        uint8_t * mem = thread->allocate(sizeof(Task) + sizeof(args_t));
+        // TODO : create a dependent task
+        uint8_t * mem = thread->allocate(sizeof(task_t) + sizeof(args_t));
         assert(mem);
 
-        for (int access_id = 0 ; access_id < TASK_MAX_ACCESSES ; ++access_id)
-        {
-            if (conflicting_accesses[access_id])
-            {
-                Task * task = reinterpret_cast<Task *>(mem);
-                new(task) Task(runtime->formats.coherent_async, UNSPECIFIED_TASK_ACCESS, HOST_DEVICE_GLOBAL_ID);
+        task_t * task = reinterpret_cast<task_t *>(mem);
+        new(task) task_t(runtime->formats.coherent_async, UNSPECIFIED_TASK_ACCESS, HOST_DEVICE_GLOBAL_ID);
 
-                args_t  * args = reinterpret_cast<args_t *>(task + 1);
-                new (args) args_t(access, conflicting_task->accesses[access_id]);
+        args_t  * args = reinterpret_cast<args_t *>(task + 1);
+        new (args) args_t(access, conflicting_task->accesses[access_id]);
 
-                #ifndef NDEBUG
-                strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
-                #endif /* NDEBUG */
+        #ifndef NDEBUG
+        strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
+        #endif /* NDEBUG */
 
-                deptree->precedence(conflicting_task, task);
-                runtime->task_commit(task);
-            }
-        }
+        deptree->precedence(conflicting_task, task);
+        runtime->task_commit(task);
     }
 }
 

@@ -24,7 +24,7 @@ find_path(CUDA_DRIVER_PREFIX
 find_library(CUDA_DRIVER_LIBRARIES
     # Pick the static library first for easier run-time linking.
     NAMES cuda
-    HINTS ${CUDA_DRIVER_PREFIX}/lib64 ${CUDA_DRIVER_PREFIX}/lib ${HILTIDEPS}/lib
+    HINTS ${CUDA_DRIVER_PREFIX}/lib64 ${CUDA_DRIVER_PREFIX}/lib64/stubs ${CUDA_DRIVER_PREFIX}/lib ${HILTIDEPS}/lib
 )
 
 find_path(CUDA_DRIVER_INCLUDE_DIRS

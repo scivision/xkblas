@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 06:21:38 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/01 23:45:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,7 +44,7 @@ Thread::self(void)
 
 Thread::Thread() :
     cpuset(),
-    implicit_task(TASK_FLAG_IMPLICIT),
+    implicit_task(TASK_FORMAT_NULL, TASK_FLAG_ZERO),
     current_task(&this->implicit_task),
     memory_stack_bottom(NULL),
     capacity(THREAD_MAX_MEMORY),
@@ -106,13 +106,13 @@ Thread::deallocate_all(void)
 }
 
 void
-Thread::push(Task * const & task)
+Thread::push(task_t * const & task)
 {
     this->queue.push(task);
     this->wakeup();
 }
 
-Task *
+task_t *
 Thread::pop(void)
 {
     /* this is true as we only have 1 worker per device currently */
@@ -156,14 +156,10 @@ Thread::report_tasks(void)
 
     for (size_t i = 0 ; i < this->tasks.size() ; ++i)
     {
-        Task * task = this->tasks[i];
+        task_t * task = this->tasks[i];
         assert(task);
 
-        LOGGER_WARN(
-            "%4lu - %12s - wc=%u - %s",
-            i, task_state_to_str(task->state.value), task->wc.load(), task->label
-        );
-
+        LOGGER_WARN("%4lu - %12s - %s", i, task_state_to_str(task->state.value), task->label);
         ++summary[task->state.value];
     }
 
