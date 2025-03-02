@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:36:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:03:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,6 +38,12 @@ extern "C" {
     /* Synchronize host memory with devices memory on the passed address space.
      * Restriction: concurrent 'xkblas_memory_coherent_async' on overlaping address spaces has an undefined behavior */
     void xkblas_memory_coherent_async(int uplo, int memflag, int m, int n, void * ptr, int ld, unsigned int sizeof_type);
+
+    /* alloc unified memory */
+    void * xkblas_unified_alloc(size_t size);
+
+    /* release unified memory */
+    void xkblas_unified_free(void * ptr, size_t size);
 
     /* alloc pinned memory */
     void * xkblas_host_alloc(size_t size);

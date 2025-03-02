@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 05:23:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 16:45:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,6 +44,12 @@ class access_t
 
         /* the mode */
         access_mode_t mode;
+
+        /* the concurrency */
+        access_concurrency_t concurrency;
+
+        /* the scope */
+        access_scope_t scope;
 
         /* As opposed to kaapi/v1, we have no data handle to attach a sync access onto.
          * How to remove that vector and have a similar 'sync access' logic instead ?
@@ -86,9 +92,13 @@ class access_t
             const size_t m,
             const size_t n,
             const size_t s, // sizeof_type,
-            access_mode_t mode
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
         ) :
             mode(mode),
+            concurrency(concurrency),
+            scope(scope),
             successors(8),
             task(task),
             cubes(),
@@ -98,12 +108,18 @@ class access_t
             /* clear preallocated empty successors */
             successors.clear();
 
+            /* virtual access, no need to compute the region */
             if (mode == ACCESS_MODE_V)
                 return ;
 
+            /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
+            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
+
+            /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
+            assert(mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
-
             const size_t A = host_view.begin_addr();
 
             # if ACCESS_FORCE_ALIGNMENT

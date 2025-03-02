@@ -13,6 +13,8 @@ hwloc_topology_t TOPOLOGY;
 // BENCHMARKS //
 ////////////////
 
+void  cuda_benchmark_init(void);
+void  cuda_benchmark_deinit(void);
 void  cuda_benchmark_push(benchmark_node_t *);
 
 void hwloc_benchmark_push(benchmark_node_t *);
@@ -27,9 +29,9 @@ void  xkrt_benchmark_push(benchmark_node_t *);
 
 backend_t backends[] = {
     {"XKRT",    1,                  XKRT_DRIVER_TYPE_MAX , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
+    {"CUDA",    XKRT_SUPPORT_CUDA,  XKRT_DRIVER_TYPE_CUDA, cuda_benchmark_push , NULL               , NULL                     },
     //{"ZE",      XKRT_SUPPORT_ZE,    XKRT_DRIVER_TYPE_ZE  , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
     //{"HWLOC",   1,                  XKRT_DRIVER_TYPE_MAX , hwloc_benchmark_push, NULL               , NULL                     },
-//    {"CUDA",    XKRT_SUPPORT_CUDA,  XKRT_DRIVER_TYPE_CUDA, cuda_benchmark_push , NULL               , NULL                     },
 };
 
 benchmark_node_t xkbm = {
@@ -59,7 +61,7 @@ export_conf_for_bench(benchmark_node_t * bench)
 
     data["name"] = bench->name;
     data["desc"] = bench->desc;
-    data["enabled"] = 0;
+    data["enabled"] = bench->enabled;
 
     std::vector<json> children;
     for (int i = 0 ; i < bench->nchildren; ++i)

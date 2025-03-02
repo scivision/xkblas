@@ -411,6 +411,21 @@ static benchmark_node_t driver_notouch_parallel = {
     .run = alloc_parallel_run
 };
 
+///////////////////////////
+// MEMORY TYPE DETECTION //
+///////////////////////////
+
+static void
+detect_run(benchmark_node_t * bench)
+{
+}
+
+static benchmark_node_t detect = {
+    .name = "detect",
+    .desc = "Detect",
+    .run = detect_run
+};
+
 //////////////////////////
 // D2D memory transfers //
 //////////////////////////
@@ -730,6 +745,7 @@ static benchmark_node_t d2h = {
     .run = mem_run<D2H>
 };
 
+
 /////////////////////
 // XKRT BENCHMARKS //
 /////////////////////
@@ -785,6 +801,7 @@ xkrt_benchmark_push(benchmark_node_t * parent)
     LINK(kernel, kernel_launch_latency);
 
     LINK(memory, allocation);
+    LINK(memory, detect);
     LINK(memory, transfer);
 
     LINK(allocation, system_touch);

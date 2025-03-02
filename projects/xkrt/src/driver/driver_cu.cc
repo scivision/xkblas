@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 06:22:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 07:09:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -266,6 +266,20 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
 {
     assert(area_idx == 0);
     cu_set_context(device_driver_id);
+    CU_SAFE_CALL(cuMemFree((CUdeviceptr) ptr));
+}
+
+static void *
+XKRT_DRIVER_ENTRYPOINT(memory_unified_allocate)(int device_driver_id, const size_t size)
+{
+    CUdeviceptr device_ptr;
+    CU_SAFE_CALL(cuMemAllocManaged(&device_ptr, size, CU_MEM_ATTACH_GLOBAL));
+    return (void *) device_ptr;
+}
+
+static void
+XKRT_DRIVER_ENTRYPOINT(memory_unified_deallocate)(int device_driver_id, void * ptr, const size_t size)
+{
     CU_SAFE_CALL(cuMemFree((CUdeviceptr) ptr));
 }
 
@@ -799,8 +813,8 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
     REGISTER(memory_host_deallocate);
     REGISTER(memory_host_register);
     REGISTER(memory_host_unregister);
-    // REGISTER(memory_unified_allocate);
-    // REGISTER(memory_unified_deallocate);
+    REGISTER(memory_unified_allocate);
+    REGISTER(memory_unified_deallocate);
 
     REGISTER(device_cpuset);
 

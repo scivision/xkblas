@@ -43,7 +43,50 @@ struct  time_array_t
 
     static void report_element_default(time_array_t * time, size_t i)
     {
-        printf("%12lu | %10lu +/- %10lu | %10lu | %10lu | %10lu\n", i, time->avg, time->stdev, time->values[i][0], time->values[i][N_ITERS/2], time->values[i][N_ITERS-1]);
+        printf("%12lu | %10lu +/- %10lu | %10lu | %10lu | %10lu\n",
+                i, time->avg, time->stdev, time->values[i][0], time->values[i][N_ITERS/2], time->values[i][N_ITERS-1]);
+    }
+
+    template <metric_t metric>
+    inline void
+    report(
+        const char * label,
+        const std::function<const char *(int)>& convert_label
+    ) {
+
+        LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s", label, "avg", "stdev", "min", "med", "max");
+        for (size_t i = 0 ; i < nelements ; ++i)
+        {
+            qsort(this->values[i], N_ITERS, sizeof(size_t), size_t_cmp);
+            size_t min = this->values[i][0];
+            size_t med = this->values[i][N_ITERS / 2];
+            size_t max = this->values[i][N_ITERS - 1];
+
+            this->avg = 0;
+            for (int j = 0 ; j < N_ITERS ; ++j)
+                this->avg += this->values[i][j];
+            this->avg = this->avg / N_ITERS;
+
+            this->variance = 0;
+            for (int j = 0 ; j < N_ITERS ; ++j)
+                this->variance += (this->values[i][j] - this->avg) * (this->values[i][j] - this->avg);
+            this->variance = this->variance / N_ITERS;
+
+            this->stdev = sqrt(this->variance);
+
+            void (*func[METRIC_MAX])(char * buffer, int bufsize, size_t nbytes);
+            func[METRIC_BYTE] = xkrt_metric_byte;
+            func[METRIC_TIME] = xkrt_metric_time;
+            func[METRIC_BW]   = xkrt_metric_bandwidth;
+
+            char buffer[5][64];
+            func[metric](buffer[0], sizeof(buffer[0]), this->avg);
+            func[metric](buffer[1], sizeof(buffer[1]), this->stdev);
+            func[metric](buffer[2], sizeof(buffer[2]), this->values[i][0]);
+            func[metric](buffer[3], sizeof(buffer[3]), this->values[i][N_ITERS/2]);
+            func[metric](buffer[4], sizeof(buffer[4]), this->values[i][N_ITERS-1]);
+            LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s", convert_label(i), buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+        }
     }
 
     template <void (*REPORT_ELEMENT)(time_array_t *, size_t) = report_element_default>
@@ -71,6 +114,11 @@ struct  time_array_t
             REPORT_ELEMENT(this, i);
         }
     }
+
+    static void
+    pp_custom_1time(time_array_t * time, size_t i)
+    {
+   }
 
     static void
     pp_1zu_1time(time_array_t * time, size_t i)

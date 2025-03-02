@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 04:48:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:04:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,6 +15,7 @@
 # include "auto-tile.h"
 # include "xkblas/kernel-type.h"
 # include "xkblas/cblas.h"
+# include "xkblas/xkblas-experimental.h"
 
 # include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread.hpp>
@@ -86,9 +87,9 @@ xkblas_£copyscale_tile_async(
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
-    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R);
-    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW);
-    new(accesses + 2) access_t(task, MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W);
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R , ACCESS_CONCURRENCY_SEQUENTIAL, XKBLAS_ACCESS_SCOPE);
+    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, XKBLAS_ACCESS_SCOPE);
+    new(accesses + 2) access_t(task, MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W , ACCESS_CONCURRENCY_SEQUENTIAL, XKBLAS_ACCESS_SCOPE);
     thread->resolve<AC>(task, accesses);
     # undef AC
 

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:39:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:01:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -50,10 +50,7 @@ xkblas_host_alloc(size_t size)
     if (ptr == NULL)
         return NULL;
 
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    xkrt_runtime_t * runtime = &(context->runtime);
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
     xkrt_memory_register(runtime, ptr, size);
 
     return ptr;
@@ -63,13 +60,25 @@ extern "C"
 void
 xkblas_host_free(void * ptr, size_t size)
 {
-    xkblas_context_t * context = xkblas_context_get();
-    assert(context);
-
-    xkrt_runtime_t * runtime = &(context->runtime);
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
     xkrt_memory_unregister(runtime, ptr, size);
-
     xkblas_free(ptr, size);
+}
+
+extern "C"
+void *
+xkblas_unified_alloc(size_t size)
+{
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
+    return runtime->memory_unified_allocate(0, size);
+}
+
+extern "C"
+void
+xkblas_unified_free(void * ptr, size_t size)
+{
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
+    return runtime->memory_unified_deallocate(0, ptr, size);
 }
 
 // Added symbols for compatibility with previous version and unified version

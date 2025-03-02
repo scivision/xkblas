@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/26 00:40:42 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 04:47:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 16:25:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -25,21 +25,9 @@
 # include <xkrt/logger/logger-ze.h>
 # include <xkrt/logger/metric.h>
 
-////////////////
-// H2D or D2H //
-////////////////
-
-# if 0
-static benchmark_node_t ze_benchmarks_h2d = {
-    .name = "H2D",
-    .desc = "Host memory to device (global) memory bandwidth",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = ze_benchmarks_mem_run,
-    .enabled = 1
-};
-# endif
+static ze_driver_handle_t driverHandle;
+static ze_device_handle_t deviceHandle;
+static ze_context_handle_t contextHandle;
 
 ///////////////////
 // ZE BENCHMARKS //
@@ -65,9 +53,21 @@ ze_benchmark_push(benchmark_node_t * parent)
 void
 ze_benchmark_init(void)
 {
+    ze_init_flag_t initFlags = ZE_INIT_FLAG_GPU_ONLY;
+    ZE_SAFE_CALL(zeInit(initFlags));
+
+    uint32_t driverCount = 1;
+    ZE_SAFE_CALL(zeDriverGet(&driverCount, &driverHandle));
+
+    uint32_t deviceCount = 1;
+    ZE_SAFE_CALL(zeDeviceGet(driverHandle, &deviceCount, &deviceHandle));
+
+    ze_context_desc_t contextDesc = {ZE_STRUCTURE_TYPE_CONTEXT_DESC};
+    ZE_SAFE_CALL(zeContextCreate(driverHandle, &contextDesc, &contextHandle));
 }
 
 void
 ze_benchmark_deinit(void)
 {
+    ZE_SAFE_CALL(zeContextDestroy(contextHandle));
 }

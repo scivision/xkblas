@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 06:01:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:14:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -93,7 +93,6 @@ xkrt_device_prepare_task(
             MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
             assert(memcontroller);
 
-            // TODO " pass task
             memcontroller->fetch(task, access, device->global_id);
         }
 
@@ -426,6 +425,37 @@ xkrt_runtime_t::memory_host_deallocate(
     {
         LOGGER_WARN("Driver `%s` does not implement memory_dealloc_host", driver->f_get_name());
         free(mem);
+    }
+}
+
+void *
+xkrt_runtime_t::memory_unified_allocate(
+    const xkrt_device_global_id_t device_global_id,
+    const size_t size
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_memory_unified_allocate)
+        return driver->f_memory_unified_allocate(device->driver_id, size);
+    else
+    {
+        LOGGER_FATAL("Driver `%s` does not implement memory_alloc_unified", driver->f_get_name());
+    }
+}
+
+void
+xkrt_runtime_t::memory_unified_deallocate(
+    const xkrt_device_global_id_t device_global_id,
+    void * mem,
+    const size_t size
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_memory_unified_deallocate)
+        driver->f_memory_unified_deallocate(device->driver_id, mem, size);
+    else
+    {
+        LOGGER_FATAL("Driver `%s` does not implement memory_dealloc_unified", driver->f_get_name());
     }
 }
 

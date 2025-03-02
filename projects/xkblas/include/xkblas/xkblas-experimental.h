@@ -1,16 +1,23 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   pp.cc                                                                    */
+/*   xkblas-experimental.h                                                    */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2025/02/26 16:53:13 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 16:53:57 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2025/03/02 17:03:46 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2025/03/02 17:17:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/logger/logger.h>
-# include <xkrt/logger/metric.h>
+#ifndef __XKBLAS_EXPERIMENTAL_H__
 
+# define __XKBLAS_EXPERIMENTAL_H__
+
+/* UNIFIED MEMORY EXPERIMENTAL */
+# include <xkrt/memory/access-mode.h>
+# define XKBLAS_ACCESS_SCOPE ACCESS_SCOPE_NONUNIFIED
+//# define XKBLAS_ACCESS_SCOPE ACCESS_SCOPE_UNIFIED
+
+# endif /* __XKBLAS_EXPERIMENTAL_H__ */

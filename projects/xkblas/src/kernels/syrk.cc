@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 04:53:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:04:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,6 +15,7 @@
 # include "context.h"
 # include "xkblas/kernel-type.h"
 # include "xkblas/cblas.h"
+# include "xkblas/xkblas-experimental.h"
 
 # include <xkrt/xkrt-support.h>
 # include <xkrt/driver/thread.hpp>
@@ -105,8 +106,8 @@ xkblas_£syrk_tile_async(
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R);
-    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        );
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R, ACCESS_CONCURRENCY_SEQUENTIAL, XKBLAS_ACCESS_SCOPE);
+    new(accesses + 1) access_t(task, MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        , ACCESS_CONCURRENCY_SEQUENTIAL, XKBLAS_ACCESS_SCOPE);
     thread->resolve<AC>(task, accesses);
     # undef AC
 

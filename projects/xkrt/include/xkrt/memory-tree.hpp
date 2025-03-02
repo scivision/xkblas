@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:48:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/02 17:16:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1614,12 +1614,23 @@ next_view:
                 fetch_list_launch_ith(task, device_global_id, list, i);
         }
 
+        // TODO : remove the task parameter, as it is now implicit with the given access
+        /** Fetch the access on the given device */
         void
         fetch(
             task_t * task,
             access_t * access,
             xkrt_device_global_id_t device_global_id
         ) {
+            // no need to fetch unified memory
+            if (access->scope == ACCESS_SCOPE_UNIFIED)
+            {
+                access->device_view.addr = access->host_view.begin_addr();
+                access->device_view.ld   = access->host_view.ld;
+                return ;
+            }
+
+            // else, run the coherency protocol
             Search search(device_global_id);
 
             this->lock();
