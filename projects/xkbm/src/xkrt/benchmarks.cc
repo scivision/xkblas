@@ -14,6 +14,40 @@
 
 static xkrt_runtime_t runtime;
 
+///////////////////////////////////////
+// HELPER TO RUN 1 THREAD PER DEVICE //
+///////////////////////////////////////
+
+typedef struct  tls_t
+{
+    // used in D2D only
+    xkrt_area_chunk_t * areas[XKRT_DEVICES_MAX][XKRT_DEVICES_MAX][XKRT_DEVICE_MEMORIES_MAX][2];
+
+}               tls_t;
+
+template <void * (*func)(xkrt_team_t * team, int tid)>
+static void
+foreach_device(benchmark_node_t * bench)
+{
+    // TODO: Update this benchmark if GPU has several memories
+
+    tls_t tls;
+    xkrt_team_t team = {
+        .desc = {
+            .routine = func,
+            .args = &tls,
+            .nthreads = runtime.drivers.devices.n,
+            .binding = {
+                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+            }
+        }
+    };
+
+    runtime.team_create(&team);
+    runtime.team_join(&team);
+}
+
 ///////////////////////////
 // kernel launch latency //
 ///////////////////////////
@@ -240,9 +274,9 @@ static benchmark_node_t kernel_launch_latency = {
     .run = kernel_launch_latency_launch<false>,
 };
 
-////////////////
-// alloc host //
-////////////////
+//////////////////
+// alloc device //
+//////////////////
 
 typedef enum    alloc_mode_t
 {
@@ -250,9 +284,195 @@ typedef enum    alloc_mode_t
     DRIVER
 }               alloc_mode_t;
 
+template<alloc_mode_t mode>
+static void *
+alloc_device_run_fragmented(xkrt_team_t * team, int tid)
+{
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
+
+    srand(16112003);
+
+    xkrt_device_t * device = runtime.device_get(device_global_id);
+    xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
+    assert(driver->f_memory_device_allocate);
+    assert(driver->f_memory_device_deallocate);
+
+    // TODO : update if the device has more than 1x physical
+    const int area_idx = 0;
+    const xkrt_device_memory_info_t * meminfo = device->memories + area_idx;
+
+    std::list<std::pair<void *, size_t>> allocs;
+
+    size_t total_allocated = 0;
+    size_t resident = 0;
+    size_t nallocs = 0;
+    size_t nfree = 0;
+    uint64_t time_alloc = 0;
+    uint64_t time_free = 0;
+
+    runtime.team_critical_begin(team);
+    while (1)
+    {
+        const size_t size = 512 * 1024 + rand() % (8 * 1024 * 1024);
+        void * ptr;
+
+        uint64_t t0 = xkrt_get_nanotime();
+        if constexpr(mode == SYSTEM)
+            ptr = runtime.memory_device_allocate(device_global_id, size);
+        else
+            ptr = driver->f_memory_device_allocate(device_global_id, size, area_idx);
+        uint64_t tf = xkrt_get_nanotime();
+        time_alloc += (tf - t0);
+        if (ptr == NULL)
+            break ;
+
+        total_allocated += size;
+        resident += size;
+        ++nallocs;
+        allocs.push_back(std::pair<void *, size_t>(ptr, size));
+
+        if (rand() % 4 == 0)
+        {
+            std::pair<void *, size_t> alloc = allocs.front();
+            allocs.pop_front();
+            uint64_t t0 = xkrt_get_nanotime();
+            if constexpr(mode == SYSTEM)
+                runtime.memory_device_deallocate(device_global_id, (xkrt_area_chunk_t *) ptr);
+            else
+                driver->f_memory_device_deallocate(device_global_id, alloc.first, alloc.second, area_idx);
+            uint64_t tf = xkrt_get_nanotime();
+            time_free += (tf - t0);
+            ++nfree;
+            resident -= alloc.second;
+        }
+    }
+
+    if constexpr(mode == DRIVER)
+        for (auto & alloc : allocs)
+            driver->f_memory_device_deallocate(device_global_id, alloc.first, alloc.second, area_idx);
+    runtime.memory_device_deallocate_all(device_global_id);
+
+    char b1[32], b2[32], b3[32], b4[32];
+    xkrt_metric_byte(b1, sizeof(b1), total_allocated);
+    xkrt_metric_byte(b2, sizeof(b2), resident);
+    xkrt_metric_time(b3, sizeof(b3), nallocs == 0 ? 0 : time_alloc / nallocs);
+    xkrt_metric_time(b4, sizeof(b4), nfree == 0 ? 0 : time_free / nfree);
+    LOGGER_INFO(
+        "Allocated `%s` bytes in `%zu` allocs until first allocation failing "
+        "with `%s` resident bytes (=%.1lf%% occupancy) - with `%s` per alloc and `%s` per free in average",
+        b1, nallocs, b2, resident/(double)meminfo->capacity*100.0, b3, b4
+    );
+
+    return NULL;
+}
+
+template<alloc_mode_t mode>
+static void *
+alloc_device_run(xkrt_team_t * team, int tid)
+{
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
+
+    time_array_t<30, 5> time_alloc;
+    time_array_t<30, 5> time_dealloc;
+
+    xkrt_device_t * device = runtime.device_get(device_global_id);
+    xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
+    assert(driver->f_memory_device_allocate);
+    assert(driver->f_memory_device_deallocate);
+
+    // TODO : update if the device get more memory
+    const int area_idx = 0;
+
+    runtime.team_critical_begin(team);
+    for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
+    {
+        for (int i = 0 ; i < time_alloc.nelements ; ++i)
+        {
+            const size_t size = ((size_t) 1) << i;
+            void * ptr = NULL;
+
+            // alloc
+            {
+                uint64_t t0 = xkrt_get_nanotime();
+                {
+                    if constexpr(mode == SYSTEM)
+                        ptr = runtime.memory_device_allocate(device_global_id, size);
+                    else
+                        ptr = driver->f_memory_device_allocate(device_global_id, size, area_idx);
+
+                    if (ptr == NULL)
+                        break ;
+                }
+                uint64_t tf = xkrt_get_nanotime();
+                time_alloc.set(i, iter, tf - t0);
+            }
+
+            assert(ptr);
+
+            // dealloc
+            {
+                uint64_t t0 = xkrt_get_nanotime();
+                {
+                    if constexpr(mode == SYSTEM)
+                        runtime.memory_device_deallocate(device_global_id, (xkrt_area_chunk_t *) ptr);
+                    else
+                        driver->f_memory_device_deallocate(device_global_id, ptr, size, area_idx);
+                }
+                uint64_t tf = xkrt_get_nanotime();
+                time_dealloc.set(i, iter, tf - t0);
+            }
+        }
+    }
+    runtime.team_critical_end(team);
+
+    const char * smode  = (mode == DRIVER) ? "driver" : "runtime";
+    LOGGER_INFO("---- Device %u (alloc with %s) ----", device_global_id, smode);
+    time_alloc.report<decltype(time_alloc)::pp_1byte_1time>("Memory Size");
+
+    LOGGER_INFO("---- Device %u (dealloc with %s) ----", device_global_id, smode);
+    time_dealloc.report<decltype(time_dealloc)::pp_1byte_1time>("Memory Size");
+
+    return NULL;
+}
+
+template <void * (*func)(xkrt_team_t * team, int tid)>
+static void
+foreach_device_checkmem(benchmark_node_t * bench)
+{
+    foreach_device<func>(bench);
+}
+
+static benchmark_node_t allocation_device_driver_fragmented = {
+    .name = "driver-fragmented",
+    .desc = "Time to allocate/deallocate device memory through the driver directly - with random accesses",
+    .run = foreach_device_checkmem<alloc_device_run_fragmented<DRIVER>>
+};
+
+static benchmark_node_t allocation_device_system_fragmented = {
+    .name = "runtime-fragmented",
+    .desc = "Time to allocate/deallocate device memory through the runtime custom allocator that overrides driver's allocator - with random accesses",
+    .run = foreach_device_checkmem<alloc_device_run_fragmented<SYSTEM>>
+};
+
+static benchmark_node_t allocation_device_driver = {
+    .name = "driver",
+    .desc = "Time to allocate/deallocate device memory through the driver directly",
+    .run = foreach_device_checkmem<alloc_device_run<DRIVER>>
+};
+
+static benchmark_node_t allocation_device_system = {
+    .name = "runtime",
+    .desc = "Time to allocate/deallocate device memory through the runtime custom allocator that overrides driver's allocator",
+    .run = foreach_device_checkmem<alloc_device_run<SYSTEM>>
+};
+
+////////////////
+// alloc host //
+////////////////
+
 template<alloc_mode_t mode, bool touch>
 static void *
-alloc_run_thread(xkrt_team_t * team, int tid)
+alloc_host_run(xkrt_team_t * team, int tid)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
 
@@ -312,57 +532,37 @@ alloc_run_thread(xkrt_team_t * team, int tid)
     LOGGER_INFO("---- Device %u (dealloc with %s and %s) ----", device_global_id, smode, stouch);
     time_dealloc.report<decltype(time_dealloc)::pp_1byte_1time>("Memory Size");
 
-    return NULL;
-}
-
-template <alloc_mode_t mode, bool touch>
-static void
-alloc_run(benchmark_node_t * bench)
-{
-    xkrt_team_t team = {
-        .desc = {
-            .routine = alloc_run_thread<mode, touch>,
-            .args = NULL,
-            .nthreads = runtime.drivers.devices.n,
-            .binding = {
-                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
-                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
-            }
-        }
-    };
-
-    runtime.team_create(&team);
-    runtime.team_join(&team);
+    return 0;
 }
 
 static benchmark_node_t system_touch = {
     .name = "host-system-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
-    .run = alloc_run<SYSTEM, true>
+    .run = foreach_device<alloc_host_run<SYSTEM, true>>
 };
 
 static benchmark_node_t system_notouch = {
     .name = "host-system-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
-    .run = alloc_run<SYSTEM, false>
+    .run = foreach_device<alloc_host_run<SYSTEM, false>>
 };
 
 static benchmark_node_t driver_touch = {
     .name = "host-driver-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
-    .run = alloc_run<DRIVER, true>,
+    .run = foreach_device<alloc_host_run<DRIVER, true>>
 };
 
 static benchmark_node_t driver_notouch = {
     .name = "host-driver-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
-    .run = alloc_run<DRIVER, false>
+    .run = foreach_device<alloc_host_run<DRIVER, false>>
 };
 
 //////////////////////////////////////////////
 
 static void *
-alloc_parallel_run_thread(xkrt_team_t * team, int tid)
+alloc_parallel_run(xkrt_team_t * team, int tid)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
     time_array_t<34, 5> time_alloc;
@@ -399,29 +599,10 @@ alloc_parallel_run_thread(xkrt_team_t * team, int tid)
     return NULL;
 }
 
-static void
-alloc_parallel_run(benchmark_node_t * bench)
-{
-    xkrt_team_t team = {
-        .desc = {
-            .routine = alloc_parallel_run_thread,
-            .args = NULL,
-            .nthreads = runtime.drivers.devices.n,
-            .binding = {
-                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
-                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
-            }
-        }
-    };
-
-    runtime.team_create(&team);
-    runtime.team_join(&team);
-}
-
 static benchmark_node_t driver_notouch_parallel = {
     .name = "host-driver-no-touch-parallel",
     .desc = "Time (allocation) of host memory using the driver host-allocator in parallel on every devices",
-    .run = alloc_parallel_run
+    .run = foreach_device<alloc_parallel_run>
 };
 
 ///////////////////////////
@@ -443,12 +624,6 @@ static benchmark_node_t detect = {
 // D2D memory transfers //
 //////////////////////////
 
-typedef struct  tls_t
-{
-    xkrt_area_chunk_t * areas[XKRT_DEVICES_MAX][XKRT_DEVICES_MAX][XKRT_DEVICE_MEMORIES_MAX][2];
-
-}               tls_t;
-
 typedef enum    parallel_mode_t
 {
     P2P,
@@ -463,7 +638,7 @@ typedef enum    dir_t
 
 template<int nchunks, parallel_mode_t mode>
 static void *
-mem_transfer_run_d2d_thread(xkrt_team_t * team, int tid)
+mem_transfer_run_d2d(xkrt_team_t * team, int tid)
 {
     tls_t * tls = (tls_t *) team->desc.args;
     assert(tls);
@@ -577,51 +752,28 @@ mem_transfer_run_d2d_thread(xkrt_team_t * team, int tid)
     return NULL;
 }
 
-template <int nchunks, parallel_mode_t mode>
-static void
-mem_transfer_run_d2d(benchmark_node_t * bench)
-{
-    // TODO: Update this benchmark if GPU has several memories
-
-    tls_t tls;
-    xkrt_team_t team = {
-        .desc = {
-            .routine = mem_transfer_run_d2d_thread<nchunks, mode>,
-            .args = &tls,
-            .nthreads = runtime.drivers.devices.n,
-            .binding = {
-                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
-                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
-            }
-        }
-    };
-
-    runtime.team_create(&team);
-    runtime.team_join(&team);
-}
-
 static benchmark_node_t d2d_1_all = {
     .name = "D2D-1-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent in parallel between all pair of GPUs",
-    .run = mem_transfer_run_d2d<1, ALL>
+    .run = foreach_device<mem_transfer_run_d2d<1, ALL>>
 };
 
 static benchmark_node_t d2d_16_all = {
     .name = "D2D-16-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent in parallel between all pair of GPUs",
-    .run = mem_transfer_run_d2d<16, ALL>
+    .run = foreach_device<mem_transfer_run_d2d<16, ALL>>
 };
 
 static benchmark_node_t d2d_1_p2p = {
     .name = "D2D-1-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent P2P a pair of GPUs after the other",
-    .run = mem_transfer_run_d2d<1, P2P>
+    .run = foreach_device<mem_transfer_run_d2d<1, ALL>>
 };
 
 static benchmark_node_t d2d_16_p2p = {
     .name = "D2D-16-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent P2P a pair of GPUs after the other",
-    .run = mem_transfer_run_d2d<16, P2P>
+    .run = foreach_device<mem_transfer_run_d2d<16, ALL>>
 };
 
 //////////////////////////////
@@ -636,7 +788,7 @@ typedef enum    direction_t
 
 template <direction_t direction, int nchunks>
 static void *
-mem_transfer_run_thread(xkrt_team_t * team, int tid)
+mem_transfer_run(xkrt_team_t * team, int tid)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
 
@@ -714,7 +866,7 @@ mem_transfer_run_thread(xkrt_team_t * team, int tid)
         /////////////
 
         // device
-        runtime.memory_deallocate_all(device_global_id);
+        runtime.memory_device_deallocate_all(device_global_id);
         runtime.memory_host_deallocate(device_global_id, host_mem, size);
 
         //////////////////
@@ -731,38 +883,17 @@ mem_transfer_run_thread(xkrt_team_t * team, int tid)
     return NULL;
 }
 
-template <direction_t direction>
-static void
-mem_transfer_run(benchmark_node_t * bench)
-{
-    xkrt_team_t team = {
-        .desc = {
-            .routine = mem_transfer_run_thread<direction, 1>,
-            .args = NULL,
-            .nthreads = runtime.drivers.devices.n,
-            .binding = {
-                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
-                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
-            }
-        }
-    };
-
-    runtime.team_create(&team);
-    runtime.team_join(&team);
-}
-
 static benchmark_node_t h2d = {
     .name = "H2D",
     .desc = "Host memory to device (global) memory bandwidth",
-    .run = mem_transfer_run<H2D>
+    .run = foreach_device<mem_transfer_run<H2D, 1>>
 };
 
 static benchmark_node_t d2h = {
     .name = "D2H",
     .desc = "Device (global) to host memory memory bandwidth",
-    .run = mem_transfer_run<D2H>
+    .run = foreach_device<mem_transfer_run<D2H, 1>>
 };
-
 
 /////////////////////
 // XKRT BENCHMARKS //
@@ -770,22 +901,38 @@ static benchmark_node_t d2h = {
 
 static benchmark_node_t kernel = {
     .name = "kernel",
-    .desc = "Kernel-related metrics"
+    .desc = "Kernel-related metrics",
+    .enabled = 1
 };
 
 static benchmark_node_t allocation = {
     .name = "allocation",
     .desc = "Allocation",
+    .enabled = 1
+};
+
+static benchmark_node_t allocation_host = {
+    .name = "allocation-host",
+    .desc = "Allocation on the host",
+    .enabled = 1
+};
+
+static benchmark_node_t allocation_device = {
+    .name = "allocation-device",
+    .desc = "Allocation on the device",
+    .enabled = 1
 };
 
 static benchmark_node_t transfer = {
     .name = "transfer",
     .desc = "Transfer",
+    .enabled = 1
 };
 
 static benchmark_node_t memory = {
     .name = "memory",
     .desc = "Memory-related metrics",
+    .enabled = 1
 };
 
 static void
@@ -822,11 +969,18 @@ xkrt_benchmark_push(benchmark_node_t * parent)
     LINK(memory, detect);
     LINK(memory, transfer);
 
-    LINK(allocation, system_touch);
-    LINK(allocation, system_notouch);
-    LINK(allocation, driver_touch);
-    LINK(allocation, driver_notouch);
-    LINK(allocation, driver_notouch_parallel);
+    LINK(allocation, allocation_host);
+    LINK(allocation_host, system_touch);
+    LINK(allocation_host, system_notouch);
+    LINK(allocation_host, driver_touch);
+    LINK(allocation_host, driver_notouch);
+    LINK(allocation_host, driver_notouch_parallel);
+
+    LINK(allocation, allocation_device);
+    LINK(allocation_device, allocation_device_driver);
+    LINK(allocation_device, allocation_device_system);
+    LINK(allocation_device, allocation_device_driver_fragmented);
+    LINK(allocation_device, allocation_device_system_fragmented);
 
     LINK(transfer, h2d);
     LINK(transfer, d2h);

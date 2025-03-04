@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 05:48:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 17:18:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -226,13 +226,16 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 1;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int i = 0 ; i < 100 ; ++i)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+
+    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    {
+        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
+            // printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             uint64_t t0 = get_nanotime();
             impl.set_tile(ts);
             impl.gemm(TRANS[t2], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
@@ -240,9 +243,9 @@ main_gemm(char ** args)
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
-            printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
-                    (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
-            );
+            // printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
+            //         (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
+            // );
             if (!SKIP_CHECK)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
@@ -251,6 +254,7 @@ main_gemm(char ** args)
             }
             impl.reset();
         }
+    }
     }
 
     # undef A

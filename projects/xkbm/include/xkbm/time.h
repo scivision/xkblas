@@ -24,7 +24,7 @@ struct  time_array_t
 
     const size_t nelements;
     const int niters;
-    size_t values[N_ELEMENTS][N_ITERS];
+    uint64_t values[N_ELEMENTS][N_ITERS];
     size_t avg;
     size_t variance;
     size_t stdev;
@@ -36,17 +36,12 @@ struct  time_array_t
 
     virtual ~time_array_t() {}
 
-    inline void set(int element, int iter, size_t value)
+    inline void set(int element, int iter, uint64_t value)
     {
         this->values[element][iter] = value;
     }
 
-    static void report_element_default(time_array_t * time, size_t i)
-    {
-        printf("%12lu | %10lu +/- %10lu | %10lu | %10lu | %10lu\n",
-                i, time->avg, time->stdev, time->values[i][0], time->values[i][N_ITERS/2], time->values[i][N_ITERS-1]);
-    }
-
+    // TODO : remove all other to keep only this one
     template <metric_t metric>
     inline void
     report(
@@ -89,7 +84,7 @@ struct  time_array_t
         }
     }
 
-    template <void (*REPORT_ELEMENT)(time_array_t *, size_t) = report_element_default>
+    template <void (*REPORT_ELEMENT)(time_array_t *, size_t)>
     inline void report(const char * label, const int nelements = N_ELEMENTS)
     {
         LOGGER_INFO("%12s | %10s +/- %10s | %10s | %10s | %10s", label, "avg", "stdev", "min", "med", "max");
@@ -114,11 +109,6 @@ struct  time_array_t
             REPORT_ELEMENT(this, i);
         }
     }
-
-    static void
-    pp_custom_1time(time_array_t * time, size_t i)
-    {
-   }
 
     static void
     pp_1zu_1time(time_array_t * time, size_t i)
@@ -156,6 +146,8 @@ struct  time_array_t
         xkrt_metric_bandwidth(buffer[4], sizeof(buffer[4]), time->values[i][N_ITERS-1]);
         LOGGER_INFO("%12zu | %10s +/- %10s | %10s | %10s | %10s", i, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
     }
+
+
 };
 
 # endif /* __TIME_H__ */

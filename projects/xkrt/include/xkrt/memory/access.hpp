@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 02:34:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 15:13:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -46,20 +46,21 @@ class access_t
         // the mode //
         //////////////
 
-        /* the mode */
+        /* the mode (READ, WRITE) */
         access_mode_t mode;
 
-        /* the concurrency */
+        /* the concurrency (SEQUENTIAL, COMMUTATIVE, CONCURRENT)*/
         access_concurrency_t concurrency;
 
-        /* the scope */
+        /* the scope (UNIFIED or NONUNIFIED) */
         access_scope_t scope;
 
         ////////////////
         // the region //
         ////////////////
 
-        /* Currently always 2 cubes that represents a matrix in an XKTree (1 cube if aligned on ld.s, else 2 cubes) */
+        /* Currently always 2 cubes that represents a matrix in an XKTree
+         * (1 cube if access is aligned on ld x sizeof_type, else 2 cubes) */
         Cube cubes[2];
 
         ////////////////////////////////////////////////////

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 22:01:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 17:41:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -156,7 +156,7 @@ class KHPTree {
                     Cube cube;              // subtree englobing cube
                     int nelements[K];       // subtree number of elements
                     int height[K];          // subtree height
-                    int outdated;           // whether 'includes' struct must be recomputed
+                    int outdated;           // whether 'includes' struct must be recomputed // TODO : remove this, and only update when needed : (1) locally on rotations; and (2) recursively to parent on insertion
                 } includes;
 
                 #ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS

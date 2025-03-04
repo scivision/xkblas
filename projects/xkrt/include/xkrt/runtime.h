@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 02:14:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 20:44:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -101,13 +101,13 @@ typedef struct  xkrt_runtime_t
     ////////////
 
     /* allocate memory onto the given device */
-    xkrt_area_chunk_t * memory_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
+    xkrt_area_chunk_t * memory_device_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
 
     /* deallocate the given chunk */
-    void memory_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
+    void memory_device_deallocate(const xkrt_device_global_id_t device_global_id, xkrt_area_chunk_t * chunk);
 
     /* dealloacte all memory previously allocated on the device */
-    void memory_deallocate_all(const xkrt_device_global_id_t device_global_id);
+    void memory_device_deallocate_all(const xkrt_device_global_id_t device_global_id);
 
     /* allocate memory onto the host using the driver given device */
     void * memory_host_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);

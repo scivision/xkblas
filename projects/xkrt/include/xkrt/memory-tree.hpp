@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 01:20:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 20:45:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1160,7 +1160,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         if (allocation->chunk->use_counter == 1)
                         {
                             LOGGER_WARN("Evicted a block of size %zu MB", allocation->chunk->size/1024/1024);
-                            this->runtime->memory_deallocate(device_global_id, allocation->chunk);
+                            this->runtime->memory_device_deallocate(device_global_id, allocation->chunk);
                             freed += allocation->chunk->size;
                         }
                         /* else: what to do ? */
@@ -1208,7 +1208,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             do {
 
-                chunk = this->runtime->memory_allocate(device_global_id, size);
+                chunk = this->runtime->memory_device_allocate(device_global_id, size);
                 if (chunk)
                     return chunk;
 

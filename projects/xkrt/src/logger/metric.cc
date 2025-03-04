@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/18 15:09:41 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 15:26:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 21:56:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -41,7 +41,7 @@ xkrt_metric_byte(char * buffer, int bufsize, size_t nbytes)
 
 extern "C"
 void
-xkrt_metric_time(char * buffer, int bufsize, size_t ns)
+xkrt_metric_time(char * buffer, int bufsize, uint64_t ns)
 {
     const char * suffixes[] = {"ns", "us", "ms", "s"};
     int i = 0;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 05:31:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 21:46:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -264,8 +264,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 
     cu_set_context(device_driver_id);
 
-    CUdeviceptr device_ptr;
-    CU_SAFE_CALL(cuMemAlloc(&device_ptr, size));
+    CUdeviceptr device_ptr = (CUdeviceptr) NULL;
+    cuMemAlloc(&device_ptr, size);
     return (void *) device_ptr;
 }
 
