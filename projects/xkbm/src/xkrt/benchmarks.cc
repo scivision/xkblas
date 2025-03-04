@@ -2,7 +2,6 @@
 
 # include <xkbm/allocator.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/thread.h>
 # include <xkbm/topology.h>
 # include <xkbm/time.h>
 # include <xkbm/pp.h>
@@ -253,9 +252,9 @@ typedef enum    alloc_mode_t
 
 template<alloc_mode_t mode, bool touch>
 static void *
-alloc_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+alloc_run_thread(xkrt_team_t * team, int tid)
 {
-    xkrt_team_t * team = (xkrt_team_t *) vargs;
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
 
     time_array_t<34, 5> time_alloc;
     time_array_t<34, 5> time_dealloc;
@@ -320,10 +319,17 @@ template <alloc_mode_t mode, bool touch>
 static void
 alloc_run(benchmark_node_t * bench)
 {
-    xkrt_team_t team;
-    team.desc.routine = alloc_run_thread<mode, touch>;
-    team.desc.args    = &team;
-    team.desc.devices = XKRT_DEVICES_MASK_ALL;
+    xkrt_team_t team = {
+        .desc = {
+            .routine = alloc_run_thread<mode, touch>,
+            .args = NULL,
+            .nthreads = runtime.drivers.devices.n,
+            .binding = {
+                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+            }
+        }
+    };
 
     runtime.team_create(&team);
     runtime.team_join(&team);
@@ -356,11 +362,11 @@ static benchmark_node_t driver_notouch = {
 //////////////////////////////////////////////
 
 static void *
-alloc_parallel_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+alloc_parallel_run_thread(xkrt_team_t * team, int tid)
 {
-    xkrt_team_t * team = (xkrt_team_t *) vargs;
-
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
     time_array_t<34, 5> time_alloc;
+
     uint64_t t0, tf;
 
     for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
@@ -396,10 +402,17 @@ alloc_parallel_run_thread(xkrt_device_global_id_t device_global_id, void * vargs
 static void
 alloc_parallel_run(benchmark_node_t * bench)
 {
-    xkrt_team_t team;
-    team.desc.routine = alloc_parallel_run_thread,
-    team.desc.args    = &team;
-    team.desc.devices = XKRT_DEVICES_MASK_ALL;
+    xkrt_team_t team = {
+        .desc = {
+            .routine = alloc_parallel_run_thread,
+            .args = NULL,
+            .nthreads = runtime.drivers.devices.n,
+            .binding = {
+                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+            }
+        }
+    };
 
     runtime.team_create(&team);
     runtime.team_join(&team);
@@ -432,7 +445,6 @@ static benchmark_node_t detect = {
 
 typedef struct  tls_t
 {
-    xkrt_team_t * team;
     xkrt_area_chunk_t * areas[XKRT_DEVICES_MAX][XKRT_DEVICES_MAX][XKRT_DEVICE_MEMORIES_MAX][2];
 
 }               tls_t;
@@ -451,13 +463,12 @@ typedef enum    dir_t
 
 template<int nchunks, parallel_mode_t mode>
 static void *
-mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
+mem_transfer_run_d2d_thread(xkrt_team_t * team, int tid)
 {
-    tls_t * tls = (tls_t *) vargs;
+    tls_t * tls = (tls_t *) team->desc.args;
     assert(tls);
 
-    xkrt_team_t * team = tls->team;
-
+    xkrt_device_global_id_t src_device_global_id = (xkrt_device_global_id_t) tid;
     xkrt_device_t * src_device = runtime.device_get(src_device_global_id);
     assert(src_device);
 
@@ -466,14 +477,15 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
     ////////////////////////////////////
 
     // size of memory to transfer
-    const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
+    // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
+    const size_t size = (size_t) 1 * 512 * 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
         for (int i = 0 ; i < src_device->nmemories ; ++i)
             for (int j = 0 ; j < 2 ; ++j)
-                tls->areas[src_device_global_id][device_global_id][i][j] = src_device->memory_allocate_on(size, i);
-
+                if ((tls->areas[src_device_global_id][device_global_id][i][j] = src_device->memory_allocate_on(size, i)) == NULL)
+                    LOGGER_FATAL("oom");
     runtime.team_barrier(team);
 
     /////////////////////
@@ -567,19 +579,22 @@ mem_run_d2d_thread(xkrt_device_global_id_t src_device_global_id, void * vargs)
 
 template <int nchunks, parallel_mode_t mode>
 static void
-mem_run_d2d(benchmark_node_t * bench)
+mem_transfer_run_d2d(benchmark_node_t * bench)
 {
     // TODO: Update this benchmark if GPU has several memories
 
     tls_t tls;
     xkrt_team_t team = {
         .desc = {
-            .routine = mem_run_d2d_thread<nchunks, mode>,
-            .args    = &tls,
-            .devices = XKRT_DEVICES_MASK_ALL,
+            .routine = mem_transfer_run_d2d_thread<nchunks, mode>,
+            .args = &tls,
+            .nthreads = runtime.drivers.devices.n,
+            .binding = {
+                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+            }
         }
     };
-    tls.team = &team;
 
     runtime.team_create(&team);
     runtime.team_join(&team);
@@ -588,25 +603,25 @@ mem_run_d2d(benchmark_node_t * bench)
 static benchmark_node_t d2d_1_all = {
     .name = "D2D-1-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent in parallel between all pair of GPUs",
-    .run = mem_run_d2d<1, ALL>
+    .run = mem_transfer_run_d2d<1, ALL>
 };
 
 static benchmark_node_t d2d_16_all = {
     .name = "D2D-16-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent in parallel between all pair of GPUs",
-    .run = mem_run_d2d<16, ALL>
+    .run = mem_transfer_run_d2d<16, ALL>
 };
 
 static benchmark_node_t d2d_1_p2p = {
     .name = "D2D-1-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent P2P a pair of GPUs after the other",
-    .run = mem_run_d2d<1, P2P>
+    .run = mem_transfer_run_d2d<1, P2P>
 };
 
 static benchmark_node_t d2d_16_p2p = {
     .name = "D2D-16-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent P2P a pair of GPUs after the other",
-    .run = mem_run_d2d<16, P2P>
+    .run = mem_transfer_run_d2d<16, P2P>
 };
 
 //////////////////////////////
@@ -621,9 +636,9 @@ typedef enum    direction_t
 
 template <direction_t direction, int nchunks>
 static void *
-mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
+mem_transfer_run_thread(xkrt_team_t * team, int tid)
 {
-    xkrt_team_t * team = (xkrt_team_t *) vargs;
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) tid;
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
@@ -677,7 +692,7 @@ mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
                             dst_device_mem + i * chunk_size,
                             src_device_global_id,
                             src_device_mem + i * chunk_size,
-                            size
+                            chunk_size
                         );
                     }
                     xkrt_sync(&runtime);
@@ -718,16 +733,19 @@ mem_run_thread(xkrt_device_global_id_t device_global_id, void * vargs)
 
 template <direction_t direction>
 static void
-mem_run(benchmark_node_t * bench)
+mem_transfer_run(benchmark_node_t * bench)
 {
     xkrt_team_t team = {
         .desc = {
-            .routine = mem_run_thread<direction, 1>,
-            .args    = NULL,
-            .devices = XKRT_DEVICES_MASK_ALL,
+            .routine = mem_transfer_run_thread<direction, 1>,
+            .args = NULL,
+            .nthreads = runtime.drivers.devices.n,
+            .binding = {
+                .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+            }
         }
     };
-    team.desc.args = &team;
 
     runtime.team_create(&team);
     runtime.team_join(&team);
@@ -736,13 +754,13 @@ mem_run(benchmark_node_t * bench)
 static benchmark_node_t h2d = {
     .name = "H2D",
     .desc = "Host memory to device (global) memory bandwidth",
-    .run = mem_run<H2D>
+    .run = mem_transfer_run<H2D>
 };
 
 static benchmark_node_t d2h = {
     .name = "D2H",
     .desc = "Device (global) to host memory memory bandwidth",
-    .run = mem_run<D2H>
+    .run = mem_transfer_run<D2H>
 };
 
 

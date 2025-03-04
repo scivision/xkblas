@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:02:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 02:14:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -138,14 +138,17 @@ typedef struct  xkrt_runtime_t
     /* Commit a task - so it may be schedule from now once its dependences completed */
     void task_commit(task_t * task);
 
-    /* Complete a task */
-    void task_executed(task_t * task);
-
-    /* Complete a task */
+    /* Notify once a detachable task */
     void task_detachable_post(task_t * task);
 
     /* Complete a task */
     void task_complete(task_t * task);
+
+    /* wait for children tasks of the current task to complete */
+    void task_wait(void);
+
+    /* schedule a ready task, and return 1 if one task was found, 0 otherwise */
+    int task_schedule(void);
 
     ///////////////
     // THREADING //

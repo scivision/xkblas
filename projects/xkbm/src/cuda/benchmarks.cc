@@ -6,9 +6,7 @@
 
 # include <xkbm/allocator.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/thread.h>
 # include <xkbm/topology.h>
-# include <xkbm/team.h>
 # include <xkbm/time.h>
 # include <xkbm/combinator.h>
 # include <xkbm/pp.h>

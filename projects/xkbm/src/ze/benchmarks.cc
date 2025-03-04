@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/26 00:40:42 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 16:25:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 03:36:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -17,7 +17,6 @@
 
 # include <xkbm/allocator.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/thread.h>
 # include <xkbm/topology.h>
 # include <xkbm/time.h>
 
@@ -28,6 +27,12 @@
 static ze_driver_handle_t driverHandle;
 static ze_device_handle_t deviceHandle;
 static ze_context_handle_t contextHandle;
+
+/////////////////////////////////////
+// LATENCY OF SUBMISSION IN QUEUES //
+/////////////////////////////////////
+
+
 
 ///////////////////
 // ZE BENCHMARKS //

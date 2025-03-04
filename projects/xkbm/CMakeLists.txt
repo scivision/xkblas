@@ -17,12 +17,10 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/benchmark.cc
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
     ${CMAKE_SOURCE_DIR}/src/cuda/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/libnuma/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/hwloc/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/opencl/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/hip/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/xkrt/benchmarks.cc
+    ${CMAKE_SOURCE_DIR}/src/aml/benchmarks.cc
 )
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
@@ -41,7 +39,6 @@ add_custom_command(
 
 # XKBM Lib
 add_executable(${XKBM} ${SOURCE_FILES})
-target_link_libraries(${XKBM} PRIVATE ${AML_LIBRARIES} ${EXCIT_LIBRARIES} ${HWLOC_LIBRARIES})
 
 # Include directory
 include_directories(include/)
@@ -78,4 +75,14 @@ if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
     target_link_libraries(${XKBM} PRIVATE ${ZE_LIBRARIES})
+endif()
+
+# AML
+option(USE_AML "Whether to build AML benchs." ON)
+if (USE_AML)
+    find_package(AML REQUIRED)
+    find_package(EXCIT REQUIRED)
+    include_directories("${AML_INCLUDE_DIRS}")
+    include_directories("${EXCIT_INCLUDE_DIRS}")
+    target_link_libraries(${XKBM} PRIVATE ${AML_LIBRARIES} ${EXCIT_LIBRARIES})
 endif()

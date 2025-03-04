@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 05:57:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 21:57:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -65,6 +65,12 @@ body_memory_copy(task_t * task)
     );
 }
 
+/**
+ *  Create a detachable task to be scheduled onto a thread of the device 'device_global_id'.
+ *  The task will intiate the copy
+ *  TODO: instead of creating a task, maybe simply submit the instruction
+ *  taking to the stream of one of the two devices
+ */
 extern "C"
 void
 xkrt_memory_copy_async(

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 16:45:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 02:34:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,6 +42,10 @@ class access_t
 
     public:
 
+        //////////////
+        // the mode //
+        //////////////
+
         /* the mode */
         access_mode_t mode;
 
@@ -50,6 +54,15 @@ class access_t
 
         /* the scope */
         access_scope_t scope;
+
+        ////////////////
+        // the region //
+        ////////////////
+
+        /* Currently always 2 cubes that represents a matrix in an XKTree (1 cube if aligned on ld.s, else 2 cubes) */
+        Cube cubes[2];
+
+        ////////////////////////////////////////////////////
 
         /* As opposed to kaapi/v1, we have no data handle to attach a sync access onto.
          * How to remove that vector and have a similar 'sync access' logic instead ?
@@ -62,10 +75,6 @@ class access_t
          * array, allowing to retrieve the original task */
         # define ACCESS_GET_TASK(A) (A->task)
         task_t * task;
-
-        /* The region.
-         * Currently always 2 cubes that represents a matrix in an XKTree (1 cube if aligned on ld.s, else 2 cubes) */
-        Cube cubes[2];
 
         /* host view of the access */
         memory_view_t host_view;

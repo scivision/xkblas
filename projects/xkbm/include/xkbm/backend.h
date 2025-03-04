@@ -3,13 +3,10 @@
 
 # include "benchmark.h"
 
-# include <xkrt/driver/driver-type.h>
-
 typedef struct  backend_s
 {
     const char * name;                                      /* XKRT name */
-    const int supported;                                    /* if supported */
-    xkrt_driver_type_t id;                                  /* XKRT id */
+    const int enabled;                                    /* if enabled */
     void (*benchmark_push)(benchmark_node_t * parent);      /* to push a new benchmark */
     void (*init)(void);
     void (*deinit)(void);

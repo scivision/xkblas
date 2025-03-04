@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/20 20:03:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 04:09:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -36,7 +36,7 @@ xkrt_runtime_t::thread_getaffinity(cpu_set_t & cpuset)
 typedef struct  xkrt_thread_trampoline_args_t
 {
     xkrt_team_t * team;
-    xkrt_device_global_id_t device_global_id;
+    int tid;
 }               xkrt_thread_trampoline_args_t;
 
 static void *
@@ -45,7 +45,7 @@ trampoline(void * vargs)
     xkrt_thread_trampoline_args_t * args = (xkrt_thread_trampoline_args_t *) vargs;
     assert(args);
 
-    args->team->desc.routine(args->device_global_id, args->team->desc.args);
+    args->team->desc.routine(args->team, args->tid);
     free(args);
 
     return NULL;
@@ -58,7 +58,7 @@ team_barrier_fetch(xkrt_team_t * team, int delta)
     assert(n >= 0);
     if (n == 0)
     {
-        team->priv.barrier.n.store(team->priv.nthreads, std::memory_order_seq_cst);
+        team->priv.barrier.n.store(team->desc.nthreads, std::memory_order_seq_cst);
         ++team->priv.barrier.version;
         pthread_mutex_lock(&team->priv.barrier.mtx);
         {
@@ -72,6 +72,12 @@ team_barrier_fetch(xkrt_team_t * team, int delta)
 void
 xkrt_runtime_t::team_create(xkrt_team_t * team)
 {
+    // only supported modes currently
+    assert(
+        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_DEVICE) ||
+        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_SPREAD  && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_MACHINE)
+    );
+
     // save calling thread cpu set
     cpu_set_t save_set;
     xkrt_runtime_t::thread_getaffinity(save_set);
@@ -79,39 +85,71 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     // set all to zero
     memset(&team->priv, 0, sizeof(team->priv));
 
-    // store the number of threads
-    int max_nthreads = this->drivers.devices.n;
-    int nthreads = this->drivers.devices.n;
+    // allocate thread array
+    team->priv.threads = (xkrt_thread_t *) malloc(sizeof(xkrt_thread_t) * team->desc.nthreads);
+    assert(team->priv.threads);
 
-    // init barrier - max_threads + 1 to avoid early barrier release
-    team->priv.barrier.n.store(max_nthreads + 1, std::memory_order_seq_cst);
+    // init barrier with nthreads + 1 to avoid early barrier release
+    team->priv.barrier.n.store(team->desc.nthreads + 1, std::memory_order_seq_cst);
     pthread_mutex_init(&team->priv.barrier.mtx, NULL);
     pthread_cond_init(&team->priv.barrier.cond, NULL);
 
     // init critical
     pthread_mutex_init(&team->priv.critical.mtx, NULL);
 
-    // fork 1 thread per device
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < this->drivers.devices.n ; ++device_global_id)
+    // load hwloc topo
+    hwloc_topology_t topology;
+    hwloc_topology_init(&topology);
+    hwloc_topology_load(topology);
+
+    switch (team->desc.binding.mode)
     {
-        if (team->desc.devices & (1 << device_global_id))
+        case (XKRT_TEAM_BINDING_MODE_COMPACT):
         {
-            const xkrt_device_t * device = this->device_get(device_global_id);
-            if (device == NULL)
+            switch (team->desc.binding.places)
             {
-                team->priv.threads[device_global_id].state = XKRT_THREAD_UNINITIALIZED;
-                --nthreads;
-                continue ;
+                case (XKRT_TEAM_BINDING_PLACES_DEVICE):
+                {
+                    assert(team->desc.nthreads == this->drivers.devices.n);
+                    for (xkrt_device_global_id_t device_global_id ; device_global_id < this->drivers.devices.n ; ++device_global_id)
+                    {
+                        const xkrt_device_t * device = this->device_get(device_global_id);
+                        assert(device);
+
+                        xkrt_runtime_t::thread_setaffinity(device->thread->cpuset);
+
+                        xkrt_thread_t * thread = team->priv.threads + device_global_id;
+                        thread->state = XKRT_THREAD_INITIALIZED;
+
+                        xkrt_thread_trampoline_args_t * args = (xkrt_thread_trampoline_args_t *) malloc(sizeof(xkrt_thread_trampoline_args_t));
+                        args->team = team;
+                        args->tid = (int) device_global_id;
+                        pthread_create(&thread->pthread, NULL, trampoline, args);
+                    }
+
+                    break ;
+                }
+
+                default:
+                    LOGGER_FATAL("Team config. not supported");
             }
-            team->priv.threads[device_global_id].state = XKRT_THREAD_INITIALIZED;
+            break ;
+        }
 
-            xkrt_runtime_t::thread_setaffinity(device->thread->cpuset);
+        case (XKRT_TEAM_BINDING_MODE_SPREAD):
+        {
+            switch (team->desc.binding.places)
+            {
+                case (XKRT_TEAM_BINDING_PLACES_MACHINE):
+                {
+                    // TODO
+                    break ;
+                }
 
-            xkrt_thread_trampoline_args_t * args = (xkrt_thread_trampoline_args_t *) malloc(sizeof(xkrt_thread_trampoline_args_t));
-            assert(args);
-            args->team = team;
-            args->device_global_id = device_global_id;
-            pthread_create(&team->priv.threads[device_global_id].pthread, NULL, trampoline, args);
+                default:
+                    LOGGER_FATAL("Team config. not supported");
+            }
+            break ;
         }
     }
 
@@ -119,14 +157,17 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     xkrt_runtime_t::thread_setaffinity(save_set);
 
     // decrement barrier
-    team->priv.nthreads = nthreads;
-    mem_barrier();
-    team_barrier_fetch(team, 1 + (max_nthreads - nthreads));
+    team_barrier_fetch(team, 1);
+
+    // release topo
+    hwloc_topology_destroy(topology);
 }
 
 void
 xkrt_runtime_t::team_barrier(xkrt_team_t * team)
 {
+    // TODO : reimplement this using team's topology
+
     int old_version = team->priv.barrier.version;
     if (team_barrier_fetch(team, 1))
     {
@@ -147,9 +188,12 @@ xkrt_runtime_t::team_barrier(xkrt_team_t * team)
 void
 xkrt_runtime_t::team_join(xkrt_team_t * team)
 {
-    for (int i = 0 ; i < team->priv.nthreads ; ++i)
-        if (team->priv.threads[i].state == XKRT_THREAD_INITIALIZED)
-            pthread_join(team->priv.threads[i].pthread, NULL);
+    for (int i = 0 ; i < team->desc.nthreads ; ++i)
+    {
+        assert(team->priv.threads[i].state == XKRT_THREAD_INITIALIZED);
+        pthread_join(team->priv.threads[i].pthread, NULL);
+    }
+    free(team->priv.threads);
 }
 
 void

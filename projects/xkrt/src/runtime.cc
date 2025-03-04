@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/28 22:42:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 01:54:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -142,38 +142,7 @@ int
 xkrt_sync(xkrt_runtime_t * runtime)
 {
     assert(runtime);
-
-    Thread * thread = Thread::self();
-    assert(thread);
-
-    # define WAIT    do { if (thread->current_task->cc.load(std::memory_order_seq_cst) == 0) return 0; } while (0)
-    # define WAIT2   do { WAIT   ; WAIT   ; } while (0)
-    # define WAIT4   do { WAIT2  ; WAIT2  ; } while (0)
-    # define WAIT8   do { WAIT4  ; WAIT4  ; } while (0)
-    # define WAIT16  do { WAIT8  ; WAIT8  ; } while (0)
-    # define WAIT32  do { WAIT16 ; WAIT16 ; } while (0)
-    # define WAIT64  do { WAIT32 ; WAIT32 ; } while (0)
-    # define WAIT128 do { WAIT64 ; WAIT64 ; } while (0)
-
-    // Poll 128 times first
-    mem_barrier();
-    WAIT128 ;
-
-    // Else, sleep with backoff
-    int backoff = 1024;                 // Initial backoff time in nanoseconds
-    const int max_backoff = 64 * 1024;  // Maximum backoff time in microseconds
-    assert(max_backoff < 1000000);      // nanosleep condition
-
-    struct timespec ts = { .tv_sec = 0 };
-
-    while (1)
-    {
-        ts.tv_nsec = backoff;
-        nanosleep(&ts, NULL);
-        if (backoff < max_backoff)
-            backoff *= 2;
-        WAIT128 ;
-    }
+    runtime->task_wait();
 
 # if 0
 # if !defined(NDEBUG)

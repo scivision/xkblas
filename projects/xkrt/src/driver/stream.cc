@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 17:13:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 20:15:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -63,6 +63,8 @@ xkrt_stream_instruction_queue_init(
     queue->pos.r = 0;
     queue->pos.w = 0;
 }
+
+// TODO : move methods to the driver instead
 
 # pragma message(TODO "Implement and use constructors instead of this routine")
 void

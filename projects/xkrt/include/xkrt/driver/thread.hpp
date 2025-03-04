@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 04:36:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 05:42:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -28,8 +28,54 @@
 #  define THREAD_MAX_MEMORY ((size_t)2*1024*1024*1024)
 # endif /* THREAD_MAX_MEMORY */
 
+/* thread local storage through Thread::self() */
 class alignas(CACHE_LINE_SIZE) Thread
 {
+
+    public:
+
+        /* the cpuset of that thread */
+        cpu_set_t cpuset;
+
+        /* the thread implicit task */
+        union {
+            task_t implicit_task;
+            char _implicit_task_buffer[task_compute_size(TASK_FLAG_DOMAIN, 0)];
+        };
+
+        /* the current task */
+        task_t * current_task;
+
+    private:
+
+        /* tasks stack */
+        uint8_t * memory_stack_bottom;
+
+        /* next free task pointer in the stack */
+        uint8_t * memory_stack_ptr;
+
+        /* memory capacity */
+        size_t capacity;
+
+        /* per-thread queue */
+        // Deque<task_t *, THREAD_WORKER_DEQUE_CAPACITY> queue;
+        NaiveQueue<task_t *> queue;
+
+        /* lock and condition to sleep the mutex */
+        struct {
+            pthread_mutex_t lock;
+            pthread_cond_t  cond;
+            volatile bool   sleeping;
+        } sleep;
+
+        /* Dependency tree */
+        std::vector<DependencyTree *> deptrees;
+
+        #ifndef NDEBUG
+        std::vector<task_t *> tasks;
+        #endif /* NDEBUG */
+
+
     public:
 
         ////////////////////
@@ -51,6 +97,9 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         Thread();
         ~Thread();
+
+        /* touch every pages of thread memory */
+        void warmup(void);
 
         /* allocates a task */
         task_t * allocate_task(const size_t size);
@@ -167,50 +216,6 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         void report_tasks(void);
         # endif /* NDEBUG */
-
-    public:
-
-        /* the cpuset of that worker */
-        cpu_set_t cpuset;
-
-        /* the thread implicit task */
-        union {
-            task_t implicit_task;
-            char _implicit_task_buffer[task_compute_size(TASK_FLAG_DOMAIN, 0)];
-        };
-
-        /* the current task */
-        task_t * current_task;
-
-    private:
-
-        /* tasks stack */
-        uint8_t * memory_stack_bottom;
-
-        /* next free task pointer in the stack */
-        uint8_t * memory_stack_ptr;
-
-        /* memory capacity */
-        size_t capacity;
-
-        /* per-thread queue */
-        // Deque<task_t *, THREAD_WORKER_DEQUE_CAPACITY> queue;
-        NaiveQueue<task_t *> queue;
-
-        /* lock and condition to sleep the mutex */
-        struct {
-            pthread_mutex_t lock;
-            pthread_cond_t  cond;
-            volatile bool   sleeping;
-        } sleep;
-
-        /* Dependency tree */
-        std::vector<DependencyTree *> deptrees;
-
-        #ifndef NDEBUG
-        std::vector<task_t *> tasks;
-        #endif /* NDEBUG */
-
 
 };
 

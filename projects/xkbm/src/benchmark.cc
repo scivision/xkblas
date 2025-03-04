@@ -1,3 +1,16 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   benchmark.cc                                                             */
+/*                                                                   .-*-.    */
+/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
+/*                                                              __/_*_*(_     */
+/*   Created: 2025/03/03 20:51:35 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2025/03/03 20:51:36 by Romain PEREIRA            \_)     (_/    */
+/*                                                                            */
+/*   License: ???                                                             */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include <xkbm/benchmark.h>
 
 # include <xkrt/logger/logger.h>

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:18:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 05:41:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -67,9 +67,6 @@ Thread::Thread() :
     }
     this->memory_stack_ptr = this->memory_stack_bottom;
     assert(this->memory_stack_bottom);
-    size_t pagesize = (size_t) getpagesize();
-    for (size_t i = 0 ; i < this->capacity ; i += pagesize)
-        this->memory_stack_bottom[i] = 42;
 
     pthread_mutex_init(&this->sleep.lock, 0);
     pthread_cond_init (&this->sleep.cond, 0);
@@ -85,6 +82,16 @@ Thread::Thread() :
 Thread::~Thread()
 {
     free(this->memory_stack_ptr);
+}
+
+void
+Thread::warmup(void)
+{
+    // touches every pages to avoid minor page faults later during the execution
+    size_t pagesize = (size_t) getpagesize();
+    uint8_t * ptr = this->memory_stack_ptr;
+    for (uint8_t * ptr = this->memory_stack_ptr ; ptr < this->memory_stack_bottom + THREAD_MAX_MEMORY ; ptr += pagesize)
+        *ptr = 42;
 }
 
 task_t *

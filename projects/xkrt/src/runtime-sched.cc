@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:14:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/03 02:13:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -240,7 +240,7 @@ xkrt_device_task_executed_callback(
     task_t * task = (task_t *) args[1];
     assert(task);
 
-    runtime->task_executed(task);
+    __task_executed(task, xkrt_runtime_submit_task, runtime);
 }
 
 /**
@@ -262,7 +262,7 @@ xkrt_device_task_execute(
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
     {
-        runtime->task_executed(task);
+        __task_executed(task, xkrt_runtime_submit_task, runtime);
     }
     else
     {
@@ -298,7 +298,7 @@ xkrt_device_task_execute(
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
             ((void (*)(task_t *)) format->f[targetfmt])(task);
-            runtime->task_executed(task);
+            __task_executed(task, xkrt_runtime_submit_task, runtime);
         }
         /* running a device task */
         else
@@ -540,13 +540,6 @@ xkrt_runtime_t::task_commit(task_t * task)
 }
 
 void
-xkrt_runtime_t::task_executed(task_t * task)
-{
-    assert(task);
-    __task_executed(task, xkrt_runtime_submit_task, this);
-}
-
-void
 xkrt_runtime_t::task_detachable_post(task_t * task)
 {
     assert(task);
@@ -564,4 +557,54 @@ xkrt_runtime_t::task_complete(task_t * task)
     assert(thread);
 
     __task_complete(task, xkrt_runtime_submit_task, this);
+}
+
+int
+xkrt_runtime_t::task_schedule(void)
+{
+
+    return 0;
+}
+
+void
+xkrt_runtime_t::task_wait(void)
+{
+    Thread * thread = Thread::self();
+    assert(thread);
+
+    # define WAIT    do { if (thread->current_task->cc.load(std::memory_order_relaxed) == 0) return ; } while (0)
+    # define WAIT2   do { WAIT   ; WAIT   ; } while (0)
+    # define WAIT4   do { WAIT2  ; WAIT2  ; } while (0)
+    # define WAIT8   do { WAIT4  ; WAIT4  ; } while (0)
+    # define WAIT16  do { WAIT8  ; WAIT8  ; } while (0)
+    # define WAIT32  do { WAIT16 ; WAIT16 ; } while (0)
+    # define WAIT64  do { WAIT32 ; WAIT32 ; } while (0)
+
+    // Poll first for fast way out
+    mem_barrier();
+    WAIT16 ;
+
+    // Else, work steal and sleep with backoff
+    constexpr int initial_backoff = 1024;;  // Initial backoff time in nanoseconds
+    constexpr int max_backoff = 64 * 1024;  // Maximum backoff time nanoseconds
+    int backoff = initial_backoff;          // Initial backoff time in nanoseconds
+    assert(max_backoff < 1000000);          // nanosleep condition
+
+    struct timespec ts = { .tv_sec = 0 };
+    while (1)
+    {
+        // work steal
+        if (task_schedule())
+        {
+            backoff = initial_backoff;
+            continue ;
+        }
+
+        // sleep with backoff
+        ts.tv_nsec = backoff;
+        nanosleep(&ts, NULL);
+        if (backoff < max_backoff)
+            backoff = (backoff << 1);
+        WAIT64 ;
+    }
 }
