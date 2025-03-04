@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 07:09:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 05:31:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -81,11 +81,9 @@ static int          cu_count_perfrank = 0;
 static uint64_t *   cu_perf_device    = NULL;
 
 static void
-get_gpu_topo(void)
+get_gpu_topo(int ngpus)
 {
-    CU_SAFE_CALL(cuDeviceGetCount(&cu_device_count));
-    if (cu_device_count == 0)
-        return;
+    cu_device_count = ngpus;
 
     int min_perf = 0;
     int max_perf = 0;
@@ -96,6 +94,7 @@ get_gpu_topo(void)
     // Enumerates Device <-> Device links and store perf_rank
     for (int i = 0; i < cu_device_count; ++i)
     {
+        xkrt_device_cu_t * device_i = device_cu_get(i);
         for (int j = 0; j < cu_device_count; ++j)
         {
             if (i == j)
@@ -104,14 +103,16 @@ get_gpu_topo(void)
             }
             else
             {
+                xkrt_device_cu_t * device_j = device_cu_get(j);
                 int perf_rank = 0;
                 int access_supported = 0;
 
                 CU_SAFE_CALL(
                     cuDeviceGetP2PAttribute(
-                        &access_supported,
+                       &access_supported,
                         CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED,
-                        i, j
+                        device_i->cu.device,
+                        device_j->cu.device
                     )
                 );
 
@@ -119,9 +120,10 @@ get_gpu_topo(void)
                 {
                     CU_SAFE_CALL(
                         cuDeviceGetP2PAttribute(
-                            &perf_rank,
+                           &perf_rank,
                             CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK,
-                            i, j
+                            device_i->cu.device,
+                            device_j->cu.device
                         )
                     );
 
@@ -172,22 +174,28 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
 {
     CUresult err = cuInit(0);
     if (err != CUDA_SUCCESS)
+    {
+        if (err == CUDA_ERROR_STUB_LIBRARY)
+            LOGGER_WARN("Tried to load Cuda driver with a stub library...");
         return 1;
-
+    }
     // TODO : move that to device init
-    int ndevices_max = ngpus;
+    int ndevices_max;
     err = cuDeviceGetCount(&ndevices_max);
     if (err)
         return 1;
+    ngpus = MIN(ngpus, ndevices_max);
 
     assert(ngpus <= XKRT_DEVICES_MAX);
-    for (int i = 0 ; i < MIN(ngpus, ndevices_max) ; ++i)
+    for (int i = 0 ; i < ngpus ; ++i)
     {
         xkrt_device_cu_t * device = device_cu_get(i);
         device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
         CU_SAFE_CALL(cuDeviceGet(&device->cu.device, i));
         CU_SAFE_CALL(cuCtxCreate(&device->cu.context, 0, device->cu.device));
     }
+
+    get_gpu_topo(ngpus);
 
     return 0;
 }
@@ -350,8 +358,6 @@ XKRT_DRIVER_ENTRYPOINT(get_source)(
 static int
 XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
 {
-    get_gpu_topo();
-
     xkrt_device_cu_t * device = device_cu_get(device_driver_id);
     assert(device);
     assert(device->inherited.state == XKRT_DEVICE_STATE_INIT);
@@ -359,6 +365,8 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
     const uint64_t size = sizeof(xkrt_device_global_id_bitfield_t) * cu_count_perfrank;
     device->affinity = (xkrt_device_global_id_bitfield_t *) malloc(size);
     memset(device->affinity, 0, size);
+
+    cu_set_context(device_driver_id);
 
     /* all other devices have been initialized, enable peer */
     for (int other_device_driver_id = 0 ; other_device_driver_id < XKRT_DEVICES_MAX ; ++other_device_driver_id)
@@ -376,12 +384,17 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         else
         {
             int access;
-            CU_SAFE_CALL(cuDeviceCanAccessPeer(&access, device->cu.device, other_device->cu.device));
+            CU_SAFE_CALL(
+                cuDeviceCanAccessPeer(
+                   &access,
+                    device->cu.device,
+                    other_device->cu.device
+                )
+            );
 
             if (access)
             {
-
-                CUresult res = cuCtxEnablePeerAccess(device->cu.context, 0);
+                CUresult res = cuCtxEnablePeerAccess(other_device->cu.context, 0);
                 if ((res == CUDA_SUCCESS) || (res == CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED))
                 {
                     int rank = cu_perf_topo[device_driver_id*cu_device_count+other_device_driver_id];
@@ -432,6 +445,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
 ) {
     (void) device_driver_id;
     void * ptr;
+    cu_set_context(device_driver_id);
     CU_SAFE_CALL(cuMemHostAlloc(&ptr, size, CU_MEMHOSTREGISTER_PORTABLE));
     // CU_SAFE_CALL(cuHostAlloc(&ptr, size, cuHostRegisterPortable | cuHostAllocWriteCombined));
     return ptr;
