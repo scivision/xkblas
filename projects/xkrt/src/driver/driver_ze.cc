@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 00:04:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 02:32:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -372,6 +372,21 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_wait)(
     return 0;
 }
 
+
+static int
+XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
+    int device_driver_id,
+    xkrt_stream_type_t stype
+) {
+    switch (stype)
+    {
+        case (XKRT_STREAM_TYPE_KERN):
+            return 8;
+        default:
+            return 2;
+    }
+}
+
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     xkrt_stream_t * istream,
@@ -509,6 +524,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
             LOGGER_FATAL("Unknown stream type");
     }
 
+    # if 1
+    // Round robin over copy engines
+
     // create command queue
     uint32_t ordinal = device_command_queue_group_next<ze_command_queue_group_property_flag_t, f_equals>(device, flag);
     if (ordinal == UINT32_MAX)
@@ -521,6 +539,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     // retrieve group properties
     const ze_command_queue_group_properties_t * properties = device->ze_command_queue_group_properties + ordinal;
     uint32_t index = device->ze_command_queue_group_used[ordinal].fetch_add(1) % properties->numQueues;
+    # else
+    // use virtual copy engine
+    uint32_t ordinal = 0;
+    uint32_t index = 0;
+    # endif
 
     // get the next command queue index to use in the group
     const ze_command_queue_desc_t ze_command_queue_desc = {
@@ -818,6 +841,7 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 
     REGISTER(device_cpuset);
 
+    REGISTER(stream_suggest);
     REGISTER(stream_create);
     REGISTER(stream_delete);
 

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 20:44:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 02:33:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -183,7 +183,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     LOGGER_INFO("%s", driver->f_device_info(device_driver_id));
 
     // initialize offloader
-    device->offloader_init(driver->f_stream_create);
+    device->offloader_init(driver->f_stream_suggest, driver->f_stream_create);
 
     /* init memory */
 

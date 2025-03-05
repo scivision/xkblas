@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 01:54:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 04:34:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,6 +23,8 @@
 # include <stdlib.h>
 # include <string.h>
 # include <signal.h>
+
+# include <hwloc.h>
 
 /////////////////////////////////////////////////////////////////////
 //  All runtimes instances, for cleaning up if crash / interupting //
@@ -72,6 +74,10 @@ xkrt_init(xkrt_runtime_t * runtime)
     LOGGER_INFO("Initializing XKRT");
 
     memset(runtime, 0, sizeof(xkrt_runtime_t));
+
+    // create topology
+    hwloc_topology_init(&runtime->topology);
+    hwloc_topology_load(runtime->topology);
 
     // load
     xkrt_init_conf(&(runtime->conf));
@@ -129,6 +135,8 @@ xkrt_deinit(xkrt_runtime_t * runtime)
 
     xkrt_drivers_deinit(&runtime->drivers);
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
+
+    hwloc_topology_destroy(runtime->topology);
 
     return 0;
 }

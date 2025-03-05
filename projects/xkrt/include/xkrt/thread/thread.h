@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 04:10:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 05:03:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -21,8 +21,8 @@
 /* thread states */
 typedef enum    xkrt_thread_state_t
 {
-    XKRT_THREAD_UNINITIALIZED,
-    XKRT_THREAD_INITIALIZED
+    XKRT_THREAD_UNINITIALIZED   = 0,
+    XKRT_THREAD_INITIALIZED     = 1
 }               xkrt_thread_state_t;
 
 struct xkrt_team_node_t;
@@ -137,6 +137,7 @@ typedef struct  xkrt_team_t
 
         // threads
         xkrt_thread_t * threads;
+        int nthreads;
 
         // barrier
         struct {

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/18 22:37:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 01:53:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -63,15 +63,6 @@ class xkrt_stream_t : public Lockable
     public:
         xkrt_stream_type_t type;
 
-        /* launch a stream instruction */
-        int (*f_instruction_launch)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx);
-
-        /* progress a stream instruction */
-        int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx);
-
-        /* wait for all instructions completion on a stream */
-        int (*f_instructions_wait)(xkrt_stream_t * stream);
-
         /* queue for ready instruction */
         xkrt_stream_instruction_queue_t ready;
 
@@ -87,6 +78,15 @@ class xkrt_stream_t : public Lockable
             stats_int_t transfered;
         } stats;
         # endif /* XKRT_SUPPORT_STATS */
+
+        /* launch a stream instruction */
+        int (*f_instruction_launch)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx);
+
+        /* progrtream instruction */
+        int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx);
+
+        /* wait  instructions completion on a stream */
+        int (*f_instructions_wait)(xkrt_stream_t * stream);
 
     public:
 
@@ -127,8 +127,8 @@ void xkrt_stream_init(
     xkrt_stream_t * stream,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity,
-    int (*f_instruction_launch)(xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t idx),
-    int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
+    int (*f_instruction_launch)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx),
+    int (*f_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx),
     int (*f_instructions_wait)(xkrt_stream_t * stream)
 );
 

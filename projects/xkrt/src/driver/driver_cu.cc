@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 21:46:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 02:32:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -463,7 +463,21 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
 }
 
 static int
-cu_stream_instructions_launch(
+XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
+    int device_driver_id,
+    xkrt_stream_type_t stype
+) {
+    switch (stype)
+    {
+        case (XKRT_STREAM_TYPE_KERN):
+            return 8;
+        default:
+            return 2;
+    }
+}
+
+static int
+XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkrt_stream_t * istream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
@@ -619,7 +633,7 @@ cu_stream_instructions_launch(
 }
 
 static inline int
-cu_stream_instructions_wait(
+XKRT_DRIVER_ENTRYPOINT(stream_instructions_wait)(
     xkrt_stream_t * istream
 ) {
     xkrt_stream_cu_t * stream = (xkrt_stream_cu_t *) istream;
@@ -632,7 +646,7 @@ cu_stream_instructions_wait(
 }
 
 static inline int
-cu_stream_instructions_progress(
+XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     xkrt_stream_t * istream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
@@ -694,9 +708,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         (xkrt_stream_t *) stream,
         type,
         capacity,
-        cu_stream_instructions_launch,
-        cu_stream_instructions_progress,
-        cu_stream_instructions_wait
+        XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch),
+        XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress),
+        XKRT_DRIVER_ENTRYPOINT(stream_instructions_wait)
     );
 
     /*************************/
@@ -832,6 +846,7 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 
     REGISTER(device_cpuset);
 
+    REGISTER(stream_suggest);
     REGISTER(stream_create);
     REGISTER(stream_delete);
 

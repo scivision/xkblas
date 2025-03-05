@@ -652,8 +652,8 @@ mem_transfer_run_d2d(xkrt_team_t * team, int tid)
     ////////////////////////////////////
 
     // size of memory to transfer
-    // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    const size_t size = (size_t) 1 * 512 * 1024 * 1024;
+    const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
+    // const size_t size = (size_t) 1 * 512 * 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
@@ -672,7 +672,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, int tid)
 
     for (int i = 0 ; i < src_device->nmemories ; ++i)
     {
-        time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 7> time;
+        time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 3> time;
 
         for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
         {
@@ -687,7 +687,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, int tid)
                 xkrt_area_chunk_t * dst_chunk = tls->areas[dst_device_global_id][src_device_global_id][j][0];
                 assert(dst_chunk);
 
-                for (int iter = -3 ; iter < time.niters ; ++iter)
+                for (int iter = -1 ; iter < time.niters ; ++iter)
                 {
                     if (mode == ALL)
                         runtime.team_barrier(team);
@@ -883,16 +883,28 @@ mem_transfer_run(xkrt_team_t * team, int tid)
     return NULL;
 }
 
-static benchmark_node_t h2d = {
-    .name = "H2D",
+static benchmark_node_t h2d_1 = {
+    .name = "H2D-1",
     .desc = "Host memory to device (global) memory bandwidth",
     .run = foreach_device<mem_transfer_run<H2D, 1>>
 };
 
-static benchmark_node_t d2h = {
-    .name = "D2H",
+static benchmark_node_t d2h_1 = {
+    .name = "D2H-1",
     .desc = "Device (global) to host memory memory bandwidth",
     .run = foreach_device<mem_transfer_run<D2H, 1>>
+};
+
+static benchmark_node_t h2d_16 = {
+    .name = "H2D-16",
+    .desc = "Host memory to device (global) memory bandwidth with 16x chunks bulk copies",
+    .run = foreach_device<mem_transfer_run<H2D, 16>>
+};
+
+static benchmark_node_t d2h_16 = {
+    .name = "D2H-16",
+    .desc = "Device (global) to host memory memory bandwidth with 16x chunks bulk copies",
+    .run = foreach_device<mem_transfer_run<D2H, 16>>
 };
 
 /////////////////////
@@ -950,7 +962,8 @@ check_devices(benchmark_node_t * bench)
 static benchmark_node_t xkrt = {
     .name = "xkrt",
     .desc = "Metrics on XKRT-supported devices",
-    .run = check_devices
+    .run = check_devices,
+    .enabled = 1
 };
 
 void
@@ -982,8 +995,10 @@ xkrt_benchmark_push(benchmark_node_t * parent)
     LINK(allocation_device, allocation_device_driver_fragmented);
     LINK(allocation_device, allocation_device_system_fragmented);
 
-    LINK(transfer, h2d);
-    LINK(transfer, d2h);
+    LINK(transfer, h2d_1);
+    LINK(transfer, h2d_16);
+    LINK(transfer, d2h_1);
+    LINK(transfer, d2h_16);
     LINK(transfer, d2d_1_p2p);
     LINK(transfer, d2d_16_p2p);
     LINK(transfer, d2d_1_all);

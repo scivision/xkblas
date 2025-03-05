@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 20:44:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 04:33:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,6 +62,9 @@ typedef struct  xkrt_runtime_t
 
     /* get a memory controller for the given ld/type size */
     MemoryCoherencyController * get_or_insert_memory_controller(const size_t ld, const size_t sizeof_type);
+
+    /* hwloc topology, read only, initialized at init */
+    hwloc_topology_t topology;
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // UTILITIES FOR THE MEMORY COHERENCY TREE - THIS SHOULD GTFO AND BE ABSTRACTED IN THE TREE //

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 20:16:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 01:52:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -117,6 +117,9 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
     // STREAM MANAGEMENT          //
     ////////////////////////////////
+
+    /* suggest a number of stream to use for the given stream type */
+    int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t stype);
 
     /* alllocate and initialize a stream */
     xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity);

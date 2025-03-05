@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 20:15:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 02:34:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -72,16 +72,16 @@ xkrt_stream_init(
     xkrt_stream_t * stream,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity,
-    int (*f_instruction_launch)   (xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
-    int (*f_instructions_progress)(xkrt_stream_t *, xkrt_stream_instruction_t *, xkrt_stream_instruction_counter_t),
-    int (*f_instructions_wait)(xkrt_stream_t *)
+    int (*f_stream_instruction_launch)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx),
+    int (*f_stream_instructions_progress)(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr, xkrt_stream_instruction_counter_t idx),
+    int (*f_stream_instructions_wait)(xkrt_stream_t * stream)
 ) {
     stream->type = type;
     stream->spinlock = SPINLOCK_INITIALIZER;
 
-    stream->f_instruction_launch    = f_instruction_launch;
-    stream->f_instructions_progress = f_instructions_progress;
-    stream->f_instructions_wait     = f_instructions_wait;
+    stream->f_instruction_launch    = f_stream_instruction_launch;
+    stream->f_instructions_progress = f_stream_instructions_progress;
+    stream->f_instructions_wait     = f_stream_instructions_wait;
 
     uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_instruction_t) * capacity * 2);
     assert(mem);
@@ -158,6 +158,7 @@ xkrt_stream_t::launch_ready_instructions(void)
 //    LOGGER_DEBUG("Launching ready instructions of stream %p of type `%s` (%d ready)",
 //            this, xkrt_stream_type_to_str(this->type), this->ready.size());
 
+    assert(this->f_instruction_launch);
     assert(this->ready.pos.r <= this->ready.pos.w);
 
     /* launch every ready instructions */
@@ -171,14 +172,12 @@ xkrt_stream_t::launch_ready_instructions(void)
         assert(instr);
 
         LOGGER_DEBUG(
-            "Decoding instruction `%s` on stream %p of type `%s` (decoding via %p)",
+            "Decoding instruction `%s` on stream %p of type `%s`",
             xkrt_stream_instruction_type_to_str(instr->type),
             this,
-            xkrt_stream_type_to_str(this->type),
-            this->f_instruction_launch
+            xkrt_stream_type_to_str(this->type)
         );
 
-        assert(this->f_instruction_launch);
         switch (instr->type)
         {
             case (XKRT_STREAM_INSTR_TYPE_KERN):
@@ -285,7 +284,6 @@ void
 xkrt_stream_t::wait_pending_instructions(void)
 {
     assert(this->pending.pos.r <= this->pending.pos.w);
-    assert(this->f_instructions_progress);
 
     if (this->pending.pos.r < this->pending.pos.w)
     {

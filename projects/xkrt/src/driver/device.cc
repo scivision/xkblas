@@ -5,14 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 17:34:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 01:43:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/driver/device.hpp>
-# include <type_traits>
 
 //////////////////////
 // MEMORY MANAGMENT //
@@ -254,6 +253,7 @@ xkrt_device_t::memory_allocate(const size_t user_size)
 
 void
 xkrt_device_t::offloader_init(
+    int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type),
     xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity)
 ) {
     assert(f_stream_create);
@@ -265,7 +265,7 @@ xkrt_device_t::offloader_init(
     int cnt = 0;
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
-        this->count[stype] = this->conf->offloader.streams[stype].n;
+        this->count[stype] = (this->conf->offloader.streams[stype].n > 0) ? this->conf->offloader.streams[stype].n : f_stream_suggest ? f_stream_suggest(this->driver_id, (xkrt_stream_type_t) stype) : 4;
         cnt += this->conf->offloader.streams[stype].n;
     }
 
