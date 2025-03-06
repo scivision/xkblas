@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 20:45:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 05:35:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -820,7 +820,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             task_t * task
         ) {
             LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
-            __task_fetched(1, task, runtime->task_submit, fetch->dst_device_global_id, task);
+            __task_fetched(1, task, xkrt_device_task_submit, runtime, fetch->dst_device_global_id);
         }
 
         static void

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 23:41:05 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 05:38:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,6 +25,7 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mem.h>
 # include <xkrt/stats/stats.h>
+# include <xkrt/task/task.hpp>
 
 # include <cassert>
 # include <cstring>
@@ -97,7 +98,7 @@ xkrt_device_prepare_task(
         }
 
         /* decrease the task 'fetching' counter to detect early-fetch completion */
-        __task_fetched(1, task, xkrt_device_task_execute, runtime, device, task);
+        __task_fetched(1, task, xkrt_device_task_execute, runtime, device);
         /* else the task will be launched in a callback while all accesses were fetched */
     }
     else
@@ -514,7 +515,6 @@ xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 //////////
 
 // TODO : remove these, and use threads instead
-
 void
 xkrt_runtime_t::task_submit(
     const xkrt_device_global_id_t device_global_id,
@@ -524,19 +524,23 @@ xkrt_runtime_t::task_submit(
     xkrt_device_task_execute(this, device, task);
 }
 
-static inline void
-enqueue(void * vargs, task_t * task)
-{
-    xkrt_runtime_submit_task((xkrt_runtime_t *) vargs, task);
+/* submit a task to the given device */
+void
+xkrt_device_task_submit(
+    xkrt_runtime_t * runtime,
+    xkrt_device_global_id_t device_global_id,
+    task_t * task
+) {
+    runtime->task_submit(device_global_id, task);
 }
 
 void
 xkrt_runtime_t::task_commit(task_t * task)
 {
-    Thread * thread = Thread::self();
-    assert(thread);
+    Thread * tls = Thread::self();
+    assert(tls);
 
-    thread->commit<enqueue>(this, task);
+    tls->commit(task, xkrt_runtime_submit_task, this);
 }
 
 void
@@ -558,3 +562,14 @@ xkrt_runtime_t::task_complete(task_t * task)
 
     __task_complete(task, xkrt_runtime_submit_task, this);
 }
+
+void
+xkrt_team_thread_task_enqueue(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    xkrt_thread_t * thread,
+    task_t * task
+) {
+    thread->deque.push(task);
+}
+

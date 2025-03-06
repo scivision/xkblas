@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 00:37:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 06:56:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,7 +32,6 @@
 /* thread local storage through Thread::self() */
 class alignas(CACHE_LINE_SIZE) Thread
 {
-
     public:
 
         /* the xkrt_team_t of that thread */
@@ -174,27 +173,19 @@ class alignas(CACHE_LINE_SIZE) Thread
                 T->current_task = current;                                                          \
             } while (0)
 
-        # define __Thread_task_commit(T, t, F, ...)                             \
-            do {                                                                \
-                assert(T->current_task);                                        \
-                ++T->current_task->cc;                                          \
-                t->parent = T->current_task;                                    \
-                __task_commit(t, F, __VA_ARGS__);                               \
-            } while(0)
-
-        /**
-         *  Commit the passed task
-         *      - compute its dependences
-         *      - submit if ready
-         *  A task cannot be scheduled before a 'commit' call.
-         *  The task may be scheduled before this function returns
-         */
-        template <void (*callback)(void * vargs, task_t * task)>
+        template <typename... Args>
         inline void
-        commit(void * vargs, task_t * task)
-        {
-            __Thread_task_commit(this, task, callback, vargs, task);
+        commit(
+            task_t * task,
+            void (*F)(Args..., task_t *),
+            Args... args
+        ) {
+            assert(this->current_task);
+            ++this->current_task->cc;
+            task->parent = this->current_task;
+            __task_commit(task, F, args...);
         }
+
 };
 
 #endif /* __THREAD_HPP__ */

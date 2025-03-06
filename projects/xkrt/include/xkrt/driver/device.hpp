@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 01:30:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 06:49:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __DEVICE_HPP__
-# define __DEVICE_HPP__
+#ifndef __XKRT_DEVICE_HPP__
+# define __XKRT_DEVICE_HPP__
 
 # include <stdint.h>    /* uint64_t */
 
@@ -322,4 +322,4 @@ typedef struct  xkrt_device_t
     }
 }               xkrt_device_t;
 
-#endif /* __DEVICE_HPP__ */
+#endif /* __XKRT_DEVICE_HPP__ */

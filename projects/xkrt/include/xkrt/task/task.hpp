@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 23:52:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 05:42:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __TASK_H__
-# define __TASK_H__
+#ifndef __XKRT_TASK_HPP__
+# define __XKRT_TASK_HPP__
 
 // https://stackoverflow.com/questions/45342776/how-to-include-c11-headers-when-compiling-c-with-gcc
 // cannot use <stdatomic.h> with c++
@@ -147,7 +147,8 @@ typedef struct  task_t
 
 }               task_t;
 
-typedef std::atomic<uint8_t> task_wait_counter_t;
+typedef uint8_t task_wait_counter_type_t;
+typedef std::atomic<task_wait_counter_type_t> task_wait_counter_t;
 
 # define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)
 typedef uint8_t task_access_counter_t;
@@ -398,141 +399,178 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
 }
 
 /* task task precedes the passed task */
-# define __task_precedes(pred, succ)                                        \
-    do {                                                                    \
-        assert(pred);                                                       \
-        assert(succ);                                                       \
-        assert(pred->state.value >= TASK_STATE_ALLOCATED);                  \
-        assert(succ->state.value >= TASK_STATE_ALLOCATED);                  \
-        assert(pred->flags & TASK_FLAG_DEPENDENT);                          \
-        assert(succ->flags & TASK_FLAG_DEPENDENT);                          \
-        if (pred->state.value < TASK_STATE_COMPLETED)                       \
-        {                                                                   \
-            SPINLOCK_LOCK(pred->state.lock);                                \
-            {                                                               \
-                if (pred->state.value < TASK_STATE_COMPLETED)               \
-                {                                                           \
-                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);           \
-                    sdep->wc.fetch_add(1, std::memory_order_seq_cst);       \
-                }                                                           \
-            }                                                               \
-            SPINLOCK_UNLOCK(pred->state.lock);                              \
-        }                                                                   \
-    } while (0)
+static inline void
+__task_precedes(task_t * pred, task_t * succ)
+{
+    assert(pred);
+    assert(succ);
+    assert(pred->state.value >= TASK_STATE_ALLOCATED);
+    assert(succ->state.value >= TASK_STATE_ALLOCATED);
+    assert(pred->flags & TASK_FLAG_DEPENDENT);
+    assert(succ->flags & TASK_FLAG_DEPENDENT);
+    if (pred->state.value < TASK_STATE_COMPLETED)
+    {
+        SPINLOCK_LOCK(pred->state.lock);
+        {
+            if (pred->state.value < TASK_STATE_COMPLETED)
+            {
+                task_dep_info_t * sdep = TASK_DEP_INFO(succ);
+                sdep->wc.fetch_add(1, std::memory_order_seq_cst);
+            }
+        }
+        SPINLOCK_UNLOCK(pred->state.lock);
+    }
+}
 
 ////////////////////////////////////
 // Methods to transition the task //
 ////////////////////////////////////
 
 /* mark the task ready and call F(args) */
-# define __task_ready(task, F, ...)                         \
-    do {                                                    \
-        assert(task->state.value == TASK_STATE_ALLOCATED);  \
-        task->state.value = TASK_STATE_READY;               \
-        LOGGER_DEBUG_TASK_STATE(task);                      \
-        F(__VA_ARGS__);                                     \
-    } while (0)
-
-/* commit the task and call F(args) if it is now ready */
-# define __task_commit(task, F, ...)                                    \
-    do {                                                                \
-        assert(task->state.value == TASK_STATE_ALLOCATED);              \
-        if (task->flags & TASK_FLAG_DEPENDENT)                          \
-        {                                                               \
-            task_dep_info_t * dep = TASK_DEP_INFO(task);                \
-            if (dep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)   \
-                __task_ready(task, F, __VA_ARGS__);                     \
-        }                                                               \
-        else                                                            \
-            __task_ready(task, F, __VA_ARGS__);                         \
-    } while (0)
-
-# define __task_fetching(n, task)                                   \
-    do {                                                            \
-        assert(task->flags & TASK_FLAG_DEPENDENT);                  \
-        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
-        if (dep->wc.fetch_add(n, std::memory_order_seq_cst) == 0)   \
-        {                                                           \
-            assert(task->state.value == TASK_STATE_READY);          \
-            task->state.value = TASK_STATE_DATA_FETCHING;           \
-            LOGGER_DEBUG_TASK_STATE(task);                          \
-        }                                                           \
-    } while (0)
-
-/* notify that 'n' accesses had been fetched. If all accesses were fetched,
- * then mark the task as 'fetched' and call F(...) */
-# define __task_fetched(n, task, F, ...)                            \
-    do {                                                            \
-        assert(task->state.value == TASK_STATE_DATA_FETCHING);      \
-        assert(task->flags & TASK_FLAG_DEPENDENT);                  \
-        task_dep_info_t * dep = TASK_DEP_INFO(task);                \
-        if (dep->wc.fetch_sub(n, std::memory_order_seq_cst) == n)   \
-        {                                                           \
-            task->state.value = TASK_STATE_DATA_FETCHED;            \
-            LOGGER_DEBUG_TASK_STATE(task);                          \
-            F(__VA_ARGS__);                                         \
-        }                                                           \
-    } while (0)
-
-# define __task_detachable_post(task, F, ...)                       \
-    do {                                                            \
-        assert(task->flags & TASK_FLAG_DETACHABLE);                 \
-        task_det_info_t * det = TASK_DET_INFO(task);                \
-        if (det->wc.fetch_add(1, std::memory_order_relaxed) == 1)   \
-            __task_complete(task, F, __VA_ARGS__);                  \
-    } while (0)
+template <typename... Args>
+static inline void
+__task_ready(
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    assert(task->state.value == TASK_STATE_ALLOCATED);
+    task->state.value = TASK_STATE_READY;
+    LOGGER_DEBUG_TASK_STATE(task);
+    F(std::forward<Args>(args)..., task);
+}
 
 /* mark the task as completed, and call F(..., succ) for each of its successors
  * 'succ' that are now ready */
-# define __task_complete(task, F, ...)                                                              \
-    do {                                                                                            \
-        assert(                                                                                     \
-            task->state.value == TASK_STATE_DATA_FETCHED ||                                         \
-            task->state.value == TASK_STATE_READY                                                   \
-        );                                                                                          \
-        if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))                             \
-        {                                                                                           \
-            assert(                                                                                 \
-                ((task->flags & TASK_FLAG_DEPENDENT)  && (TASK_DEP_INFO(task)->wc.load() == 0)) ||  \
-                ((task->flags & TASK_FLAG_DETACHABLE) && (TASK_DET_INFO(task)->wc.load() == 2))     \
-            );                                                                                      \
-        }                                                                                           \
-        SPINLOCK_LOCK(task->state.lock);                                                            \
-        {                                                                                           \
-            task->state.value = TASK_STATE_COMPLETED;                                               \
-            LOGGER_DEBUG_TASK_STATE(task);                                                          \
-        }                                                                                           \
-        SPINLOCK_UNLOCK(task->state.lock);                                                          \
-        assert(task->parent);                                                                       \
-        task->parent->cc.fetch_sub(1, std::memory_order_relaxed);                                   \
-        if (task->flags & TASK_FLAG_DEPENDENT)                                                      \
-        {                                                                                           \
-            task_dep_info_t * dep = TASK_DEP_INFO(task);                                            \
-            access_t * accesses = TASK_ACCESSES(task);                                              \
-            for (uint8_t i = 0 ; i < dep->ac ; ++i)                                                 \
-            {                                                                                       \
-                access_t * access = accesses + i;                                                   \
-                for (access_t * succ_access : access->successors)                                   \
-                {                                                                                   \
-                    task_t * succ = succ_access->task;                                              \
-                    assert(succ->flags & TASK_FLAG_DEPENDENT);                                      \
-                    task_dep_info_t * sdep = TASK_DEP_INFO(succ);                                   \
-                    if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)                      \
-                        __task_ready(succ, F, __VA_ARGS__, succ);                                   \
-                }                                                                                   \
-            }                                                                                       \
-        }                                                                                           \
-    } while (0)
-
-/* mark the task as 'executed' and call F(...) if its now completed */
-# define __task_executed(task, F, ...)                      \
-    do {                                                    \
-        if (task->flags & TASK_FLAG_DETACHABLE)             \
-            __task_detachable_post(task, F, __VA_ARGS__);   \
-        else                                                \
-            __task_complete(task, F, __VA_ARGS__);          \
-    } while (0)
+template <typename... Args>
+static inline void
+__task_complete(
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    assert(
+        task->state.value == TASK_STATE_DATA_FETCHED ||
+        task->state.value == TASK_STATE_READY
+    );
+    if (task->flags & (TASK_FLAG_DETACHABLE | TASK_FLAG_DEPENDENT))
+    {
+        assert(
+            ((task->flags & TASK_FLAG_DEPENDENT)  && (TASK_DEP_INFO(task)->wc.load() == 0)) ||
+            ((task->flags & TASK_FLAG_DETACHABLE) && (TASK_DET_INFO(task)->wc.load() == 2))
+        );
+    }
+    SPINLOCK_LOCK(task->state.lock);
+    {
+        task->state.value = TASK_STATE_COMPLETED;
+        LOGGER_DEBUG_TASK_STATE(task);
+    }
+    SPINLOCK_UNLOCK(task->state.lock);
+    assert(task->parent);
+    task->parent->cc.fetch_sub(1, std::memory_order_relaxed);
+    if (task->flags & TASK_FLAG_DEPENDENT)
+    {
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        access_t * accesses = TASK_ACCESSES(task);
+        for (uint8_t i = 0 ; i < dep->ac ; ++i)
+        {
+            access_t * access = accesses + i;
+            for (access_t * succ_access : access->successors)
+            {
+                task_t * succ = succ_access->task;
+                assert(succ->flags & TASK_FLAG_DEPENDENT);
+                task_dep_info_t * sdep = TASK_DEP_INFO(succ);
+                if (sdep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
+                    __task_ready(succ, F, args...);
+            }
+        }
+    }
+}
 
 
+/* commit the task and call F(args) if it is now ready */
+template <typename... Args>
+static inline void
+__task_commit(
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    assert(task->state.value == TASK_STATE_ALLOCATED);
+    if (task->flags & TASK_FLAG_DEPENDENT)
+    {
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        if (dep->wc.fetch_sub(1, std::memory_order_seq_cst) == 1)
+            __task_ready(task, F, args...);
+    }
+    else
+        __task_ready(task, F, args...);
+}
 
-#endif /* __TASK_H__ */
+static inline void
+__task_fetching(
+    task_wait_counter_type_t n,
+    task_t * task
+) {
+    assert(task->flags & TASK_FLAG_DEPENDENT);
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    if (dep->wc.fetch_add(n, std::memory_order_seq_cst) == 0)
+    {
+        assert(task->state.value == TASK_STATE_READY);
+        task->state.value = TASK_STATE_DATA_FETCHING;
+        LOGGER_DEBUG_TASK_STATE(task);
+    }
+}
+
+/* notify that 'n' accesses had been fetched. If all accesses were fetched,
+ * then mark the task as 'fetched' and call F(...) */
+template <typename... Args>
+static inline void
+__task_fetched(
+    task_wait_counter_type_t n,
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    assert(task->state.value == TASK_STATE_DATA_FETCHING);
+    assert(task->flags & TASK_FLAG_DEPENDENT);
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    if (dep->wc.fetch_sub(n, std::memory_order_seq_cst) == n)
+    {
+        task->state.value = TASK_STATE_DATA_FETCHED;
+        LOGGER_DEBUG_TASK_STATE(task);
+        F(std::forward<Args>(args)..., task);
+    }
+}
+
+/* decrease detachable ref counter by 1, and call F(..., succ) foreach task
+ * 'succ' that became ready */
+template <typename... Args>
+static inline void
+__task_detachable_post(
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    assert(task->flags & TASK_FLAG_DETACHABLE);
+    task_det_info_t * det = TASK_DET_INFO(task);
+    if (det->wc.fetch_add(1, std::memory_order_relaxed) == 1)
+        __task_complete(task, F, args...);
+}
+
+/* mark the task as 'executed' and call F(..., succ) for each task 'succ' that
+ * became ready */
+template <typename... Args>
+static inline void
+__task_executed(
+    task_t * task,
+    void (*F)(Args..., task_t *),
+    Args... args
+) {
+    if (task->flags & TASK_FLAG_DETACHABLE)
+        __task_detachable_post(task, F, args...);
+    else
+        __task_complete(task, F, args...);
+}
+
+#endif /* __XKRT_TASK_HPP__ */

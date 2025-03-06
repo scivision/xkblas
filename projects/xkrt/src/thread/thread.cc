@@ -5,12 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 01:20:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 14:49:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkrt/thread/thread.h>
 # include <xkrt/runtime.h>
 
 # include <cassert>
@@ -53,39 +54,6 @@ team_barrier_fetch(xkrt_team_t * team, int delta)
     }
     return n;
 }
-
-/**
- *  Let's say (to, from) = (0, 3) - then the calling thread
- *      - fork a new thread with (to, from) = (0, 1)
- *      - fork a new thread with (to, from) = (2, 3)
- *      - and return
- *
- *      with (to, from) = (0, 1)
- *          - fork a new thread with (to, from) = (0, 0)
- *          - fork a new thread with (to, from) = (1, 1)
- *          - and return
- *
- *          with (to, from) = (0, 0)
- *              - the thread binds to the place '0' and call the routine
- *              - and return
- *
- *          with (to, from) = (1, 1)
- *              - the thread binds to the place '1' and call the routine
- *              - and return
- *
- *      with (to, from) = (2, 3)
- *          - fork a new thread with (to, from) = (2, 2)
- *          - fork a new thread with (to, from) = (3, 3)
- *          - and return
- *
- *          with (to, from) = (2, 2)
- *              - the thread binds to the place '2' and call the routine
- *              - and return
- *
- *          with (to, from) = (3, 3)
- *              - the thread binds to the place '3' and call the routine
- *              - and return
- */
 
 typedef struct  team_recursive_args_t
 {
@@ -138,6 +106,8 @@ team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, cp
     }
 }
 
+void team_create_recursive_fork(xkrt_runtime_t * runtime, xkrt_team_t * team, int from, int to);
+
 static void *
 team_create_recursive(void * vargs)
 {
@@ -168,52 +138,57 @@ team_create_recursive(void * vargs)
         return r;
     }
 
-    // create threads
-    const int pairs[2][2] = {
-        {args->from,                                   args->from + (args->to - args->from) / 2},
-        {args->from + (args->to - args->from) / 2 + 1, args->to}
-    };
+    const int from1 = args->from;
+    const int to1   = args->from + (args->to - args->from) / 2;
+    const int from2 = to1 + 1;
+    const int to2   = args->to;
+
+    if (from2 <= to2)
+        team_create_recursive_fork(args->runtime, args->team, from2, to2);
+
+    args->from = from1;
+    args->to   = to1;
+    team_create_recursive(args);
+
+    return NULL;
+}
+
+void
+team_create_recursive_fork(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    int from,
+    int to
+) {
+    assert(to >= from);
 
     // save calling thread cpu set
     cpu_set_t save_set;
     xkrt_runtime_t::thread_getaffinity(save_set);
 
-    for (int i = 0 ; i < 2 ; ++i)
-    {
-        if (pairs[i][0] > pairs[i][1])
-            continue ;
+    // retrieve cpuset
+    const int tid = from;
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    team_create_get_cpuset(runtime, team, tid, &cpuset);
 
-        team_recursive_args_t new_args = {
-            .runtime    = args->runtime,
-            .team       = args->team,
-            .from       = pairs[i][0],
-            .to         = pairs[i][1]
-        };
-        CPU_ZERO(&new_args.cpuset);
+    // move thread before allocating future thread-private memory
+    xkrt_runtime_t::thread_setaffinity(cpuset);
 
-        // retrieve cpuset
-        int tid = new_args.from;
-        team_create_get_cpuset(args->runtime, args->team, tid, &new_args.cpuset);
+    team_recursive_args_t * args = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
+    args->runtime = runtime;
+    args->team = team;
+    args->from = from;
+    args->to = to;
+    args->cpuset = cpuset;
 
-        // move thread before allocating future thread-private memory
-        xkrt_runtime_t::thread_setaffinity(new_args.cpuset);
-
-        team_recursive_args_t * dup = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
-        memcpy(dup, &new_args, sizeof(team_recursive_args_t));
-
-        xkrt_thread_t * thread = new_args.team->priv.threads + tid;
-        pthread_create(&thread->pthread, NULL, team_create_recursive, dup);
-    }
+    // fork
+    xkrt_thread_t * thread = team->priv.threads + tid;
+    pthread_create(&thread->pthread, NULL, team_create_recursive, args);
 
     // restore calling thread cpu set
     xkrt_runtime_t::thread_setaffinity(save_set);
-
-    free(args);
-
-    return NULL;
 }
-
-// TODO : this implementation is fucked, it creates way too many threads
 
 void
 xkrt_runtime_t::team_create(xkrt_team_t * team)
@@ -228,7 +203,7 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     memset(&team->priv, 0, sizeof(team->priv));
 
     // allocate thread array
-    const int nthreads = team->desc.nthreads;   // TODO : this should be func of the team desc
+    const int nthreads = team->desc.nthreads;   // TODO : this should be a func of the team desc
     team->priv.nthreads = nthreads;
     team->priv.threads = (xkrt_thread_t *) malloc(sizeof(xkrt_thread_t) * team->priv.nthreads);
     assert(team->priv.threads);
@@ -242,16 +217,8 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     // init critical
     pthread_mutex_init(&team->priv.critical.mtx, NULL);
 
-    // TODO : rework this to always use the recursive fork and generate the topology
-
-    team_recursive_args_t * args = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
-    assert(args);
-
-    args->runtime = this;
-    args->team = team;
-    args->from = 0;
-    args->to = team->priv.nthreads - 1;
-    pthread_create(&team->priv.threads[0].pthread, NULL, team_create_recursive, args);
+    // fork thread 0
+    team_create_recursive_fork(this, team, 0, team->priv.nthreads - 1);
 
     // decrement barrier
     team_barrier_fetch(team, 1);
@@ -265,7 +232,8 @@ run(
     task_t * task
 ) {
     Thread * tls = Thread::self();
-    __Thread_task_execute(tls, task, runtime->team_thread_enqueue, team, thread);
+    // tls->execute(task, xkrt_team_thread_task_enqueue, runtime, team, thread);
+    __Thread_task_execute(tls, task, xkrt_team_thread_task_enqueue, runtime, team, thread);
 }
 
 /* Return the 'i-th' victim to steal for the thread 'tid' when there is 'n' threads in the tree */
@@ -306,11 +274,8 @@ worksteal(
     for (int i = 0 ; i < n ; ++i)
     {
         const int victim_tid = get_ith_victim(tid, i, n);
-        if (victim_tid == tid)
-            continue ;
-
         xkrt_thread_t * victim = team->priv.threads + victim_tid;
-        task_t * task = victim->deque.steal();
+        task_t * task = (victim_tid == tid) ? victim->deque.pop() : victim->deque.steal();
         if (task)
         {
             run(runtime, team, thread, task);
@@ -326,22 +291,7 @@ schedule(
     xkrt_team_t * team,
     xkrt_thread_t * thread
 ) {
-    task_t * task = thread->deque.pop();
-    if (task)
-    {
-        run(runtime, team, thread, task);
-        return 1;
-    }
     return worksteal(runtime, team, thread);
-}
-
-void
-xkrt_runtime_t::team_thread_enqueue(
-    xkrt_team_t * team,
-    xkrt_thread_t * thread,
-    task_t * task
-) {
-    thread->deque.push(task);
 }
 
 void

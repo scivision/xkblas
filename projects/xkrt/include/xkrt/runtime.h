@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 22:51:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 05:36:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,15 +14,13 @@
 #ifndef __XKRT_RUNTIME_H__
 # define __XKRT_RUNTIME_H__
 
-# include <xkrt/logger/todo.h>
-# pragma message(TODO "split this file in two with public/private interfaces - moving public interfaces to 'xkrt.h'")
-
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/thread/thread.h>
 # include <xkrt/memory/coherency-controller.hpp>
 # include <xkrt/router-random.hpp>
 # include <xkrt/sync/spinlock.h>
+# include <xkrt/task/task.hpp>
 
 # include <hwloc.h>
 
@@ -179,9 +177,6 @@ typedef struct  xkrt_runtime_t
     /* end a critical section */
     void team_critical_end(xkrt_team_t * team);
 
-    /* enqueue a task to the given thread */
-    void team_thread_enqueue(xkrt_team_t * team, xkrt_thread_t * thread, task_t * task);
-
     ///////////////
     // UTILITIES //
     ///////////////
@@ -213,6 +208,16 @@ void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, ui
 void xkrt_device_task_execute(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device,
+    task_t * task
+);
+
+/* enqueue the task in the thread of the team */
+void xkrt_team_thread_task_enqueue(xkrt_runtime_t * runtime, xkrt_team_t * team, xkrt_thread_t * thread, task_t * task);
+
+/* submit a task to the given device */
+void xkrt_device_task_submit(
+    xkrt_runtime_t * runtime,
+    xkrt_device_global_id_t device_global_id,
     task_t * task
 );
 

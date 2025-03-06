@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 01:29:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 06:58:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -15,18 +15,12 @@
 #  define __XKRT_THREAD_H__
 
 #  include <xkrt/consts.h>
+#  include <xkrt/sync/spinlock.h>
+#  include <xkrt/task/task.hpp>
+#  include <xkrt/thread/deque.hpp>
 
 #  include <pthread.h>
-#  include <new>
-
-#ifdef __cpp_lib_hardware_interference_size
-    using std::hardware_constructive_interference_size;
-    using std::hardware_destructive_interference_size;
-#else
-    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
-    constexpr std::size_t hardware_constructive_interference_size = 64;
-    constexpr std::size_t hardware_destructive_interference_size = 64;
-#endif
+#  include <atomic>
 
 /* thread states */
 typedef enum    xkrt_thread_state_t
@@ -36,65 +30,6 @@ typedef enum    xkrt_thread_state_t
 }               xkrt_thread_state_t;
 
 struct xkrt_team_node_t;
-
-/* a deque (THE protocol) */
-template<typename T, int C>
-struct xkrt_deque_t
-{
-    T tasks[C];
-    alignas(hardware_destructive_interference_size) spinlock_t lock;
-    alignas(hardware_destructive_interference_size) std::atomic<int> h;
-    alignas(hardware_destructive_interference_size) std::atomic<int> t;
-
-    xkrt_deque_t() : tasks(), lock(0), t(0), h(0) {}
-
-    inline void
-    push(T & task)
-    {
-        tasks[t++] = task;
-    }
-
-    inline T
-    pop(void)
-    {
-        int idx = --t;
-        if (h > idx)
-        {
-            ++t;
-            SPINLOCK_LOCK(lock);
-            {
-                idx = --t;
-                if (h > idx)
-                {
-                    ++t;
-                    SPINLOCK_UNLOCK(lock);
-                    return NULL; // FAILURE
-                }
-            }
-            SPINLOCK_UNLOCK(lock);
-        }
-        return tasks[idx]; // SUCCESS
-    }
-
-    inline T
-    steal(void)
-    {
-        int idx;
-        SPINLOCK_LOCK(lock);
-        {
-            idx = h++;
-            if (idx > t)
-            {
-                --h;
-                SPINLOCK_UNLOCK(lock);
-                return NULL;  // FAILURE
-            }
-        }
-        SPINLOCK_UNLOCK(lock);
-        return tasks[idx];  // SUCCESS
-    }
-
-};
 
 /* a thread */
 typedef struct  xkrt_thread_t

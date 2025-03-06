@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 01:24:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 15:02:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -16,8 +16,8 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
 
-# define N 36
-# define CUTOFF_DEPTH 5
+static int N = 0;
+# define CUTOFF_DEPTH 10
 
 static const int fib_values[] = {
     1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610,
@@ -26,8 +26,6 @@ static const int fib_values[] = {
     5702887, 9227465, 14930352, 24157817, 39088169, 63245986, 102334155,
     165580141, 267914296, 433494437, 701408733, 1134903170, 1836311903
 };
-
-static_assert(N < sizeof(fib_values) / sizeof(int));
 
 static xkrt_runtime_t runtime;
 static task_format_id_t fmtid;
@@ -60,7 +58,7 @@ fib(int n, int depth = 0)
         *shared1        = &fn1;
         *firstprivate11 = n - 1;
         *firstprivate12 = depth+1;
-        __Thread_task_commit(tls, t1, runtime.team_thread_enqueue, tls->team, tls->thread, t1);
+        tls->commit(t1, xkrt_team_thread_task_enqueue, &runtime, tls->team, tls->thread);
 
         // shared(fn2) firstprivate(n, depth)
         task_t * t2 = tls->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
@@ -71,7 +69,8 @@ fib(int n, int depth = 0)
         *shared2        = &fn2;
         *firstprivate21 = n - 2;
         *firstprivate22 = depth+1;
-        __Thread_task_commit(tls, t2, runtime.team_thread_enqueue, tls->team, tls->thread, t2);
+        tls->commit(t2, xkrt_team_thread_task_enqueue, &runtime, tls->team, tls->thread);
+
         runtime.task_wait();
     }
     return fn1 + fn2;
@@ -84,9 +83,6 @@ body_host(task_t * task)
     const int *  n      = (const int *)  ((char*)task + sizeof(task_t) + sizeof(int *));
     const int *  depth  = (const int *)  ((char*)task + sizeof(task_t) + sizeof(int *) + sizeof(int));
 
-    Thread * tls = Thread::self();
-    LOGGER_INFO("thread %d running %d", tls->thread->tid, *n);
-
     *fn[0] = fib(*n, *depth);
 }
 
@@ -96,7 +92,7 @@ main_team(xkrt_team_t * team, xkrt_thread_t * thread)
     // warmup
     if (thread->tid == 0)
     {
-        fib(3);
+        fib(5);
         runtime.task_wait();
     }
     runtime.team_barrier<true>(team, thread);
@@ -135,8 +131,16 @@ get_ncpus(void)
 }
 
 int
-main(void)
+main(int argc, char ** argv)
 {
+    if (argc != 2)
+    {
+        LOGGER_ERROR("usage: %s [n]", argv[0]);
+        return 1;
+    }
+    N = atoi(argv[1]);
+    assert(N < sizeof(fib_values) / sizeof(int));
+
     assert(xkrt_init(&runtime) == 0);
 
     // register task format
@@ -150,7 +154,7 @@ main(void)
         .desc = {
             .routine = main_team,
             .args = NULL,
-            .nthreads = 2, // get_ncpus(),
+            .nthreads = get_ncpus(),
             .binding = {
                 .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
                 .places = XKRT_TEAM_BINDING_PLACES_CORE,

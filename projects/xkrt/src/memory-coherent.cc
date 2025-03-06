@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 05:57:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 05:47:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -57,6 +57,18 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
 
 }                                       args_fetch_t;
 
+static inline void
+task_complete(xkrt_runtime_t * runtime, task_t * task)
+{
+    assert(task);
+    assert(!(task->flags & TASK_FLAG_DETACHABLE));
+
+    Thread * thread = Thread::self();
+    assert(thread);
+
+    __task_complete(task, xkrt_runtime_submit_task, runtime);
+}
+
 static void
 body_memory_coherent_async_fetch_callback(
     const void * args[XKRT_CALLBACK_ARGS_MAX]
@@ -79,7 +91,7 @@ body_memory_coherent_async_fetch_callback(
     assert(parent);
 
     // one fetched completed, notify the parent
-    __task_fetched(1, parent, runtime->task_complete, parent);
+    __task_fetched(1, parent, task_complete, runtime);
 
     fetch_list_t * list = (fetch_list_t *) args[3];
     assert(list);
@@ -220,7 +232,7 @@ xkrt_memory_coherent_async_worker_thread_work(
     }
 
     // if early-completion happened
-    __task_fetched(1, current, runtime->task_complete, current);
+    __task_fetched(1, current, task_complete, runtime);
 }
 
 /////////////////////////////
