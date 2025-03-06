@@ -2810,6 +2810,7 @@ void print_segments()
 
 void* xkblas_get_work_pos(size_t size)
 {
+	//printf("try alloc %lx\n", size);
 	if( size == 0 )
 		return NULL;
 	size = (size + 7UL) & ~7UL; // Align
@@ -2828,6 +2829,7 @@ void* xkblas_get_work_pos(size_t size)
 		struct memory_segment* curr = free_segment_list;
 	  	while(curr)
 		{
+			//printf("Freelist: %p size %lx\n", curr, curr->size);
 			size_t curr_size = curr->size;
 			if( curr_size >= size )
 			{ // We have enought space to work here
@@ -2869,6 +2871,7 @@ void* xkblas_get_work_pos(size_t size)
 #endif
 			//printf("[LOC][%p] xkblas_mutex_unlock %p\n", pthread_self(), &work_buffer_mutex);
 			pthread_mutex_unlock( &work_buffer_mutex );
+			//printf("allocate %p\n", (void*) curr->ptr);
 			return (void*) curr->ptr;	
 		}
 		//printf("[LOC][%p] xkblas_cond_wait %p,%p\n", pthread_self(), &work_buffer_cond, &work_buffer_mutex);
@@ -2879,6 +2882,7 @@ void* xkblas_get_work_pos(size_t size)
 
 void xkblas_free_work_pos( void* ptr )
 {
+	//printf("try free %p\n", ptr);
 	//printf("[LOC][%p] xkblas_mutex_lock %p (free)\n", pthread_self(), &work_buffer_mutex);
 	pthread_mutex_lock( &work_buffer_mutex );
 	//printf("[LOC][%p] xkblas_mutex_lock %p (free) -- locked\n", pthread_self(), &work_buffer_mutex);
@@ -3005,6 +3009,38 @@ void xkblas_free_work_pos( void* ptr )
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
 
+struct memory_buffer_args {
+	void* pos;
+	size_t size;
+	size_t element_size;
+};
+
+void* memset_init_thread_function(void* args)
+{
+	struct memory_buffer_args* bargs = (struct memory_buffer_args*) args;
+
+#if KAAPI_USE_CUDA
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+
+	uintptr_t pos = (uintptr_t) bargs->pos;
+	//printf("range [%p,%p[\n", pos, pos + bargs->size );
+	size_t keep = bargs->size;
+	while( pos < ((uintptr_t) bargs->pos) + bargs->size )
+	{
+		size_t min = (keep < bargs->element_size) ? keep : bargs->element_size;
+		printf("memset %x at [%p,%p[ | %x/%x\n", min, pos, pos + min, keep, bargs->size);
+		driver->f_memset( (void*) pos, 0, min );
+		xkblas_free_work_pos( (void*) pos );
+		pos += bargs->element_size;
+		keep -= bargs->element_size;
+	}
+	free( args );
+	return NULL;
+}	
 void xkblas_register_work_buffer( void* ptr, size_t size )
 {
 	pthread_mutex_lock( &work_buffer_mutex );
@@ -3036,12 +3072,36 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 	printf("set gpu work %ld\n", size);
 	driver->f_advise_gpu( ptr, size);
 	printf("advise ok\n");
-	driver->f_memset( ptr, 0, size );
-	printf("memset 1 ok\n");
-	driver->f_memset( ptr, 0, size );
-	printf("memset 2 ok\n");
-    	//void (*f_advise_cpu)(void*,size_t);
+	
+	struct memory_buffer_args *bargs = (struct memory_buffer_args*) malloc(sizeof(struct memory_buffer_args));
+	bargs->pos =  (uintptr_t) ptr;
+	bargs->size = size;
+	bargs->element_size = 1024L * 1024L * 1024L;
+
+	printf("Start alloc all segs\n");
+	uintptr_t pos = (uintptr_t) bargs->pos;
+	size_t total_size = 0;
+	size_t keep = bargs->size;
+	while( pos < ((uintptr_t) bargs->pos) + size )
+	{
+		size_t min = (keep < bargs->element_size) ? keep : bargs->element_size;
+		void* get_ptr = xkblas_get_work_pos(min);
+//		printf("%p %p %p %lx/%lx\n", (void*) pos, get_ptr, (void*) ((uintptr_t) bargs->pos) + size, total_size, size );	
+
+		pos += min;
+		total_size += min;
+		keep -= min;
+	}
+	printf("End alloc all segs\n");
+
+	pthread_t thread;
+	pthread_create( &thread, NULL, memset_init_thread_function, bargs );
+	//pthread_join( thread, NULL );	
+	//driver->f_memset( ptr, 0, size );
 }
+
+
+
 
 void xkblas_bind_cpu( void* ptr, size_t size )
 {

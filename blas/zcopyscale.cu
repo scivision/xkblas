@@ -162,39 +162,6 @@ __global__ void kernel_zniv12( cuDoubleComplex* A, cuDoubleComplex* A_SON, int* 
 #endif
 }
 
-/*
-__global__ void kernel_zniv12_b( cuDoubleComplex* A, cuDoubleComplex* A_SON, int* IW,
-							int nrows, int ncols, int nass1, int nelim, int nfront, int cb_compressed )
-{
-	// Should be blocks of size 1024 x 1 x 1, grid of size nfront x 1 x 1
-	cooperative_groups::thread_block block_group = cooperative_groups::this_thread_block();
-	__shared__ cuDoubleComplex shared_son[1024];
-	__shared__ cuDoubleComplex shared_a[1024];
-
-	// Algo :
-	//  1 - one block per line
-	//  2 - load batch of A_SON
-	//  3 - place where needed in "shared"
-
-	// The reference is A[nfront x nfront]
-	for( int X = 0; X < nfront; X += blockDim.x )
-	{
-		bool should_store = ((X*blockDim.x+threadIdx.x) < nfront);
-		// Load A
-		if(should_store)
-			shared_a[threadIdx.x] = A[ blockIdx.x * nfront + X * blockDim.x + threadIdx.x ];
-		block_group.sync();
-		
-		// Check if 
-		
-
-		// Store A
-		block_group.sync();
-		if(should_store)
-			A[ blockIdx.x * nfront + X * blockDim.x + threadIdx.x ] = shared_a[threadIdx.x];
-	}
-}
-*/
 __global__ void kernel_zniv12_c( cuDoubleComplex* A, cuDoubleComplex* A_SON, int* IW,
 	int nrows, int ncols, int nass1, int nelim, int nfront, int cb_compressed, int* start, int* stop )
 {
@@ -271,6 +238,11 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 	struct timespec t0, t1;
 	clock_gettime( CLOCK_MONOTONIC, &t0 );
 
+	// Place IW on GPU...
+	int* iw_gpu = (int*) (A + (((uint64_t) nfront) * nfront));
+	for( int i = 0; i < nrows; i++ )
+		iw_gpu[i] = IW[i];
+	IW = iw_gpu;	
 #define niv12_B
 #ifdef niv12_A 
 	dim3 T = { (unsigned int) nrows, (unsigned int) nrows, 1 }; // How many threads we need
@@ -315,7 +287,7 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 #endif
 
 	CUDACHECK( cudaPeekAtLastError() );
-	CUDACHECK( cudaDeviceSynchronize() );
+	CUDACHECK( cudaStreamSynchronize(cuda_stream) );
 	clock_gettime( CLOCK_MONOTONIC, &t1 );
 	
 	//if( nrows > 5000 )
