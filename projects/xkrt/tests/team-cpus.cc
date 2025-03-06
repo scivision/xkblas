@@ -5,13 +5,15 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 05:19:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 22:24:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
-# define _GNU_SOURCE
+# ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+# endif
 # include <sched.h>
 
 # include <xkrt/xkrt.h>
@@ -21,10 +23,10 @@
 static xkrt_runtime_t runtime;
 
 static void *
-main_team(xkrt_team_t * team, int tid)
+main_team(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     int cpu = sched_getcpu();
-    LOGGER_INFO("Thread `%3d` running on `sched_getcpu() -> %3d`", tid, cpu);
+    LOGGER_INFO("Thread `%3d` running on `sched_getcpu() -> %3d`", thread->tid, cpu);
     return NULL;
 }
 

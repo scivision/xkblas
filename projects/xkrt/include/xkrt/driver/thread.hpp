@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 05:42:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 00:37:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -20,6 +20,7 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/cache-line-size.hpp>
 # include <xkrt/task/task.hpp>
+# include <xkrt/thread/thread.h>
 
 # include <stddef.h>
 # include <stdint.h>
@@ -33,6 +34,12 @@ class alignas(CACHE_LINE_SIZE) Thread
 {
 
     public:
+
+        /* the xkrt_team_t of that thread */
+        xkrt_team_t * team;
+
+        /* the xkrt_thread_t of that thread */
+        xkrt_thread_t * thread;
 
         /* the cpuset of that thread */
         cpu_set_t cpuset;
@@ -70,11 +77,6 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* Dependency tree */
         std::vector<DependencyTree *> deptrees;
-
-        #ifndef NDEBUG
-        std::vector<task_t *> tasks;
-        #endif /* NDEBUG */
-
 
     public:
 
@@ -159,6 +161,27 @@ class alignas(CACHE_LINE_SIZE) Thread
             tree->resolve<AC>(accesses);
         }
 
+        # define __Thread_task_execute(T, t, F, ...)                                                \
+            do {                                                                                    \
+                assert(T && t);                                                                     \
+                task_format_t * format = runtime->formats.list.list + t->fmtid;                     \
+                assert(format->f[TASK_FORMAT_TARGET_HOST]);                                         \
+                task_t * current = T->current_task;                                                 \
+                T->current_task = t;                                                                \
+                void (*f)(task_t *) = (void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST];      \
+                f(t);                                                                               \
+                __task_executed(t, F, __VA_ARGS__);                                                 \
+                T->current_task = current;                                                          \
+            } while (0)
+
+        # define __Thread_task_commit(T, t, F, ...)                             \
+            do {                                                                \
+                assert(T->current_task);                                        \
+                ++T->current_task->cc;                                          \
+                t->parent = T->current_task;                                    \
+                __task_commit(t, F, __VA_ARGS__);                               \
+            } while(0)
+
         /**
          *  Commit the passed task
          *      - compute its dependences
@@ -170,53 +193,8 @@ class alignas(CACHE_LINE_SIZE) Thread
         inline void
         commit(void * vargs, task_t * task)
         {
-            # ifndef NDEBUG
-            tasks.push_back(task);
-            # endif
-
-            assert(this->current_task);
-            this->current_task->cc.fetch_add(1, std::memory_order_relaxed);
-            task->parent = this->current_task;
-            __task_commit(task, callback, vargs, task);
+            __Thread_task_commit(this, task, callback, vargs, task);
         }
-
-        # ifndef NDEBUG
-        void
-        dump_tasks(FILE * f)
-        {
-            Thread::dump_tasks(f, this->tasks);
-        }
-
-        static void
-        dump_tasks(FILE * f, std::vector<task_t *> & tasks)
-        {
-            fprintf(f, "digraph G {\n");
-            for (task_t * & task : tasks)
-                fprintf(f, "    \"%p\" [label=\"%s\"] ;\n", task, task->label);
-
-            for (task_t * & pred : tasks)
-            {
-                if (pred->flags & TASK_FLAG_DEPENDENT)
-                {
-                    task_dep_info_t * dep = TASK_DEP_INFO(pred);
-                    access_t * accesses = TASK_ACCESSES(pred);
-                    for (int i = 0 ; i < dep->ac ; ++i)
-                    {
-                        access_t * pred_access = accesses + i;
-                        for (access_t * succ_access : pred_access->successors)
-                        {
-                            task_t * succ = succ_access->task;
-                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
-                        }
-                    }
-                }
-            }
-            fprintf(f, "}\n");
-        }
-
-        void report_tasks(void);
-        # endif /* NDEBUG */
-
 };
 
 #endif /* __THREAD_HPP__ */

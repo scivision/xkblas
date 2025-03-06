@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 05:03:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 01:29:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -17,6 +17,16 @@
 #  include <xkrt/consts.h>
 
 #  include <pthread.h>
+#  include <new>
+
+#ifdef __cpp_lib_hardware_interference_size
+    using std::hardware_constructive_interference_size;
+    using std::hardware_destructive_interference_size;
+#else
+    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+    constexpr std::size_t hardware_constructive_interference_size = 64;
+    constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
 
 /* thread states */
 typedef enum    xkrt_thread_state_t
@@ -27,11 +37,80 @@ typedef enum    xkrt_thread_state_t
 
 struct xkrt_team_node_t;
 
+/* a deque (THE protocol) */
+template<typename T, int C>
+struct xkrt_deque_t
+{
+    T tasks[C];
+    alignas(hardware_destructive_interference_size) spinlock_t lock;
+    alignas(hardware_destructive_interference_size) std::atomic<int> h;
+    alignas(hardware_destructive_interference_size) std::atomic<int> t;
+
+    xkrt_deque_t() : tasks(), lock(0), t(0), h(0) {}
+
+    inline void
+    push(T & task)
+    {
+        tasks[t++] = task;
+    }
+
+    inline T
+    pop(void)
+    {
+        int idx = --t;
+        if (h > idx)
+        {
+            ++t;
+            SPINLOCK_LOCK(lock);
+            {
+                idx = --t;
+                if (h > idx)
+                {
+                    ++t;
+                    SPINLOCK_UNLOCK(lock);
+                    return NULL; // FAILURE
+                }
+            }
+            SPINLOCK_UNLOCK(lock);
+        }
+        return tasks[idx]; // SUCCESS
+    }
+
+    inline T
+    steal(void)
+    {
+        int idx;
+        SPINLOCK_LOCK(lock);
+        {
+            idx = h++;
+            if (idx > t)
+            {
+                --h;
+                SPINLOCK_UNLOCK(lock);
+                return NULL;  // FAILURE
+            }
+        }
+        SPINLOCK_UNLOCK(lock);
+        return tasks[idx];  // SUCCESS
+    }
+
+};
+
 /* a thread */
 typedef struct  xkrt_thread_t
 {
+    /* the thread state, use for synchronizing */
     xkrt_thread_state_t state;
+
+    /* the pthread */
     pthread_t pthread;
+
+    /* the thread tid */
+    int tid;
+
+    /* the thread deque */
+    xkrt_deque_t<task_t *, 4096> deque;
+
 }               xkrt_thread_t;
 
 //  NOTES
@@ -112,7 +191,7 @@ struct xkrt_team_t;
 typedef struct  xkrt_team_desc_t
 {
     // routine that will be executed by each thread
-    void * (*routine)(struct xkrt_team_t * team, int tid);
+    void * (*routine)(struct xkrt_team_t * team, struct xkrt_thread_t * thread);
 
     // user arguments
     void * args;

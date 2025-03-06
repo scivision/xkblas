@@ -652,8 +652,8 @@ mem_transfer_run_d2d(xkrt_team_t * team, int tid)
     ////////////////////////////////////
 
     // size of memory to transfer
-    const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    // const size_t size = (size_t) 1 * 512 * 1024 * 1024;
+    // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
+    const size_t size = (size_t) 1 * 512 * 1024 * 1024;
     const size_t chunk_size = size / nchunks;
 
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)

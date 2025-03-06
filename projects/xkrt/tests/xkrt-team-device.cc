@@ -5,11 +5,11 @@ static xkrt_runtime_t runtime;
 static volatile int run_for_device[XKRT_DEVICES_MAX];
 
 static void *
-run(xkrt_team_t * team, int tid)
+run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    assert(tid >= 0);
-    assert(tid < runtime.drivers.devices.n);
-    run_for_device[tid] = 1;
+    assert(thread->tid >= 0);
+    assert(thread->tid < runtime.drivers.devices.n);
+    run_for_device[thread->tid] = 1;
     return NULL;
 }
 

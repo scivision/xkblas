@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 05:18:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/06 01:20:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -36,26 +36,6 @@ xkrt_runtime_t::thread_getaffinity(cpu_set_t & cpuset)
     pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
 }
 
-/* trampoline arguments */
-typedef struct  xkrt_thread_trampoline_args_t
-{
-    xkrt_team_t * team;
-    int tid;
-}               xkrt_thread_trampoline_args_t;
-
-static void *
-trampoline(void * vargs)
-{
-    xkrt_thread_trampoline_args_t * args = (xkrt_thread_trampoline_args_t *) vargs;
-    assert(args);
-
-    args->team->priv.threads[args->tid].state = XKRT_THREAD_INITIALIZED;
-    args->team->desc.routine(args->team, args->tid);
-    free(args);
-
-    return NULL;
-}
-
 static inline int
 team_barrier_fetch(xkrt_team_t * team, int delta)
 {
@@ -63,7 +43,7 @@ team_barrier_fetch(xkrt_team_t * team, int delta)
     assert(n >= 0);
     if (n == 0)
     {
-        team->priv.barrier.n.store(team->desc.nthreads, std::memory_order_seq_cst);
+        team->priv.barrier.n.store(team->priv.nthreads, std::memory_order_seq_cst);
         ++team->priv.barrier.version;
         pthread_mutex_lock(&team->priv.barrier.mtx);
         {
@@ -114,8 +94,49 @@ typedef struct  team_recursive_args_t
     cpu_set_t cpuset;
     int from;
     int to;
-    int malloced;
 }               team_recursive_args_t;
+
+/** Set the cpuset for the given thread */
+static void inline
+team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, cpu_set_t * cpuset)
+{
+    switch (team->desc.binding.mode)
+    {
+        case (XKRT_TEAM_BINDING_MODE_COMPACT):
+        {
+            switch (team->desc.binding.places)
+            {
+                case (XKRT_TEAM_BINDING_PLACES_DEVICE):
+                {
+                    const xkrt_device_t * device = runtime->device_get((xkrt_device_global_id_t) tid);
+                    assert(device);
+                    *cpuset = device->thread->cpuset;
+                    return ;
+                }
+
+                case (XKRT_TEAM_BINDING_PLACES_CORE):
+                {
+                    hwloc_obj_t pu = hwloc_get_pu_obj_by_os_index(runtime->topology, tid);
+                    HWLOC_SAFE_CALL(
+                        hwloc_cpuset_to_glibc_sched_affinity(
+                            runtime->topology,
+                            pu->cpuset,
+                            cpuset,
+                            sizeof(cpu_set_t)
+                        )
+                    );
+                    return ;
+                }
+
+                default:
+                    LOGGER_FATAL("Team config. not supported");
+            }
+        }
+
+        default:
+            LOGGER_FATAL("Team config. not supported");
+    }
+}
 
 static void *
 team_create_recursive(void * vargs)
@@ -125,10 +146,25 @@ team_create_recursive(void * vargs)
     // recursion end
     if (args->from == args->to)
     {
-        const int tid = args->from;
-        args->team->priv.threads[tid].state = XKRT_THREAD_INITIALIZED;
-        void * r = args->team->desc.routine(args->team, tid);
+        // init tls
+        Thread * tls = Thread::self();
+        xkrt_team_t * team = args->team;
+        int tid = args->from;
+        xkrt_thread_t * thread = team->priv.threads + tid;
+        thread->tid = tid;
+
+        tls->team = team;
+        tls->thread = thread;
+
+        // register affinity
+        xkrt_runtime_t::thread_getaffinity(tls->cpuset);
+
+        // launch routine
+        thread->state = XKRT_THREAD_INITIALIZED;
+        void * r = args->team->desc.routine(team, thread);
+
         free(args);
+
         return r;
     }
 
@@ -151,40 +187,33 @@ team_create_recursive(void * vargs)
             .runtime    = args->runtime,
             .team       = args->team,
             .from       = pairs[i][0],
-            .to         = pairs[i][1],
-            .malloced   = 1
+            .to         = pairs[i][1]
         };
         CPU_ZERO(&new_args.cpuset);
 
         // retrieve cpuset
-        hwloc_obj_t pu = hwloc_get_pu_obj_by_os_index(args->runtime->topology, new_args.from);
-        HWLOC_SAFE_CALL(
-            hwloc_cpuset_to_glibc_sched_affinity(
-                args->runtime->topology,
-                pu->cpuset,
-               &new_args.cpuset,
-                sizeof(cpu_set_t)
-            )
-        );
+        int tid = new_args.from;
+        team_create_get_cpuset(args->runtime, args->team, tid, &new_args.cpuset);
 
         // move thread before allocating future thread-private memory
         xkrt_runtime_t::thread_setaffinity(new_args.cpuset);
 
-        xkrt_thread_t * thread = new_args.team->priv.threads + new_args.from;
-
         team_recursive_args_t * dup = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
         memcpy(dup, &new_args, sizeof(team_recursive_args_t));
+
+        xkrt_thread_t * thread = new_args.team->priv.threads + tid;
         pthread_create(&thread->pthread, NULL, team_create_recursive, dup);
     }
 
     // restore calling thread cpu set
     xkrt_runtime_t::thread_setaffinity(save_set);
 
-    if (args->malloced)
-        free(args);
+    free(args);
 
     return NULL;
 }
+
+// TODO : this implementation is fucked, it creates way too many threads
 
 void
 xkrt_runtime_t::team_create(xkrt_team_t * team)
@@ -199,93 +228,193 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     memset(&team->priv, 0, sizeof(team->priv));
 
     // allocate thread array
-    team->priv.threads = (xkrt_thread_t *) malloc(sizeof(xkrt_thread_t) * team->desc.nthreads);
+    const int nthreads = team->desc.nthreads;   // TODO : this should be func of the team desc
+    team->priv.nthreads = nthreads;
+    team->priv.threads = (xkrt_thread_t *) malloc(sizeof(xkrt_thread_t) * team->priv.nthreads);
     assert(team->priv.threads);
-    memset(team->priv.threads, 0, sizeof(xkrt_thread_t) * team->desc.nthreads);
+    memset(team->priv.threads, 0, sizeof(xkrt_thread_t) * team->priv.nthreads);
 
     // init barrier with nthreads + 1 to avoid early barrier release
-    team->priv.barrier.n.store(team->desc.nthreads + 1, std::memory_order_seq_cst);
+    team->priv.barrier.n.store(team->priv.nthreads + 1, std::memory_order_seq_cst);
     pthread_mutex_init(&team->priv.barrier.mtx, NULL);
     pthread_cond_init(&team->priv.barrier.cond, NULL);
 
     // init critical
     pthread_mutex_init(&team->priv.critical.mtx, NULL);
 
-    switch (team->desc.binding.mode)
-    {
-        case (XKRT_TEAM_BINDING_MODE_COMPACT):
-        {
-            switch (team->desc.binding.places)
-            {
-                case (XKRT_TEAM_BINDING_PLACES_DEVICE):
-                {
-                    // save calling thread cpu set
-                    cpu_set_t save_set;
-                    xkrt_runtime_t::thread_getaffinity(save_set);
+    // TODO : rework this to always use the recursive fork and generate the topology
 
-                    assert(team->desc.nthreads == this->drivers.devices.n);
-                    for (xkrt_device_global_id_t device_global_id ; device_global_id < this->drivers.devices.n ; ++device_global_id)
-                    {
-                        const xkrt_device_t * device = this->device_get(device_global_id);
-                        assert(device);
+    team_recursive_args_t * args = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
+    assert(args);
 
-                        // move thread before allocating future thread-private memory
-                        xkrt_runtime_t::thread_setaffinity(device->thread->cpuset);
-
-                        xkrt_thread_t * thread = team->priv.threads + device_global_id;
-
-                        xkrt_thread_trampoline_args_t * args = (xkrt_thread_trampoline_args_t *) malloc(sizeof(xkrt_thread_trampoline_args_t));
-                        args->team = team;
-                        args->tid = (int) device_global_id;
-                        pthread_create(&thread->pthread, NULL, trampoline, args);
-                    }
-
-                    // restore calling thread cpu set
-                    xkrt_runtime_t::thread_setaffinity(save_set);
-
-                    break ;
-                }
-
-                case (XKRT_TEAM_BINDING_PLACES_CORE):
-                {
-                    team_recursive_args_t args = {
-                        .runtime = this,
-                        .team = team,
-                        .from = 0,
-                        .to = team->desc.nthreads - 1,
-                        .malloced = 0
-                    };
-                    team_create_recursive(&args);
-                    break ;
-                }
-
-                default:
-                    LOGGER_FATAL("Team config. not supported");
-            }
-            break ;
-        }
-
-        case (XKRT_TEAM_BINDING_MODE_SPREAD):
-        {
-            LOGGER_FATAL("Team config. not supported");
-            break ;
-        }
-    }
+    args->runtime = this;
+    args->team = team;
+    args->from = 0;
+    args->to = team->priv.nthreads - 1;
+    pthread_create(&team->priv.threads[0].pthread, NULL, team_create_recursive, args);
 
     // decrement barrier
     team_barrier_fetch(team, 1);
 }
 
+static inline void
+run(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    xkrt_thread_t * thread,
+    task_t * task
+) {
+    Thread * tls = Thread::self();
+    __Thread_task_execute(tls, task, runtime->team_thread_enqueue, team, thread);
+}
+
+/* Return the 'i-th' victim to steal for the thread 'tid' when there is 'n' threads in the tree */
+static inline int
+get_ith_victim(int tid, int i, int n)
+{
+    // assume threads are bound 1:1 compactly onto physical cores
+    // for instance, if we have n = 4 threads, we have
+    //      F : (tid, i, n) -> victim
+    // defined as
+    //      F(0, 0, 4) = 0  - but whatever, threads dont steal themselves
+    //      F(0, 1, 4) = 1
+    //      F(0, 2, 4) = 2
+    //      F(0, 3, 4) = 3
+    // and
+    //      F(1, 0, 4) = 1  - but whatever, threads dont steal themselves
+    //      F(1, 1, 4) = 0
+    //      F(1, 2, 4) = 3
+    //      F(1, 3, 4) = 2
+    // and
+    //      F(2, 0, 4) = 2
+    //      F(2, 1, 4) = 3
+    //      F(2, 2, 4) = 0
+    //      F(2, 3, 4) = 1
+
+    return (i + tid) % n;
+}
+
+static inline int
+worksteal(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    xkrt_thread_t * thread
+) {
+    const int n = team->priv.nthreads;
+    const int tid = thread->tid;
+
+    for (int i = 0 ; i < n ; ++i)
+    {
+        const int victim_tid = get_ith_victim(tid, i, n);
+        if (victim_tid == tid)
+            continue ;
+
+        xkrt_thread_t * victim = team->priv.threads + victim_tid;
+        task_t * task = victim->deque.steal();
+        if (task)
+        {
+            run(runtime, team, thread, task);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static inline int
+schedule(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    xkrt_thread_t * thread
+) {
+    task_t * task = thread->deque.pop();
+    if (task)
+    {
+        run(runtime, team, thread, task);
+        return 1;
+    }
+    return worksteal(runtime, team, thread);
+}
+
 void
-xkrt_runtime_t::team_barrier(xkrt_team_t * team)
+xkrt_runtime_t::team_thread_enqueue(
+    xkrt_team_t * team,
+    xkrt_thread_t * thread,
+    task_t * task
+) {
+    thread->deque.push(task);
+}
+
+void
+xkrt_runtime_t::task_wait(void)
+{
+    Thread * tls = Thread::self();
+    assert(tls);
+
+    if (tls->team)
+    {
+        while (schedule(this, tls->team, tls->thread))
+            ;
+    }
+
+    # define WAIT    do { if (tls->current_task->cc.load(std::memory_order_relaxed) == 0) return ; } while (0)
+    # define WAIT2   do { WAIT   ; WAIT   ; } while (0)
+    # define WAIT4   do { WAIT2  ; WAIT2  ; } while (0)
+    # define WAIT8   do { WAIT4  ; WAIT4  ; } while (0)
+    # define WAIT16  do { WAIT8  ; WAIT8  ; } while (0)
+    # define WAIT32  do { WAIT16 ; WAIT16 ; } while (0)
+    # define WAIT64  do { WAIT32 ; WAIT32 ; } while (0)
+
+    // Poll first for fast way out
+    mem_barrier();
+    WAIT32 ;
+
+    // Else, work steal and sleep with backoff
+    constexpr int initial_backoff = 1024;;  // Initial backoff time in nanoseconds
+    constexpr int max_backoff = 64 * 1024;  // Maximum backoff time nanoseconds
+    int backoff = initial_backoff;          // Initial backoff time in nanoseconds
+    assert(max_backoff < 1000000);          // nanosleep condition
+
+    struct timespec ts = { .tv_sec = 0 };
+    while (1)
+    {
+        // work steal
+        if (tls->team && schedule(this, tls->team, tls->thread))
+        {
+            backoff = initial_backoff;
+            continue ;
+        }
+
+        // sleep with backoff
+        ts.tv_nsec = backoff;
+        nanosleep(&ts, NULL);
+        if (backoff < max_backoff)
+            backoff = (backoff << 1);
+        WAIT64 ;
+    }
+}
+
+template<bool worksteal>
+void
+xkrt_runtime_t::team_barrier(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     // TODO : reimplement this using team's topology
+
+    this->task_wait();
+
+    if (team->priv.nthreads == 1)
+        return ;
+
+    assert((worksteal && thread) || (!worksteal && !thread));
 
     int old_version = team->priv.barrier.version;
     if (team_barrier_fetch(team, 1))
     {
         while (old_version == team->priv.barrier.version)
         {
+            if (worksteal && schedule(this, team, thread))
+                continue ;
+
+            # if 0
             pthread_mutex_lock(&team->priv.barrier.mtx);
             {
                 if (old_version == team->priv.barrier.version)
@@ -294,16 +423,21 @@ xkrt_runtime_t::team_barrier(xkrt_team_t * team)
                 }
             }
             pthread_mutex_unlock(&team->priv.barrier.mtx);
+            # endif
         }
     }
 }
+
+template void xkrt_runtime_t::team_barrier<true>(xkrt_team_t * team, xkrt_thread_t * thread);
+template void xkrt_runtime_t::team_barrier<false>(xkrt_team_t * team, xkrt_thread_t * thread);
 
 void
 xkrt_runtime_t::team_join(xkrt_team_t * team)
 {
     // TODO : reimpl this using team's topology
-    for (int i = 0 ; i < team->desc.nthreads ; ++i)
+    for (int i = 0 ; i < team->priv.nthreads ; ++i)
     {
+        // waiting for the thread to spawn before joining
         while ((volatile xkrt_thread_state_t) team->priv.threads[i].state != XKRT_THREAD_INITIALIZED)
             ;
         assert(team->priv.threads[i].state == XKRT_THREAD_INITIALIZED);

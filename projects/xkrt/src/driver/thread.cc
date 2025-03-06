@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 05:41:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 23:59:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,17 +43,14 @@ Thread::self(void)
 }
 
 Thread::Thread() :
+    team(NULL),
+    thread(NULL),
     cpuset(),
     implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
     current_task(&this->implicit_task),
     memory_stack_bottom(NULL),
     capacity(THREAD_MAX_MEMORY),
     queue()
-    // sleep(),
-    // deptrees()
-    # ifndef NDEBUG
-    , tasks()
-    # endif /* NDEBUG */
 {
     while (1)
     {
@@ -155,26 +152,3 @@ Thread::wakeup(void)
     }
     pthread_mutex_unlock(&this->sleep.lock);
 }
-
-# ifndef NDEBUG
-void
-Thread::report_tasks(void)
-{
-    int summary[TASK_STATE_MAX];
-    memset(summary, 0, sizeof(summary));
-
-    for (size_t i = 0 ; i < this->tasks.size() ; ++i)
-    {
-        task_t * task = this->tasks[i];
-        assert(task);
-
-        LOGGER_WARN("%4lu - %12s - %s", i, task_state_to_str(task->state.value), task->label);
-        ++summary[task->state.value];
-    }
-
-    LOGGER_WARN("Summary");
-    for (int i = 0 ; i < TASK_STATE_MAX ; ++i)
-        LOGGER_WARN("  %12s: %6d", task_state_to_str((task_state_t)i), summary[i]);
-}
-
-# endif /* NDEBUG */

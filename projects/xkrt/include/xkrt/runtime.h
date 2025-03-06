@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 04:33:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/05 22:51:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -167,7 +167,8 @@ typedef struct  xkrt_runtime_t
     void team_create(xkrt_team_t * team);
 
     /* wait until all threads called the barrier */
-    void team_barrier(xkrt_team_t * team);
+    template<bool worksteal = false>
+    void team_barrier(xkrt_team_t * team, xkrt_thread_t * thread = NULL);
 
     /* wait until all threads finished and destroy the team */
     void team_join(xkrt_team_t * team);
@@ -177,6 +178,9 @@ typedef struct  xkrt_runtime_t
 
     /* end a critical section */
     void team_critical_end(xkrt_team_t * team);
+
+    /* enqueue a task to the given thread */
+    void team_thread_enqueue(xkrt_team_t * team, xkrt_thread_t * thread, task_t * task);
 
     ///////////////
     // UTILITIES //
