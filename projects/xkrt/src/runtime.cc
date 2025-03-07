@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 04:34:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:49:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -73,7 +73,8 @@ xkrt_init(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Initializing XKRT");
 
-    memset(runtime, 0, sizeof(xkrt_runtime_t));
+    // set affinities to 0
+    memset(&runtime->router.affinity, 0, sizeof(runtime->router.affinity));
 
     // create topology
     hwloc_topology_init(&runtime->topology);

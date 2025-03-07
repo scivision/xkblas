@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 05:35:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:11:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1061,7 +1061,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 const memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
                 assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
                 # else
-                // Heuristic: use the largest valid allocation on that device to reduce D2D copies later
+                // Heuristic: use the largest valid allocation on that device to reduce D2D copies when trying to merge later
                 memory_allocation_view_id_t src_allocation_view_id = 0;
                 for (memory_allocation_view_id_t allocation_view_id = 1 ; allocation_view_id < src_replicate.nallocations ; ++allocation_view_id)
                 {

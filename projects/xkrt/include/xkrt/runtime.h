@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 05:36:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:39:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,7 +18,7 @@
 # include <xkrt/driver/driver.h>
 # include <xkrt/thread/thread.h>
 # include <xkrt/memory/coherency-controller.hpp>
-# include <xkrt/router-random.hpp>
+# include <xkrt/router-affinity.hpp>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/task/task.hpp>
 
@@ -56,7 +56,7 @@ typedef struct  xkrt_runtime_t
     xkrt_conf_t conf;
 
     /* memory router */
-    RouterRandom router;
+    RouterAffinity router;
 
     /* get a memory controller for the given ld/type size */
     MemoryCoherencyController * get_or_insert_memory_controller(const size_t ld, const size_t sizeof_type);

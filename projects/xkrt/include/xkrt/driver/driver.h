@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 01:52:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:43:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -76,7 +76,7 @@ typedef struct  xkrt_driver_t
     void (*f_device_init)(int device_driver_id);
 
     /* commit device (called once all devices of that driver had been initialized) */
-    int (*f_device_commit)(int device_driver_id);
+    int (*f_device_commit)(int device_driver_id, xkrt_device_global_id_bitfield_t * affinity);
 
     /* Release a device */
     int (*f_device_destroy)(int device_driver_id);

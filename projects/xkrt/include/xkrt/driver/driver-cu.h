@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 00:42:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:26:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -46,9 +46,6 @@ typedef struct  xkrt_stream_cu_t
 typedef struct  xkrt_device_cu_t
 {
     xkrt_device_t inherited;
-
-    /* affinity[i] - j-th bit is set to '1' if this device has an affinity 'i' with 'j' (the lowest affinity, the better perf) */
-    xkrt_device_global_id_bitfield_t * affinity;
 
     struct  {
 

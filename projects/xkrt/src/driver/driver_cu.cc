@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 02:32:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 16:45:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -151,6 +151,10 @@ get_gpu_topo(int ngpus)
     }
 
     cu_count_perfrank = min_perf - max_perf + 2;
+    assert(cu_count_perfrank < XKRT_DEVICES_PERF_RANK_MAX);
+    if (cu_count_perfrank >= XKRT_DEVICES_PERF_RANK_MAX)
+        LOGGER_FATAL("Too many perf ranks. Recompile increasing `XKRT_DEVICES_PERF_RANK_MAX` to at least %d", cu_count_perfrank);
+
     size_t size = cu_device_count * cu_count_perfrank * sizeof(uint64_t);
     cu_perf_device = (uint64_t *) malloc(size);
     assert(cu_perf_device);
@@ -310,61 +314,17 @@ XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
     return 0;
 }
 
-# if 0
-
-/**
- * @params
- *      'dst_global_id' is where to send the data
- *      'valid'         is a bitmask of 'device_global_id' where '1' means the device holds valid data
- *  @return
- *      the source device to use for a valid transfer
- */
-static xkrt_device_global_id_t
-XKRT_DRIVER_ENTRYPOINT(get_source)(
-    xkrt_device_global_id_t dst_global_id,
-    xkrt_device_global_id_bitfield_t bitfield
-) {
-    # pragma message(TODO "Improve this heuristic, naive currently")
-
-    assert(bitfield);
-
-    /* retrieve dst device */
-    xkrt_device_cu_t * device = (xkrt_device_cu_t *) xkrt_device_get(dst_global_id);
-    assert(device);
-
-    /* fast way out: good on that device already */
-    if (bitfield & (1 << dst_global_id))
-        return dst_global_id;
-
-    /* lowest rank <=> best performance - find a device for P2P transfer with most perf */
-    for (int rank = 0 ; rank < cu_count_perfrank -1 ; ++rank)
-    {
-        /* get valid devices for this affinity */
-        const xkrt_device_global_id_bitfield_t mask = bitfield & device->affinity[rank];
-        if (mask == 0)
-            continue ;
-
-        /* return a random device with this affinity */
-        return (xkrt_device_global_id_t) (__random_set_bit(mask) - 1);
-    }
-
-    /* no nvlink, get any random device */
-    return (xkrt_device_global_id_t) (__random_set_bit(bitfield) - 1);
-}
-
-# endif
-
 /* Called for each device of the driver once they all have been initialized */
 static int
-XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
-{
+XKRT_DRIVER_ENTRYPOINT(device_commit)(
+    int device_driver_id,
+    xkrt_device_global_id_bitfield_t * affinity
+) {
+    assert(affinity);
+
     xkrt_device_cu_t * device = device_cu_get(device_driver_id);
     assert(device);
     assert(device->inherited.state == XKRT_DEVICE_STATE_INIT);
-
-    const uint64_t size = sizeof(xkrt_device_global_id_bitfield_t) * cu_count_perfrank;
-    device->affinity = (xkrt_device_global_id_bitfield_t *) malloc(size);
-    memset(device->affinity, 0, size);
 
     cu_set_context(device_driver_id);
 
@@ -379,18 +339,12 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
         /* add device with itself */
         if (device_driver_id == other_device_driver_id)
         {
-            device->affinity[0] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device->inherited.global_id);
+            affinity[0] |= (xkrt_device_global_id_bitfield_t) (1UL << device->inherited.global_id);
         }
         else
         {
             int access;
-            CU_SAFE_CALL(
-                cuDeviceCanAccessPeer(
-                   &access,
-                    device->cu.device,
-                    other_device->cu.device
-                )
-            );
+            CU_SAFE_CALL(cuDeviceCanAccessPeer(&access, device->cu.device, other_device->cu.device));
 
             if (access)
             {
@@ -401,17 +355,19 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
                     assert(rank);
                     if (cu_perf_device[device_driver_id*cu_count_perfrank+rank] & (1UL << other_device_driver_id))
                     {
-                        device->affinity[rank - 1] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device_driver_id);
+                        affinity[rank - 1] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device_driver_id);
                     }
                 }
                 else
                 {
-                    LOGGER_WARN("Could not enable peer from %d to %d", device->inherited.global_id, other_device->inherited.global_id);
+                    LOGGER_WARN("Could not enable peer from %d to %d",
+                            device->inherited.global_id, other_device->inherited.global_id);
                 }
             }
             else
             {
-                LOGGER_WARN("GPU peer from %d to %d is not possible", device->inherited.global_id, other_device->inherited.global_id);
+                LOGGER_WARN("GPU peer from %d to %d is not possible",
+                        device->inherited.global_id, other_device->inherited.global_id);
             }
         }
     }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 02:32:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:29:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -138,6 +138,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
             # endif
         }
     }
+
     return 0;
 }
 
@@ -248,8 +249,25 @@ XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 
 /* Called for each device of the driver once they all have been initialized */
 static int
-XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id)
+XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id, xkrt_device_global_id_bitfield_t * affinity)
 {
+    // TODO: Intel API `zeDeviceGetP2PProperties` currently does not have a property about P2P performances
+    // so instead, simply hard-code affinity for now
+
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    xkrt_device_global_id_t device_global_id = device->inherited.global_id;
+
+    int rank = 0;
+    affinity[rank++] = (1 << device_global_id);
+# if SUBDEVICE_TO_XKRT_DEVICE
+    xkrt_device_global_id_t subdevice_global_id = (device_global_id % 2 == 0) ? (device_global_id + 1) : (device_global_id - 1);
+    affinity[rank++] =  (1 << subdevice_global_id);
+    affinity[rank++] = (~affinity[0]) & (~affinity[1]);
+# else
+    affinity[rank++] = ~affinity[0];
+# endif
+    assert(rank <= XKRT_DEVICES_PERF_RANK_MAX);
+
     return 0;
 }
 

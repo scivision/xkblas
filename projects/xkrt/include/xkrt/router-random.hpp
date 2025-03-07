@@ -15,32 +15,13 @@ class RouterRandom : public Router
 
     public:
         RouterRandom() {}
-        virtual ~RouterRandom() {}
+        ~RouterRandom() {}
 
         xkrt_device_global_id_t
         get_source(
             const xkrt_device_global_id_t dst,
             const xkrt_device_global_id_bitfield_t valid
-        ) {
-    # if 0
-        /** The lower the rank, the higher the performance */
-            /* fast way out: valid on that device already */
-            if (valid & (1 << dst_device_global_id))
-                return dst_device_global_id;
-
-            /* find a device for P2P transfer - lowest rank <=> best performance */
-            for (int rank = 0 ; rank < XKRT_DEVICE_PERF_RANK_MAX - 1 ; ++rank)
-            {
-                /* get valid devices for this perf */
-                const xkrt_device_global_id_bitfield_t mask = valid & this->affinity[rank];
-                if (mask == 0)
-                    continue ;
-
-                /* return a random device with this affinity */
-                return __random_set_bit(mask) - 1;
-            }
-    # endif /* 0 */
-
+        ) const {
             /* get any random device */
             return (xkrt_device_global_id_t) (__random_set_bit(valid) - 1);
         }

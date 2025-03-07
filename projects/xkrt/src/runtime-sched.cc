@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 05:38:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:09:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,6 +22,7 @@
 # include <xkrt/driver/thread.hpp>
 # include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
+# include <xkrt/logger/bits-to-str.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mem.h>
 # include <xkrt/stats/stats.h>
@@ -32,24 +33,6 @@
 # include <cerrno>
 
 # pragma message(TODO "Move these initializer into class member functions")
-
-///////////////////////////
-// DEVICE INITIALIZATION //
-///////////////////////////
-
-static void
-xkrt_device_commit(
-    xkrt_driver_t * driver,
-    xkrt_device_t * device
-) {
-    assert(driver->f_device_commit);
-    int err = driver->f_device_commit(device->driver_id);
-    if (err)
-        LOGGER_FATAL("Commit fail device %d of driver %s", device->driver_id, driver->f_get_name());
-
-    assert(device->state == XKRT_DEVICE_STATE_INIT);
-    device->state = XKRT_DEVICE_STATE_COMMIT;
-}
 
 /////////////////////////
 //  DEVICE PROGRESSION //
@@ -217,11 +200,29 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
         mem_pause();
 
     // can now commit my device
-    xkrt_device_commit(driver, device);
+    assert(driver->f_device_commit);
+    xkrt_device_global_id_bitfield_t * affinity = &(runtime->router.affinity[device->global_id][0]);
+    memset(affinity, 0, sizeof(runtime->router.affinity[device->global_id]));
+    int err = driver->f_device_commit(device->driver_id, affinity);
+    if (err)
+        LOGGER_FATAL("Commit fail device %d of driver %s", device->driver_id, driver->f_get_name());
+    assert(device->state == XKRT_DEVICE_STATE_INIT);
+    device->state = XKRT_DEVICE_STATE_COMMIT;
     ++driver->ndevices_commited;
 
+    for (int i = 0 ; i < XKRT_DEVICES_PERF_RANK_MAX ; ++i)
+    {
+        xkrt_device_global_id_bitfield_t bf = affinity[i];
+
+        // 0b0000...000\0
+        constexpr size_t nbytes = sizeof(runtime->router.affinity[0]);
+        char buffer[8*nbytes + 1];
+        xkrt_bits_to_str(buffer, (unsigned char *) &runtime->router.affinity[device->global_id][0], nbytes);
+        LOGGER_DEBUG("Device `%u` affinity mask for perf `%u` is `%s`", device->global_id, i, buffer);
+    }
+
     /* infinite loop with the device context */
-    int err = xkrt_device_thread_main_loop(runtime, device);
+    err = xkrt_device_thread_main_loop(runtime, device);
     assert((err==0) || (err==EINTR));
 
     # pragma message(TODO "Implement proper device deinitialization")

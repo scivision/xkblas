@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 06:31:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 02:13:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -350,8 +350,10 @@ main(void)
     // Create tasks to distribute memory
     # if 1
     xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE), 0, 0);
+    xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE), 0, 0);
     # elif 0
     xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE));
+    xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE));
     # elif 0
     xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
     xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
