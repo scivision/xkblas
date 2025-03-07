@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:51:05 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 23:48:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -147,7 +147,7 @@ typedef struct  task_t
 
 }               task_t;
 
-typedef uint8_t task_wait_counter_type_t;
+typedef int8_t task_wait_counter_type_t;
 typedef std::atomic<task_wait_counter_type_t> task_wait_counter_t;
 
 # define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)
@@ -400,7 +400,7 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
 }
 
 /* task task precedes the passed task */
-static inline void
+static inline int
 __task_precedes(task_t * pred, task_t * succ)
 {
     assert(pred);
@@ -409,6 +409,8 @@ __task_precedes(task_t * pred, task_t * succ)
     assert(succ->state.value >= TASK_STATE_ALLOCATED);
     assert(pred->flags & TASK_FLAG_DEPENDENT);
     assert(succ->flags & TASK_FLAG_DEPENDENT);
+
+    int r = 0;
     if (pred->state.value < TASK_STATE_COMPLETED)
     {
         SPINLOCK_LOCK(pred->state.lock);
@@ -417,10 +419,12 @@ __task_precedes(task_t * pred, task_t * succ)
             {
                 task_dep_info_t * sdep = TASK_DEP_INFO(succ);
                 sdep->wc.fetch_add(1, std::memory_order_seq_cst);
+                r = 1;
             }
         }
         SPINLOCK_UNLOCK(pred->state.lock);
     }
+    return r;
 }
 
 ////////////////////////////////////
@@ -436,6 +440,7 @@ __task_ready(
     Args... args
 ) {
     assert(task->state.value == TASK_STATE_ALLOCATED);
+    assert(!(task->flags & TASK_FLAG_DEPENDENT) || (TASK_DEP_INFO(task)->wc.load() == 0));
     task->state.value = TASK_STATE_READY;
     LOGGER_DEBUG_TASK_STATE(task);
     F(std::forward<Args>(args)..., task);
