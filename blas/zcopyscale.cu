@@ -297,9 +297,9 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 		double bw_all = (((uint64_t) nfront)*nfront/2)/t/1e9;
 #ifdef niv12_B
 		double t_2 = (t2.tv_sec - t0.tv_sec) + (t2.tv_nsec - t0.tv_nsec)/1e9; 
-		printf("run [%06d,%d] r in %lf ms, %lf Ge/s %lf Ge/s all - cpu part %lf\n", nrows, nfront, t*1000, bw, bw_all, t_2*1000 );
+		//printf("run [%06d,%d] r in %lf ms, %lf Ge/s %lf Ge/s all - cpu part %lf\n", nrows, nfront, t*1000, bw, bw_all, t_2*1000 );
 #else	
-		printf("run [%06d,%d] r in %lf ms, %lf Ge/s %lf Ge/s all\n", nrows, nfront, t*1000, bw, bw_all);
+		//printf("run [%06d,%d] r in %lf ms, %lf Ge/s %lf Ge/s all\n", nrows, nfront, t*1000, bw, bw_all);
 #endif
 		
 		/*

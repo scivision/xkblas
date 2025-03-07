@@ -3096,7 +3096,7 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 
 	pthread_t thread;
 	pthread_create( &thread, NULL, memset_init_thread_function, bargs );
-	//pthread_join( thread, NULL );	
+	pthread_join( thread, NULL );	
 	//driver->f_memset( ptr, 0, size );
 }
 
