@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 17:26:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 23:24:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -204,6 +204,8 @@ main_gemm(char ** args)
     # define CImpl ((TYPE *)matrices[4])
     prepare_n_matrices(matrices, 5, ld);
 
+    srand(2024);
+
     // for small matrices
     if (m <= 64)
     {
@@ -217,18 +219,19 @@ main_gemm(char ** args)
             B[i * ld + i] = 1.0;
             for (int j = 0 ; j < ld ; ++j)
             {
+                A[i * ld + j] = rand() % 8;
                 // A[i * ld + j] = (7 * i * j) % 13;
-                A[i * ld + j] = (i + j);
+                // A[i * ld + j] = (i + j);
             }
         }
     }
 
     int t1 = 0;
-    int t2 = 0;
+    int t2 = 1;
 
-    // for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+//    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+//        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 

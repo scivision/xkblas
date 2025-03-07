@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 05:47:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 23:20:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -336,7 +336,7 @@ xkrt_coherency_host_async(
 
     /* create one task per conflict shrinking the access (stored in cubes)
      * responsible of fetching the chunk */
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
     constexpr size_t task_size = task_compute_size(flags, 0);
     constexpr size_t args_size = sizeof(args_t);
 
@@ -347,6 +347,9 @@ xkrt_coherency_host_async(
 
         task_dep_info_t * dep = TASK_DEP_INFO(task);
         new (dep) task_dep_info_t(0);
+
+        task_dev_info_t * dev = TASK_DEV_INFO(task);
+        new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
 
         /* link the virtual access to the task, so it is activated correctly
          * when predecessors completes.  This access is virtual though, no need

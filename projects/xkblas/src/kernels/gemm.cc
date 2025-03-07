@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:04:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 23:27:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -115,10 +115,10 @@ xkblas_£gemm_tile_async(
     # endif /* NDEBUG */
 
     // TODO : there is an issue with how trans and accesses are handled
-    const size_t Am = m; // (transA == CblasNoTrans) ? m : k;
-    const size_t An = k; // (transA == CblasNoTrans) ? k : m;
-    const size_t Bm = k; // (transB == CblasNoTrans) ? k : n;
-    const size_t Bn = n; // (transB == CblasNoTrans) ? n : k;
+    const size_t Am = (transA == CblasNoTrans) ? m : k;
+    const size_t An = (transA == CblasNoTrans) ? k : m;
+    const size_t Bm = (transB == CblasNoTrans) ? k : n;
+    const size_t Bn = (transB == CblasNoTrans) ? n : k;
     const size_t Cm = m;
     const size_t Cn = n;
 
