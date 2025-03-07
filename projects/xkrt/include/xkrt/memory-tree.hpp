@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:11:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:32:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -271,7 +271,7 @@ class KMemoryBlock {
                     // warning: 'ld' here depends on the allocation itself
                     const INTERVAL_DIFF_TYPE_T offset   = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr          = (uintptr_t) ((INTERVAL_DIFF_TYPE_T) inheriting_allocation->view.addr + offset);
-                    assert(begin_addr >= inheriting_allocation->chunk->device_ptr);
+                    assert(begin_addr >= inheriting_allocation->chunk->ptr);
 
                     # pragma message(TODO "This memory is currently leaked when 'invalidate' is called")
                     MemoryReplicateAllocationView * allocation = new MemoryReplicateAllocationView(inheriting_allocation->chunk, begin_addr, inheriting_allocation->view.ld);
@@ -819,7 +819,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             fetch_t * fetch,
             task_t * task
         ) {
-            LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->device_ptr);
+            LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->ptr);
             __task_fetched(1, task, xkrt_device_task_submit, runtime, fetch->dst_device_global_id);
         }
 
@@ -844,7 +844,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             assert(fetch_idx >= 0 && fetch_idx < list->n);
 
             fetch_t * fetch = list->fetches + fetch_idx;
-            LOGGER_DEBUG("Fetch completed for allocation `%p`", (void *) fetch->dst_chunk->device_ptr);
+            LOGGER_DEBUG("Fetch completed for allocation `%p`", (void *) fetch->dst_chunk->ptr);
 
             fetch_callback_task(runtime, fetch, task);
 
@@ -1260,7 +1260,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 assert(d[ACCESS_CUBE_COL_DIM] >= 0);
 
                 const uintptr_t offset = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM]*ld*sizeof_type;
-                const uintptr_t begin_addr = chunk->device_ptr + offset;
+                const uintptr_t begin_addr = chunk->ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
                 const uint8_t allocation_view_id = replicate.nallocations++;
@@ -1789,7 +1789,7 @@ next_view:
                         MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
                         const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_CUBE_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
                         allocation_view->view.addr += offset;
-                        assert(allocation_view->view.addr >= allocation_view->chunk->device_ptr);
+                        assert(allocation_view->view.addr >= allocation_view->chunk->ptr);
                     }
                 }
             }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 01:43:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:35:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,13 +41,13 @@ xkrt_device_t::memory_reset(void)
 
 void
 xkrt_device_t::memory_set_chunk0(
-    uintptr_t device_ptr,
+    uintptr_t ptr,
     size_t size,
     int area_idx
 ) {
     xkrt_area_t * area = &(this->memories[area_idx].area);
 
-    area->chunk0.device_ptr    = device_ptr;
+    area->chunk0.ptr    = ptr;
     area->chunk0.size          = size;
     area->chunk0.state         = XKRT_ALLOC_CHUNK_STATE_FREE;
     area->chunk0.prev          = NULL;
@@ -61,9 +61,15 @@ xkrt_device_t::memory_set_chunk0(
 void
 xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
 {
+    return this->memory_deallocate_on(chunk, chunk->area_idx);
+}
+
+void
+xkrt_device_t::memory_deallocate_on(xkrt_area_chunk_t * chunk, int area_idx)
+{
     assert(chunk->area_idx >= 0);
     assert(chunk->area_idx < this->nmemories);
-    xkrt_area_t * area = &(this->memories[chunk->area_idx].area);
+    xkrt_area_t * area = &(this->memories[area_idx].area);
 
     bool delete_chunk = false;
     XKRT_MUTEX_LOCK(area->lock);
@@ -79,8 +85,8 @@ xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
             if (chunk->prev)
                 chunk->prev->next = next_chunk;
             next_chunk->size += chunk->size;
-            assert(next_chunk->device_ptr > chunk->device_ptr);
-            next_chunk->device_ptr = chunk->device_ptr;
+            assert(next_chunk->ptr > chunk->ptr);
+            next_chunk->ptr = chunk->ptr;
             delete_chunk = true;
         }
 
@@ -93,8 +99,8 @@ xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
             {
                 if (delete_chunk)
                 {
-                    assert(prev_chunk->device_ptr < chunk->device_ptr);
-                    assert(prev_chunk->device_ptr < next_chunk->device_ptr);
+                    assert(prev_chunk->ptr < chunk->ptr);
+                    assert(prev_chunk->ptr < next_chunk->ptr);
 
                     prev_chunk->size += next_chunk->size;
                     prev_chunk->next = next_chunk->next;
@@ -106,7 +112,7 @@ xkrt_device_t::memory_deallocate(xkrt_area_chunk_t * chunk)
                 else
                 {
                     /* merge chunk into prev_chunk */
-                    assert(prev_chunk->device_ptr < chunk->device_ptr);
+                    assert(prev_chunk->ptr < chunk->ptr);
                     prev_chunk->next = chunk->next;
                     if (chunk->next)
                         chunk->next->prev = prev_chunk;
@@ -194,7 +200,7 @@ xkrt_device_t::memory_allocate_on(const size_t user_size, int area_idx)
         {
             size_t curr_size = curr->size;
             xkrt_area_chunk_t * remainder = (xkrt_area_chunk_t *) malloc(sizeof(xkrt_area_chunk_t));
-            remainder->device_ptr   = size + curr->device_ptr;
+            remainder->ptr          = size + curr->ptr;
             remainder->size         = (curr_size - size);
             remainder->state        = XKRT_ALLOC_CHUNK_STATE_FREE;
             remainder->use_counter  = 0;
@@ -237,14 +243,7 @@ xkrt_device_t::memory_allocate_on(const size_t user_size, int area_idx)
 xkrt_area_chunk_t *
 xkrt_device_t::memory_allocate(const size_t user_size)
 {
-    /* Heuristic: allocate on device's memory with increasing index order */
-    for (int i = 0 ; i < this->nmemories ; ++i)
-    {
-        xkrt_area_chunk_t * chunk = this->memory_allocate_on(user_size, i);
-        if (chunk)
-            return chunk;
-    }
-    return NULL;
+    return this->memory_allocate_on(user_size, 0);
 }
 
 ///////////////////////

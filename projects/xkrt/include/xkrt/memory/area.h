@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 17:51:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:31:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -35,7 +35,7 @@ typedef enum    xkrt_area_chunk_state_t
 */
 typedef struct  xkrt_area_chunk_t
 {
-    uintptr_t device_ptr;                   /* position of memory in device */
+    uintptr_t ptr;                   /* position of memory in device */
     size_t size;                            /* size of the segment in byte */
     int state;                              /* state of the chunk */
     struct xkrt_area_chunk_t * prev;        /* previous chunk in double chained list */

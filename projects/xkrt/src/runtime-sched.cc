@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:09:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:53:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -208,18 +208,17 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
         LOGGER_FATAL("Commit fail device %d of driver %s", device->driver_id, driver->f_get_name());
     assert(device->state == XKRT_DEVICE_STATE_INIT);
     device->state = XKRT_DEVICE_STATE_COMMIT;
-    ++driver->ndevices_commited;
 
     for (int i = 0 ; i < XKRT_DEVICES_PERF_RANK_MAX ; ++i)
     {
         xkrt_device_global_id_bitfield_t bf = affinity[i];
-
-        // 0b0000...000\0
-        constexpr size_t nbytes = sizeof(runtime->router.affinity[0]);
+        int nbytes = sizeof(xkrt_device_global_id_bitfield_t);
         char buffer[8*nbytes + 1];
-        xkrt_bits_to_str(buffer, (unsigned char *) &runtime->router.affinity[device->global_id][0], nbytes);
+        xkrt_bits_to_str(buffer, (unsigned char *) &bf, nbytes);
         LOGGER_DEBUG("Device `%u` affinity mask for perf `%u` is `%s`", device->global_id, i, buffer);
     }
+
+    ++driver->ndevices_commited;
 
     /* infinite loop with the device context */
     err = xkrt_device_thread_main_loop(runtime, device);

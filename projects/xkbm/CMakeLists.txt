@@ -18,9 +18,9 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
     ${CMAKE_SOURCE_DIR}/src/cuda/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/hwloc/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
+  # ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/xkrt/benchmarks.cc
-    ${CMAKE_SOURCE_DIR}/src/aml/benchmarks.cc
+  # ${CMAKE_SOURCE_DIR}/src/aml/benchmarks.cc
 )
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")

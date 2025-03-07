@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:42:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:35:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -112,6 +112,9 @@ typedef struct  xkrt_device_t
 
     /* allocate memory */
     xkrt_area_chunk_t * memory_allocate(const size_t size);
+
+    /* deallocate the given chunk */
+    void memory_deallocate_on(xkrt_area_chunk_t * chunk, int area_idx);
 
     /* deallocate the given chunk */
     void memory_deallocate(xkrt_area_chunk_t * chunk);

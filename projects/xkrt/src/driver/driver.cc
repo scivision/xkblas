@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 01:21:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/07 17:33:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -241,7 +241,7 @@ xkrt_driver_deinit(xkrt_drivers_t * drivers, uint8_t driver_type)
             for (int j = 0 ; j < device->nmemories ; ++j)
             {
                 xkrt_area_t * area = &(device->memories[j].area);
-                driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.device_ptr, area->chunk0.size, j);
+                driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.ptr, area->chunk0.size, j);
             }
         }
     }
