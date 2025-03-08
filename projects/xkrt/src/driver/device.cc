@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:35:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/08 00:21:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -265,7 +265,7 @@ xkrt_device_t::offloader_init(
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = (this->conf->offloader.streams[stype].n > 0) ? this->conf->offloader.streams[stype].n : f_stream_suggest ? f_stream_suggest(this->driver_id, (xkrt_stream_type_t) stype) : 4;
-        cnt += this->conf->offloader.streams[stype].n;
+        cnt += this->count[stype];
     }
 
     /* allocate streams array */
@@ -277,7 +277,7 @@ xkrt_device_t::offloader_init(
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
         this->streams[stype] = all_streams + i;
-        for (int j = 0 ; j < this->conf->offloader.streams[stype].n ; ++j, ++i)
+        for (int j = 0 ; j < this->count[stype] ; ++j, ++i)
         {
             all_streams[i] = f_stream_create(this, static_cast<xkrt_stream_type_t>(stype), this->conf->offloader.capacity);
             assert(all_streams[i]);

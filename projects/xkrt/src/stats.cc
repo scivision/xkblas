@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 05:05:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/08 00:15:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -140,6 +140,8 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
     # if XKRT_SUPPORT_STATS
     LOGGER_WARN("----------------- STATS -----------------");
     device_stats_t agg;
+    memset(&agg, 0, sizeof(agg));
+
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
     {
         xkrt_device_t * device = runtime->drivers.devices.list[device_global_id];
