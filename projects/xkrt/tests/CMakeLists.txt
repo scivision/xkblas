@@ -6,7 +6,7 @@ include(CTest)
 project(tests)
 
 # list of tests
-file(GLOB TEST_SOURCES "*.cc")
+file(GLOB TEST_SOURCES "*.cc" "khp-tree/*.cc")
 
 # Loop over each test source file
 foreach(TEST_FILE ${TEST_SOURCES})
