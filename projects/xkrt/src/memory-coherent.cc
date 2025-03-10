@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 23:20:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 23:00:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,27 @@
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;
+
+// args for 'runtime->coherent_async'
+typedef struct alignas(CACHE_LINE_SIZE) args_t
+{
+    xkrt_runtime_t * runtime;
+    access_t access;
+    Cube cubes[4];
+    std::atomic<int> counter;
+
+    args_t(xkrt_runtime_t * runtime, task_t * task, const access_t & x, const access_t & y) :
+        runtime(runtime), access(task, MATRIX_COLMAJOR, NULL, x.host_view.ld, 0, 0, 0, 0, x.host_view.sizeof_type, ACCESS_MODE_V), counter(0)
+    {
+        assert(x.host_view.ld          == y.host_view.ld);
+        assert(x.host_view.sizeof_type == y.host_view.sizeof_type);
+        access_t::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
+        access_t::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
+        access_t::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
+        access_t::Cube::intersection(this->cubes + 3, x.cubes[1], y.cubes[1]);
+    }
+    ~args_t() {}
+}                                       args_t;
 
 //////////////////////////
 // COHERENT FETCH TASKS //
@@ -57,18 +78,6 @@ typedef struct alignas(CACHE_LINE_SIZE) args_fetch_t
 
 }                                       args_fetch_t;
 
-static inline void
-task_complete(xkrt_runtime_t * runtime, task_t * task)
-{
-    assert(task);
-    assert(!(task->flags & TASK_FLAG_DETACHABLE));
-
-    Thread * thread = Thread::self();
-    assert(thread);
-
-    __task_complete(task, xkrt_runtime_submit_task, runtime);
-}
-
 static void
 body_memory_coherent_async_fetch_callback(
     const void * args[XKRT_CALLBACK_ARGS_MAX]
@@ -91,7 +100,9 @@ body_memory_coherent_async_fetch_callback(
     assert(parent);
 
     // one fetched completed, notify the parent
-    __task_fetched(1, parent, task_complete, runtime);
+    args_t * parent_args = (args_t *) TASK_ARGS(parent);
+    if (parent_args->counter.fetch_sub(1, std::memory_order_seq_cst) == 1)
+        runtime->task_detachable_post(parent);
 
     fetch_list_t * list = (fetch_list_t *) args[3];
     assert(list);
@@ -152,42 +163,17 @@ body_memory_coherent_async_fetch(task_t * task)
 // COHERENT ASYNC TASK //
 /////////////////////////
 
-// args for 'runtime->coherent_async'
-typedef struct alignas(CACHE_LINE_SIZE) args_t
-{
-    access_t access;
-    Cube cubes[4];
-
-    args_t(task_t * task, const access_t & x, const access_t & y) :
-        access(task, MATRIX_COLMAJOR, NULL, x.host_view.ld, 0, 0, 0, 0, x.host_view.sizeof_type, ACCESS_MODE_V)
-    {
-        assert(x.host_view.ld          == y.host_view.ld);
-        assert(x.host_view.sizeof_type == y.host_view.sizeof_type);
-        access_t::Cube::intersection(this->cubes + 0, x.cubes[0], y.cubes[0]);
-        access_t::Cube::intersection(this->cubes + 1, x.cubes[0], y.cubes[1]);
-        access_t::Cube::intersection(this->cubes + 2, x.cubes[1], y.cubes[0]);
-        access_t::Cube::intersection(this->cubes + 3, x.cubes[1], y.cubes[1]);
-    }
-    ~args_t() {}
-}                                       args_t;
-
 static void
-xkrt_memory_coherent_async_worker_thread_work(
-    xkrt_runtime_t * runtime,
-    Thread * thread,
-    task_t * current
-) {
-    assert(runtime);
-    assert(thread);
-    assert(thread == Thread::self());
-    assert(thread == runtime->memory_coherent_worker_thread);
-    assert(current);
-    assert(current->state.value == TASK_STATE_READY);
-    assert(current->flags & TASK_FLAG_DEPENDENT);
-    assert(TASK_DEP_INFO(current)->wc == 0);
-
-    const args_t * args = (const args_t *) TASK_ARGS(current);
+body_memory_coherent_async(task_t * current)
+{
+    args_t * args = (args_t *) TASK_ARGS(current);
     assert(args);
+
+    xkrt_runtime_t * runtime = args->runtime;
+    assert(runtime);
+
+    Thread * thread = Thread::self();
+    assert(thread);
 
     // this is ugly, result of the memorytree bad design, fix me
     MemoryTree * memtree = (MemoryTree *) runtime->get_or_insert_memory_controller(args->access.host_view.ld, args->access.host_view.sizeof_type);
@@ -197,16 +183,11 @@ xkrt_memory_coherent_async_worker_thread_work(
     assert(list);
 
     // avoid early completion
-    __task_fetching(1, current);
-
-    Thread * producer = Thread::self();
-    assert(producer);
+    args->counter.fetch_add(list->n + 1, std::memory_order_seq_cst);
 
     // launch each fetch
     for (uint32_t i = 0 ; i < list->n ; ++i)
     {
-        __task_fetching(1, current);
-
         fetch_t * fetch = list->fetches + i;
         assert(fetch->src_device_global_id != HOST_DEVICE_GLOBAL_ID);
         assert(fetch->dst_device_global_id == HOST_DEVICE_GLOBAL_ID);
@@ -232,66 +213,8 @@ xkrt_memory_coherent_async_worker_thread_work(
     }
 
     // if early-completion happened
-    __task_fetched(1, current, task_complete, runtime);
-}
-
-/////////////////////////////
-// HELPER THREAD MAIN LOOP //
-/////////////////////////////
-
-static void
-xkrt_memory_coherent_async_worker_thread_main_loop(xkrt_runtime_t * runtime)
-{
-    Thread * thread = Thread::self();
-    assert(thread == runtime->memory_coherent_worker_thread);
-
-    // TODO : instead, while runtime->running
-    while (1)
-    {
-        task_t * task;
-        while ((task = thread->pop()) == NULL)
-            thread->pause();
-
-        assert(task->fmtid == runtime->formats.coherent_async);
-        xkrt_memory_coherent_async_worker_thread_work(runtime, thread, task);
-    }
-}
-
-static void *
-xkrt_memory_coherent_async_worker_thread_main(void * arg)
-{
-    xkrt_runtime_t * runtime = (xkrt_runtime_t *) arg;
-    assert(runtime);
-
-    runtime->memory_coherent_worker_thread = Thread::self();
-
-    unsigned int cpu, node;
-    getcpu(&cpu, &node);
-    LOGGER_INFO("Starting a helper thread for async host copy on cpu %d of node %d", cpu, node);
-
-    /* infinite loop with the device runtime */
-    xkrt_memory_coherent_async_worker_thread_main_loop(runtime);
-
-    return NULL;
-}
-
-////////////////////////
-// HELPER THREAD INIT //
-////////////////////////
-
-void
-xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime)
-{
-    runtime->memory_coherent_worker_thread = NULL;
-
-    pthread_t thread;
-    int err = pthread_create(&thread, NULL, xkrt_memory_coherent_async_worker_thread_main, runtime);
-    if (err)
-        LOGGER_FATAL("Could not create thread for async host copy");
-
-    // TODO : could use a mutex and a cond here
-    while ((volatile void *) runtime->memory_coherent_worker_thread == NULL)
-        mem_pause();
+    if (args->counter.fetch_sub(1, std::memory_order_seq_cst) == 1)
+        runtime->task_detachable_post(current);
 }
 
 //////////////////////
@@ -316,7 +239,36 @@ xkrt_coherency_host_async(
     size_t m, size_t n,
     size_t sizeof_type
 ) {
-    LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
+    // LOGGER_IMPL("in `xkrt_memory_coherent_async` - uplo and memflag parameters not supported");
+
+    # if 0
+    // implementation with a single copy once all partites are ready
+    Thread * thread = Thread::self();
+
+    # define AC 1
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+
+    task_t * task = thread->allocate_task(task_size);
+    new(task) task_t(TASK_FORMAT_NULL, flags);
+
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    # ifndef NDEBUG
+    snprintf(task->label, sizeof(task->label), "coherency-host-all");
+    # endif /* NDEBUG */
+
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
+    new(accesses + 0) access_t(task, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    thread->resolve<AC>(task, accesses);
+    # undef AC
+
+    runtime->task_commit(task);
+
+    # else
+    // implementation with 1 copy per partite, launched as soon as they are ready
 
     // TODO : allocate instead on the thread thread ? creates a concurrency issue in the allocator though
     Thread * thread = Thread::self();
@@ -336,7 +288,7 @@ xkrt_coherency_host_async(
 
     /* create one task per conflict shrinking the access (stored in cubes)
      * responsible of fetching the chunk */
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, 0);
     constexpr size_t args_size = sizeof(args_t);
 
@@ -348,14 +300,11 @@ xkrt_coherency_host_async(
         task_dep_info_t * dep = TASK_DEP_INFO(task);
         new (dep) task_dep_info_t(0);
 
-        task_dev_info_t * dev = TASK_DEV_INFO(task);
-        new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
-
         /* link the virtual access to the task, so it is activated correctly
          * when predecessors completes.  This access is virtual though, no need
          * to fetch */
         args_t * args = (args_t *) TASK_ARGS(task, task_size);
-        new (args) args_t(task, access, *conflict);
+        new (args) args_t(runtime, task, access, *conflict);
 
         #ifndef NDEBUG
         strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
@@ -364,6 +313,7 @@ xkrt_coherency_host_async(
         deptree->precedence(conflict, &args->access);
         runtime->task_commit(task);
     }
+    # endif
 }
 
 //////////////////////////
@@ -377,7 +327,7 @@ xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime)
         task_format_t format;
         memset(format.f, 0, sizeof(format.f));
         snprintf(format.label, sizeof(format.label), "coherent");
-        // no body, body is implicit, see the main loop
+        format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_coherent_async;
         runtime->formats.coherent_async = task_format_create(&(runtime->formats.list), &format);
     }
 

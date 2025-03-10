@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 17:12:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:38:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -50,8 +50,11 @@ typedef struct  xkrt_runtime_t
     /* memory controller for coherency */
     std::vector<MemoryCoherencyController *> memcontrollers;
 
-    /* worker thread to copy data asynchronously */
-    Thread * memory_coherent_worker_thread;
+    /* mutex for accessing the memcontroller list */
+    spinlock_t memcontrollers_lock;
+
+    /* host thread */
+    Thread * host_thread;
 
     /* user conf */
     xkrt_conf_t conf;
@@ -210,9 +213,11 @@ typedef struct  xkrt_runtime_t
 void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
-void xkrt_memory_coherent_async_worker_thread_init(xkrt_runtime_t * runtime);
 void xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime);
 void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
+
+void xkrt_host_thread_init(xkrt_runtime_t * runtime);
+void * xkrt_host_thread_main_loop(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id);

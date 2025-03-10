@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 22:37:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:36:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,7 +17,9 @@
 static inline void
 xkrt_runtime_submit_task_host(xkrt_runtime_t * runtime, task_t * task)
 {
-    LOGGER_FATAL("Task execution onto the host is not supported");
+    Thread * thread = runtime->host_thread;
+    thread->push(task);
+    thread->wakeup();
 }
 
 void
@@ -79,11 +81,7 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
 
     // only coherent async are supported onto the host device yet
     if (device_id == HOST_DEVICE_GLOBAL_ID)
-    {
-        assert(task->fmtid == runtime->formats.coherent_async);
-        runtime->memory_coherent_worker_thread->push(task);
-        return ;
-    }
+        return xkrt_runtime_submit_task_host(runtime, task);
 
     if (worker == nullptr)
     {

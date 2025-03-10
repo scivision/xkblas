@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 17:11:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 21:32:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,7 +19,6 @@
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/bits-to-str.h>
@@ -47,16 +46,18 @@ xkrt_device_accept_new_task(xkrt_device_t * device)
     return 1;
 }
 
-static inline void
+inline void
 xkrt_device_prepare_task(
     xkrt_runtime_t * runtime,
     xkrt_device_t * device,
+    xkrt_device_global_id_t device_global_id,
     task_t * task
 ) {
+    assert((device == NULL && device_global_id == HOST_DEVICE_GLOBAL_ID) || (device && device->global_id == device_global_id));
     assert(  task->state.value == TASK_STATE_READY);
 
     LOGGER_DEBUG("Preparing task `%s` of format `%d` on device %d",
-            task->label, task->fmtid, device->global_id);
+            task->label, task->fmtid, device_global_id);
 
     if (task->flags & TASK_FLAG_DEPENDENT)
     {
@@ -77,7 +78,7 @@ xkrt_device_prepare_task(
             MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
             assert(memcontroller);
 
-            memcontroller->fetch(task, access, device->global_id);
+            memcontroller->fetch(task, access, device_global_id);
         }
 
         /* decrease the task 'fetching' counter to detect early-fetch completion */
@@ -98,10 +99,8 @@ xkrt_device_thread_main_loop(
 ) {
     assert(Thread::self() == device->thread);
     assert(device->state == XKRT_DEVICE_STATE_COMMIT);
-    device->state = XKRT_DEVICE_STATE_RUNNING;
 
-    # pragma message(TODO "do we really need this mem_barrier here?")
-    mem_barrier();
+    device->state.store(XKRT_DEVICE_STATE_RUNNING, std::memory_order_seq_cst);
 
     Thread * worker = Thread::self();
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
@@ -112,10 +111,30 @@ xkrt_device_thread_main_loop(
 
         device->offloader_poll();
         if (task)
-            xkrt_device_prepare_task(runtime, device, task);
+            xkrt_device_prepare_task(runtime, device, device->global_id, task);
     }
 
     return EINTR;
+}
+
+void *
+xkrt_host_thread_main_loop(xkrt_runtime_t * runtime)
+{
+    Thread * thread = Thread::self();
+    runtime->host_thread = thread;
+
+    // TODO
+    // while (runtime->state == XKRT_RUNTIME_INITIALIZED)
+    while (1)
+    {
+        task_t * task;
+        while ((task = thread->pop()) == NULL)
+            thread->pause();
+
+        if (task)
+            xkrt_device_prepare_task(runtime, NULL, HOST_DEVICE_GLOBAL_ID, task);
+    }
+    return NULL;
 }
 
 ///////////
@@ -245,7 +264,7 @@ xkrt_device_task_executed_callback(
 }
 
 /**
- * Must be called once all task accessed were fetched, to queue the task kernel for execution
+ * Must be called once all task accesses were fetched, to queue the task kernel for execution
  *  - driver - the driver to use for executing the kernel
  *  - device - the device to use for executing the kernel
  *  - task   - the task
@@ -265,7 +284,7 @@ xkrt_device_task_execute(
     {
         __task_executed(task, xkrt_runtime_submit_task, runtime);
     }
-    else
+    else if (device)
     {
         /* retrieve task format */
         task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
@@ -319,6 +338,16 @@ xkrt_device_task_execute(
             );
         }
     }
+    else
+    {
+        /* retrieve task format */
+        task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
+        assert(format);
+        assert(format->f[TASK_FORMAT_TARGET_HOST]);
+
+        ((void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST])(task);
+        __task_executed(task, xkrt_runtime_submit_task, runtime);
+    }
 
     thread->current_task = current;
 }
@@ -350,13 +379,17 @@ xkrt_runtime_t::get_or_insert_memory_controller(
     const size_t ld,
     const size_t sizeof_type
 ) {
+    SPINLOCK_LOCK(this->memcontrollers_lock);
 
     /* find previous memtree for that ld */
     for (MemoryCoherencyController * memcontroller : this->memcontrollers)
     {
         MemoryTree * memtree = (MemoryTree *) memcontroller;
         if (memtree->ld == ld && memtree->sizeof_type == sizeof_type)
+        {
+            SPINLOCK_UNLOCK(this->memcontrollers_lock);
             return memcontroller;
+        }
     }
 
     LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
@@ -364,8 +397,10 @@ xkrt_runtime_t::get_or_insert_memory_controller(
 
     /* if not found, create a new memtree */
     MemoryCoherencyController * memcontroller = new MemoryTree(this, ld, sizeof_type, this->conf.merge_transfers);
-    assert(memcontroller);;
+    assert(memcontroller);
     this->memcontrollers.push_back(memcontroller);
+
+    SPINLOCK_UNLOCK(this->memcontrollers_lock);
 
     return memcontroller;
 }
@@ -514,13 +549,12 @@ xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
 // TASK //
 //////////
 
-// TODO : remove these, and use threads instead
 void
 xkrt_runtime_t::task_submit(
     const xkrt_device_global_id_t device_global_id,
     task_t * task
 ) {
-    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_device_t * device = (device_global_id == HOST_DEVICE_GLOBAL_ID) ? NULL : this->device_get(device_global_id);
     XKRT_STATS_INCR(this->stats.tasks[task->fmtid].submitted, 1);
     xkrt_device_task_execute(this, device, task);
 }

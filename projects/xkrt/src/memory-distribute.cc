@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 03:39:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 19:33:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -114,10 +114,13 @@ xkrt_coherency_distribute_packed_2D_halo_async(
         size_t fn = 1;
         while (fm * fn != runtime->drivers.devices.n)
         {
+            # if 0
             if (fm < fn)
                 fm *= 2;
             else
                 fn *= 2;
+            # endif
+            fn *= 2;
         }
 
         const size_t mb = m / fm;

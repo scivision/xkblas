@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 23:59:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:18:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -99,6 +99,11 @@ Thread::allocate_task(const size_t size)
         LOGGER_FATAL("Stack overflow ! Increase `THREAD_MAX_MEMORY` and recompile");
     task_t * task = (task_t *) this->memory_stack_ptr;
     this->memory_stack_ptr += size;
+
+    # ifndef NDEBUG
+    this->tasks.push_back(task);
+    # endif /* NDEBUG */
+
     return task;
     # else
     return (uint8_t *) malloc(size);

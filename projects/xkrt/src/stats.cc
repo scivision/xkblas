@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 17:16:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:21:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -143,14 +143,29 @@ xkrt_runtime_stats_tasks_report(xkrt_runtime_t * runtime)
         task_format_t * format = task_format_get(&runtime->formats.list, (task_format_id_t) i);
         if (format == NULL)
             break ;
-        if (runtime->stats.tasks[i].submitted)
-            LOGGER_WARN("  `%16s` - %6zu submitted - %6zu commited - %6zu completed",
+        if (runtime->stats.tasks[i].commited)
+            LOGGER_WARN("  `%16s` - %6zu commited - %6zu submitted - %6zu completed",
                 format->label,
-                runtime->stats.tasks[i].submitted.load(),
                 runtime->stats.tasks[i].commited.load(),
+                runtime->stats.tasks[i].submitted.load(),
                 runtime->stats.tasks[i].completed.load()
             );
     }
+
+    # ifndef NDEBUG
+    Thread * thread = Thread::self();
+    int counter[TASK_STATE_MAX];
+    memset(counter, 0, sizeof(counter));
+    for (task_t * & task : thread->tasks)
+    {
+        assert(task->state.value >= TASK_STATE_ALLOCATED && task->state.value < TASK_STATE_MAX);
+        ++counter[task->state.value];
+    }
+
+    for (int i = 0 ; i < TASK_STATE_MAX ; ++i)
+        LOGGER_WARN("  `%8zu` tasks in state `%12s`", counter[i], task_state_to_str((task_state_t)i));
+
+    # endif /* NDEBUG */
 }
 
 void

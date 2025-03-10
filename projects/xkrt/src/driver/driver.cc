@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:33:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 21:16:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -26,8 +26,8 @@
 typedef struct  xkrt_driver_device_thread_arg_t
 {
     xkrt_driver_type_t driver_type;
-    uint8_t device_driver_type;
-    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_type);
+    uint8_t device_driver_id;
+    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
     void * vargs;
 }               xkrt_driver_device_thread_arg_t;
 
@@ -38,7 +38,7 @@ trampoline(void * vargs)
     assert(args);
 
     // launch thread
-    args->routine(args->vargs, args->driver_type, args->device_driver_type);
+    args->routine(args->vargs, args->driver_type, args->device_driver_id);
 
     // release memory
     free(args);
@@ -50,7 +50,7 @@ static void
 xkrt_driver_init(
     xkrt_drivers_t * drivers,
     int ngpus,
-    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_type),
+    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * vargs,
     xkrt_driver_type_t driver_type
 ) {
@@ -127,7 +127,7 @@ xkrt_driver_init(
         arg->routine = routine;
         arg->vargs = vargs;
         arg->driver_type = driver_type;
-        arg->device_driver_type = i;
+        arg->device_driver_id = i;
 
         pthread_t thread;
         err = pthread_create(&thread, &attr, trampoline, arg);
@@ -151,7 +151,7 @@ xkrt_drivers_init(
     xkrt_drivers_t * drivers,
     int ngpus,
     int drivers_mask,
-    void (*routine)(void * args, xkrt_driver_type_t driver_type, uint8_t device_driver_type),
+    void (*routine)(void * args, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * args
 ) {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")

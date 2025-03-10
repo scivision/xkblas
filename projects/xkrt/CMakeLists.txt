@@ -20,6 +20,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/bits-to-str.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
+    ${CMAKE_SOURCE_DIR}/src/host-thread.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc

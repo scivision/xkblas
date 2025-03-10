@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 18:30:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 19:56:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -16,7 +16,7 @@
 /* A naive kernel to update the grid */
 __kernel
 void
-diffusion_cuda_kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y)
+diffusion_cuda_kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
 {
     const int li = get_global_id(0);
     const int lj = get_global_id(1);

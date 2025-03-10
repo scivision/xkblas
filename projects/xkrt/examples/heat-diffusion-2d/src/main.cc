@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 16:00:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 23:02:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -22,6 +22,8 @@
 
 /* Making a global xkrt context of simplicity purposes */
 static xkrt_runtime_t runtime;
+static int TSX = 0;
+static int TSY = 0;
 
 ////////////////
 // VTK EXPORT //
@@ -69,6 +71,23 @@ export_to_vtk(int frame, TYPE * grid)
     export_to_vtk(grid, filename, frame);
 }
 
+typedef struct  args_export_t
+{
+    TYPE * grid;
+    int frame;
+    args_export_t(TYPE * grid, int frame) : grid(grid), frame(frame) {}
+}               args_export_t;
+
+static void
+body_export_vtk(task_t * task)
+{
+    args_export_t * args = (args_export_t *) TASK_ARGS(task);
+    LOGGER_INFO("Exporting frame %d/%d", args->frame+1, N_VTK);
+    export_to_vtk(args->frame, args->grid);
+}
+
+static task_format_id_t export_vtk_format_id;
+
 static void
 maybe_export(int step, TYPE * grid)
 {
@@ -76,6 +95,9 @@ maybe_export(int step, TYPE * grid)
     {
         if (step % (N_STEP / N_VTK) == 0)
         {
+            int frame = step / (N_STEP / N_VTK);
+
+            # if 0
             // Create a cohrency task, to gather data back from gpus
             int uplo = 0, memflag = 0;
             xkrt_coherency_host_async(&runtime, MATRIX_COLMAJOR, grid, LD, NX, NY, sizeof(TYPE));
@@ -83,17 +105,52 @@ maybe_export(int step, TYPE * grid)
             // TODO : instead of a sync+coherent, maybe make a host task that reads data
             // Wait for the completion of all tasks
             xkrt_sync(&runtime);
-
-            // export grid
-            int frame = step / (N_STEP / N_VTK);
             export_to_vtk(frame, grid);
+
+            # else
+            Thread * thread = Thread::self();
+
+            # define AC 1
+            constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
+            constexpr size_t task_size = task_compute_size(flags, AC);
+            constexpr size_t args_size = sizeof(args_export_t);
+
+            task_t * task = thread->allocate_task(task_size + args_size);
+            new(task) task_t(export_vtk_format_id, flags);
+
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(AC);
+
+            args_export_t * args = (args_export_t *) TASK_ARGS(task, task_size);
+            new(args) args_export_t(grid, frame);
+
+            # ifndef NDEBUG
+            snprintf(task->label, sizeof(task->label), "export-vtk-%d", frame);
+            # endif
+
+            static_assert(AC <= TASK_MAX_ACCESSES);
+            access_t * accesses = TASK_ACCESSES(task, flags);
+            {
+                const ssize_t x0 = 0;
+                const ssize_t y0 = 0;
+                const ssize_t x1 = NX;
+                const ssize_t y1 = NY;
+                const  size_t sx = x1 - x0;
+                const  size_t sy = y1 - y0;
+                new(accesses + 0) access_t(task, MATRIX_COLMAJOR, grid, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
+            }
+            thread->resolve<AC>(task, accesses);
+            # undef AC
+
+            runtime.task_commit(task);
+            # endif
         }
     }
 }
 
-///////////////
-// XKRT TASK //
-///////////////
+////////////////////
+// DIFFUSION TASK //
+////////////////////
 
 static task_format_id_t diffusion_format_id;
 
@@ -111,7 +168,7 @@ typedef struct  args_t
 # include <xkrt/driver/driver-cu.h>
 # include <xkrt/logger/logger-cu.h>
 
-extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y);
+extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y, unsigned int tsx, unsigned int tsy);
 
 static void
 body_cuda(
@@ -148,7 +205,8 @@ body_cuda(
         custream,
         src, ld_src,
         dst, ld_dst,
-        args->tile_x, args->tile_y
+        args->tile_x, args->tile_y,
+        TSX, TSY
     );
     CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], custream));
 }
@@ -169,32 +227,35 @@ update_cpu(TYPE * src, TYPE * dst)
     }
 }
 
+////////////////
+// XKRT TASKS //
+////////////////
+
 static void
 setup_tasks(void)
 {
-    task_format_t format;
-    memset(&format, 0, sizeof(task_format_t));
+    // diffusion
+    {
+        task_format_t format;
+        memset(&format, 0, sizeof(task_format_t));
 
-    # if XKRT_SUPPORT_CUDA
-    format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
-    # endif /* XKRT_SUPPORT_CUDA */
+        # if XKRT_SUPPORT_CUDA
+        format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
+        # endif /* XKRT_SUPPORT_CUDA */
 
-    # if 0
-    # if XKRT_SUPPORT_HOST
-    format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu;
-    # endif /* XKRT_SUPPORT_HOST */
+        snprintf(format.label, sizeof(format.label), "heat-diffusion");
+        diffusion_format_id = task_format_create(&(runtime.formats.list), &format);
+    }
 
-    # if XKRT_SUPPORT_ZE
-    format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
-    # endif /* XKRT_SUPPORT_ZE */
+    // export vtk
+    {
+        task_format_t format;
+        memset(&format, 0, sizeof(task_format_t));
 
-    # if XKRT_SUPPORT_CL
-    format.f[XKRT_DRIVER_TYPE_CL] = (task_format_func_t) body_cl;
-    # endif /* XKRT_SUPPORT_CL */
-    # endif
-
-    snprintf(format.label, sizeof(format.label), "heat-diffusion");
-    diffusion_format_id = task_format_create(&(runtime.formats.list), &format);
+        format.f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_export_vtk;
+        snprintf(format.label, sizeof(format.label), "export-vtk");
+        export_vtk_format_id = task_format_create(&(runtime.formats.list), &format);
+    }
 }
 
 //////////////////
@@ -262,8 +323,8 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 1;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+    constexpr uint8_t ocr_access = 1;
+    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(src, dst, tile_x, tile_y);
@@ -272,19 +333,19 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     snprintf(task->label, sizeof(task->label), "diffusion(%d, %d)", tile_x, tile_y);
     # endif
 
-    const int ntx = NUM_OF_TILES(NX, TS);
-    const int nty = NUM_OF_TILES(NY, TS);
+    const int ntx = NUM_OF_TILES(NX, TSX);
+    const int nty = NUM_OF_TILES(NY, TSY);
 
-    const int x = (tile_x * TS);
-    const int y = (tile_y * TS);
+    const int x = (tile_x * TSX);
+    const int y = (tile_y * TSY);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
     {
         const ssize_t x0 = MAX(x-1, 0);
         const ssize_t y0 = MAX(y-1, 0);
-        const ssize_t x1 = MIN(x+TS+1, NX);
-        const ssize_t y1 = MIN(y+TS+1, NY);
+        const ssize_t x1 = MIN(x+TSX+1, NX);
+        const ssize_t y1 = MIN(y+TSY+1, NY);
         const  size_t sx = x1 - x0;
         const  size_t sy = y1 - y0;
         new(accesses + 0) access_t(task, MATRIX_COLMAJOR, src, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
@@ -293,8 +354,8 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
         const ssize_t x0 = MAX(x, 1);
 
         const ssize_t y0 = MAX(y, 1);
-        const ssize_t x1 = MIN(x+TS, NX-1);
-        const ssize_t y1 = MIN(y+TS, NY-1);
+        const ssize_t x1 = MIN(x+TSX, NX-1);
+        const ssize_t y1 = MIN(y+TSY, NY-1);
         const  size_t sx = x1 - x0;
         const  size_t sy = y1 - y0;
         new(accesses + 1) access_t(task, MATRIX_COLMAJOR, dst, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_W);
@@ -310,8 +371,8 @@ static void
 update(TYPE * src, TYPE * dst)
 {
     # if 1
-    const int ntx = NUM_OF_TILES(NX, TS);
-    const int nty = NUM_OF_TILES(NY, TS);
+    const int ntx = NUM_OF_TILES(NX, TSX);
+    const int nty = NUM_OF_TILES(NY, TSY);
     for (int tile_x = 0; tile_x < ntx; ++tile_x)
         for (int tile_y = 0; tile_y < nty; ++tile_y)
             update_tile(src, dst, tile_x, tile_y);
@@ -330,6 +391,12 @@ main(void)
 {
     // Initialize xkrt runtime
     xkrt_init(&runtime);
+
+    // compute data partitioning
+    TSX = NX / 1;
+    TSY = NY / runtime.drivers.devices.n;
+
+    // setup task format
     setup_tasks();
 
     // Allocate memory for the temperature grids on the CPU
@@ -353,18 +420,18 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
-    # if 1
+    # if 0
     xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE), 1, 1);
     xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE), 1, 1);
     # elif 0
     xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE));
     xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE));
+    # elif 1
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
     # elif 0
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE), 1, 1);
-    # elif 0
-    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TS, TS, sizeof(TYPE));
-    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TS, TS, sizeof(TYPE));
+    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE));
+    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE));
     # else
     # endif
 

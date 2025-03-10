@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 16:22:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:38:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -80,6 +80,9 @@ xkrt_init(xkrt_runtime_t * runtime)
     // set affinities to 0
     memset(&runtime->router.affinity, 0, sizeof(runtime->router.affinity));
 
+    // init spinlock
+    runtime->memcontrollers_lock = SPINLOCK_INITIALIZER;
+
     // create topology
     hwloc_topology_init(&runtime->topology);
     hwloc_topology_load(runtime->topology);
@@ -87,7 +90,7 @@ xkrt_init(xkrt_runtime_t * runtime)
     // load
     xkrt_init_conf(&(runtime->conf));
     task_format_register(runtime);
-    xkrt_memory_coherent_async_worker_thread_init(runtime);
+    xkrt_host_thread_init(runtime);
 
     const int ngpus = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus);
     xkrt_drivers_init(&(runtime->drivers), ngpus, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
@@ -150,6 +153,8 @@ xkrt_deinit(xkrt_runtime_t * runtime)
 //  Runtime synchronize     //
 //////////////////////////////
 
+# include <xkrt/memory-tree.hpp>
+
 extern "C"
 int
 xkrt_sync(xkrt_runtime_t * runtime)
@@ -173,10 +178,9 @@ xkrt_sync(xkrt_runtime_t * runtime)
     LOGGER_INFO("Exporting memory tree...");
 
     // memory kinterval btree
-    runtime->memtree.export_pdf("memory");
+    MemoryTree * memtree = (MemoryTree *) runtime->memcontrollers[0];
+    memtree->export_pdf("memory");
 
-    // dependency kinterval btree
-    thread->deptree.export_pdf("dependency");
 # endif
     return 0;
 }

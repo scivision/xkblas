@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 06:56:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 22:17:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,6 +51,11 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* the current task */
         task_t * current_task;
+
+        # ifndef NDEBUG
+        std::vector<task_t *> tasks;
+        # endif /* NDEBUG */
+
 
     private:
 

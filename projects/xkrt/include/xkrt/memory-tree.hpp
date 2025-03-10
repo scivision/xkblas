@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 15:54:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 23:04:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -50,7 +50,7 @@
  *  We need some way to decide which link to use.
  *  For instance, MPICH does a round-robin between all links - in our case, we probably want to sature the PCI, and then forward instead
  */
-# define USE_D2D_FORWARDING 0
+# define USE_D2D_FORWARDING 1
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -819,7 +819,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             fetch_t * fetch,
             task_t * task
         ) {
-            LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) fetch->dst_chunk->ptr);
+            LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) (fetch->dst_chunk ? fetch->dst_chunk->ptr : NULL));
             __task_fetched(1, task, xkrt_device_task_submit, runtime, fetch->dst_device_global_id);
         }
 
@@ -844,63 +844,68 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             assert(fetch_idx >= 0 && fetch_idx < list->n);
 
             fetch_t * fetch = list->fetches + fetch_idx;
-            LOGGER_DEBUG("Fetch completed for allocation `%p`", (void *) fetch->dst_chunk->ptr);
+
+            if (fetch->dst_chunk)
+                LOGGER_DEBUG("Fetch completed for allocation `%p`", (void *) fetch->dst_chunk->ptr);
 
             fetch_callback_task(runtime, fetch, task);
 
-            /* `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
-             * Search in the tree for awaiting tasks and forwards */
-            assert(fetch->dst_chunk);
-
-            Search search(fetch->dst_device_global_id);
-            search.prepare_search_awaiting(fetch->dst_chunk);
-            tree->lock();
+            if (fetch->dst_device_global_id != HOST_DEVICE_GLOBAL_ID)
             {
-                for (Cube & cube : fetch->cubes)
-                    tree->intersect(search, cube);
-            }
-            tree->unlock();
+                /* `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
+                 * Search in the tree for awaiting tasks and forwards */
+                assert(fetch->dst_chunk);
 
-            /* callback to release awaiting tasks */
-            for (task_t * & task : search.awaiting.tasks)
-                fetch_callback_task(runtime, fetch, task);
-
-            /* callback to forward the data to other devices */
-            size_t nforwards = search.awaiting.forwards.size();
-            if (nforwards)
-            {
-                fetch_list_t * forward_list = (fetch_list_t *) malloc(sizeof(fetch_list_t) + nforwards * sizeof(fetch_t));
-                assert(forward_list);
-
-                new (forward_list) fetch_list_t(tree, (fetch_t *) (forward_list + 1), nforwards);
-                forward_list->fetching();
-
-                # pragma message(TODO "Forwards consecutive in memory should be merged")
-                for (size_t i = 0 ; i < nforwards ; ++i)
+                Search search(fetch->dst_device_global_id);
+                search.prepare_search_awaiting(fetch->dst_chunk);
+                tree->lock();
                 {
-                    MemoryForward & forward = search.awaiting.forwards[i];
+                    for (Cube & cube : fetch->cubes)
+                        tree->intersect(search, cube);
+                }
+                tree->unlock();
 
-                    assert(forward.task);
-                    assert(forward.chunk);
+                /* callback to release awaiting tasks */
+                for (task_t * & task : search.awaiting.tasks)
+                    fetch_callback_task(runtime, fetch, task);
 
-                    fetch_t * forward_fetch = forward_list->prepare_next_fetch();
-                    assert(fetch);
-                    assert(i == forward_list->n - 1);
+                /* callback to forward the data to other devices */
+                size_t nforwards = search.awaiting.forwards.size();
+                if (nforwards)
+                {
+                    fetch_list_t * forward_list = (fetch_list_t *) malloc(sizeof(fetch_list_t) + nforwards * sizeof(fetch_t));
+                    assert(forward_list);
+
+                    new (forward_list) fetch_list_t(tree, (fetch_t *) (forward_list + 1), nforwards);
                     forward_list->fetching();
 
-                    forward_fetch->cubes                = fetch->cubes;                 // the logicial view hasn't changed
-                    new (&forward_fetch->host_view) memory_view_t(fetch->host_view);    // the host view hasn't changed
-                    forward_fetch->dst_chunk            = forward.chunk;
-                    forward_fetch->dst_device_global_id = forward.device_global_id;     // use the forwarded dst device
-                    forward_fetch->dst_view             = forward.view;                 // use the forwarded dst view
-                    forward_fetch->src_device_global_id = fetch->dst_device_global_id;  // the current 'dst' is the new 'src'
-                    forward_fetch->src_view             = fetch->dst_view;              // the current 'dst' is the new 'src'
+                    # pragma message(TODO "Forwards consecutive in memory should be merged")
+                    for (size_t i = 0 ; i < nforwards ; ++i)
+                    {
+                        MemoryForward & forward = search.awaiting.forwards[i];
 
-                    tree->fetch_list_launch_ith(forward.task, forward.device_global_id, forward_list, i);
+                        assert(forward.task);
+                        assert(forward.chunk);
+
+                        fetch_t * forward_fetch = forward_list->prepare_next_fetch();
+                        assert(fetch);
+                        assert(i == forward_list->n - 1);
+                        forward_list->fetching();
+
+                        forward_fetch->cubes                = fetch->cubes;                 // the logicial view hasn't changed
+                        new (&forward_fetch->host_view) memory_view_t(fetch->host_view);    // the host view hasn't changed
+                        forward_fetch->dst_chunk            = forward.chunk;
+                        forward_fetch->dst_device_global_id = forward.device_global_id;     // use the forwarded dst device
+                        forward_fetch->dst_view             = forward.view;                 // use the forwarded dst view
+                        forward_fetch->src_device_global_id = fetch->dst_device_global_id;  // the current 'dst' is the new 'src'
+                        forward_fetch->src_view             = fetch->dst_view;              // the current 'dst' is the new 'src'
+
+                        tree->fetch_list_launch_ith(forward.task, forward_list, i);
+                    }
                 }
-
-                list->fetched();
             }
+
+            list->fetched();
         }
 
         ////////////////////////////////////////////////////////////
@@ -1166,7 +1171,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         /* else: what to do ? */
                         else
                         {
-                            LOGGER_FATAL("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                            // LOGGER_FATAL("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
                         }
 
                         // delete allocation;
@@ -1478,11 +1483,11 @@ next_view:
                         partite.must_fetch = false;
 
                         /* one device is already fetching, add a D2D forward callback */
-                        xkrt_device_global_id_t fetching = this->runtime->router.get_source(device_global_id, partite.block->fetching);
-                        assert(0 <= fetching && fetching < XKRT_DEVICES_MAX);
-                        assert(partite.block->fetching & (1 << fetching));
+                        xkrt_device_global_id_t fetching_device_global_id = this->runtime->router.get_source(device_global_id, partite.block->fetching);
+                        assert(0 <= fetching_device_global_id && fetching_device_global_id < XKRT_DEVICES_MAX);
+                        assert(partite.block->fetching & (1 << fetching_device_global_id));
 
-                        MemoryReplicate & fetching_replicate = partite.block->replicates[fetching];
+                        MemoryReplicate & fetching_replicate = partite.block->replicates[fetching_device_global_id];
                         assert(fetching_replicate.fetching);
 
                         // TODO : maybe there is several fetching alloc ?
@@ -1574,7 +1579,6 @@ next_view:
         inline void
         fetch_list_launch_ith(
             task_t * task,
-            xkrt_device_global_id_t device_global_id,
             fetch_list_t * list,
             size_t i
         ) {
@@ -1592,6 +1596,10 @@ next_view:
             callback.args[2] = list;
             callback.args[3] = (void *) i;
 
+            /* the device on which a stream will perform the device - use the dst device if not the host */
+            assert(fetch->src_device_global_id != HOST_DEVICE_GLOBAL_ID || fetch->dst_device_global_id != HOST_DEVICE_GLOBAL_ID);
+            xkrt_device_global_id_t device_global_id = (fetch->dst_device_global_id != HOST_DEVICE_GLOBAL_ID) ? fetch->dst_device_global_id : fetch->src_device_global_id;
+
             /* launch asynchronous copy */
             this->runtime->copy(
                 device_global_id,
@@ -1607,30 +1615,19 @@ next_view:
         inline void
         fetch_list_launch(
             task_t * task,
-            xkrt_device_global_id_t device_global_id,
             fetch_list_t * list
         ) {
             for (size_t i = 0 ; i < list->n ; ++i)
-                fetch_list_launch_ith(task, device_global_id, list, i);
+                fetch_list_launch_ith(task, list, i);
         }
 
-        // TODO : remove the task parameter, as it is now implicit with the given access
-        /** Fetch the access on the given device */
-        void
-        fetch(
+        inline fetch_list_t *
+        fetch_list_to_device(
             task_t * task,
             access_t * access,
             xkrt_device_global_id_t device_global_id
         ) {
-            // no need to fetch unified memory
-            if (access->scope == ACCESS_SCOPE_UNIFIED)
-            {
-                access->device_view.addr = access->host_view.begin_addr();
-                access->device_view.ld   = access->host_view.ld;
-                return ;
-            }
-
-            // else, run the coherency protocol
+            // run the coherency protocol
             Search search(device_global_id);
 
             this->lock();
@@ -1677,14 +1674,50 @@ next_view:
             } /* this->lock(); */
             this->unlock();
 
+            fetch_list_t * list = NULL;
             if (access->mode & ACCESS_MODE_R)
             {
                 /* step (7) - convert a partition to the minimum number of fetches to run */
-                fetch_list_t * list = this->fetch_list_from_partition(search.partition);
+                list = this->fetch_list_from_partition(search.partition);
+            }
+            return list;
+        }
 
-                /* step (8) - launch transfers */
+        // TODO : remove the task parameter, as it is now implicit with the given access
+        /** Fetch the access on the given device */
+        void
+        fetch(
+            task_t * task,
+            access_t * access,
+            xkrt_device_global_id_t device_global_id
+        ) {
+            // no need to fetch unified memory
+            if (access->scope == ACCESS_SCOPE_UNIFIED)
+            {
+                access->device_view.addr = access->host_view.begin_addr();
+                access->device_view.ld   = access->host_view.ld;
+                return ;
+            }
+
+            fetch_list_t * list;
+
+            // short-path if targetting the host
+            if (device_global_id == HOST_DEVICE_GLOBAL_ID)
+            {
+                assert(access->mode == ACCESS_MODE_R);
+                list = this->fetch_list_to_host_from_cubes<2>(access->cubes);
+            }
+            // long-path if targetting a device
+            else
+            {
+                list = this->fetch_list_to_device(task, access, device_global_id);
+            }
+
+            // if there is fetch to perform, launch them
+            if (list)
+            {
                 __task_fetching(list->n, task);
-                this->fetch_list_launch(task, device_global_id, list);
+                this->fetch_list_launch(task, list);
             }
         }
 
@@ -1881,7 +1914,11 @@ next_view:
                             allocation_view->awaiting.tasks.clear();
 
                             /* move awaiting forwards */
-                            search.awaiting.forwards.insert(search.awaiting.forwards.end(), allocation_view->awaiting.forwards.begin(), allocation_view->awaiting.forwards.end());
+                            search.awaiting.forwards.insert(
+                                search.awaiting.forwards.end(),
+                                allocation_view->awaiting.forwards.begin(),
+                                allocation_view->awaiting.forwards.end()
+                            );
                             allocation_view->awaiting.forwards.clear();
 
                             /* this replicate just got fetched and is now valid */
