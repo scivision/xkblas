@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:39:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 17:12:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,6 +19,7 @@
 # include <xkrt/thread/thread.h>
 # include <xkrt/memory/coherency-controller.hpp>
 # include <xkrt/router-affinity.hpp>
+# include <xkrt/stats/stats.h>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/task/task.hpp>
 
@@ -187,9 +188,21 @@ typedef struct  xkrt_runtime_t
     /* get device */
     xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
-    //////////////////////
+    //////////////////////////////////////
+    // linked list for freeing on crash //
+    //////////////////////////////////////
     struct xkrt_runtime_t * prev;
     struct xkrt_runtime_t * next;
+
+     # if XKRT_SUPPORT_STATS
+     struct {
+         struct {
+             stats_int_t submitted;
+             stats_int_t commited;
+             stats_int_t completed;
+         } tasks[TASK_FORMAT_MAX];
+     } stats;
+     # endif /* XKRT_SUPPORT_STATS */
 
 }               xkrt_runtime_t;
 

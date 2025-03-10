@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:49:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 16:22:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -72,6 +72,10 @@ int
 xkrt_init(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Initializing XKRT");
+
+    # if XKRT_SUPPORT_STATS
+    memset(&runtime->stats, 0, sizeof(runtime->stats));
+    # endif /* XKRT_SUPPORT_STATS */
 
     // set affinities to 0
     memset(&runtime->router.affinity, 0, sizeof(runtime->router.affinity));

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/08 00:05:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 16:00:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -336,9 +336,14 @@ main(void)
     const size_t s = sizeof(TYPE);
     # if 1
     const uintptr_t alignon = NX * s;
-    const uintptr_t   mem   = (uintptr_t) runtime.memory_host_allocate(0, 2 * NX * NY * s + alignon);
+    const size_t       size = 2 * (NX * NY * s + alignon);
+    const uintptr_t   mem   = (uintptr_t) runtime.memory_host_allocate(0, size);
     TYPE * grid1 = (TYPE *) (mem + (alignon - (mem % alignon)) + 0 * s * (NX * NY));
     TYPE * grid2 = (TYPE *) (mem + (alignon - (mem % alignon)) + 1 * s * (NX * NY));
+    assert((uintptr_t)grid1 % alignon == 0);
+    assert((uintptr_t)grid1 + NX * NY * s < mem + size);
+    assert((uintptr_t)grid2 % alignon == 0);
+    assert((uintptr_t)grid2 + NX * NY * s < mem + size);
     # else
     TYPE * grid1 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * s);
     TYPE * grid2 = (TYPE *) runtime.memory_host_allocate(0, NX * NY * s);
@@ -374,7 +379,7 @@ main(void)
 
         // Update
         update(src, dst);
-        if (step % (N_STEP / 10) == 0)
+        if (step % (N_STEP / 10 + 1) == 0)
             LOGGER_WARN("Progress: %.2lf%%", step / (double)N_STEP*100);
 
         // Export every other frames

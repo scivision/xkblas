@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/08 00:21:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 16:03:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,13 +47,13 @@ xkrt_device_t::memory_set_chunk0(
 ) {
     xkrt_area_t * area = &(this->memories[area_idx].area);
 
-    area->chunk0.ptr    = ptr;
-    area->chunk0.size          = size;
-    area->chunk0.state         = XKRT_ALLOC_CHUNK_STATE_FREE;
-    area->chunk0.prev          = NULL;
-    area->chunk0.next          = NULL;
-    area->chunk0.freelink      = NULL;
-    area->chunk0.use_counter   = 0;
+    area->chunk0.ptr            = ptr;
+    area->chunk0.size           = size;
+    area->chunk0.state          = XKRT_ALLOC_CHUNK_STATE_FREE;
+    area->chunk0.prev           = NULL;
+    area->chunk0.next           = NULL;
+    area->chunk0.freelink       = NULL;
+    area->chunk0.use_counter    = 0;
 
     this->memory_reset_on(area_idx);
 }

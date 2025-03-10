@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/08 00:08:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 15:36:05 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -22,7 +22,7 @@
 #  define TYPE float
 
 /* Number of timesteps */
-#  define N_STEP 1000
+#  define N_STEP 0
 
 /* Number of vtk images to generate */
 #  define N_VTK MIN(0, N_STEP)

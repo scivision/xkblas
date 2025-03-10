@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/08 00:15:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 15:54:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -50,7 +50,7 @@
  *  We need some way to decide which link to use.
  *  For instance, MPICH does a round-robin between all links - in our case, we probably want to sature the PCI, and then forward instead
  */
-# define USE_D2D_FORWARDING 1
+# define USE_D2D_FORWARDING 0
 
 # pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
@@ -1639,7 +1639,7 @@ next_view:
 
                 # if 1
                 LOGGER_DEBUG(
-                    "KMemoryaccess_t<2>(MATRIX_COLMAJOR, (void *) %p, %lu, %lu, %lu, %lu, %lu, %lu, %s),",
+                    "access_t<2>(MATRIX_COLMAJOR, (void *) %p, %lu, %lu, %lu, %lu, %lu, %lu, %s),",
                     (void *) access->host_view.addr,
                     access->host_view.ld,
                     access->host_view.offset_m,

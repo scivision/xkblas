@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:53:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 17:11:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -521,6 +521,7 @@ xkrt_runtime_t::task_submit(
     task_t * task
 ) {
     xkrt_device_t * device = this->device_get(device_global_id);
+    XKRT_STATS_INCR(this->stats.tasks[task->fmtid].submitted, 1);
     xkrt_device_task_execute(this, device, task);
 }
 
@@ -541,6 +542,8 @@ xkrt_runtime_t::task_commit(task_t * task)
     assert(tls);
 
     tls->commit(task, xkrt_runtime_submit_task, this);
+
+    XKRT_STATS_INCR(this->stats.tasks[task->fmtid].commited, 1);
 }
 
 void
@@ -561,6 +564,8 @@ xkrt_runtime_t::task_complete(task_t * task)
     assert(thread);
 
     __task_complete(task, xkrt_runtime_submit_task, this);
+
+    XKRT_STATS_INCR(this->stats.tasks[task->fmtid].completed, 1);
 }
 
 void

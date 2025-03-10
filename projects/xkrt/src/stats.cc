@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/08 00:15:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 17:16:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,6 +14,7 @@
 # include <xkrt/runtime.h>
 # include <xkrt/xkrt-support.h>
 # include <xkrt/task/task.hpp>
+# include <xkrt/task/task-format.h>
 # include <xkrt/logger/logger.h>
 
 # include <string.h>
@@ -134,6 +135,24 @@ xkrt_runtime_stats_device_gather(xkrt_runtime_t * runtime, xkrt_device_t * devic
     }
 }
 
+static void
+xkrt_runtime_stats_tasks_report(xkrt_runtime_t * runtime)
+{
+    for (size_t i = 0 ; i < TASK_FORMAT_MAX ; ++i)
+    {
+        task_format_t * format = task_format_get(&runtime->formats.list, (task_format_id_t) i);
+        if (format == NULL)
+            break ;
+        if (runtime->stats.tasks[i].submitted)
+            LOGGER_WARN("  `%16s` - %6zu submitted - %6zu commited - %6zu completed",
+                format->label,
+                runtime->stats.tasks[i].submitted.load(),
+                runtime->stats.tasks[i].commited.load(),
+                runtime->stats.tasks[i].completed.load()
+            );
+    }
+}
+
 void
 xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
 {
@@ -159,6 +178,9 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
     LOGGER_WARN("-----------------------------------------");
     LOGGER_WARN("All Devices");
     xkrt_runtime_stats_device_report(runtime, &agg);
+    LOGGER_WARN("-----------------------------------------");
+    LOGGER_WARN("Tasks");
+    xkrt_runtime_stats_tasks_report(runtime);
     LOGGER_WARN("-----------------------------------------");
 
     # else /* XKRT_SUPPORT_STATS */

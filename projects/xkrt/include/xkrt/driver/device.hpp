@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:35:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/10 16:18:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,6 +23,7 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/area.h>
 # include <xkrt/memory/cache-line-size.hpp>
+# include <xkrt/stats/stats.h>
 # include <xkrt/sync/mutex.h>
 # include <xkrt/task/task.hpp>
 
