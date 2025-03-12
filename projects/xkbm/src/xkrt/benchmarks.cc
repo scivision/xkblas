@@ -181,9 +181,9 @@ template<bool task>
 static void
 kernel_launch_latency_launch(benchmark_node_t * bench)
 {
-    time_array_t<XKRT_DEVICES_MAX, 1001> time;
+    time_array_t time(runtime.drivers.devices.n, 1001);
 
-    for (xkrt_device_global_id_t device_global_id ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
+    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
     {
         xkrt_device_t * device = runtime.device_get(device_global_id);
         assert(device);
@@ -202,7 +202,8 @@ kernel_launch_latency_launch(benchmark_node_t * bench)
         }
     }
 
-    time.report<decltype(time)::pp_1zu_1time>("Device ID", runtime.drivers.devices.n);
+    auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", i); };
+    time.report<METRIC_TIME>("Device ID", convert);
 }
 
 static void
@@ -384,8 +385,8 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
 
-    time_array_t<30, 5> time_alloc;
-    time_array_t<30, 5> time_dealloc;
+    time_array_t time_alloc(30, 5);
+    time_array_t time_dealloc(30, 5);
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
@@ -488,8 +489,8 @@ alloc_host_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
 
-    time_array_t<34, 5> time_alloc;
-    time_array_t<34, 5> time_dealloc;
+    time_array_t time_alloc(34, 5);
+    time_array_t time_dealloc(34, 5);
 
     runtime.team_critical_begin(team);
     for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
@@ -548,25 +549,25 @@ alloc_host_run(xkrt_team_t * team, xkrt_thread_t * thread)
 }
 
 static benchmark_node_t system_touch = {
-    .name = "host-system-touch",
+    .name = "system-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
     .run = foreach_device<alloc_host_run<SYSTEM, true>>
 };
 
 static benchmark_node_t system_notouch = {
-    .name = "host-system-no-touch",
+    .name = "system-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
     .run = foreach_device<alloc_host_run<SYSTEM, false>>
 };
 
 static benchmark_node_t driver_touch = {
-    .name = "host-driver-touch",
+    .name = "driver-touch",
     .desc = "Time (allocation+touch) and (deallocation) of host memory using the system host-allocator",
     .run = foreach_device<alloc_host_run<DRIVER, true>>
 };
 
 static benchmark_node_t driver_notouch = {
-    .name = "host-driver-no-touch",
+    .name = "driver-no-touch",
     .desc = "Time (allocation) and (deallocation) of host memory using the system host-allocator",
     .run = foreach_device<alloc_host_run<DRIVER, false>>
 };
@@ -577,7 +578,7 @@ static void *
 alloc_parallel_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
-    time_array_t<34, 5> time_alloc;
+    time_array_t time_alloc(34, 5);
 
     uint64_t t0, tf;
 
@@ -648,7 +649,13 @@ typedef enum    dir_t
     SEND = 1
 }               dir_t;
 
-template<int nchunks, parallel_mode_t mode>
+typedef enum    transfer_mode_t
+{
+    LATENCY,
+    BANDWIDTH,
+}               transfer_mode_t;
+
+template<int nchunks, parallel_mode_t mode, transfer_mode_t transfer_mode>
 static void *
 mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 {
@@ -665,7 +672,8 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     // size of memory to transfer
     // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    const size_t size = (size_t) 1 * 512 * 1024 * 1024;
+    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) 1 * 512 * 1024 * 1024 : 0;
+    assert(size);
     const size_t chunk_size = size / nchunks;
 
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
@@ -684,7 +692,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     for (int i = 0 ; i < src_device->nmemories ; ++i)
     {
-        time_array_t<XKRT_DEVICES_MAX*XKRT_DEVICE_MEMORIES_MAX, 3> time;
+        time_array_t time(runtime.drivers.devices.n*XKRT_DEVICE_MEMORIES_MAX, 3);
 
         for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
         {
@@ -709,7 +717,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                         for (int c = 0 ; c < nchunks ; ++c)
                         {
                             xkrt_memory_copy_async(
-                                &runtime,
+                               &runtime,
                                 src_device_global_id,
                                 dst_device_global_id,
                                 (uintptr_t)dst_chunk->ptr + c * chunk_size,
@@ -736,7 +744,9 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
             runtime.team_critical_begin(team);
 
         LOGGER_INFO("### From Device %u ###", src_device_global_id);
-        time.report<decltype(time)::pp_1zu_1bw>("Device", runtime.drivers.devices.n);
+        auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", i); };
+        constexpr metric_t metric = transfer_mode == LATENCY ? METRIC_TIME : METRIC_BW;
+        time.report<metric>("Device", convert);
 
         if (mode == ALL)
             runtime.team_critical_end(team);
@@ -764,28 +774,34 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
     return NULL;
 }
 
-static benchmark_node_t d2d_1_all = {
+static benchmark_node_t bw_d2d_1_all = {
     .name = "D2D-1-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent in parallel between all pair of GPUs",
-    .run = foreach_device<mem_transfer_run_d2d<1, ALL>>
+    .run = foreach_device<mem_transfer_run_d2d<1, ALL, BANDWIDTH>>
 };
 
-static benchmark_node_t d2d_16_all = {
+static benchmark_node_t bw_d2d_16_all = {
     .name = "D2D-16-ALLGATHER",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent in parallel between all pair of GPUs",
-    .run = foreach_device<mem_transfer_run_d2d<16, ALL>>
+    .run = foreach_device<mem_transfer_run_d2d<16, ALL, BANDWIDTH>>
 };
 
-static benchmark_node_t d2d_1_p2p = {
+static benchmark_node_t bw_d2d_1_p2p = {
     .name = "D2D-1-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 1 chunk sent P2P a pair of GPUs after the other",
-    .run = foreach_device<mem_transfer_run_d2d<1, ALL>>
+    .run = foreach_device<mem_transfer_run_d2d<1, P2P, BANDWIDTH>>
 };
 
-static benchmark_node_t d2d_16_p2p = {
+static benchmark_node_t bw_d2d_16_p2p = {
     .name = "D2D-16-P2P",
     .desc = "Device (global) memory to device (global) memory bandwidth - 16 chunk sent P2P a pair of GPUs after the other",
-    .run = foreach_device<mem_transfer_run_d2d<16, ALL>>
+    .run = foreach_device<mem_transfer_run_d2d<16, P2P, BANDWIDTH>>
+};
+
+static benchmark_node_t lat_d2d = {
+    .name = "D2D-LAT",
+    .desc = "Device (global) memory to device (global) memory latency",
+    .run  = foreach_device<mem_transfer_run_d2d<1, P2P, LATENCY>>
 };
 
 //////////////////////////////
@@ -798,7 +814,7 @@ typedef enum    direction_t
     D2H
 }               direction_t;
 
-template <direction_t direction, int nchunks>
+template <direction_t direction, int nchunks, transfer_mode_t transfer_mode>
 static void *
 mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
@@ -807,7 +823,7 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
 
-    time_array_t<XKRT_DEVICE_MEMORIES_MAX, 11> time;
+    time_array_t time(device->nmemories, 11);
     for (int i = 0 ; i < device->nmemories ; ++i)
     {
         xkrt_device_memory_info_t * meminfo = device->memories + i;
@@ -817,19 +833,16 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
         /////////////////////
 
         // device alocation
-        const float                      f = runtime.conf.device.gpu_mem_percent / 100.0 * 0.99;
-        const size_t                  size = (meminfo->capacity * f);
-        const size_t            chunk_size = size / nchunks;
-        const xkrt_area_chunk_t    * chunk = device->memory_allocate_on(size, i);
+        constexpr size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) 1 * 512 * 1024 * 1024 : 0;
+        static_assert(size);
+        constexpr size_t chunk_size = size / nchunks;
+        const xkrt_area_chunk_t * chunk = device->memory_allocate_on(size, i);
         if (chunk == NULL)
             LOGGER_FATAL("Out of device memory");
 
         // host allocation
         void * host_mem = runtime.memory_host_allocate(device_global_id, size);
         xkbm_mem_touch(host_mem, size);
-
-        // wait for all devices to allocate
-        runtime.team_barrier(team);
 
         /////////////////////
         // do the transfer //
@@ -867,7 +880,7 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
                 {
                     const size_t size = chunk_size * nchunks;
                     const size_t bw = size / ((tf - t0) / 1e9);
-                    time.set(device_global_id, iter, bw);
+                    time.set(i, iter, bw);
                 }
             }
         }
@@ -887,36 +900,52 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
         runtime.team_critical_begin(team);
         {
             LOGGER_INFO("--- Device %u ---", device_global_id);
-            time.report<decltype(time)::pp_1zu_1bw>("Memory ID", device->nmemories);
+            auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", i); };
+            constexpr metric_t metric = transfer_mode == LATENCY ? METRIC_TIME : METRIC_BW;
+            time.report<metric>("MemoryID", convert);
         }
         runtime.team_critical_end(team);
     }
 
+    runtime.team_barrier(team);
+
     return NULL;
 }
 
-static benchmark_node_t h2d_1 = {
+static benchmark_node_t bw_h2d_1 = {
     .name = "H2D-1",
     .desc = "Host memory to device (global) memory bandwidth",
-    .run = foreach_device<mem_transfer_run<H2D, 1>>
+    .run = foreach_device<mem_transfer_run<H2D, 1, BANDWIDTH>>
 };
 
-static benchmark_node_t d2h_1 = {
+static benchmark_node_t bw_d2h_1 = {
     .name = "D2H-1",
     .desc = "Device (global) to host memory memory bandwidth",
-    .run = foreach_device<mem_transfer_run<D2H, 1>>
+    .run = foreach_device<mem_transfer_run<D2H, 1, BANDWIDTH>>
 };
 
-static benchmark_node_t h2d_16 = {
+static benchmark_node_t bw_h2d_16 = {
     .name = "H2D-16",
     .desc = "Host memory to device (global) memory bandwidth with 16x chunks bulk copies",
-    .run = foreach_device<mem_transfer_run<H2D, 16>>
+    .run = foreach_device<mem_transfer_run<H2D, 16, BANDWIDTH>>
 };
 
-static benchmark_node_t d2h_16 = {
+static benchmark_node_t bw_d2h_16 = {
     .name = "D2H-16",
     .desc = "Device (global) to host memory memory bandwidth with 16x chunks bulk copies",
-    .run = foreach_device<mem_transfer_run<D2H, 16>>
+    .run = foreach_device<mem_transfer_run<D2H, 16, BANDWIDTH>>
+};
+
+static benchmark_node_t lat_h2d = {
+    .name = "H2D-LAT",
+    .desc = "Host memory to device (global) memory latency",
+    .run = foreach_device<mem_transfer_run<H2D, 1, LATENCY>>
+};
+
+static benchmark_node_t lat_d2h = {
+    .name = "D2H-LAT",
+    .desc = "Device (global) memory to host memory latency",
+    .run = foreach_device<mem_transfer_run<D2H, 1, LATENCY>>
 };
 
 /////////////////////
@@ -947,6 +976,16 @@ static benchmark_node_t allocation_device = {
     .enabled = 1
 };
 
+static benchmark_node_t latency = {
+    .name = "latency",
+    .desc = "Latency",
+    .enabled = 1
+};
+static benchmark_node_t bandwidth = {
+    .name = "bandwidth",
+    .desc = "Bandwidth",
+    .enabled = 1
+};
 static benchmark_node_t transfer = {
     .name = "transfer",
     .desc = "Transfer",
@@ -1007,14 +1046,20 @@ xkrt_benchmark_push(benchmark_node_t * parent)
     LINK(allocation_device, allocation_device_driver_fragmented);
     LINK(allocation_device, allocation_device_runtime_fragmented);
 
-    LINK(transfer, h2d_1);
-    LINK(transfer, h2d_16);
-    LINK(transfer, d2h_1);
-    LINK(transfer, d2h_16);
-    LINK(transfer, d2d_1_p2p);
-    LINK(transfer, d2d_16_p2p);
-    LINK(transfer, d2d_1_all);
-    LINK(transfer, d2d_16_all);
+    LINK(transfer, bandwidth);
+    LINK(bandwidth, bw_h2d_1);
+    LINK(bandwidth, bw_h2d_16);
+    LINK(bandwidth, bw_d2h_1);
+    LINK(bandwidth, bw_d2h_16);
+    LINK(bandwidth, bw_d2d_1_p2p);
+    LINK(bandwidth, bw_d2d_16_p2p);
+    LINK(bandwidth, bw_d2d_1_all);
+    LINK(bandwidth, bw_d2d_16_all);
+
+    LINK(transfer, latency);
+    LINK(latency, lat_h2d);
+    LINK(latency, lat_d2h);
+    LINK(latency, lat_d2d);
 }
 
 void

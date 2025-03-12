@@ -5,12 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:07:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 14:03:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkblas/xkblas-experimental.h>
 # include <assert.h>
 # include <unistd.h>
 
@@ -18,7 +19,6 @@
 
 # include <xkblas/xkblas.h>
 # include <xkblas/skernels.h>
-# include <xkblas/xkblas-experimental.h>
 
 /* Implementation name */
 const char *
@@ -45,7 +45,8 @@ impl_t::deinit(void)
 uintptr_t
 impl_t::alloc(size_t size)
 {
-    # if XKBLAS_ACCESS_SCOPE == ACCESS_SCOPE_UNIFIED
+    return (uintptr_t) xkblas_host_alloc(size);
+    # if XKBLAS_ACCESS_SCOPE_UNIFIED
     return (uintptr_t) xkblas_unified_alloc(size);
     # else
     return (uintptr_t) xkblas_host_alloc(size);

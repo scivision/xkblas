@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:29:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 20:55:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -653,7 +653,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     };
     const size_t alignment = 4 * sizeof(double);
     void * device_ptr = NULL;
-    ZE_SAFE_CALL(zeMemAllocDevice(device->ze_context, &device_desc, size, alignment, device->ze_device, &device_ptr));
+    ze_result_t res = zeMemAllocDevice(device->ze_context, &device_desc, size, alignment, device->ze_device, &device_ptr);
     # else
 
     // TODO : cannot select memory ordinal with virtual/physical memory API
@@ -714,15 +714,16 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     );
     # endif
 
-    ZE_SAFE_CALL(
-        zeContextMakeMemoryResident(
-            device->ze_context,
-            device->ze_device,
-            device_ptr, size
-        )
-    );
+    if (res == ZE_RESULT_SUCCESS)
+    {
+        res = zeContextMakeMemoryResident(device->ze_context, device->ze_device, device_ptr, size);
+        if (res == ZE_RESULT_SUCCESS)
+            return device_ptr;
 
-    return device_ptr;
+        ZE_SAFE_CALL(zeMemFree(device->ze_context, device_ptr));
+    }
+
+    return NULL;
 }
 
 static void

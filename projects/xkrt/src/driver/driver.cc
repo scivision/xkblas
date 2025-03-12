@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 21:16:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 17:45:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -198,8 +198,13 @@ xkrt_drivers_init(
         xkrt_driver_t * (*creator)(void) = creators[driver_type];
         if (drivers_mask & (1 << driver_type) && creator)
         {
-            drivers->list[driver_type] = creator();
+            xkrt_driver_t * driver = creator();
+            drivers->list[driver_type] = driver;
+
             xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);
+            while (driver->ndevices_commited != driver->ndevices_targeted)
+                mem_pause();
+
             total_gpus += drivers->devices.n;
             assert(total_gpus <= ngpus);
             if (total_gpus == ngpus)
@@ -207,15 +212,6 @@ xkrt_drivers_init(
         }
         else
             drivers->list[driver_type] = NULL;
-    }
-
-    /* wait each thread of each device of each driver to start */
-    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
-    {
-        xkrt_driver_t * driver = drivers->list[driver_type];
-        if (driver)
-            while (driver->ndevices_commited != driver->ndevices_targeted)
-                mem_pause();
     }
 
     // DEBUG OUTPUT

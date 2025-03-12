@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 14:49:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 20:30:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -300,13 +300,21 @@ xkrt_runtime_t::task_wait(void)
     Thread * tls = Thread::self();
     assert(tls);
 
-    if (tls->team)
+    # define WAIT do { if (tls->current_task->cc.load(std::memory_order_relaxed) == 0) return ; } while (0)
+
+    /* active polling */
+    # if 0
+
+    while (1)
     {
-        while (schedule(this, tls->team, tls->thread))
-            ;
+        if (tls->team && schedule(this, tls->team, tls->thread))
+            continue ;
+        WAIT ;
     }
 
-    # define WAIT    do { if (tls->current_task->cc.load(std::memory_order_relaxed) == 0) return ; } while (0)
+    # else
+    /* exponential backoff sleep */
+
     # define WAIT2   do { WAIT   ; WAIT   ; } while (0)
     # define WAIT4   do { WAIT2  ; WAIT2  ; } while (0)
     # define WAIT8   do { WAIT4  ; WAIT4  ; } while (0)
@@ -341,6 +349,7 @@ xkrt_runtime_t::task_wait(void)
             backoff = (backoff << 1);
         WAIT64 ;
     }
+    # endif
 }
 
 template<bool worksteal>

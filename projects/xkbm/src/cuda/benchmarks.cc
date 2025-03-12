@@ -65,7 +65,7 @@ bench_pointer_get_attribute(benchmark_node_t * node)
     };
 
     constexpr size_t N = sizeof(attributes) / sizeof(CUpointer_attribute);
-    time_array_t<N, 1023> time;
+    time_array_t time(N, 1023);
 
     // allocate some memory to populate cuda allocator
     CUdeviceptr ptrs[24];
@@ -99,7 +99,7 @@ bench_pointer_get_attribute(benchmark_node_t * node)
         }
     }
 
-    auto convert = [] (int i) {
+    auto convert = [] (char * buffer, size_t buffer_size, int i) {
         const char * attributes_name[] = {
             "CONTEXT",
             "MEMORY_TYPE",
@@ -123,7 +123,7 @@ bench_pointer_get_attribute(benchmark_node_t * node)
             "MEMORY_BLOCK_ID",
             // "IS_HW_DECOMPRESS_CAPABLE"
         };
-        return attributes_name[i];
+        snprintf(buffer, buffer_size, "%s", attributes_name[i]);
     };
     time.report<METRIC_TIME>("Attribute", convert);
 
@@ -167,8 +167,8 @@ bench_register_memory(benchmark_node_t * bench)
         {              "Portable",               "Mapped",               "IoMemory",               "ReadOnly"}
     );
 
-    time_array_t<32, 5>   register_time;
-    time_array_t<32, 5> unregister_time;
+    time_array_t   register_time(32, 5);
+    time_array_t unregister_time(32, 5);
 
     for (auto flags : combinator)
     {

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 23:48:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 20:37:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -455,6 +455,8 @@ __task_complete(
     void (*F)(Args..., task_t *),
     Args... args
 ) {
+    task->parent->cc.fetch_sub(1, std::memory_order_relaxed);
+
     assert(
         task->state.value == TASK_STATE_DATA_FETCHED ||
         task->state.value == TASK_STATE_READY
@@ -473,7 +475,6 @@ __task_complete(
     }
     SPINLOCK_UNLOCK(task->state.lock);
     assert(task->parent);
-    task->parent->cc.fetch_sub(1, std::memory_order_relaxed);
     if (task->flags & TASK_FLAG_DEPENDENT)
     {
         task_dep_info_t * dep = TASK_DEP_INFO(task);

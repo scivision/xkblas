@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 15:01:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 17:51:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,7 +21,7 @@ void
 xkrt_deque_t<T, C>::push(T & task)
 {
     int idx = _t++;
-    tasks[idx] = task;
+    tasks[idx%C] = task;
 }
 
 template <typename T, int C>
@@ -36,21 +36,21 @@ xkrt_deque_t<T,C>::pop(void)
         SPINLOCK_LOCK(lock);
         {
             int idx = --_t;
-            if (idx > _t || ((task = tasks[idx]) == NULL))
+            if (idx > _t || ((task = tasks[idx%C]) == NULL))
             {
                 ++_t;
                 SPINLOCK_UNLOCK(lock);
                 return NULL; // FAILURE
             }
             else
-                tasks[idx] = NULL;
+                tasks[idx%C] = NULL;
         }
         SPINLOCK_UNLOCK(lock);
     }
     else
     {
-        task = tasks[idx];
-        tasks[idx] = NULL;
+        task = tasks[idx%C];
+        tasks[idx%C] = NULL;
     }
     return task; // SUCCESS
 }
@@ -63,13 +63,13 @@ xkrt_deque_t<T,C>::steal(void)
     SPINLOCK_LOCK(lock);
     {
         int idx = _h++;
-        if (idx >= _t || ((task = tasks[idx]) == NULL))
+        if (idx >= _t || ((task = tasks[idx%C]) == NULL))
         {
             --_h;
             SPINLOCK_UNLOCK(lock);
             return NULL;  // FAILURE
         }
-        tasks[idx] = NULL;
+        tasks[idx%C] = NULL;
     }
     SPINLOCK_UNLOCK(lock);
     return task;  // SUCCESS
