@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 23:09:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 22:47:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -25,7 +25,7 @@
 #  define N_STEP 100
 
 /* Number of vtk images to generate */
-#  define N_VTK MIN(0, N_STEP)
+#  define N_VTK MIN(10, N_STEP)
 
 /* Thermal diffusivity */
 #  define ALPHA (1.11e-4)
@@ -46,8 +46,9 @@
 
 /* Number of points per dimension in the grid */
 //#  define NX (32768)
-#  define NX (32768+8192)
-//#  define NX (256)
+//#  define NX (32768+8192)
+#  define NX (256)
+//#  define NX (16)
 #  define NY NX
 
 /* Size of a cell (m) */

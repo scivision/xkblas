@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 20:55:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 21:52:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -505,11 +505,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 ) {
     assert(idevice);
 
-    uint8_t * mem = (uint8_t *) malloc(sizeof(xkrt_stream_ze_t));
-    assert(mem);
+    xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) malloc(sizeof(xkrt_stream_ze_t));
+    assert(stream);
 
     xkrt_stream_init(
-        (xkrt_stream_t *) mem,
+        (xkrt_stream_t *) stream,
         type,
         capacity,
         XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch),
@@ -518,7 +518,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     );
 
     xkrt_device_ze_t * device = (xkrt_device_ze_t *) idevice;
-    xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) mem;
+    stream->device = device;
 
     // convert xkrt stream type to a command queue group flag
     ze_command_queue_group_property_flag_t flag;
@@ -817,7 +817,7 @@ XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
         .stype = ZE_STRUCTURE_TYPE_KERNEL_DESC,
         .pNext = NULL,
         .flags = ZE_KERNEL_FLAG_FORCE_RESIDENCY,
-        .pKernelName = "empty_kernel"
+        .pKernelName = name
     };
     ZE_SAFE_CALL(zeKernelCreate((ze_module_handle_t) module, &desc, (ze_kernel_handle_t *) &fn));
     assert(fn);

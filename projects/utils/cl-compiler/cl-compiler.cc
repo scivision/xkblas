@@ -41,13 +41,14 @@ void writeSpirvBinary(const char* filename, const unsigned char* binary, size_t 
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <input_kernel.cl> <output_binary.spv>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <input_kernel.cl> <output_binary.spv> <options>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     const char* inputFilename = argv[1];
     const char* outputFilename = argv[2];
+    const char* options = argv[3];
 
     // Read the kernel source from the input file
     char* kernelSource = readKernelSource(inputFilename);
@@ -67,7 +68,6 @@ int main(int argc, char* argv[]) {
     cl_program program = clCreateProgramWithSource(context, 1, (const char**)&kernelSource, NULL, &ret);
 
     // Build the program with SPIR-V options
-    const char* options = NULL; // "-cl-std=CL2.0 -x spirv";
     ret = clBuildProgram(program, 1, &device_id, options, NULL, NULL);
     if (ret != CL_SUCCESS) {
         fprintf(stderr, "Failed to build program\n");

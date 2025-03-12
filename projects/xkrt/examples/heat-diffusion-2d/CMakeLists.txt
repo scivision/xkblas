@@ -48,3 +48,11 @@ if (ENABLE_CU)
     install(TARGETS ${HEAT_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
     target_link_libraries(${HEAT_NAME} PRIVATE ${HEAT_NAME}_kernels_cuda)
 endif()
+
+# Level Zero
+option(ENABLE_ZE "Enable the compilation of ze kernels" ON)
+if (ENABLE_ZE)
+    find_package(ZE REQUIRED)
+    include_directories("${ZE_INCLUDE_DIRS}")
+    target_link_libraries(${HEAT_NAME} PRIVATE ${ZE_LIBRARIES})
+endif()

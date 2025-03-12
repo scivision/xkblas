@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 02:34:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 21:51:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -129,11 +129,6 @@ xkrt_stream_t::instruction_new(
     return instr;
 }
 
-void
-xkrt_stream_t::complete(const xkrt_stream_instruction_counter_t i)
-{
-}
-
 int
 xkrt_stream_t::commit(xkrt_stream_instruction_t * instr)
 {
@@ -155,9 +150,6 @@ xkrt_stream_t::commit(xkrt_stream_instruction_t * instr)
 int
 xkrt_stream_t::launch_ready_instructions(void)
 {
-//    LOGGER_DEBUG("Launching ready instructions of stream %p of type `%s` (%d ready)",
-//            this, xkrt_stream_type_to_str(this->type), this->ready.size());
-
     assert(this->f_instruction_launch);
     assert(this->ready.pos.r <= this->ready.pos.w);
 

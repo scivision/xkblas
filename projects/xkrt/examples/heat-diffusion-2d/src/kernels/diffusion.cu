@@ -5,11 +5,78 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 19:58:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 21:17:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
+
+
+// from GPT4.o
+
+# if 0
+// Optimizing a CUDA stencil kernel involves several strategies, including improving memory access patterns, using shared memory, and optimizing thread and block configurations. Here's a revised version of your kernel with some optimizations:
+
+__global__ void diffusion_cuda_kernel(TYPE *src, int ld_src, TYPE *dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy) {
+    // Calculate global indices
+    const int li = threadIdx.x;
+    const int lj = threadIdx.y;
+    const int i = tile_x * tsx + blockIdx.x * blockDim.x + li;
+    const int j = tile_y * tsy + blockIdx.y * blockDim.y + lj;
+
+    // Shared memory for the current tile
+    extern __shared__ TYPE shared_mem[];
+
+    // Calculate shared memory indices
+    const int shared_i = li + 1;
+    const int shared_j = lj + 1;
+
+    // Load data into shared memory
+    if (i < NX && j < NY) {
+        shared_mem[shared_j * (blockDim.x + 2) + shared_i] = GRID(src, i, j, ld_src);
+
+        // Load halo elements
+        if (li == 0 && i > 0) {
+            shared_mem[shared_j * (blockDim.x + 2)] = GRID(src, i - 1, j, ld_src);
+        }
+        if (li == blockDim.x - 1 && i < NX - 1) {
+            shared_mem[shared_j * (blockDim.x + 2) + shared_i + 1] = GRID(src, i + 1, j, ld_src);
+        }
+        if (lj == 0 && j > 0) {
+            shared_mem[shared_i] = GRID(src, i, j - 1, ld_src);
+        }
+        if (lj == blockDim.y - 1 && j < NY - 1) {
+            shared_mem[(shared_j + 1) * (blockDim.x + 2) + shared_i] = GRID(src, i, j + 1, ld_src);
+        }
+    }
+
+    __syncthreads();
+
+    // Perform computation if within bounds
+    if (i > 0 && i < NX - 1 && j > 0 && j < NY - 1) {
+        GRID(dst, i, j, ld_dst) = shared_mem[shared_j * (blockDim.x + 2) + shared_i] + ALPHA * DT / (DX * DY) * (
+            (shared_mem[shared_j * (blockDim.x + 2) + shared_i + 1] - 2 * shared_mem[shared_j * (blockDim.x + 2) + shared_i] + shared_mem[shared_j * (blockDim.x + 2) + shared_i - 1]) / (DX * DX) +
+            (shared_mem[(shared_j + 1) * (blockDim.x + 2) + shared_i] - 2 * shared_mem[shared_j * (blockDim.x + 2) + shared_i] + shared_mem[(shared_j - 1) * (blockDim.x + 2) + shared_i]) / (DY * DY)
+        );
+    }
+}
+Key Optimizations:
+Shared Memory Usage: The kernel now uses shared memory to store the tile being processed. This reduces global memory accesses, which are slower compared to shared memory accesses.
+
+Halo Region: The kernel loads a halo region into shared memory to handle boundary conditions within the tile. This ensures that all necessary data for computation is available in shared memory.
+
+Thread Synchronization: A __syncthreads() call is used to ensure all threads have loaded their data into shared memory before any computation begins.
+
+Boundary Checks: The kernel checks if the current thread is within the valid computational domain before performing the stencil operation.
+
+Thread and Block Configuration: Ensure that the block size is chosen to maximize occupancy while considering shared memory usage. A typical block size might be 16x16 or 32x32, but this should be tuned based on your specific hardware and problem size.
+
+Additional Considerations:
+Memory Coalescing: Ensure that global memory accesses are coalesced. This is generally achieved by having threads access contiguous memory locations.
+
+Occupancy: Use CUDA occupancy calculator tools to determine the optimal block size and shared memory usage for your specific GPU.
+
+# endif
 
 # include <heat/consts.h>
 
@@ -23,7 +90,6 @@ diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x
     const int  i = tile_x * tsx + li;
     const int  j = tile_y * tsy + lj;
 
-    # if 1
     // boundary conditions fixed
     if (i > 0 && i < NX - 1 && j > 0 && j < NY - 1)
     {
@@ -32,9 +98,6 @@ diffusion_cuda_kernel(TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x
                 (GRID(src,   li, lj+1, ld_src) - 2 * GRID(src, li, lj, ld_src) + GRID(src,   li, lj-1, ld_src)) / (DY * DY)
             );
     }
-    # else
-    GRID(dst, li, lj, ld_dst) = GRID(src, li, lj, ld_src);
-    # endif
 }
 
 extern "C"

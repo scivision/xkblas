@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 23:02:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/12 22:41:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -97,17 +97,7 @@ maybe_export(int step, TYPE * grid)
         {
             int frame = step / (N_STEP / N_VTK);
 
-            # if 0
-            // Create a cohrency task, to gather data back from gpus
-            int uplo = 0, memflag = 0;
-            xkrt_coherency_host_async(&runtime, MATRIX_COLMAJOR, grid, LD, NX, NY, sizeof(TYPE));
-
-            // TODO : instead of a sync+coherent, maybe make a host task that reads data
-            // Wait for the completion of all tasks
-            xkrt_sync(&runtime);
-            export_to_vtk(frame, grid);
-
-            # else
+            # if 1
             Thread * thread = Thread::self();
 
             # define AC 1
@@ -143,6 +133,13 @@ maybe_export(int step, TYPE * grid)
             # undef AC
 
             runtime.task_commit(task);
+
+            # else
+
+            xkrt_coherency_host_async(&runtime, MATRIX_COLMAJOR, grid, LD, NX, NY, sizeof(TYPE));
+            xkrt_sync(&runtime);
+            export_to_vtk(frame, grid);
+
             # endif
         }
     }
@@ -212,6 +209,68 @@ body_cuda(
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
+# if XKRT_SUPPORT_ZE
+
+# include <xkrt/driver/driver-ze.h>
+# include <xkrt/logger/logger-ze.h>
+# include <ze_api.h>
+
+static unsigned char SPIRV_DIFFUSION_KERNEL[] = {
+    # include "kernels/diffusion.spv.bytes"
+};
+
+static xkrt_driver_module_t ZE_MODULES[XKRT_DEVICES_MAX];
+static xkrt_driver_module_fn_t ZE_KERNELS[XKRT_DEVICES_MAX];
+
+static void
+body_ze(
+    xkrt_stream_ze_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
+    task_t * task = (task_t *) instr->kern.vargs;
+    args_t * args = (args_t *) TASK_ARGS(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * a_src = accesses + 0;
+    const access_t * a_dst = accesses + 1;
+
+    TYPE * src = (TYPE *) a_src->device_view.addr;
+    TYPE * dst = (TYPE *) a_dst->device_view.addr;
+    const size_t ld_src = a_src->device_view.ld;
+    const size_t ld_dst = a_dst->device_view.ld;
+
+    // offset boundary access so the kernel receive the correct pointer
+    if (args->tile_x == 0)
+        dst = dst - 1;
+    else
+        src = src + 1;
+
+    if (args->tile_y == 0)
+        dst = dst - ld_dst;
+    else
+        src = src + ld_src;
+    // kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
+    ze_kernel_handle_t fn = (ze_kernel_handle_t) ZE_KERNELS[stream->device->inherited.driver_id];
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 0, sizeof(src),           (const void *) &src));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 1, sizeof(ld_src),        (const void *) &ld_src));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 2, sizeof(dst),           (const void *) &dst));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 3, sizeof(ld_dst),        (const void *) &ld_dst));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 4, sizeof(args->tile_x),  (const void *) &args->tile_x));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 5, sizeof(args->tile_y),  (const void *) &args->tile_y));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 6, sizeof(TSX),           (const void *) &TSX));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 7, sizeof(TSY),           (const void *) &TSY));
+
+    uint32_t gx, gy, gz;
+    ZE_SAFE_CALL(zeKernelSuggestGroupSize(fn, TSX, TSY, 1, &gx, &gy, &gz));
+    ZE_SAFE_CALL(zeKernelSetGroupSize(fn, gx, gy, gz));
+
+    ze_group_count_t gc = { TSX / gx, TSY / gy, 1 };
+    ze_event_handle_t event = stream->ze.events.list[idx];
+    ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(stream->ze.command.list, fn, &gc, event, 0, NULL));
+}
+# endif /* XKRT_SUPPORT_CUDA */
+
 static void
 update_cpu(TYPE * src, TYPE * dst)
 {
@@ -234,6 +293,23 @@ update_cpu(TYPE * src, TYPE * dst)
 static void
 setup_tasks(void)
 {
+    // compile kernels
+    {
+        # if XKRT_SUPPORT_ZE
+        xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
+        assert(driver);
+
+        for (int i = 0 ; i < runtime.drivers.devices.n ; ++i)
+        {
+            ZE_MODULES[i] = driver->f_module_load(i, SPIRV_DIFFUSION_KERNEL, sizeof(SPIRV_DIFFUSION_KERNEL));
+            assert(ZE_MODULES[i]);
+
+            ZE_KERNELS[i] = driver->f_module_get_fn(ZE_MODULES[i], "diffusion_cl_kernel");
+            assert(ZE_KERNELS[i]);
+        }
+        # endif /* XKRT_SUPPORT_ZE */
+    }
+
     // diffusion
     {
         task_format_t format;
@@ -242,6 +318,10 @@ setup_tasks(void)
         # if XKRT_SUPPORT_CUDA
         format.f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda;
         # endif /* XKRT_SUPPORT_CUDA */
+
+        # if XKRT_SUPPORT_ZE
+        format.f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze;
+        # endif /* XKRT_SUPPORT_ZE */
 
         snprintf(format.label, sizeof(format.label), "heat-diffusion");
         diffusion_format_id = task_format_create(&(runtime.formats.list), &format);
@@ -379,7 +459,6 @@ update(TYPE * src, TYPE * dst)
     # else
     update_cpu(src, dst);
     # endif
-
 }
 
 //////////
@@ -391,6 +470,8 @@ main(void)
 {
     // Initialize xkrt runtime
     xkrt_init(&runtime);
+    if (runtime.drivers.devices.n == 0)
+        LOGGER_FATAL("No devices found");
 
     // compute data partitioning
     TSX = NX / 1;
@@ -403,8 +484,8 @@ main(void)
     const size_t s = sizeof(TYPE);
     # if 1
     const uintptr_t alignon = NX * s;
-    const size_t       size = 2 * (NX * NY * s + alignon);
-    const uintptr_t   mem   = (uintptr_t) runtime.memory_host_allocate(0, size);
+    const size_t size = 2 * (NX * NY * s + alignon);
+    const uintptr_t mem = (uintptr_t) runtime.memory_host_allocate(0, size);
     TYPE * grid1 = (TYPE *) (mem + (alignon - (mem % alignon)) + 0 * s * (NX * NY));
     TYPE * grid2 = (TYPE *) (mem + (alignon - (mem % alignon)) + 1 * s * (NX * NY));
     assert((uintptr_t)grid1 % alignon == 0);
@@ -420,20 +501,8 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
-    # if 0
-    xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE), 1, 1);
-    xkrt_coherency_distribute_packed_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE), 1, 1);
-    # elif 0
-    xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, sizeof(TYPE));
-    xkrt_coherency_distribute_packed_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, sizeof(TYPE));
-    # elif 1
     xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
     xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
-    # elif 0
-    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE));
-    xkrt_coherency_distribute_cyclic_2D_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE));
-    # else
-    # endif
 
     uint64_t t0 = xkrt_get_nanotime();
 
