@@ -373,7 +373,6 @@ xkrt_runtime_t::team_barrier(xkrt_team_t * team, xkrt_thread_t * thread)
             if (worksteal && schedule(this, team, thread))
                 continue ;
 
-            # if 0
             pthread_mutex_lock(&team->priv.barrier.mtx);
             {
                 if (old_version == team->priv.barrier.version)
@@ -382,7 +381,6 @@ xkrt_runtime_t::team_barrier(xkrt_team_t * team, xkrt_thread_t * thread)
                 }
             }
             pthread_mutex_unlock(&team->priv.barrier.mtx);
-            # endif
         }
     }
 }
