@@ -238,6 +238,7 @@ read_from_binary(unsigned char **output, size_t * size, const char *name)
 # include <ze_api.h>
 
 static xkrt_driver_module_t ZE_MODULES[XKRT_DEVICES_MAX];
+static xkrt_driver_module_t ZE_KERNELS[XKRT_DEVICES_MAX];
 
 static void
 body_ze(
@@ -271,13 +272,39 @@ body_ze(
     xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
     assert(driver);
 
-    xkrt_driver_module_t module = ZE_MODULES[stream->device->inherited.driver_id];
+    // retrieve module, or compile it
+    const int device_id = stream->device->inherited.driver_id;
+    xkrt_driver_module_t module = ZE_MODULES[device_id];
+    if (module == NULL)
+    {
+        xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
+        assert(driver);
+
+        unsigned char * file;
+        size_t size;
+        const char * name = "../src/kernels/diffusion.ar";
+        if (read_from_binary(&file, &size, name))
+            LOGGER_FATAL("Could not find the kernel binary file, have you precompiled the kernel ?");
+        ZE_MODULES[device_id] = driver->f_module_load(device_id, file, size, XKRT_DRIVER_MODULE_FORMAT_NATIVE);
+        assert(ZE_MODULES[device_id]);
+        free(file);
+
+        module = ZE_MODULES[device_id];
+    }
     assert(module);
 
-    ze_kernel_handle_t fn = (ze_kernel_handle_t) driver->f_module_get_fn(module, "diffusion_cl_kernel");
+    ze_kernel_handle_t fn = (ze_kernel_handle_t) ZE_KERNELS[device_id];
+    if (fn == NULL)
+    {
+        fn = (ze_kernel_handle_t) driver->f_module_get_fn(module, "diffusion_cl_kernel");
+        ZE_KERNELS[device_id] = fn;
+        if (fn == NULL)
+            LOGGER_FATAL("Couldnt find the `diffusion_cl_kernel` within the module");
+    }
     assert(fn);
 
-    ZE_SAFE_CALL(zeKernelSetIndirectAccess(fn, ZE_KERNEL_INDIRECT_ACCESS_FLAG_DEVICE));
+    // not necessary, thats a hint for having memory resident during kernel execution
+    // ZE_SAFE_CALL(zeKernelSetIndirectAccess(fn, ZE_KERNEL_INDIRECT_ACCESS_FLAG_DEVICE));
 
     // kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 0, sizeof(TYPE *),    &src));
@@ -301,8 +328,6 @@ body_ze(
     dispatch.groupCountZ = 1;
 
     ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(stream->ze.command.list, fn, &dispatch, stream->ze.events.list[idx], 0, NULL));
-    ZE_SAFE_CALL(zeEventHostSynchronize(stream->ze.events.list[idx], UINT64_MAX));
-    ZE_SAFE_CALL(zeKernelDestroy(fn));
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
@@ -328,26 +353,6 @@ update_cpu(TYPE * src, TYPE * dst)
 static void
 setup_tasks(void)
 {
-    // compile kernels
-    {
-        # if XKRT_SUPPORT_ZE
-        xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
-        assert(driver);
-
-        for (int i = 0 ; i < runtime.drivers.devices.n ; ++i)
-        {
-            // ZE_MODULES[i] = driver->f_module_load(i, SPIRV_DIFFUSION_KERNEL, sizeof(SPIRV_DIFFUSION_KERNEL));
-            unsigned char * file;
-            size_t size;
-            const char * name = "../src/kernels/diffusion.ar";
-            assert(read_from_binary(&file, &size, name) == 0);
-            ZE_MODULES[i] = driver->f_module_load(i, file, size, XKRT_DRIVER_MODULE_FORMAT_NATIVE);
-            assert(ZE_MODULES[i]);
-            free(file);
-        }
-        # endif /* XKRT_SUPPORT_ZE */
-    }
-
     // diffusion
     {
         task_format_t format;
@@ -554,7 +559,7 @@ main(void)
         // Update
         update(src, dst, step);
         if (step % (N_STEP / 10 + 1) == 0)
-            LOGGER_WARN("Progress: %.2lf%%", step / (double)N_STEP*100);
+            LOGGER_WARN("(graph creation) Progress: %.2lf%%", step / (double)N_STEP*100);
 
         // Export every other frames
         maybe_export(step, dst);
