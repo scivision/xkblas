@@ -29,6 +29,13 @@
 
 # include <hwloc.h>
 
+typedef enum    xkrt_driver_module_format_t
+{
+    XKRT_DRIVER_MODULE_FORMAT_SPIRV,
+    XKRT_DRIVER_MODULE_FORMAT_NATIVE,
+    XKRT_DRIVER_MODULE_FORMAT_UNKWN
+}               xkrt_driver_module_format_t;
+
 typedef void * xkrt_driver_module_t;
 typedef void * xkrt_driver_module_fn_t;
 
@@ -136,7 +143,7 @@ typedef struct  xkrt_driver_t
     /////////////
     // MODULES //
     /////////////
-    xkrt_driver_module_t    (*f_module_load)(int device_driver_id, uint8_t * bin, size_t binsize);
+    xkrt_driver_module_t    (*f_module_load)(int device_driver_id, uint8_t * bin, size_t binsize, xkrt_driver_module_format_t format);
     void                    (*f_module_unload)(xkrt_driver_module_t module);
     xkrt_driver_module_fn_t (*f_module_get_fn)(xkrt_driver_module_t module, const char * name);
 

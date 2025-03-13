@@ -211,16 +211,33 @@ body_cuda(
 
 # if XKRT_SUPPORT_ZE
 
+int
+read_from_binary(unsigned char **output, size_t * size, const char *name)
+{
+    FILE *fp = fopen(name, "rb");
+    if (!fp)
+        return -1;
+
+    fseek(fp, 0, SEEK_END);
+    *size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    *output = (unsigned char *)malloc(*size * sizeof(unsigned char));
+    if (!*output) {
+        fclose(fp);
+        return -1;
+    }
+
+    fread(*output, *size, 1, fp);
+    fclose(fp);
+    return 0;
+}
+
 # include <xkrt/driver/driver-ze.h>
 # include <xkrt/logger/logger-ze.h>
 # include <ze_api.h>
 
-static unsigned char SPIRV_DIFFUSION_KERNEL[] = {
-    # include "kernels/diffusion.spv.bytes"
-};
-
 static xkrt_driver_module_t ZE_MODULES[XKRT_DEVICES_MAX];
-static xkrt_driver_module_fn_t ZE_KERNELS[XKRT_DEVICES_MAX];
 
 static void
 body_ze(
@@ -250,10 +267,19 @@ body_ze(
         dst = dst - ld_dst;
     else
         src = src + ld_src;
+
+    xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
+    assert(driver);
+
+    xkrt_driver_module_t module = ZE_MODULES[stream->device->inherited.driver_id];
+    assert(module);
+
+    ze_kernel_handle_t fn = (ze_kernel_handle_t) driver->f_module_get_fn(module, "diffusion_cl_kernel");
+    assert(fn);
+
+    ZE_SAFE_CALL(zeKernelSetIndirectAccess(fn, ZE_KERNEL_INDIRECT_ACCESS_FLAG_DEVICE));
+
     // kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
-    ze_kernel_handle_t fn = (ze_kernel_handle_t) ZE_KERNELS[stream->device->inherited.driver_id];
-    src = NULL;
-    dst = NULL;
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 0, sizeof(TYPE *),    &src));
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 1, sizeof(int),       &ld_src));
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 2, sizeof(TYPE *),    &dst));
@@ -263,13 +289,20 @@ body_ze(
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 6, sizeof(int),       &TSX));
     ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 7, sizeof(int),       &TSY));
 
-    uint32_t gx, gy, gz;
-    ZE_SAFE_CALL(zeKernelSuggestGroupSize(fn, TSX, TSY, 1, &gx, &gy, &gz));
-    ZE_SAFE_CALL(zeKernelSetGroupSize(fn, gx, gy, gz));
+    uint32_t gsX = 16;
+    uint32_t gsY = 16;
+    uint32_t gsZ = 1;
+    ZE_SAFE_CALL(zeKernelSuggestGroupSize(fn, TSX, TSY, 1, &gsX, &gsY, &gsZ));
+    ZE_SAFE_CALL(zeKernelSetGroupSize(fn, gsX, gsY, gsZ));
 
-    ze_group_count_t gc = { (uint32_t) TSX, (uint32_t) TSY, 1 };
-    ze_event_handle_t event = stream->ze.events.list[idx];
-    ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(stream->ze.command.list, fn, &gc, event, 0, NULL));
+    ze_group_count_t dispatch;
+    dispatch.groupCountX = TSX / gsX;
+    dispatch.groupCountY = TSY / gsY;
+    dispatch.groupCountZ = 1;
+
+    ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(stream->ze.command.list, fn, &dispatch, stream->ze.events.list[idx], 0, NULL));
+    ZE_SAFE_CALL(zeEventHostSynchronize(stream->ze.events.list[idx], UINT64_MAX));
+    ZE_SAFE_CALL(zeKernelDestroy(fn));
 }
 # endif /* XKRT_SUPPORT_CUDA */
 
@@ -303,11 +336,14 @@ setup_tasks(void)
 
         for (int i = 0 ; i < runtime.drivers.devices.n ; ++i)
         {
-            ZE_MODULES[i] = driver->f_module_load(i, SPIRV_DIFFUSION_KERNEL, sizeof(SPIRV_DIFFUSION_KERNEL));
+            // ZE_MODULES[i] = driver->f_module_load(i, SPIRV_DIFFUSION_KERNEL, sizeof(SPIRV_DIFFUSION_KERNEL));
+            unsigned char * file;
+            size_t size;
+            const char * name = "../src/kernels/diffusion.ar";
+            assert(read_from_binary(&file, &size, name) == 0);
+            ZE_MODULES[i] = driver->f_module_load(i, file, size, XKRT_DRIVER_MODULE_FORMAT_NATIVE);
             assert(ZE_MODULES[i]);
-
-            ZE_KERNELS[i] = driver->f_module_get_fn(ZE_MODULES[i], "diffusion_cl_kernel");
-            assert(ZE_KERNELS[i]);
+            free(file);
         }
         # endif /* XKRT_SUPPORT_ZE */
     }

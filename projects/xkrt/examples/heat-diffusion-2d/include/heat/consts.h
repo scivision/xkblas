@@ -28,7 +28,7 @@
 #  define N_VTK MIN(10, N_STEP)
 
 /* Thermal diffusivity */
-#  define ALPHA (1.11e-4)
+#  define ALPHA (1.11e-4f)
 
 /* Boundary conditions (°C) */
 #  define TEMPERATURE_BOUNDARY 100
@@ -52,17 +52,17 @@
 #  define NY NX
 
 /* Size of a cell (m) */
-#  define DX (1.0)
+#  define DX (1.0f)
 #  define DY (DX)
 
 /* Duration of the simulation (in s.) */
-#  define DT (0.5*(DX*DX * DY*DY) / (2*ALPHA*(DX*DX + DY*DY)))
+#  define DT (0.5f*(DX*DX * DY*DY) / (2.0f*ALPHA*(DX*DX + DY*DY)))
 
 //////////////////////////////////////////
 //  INFERED FROM CONSTS (do not modify) //
 //////////////////////////////////////////
 
-#  define DURATION (DT * (double) N_STEP)
+#  define DURATION (DT * (TYPE) N_STEP)
 
 # define GRID(G, I, J, L) (G[(J)*L+(I)])
 # define LD NX

@@ -779,13 +779,32 @@ xkrt_driver_module_t
 XKRT_DRIVER_ENTRYPOINT(module_load)(
     int device_driver_id,
     uint8_t * bin,
-    size_t binsize
+    size_t binsize,
+    xkrt_driver_module_format_t format
 ) {
+    ze_module_format_t ze_format;
+    switch (format)
+    {
+        case (XKRT_DRIVER_MODULE_FORMAT_SPIRV):
+        {
+            ze_format = ZE_MODULE_FORMAT_IL_SPIRV;
+            break ;
+        }
+
+        case (XKRT_DRIVER_MODULE_FORMAT_NATIVE):
+        {
+            ze_format = ZE_MODULE_FORMAT_NATIVE;
+            break ;
+        }
+
+        default:
+            LOGGER_FATAL("Unknown format");
+    }
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     ze_module_desc_t desc = {
         .stype = ZE_STRUCTURE_TYPE_MODULE_DESC,
         .pNext = NULL,
-        .format = ZE_MODULE_FORMAT_IL_SPIRV,
+        .format = ze_format,
         .inputSize = binsize,
         .pInputModule = bin,
         .pBuildFlags = NULL,

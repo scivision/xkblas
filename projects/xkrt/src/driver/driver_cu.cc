@@ -742,8 +742,10 @@ xkrt_driver_module_t
 XKRT_DRIVER_ENTRYPOINT(module_load)(
     int device_driver_id,
     uint8_t * bin,
-    size_t binsize
+    size_t binsize,
+    xkrt_driver_module_format_t format
 ) {
+    assert(format == XKRT_DRIVER_MODULE_FORMAT_NATIVE);
     cu_set_context(device_driver_id);
     xkrt_driver_module_t module = NULL;
     CU_SAFE_CALL(cuModuleLoadData((CUmodule *) &module, bin));

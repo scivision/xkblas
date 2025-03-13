@@ -15,12 +15,17 @@
 
 __kernel
 void
-diffusion_cl_kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
-{
+diffusion_cl_kernel(
+    __global TYPE * src, int ld_src,
+    __global TYPE * dst, int ld_dst,
+    int tile_x, int tile_y,
+    int tsx, int tsy
+) {
     const int li = get_global_id(0);
     const int lj = get_global_id(1);
     const int  i = tile_x * tsx + li;
     const int  j = tile_y * tsy + lj;
+    // printf("Running (li, lj) = (%d, %d) and (i, j) = (%d, %d)\n", li, lj, i, j);
 
     // boundary conditions fixed
     if (i > 0 && i < NX - 1 && j > 0 && j < NY - 1)
