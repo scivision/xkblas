@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 22:41:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/13 14:24:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -165,7 +165,7 @@ typedef struct  args_t
 # include <xkrt/driver/driver-cu.h>
 # include <xkrt/logger/logger-cu.h>
 
-extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y, unsigned int tsx, unsigned int tsy);
+extern "C" void diffusion_cuda(cudaStream_t stream, TYPE * src, int ld_src, TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy);
 
 static void
 body_cuda(
@@ -237,8 +237,8 @@ body_ze(
 
     TYPE * src = (TYPE *) a_src->device_view.addr;
     TYPE * dst = (TYPE *) a_dst->device_view.addr;
-    const size_t ld_src = a_src->device_view.ld;
-    const size_t ld_dst = a_dst->device_view.ld;
+    const int ld_src = (int) a_src->device_view.ld;
+    const int ld_dst = (int) a_dst->device_view.ld;
 
     // offset boundary access so the kernel receive the correct pointer
     if (args->tile_x == 0)
@@ -252,20 +252,22 @@ body_ze(
         src = src + ld_src;
     // kernel(__global TYPE * src, int ld_src, __global TYPE * dst, int ld_dst, int tile_x, int tile_y, int tsx, int tsy)
     ze_kernel_handle_t fn = (ze_kernel_handle_t) ZE_KERNELS[stream->device->inherited.driver_id];
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 0, sizeof(src),           (const void *) &src));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 1, sizeof(ld_src),        (const void *) &ld_src));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 2, sizeof(dst),           (const void *) &dst));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 3, sizeof(ld_dst),        (const void *) &ld_dst));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 4, sizeof(args->tile_x),  (const void *) &args->tile_x));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 5, sizeof(args->tile_y),  (const void *) &args->tile_y));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 6, sizeof(TSX),           (const void *) &TSX));
-    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 7, sizeof(TSY),           (const void *) &TSY));
+    src = NULL;
+    dst = NULL;
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 0, sizeof(TYPE *),    &src));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 1, sizeof(int),       &ld_src));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 2, sizeof(TYPE *),    &dst));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 3, sizeof(int),       &ld_dst));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 4, sizeof(int),       &args->tile_x));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 5, sizeof(int),       &args->tile_y));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 6, sizeof(int),       &TSX));
+    ZE_SAFE_CALL(zeKernelSetArgumentValue(fn, 7, sizeof(int),       &TSY));
 
     uint32_t gx, gy, gz;
     ZE_SAFE_CALL(zeKernelSuggestGroupSize(fn, TSX, TSY, 1, &gx, &gy, &gz));
     ZE_SAFE_CALL(zeKernelSetGroupSize(fn, gx, gy, gz));
 
-    ze_group_count_t gc = { TSX / gx, TSY / gy, 1 };
+    ze_group_count_t gc = { (uint32_t) TSX, (uint32_t) TSY, 1 };
     ze_event_handle_t event = stream->ze.events.list[idx];
     ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(stream->ze.command.list, fn, &gc, event, 0, NULL));
 }
@@ -387,7 +389,7 @@ initialize(TYPE * grid1, TYPE * grid2)
 
 /* Submit a tile */
 static void
-update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
+update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y, int step)
 {
     Thread * thread = Thread::self();
 
@@ -410,7 +412,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
     new(args) args_t(src, dst, tile_x, tile_y);
 
     # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "diffusion(%d, %d)", tile_x, tile_y);
+    snprintf(task->label, sizeof(task->label), "diffusion(%d, %d, s=%d)", tile_x, tile_y, step);
     # endif
 
     const int ntx = NUM_OF_TILES(NX, TSX);
@@ -448,14 +450,14 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y)
 
 /* Simulate 1 time step */
 static void
-update(TYPE * src, TYPE * dst)
+update(TYPE * src, TYPE * dst, int step)
 {
     # if 1
     const int ntx = NUM_OF_TILES(NX, TSX);
     const int nty = NUM_OF_TILES(NY, TSY);
     for (int tile_x = 0; tile_x < ntx; ++tile_x)
         for (int tile_y = 0; tile_y < nty; ++tile_y)
-            update_tile(src, dst, tile_x, tile_y);
+            update_tile(src, dst, tile_x, tile_y, step);
     # else
     update_cpu(src, dst);
     # endif
@@ -514,7 +516,7 @@ main(void)
         TYPE * dst = (step % 2 == 0) ? grid2 : grid1;
 
         // Update
-        update(src, dst);
+        update(src, dst, step);
         if (step % (N_STEP / 10 + 1) == 0)
             LOGGER_WARN("Progress: %.2lf%%", step / (double)N_STEP*100);
 

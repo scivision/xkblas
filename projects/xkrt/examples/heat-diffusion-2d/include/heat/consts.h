@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 22:47:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/13 14:01:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -47,8 +47,8 @@
 /* Number of points per dimension in the grid */
 //#  define NX (32768)
 //#  define NX (32768+8192)
-#  define NX (256)
-//#  define NX (16)
+//#  define NX (256)
+#  define NX (16)
 #  define NY NX
 
 /* Size of a cell (m) */

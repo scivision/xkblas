@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 21:17:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/13 13:58:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -107,7 +107,7 @@ diffusion_cuda(
     TYPE * src, int ld_src,
     TYPE * dst, int ld_dst,
     int tile_x, int tile_y,
-    unsigned int tsx, unsigned int tsy
+    int tsx, int tsy
 ) {
     // Number of threads per block line
     const unsigned int dtsx = (32 < (tsx) ? 32 : (tsx));
