@@ -692,7 +692,9 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     for (int i = 0 ; i < src_device->nmemories ; ++i)
     {
-        time_array_t time(runtime.drivers.devices.n*XKRT_DEVICE_MEMORIES_MAX, 3);
+        constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 5 : 0;
+        static_assert(niters);
+        time_array_t time(runtime.drivers.devices.n*XKRT_DEVICE_MEMORIES_MAX, niters);
 
         for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
         {
@@ -823,7 +825,9 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
 
-    time_array_t time(device->nmemories, 11);
+    constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 11 : 0;
+    static_assert(niters);
+    time_array_t time(device->nmemories, niters);
     for (int i = 0 ; i < device->nmemories ; ++i)
     {
         xkrt_device_memory_info_t * meminfo = device->memories + i;
