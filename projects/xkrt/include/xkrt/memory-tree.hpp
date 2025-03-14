@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 22:45:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/14 18:58:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -71,6 +71,35 @@ static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= (1 << (sizeof(memory_allo
 typedef uint8_t memory_allocation_view_id_bitfield_t;
 static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= sizeof(memory_allocation_view_id_bitfield_t) * 8);
 
+template<int K>
+static inline void
+memory_view_from_cube(
+    memory_view_t * view,
+    const KCube<K> & cube,
+    const size_t ld,
+    const size_t sizeof_type
+) {
+
+    const INTERVAL_TYPE_T       x = cube[ACCESS_CUBE_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dx = cube[ACCESS_CUBE_ROW_DIM].length();
+    const INTERVAL_TYPE_T       y = cube[ACCESS_CUBE_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dy = cube[ACCESS_CUBE_COL_DIM].length();
+    assert(dx > 0);
+    assert(dy > 0);
+
+    view->order         = MATRIX_COLMAJOR;
+    view->addr          = x + y * ld * sizeof_type;
+    view->ld            = ld;
+    view->offset_m      = 0;
+    view->offset_n      = 0;
+    view->m             = dx / sizeof_type;
+    view->n             = dy;
+    view->sizeof_type   = sizeof_type;
+
+    // accesses must be aligned on sizeof(type)
+    assert(view->m * sizeof_type == dx);
+}
+
 /* a forward request */
 template <int K>
 class KMemoryForward {
@@ -83,24 +112,29 @@ class KMemoryForward {
         /* dst chunk */
         xkrt_area_chunk_t * chunk;
 
+        /* the dst cube */
+        Cube dst_cube;
+
         /* the dst device */
         xkrt_device_global_id_t device_global_id;
 
-        /* the dst alloc view id to use */
-        memory_replicate_view_t view;
+        /* the dst view */
+        memory_replicate_view_t device_view;
 
     public:
 
         KMemoryForward(
             task_t * task,
             xkrt_area_chunk_t * chunk,
+            const Cube & dst_cube,
             xkrt_device_global_id_t device_global_id,
-            memory_replicate_view_t & view
+            memory_replicate_view_t & device_view
         ) :
             task(task),
             chunk(chunk),
+            dst_cube(dst_cube),
             device_global_id(device_global_id),
-            view(view)
+            device_view(device_view)
         {}
 
         ~KMemoryForward() {}
@@ -364,33 +398,6 @@ class KMemoryTreeNodeSearch {
                 {}
 
                 virtual ~Partite() {}
-
-                inline memory_view_t
-                create_host_view(const size_t ld, const size_t sizeof_type) const
-                {
-                    const INTERVAL_TYPE_T       x = this->cube[ACCESS_CUBE_ROW_DIM].a;
-                    const INTERVAL_DIFF_TYPE_T dx = this->cube[ACCESS_CUBE_ROW_DIM].length();
-                    const INTERVAL_TYPE_T       y = this->cube[ACCESS_CUBE_COL_DIM].a;
-                    const INTERVAL_DIFF_TYPE_T dy = this->cube[ACCESS_CUBE_COL_DIM].length();
-                    assert(dx > 0);
-                    assert(dy > 0);
-
-                    memory_view_t host_view;
-
-                    host_view.order         = MATRIX_COLMAJOR;
-                    host_view.addr          = x + y * ld * sizeof_type;
-                    host_view.ld            = ld;
-                    host_view.offset_m      = 0;
-                    host_view.offset_n      = 0;
-                    host_view.m             = dx / sizeof_type;
-                    host_view.n             = dy;
-                    host_view.sizeof_type   = sizeof_type;
-
-                    // accesses must be aligned on sizeof(type)
-                    assert(host_view.m * sizeof_type == dx);
-
-                    return host_view;
-                }
 
                 bool
                 operator<(const Partite & p) const
@@ -850,12 +857,14 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             fetch_callback_task(runtime, fetch, task);
 
+            /* if fetched to a device */
             if (fetch->dst_device_global_id != HOST_DEVICE_GLOBAL_ID)
             {
                 /* `fetch->dst_chunk` is the memory allocated chunk on which the data had been fetched.
                  * Search in the tree for awaiting tasks and forwards */
                 assert(fetch->dst_chunk);
 
+                /* retrieve awaiting tasks */
                 Search search(fetch->dst_device_global_id);
                 search.prepare_search_awaiting(fetch->dst_chunk);
                 tree->lock();
@@ -892,14 +901,30 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         assert(i == forward_list->n - 1);
                         forward_list->fetching();
 
-                        forward_fetch->cubes                = fetch->cubes;                 // the logicial view hasn't changed
-                        new (&forward_fetch->host_view) memory_view_t(fetch->host_view);    // the host view hasn't changed
-                        forward_fetch->dst_chunk            = forward.chunk;
-                        forward_fetch->dst_device_global_id = forward.device_global_id;     // use the forwarded dst device
-                        forward_fetch->dst_view             = forward.view;                 // use the forwarded dst view
-                        forward_fetch->src_device_global_id = fetch->dst_device_global_id;  // the current 'dst' is the new 'src'
-                        forward_fetch->src_view             = fetch->dst_view;              // the current 'dst' is the new 'src'
+                        // upcoming copy only needs m, n, sizeof_type
+                        memory_view_from_cube(&forward_fetch->host_view, forward.dst_cube, tree->ld, tree->sizeof_type);
 
+                        // the chunk to use
+                        forward_fetch->dst_chunk = forward.chunk;
+
+                        // the dst device to forward to
+                        forward_fetch->dst_device_global_id = forward.device_global_id;
+
+                        // the forward dst view - memory region where to forward the data
+                        forward_fetch->dst_view = forward.device_view;
+
+                        // only 1 cube representing the forward view
+                        forward_fetch->cubes.push_back(forward.dst_cube);
+
+                        // the just-fetched 'dst' is the new 'src'
+                        forward_fetch->src_device_global_id = fetch->dst_device_global_id;
+
+                        // the just-fetched 'dst' is the new 'src' - offset it to the begining of the forward view
+                        assert(fetch->host_view.begin_addr() <= forward_fetch->host_view.begin_addr());
+                        const size_t offset = forward_fetch->host_view.begin_addr() - fetch->host_view.begin_addr();
+                        new (&forward_fetch->src_view) memory_replicate_view_t(fetch->dst_view.addr + offset, fetch->dst_view.ld);
+
+                        // can launch the forward already
                         tree->fetch_list_launch_ith(forward.task, forward_list, i);
                     }
                 }
@@ -1006,7 +1031,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         partite.src_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
 
                 /* set the views */
-                const memory_view_t host_view = partite.create_host_view(this->ld, this->sizeof_type);
+                memory_view_t host_view;
+                memory_view_from_cube(&host_view, partite.cube, this->ld, this->sizeof_type);
                 const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
                 const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
                 const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
@@ -1416,9 +1442,9 @@ next_view:
 
                     /* increment task fetch counter */
                     LOGGER_DEBUG(
-                        "task `%s` fetching one by `%s` on `%p`",
+                        "task `%s` fetching by `%s` on `%p`",
                         task->label,
-                        (dst_replicate.fetching & dst_allocbit) ? "awaiting" : "launching",
+                        (dst_replicate.fetching & dst_allocbit) ? "awaiting" : (partite.block->fetching) ? "forwarding" : "launching",
                         (void *) dst_allocation_view->view.addr
                     );
 
@@ -1502,7 +1528,7 @@ next_view:
 
                         LOGGER_DEBUG("registered a forward for task `%s`", task->label);
 
-                        const MemoryForward forward(task, partition.chunk, device_global_id, dst_allocation_view->view);
+                        const MemoryForward forward(task, partition.chunk, partite.cube, device_global_id, dst_allocation_view->view);
                         fetching_allocation_view->awaiting.forwards.push_back(forward);
                         __task_fetching(1, task);
                     }
@@ -1629,6 +1655,7 @@ next_view:
         ) {
             // run the coherency protocol
             Search search(device_global_id);
+            fetch_list_t * list = NULL;
 
             this->lock();
             {
@@ -1674,12 +1701,10 @@ next_view:
             } /* this->lock(); */
             this->unlock();
 
-            fetch_list_t * list = NULL;
+            /* step (7) - convert a partition to the minimum number of fetches to run */
             if (access->mode & ACCESS_MODE_R)
-            {
-                /* step (7) - convert a partition to the minimum number of fetches to run */
                 list = this->fetch_list_from_partition(search.partition);
-            }
+
             return list;
         }
 
@@ -1898,6 +1923,9 @@ next_view:
                 {
                     const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << search.device_global_id);
                     MemoryReplicate & replicate = node->block.replicates[search.device_global_id];
+
+                    /* this is called when searching for awaiting tasks after completing a fetch.
+                     * There must be at least one allocation available (the one that just got fetched...) */
                     assert(replicate.nallocations);
 
                     /* for each allocation of that block */
