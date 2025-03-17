@@ -32,7 +32,7 @@ extern "C" {
     int xkrt_deinit(xkrt_runtime_t * runtime);
 
     /* return the number of gpus running */
-    int xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count);
+    int xkrt_get_ndevices(xkrt_runtime_t * runtime, int * count);
 
     //////////////////////
     // SYNCHRONIZATIONS //

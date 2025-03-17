@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:18:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 20:58:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -49,8 +49,7 @@ Thread::Thread() :
     implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
     current_task(&this->implicit_task),
     memory_stack_bottom(NULL),
-    capacity(THREAD_MAX_MEMORY),
-    queue()
+    capacity(THREAD_MAX_MEMORY)
 {
     while (1)
     {
@@ -64,10 +63,6 @@ Thread::Thread() :
     }
     this->memory_stack_ptr = this->memory_stack_bottom;
     assert(this->memory_stack_bottom);
-
-    pthread_mutex_init(&this->sleep.lock, 0);
-    pthread_cond_init (&this->sleep.cond, 0);
-    this->sleep.sleeping = false;
 
     task_dom_info_t * dom = TASK_DOM_INFO(&this->implicit_task);
     new (dom) task_dom_info_t();
@@ -119,8 +114,9 @@ Thread::deallocate_all_tasks(void)
 void
 Thread::push(task_t * const & task)
 {
-    this->queue.push(task);
-    this->wakeup();
+    assert(this->thread);
+    this->thread->deque.push(task);
+    this->thread->wakeup();
 }
 
 task_t *
@@ -128,32 +124,6 @@ Thread::pop(void)
 {
     /* this is true as we only have 1 worker per device currently */
     assert(Thread::self() == this);
-    return this->queue.pop();
-}
-
-void
-Thread::pause(void)
-{
-    assert(Thread::self() == this);
-    pthread_mutex_lock(&this->sleep.lock);
-    {
-        this->sleep.sleeping = true;
-        while (this->sleep.sleeping)
-        {
-            pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
-        }
-    }
-    pthread_mutex_unlock(&this->sleep.lock);
-}
-
-void
-Thread::wakeup(void)
-{
-    pthread_mutex_lock(&this->sleep.lock);
-    if (this->sleep.sleeping)
-    {
-        this->sleep.sleeping = false;
-        pthread_cond_signal(&this->sleep.cond);
-    }
-    pthread_mutex_unlock(&this->sleep.lock);
+    assert(this->thread);
+    return this->thread->deque.pop();
 }

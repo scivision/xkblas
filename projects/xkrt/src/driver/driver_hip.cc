@@ -196,15 +196,15 @@ __get_gpu_topo(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
+XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
 {
     int ndevices_max;
     hipError_t err = hipGetDeviceCount(&ndevices_max);
     if (err)
         return 1;
 
-    assert(ngpus <= XKRT_DEVICES_MAX);
-    for (int i = 0 ; i < ngpus ; ++i)
+    assert(ndevices <= XKRT_DEVICES_MAX);
+    for (int i = 0 ; i < ndevices ; ++i)
     {
         xkrt_device_hip_t * device = __get_device_hip(i);
         assert(device);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/24 17:37:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:02:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,10 +32,10 @@ typedef uint32_t xkrt_device_global_id_bitfield_t;
 static_assert(XKRT_DEVICES_MAX <= sizeof(xkrt_device_global_id_bitfield_t)*8);
 
 /* an ID representing the host device */
-# define HOST_DEVICE_GLOBAL_ID (XKRT_DEVICES_MAX)
+# define HOST_DEVICE_GLOBAL_ID (0)
 
 /* an ID representing an unspecified device */
-# define UNSPECIFIED_DEVICE_GLOBAL_ID (XKRT_DEVICES_MAX+1)
+# define UNSPECIFIED_DEVICE_GLOBAL_ID (XKRT_DEVICES_MAX)
 
 /* a bitmask that represents all devices */
 # define XKRT_DEVICES_MASK_ALL (~((xkrt_device_global_id_bitfield_t)0))

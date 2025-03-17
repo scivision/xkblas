@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/05 01:26:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:07:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -120,7 +120,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_VERBOSE",              __parse_verbose,            "Verbosity level (the higher the most)"},
     {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,    "Merge memory transfers over continuous virtual memory"},
     {"XKRT_PRECISION",            NULL,                       NULL},
-    {"XKRT_NGPUS",                __parse_ngpus,              "Number of GPUs to use"},
+    {"XKRT_NGPUS",                __parse_ngpus,              "Number of gpus to use"},
     {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,    "%% of total memory to allocate initially per GPU (in ]0..100["},
     {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,       "Number of concurrent H2D streams per GPU"},
     {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,       "Number of concurrent D2H streams per GPU"},
@@ -151,7 +151,7 @@ xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
     conf->report_stats_on_deinit    = 0;
-    conf->device.ngpus              = (uint8_t)-1;
+    conf->device.ngpus           = (uint8_t)-1;
     conf->device.gpu_mem_percent    = (float) 50.0;
 
     //////////////////

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:17:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 20:54:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -56,7 +56,6 @@ class alignas(CACHE_LINE_SIZE) Thread
         std::vector<task_t *> tasks;
         # endif /* NDEBUG */
 
-
     private:
 
         /* tasks stack */
@@ -67,17 +66,6 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* memory capacity */
         size_t capacity;
-
-        /* per-thread queue */
-        // Deque<task_t *, THREAD_WORKER_DEQUE_CAPACITY> queue;
-        NaiveQueue<task_t *> queue;
-
-        /* lock and condition to sleep the mutex */
-        struct {
-            pthread_mutex_t lock;
-            pthread_cond_t  cond;
-            volatile bool   sleeping;
-        } sleep;
 
         /* Dependency tree */
         std::vector<DependencyTree *> deptrees;
@@ -112,12 +100,6 @@ class alignas(CACHE_LINE_SIZE) Thread
 
         /* free all allocated memory */
         void deallocate_all_tasks(void);
-
-        /* Sleep the thread until signaled */
-        void pause(void);
-
-        /* Wake up the thread */
-        void wakeup(void);
 
         /* push a task */
         void push(task_t * const & task);

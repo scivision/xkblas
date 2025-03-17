@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 17:45:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:30:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,6 +17,7 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/min-max.h>
 # include <xkrt/sync/spinlock.h>
+# include <xkrt/thread/thread.h>
 
 # include <cassert>
 # include <cstring>
@@ -25,9 +26,10 @@
 
 typedef struct  xkrt_driver_device_thread_arg_t
 {
+    xkrt_thread_t thread;
     xkrt_driver_type_t driver_type;
     uint8_t device_driver_id;
-    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
+    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
     void * vargs;
 }               xkrt_driver_device_thread_arg_t;
 
@@ -38,10 +40,10 @@ trampoline(void * vargs)
     assert(args);
 
     // launch thread
-    args->routine(args->vargs, args->driver_type, args->device_driver_id);
+    args->routine(args->vargs, &args->thread, args->driver_type, args->device_driver_id);
 
-    // release memory
-    free(args);
+    // cannot free args here, because the main thread may `join` onto `args->thread->pthread` - TODO: fix me
+    // free(args);
 
     return NULL;
 }
@@ -49,8 +51,8 @@ trampoline(void * vargs)
 static void
 xkrt_driver_init(
     xkrt_drivers_t * drivers,
-    int ngpus,
-    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
+    int ndevices,
+    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * vargs,
     xkrt_driver_type_t driver_type
 ) {
@@ -65,7 +67,7 @@ xkrt_driver_init(
     const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
     LOGGER_INFO("Loading driver `%s`", driver_name);
 
-    if (driver->f_init == NULL || driver->f_init(ngpus))
+    if (driver->f_init == NULL || driver->f_init(ndevices))
     {
         LOGGER_WARN("Failed to load");
         return ;
@@ -75,7 +77,7 @@ xkrt_driver_init(
     unsigned int n_devices_max = driver->f_get_ndevices_max();
     LOGGER_DEBUG("Found %u devices", n_devices_max);
 
-    unsigned int n_devices = MIN(ngpus, n_devices_max);
+    unsigned int n_devices = MIN(ndevices, n_devices_max);
 
     driver->ndevices_targeted = n_devices;
     driver->ndevices_inited   = 0;
@@ -128,9 +130,9 @@ xkrt_driver_init(
         arg->vargs = vargs;
         arg->driver_type = driver_type;
         arg->device_driver_id = i;
+        new (&arg->thread) xkrt_thread_t(-1);
 
-        pthread_t thread;
-        err = pthread_create(&thread, &attr, trampoline, arg);
+        err = pthread_create(&arg->thread.pthread, &attr, trampoline, arg);
         if (err)
         {
             LOGGER_ERROR("could not create a thread for the device %d", i);
@@ -149,9 +151,9 @@ xkrt_driver_init(
 void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
-    int ngpus,
+    int ndevices,
     int drivers_mask,
-    void (*routine)(void * args, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
+    void (*routine)(void * args, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * args
 ) {
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
@@ -166,10 +168,10 @@ xkrt_drivers_init(
     xkrt_driver_t * (*creators[XKRT_DRIVER_TYPE_MAX])(void);
     memset(creators, 0, sizeof(creators));
 
-# if XKRT_SUPPORT_HOST
-    extern xkrt_driver_t * XKRT_DRIVER_HOST_create_driver(void);
-    creators[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_HOST_create_driver;
-# endif /* XKRT_SUPPORT_HOST */
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_HOST_create_driver(void);
+    creators[XKRT_DRIVER_TYPE_HOST] = XKRT_DRIVER_TYPE_HOST_create_driver;
+    static_assert(XKRT_DRIVER_TYPE_HOST == 0);
+    static_assert(HOST_DEVICE_GLOBAL_ID == 0);
 
 # if XKRT_SUPPORT_CUDA
     extern xkrt_driver_t * XKRT_DRIVER_TYPE_CU_create_driver(void);
@@ -191,8 +193,7 @@ xkrt_drivers_init(
     creators[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
 # endif /* XKRT_SUPPORT_HIP */
 
-    int total_gpus = 0;
-    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
+    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX && drivers->devices.n < ndevices ; ++driver_type)
     {
         // TODO : do not load if conf
         xkrt_driver_t * (*creator)(void) = creators[driver_type];
@@ -201,13 +202,12 @@ xkrt_drivers_init(
             xkrt_driver_t * driver = creator();
             drivers->list[driver_type] = driver;
 
-            xkrt_driver_init(drivers, ngpus - total_gpus, routine, args, (xkrt_driver_type_t) driver_type);
+            xkrt_driver_init(drivers, ndevices - drivers->devices.n, routine, args, (xkrt_driver_type_t) driver_type);
             while (driver->ndevices_commited != driver->ndevices_targeted)
                 mem_pause();
 
-            total_gpus += drivers->devices.n;
-            assert(total_gpus <= ngpus);
-            if (total_gpus == ngpus)
+            assert(drivers->devices.n <= ndevices);
+            if (drivers->devices.n == ndevices)
                 break ;
         }
         else
@@ -215,79 +215,42 @@ xkrt_drivers_init(
     }
 
     // DEBUG OUTPUT
-    if (drivers->devices.n == 0 && ngpus != 0)
+    if (drivers->devices.n == 0 && ndevices != 0)
         LOGGER_WARN("No devices found :-(");
 
-    LOGGER_INFO("Enabled %d devices (with %d requested)", drivers->devices.n.load(), ngpus);
-    assert(drivers->devices.n <= ngpus);
-}
-
-static void
-xkrt_driver_deinit(xkrt_drivers_t * drivers, uint8_t driver_type)
-{
-    xkrt_driver_t * driver = drivers->list[driver_type];
-    if (driver == NULL)
-        return ;
-    // release memory
-    if (driver->f_memory_device_deallocate)
-    {
-        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
-        {
-            xkrt_device_t * device = driver->devices[i];
-            for (int j = 0 ; j < device->nmemories ; ++j)
-            {
-                xkrt_area_t * area = &(device->memories[j].area);
-                driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.ptr, area->chunk0.size, j);
-            }
-        }
-    }
-    else
-        LOGGER_WARN("Driver `%u` is missing `f_device_memory_deallocate`", driver_type);
-
-    // delete streams
-    if (driver->f_stream_delete)
-    {
-        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
-        {
-            xkrt_device_t * device = driver->devices[i];
-            for (uint8_t j = 0 ; j < XKRT_STREAM_TYPE_ALL ; ++j)
-            {
-                for (int k = 0 ; k < device->count[j] ; ++k)
-                {
-                    xkrt_stream_t * stream = device->streams[j][k];
-                    driver->f_stream_delete(stream);
-                }
-            }
-        }
-    }
-    else
-        LOGGER_WARN("Driver `%u` is missing `f_stream_delete`", driver_type);
-
-    // delete device
-    if (driver->f_device_destroy)
-    {
-        for (int i = 0 ; i < driver->ndevices_commited ; ++i)
-        {
-            xkrt_device_t * device = driver->devices[i];
-            driver->f_device_destroy(device->driver_id);
-        }
-    }
-    else
-        LOGGER_WARN("Driver `%u` is missing `f_device_destroy`", driver_type);
-
-    // delete context
-    if (driver->f_finalize)
-        driver->f_finalize();
-    else
-        LOGGER_WARN("Driver `%u` is missing `f_finalize`", driver_type);
+    LOGGER_INFO("Enabled %d devices (with %d requested)", drivers->devices.n.load(), ndevices);
+    assert(drivers->devices.n <= ndevices);
 }
 
 void
 xkrt_drivers_deinit(xkrt_drivers_t * drivers)
 {
+    // notify each thread to stop
+    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
+    {
+        xkrt_device_t * device = drivers->devices.list[device_global_id];
+        device->state = XKRT_DEVICE_STATE_STOP;
+        device->thread->thread->wakeup();
+    }
+
+    // wait for each thread
+    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
+    {
+        xkrt_device_t * device = drivers->devices.list[device_global_id];
+        pthread_join(device->thread->thread->pthread, NULL);
+    }
+
+    // finalize each driver
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
-        xkrt_driver_deinit(drivers, driver_type);
+        xkrt_driver_t * driver = drivers->list[driver_type];
+        if (driver)
+        {
+            if (driver->f_finalize)
+                driver->f_finalize();
+            else
+                LOGGER_WARN("Driver `%u` is missing `f_finalize`", driver_type);
+        }
     }
 }
 
@@ -297,7 +260,7 @@ xkrt_support_driver(xkrt_driver_type_t driver_type)
 {
     switch (driver_type)
     {
-        case (XKRT_DRIVER_TYPE_HOST):   return XKRT_SUPPORT_HOST;
+        case (XKRT_DRIVER_TYPE_HOST):   return 1;
         case (XKRT_DRIVER_TYPE_CUDA):   return XKRT_SUPPORT_CUDA;
         case (XKRT_DRIVER_TYPE_ZE):     return XKRT_SUPPORT_ZE;
         case (XKRT_DRIVER_TYPE_CL):     return XKRT_SUPPORT_CL;

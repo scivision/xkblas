@@ -20,7 +20,6 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/bits-to-str.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
-    ${CMAKE_SOURCE_DIR}/src/host-thread.cc
     ${CMAKE_SOURCE_DIR}/src/runtime.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
     ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
@@ -38,7 +37,7 @@ SET(SOURCE_FILES
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_HOST} ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
 )
 
 add_custom_target(${XKRT}_generated_files ALL DEPENDS always-run)
@@ -82,13 +81,10 @@ find_package(HWLOC REQUIRED)
 include_directories(${HWLOC_INCLUDE_DIRS})
 target_link_libraries(${XKRT} PRIVATE ${HWLOC_LIBRARIES})
 
-# HOST DRIVER
-option(USE_HOST "Whether to build the HOST driver." OFF)
-if (USE_HOST)
-    add_library(${XKRT}_driver_cpu SHARED src/driver/driver_cpu.cc)
-    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cpu)
-    install(TARGETS ${XKRT}_driver_cpu LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-endif()
+# Host driver
+add_library(${XKRT}_driver_host SHARED src/driver/driver_host.cc)
+target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_host)
+install(TARGETS ${XKRT}_driver_host LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 # CUDA
 option(USE_CUDA "Whether to build the CUDA driver." ON)

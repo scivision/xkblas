@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 20:30:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:32:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,6 +23,33 @@
 # include <hwloc/glibc-sched.h>
 
 # pragma message(TODO "Threading layer had been implemented in half a day with naive algorithm. If perf is an issue, reimplement with well-known hierarchical algorithm")
+
+void
+xkrt_thread_t::pause(void)
+{
+    assert(pthread_self() == this->pthread);
+    pthread_mutex_lock(&this->sleep.lock);
+    {
+        this->sleep.sleeping = true;
+        while (this->sleep.sleeping)
+        {
+            pthread_cond_wait(&this->sleep.cond, &this->sleep.lock);
+        }
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
+}
+
+void
+xkrt_thread_t::wakeup(void)
+{
+    pthread_mutex_lock(&this->sleep.lock);
+    if (this->sleep.sleeping)
+    {
+        this->sleep.sleeping = false;
+        pthread_cond_signal(&this->sleep.cond);
+    }
+    pthread_mutex_unlock(&this->sleep.lock);
+}
 
 void
 xkrt_runtime_t::thread_setaffinity(cpu_set_t & cpuset)
@@ -121,7 +148,8 @@ team_create_recursive(void * vargs)
         xkrt_team_t * team = args->team;
         int tid = args->from;
         xkrt_thread_t * thread = team->priv.threads + tid;
-        thread->tid = tid;
+        new (thread) xkrt_thread_t(tid);
+        thread->pthread = pthread_self();
 
         tls->team = team;
         tls->thread = thread;
@@ -183,8 +211,8 @@ team_create_recursive_fork(
     args->cpuset = cpuset;
 
     // fork
-    xkrt_thread_t * thread = team->priv.threads + tid;
-    pthread_create(&thread->pthread, NULL, team_create_recursive, args);
+    pthread_t pthread;
+    pthread_create(&pthread, NULL, team_create_recursive, args);
 
     // restore calling thread cpu set
     xkrt_runtime_t::thread_setaffinity(save_set);

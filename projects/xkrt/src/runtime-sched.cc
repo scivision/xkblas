@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 21:32:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:09:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -106,8 +106,10 @@ xkrt_device_thread_main_loop(
     while (device->state == XKRT_DEVICE_STATE_RUNNING)
     {
         task_t * task;
-        while ((task = worker->pop()) == NULL && device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-            worker->pause();
+        while ((task = worker->pop()) == NULL &&
+                device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL) &&
+                device->state == XKRT_DEVICE_STATE_RUNNING)
+            worker->thread->pause();
 
         device->offloader_poll();
         if (task)
@@ -117,33 +119,13 @@ xkrt_device_thread_main_loop(
     return EINTR;
 }
 
-void *
-xkrt_host_thread_main_loop(xkrt_runtime_t * runtime)
-{
-    Thread * thread = Thread::self();
-    runtime->host_thread = thread;
-
-    // TODO
-    // while (runtime->state == XKRT_RUNTIME_INITIALIZED)
-    while (1)
-    {
-        task_t * task;
-        while ((task = thread->pop()) == NULL)
-            thread->pause();
-
-        if (task)
-            xkrt_device_prepare_task(runtime, NULL, HOST_DEVICE_GLOBAL_ID, task);
-    }
-    return NULL;
-}
-
 ///////////
 //  MAIN //
 ///////////
 
 /* Main entry thread created per device */
 void
-xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id)
+xkrt_device_thread_main(void * vruntime, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id)
 {
     # pragma message(TODO "Implement device thread")
 
@@ -168,9 +150,11 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     device->conf        = &(runtime->conf.device);
 
     // register worker thread
-    Thread::init();
-    device->thread = Thread::self();
-    assert(device->thread);
+    Thread * tls = Thread::self();
+    assert(tls);
+    assert(thread);
+    tls->thread = thread;
+    device->thread = tls;
 
     // register affinity
     xkrt_runtime_t::thread_getaffinity(device->thread->cpuset);
@@ -191,20 +175,22 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     /* init memory */
 
     /* get total memory and allocate chunk0 */
-    assert(driver->f_memory_device_info);
-    driver->f_memory_device_info(device->driver_id, device->memories, &device->nmemories);
-    assert(device->nmemories > 0);
-    for (int i = 0 ; i < device->nmemories ; ++i)
+    if (driver->f_memory_device_info)
     {
-        xkrt_device_memory_info_t * info = device->memories + i;
-        LOGGER_INFO("Found memory `%s` of capacity %zuGB", info->name, info->capacity/(size_t)1e9);
+        driver->f_memory_device_info(device->driver_id, device->memories, &device->nmemories);
+        assert(device->nmemories > 0);
+        for (int i = 0 ; i < device->nmemories ; ++i)
+        {
+            xkrt_device_memory_info_t * info = device->memories + i;
+            LOGGER_INFO("Found memory `%s` of capacity %zuGB", info->name, info->capacity/(size_t)1e9);
 
-        XKRT_MUTEX_INIT(info->area.lock);
-        const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
+            XKRT_MUTEX_INIT(info->area.lock);
+            const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
 
-        assert(driver->f_memory_device_allocate);
-        const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size, i);
-        device->memory_set_chunk0((uintptr_t) device_ptr, size, i);
+            assert(driver->f_memory_device_allocate);
+            const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size, i);
+            device->memory_set_chunk0((uintptr_t) device_ptr, size, i);
+        }
     }
 
     assert(device->state == XKRT_DEVICE_STATE_CREATE);
@@ -234,7 +220,7 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
         int nbytes = sizeof(xkrt_device_global_id_bitfield_t);
         char buffer[8*nbytes + 1];
         xkrt_bits_to_str(buffer, (unsigned char *) &bf, nbytes);
-        LOGGER_DEBUG("Device `%u` affinity mask for perf `%u` is `%s`", device->global_id, i, buffer);
+        LOGGER_DEBUG("Device `%2u` affinity mask for perf `%2u` is `%s`", device->global_id, i, buffer);
     }
 
     ++driver->ndevices_commited;
@@ -243,12 +229,43 @@ xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t
     err = xkrt_device_thread_main_loop(runtime, device);
     assert((err==0) || (err==EINTR));
 
-    # pragma message(TODO "Implement proper device deinitialization")
+    /* deinitialize driver */
+
+    // release memory
+    if (driver->f_memory_device_deallocate)
+    {
+        for (int j = 0 ; j < device->nmemories ; ++j)
+        {
+            xkrt_area_t * area = &(device->memories[j].area);
+            driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.ptr, area->chunk0.size, j);
+        }
+    }
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_device_memory_deallocate`", driver_type);
+
+    // delete streams
+    if (driver->f_stream_delete)
+    {
+        for (uint8_t j = 0 ; j < XKRT_STREAM_TYPE_ALL ; ++j)
+        {
+            for (int k = 0 ; k < device->count[j] ; ++k)
+            {
+                xkrt_stream_t * stream = device->streams[j][k];
+                driver->f_stream_delete(stream);
+            }
+        }
+    }
+
+    // delete device
+    if (driver->f_device_destroy)
+        driver->f_device_destroy(device->driver_id);
+    else
+        LOGGER_WARN("Driver `%u` is missing `f_device_destroy`", driver_type);
 }
 
-////////////////////
+//////////////////////
 // task_t execution //
-////////////////////
+//////////////////////
 
 static void
 xkrt_device_task_executed_callback(

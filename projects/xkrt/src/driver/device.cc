@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 16:03:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 21:42:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -255,8 +255,6 @@ xkrt_device_t::offloader_init(
     int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type),
     xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity)
 ) {
-    assert(f_stream_create);
-
     /* next stream to use (round robin) */
     memset(this->next, 0, sizeof(this->next));
 
@@ -267,6 +265,9 @@ xkrt_device_t::offloader_init(
         this->count[stype] = (this->conf->offloader.streams[stype].n > 0) ? this->conf->offloader.streams[stype].n : f_stream_suggest ? f_stream_suggest(this->driver_id, (xkrt_stream_type_t) stype) : 4;
         cnt += this->count[stype];
     }
+
+    if (cnt == 0)
+        return ;
 
     /* allocate streams array */
     xkrt_stream_t ** all_streams = (xkrt_stream_t **) malloc(sizeof(xkrt_stream_t *) * cnt);
@@ -396,7 +397,7 @@ xkrt_device_t::offloader_stream_instruction_commit(
     stream->commit(instr);
 
     /* wakeup device worker thread */
-    this->thread->wakeup();
+    this->thread->thread->wakeup();
 
     /* unlock the stream */
     stream->unlock();

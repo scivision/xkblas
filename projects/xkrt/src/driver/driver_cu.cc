@@ -81,9 +81,9 @@ static int          cu_count_perfrank = 0;
 static uint64_t *   cu_perf_device    = NULL;
 
 static void
-get_gpu_topo(int ngpus)
+get_gpu_topo(int ndevices)
 {
-    cu_device_count = ngpus;
+    cu_device_count = ndevices;
 
     int min_perf = 0;
     int max_perf = 0;
@@ -174,7 +174,7 @@ get_gpu_topo(int ngpus)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
+XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
 {
     CUresult err = cuInit(0);
     if (err != CUDA_SUCCESS)
@@ -188,10 +188,10 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
     err = cuDeviceGetCount(&ndevices_max);
     if (err)
         return 1;
-    ngpus = MIN(ngpus, ndevices_max);
+    ndevices = MIN(ndevices, ndevices_max);
 
-    assert(ngpus <= XKRT_DEVICES_MAX);
-    for (int i = 0 ; i < ngpus ; ++i)
+    assert(ndevices <= XKRT_DEVICES_MAX);
+    for (int i = 0 ; i < ndevices ; ++i)
     {
         xkrt_device_cu_t * device = device_cu_get(i);
         device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
@@ -199,7 +199,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
         CU_SAFE_CALL(cuCtxCreate(&device->cu.context, 0, device->cu.device));
     }
 
-    get_gpu_topo(ngpus);
+    get_gpu_topo(ndevices);
 
     return 0;
 }

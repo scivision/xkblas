@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 15:03:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 19:58:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -41,7 +41,7 @@ struct xkrt_deque_t
 
     xkrt_deque_t() : tasks{}, lock(0), _h(0), _t(0) {}
 
-    void push(T & task);
+    void push(T const & task);
     T pop(void);
     T steal(void);
 };

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 20:51:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 21:01:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,7 +69,7 @@ typedef struct  xkrt_driver_t
     ///////////////////////
     //  DRIVER LIFECYCLE //
     ///////////////////////
-    int (*f_init)(unsigned int ngpus);
+    int (*f_init)(unsigned int ndevices);
     void (*f_finalize)(void);
 
     /////////////////////////////////
@@ -149,8 +149,6 @@ typedef struct  xkrt_driver_t
 
 }               xkrt_driver_t;
 
-void * xkrt_device_thread_main(void * a);
-
 extern "C"
 xkrt_device_t * xkrt_driver_device_get(xkrt_driver_t * driver, xkrt_device_global_id_t driver_device_id);
 
@@ -175,17 +173,14 @@ typedef struct  xkrt_drivers_t
 
     } devices;
 
-    /* the host worker thread */
-    Thread * host_worker_thread;
-
 }               xkrt_drivers_t;
 
 void
 xkrt_drivers_init(
     xkrt_drivers_t * drivers,
-    int ngpus,
+    int ndevices,
     int drivers_mask,
-    void (*routine)(void * vargs, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
+    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
     void * vargs
 );
 void xkrt_drivers_deinit(xkrt_drivers_t * drivers);

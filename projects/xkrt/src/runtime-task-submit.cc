@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:36:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:00:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,9 +17,13 @@
 static inline void
 xkrt_runtime_submit_task_host(xkrt_runtime_t * runtime, task_t * task)
 {
-    Thread * thread = runtime->host_thread;
-    thread->push(task);
-    thread->wakeup();
+    xkrt_driver_t * driver = runtime->drivers.list[XKRT_DRIVER_TYPE_HOST];
+    assert(driver->ndevices_commited == 1);
+
+    xkrt_device_t * device = driver->devices[0];
+    assert(device);
+
+    device->thread->push(task);
 }
 
 void
@@ -71,7 +75,9 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
             {
                 device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
                 device_id = device_id % runtime->drivers.devices.n;
-                if (runtime->drivers.devices.list[device_id])
+
+                xkrt_device_t * device = runtime->drivers.devices.list[device_id];
+                if (device && device->driver_type != XKRT_DRIVER_TYPE_HOST)
                     break ;
             }
         }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 21:15:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:36:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,7 +34,7 @@ xkblas_get_ngpus(int * count)
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    return xkrt_get_ngpus(&(context->runtime), count);
+    return xkrt_get_ndevices(&(context->runtime), count);
 }
 
 extern "C"

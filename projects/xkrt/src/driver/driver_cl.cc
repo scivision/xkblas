@@ -134,13 +134,13 @@ static void xkrt_cl_pfn_notify(
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
+XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
 {
-    assert(0 < ngpus);
-    assert(ngpus <= XKRT_DEVICES_MAX);
+    assert(0 < ndevices);
+    assert(ndevices <= XKRT_DEVICES_MAX);
 
     // get all drivers
-    cl_uint cl_n_platforms = ngpus; // i believe cl ensure at least 1 device per platform ?
+    cl_uint cl_n_platforms = ndevices; // i believe cl ensure at least 1 device per platform ?
     CL_SAFE_CALL(clGetPlatformIDs(cl_n_platforms, cl_platforms, &cl_n_platforms));
     assert(0 <= cl_n_platforms);
 
@@ -148,13 +148,13 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
     {
         // retrieve cl device ids
         cl_device_id * devices = cl_devices + cl_n_devices;
-        cl_uint ndevices = ngpus - cl_n_devices;
+        cl_uint ndevices = ndevices - cl_n_devices;
         int err = clGetDeviceIDs(cl_platforms[i], CL_DEVICE_TYPE_GPU, ndevices, devices, &ndevices);
         if (err == CL_DEVICE_NOT_FOUND)
             continue ;
         CL_SAFE_CALL(err);
         assert(0 <= ndevices);
-        assert(ndevices <= ngpus - cl_n_devices);
+        assert(ndevices <= ndevices - cl_n_devices);
 
         // create a context for all these platform devices
         const cl_context_properties properties[] = {
@@ -174,7 +174,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
             // initialize device virtual memory
             device->memory.nbuffers = 0;
             device->memory.head = VIRT_MEM_ORIGIN + j * VIRT_MEM_PER_DEVICE_MAX;
-            if (++cl_n_devices >= ngpus)
+            if (++cl_n_devices >= ndevices)
                 return 0;
         }
     }

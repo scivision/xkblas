@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:38:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 20:00:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -220,7 +220,7 @@ void xkrt_host_thread_init(xkrt_runtime_t * runtime);
 void * xkrt_host_thread_main_loop(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
-void xkrt_device_thread_main(void * vruntime, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
+void xkrt_device_thread_main(void * vruntime, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
 
 /* must be call once task accesses were all fetched */
 void xkrt_device_task_execute(

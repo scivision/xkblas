@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 06:58:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:15:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -34,17 +34,41 @@ struct xkrt_team_node_t;
 /* a thread */
 typedef struct  xkrt_thread_t
 {
-    /* the thread state, use for synchronizing */
-    xkrt_thread_state_t state;
+    public:
 
-    /* the pthread */
-    pthread_t pthread;
+        /* the thread state, use for synchronizing */
+        xkrt_thread_state_t state;
 
-    /* the thread tid */
-    int tid;
+        /* the pthread */
+        pthread_t pthread;
 
-    /* the thread deque */
-    xkrt_deque_t<task_t *, 4096> deque;
+        /* the tid in the team */
+        int tid;
+
+        /* the thread deque */
+        xkrt_deque_t<task_t *, 4096> deque;
+
+    private:
+
+        /* lock and condition to sleep the mutex */
+        struct {
+            pthread_mutex_t lock;
+            pthread_cond_t  cond;
+            volatile bool   sleeping;
+        } sleep;
+
+    public:
+
+        xkrt_thread_t(int tid) : state(XKRT_THREAD_INITIALIZED), pthread(0), tid(tid), deque()
+        {
+            pthread_mutex_init(&this->sleep.lock, 0);
+            pthread_cond_init (&this->sleep.cond, 0);
+            this->sleep.sleeping = false;
+        }
+        ~xkrt_thread_t() {}
+
+        void pause(void);
+        void wakeup(void);
 
 }               xkrt_thread_t;
 
@@ -60,8 +84,8 @@ typedef struct  xkrt_thread_t
 //     1 <=      k      <= 2^(n-1)
 // <=> 0 <= log2(k)     <= n-1
 // <=>      log2(k) + 1 <= n
-//                                     _             _
-//  So we need a tree of height 'n' = |   log2(k) + 1 | to represent the 'k' threads
+//                                     _            _
+//  So we need a tree of height 'n' = |  log2(k) + 1 | to represent the 'k' threads
 
 /* type of nodes in the tree */
 typedef enum    xkrt_team_node_type_t

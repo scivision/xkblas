@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 21:52:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 21:24:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -59,10 +59,10 @@ device_ze_get(int device_driver_id)
 # define SUBDEVICE_TO_XKRT_DEVICE 1
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
+XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 {
-    assert(0 < ngpus);
-    assert(ngpus <= XKRT_DEVICES_MAX);
+    assert(0 < ndevices_requested);
+    assert(ndevices_requested <= XKRT_DEVICES_MAX);
 
     # pragma message(TODO "We initialize all Intel drivers and devices here. Maybe make this a bit more lazy")
 
@@ -82,11 +82,11 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
         return 1;
 
     // get all drivers
-    uint32_t ze_n_drivers = ngpus; // i believe Intel API ensure at least 1 gpu per driver ?
+    uint32_t ze_n_drivers = ndevices_requested; // i believe Intel API ensure at least 1 gpu per driver ?
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, ze_drivers));
 
     // get all device handles per driver
-    for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < ngpus ; ++ze_driver_id)
+    for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < ndevices_requested ; ++ze_driver_id)
     {
         // Create context for driver
         ze_context_desc_t ze_context_desc = {
@@ -97,7 +97,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
         ZE_SAFE_CALL(zeContextCreate(ze_drivers[ze_driver_id], &ze_context_desc, ze_contextes + ze_driver_id));
 
         // get devices handles
-        uint32_t ndevices = ngpus - ze_n_devices;
+        uint32_t ndevices = ndevices_requested - ze_n_devices;
         ze_device_handle_t ze_devices[XKRT_DEVICES_MAX];
         ZE_SAFE_CALL(zeDeviceGet(ze_drivers[ze_driver_id], &ndevices, ze_devices));
 
@@ -107,7 +107,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
 
             # if SUBDEVICE_TO_XKRT_DEVICE
             ze_device_handle_t ze_subdevices[XKRT_DEVICES_MAX];
-            uint32_t nsubdevices = ngpus - ze_n_devices;
+            uint32_t nsubdevices = ndevices - ze_n_devices;
             zeDeviceGetSubDevices(ze_device, &nsubdevices, ze_subdevices);
 
             for (unsigned int j = 0; j < nsubdevices ; ++j)
@@ -130,7 +130,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ngpus)
                 device->memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
                 ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze_device, &device->memory.pcount, device->memory.ze_properties));
 
-                if (++ze_n_devices == ngpus)
+                if (++ze_n_devices == ndevices_requested)
                     return 0;
 
             # if SUBDEVICE_TO_XKRT_DEVICE

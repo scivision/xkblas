@@ -68,7 +68,7 @@ typedef struct  xkrt_device_t
     /* the driver type in [0..XKRT_DRIVER_TYPE_MAX[ */
     xkrt_driver_type_t driver_type;
 
-    /* driver device id in [0..ngpus_for_device] */
+    /* driver device id in [0..ndevices_for_device] */
     uint8_t driver_id;
 
     /* global device id in [0, XKRT_DEVICES_MAX[ - host is a virtual device of id 'XKRT_DEVICES_MAX' */

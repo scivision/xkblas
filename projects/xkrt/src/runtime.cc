@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:38:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/17 22:37:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -90,10 +90,10 @@ xkrt_init(xkrt_runtime_t * runtime)
     // load
     xkrt_init_conf(&(runtime->conf));
     task_format_register(runtime);
-    xkrt_host_thread_init(runtime);
 
-    const int ngpus = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus);
-    xkrt_drivers_init(&(runtime->drivers), ngpus, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
+    // the '+1' is to enforce the host device, always
+    const int ndevices = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus + 1);
+    xkrt_drivers_init(&(runtime->drivers), ndevices, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
     // register signal and exit function for cleaning up drivers
@@ -141,9 +141,8 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     }
     SPINLOCK_UNLOCK(runtimes.lock);
 
-    xkrt_drivers_deinit(&runtime->drivers);
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
-
+    xkrt_drivers_deinit(&runtime->drivers);
     hwloc_topology_destroy(runtime->topology);
 
     return 0;
@@ -191,16 +190,19 @@ xkrt_sync(xkrt_runtime_t * runtime)
 
 extern "C"
 int
-xkrt_get_ngpus(xkrt_runtime_t * runtime, int * count)
+xkrt_get_ndevices(xkrt_runtime_t * runtime, int * count)
 {
     assert(count);
 
     *count = 0;
     for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
     {
-        xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) i);
-        if (driver && driver->f_get_ndevices_max)
-            *count += driver->f_get_ndevices_max();
+        if (i != XKRT_DRIVER_TYPE_HOST)
+        {
+            xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) i);
+            if (driver && driver->f_get_ndevices_max)
+                *count += driver->f_get_ndevices_max();
+        }
     }
     return 0;
 }
