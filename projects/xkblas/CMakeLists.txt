@@ -9,8 +9,8 @@ project(${XKBLAS_NAME})
 message(STATUS "TODO: automate kernel files in the build")
 
 SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
-#SET(XKBLAS_KERNELS_PRECISIONS s c d z)
-SET(XKBLAS_KERNELS_PRECISIONS s)
+SET(XKBLAS_KERNELS_PRECISIONS s c d z)
+# SET(XKBLAS_KERNELS_PRECISIONS s)
 
 # custom kernels
 SET(XKBLAS_CUDA_KERNELS copyscale)
@@ -117,18 +117,17 @@ endif()
 # DEPENDENCIES #
 ################
 
-find_package(CUBLAS)
-if (${CUBLAS_FOUND})
+option(USE_CUBLAS "Enable cublas" ON)
+if (USE_CUBLAS)
+    find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
     message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
-else()
-    message(STATUS "Cublas not found")
 endif()
 
 # Cuda kernels
-option(ENABLE_CU "Enable the compilation of custom cuda kernels" ON)
-if (ENABLE_CU)
+option(USE_CUDA "Enable the compilation of custom cuda kernels" ON)
+if (USE_CUDA)
     enable_language(CUDA)
     set_source_files_properties(${XKBLAS_CUDA_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
     add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${XKBLAS_CUDA_KERNELS_SOURCE_FILES})
@@ -137,14 +136,13 @@ if (ENABLE_CU)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
 endif()
 
-find_package(CLBLAST)
+option(USE_CLBLAST "Enable clblast" ON)
 if (${CLBLAST_FOUND})
+    find_package(CLBLAST REQUIRED)
     add_compile_definitions(XKBLAS_SUPPORT_CLBLAST=1)
     include_directories("${CLBLAST_INCLUDE_DIRS}")
     message(STATUS "Found CLBlast: ${CLBLAST_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CLBLAST_LIBRARIES})
-else()
-    message(STATUS "CLBlast not found")
 endif()
 
 find_package(ZE)
@@ -152,8 +150,8 @@ if (${ZE_FOUND})
     include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 
-option(ENABLE_SYCL "Enable the compilation of Intel's BLAS via SYCL" ON)
-if (ENABLE_SYCL)
+option(USE_SYCL "Enable the compilation of Intel's BLAS via SYCL" OFF)
+if (USE_SYCL)
 
     # set sources
     add_compile_definitions(XKBLAS_SUPPORT_SYCL=1)

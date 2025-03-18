@@ -1,12 +1,12 @@
 # ENVIRONMENT VARIABLES
-- `XKRT_HELP` - shows a helper with available environment variables
+- `XKRT_HELP=1` - displays available environment variables
 
 # BUILD EXAMPLE
-Must have hwloc installed and be sure your `CMAKE_PREFIX_PATH` points to where libs are installed
+Must have hwloc installed and be sure your `CMAKE_PREFIX_PATH` holds libs/include locations
 ```bash
 mkdir build-debug
 cd build-debug
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkrt/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_HOST=off -DUSE_CUDA=on -DUSE_ZE=off -DUSE_CL=on -DENABLE_HEAVY_DEBUG=off ..
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkrt/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_CUDA=on -DUSE_ZE=off -DUSE_CL=on -DENABLE_HEAVY_DEBUG=off ..
 ```
 
 # PERFORMANCE IDEA
