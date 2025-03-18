@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 20:54:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 22:28:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -124,8 +124,7 @@ class alignas(CACHE_LINE_SIZE) Thread
         }
 
         /**
-         * Resolve dependencies of the passed task through the domain of the
-         * task currently executing
+         * Find conflicts and insert accesses int he dependency tree
          */
         template <int AC>
         inline void
@@ -134,17 +133,32 @@ class alignas(CACHE_LINE_SIZE) Thread
             assert(task->flags & TASK_FLAG_DEPENDENT);
             assert(AC > 0);
 
-            task_dep_info_t * dep = TASK_DEP_INFO(task);
-            new (dep) task_dep_info_t(AC);
+            // TODO
+            // 1) we assume that all accesses use that same dependency domain
+            // 2) C++ pure virtual function cannot be templated. To still
+            //    benefits from compile-time optimization, we force the casting to
+            //    a DependencyTree, as it is the only DependencyDomain currently.
+            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(accesses + 0);
+            tree->resolve<AC>(accesses);
+        }
+
+        /**
+         * Insert a task and its access in the dependency tree, without finding conflicts
+         */
+        template <int AC>
+        inline void
+        insert(task_t * task, access_t * accesses)
+        {
+            assert(task->flags & TASK_FLAG_DEPENDENT);
+            assert(AC > 0);
 
             // TODO
             // 1) we assume that all accesses use that same dependency domain
             // 2) C++ pure virtual function cannot be templated. To still
             //    benefits from compile-time optimization, we force the casting to
             //    a DependencyTree, as it is the only DependencyDomain currently.
-            access_t * access = accesses + 0;
-            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(access);
-            tree->resolve<AC>(accesses);
+            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(accesses + 0);
+            tree->insert<AC>(accesses);
         }
 
         # define __Thread_task_execute(T, t, F, ...)                                                \

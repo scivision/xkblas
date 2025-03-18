@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:09:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 23:06:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -359,10 +359,11 @@ xkrt_device_task_execute(
     {
         /* retrieve task format */
         task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
-        assert(format);
-        assert(format->f[TASK_FORMAT_TARGET_HOST]);
-
-        ((void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST])(task);
+        if (format)
+        {
+            assert(format->f[TASK_FORMAT_TARGET_HOST]);
+            ((void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST])(task);
+        }
         __task_executed(task, xkrt_runtime_submit_task, runtime);
     }
 

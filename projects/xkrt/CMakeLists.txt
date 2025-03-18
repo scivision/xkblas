@@ -131,6 +131,7 @@ if (USE_ZE)
     include_directories("${ZE_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
+    target_compile_options(${XKRT}_driver_ze PRIVATE -fsycl)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
@@ -141,7 +142,8 @@ option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Z
 if (USE_SYCL)
     find_package(SYCL REQUIRED)
     include_directories(${SYCL_INCLUDE_DIRS})
-    target_link_libraries(${XKRT} PRIVATE ${SYCL_LIBRARIES})
+    target_link_libraries(${XKRT} PRIVATE ${SYCL_LIBRARIES} -fsycl)
+    target_link_libraries(${XKRT}_driver_ze PRIVATE -fsycl)
 endif()
 
 # OpenCL

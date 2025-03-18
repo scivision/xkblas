@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 23:27:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 21:35:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -37,7 +37,8 @@
 # if XKBLAS_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 #  include <oneapi/mkl.hpp>
-#  include <sycl/backend/level_zero.hpp>
+#  include <sycl/ext/oneapi/backend/level_zero.hpp>
+#  include <xkblas/oneapi-mkl-helper.h>
 # else
 #  include "xkblas/cblas.h"
 # endif
@@ -386,13 +387,13 @@ body_cuda(
 # if XKRT_SUPPORT_ZE
 
 static void
-body_ze(void * ihandle, void * vargs)
-{
+body_ze(
+    xkrt_stream_ze_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
     // unpack arguments
-    xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) ihandle;
-    assert(stream);
-
-    task_t * task = (task_t *) vargs;
+    task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -404,33 +405,66 @@ body_ze(void * ihandle, void * vargs)
 
     # if XKBLAS_SUPPORT_SYCL
 
-    # if 0
-    oneapi::mkl::blas::column_major::gemm(
-        sycl::_V1::queue &,
-        oneapi::mkl::transpose,
-        oneapi::mkl::transpose,
-        long, long, long,
-        oneapi::mkl::value_or_pointer<double>,
-        double const*, long, double const*, long,
-        oneapi::mkl::value_or_pointer<double>,
-        double*,
-        long, oneapi::mkl::blas::compute_mode,
-        std::vector<sycl::_V1::event, std::allocator<sycl::_V1::event> > const &
+    sycl::queue & queue = stream->sycl.queue;
+    oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
+    oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
+    std::int64_t m = args->m;
+    std::int64_t n = args->n;
+    std::int64_t k = args->k;
+    oneapi::mkl::value_or_pointer<TYPE> alpha = args->alpha;
+    oneapi::mkl::value_or_pointer<TYPE> beta = args->beta;
+    const TYPE * a   = (const TYPE *) A->device_view.addr;
+    const TYPE * b   = (const TYPE *) B->device_view.addr;
+          TYPE * c   = (      TYPE *) C->device_view.addr;
+    std::int64_t lda = (std::int64_t) A->device_view.ld;
+    std::int64_t ldb = (std::int64_t) B->device_view.ld;
+    std::int64_t ldc = (std::int64_t) C->device_view.ld;
+    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
+    const std::vector<sycl::event> dependencies = {};
+
+    # if 1
+    sycl::event event = oneapi::mkl::blas::column_major::gemm(
+        queue,
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc,
+        mode,
+        dependencies
     );
+    stream->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
+    queue.wait();
+
+    # else
+
+    oneapi::mkl::blas::column_major::gemm(
+        queue,
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc,
+        mode
+    );
+    queue.wait();
+    zeEventHostSignal(stream->ze.events.list[idx]);
+
     # endif
 
     # else /* XKBLAS_SUPPORT_SYCL */
     LOGGER_FATAL("no blas impl for ze");
     # endif /* XKBLAS_SUPPORT_SYCL */
 
-
-
     # if 0
 
-
-    // TODO : having to use sycl here is super ugly, but Intel do not seems to
-    // provide the kernels direcly, so we could pass them via a
-    // zeCommandListAdKernelLaunch - or even to simply call a gemm with a command list/queue
+    // TODO : Intel do not provides provide the kernels direcly or similar interface to cuBlas,
+    // so we could pass them via a zeCommandListAdKernelLaunch - or even to
+    // simply call a gemm with a command list/queue
 
     // Retrieve the Level Zero context and device from the command list
     ze_context_handle_t ze_context;
@@ -448,21 +482,7 @@ body_ze(void * ihandle, void * vargs)
     // Create SYCL queue from SYCL context and Level Zero command list
     sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
 
-    # if 0
-    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::standard;
-    oneapi::mkl::blas::column_major::gemm(
-        sycl_queue,
-        args->transA, args->transB,
-        args->m, args->n, args->k,
-       &args->alpha,
-        A->device_view.addr, A->device_view.ld,
-        B->device_view.addr, B->device_view.ld,
-       &args->beta,
-        C->device_view.addr, C->device_view.ld
-    );
     # endif
-    # endif
-    // TODO ; need an event
 }
 
 # endif

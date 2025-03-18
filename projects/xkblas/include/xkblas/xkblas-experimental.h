@@ -5,19 +5,17 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/02 17:03:46 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 14:00:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 20:54:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef __XKBLAS_EXPERIMENTAL_H__
-
 # define __XKBLAS_EXPERIMENTAL_H__
 
 /* UNIFIED MEMORY EXPERIMENTAL */
 # include <xkrt/memory/access-mode.h>
 # define XKBLAS_ACCESS_SCOPE ACCESS_SCOPE_NONUNIFIED
-// # define XKBLAS_ACCESS_SCOPE ACCESS_SCOPE_UNIFIED
 
 # endif /* __XKBLAS_EXPERIMENTAL_H__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 23:48:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 22:49:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -193,8 +193,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
             Search search;
             search.prepare_conflicting(conflicts, access);
-            this->intersect(search, access->cubes[0]);
-            this->intersect(search, access->cubes[1]);
+            Base::intersect(search, access->cubes[0]);
+            Base::intersect(search, access->cubes[1]);
         }
 
         //////////////
@@ -337,33 +337,43 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         }
 
         template<int AC>
-        void
-        resolve(access_t * accesses)
+        inline void
+        intersect(access_t * accesses)
         {
             Search search;
-
-            // intersect with past accesses
             for (int i = 0 ; i < AC ; ++i)
             {
                 access_t * access = accesses + i;
                 assert(this->can_resolve(access));
 
                 search.prepare_resolve(access);
-                this->intersect(search, access->cubes[0]);
-                this->intersect(search, access->cubes[1]);
+                Base::intersect(search, access->cubes[0]);
+                Base::intersect(search, access->cubes[1]);
             }
+        }
 
-            # pragma message(TODO "If we semantically force a accesses region to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
-
-            // insert for future accesses
+        template<int AC>
+        inline void
+        insert(access_t * accesses)
+        {
+            Search search;
             for (int i = 0 ; i < AC ; ++i)
             {
                 access_t * access = accesses + i;
 
                 search.prepare_resolve(access);
-                this->insert(search, access->cubes[0]);
-                this->insert(search, access->cubes[1]);
+                Base::insert(search, access->cubes[0]);
+                Base::insert(search, access->cubes[1]);
             }
+        }
+
+        template<int AC>
+        inline void
+        resolve(access_t * accesses)
+        {
+            # pragma message(TODO "If we semantically force a accesses region to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
+            this->intersect<AC>(accesses);
+            this->insert<AC>(accesses);
         }
 
         void

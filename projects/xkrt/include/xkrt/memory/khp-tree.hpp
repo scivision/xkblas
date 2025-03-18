@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/09 04:15:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/04 17:41:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -156,6 +156,7 @@ class KHPTree {
                     Cube cube;              // subtree englobing cube
                     int nelements[K];       // subtree number of elements
                     int height[K];          // subtree height
+                    int outdated;           // whether 'includes' struct must be recomputed // TODO : remove this, and only update when needed : (1) locally on rotations; and (2) recursively to parent on insertion
                 } includes;
 
                 #ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
@@ -184,6 +185,7 @@ class KHPTree {
                     memset(this->st, 0, sizeof(this->st));
 
                     this->includes.cube.copy(r);
+                    this->includes.outdated = 0;
 
                     memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
                     this->includes.nelements[k] = 1;
@@ -398,11 +400,14 @@ class KHPTree {
         /* List of cut-out branches whose subtree requires deletion from memory */
         std::vector<Node *> limbs;
 
+        /* Buffer of nodes inserted by an insert() call */
+        std::vector<Node *> outdated;
+
     public:
         KHPTree() :
             root(nullptr),
-            limbs()
-        {}
+            limbs(),
+            outdated() {}
 
         inline void
         subtree_delete(Node * node)
@@ -601,18 +606,42 @@ class KHPTree {
         //  INSERT  //
         //////////////
 
+        // TODO : proecssing 'outdated' list by depth-order would remove
         // redundant updates
         void
-        update(Node * node)
+        update(void)
         {
-            while (1)
+            for (Node * & node : this->outdated)
             {
-                node->update_includes();
-                if (node->parent)
-                    node = node->parent;
-                else
-                    break ;
+                while (1)
+                {
+                    if (node->includes.outdated)
+                    {
+                        node->update_includes();
+                        node->includes.outdated = false;
+                    }
+                    else
+                        break ;
+
+                    if (node->parent)
+                    {
+                        node->parent->includes.outdated = true;
+                        node = node->parent;
+                    }
+                    else
+                    {
+                        break ;
+                    }
+                }
             }
+            this->outdated.clear();
+        }
+
+        void
+        outdate(Node * node)
+        {
+            node->includes.outdated = true;
+            this->outdated.push_back(node);
         }
 
         /**
@@ -655,8 +684,8 @@ class KHPTree {
 
          // B->update_includes();
          // D->update_includes();
-         // E->update_includes();
             A->update_includes();
+         // E->update_includes();
             C->update_includes();
         }
 
@@ -701,8 +730,8 @@ class KHPTree {
 
          // E->update_includes();
          // C->update_includes();
-         // D->update_includes();
             A->update_includes();
+         // D->update_includes();
             B->update_includes();
         }
 
@@ -773,15 +802,6 @@ class KHPTree {
         }
 
         inline void
-        insert_finalize(
-            Node * node,
-            T & t
-        ) {
-            this->update(node);
-            this->on_insert(node, t);
-        }
-
-        inline void
         insert_fixup(
             T & t,
             Cube cube,
@@ -799,15 +819,19 @@ class KHPTree {
 
             parent->st[k].children[dir] = node;
             node->parent = parent;
+            this->on_insert(node, t);
+            this->outdate(node);
 
             // inserting a new k-subtree, this k-root is black
             if (parent->k < k)
+            {
                 node->colors[k] = BLACK;
+            }
             // rebalance the k-subtree
             else
+            {
                 this->balance_fixup(k, node);
-
-            this->insert_finalize(node, t);
+            }
         }
 
 # ifdef KHP_TREE_REBALANCE
@@ -967,6 +991,8 @@ class KHPTree {
         void
         post_insert(const Cube & cube)
         {
+            this->update();
+
 # ifdef KHP_TREE_REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
@@ -995,7 +1021,9 @@ class KHPTree {
             FOREACH_CHILD_END(parent, child, k, dir);
 
             parent->cube.copy(cube);
-            this->insert_finalize(parent, t);
+            this->on_insert(parent, t);
+
+            this->outdate(parent);
         }
 
         inline void
@@ -1057,7 +1085,8 @@ class KHPTree {
                     {
                         if (++k == K)
                         {
-                            this->insert_finalize(parent, t);
+                            this->on_insert(parent, t);
+                            this->outdate(parent);
                             break ;
                         }
                     }
@@ -1179,7 +1208,8 @@ class KHPTree {
             if (this->root == nullptr)
             {
                 this->root = this->new_node(t, cube, 0, BLACK);
-                this->insert_finalize(this->root, t);
+                this->on_insert(this->root, t);
+                this->root->update_includes();
             }
             else
             {
@@ -1430,6 +1460,8 @@ class KHPTree {
             /* 4. Every path from a node to any of its descbant NULL nodes
              * has the same number of black nodes */
             coherency_black_height(root);
+            // TODO : this fail
+            // TODO : all new nodes for a new dimension should be black ?
 
             /* 5. cube must be disjoint (weak check) */
             coherency_cube_disjoint(root);

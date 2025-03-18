@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/14 18:58:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 22:45:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -70,35 +70,6 @@ static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= (1 << (sizeof(memory_allo
 
 typedef uint8_t memory_allocation_view_id_bitfield_t;
 static_assert(MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX <= sizeof(memory_allocation_view_id_bitfield_t) * 8);
-
-template<int K>
-static inline void
-memory_view_from_cube(
-    memory_view_t * view,
-    const KCube<K> & cube,
-    const size_t ld,
-    const size_t sizeof_type
-) {
-
-    const INTERVAL_TYPE_T       x = cube[ACCESS_CUBE_ROW_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dx = cube[ACCESS_CUBE_ROW_DIM].length();
-    const INTERVAL_TYPE_T       y = cube[ACCESS_CUBE_COL_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dy = cube[ACCESS_CUBE_COL_DIM].length();
-    assert(dx > 0);
-    assert(dy > 0);
-
-    view->order         = MATRIX_COLMAJOR;
-    view->addr          = x + y * ld * sizeof_type;
-    view->ld            = ld;
-    view->offset_m      = 0;
-    view->offset_n      = 0;
-    view->m             = dx / sizeof_type;
-    view->n             = dy;
-    view->sizeof_type   = sizeof_type;
-
-    // accesses must be aligned on sizeof(type)
-    assert(view->m * sizeof_type == dx);
-}
 
 /* a forward request */
 template <int K>
@@ -1120,11 +1091,11 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             }
         }
 
-        /* append D2H fetch request to the list matching the cube */
+        /* create a list of fetch request to perform for the given cubes */
         template <int NC>
         fetch_list_t *
         fetch_list_to_host_from_cubes(
-            const Cube cubes[NC]
+            const Cube * cubes
         ) {
             # pragma message(TODO "merge continuous partites using the same 'chunk'")
 

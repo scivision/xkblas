@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 21:24:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 20:16:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -88,18 +88,24 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
     // get all device handles per driver
     for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < ndevices_requested ; ++ze_driver_id)
     {
+        // get the driver
+        ze_driver_handle_t ze_driver = ze_drivers[ze_driver_id];
+
         // Create context for driver
         ze_context_desc_t ze_context_desc = {
             .stype = ZE_STRUCTURE_TYPE_CONTEXT_DESC,
             .pNext = NULL,
             .flags = ZE_CONTEXT_FLAG_TBD
         };
-        ZE_SAFE_CALL(zeContextCreate(ze_drivers[ze_driver_id], &ze_context_desc, ze_contextes + ze_driver_id));
+        ZE_SAFE_CALL(zeContextCreate(ze_driver, &ze_context_desc, ze_contextes + ze_driver_id));
 
         // get devices handles
         uint32_t ndevices = ndevices_requested - ze_n_devices;
         ze_device_handle_t ze_devices[XKRT_DEVICES_MAX];
-        ZE_SAFE_CALL(zeDeviceGet(ze_drivers[ze_driver_id], &ndevices, ze_devices));
+        ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ndevices, ze_devices));
+
+        // sycl interop
+        sycl::platform platform = sycl::ext::oneapi::level_zero::make_platform((pi_native_handle) ze_driver);
 
         for (unsigned int i = 0 ; i < ndevices ; ++i)
         {
@@ -118,17 +124,24 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
                 xkrt_device_ze_t * device = DEVICES + ze_n_devices;
 
                 // save handles
-                device->ze_context = ze_contextes[ze_driver_id];
-                device->ze_driver  = ze_drivers[ze_driver_id];
-                device->ze_device  = ze_device;
+                device->ze.context = ze_contextes[ze_driver_id];
+                device->ze.driver  = ze_drivers[ze_driver_id];
+                device->ze.device  = ze_device;
 
                 // get subdevice properties
-                device->ze_device_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
-                ZE_SAFE_CALL(zeDeviceGetProperties(device->ze_device, &device->ze_device_properties));
+                device->ze.device_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
+                ZE_SAFE_CALL(zeDeviceGetProperties(device->ze.device, &device->ze.device_properties));
 
                 // get memory properties
-                device->memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
-                ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze_device, &device->memory.pcount, device->memory.ze_properties));
+                device->ze.memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
+                ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.device, &device->ze.memory.pcount, device->ze.memory.properties));
+
+                // sycl interop
+                device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
+
+                std::vector<sycl::device> sycl_devices(1);
+                sycl_devices[0] = device->sycl.device;
+                device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
 
                 if (++ze_n_devices == ndevices_requested)
                     return 0;
@@ -156,17 +169,17 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
         "timer resolution of %luns - deviceId(pci)=%d - uuid[%d]=%x",
         device_driver_id,
-        device->ze_device_properties.name,
-        device->ze_device_properties.numSlices,
-        device->ze_device_properties.numSubslicesPerSlice,
-        device->ze_device_properties.numEUsPerSubslice,
-        device->ze_device_properties.numThreadsPerEU,
-        device->ze_device_properties.maxMemAllocSize / 1e9,
-        device->ze_device_properties.coreClockRate / 1e3,
-        device->ze_device_properties.timerResolution,
-        device->ze_device_properties.deviceId,
+        device->ze.device_properties.name,
+        device->ze.device_properties.numSlices,
+        device->ze.device_properties.numSubslicesPerSlice,
+        device->ze.device_properties.numEUsPerSubslice,
+        device->ze.device_properties.numThreadsPerEU,
+        device->ze.device_properties.maxMemAllocSize / 1e9,
+        device->ze.device_properties.coreClockRate / 1e3,
+        device->ze.device_properties.timerResolution,
+        device->ze.device_properties.deviceId,
         ZE_MAX_DEVICE_UUID_SIZE - 1,
-        device->ze_device_properties.uuid.id[ZE_MAX_DEVICE_UUID_SIZE - 1]
+        device->ze.device_properties.uuid.id[ZE_MAX_DEVICE_UUID_SIZE - 1]
     );
     return buffer;
 }
@@ -199,7 +212,7 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
     hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-    HWLOC_SAFE_CALL(hwloc_levelzero_get_device_cpuset(topology, device->ze_device, cpuset));
+    HWLOC_SAFE_CALL(hwloc_levelzero_get_device_cpuset(topology, device->ze.device, cpuset));
     CPU_ZERO(schedset);
     HWLOC_SAFE_CALL(hwloc_cpuset_to_glibc_sched_affinity(topology, cpuset, schedset, sizeof(cpu_set_t)));
 
@@ -216,18 +229,18 @@ XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_
     assert(device->inherited.state == XKRT_DEVICE_STATE_DEALLOCATED);
 
     // query number of command queue groups
-    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze_device, &device->ncommandqueuegroups, NULL));
-    assert(device->ncommandqueuegroups);
+    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.device, &device->ze.ncommandqueuegroups, NULL));
+    assert(device->ze.ncommandqueuegroups);
 
     // query each group
-    device->ze_command_queue_group_properties = (ze_command_queue_group_properties_t *) malloc(sizeof(ze_command_queue_group_properties_t) * device->ncommandqueuegroups);
-    assert(device->ze_command_queue_group_properties);
-    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze_device, &device->ncommandqueuegroups, device->ze_command_queue_group_properties));
+    device->ze.command_queue_group_properties = (ze_command_queue_group_properties_t *) malloc(sizeof(ze_command_queue_group_properties_t) * device->ze.ncommandqueuegroups);
+    assert(device->ze.command_queue_group_properties);
+    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.device, &device->ze.ncommandqueuegroups, device->ze.command_queue_group_properties));
 
-    device->ze_command_queue_group_used = new std::atomic<uint32_t>[device->ncommandqueuegroups];
-    assert(device->ze_command_queue_group_used);
-    for (uint32_t i = 0 ; i < device->ncommandqueuegroups ; ++i)
-        device->ze_command_queue_group_used[i].store(0);
+    device->ze.command_queue_group_used = new std::atomic<uint32_t>[device->ze.ncommandqueuegroups];
+    assert(device->ze.command_queue_group_used);
+    for (uint32_t i = 0 ; i < device->ze.ncommandqueuegroups ; ++i)
+        device->ze.command_queue_group_used[i].store(0);
 
     return (xkrt_device_t *) device;
 }
@@ -243,7 +256,7 @@ static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    delete [] device->ze_command_queue_group_used;
+    delete [] device->ze.command_queue_group_used;
     return 0;
 }
 
@@ -452,6 +465,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     return EINPROGRESS;
 }
 
+# if 1
 template<typename T>
 static inline bool
 f_equals(
@@ -480,12 +494,12 @@ device_command_queue_group_next(
     uint32_t ordinal_with_least_queues = UINT32_MAX;
     uint32_t min_queues = UINT32_MAX;
 
-    for (uint32_t i = 0; i < device->ncommandqueuegroups; ++i)
+    for (uint32_t i = 0; i < device->ze.ncommandqueuegroups; ++i)
     {
-        ze_command_queue_group_properties_t * properties = device->ze_command_queue_group_properties + i;
+        ze_command_queue_group_properties_t * properties = device->ze.command_queue_group_properties + i;
         if (f((const ze_command_queue_group_property_flag_t &) properties->flags, flag))
         {
-            const uint32_t used = device->ze_command_queue_group_used[i].load();
+            const uint32_t used = device->ze.command_queue_group_used[i].load();
             if (used < min_queues)
             {
                 min_queues = used;
@@ -496,6 +510,7 @@ device_command_queue_group_next(
 
     return ordinal_with_least_queues;
 }
+# endif
 
 static xkrt_stream_t *
 XKRT_DRIVER_ENTRYPOINT(stream_create)(
@@ -518,7 +533,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     );
 
     xkrt_device_ze_t * device = (xkrt_device_ze_t *) idevice;
-    stream->device = device;
+    stream->ze.device = device;
 
     // convert xkrt stream type to a command queue group flag
     ze_command_queue_group_property_flag_t flag;
@@ -555,10 +570,10 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     }
 
     // retrieve group properties
-    const ze_command_queue_group_properties_t * properties = device->ze_command_queue_group_properties + ordinal;
-    uint32_t index = device->ze_command_queue_group_used[ordinal].fetch_add(1) % properties->numQueues;
+    const ze_command_queue_group_properties_t * properties = device->ze.command_queue_group_properties + ordinal;
+    uint32_t index = device->ze.command_queue_group_used[ordinal].fetch_add(1) % properties->numQueues;
     # else
-    // use virtual copy engine
+    /* see https://github.com/pmodels/mpich/blob/main/src/mpl/src/gpu/mpl_gpu_ze.c */
     uint32_t ordinal = 0;
     uint32_t index = 0;
     # endif
@@ -571,14 +586,15 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         .index      = index,
         .flags      = ZE_COMMAND_QUEUE_FLAG_EXPLICIT_ONLY,
         .mode       = ZE_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
-        .priority   = ZE_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW    // TODO : maybe do one queue for each priority in 'device->ze_device_properties.maxCommandQueuePriority'
+        .priority   = ZE_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW
     };
+    // LOGGER_INFO("Creating with (ordinal, index) = (%d, %d) of %d", ordinal, index, (int) type);
 
     # if 0 /* use a command list and command queue */
     ZE_SAFE_CALL(
         zeCommandQueueCreate(
-            device->ze_context,
-            device->ze_device,
+            device->ze.context,
+            device->ze.device,
            &ze_command_queue_desc,
            &stream->ze.command.queue
         )
@@ -594,12 +610,25 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     # else /* use command list immediate */
     ZE_SAFE_CALL(
         zeCommandListCreateImmediate(
-            device->ze_context,
-            device->ze_device,
+            device->ze.context,
+            device->ze.device,
            &ze_command_queue_desc,
            &stream->ze.command.list
         )
     );
+
+    // see https://github.com/CHIP-SPV/H4I-MKLShim/blob/fb114334304e3b760c120c7ddedac53ac13c9c26/src/Context.cpp#L30
+
+    sycl::property_list props = {}; /* how to convert `ze_command_queue_desc` to `sycl::property_list` ? */
+    stream->sycl.queue = sycl::ext::oneapi::level_zero::make_queue(
+        device->sycl.context,
+        device->sycl.device,
+        (pi_native_handle) stream->ze.command.list,
+        true,   /* immediate */
+        true,   /* keep ownership */
+        props
+    );
+
     # endif
 
     // create event pool and events
@@ -610,7 +639,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         .count  = capacity
     };
     const uint32_t ndevices = 1;
-    ZE_SAFE_CALL(zeEventPoolCreate(device->ze_context, &ze_event_pool_desc, ndevices, &device->ze_device, &stream->ze.events.pool));
+    ZE_SAFE_CALL(zeEventPoolCreate(device->ze.context, &ze_event_pool_desc, ndevices, &device->ze.device, &stream->ze.events.pool));
 
     ze_event_desc_t event_desc = {
         .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
@@ -653,7 +682,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     };
     const size_t alignment = 4 * sizeof(double);
     void * device_ptr = NULL;
-    ze_result_t res = zeMemAllocDevice(device->ze_context, &device_desc, size, alignment, device->ze_device, &device_ptr);
+    ze_result_t res = zeMemAllocDevice(device->ze.context, &device_desc, size, alignment, device->ze.device, &device_ptr);
     # else
 
     // TODO : cannot select memory ordinal with virtual/physical memory API
@@ -662,8 +691,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     size_t pagesize;
     ZE_SAFE_CALL(
         zeVirtualMemQueryPageSize(
-            device->ze_context,
-            device->ze_device,
+            device->ze.context,
+            device->ze.device,
             size,
            &pagesize
         )
@@ -674,7 +703,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     void * device_ptr = NULL;
     ZE_SAFE_CALL(
         zeVirtualMemReserve(
-            device->ze_context,
+            device->ze.context,
             NULL,
             reserve_size,
            &device_ptr
@@ -692,8 +721,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     ze_physical_mem_handle_t ze_physical_mem_handle;
     ZE_SAFE_CALL(
         zePhysicalMemCreate(
-            device->ze_context,
-            device->ze_device,
+            device->ze.context,
+            device->ze.device,
            &ze_physical_mem_desc,
            &ze_physical_mem_handle
         )
@@ -704,7 +733,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     const size_t offset = 0;
     ZE_SAFE_CALL(
         zeVirtualMemMap(
-            device->ze_context,
+            device->ze.context,
             device_ptr,
             size,
             ze_physical_mem_handle,
@@ -716,11 +745,11 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 
     if (res == ZE_RESULT_SUCCESS)
     {
-        res = zeContextMakeMemoryResident(device->ze_context, device->ze_device, device_ptr, size);
+        res = zeContextMakeMemoryResident(device->ze.context, device->ze.device, device_ptr, size);
         if (res == ZE_RESULT_SUCCESS)
             return device_ptr;
 
-        ZE_SAFE_CALL(zeMemFree(device->ze_context, device_ptr));
+        ZE_SAFE_CALL(zeMemFree(device->ze.context, device_ptr));
     }
 
     return NULL;
@@ -730,19 +759,19 @@ static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    ZE_SAFE_CALL(zeMemFree(device->ze_context, ptr));
+    ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    info->capacity = device->ze_device_properties.maxMemAllocSize;
-    *nmemories = device->memory.pcount;
-    for (int i = 0 ; i < device->memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+    info->capacity = device->ze.device_properties.maxMemAllocSize;
+    *nmemories = device->ze.memory.pcount;
+    for (int i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
-        info[i].capacity = device->memory.ze_properties[i].totalSize;
-        strncpy(info[i].name, device->memory.ze_properties[i].name, MIN(sizeof(device->memory.ze_properties[i].name), sizeof(info[i].name)));
+        info[i].capacity = device->ze.memory.properties[i].totalSize;
+        strncpy(info[i].name, device->ze.memory.properties[i].name, MIN(sizeof(device->ze.memory.properties[i].name), sizeof(info[i].name)));
     }
 }
 
@@ -759,7 +788,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
         // .flags = ZE_HOST_MEM_ALLOC_FLAG_BIAS_CACHED | ZE_HOST_MEM_ALLOC_FLAG_BIAS_INITIAL_PLACEMENT | ZE_HOST_MEM_ALLOC_FLAG_BIAS_WRITE_COMBINED
     };
     void * ptr;
-    ZE_SAFE_CALL(zeMemAllocHost(device->ze_context, &host_desc, size, 64, (void **) &ptr));
+    ZE_SAFE_CALL(zeMemAllocHost(device->ze.context, &host_desc, size, 64, (void **) &ptr));
     return ptr;
 }
 
@@ -772,7 +801,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
     (void) size;
 
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    ZE_SAFE_CALL(zeMemFree(device->ze_context, mem));
+    ZE_SAFE_CALL(zeMemFree(device->ze.context, mem));
 }
 
 xkrt_driver_module_t
@@ -813,7 +842,7 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
 
     // TODO : build log
     xkrt_driver_module_t module = NULL;
-    ZE_SAFE_CALL(zeModuleCreate(device->ze_context, device->ze_device, &desc, (ze_module_handle_t *) &module, NULL));
+    ZE_SAFE_CALL(zeModuleCreate(device->ze.context, device->ze.device, &desc, (ze_module_handle_t *) &module, NULL));
     assert(module);
 
     return module;

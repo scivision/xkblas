@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 15:13:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 22:41:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,6 +34,35 @@
 
 // task and accesses depends to one another, breaking chicken/egg problem here
 struct task_t;
+
+template<int K>
+static inline void
+memory_view_from_cube(
+    memory_view_t * view,
+    const KCube<K> & cube,
+    const size_t ld,
+    const size_t sizeof_type
+) {
+
+    const INTERVAL_TYPE_T       x = cube[ACCESS_CUBE_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dx = cube[ACCESS_CUBE_ROW_DIM].length();
+    const INTERVAL_TYPE_T       y = cube[ACCESS_CUBE_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dy = cube[ACCESS_CUBE_COL_DIM].length();
+    assert(dx > 0);
+    assert(dy > 0);
+
+    view->order         = MATRIX_COLMAJOR;
+    view->addr          = x + y * ld * sizeof_type;
+    view->ld            = ld;
+    view->offset_m      = 0;
+    view->offset_n      = 0;
+    view->m             = dx / sizeof_type;
+    view->n             = dy;
+    view->sizeof_type   = sizeof_type;
+
+    // accesses must be aligned on sizeof(type)
+    assert(view->m * sizeof_type == dx);
+}
 
 class access_t
 {
@@ -109,9 +138,9 @@ class access_t
             mode(mode),
             concurrency(concurrency),
             scope(scope),
+            cubes(),
             successors(8),
             task(task),
-            cubes(),
             host_view(order, addr, ld, offset_m, offset_n, m, n, s),
             device_view()
         {
@@ -203,7 +232,37 @@ class access_t
                     assert(!this->cubes[1].is_empty());
                 }
             }
+        }
 
+        access_t(
+            task_t * task,
+            const matrix_order_t & order,
+            const Cube & cube,
+            const size_t ld,
+            const size_t s,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) :
+            mode(mode),
+            concurrency(concurrency),
+            scope(scope),
+            cubes(),
+            successors(8),
+            task(task),
+            host_view(order, 0, ld, 0, 0, 0, 0, s),
+            device_view()
+        {
+            /* clear preallocated empty successors */
+            successors.clear();
+
+            assert(order == MATRIX_COLMAJOR);
+            assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
+            if (!cube.is_empty())
+            {
+                memory_view_from_cube(&this->host_view, cube, ld, s);
+                new (this->cubes + 0) Cube(cube);
+            }
         }
 
         ~access_t() {}

@@ -57,6 +57,11 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS})
 add_executable(xkblas-kernels common/main.cc)
 target_link_libraries(xkblas-kernels PRIVATE ${XKBLAS_NAME} ${BLAS_LIBRARIES})
-if (ENABLE_CU)
+
+if (USE_CUDA)
     target_link_libraries(xkblas-kernels PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+endif()
+
+if (USE_SYCL)
+    target_link_libraries(xkblas-kernels PRIVATE sycl -fsycl -qmkl=parallel)
 endif()

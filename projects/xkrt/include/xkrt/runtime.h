@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 20:00:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 23:08:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,8 +42,6 @@ typedef struct  xkrt_runtime_t
     /* task formats */
     struct {
         task_formats_t list;
-        task_format_id_t coherent_async;
-        task_format_id_t coherent_async_fetch;
         task_format_id_t copy_async;
     } formats;
 
@@ -213,7 +211,6 @@ typedef struct  xkrt_runtime_t
 void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
-void xkrt_memory_coherent_async_register_format(xkrt_runtime_t * runtime);
 void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 
 void xkrt_host_thread_init(xkrt_runtime_t * runtime);

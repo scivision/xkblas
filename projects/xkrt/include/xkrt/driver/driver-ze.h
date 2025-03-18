@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 21:54:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 19:44:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,29 +19,42 @@
 # include <xkrt/driver/stream.h>
 # include <ze_api.h>
 
+# include <sycl/sycl.hpp>
+
 typedef struct  xkrt_device_ze_t
 {
     xkrt_device_t inherited;
 
-    ze_driver_handle_t      ze_driver;
-    ze_context_handle_t     ze_context;
-    ze_device_handle_t      ze_device;
-    ze_device_properties_t  ze_device_properties;
-
-    // memory properties
     struct {
-        uint32_t pcount;
-        ze_device_memory_properties_t ze_properties[XKRT_DEVICE_MEMORIES_MAX];
-    } memory;
 
-    // number of command queue group
-    uint32_t ncommandqueuegroups;
+        // handles
+        ze_driver_handle_t      driver;
+        ze_context_handle_t     context;
+        ze_device_handle_t      device;
+        ze_device_properties_t  device_properties;
 
-    // per command queue group property
-    ze_command_queue_group_properties_t * ze_command_queue_group_properties;
+        // number of command queue group
+        uint32_t ncommandqueuegroups;
 
-    // per command queue number of queue used
-    std::atomic<uint32_t> * ze_command_queue_group_used;
+        // per command queue group property
+        ze_command_queue_group_properties_t * command_queue_group_properties;
+
+        // per command queue number of queue used
+        std::atomic<uint32_t> * command_queue_group_used;
+
+        // memory properties
+        struct {
+            uint32_t pcount;
+            ze_device_memory_properties_t properties[XKRT_DEVICE_MEMORIES_MAX];
+        } memory;
+
+    } ze;
+
+    // sycl interop
+    struct {
+        sycl::device device;
+        sycl::context context;
+    } sycl;
 
 }               xkrt_device_ze_t;
 
@@ -58,9 +71,15 @@ typedef struct  xkrt_stream_ze_t
             ze_event_pool_handle_t  pool;
             ze_event_handle_t     * list;
         } events;
+
+        // bad design, but required to submit kernels with level zero
+        xkrt_device_ze_t * device;
+
     } ze;
 
-    xkrt_device_ze_t * device; // bad designed, but required to submit kernels with levle zero
+    struct {
+        sycl::queue queue;
+    } sycl;
 
 }               xkrt_stream_ze_t;
 
