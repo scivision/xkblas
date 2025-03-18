@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 20:16:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/18 23:23:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -878,7 +878,7 @@ XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
 xkrt_driver_t *
 XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    xkrt_driver_ze_t * driver = (xkrt_driver_ze_t *) malloc(sizeof(xkrt_driver_ze_t));
+    xkrt_driver_ze_t * driver = (xkrt_driver_ze_t *) calloc(1, sizeof(xkrt_driver_ze_t));
     assert(driver);
 
     # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)
