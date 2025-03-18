@@ -6,8 +6,6 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})
 
-message(STATUS "TODO: automate kernel files in the build")
-
 SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
 SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 # SET(XKBLAS_KERNELS_PRECISIONS s)
@@ -88,7 +86,6 @@ SET(SOURCE_FILES
 
 # XK Runtime
 find_package(XKRT REQUIRED)
-message(STATUS "Found XKRT: ${XKRT_INCLUDE_DIRS}")
 include_directories("${XKRT_INCLUDE_DIRS}")
 
 ##########
@@ -121,7 +118,6 @@ option(USE_CUBLAS "Enable cublas" ON)
 if (USE_CUBLAS)
     find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
-    message(STATUS "Found Cublas: ${CUBLAS_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
 endif()
 
@@ -137,11 +133,10 @@ if (USE_CUDA)
 endif()
 
 option(USE_CLBLAST "Enable clblast" ON)
-if (${CLBLAST_FOUND})
+if(USE_CLBLAST)
     find_package(CLBLAST REQUIRED)
     add_compile_definitions(XKBLAS_SUPPORT_CLBLAST=1)
     include_directories("${CLBLAST_INCLUDE_DIRS}")
-    message(STATUS "Found CLBlast: ${CLBLAST_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CLBLAST_LIBRARIES})
 endif()
 
