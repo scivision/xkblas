@@ -36,7 +36,7 @@ xkrt_deque_t<T,C>::pop(void)
         SPINLOCK_LOCK(lock);
         {
             int idx = --_t;
-            if (idx > _t || ((task = tasks[idx%C]) == NULL))
+            if (_h > idx || ((task = tasks[idx%C]) == NULL))
             {
                 ++_t;
                 SPINLOCK_UNLOCK(lock);
