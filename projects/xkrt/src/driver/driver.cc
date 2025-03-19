@@ -126,11 +126,11 @@ xkrt_driver_init(
         // start the device thread
         xkrt_driver_device_thread_arg_t * arg = (xkrt_driver_device_thread_arg_t *) malloc(sizeof(xkrt_driver_device_thread_arg_t));
         assert(arg);
-        arg->routine = routine;
-        arg->vargs = vargs;
+        new (&arg->thread) xkrt_thread_t(-1);
         arg->driver_type = driver_type;
         arg->device_driver_id = i;
-        new (&arg->thread) xkrt_thread_t(-1);
+        arg->routine = routine;
+        arg->vargs = vargs;
 
         err = pthread_create(&arg->thread.pthread, &attr, trampoline, arg);
         if (err)
@@ -218,7 +218,7 @@ xkrt_drivers_init(
     if (drivers->devices.n == 0 && ndevices != 0)
         LOGGER_WARN("No devices found :-(");
 
-    LOGGER_INFO("Enabled %d devices (with %d requested)", drivers->devices.n.load(), ndevices);
+    LOGGER_INFO("Enabled %d GPUs (with %d requested)", drivers->devices.n.load()-1, ndevices-1);
     assert(drivers->devices.n <= ndevices);
 }
 

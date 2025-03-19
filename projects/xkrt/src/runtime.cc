@@ -102,9 +102,12 @@ xkrt_init(xkrt_runtime_t * runtime)
         {
             runtimes.list->prev = runtime;
             runtime->next = runtimes.list;
+            runtime->prev = NULL;
         }
         else
         {
+            runtime->next = NULL;
+            runtime->prev = NULL;
             # if 0
             signal(SIGINT,  xkrt_runtimes_cleanup_signal);
             signal(SIGTERM, xkrt_runtimes_cleanup_signal);

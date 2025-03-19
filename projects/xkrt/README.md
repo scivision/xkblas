@@ -6,7 +6,7 @@ Must have hwloc installed and be sure your `CMAKE_PREFIX_PATH` holds libs/includ
 ```bash
 mkdir build-debug
 cd build-debug
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkrt/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_CUDA=on -DUSE_ZE=off -DUSE_CL=on -DENABLE_HEAVY_DEBUG=off ..
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkrt/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_CUDA=on -DUSE_ZE=off -DUSE_SYCL=off -DUSE_CL=off -DUSE_HIP=off -DENABLE_HEAVY_DEBUG=off ..
 ```
 
 # PERFORMANCE IDEA

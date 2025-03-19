@@ -140,8 +140,9 @@ if(USE_CLBLAST)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CLBLAST_LIBRARIES})
 endif()
 
-find_package(ZE)
-if (${ZE_FOUND})
+option(USE_ZE "Use Level Zero" OFF)
+if (USE_SYCL)
+    find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 

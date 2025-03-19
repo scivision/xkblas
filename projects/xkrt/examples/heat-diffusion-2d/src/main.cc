@@ -273,7 +273,7 @@ body_ze(
     assert(driver);
 
     // retrieve module, or compile it
-    const int device_id = stream->device->inherited.driver_id;
+    const int device_id = stream->ze.device->inherited.driver_id;
     xkrt_driver_module_t module = ZE_MODULES[device_id];
     if (module == NULL)
     {

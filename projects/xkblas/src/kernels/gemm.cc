@@ -422,7 +422,6 @@ body_ze(
     oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
     const std::vector<sycl::event> dependencies = {};
 
-    # if 1
     sycl::event event = oneapi::mkl::blas::column_major::gemm(
         queue,
         transa, transb,
@@ -436,25 +435,6 @@ body_ze(
         dependencies
     );
     stream->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
-    queue.wait();
-
-    # else
-
-    oneapi::mkl::blas::column_major::gemm(
-        queue,
-        transa, transb,
-        m, n, k,
-        alpha,
-        a, lda,
-        b, ldb,
-        beta,
-        c, ldc,
-        mode
-    );
-    queue.wait();
-    zeEventHostSignal(stream->ze.events.list[idx]);
-
-    # endif
 
     # else /* XKBLAS_SUPPORT_SYCL */
     LOGGER_FATAL("no blas impl for ze");

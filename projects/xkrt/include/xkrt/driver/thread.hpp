@@ -15,7 +15,6 @@
 # define __THREAD_HPP__
 
 # include <xkrt/driver/dependency-tree.hpp>
-# include <xkrt/driver/naive-queue.hpp>
 # include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/cache-line-size.hpp>

@@ -17,9 +17,13 @@
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
-# include <ze_api.h>
 
-# include <sycl/sycl.hpp>
+# include <xkrt/xkrt-support.h>
+
+# include <ze_api.h>
+# if XKRT_SUPPORT_SYCL
+#  include <sycl/sycl.hpp>
+# endif /* XKRT_SUPPORT_SYCL */
 
 typedef struct  xkrt_device_ze_t
 {
@@ -50,11 +54,13 @@ typedef struct  xkrt_device_ze_t
 
     } ze;
 
+    # if XKRT_SUPPORT_SYCL
     // sycl interop
     struct {
         sycl::device device;
         sycl::context context;
     } sycl;
+    # endif /* XKRT_SUPPORT_SYCL */
 
 }               xkrt_device_ze_t;
 
@@ -77,9 +83,11 @@ typedef struct  xkrt_stream_ze_t
 
     } ze;
 
+    # if XKRT_SUPPORT_SYCL
     struct {
         sycl::queue queue;
     } sycl;
+    # endif /* XKRT_SUPPORT_SYCL */
 
 }               xkrt_stream_ze_t;
 

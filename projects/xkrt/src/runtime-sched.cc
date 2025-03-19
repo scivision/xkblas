@@ -111,7 +111,15 @@ xkrt_device_thread_main_loop(
                 device->state == XKRT_DEVICE_STATE_RUNNING)
             worker->thread->pause();
 
-        device->offloader_poll();
+        if (device->state != XKRT_DEVICE_STATE_RUNNING)
+        {
+            assert(device->state == XKRT_DEVICE_STATE_STOP);
+            break ;
+        }
+
+        if (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
+            device->offloader_poll();
+
         if (task)
             xkrt_device_prepare_task(runtime, device, device->global_id, task);
     }

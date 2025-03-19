@@ -17,7 +17,9 @@
 #  include <xkrt/consts.h>
 #  include <xkrt/sync/spinlock.h>
 #  include <xkrt/task/task.hpp>
-#  include <xkrt/thread/deque.hpp>
+
+// #  include <xkrt/thread/deque.hpp>
+#  include <xkrt/thread/naive-queue.hpp>
 
 #  include <pthread.h>
 #  include <atomic>
@@ -47,6 +49,7 @@ typedef struct  xkrt_thread_t
 
         /* the thread deque */
         xkrt_deque_t<task_t *, 4096> deque;
+        // NaiveQueue<task_t *> deque;
 
     private:
 

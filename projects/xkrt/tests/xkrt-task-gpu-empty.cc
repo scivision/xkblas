@@ -14,6 +14,16 @@ func(task_t * task)
     r = 1;
 }
 
+static int *
+setup(int m, int n, int ld)
+{
+    int * mem = (int *) malloc(ld * ld * sizeof(int));
+    for (int i = 0 ; i < m ; ++i)
+        for (int j = 0 ; j < m ; ++j)
+            mem[i*ld+j] = 42;
+    return mem;
+}
+
 int
 main(void)
 {
@@ -33,11 +43,17 @@ main(void)
     Thread * thread = Thread::self();
     assert(thread);
 
+    // setup memory
+    const int  m = 1024;
+    const int  n = 1024;
+    const int ld = 4096;
+    int * mem = setup(m, n, ld);
+
     // Create a task
-    # define NACCESSES 1
-    static_assert(NACCESSES <= TASK_MAX_ACCESSES);
+    # define AC 1
+    static_assert(AC <= TASK_MAX_ACCESSES);
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
-    constexpr size_t task_size = task_compute_size(flags, NACCESSES);
+    constexpr size_t task_size = task_compute_size(flags, AC);
 
     task_t * task = thread->allocate_task(task_size);
     new(task) task_t(FORMAT, flags);
@@ -45,21 +61,14 @@ main(void)
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
 
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
     // set accesses
     access_t * accesses = TASK_ACCESSES(task);
-    {
-        const int ld = 1024;
-        int * mem = (int *) malloc(ld * ld * sizeof(int));
-        const int  m = 1024;
-        const int  n = 1024;
-        for (int i = 0 ; i < m ; ++i)
-            for (int j = 0 ; j < m ; ++j)
-                mem[i*ld+j] = 42;
-
-        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
-        thread->resolve<NACCESSES>(task, accesses);
-        # undef NACCESSES
-    }
+    new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
+    thread->resolve<AC>(task, accesses);
+    # undef AC
 
     // submit it to the runtime
     runtime.task_commit(task);

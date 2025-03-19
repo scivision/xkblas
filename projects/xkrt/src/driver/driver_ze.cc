@@ -24,6 +24,7 @@
 # include <xkrt/logger/logger-ze.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
+# include <xkrt/xkrt-support.h>
 
 # include <ze_api.h>
 # include <hwloc/levelzero.h>
@@ -43,7 +44,7 @@
 static ze_driver_handle_t   ze_drivers[XKRT_DEVICES_MAX];
 static ze_context_handle_t  ze_contextes[XKRT_DEVICES_MAX];
 
-static xkrt_device_ze_t DEVICES[XKRT_DEVICES_MAX];
+static xkrt_device_ze_t * DEVICES;
 static uint32_t ze_n_devices = 0;
 
 static xkrt_device_ze_t *
@@ -63,6 +64,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 {
     assert(0 < ndevices_requested);
     assert(ndevices_requested <= XKRT_DEVICES_MAX);
+
+    DEVICES = (xkrt_device_ze_t *) calloc(XKRT_DEVICES_MAX, sizeof(xkrt_device_ze_t));
+    assert(DEVICES);
 
     # pragma message(TODO "We initialize all Intel drivers and devices here. Maybe make this a bit more lazy")
 
@@ -105,7 +109,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
         ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ndevices, ze_devices));
 
         // sycl interop
+        # if XKRT_SUPPORT_SYCL
         sycl::platform platform = sycl::ext::oneapi::level_zero::make_platform((pi_native_handle) ze_driver);
+        # endif /* XKRT_SUPPORT_SYCL */
 
         for (unsigned int i = 0 ; i < ndevices ; ++i)
         {
@@ -136,12 +142,14 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
                 device->ze.memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
                 ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.device, &device->ze.memory.pcount, device->ze.memory.properties));
 
+                # if XKRT_SUPPORT_SYCL
                 // sycl interop
                 device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
 
                 std::vector<sycl::device> sycl_devices(1);
                 sycl_devices[0] = device->sycl.device;
                 device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
+                # endif /* XKRT_SUPPORT_SYCL */
 
                 if (++ze_n_devices == ndevices_requested)
                     return 0;
@@ -192,6 +200,8 @@ XKRT_DRIVER_ENTRYPOINT(finalize)(void)
     // get all device handles per driver
     for (int i = 0 ; i < XKRT_DEVICES_MAX && ze_contextes[i] ; ++i)
         ZE_SAFE_CALL(zeContextDestroy(ze_contextes[i]));
+
+    free(DEVICES);
 }
 
 static const char *
@@ -413,8 +423,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
     {
         case (XKRT_STREAM_TYPE_KERN):
             return 8;
+
+        case (XKRT_STREAM_TYPE_H2D):
+        case (XKRT_STREAM_TYPE_D2H):
+        case (XKRT_STREAM_TYPE_D2D):
+            return 4;
+
         default:
-            return 2;
+            return 1;
     }
 }
 
@@ -535,6 +551,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     xkrt_device_ze_t * device = (xkrt_device_ze_t *) idevice;
     stream->ze.device = device;
 
+    // Round robin over copy engines
+
+    # if 1
     // convert xkrt stream type to a command queue group flag
     ze_command_queue_group_property_flag_t flag;
     switch (type)
@@ -557,10 +576,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
             LOGGER_FATAL("Unknown stream type");
     }
 
-    # if 1
-    // Round robin over copy engines
-
-    // create command queue
     uint32_t ordinal = device_command_queue_group_next<ze_command_queue_group_property_flag_t, f_equals>(device, flag);
     if (ordinal == UINT32_MAX)
     {
@@ -568,15 +583,33 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         if (ordinal == UINT32_MAX)
             LOGGER_FATAL("No command queue group available for stream");
     }
+    # else
+    /* https://github.com/pmodels/mpich/blob/main/src/mpl/src/gpu/mpl_gpu_ze.c#L656-L660 */
+    uint32_t ordinal;
+    switch (type)
+    {
+        case (XKRT_STREAM_TYPE_KERN):
+        {
+            ordinal = 0;
+            break ;
+        }
+
+        case (XKRT_STREAM_TYPE_H2D):
+        case (XKRT_STREAM_TYPE_D2H):
+        case (XKRT_STREAM_TYPE_D2D):
+        {
+            ordinal = 1;
+            break ;
+        }
+
+        default:
+            LOGGER_FATAL("Unknown stream type");
+    }
+    # endif
 
     // retrieve group properties
     const ze_command_queue_group_properties_t * properties = device->ze.command_queue_group_properties + ordinal;
     uint32_t index = device->ze.command_queue_group_used[ordinal].fetch_add(1) % properties->numQueues;
-    # else
-    /* see https://github.com/pmodels/mpich/blob/main/src/mpl/src/gpu/mpl_gpu_ze.c */
-    uint32_t ordinal = 0;
-    uint32_t index = 0;
-    # endif
 
     // get the next command queue index to use in the group
     const ze_command_queue_desc_t ze_command_queue_desc = {
@@ -588,7 +621,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         .mode       = ZE_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
         .priority   = ZE_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW
     };
-    // LOGGER_INFO("Creating with (ordinal, index) = (%d, %d) of %d", ordinal, index, (int) type);
+    LOGGER_DEBUG("Creating stream of type `%4s` with (ordinal, index) = (%d, %d)", xkrt_stream_type_to_str(type), ordinal, index);
 
     # if 0 /* use a command list and command queue */
     ZE_SAFE_CALL(
@@ -617,10 +650,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         )
     );
 
-    // see https://github.com/CHIP-SPV/H4I-MKLShim/blob/fb114334304e3b760c120c7ddedac53ac13c9c26/src/Context.cpp#L30
-
+    # if XKRT_SUPPORT_SYCL
     sycl::property_list props = {}; /* how to convert `ze_command_queue_desc` to `sycl::property_list` ? */
-    stream->sycl.queue = sycl::ext::oneapi::level_zero::make_queue(
+    sycl::queue queue = sycl::ext::oneapi::level_zero::make_queue(
         device->sycl.context,
         device->sycl.device,
         (pi_native_handle) stream->ze.command.list,
@@ -628,6 +660,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         true,   /* keep ownership */
         props
     );
+    new (&stream->sycl.queue) sycl::queue(queue);
+    # endif /* XKRT_SUPPORT_SYCL */
 
     # endif
 
