@@ -2263,6 +2263,7 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
     }
   }
 #endif // CONFIG_USE_P2P
+  return 0;
 }
 
 
