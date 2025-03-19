@@ -1722,6 +1722,13 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
   int err;
   CPU_ZERO(schedset);
 
+  /*TG: patch. It seems than CPU set by slurm does not intersect cpu that have affinity with
+    GPU. Disable the feature until patch will be found
+  */
+  return ENOTSUP; 
+
+#if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
+
 #if KAAPI_USE_HWLOC
   hwloc_cpuset_t cpuset;
   hwloc_obj_t obj;

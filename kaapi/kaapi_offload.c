@@ -224,6 +224,18 @@ void _kaapi_offload_config_data_field_device(kaapi_driver_t* driver, kaapi_devic
 }
 
 
+#if KAAPI_DEBUG
+static void print_cpuset( cpu_set_t* cs )
+{
+  for (int i=127; i>=0; --i)
+  {
+    if (CPU_ISSET(i, cs)) 
+      printf("1");
+    else
+      printf("0");
+  }
+}
+#endif
 
 /* Configure Kaapi based on the loaded driver plugin.
    All devices managed by the driver are intialized.
@@ -257,6 +269,14 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
   pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &save_schedset);
   for (i= 0; i < n_devices; i++)
   {
+    kaapi_driver_thread_arg_t* arg = (kaapi_driver_thread_arg_t*)malloc(sizeof(kaapi_driver_thread_arg_t));
+    arg->driver= driver;
+    arg->device_id = i;
+    arg->global_device_id = kaapi_offload_num_devices;
+    arg->tid = 0;
+    arg->ld  = 0;
+    int type = driver->f_get_type();
+
     /* */
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -264,20 +284,22 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     int err = driver->f_device_set_cpuset(&schedset, i);
     if (err ==0)
     {
+printf("New CPU set is  : "); print_cpuset( &schedset ); printf("\n");
       err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
       kaapi_assert(err == 0);
+
+      /* move running thread on the specific cpuset */
+      pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
+      for (int i=0; i<10; ++i) sched_yield();
     }
-    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &schedset);
-    for (int i=0; i<10; ++i) sched_yield();
+#if _OFFLOAD_DEBUG
+    else {
+      _kaapi_lock_print();
+      printf("%i::[%s] cannot get thread cpuset\n", __LINE__, __func__ );
+      _kaapi_unlock_print();
+    }
+#endif
 
-    kaapi_driver_thread_arg_t* arg = (kaapi_driver_thread_arg_t*)malloc(sizeof(kaapi_driver_thread_arg_t));
-    arg->driver= driver;
-    arg->device_id = i;
-    arg->global_device_id = kaapi_offload_num_devices;
-    arg->tid = 0;
-    arg->ld  = 0;
-
-    int type = driver->f_get_type();
     switch (type) {
       case KAAPI_PROC_TYPE_HOST:
         break;
@@ -295,7 +317,11 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     };
 
     KAAPI_OFFLOAD_INIT_TRACE_MSG("device_id: %i / global_id: %i of driver name:%s\n", arg->device_id, arg->global_device_id, driver->name);
-    err = pthread_create(&arg->tid, &attr, kaapi_offload_device_thread, arg);
+    if (err ==0)
+      err = pthread_create(&arg->tid, &attr, kaapi_offload_device_thread, arg);
+    else 
+      err = pthread_create(&arg->tid, 0, kaapi_offload_device_thread, arg);
+    if (err !=0) fprintf(stderr,"%i::[kaapi_offload_config_devices] Error: %s\n", __LINE__, strerror(err) ); 
     kaapi_assert(err ==0);
     kaapi_offload_num_devices++;
   }
