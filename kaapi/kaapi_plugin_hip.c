@@ -1712,6 +1712,20 @@ static void* kaapi_cuda_D2H_io_thread( void* arg )
 #endif
 
 
+#if KAAPI_DEBUG
+void print_cpuset( cpu_set_t* cs )
+{
+  for (int i=127; i>=0; --i)
+  {
+    if (CPU_ISSET(i, cs))
+      printf("1");
+    else
+      printf("0");
+  }
+}
+#endif
+
+
 /* Update pthread_attr_t with the CPUset to start the thread that manages the device
    Return ENOTSUP is hwloc is not available or some internal error occurs.
 */
@@ -1723,6 +1737,11 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
 
   int err;
   CPU_ZERO(schedset);
+
+  /*TG: patch. It seems than CPU set by slurm does not intersect cpu that have affinity with
+    GPU. Disable the feature until patch will be found
+  */
+  return ENOTSUP; 
 
 #if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
   rsmi_status_t rerr ;
@@ -1775,7 +1794,9 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
 
   for (int i=0; i<ncpus;++i)
     if (numa_bitmask_isbitset(mask, i)) 
+    {
       CPU_SET(i, schedset); 
+    }
   numa_free_cpumask(mask);
 
 return_rsmi_error:
@@ -1808,10 +1829,12 @@ retval:
   hwloc_bitmap_free(cpuset);
 #endif
 
+printf("OUT %s\n", __func__ );
   KAAPI_OFFLOAD_TRACE_OUT
   return err;
 }
 
+#undef KAAPI_OFFLOAD_DEBUG 
 
 
 /*
