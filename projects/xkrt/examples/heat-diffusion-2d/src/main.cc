@@ -513,12 +513,14 @@ main(void)
 {
     // Initialize xkrt runtime
     xkrt_init(&runtime);
-    if (runtime.drivers.devices.n == 0)
+
+    const int ngpus = runtime.drivers.devices.n - 1;
+    if (ngpus == 0)
         LOGGER_FATAL("No devices found");
 
     // compute data partitioning
     TSX = NX / 1;
-    TSY = NY / runtime.drivers.devices.n;
+    TSY = NY / ngpus;
 
     // setup task format
     setup_tasks();
