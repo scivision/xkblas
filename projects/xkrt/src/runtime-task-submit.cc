@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:00:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 23:06:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,7 +69,8 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     // fallback to round robin if no devices found
     if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID)
     {
-        if (runtime->drivers.devices.n)
+        // must have at least one device
+        if (runtime->drivers.devices.n > 1)
         {
             while (1)
             {

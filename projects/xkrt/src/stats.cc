@@ -5,14 +5,16 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 22:21:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 22:59:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/runtime.h>
 # include <xkrt/xkrt-support.h>
+# if XKRT_SUPPORT_STATS
+
+# include <xkrt/runtime.h>
 # include <xkrt/task/task.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/logger/logger.h>
@@ -171,7 +173,6 @@ xkrt_runtime_stats_tasks_report(xkrt_runtime_t * runtime)
 void
 xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
 {
-    # if XKRT_SUPPORT_STATS
     LOGGER_WARN("----------------- STATS -----------------");
     device_stats_t agg;
     memset(&agg, 0, sizeof(agg));
@@ -197,10 +198,6 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
     LOGGER_WARN("Tasks");
     xkrt_runtime_stats_tasks_report(runtime);
     LOGGER_WARN("-----------------------------------------");
-
-    # else /* XKRT_SUPPORT_STATS */
-
-    LOGGER_WARN("--- STATS DISABLED - ENABLE WITH -DXKRT_SUPPORT_STATS=on WITH CMAKE");
-
-    # endif /* XKRT_SUPPORT_STATS */
 }
+
+# endif /* XKRT_SUPPORT_STATS */

@@ -3,8 +3,9 @@
   script:
     - cd "$CI_PROJECT_DIR/projects/xkrt/"
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+    - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE $OPTIONS ..
     - make -j
+    - make test
     - cd "$CI_PROJECT_DIR"
   artifacts:
     paths:
@@ -20,3 +21,14 @@ build-debug:
   variables:
     BUILD_TYPE: "Debug"
 
+build-release-stats:
+  extends: .build_template
+  variables:
+    BUILD_TYPE: "Release"
+    OPTIONS: "-DUSE_STATS=on"
+
+build-debug-stats:
+  extends: .build_template
+  variables:
+    BUILD_TYPE: "Debug"
+    OPTIONS: "-DUSE_STATS=on"
