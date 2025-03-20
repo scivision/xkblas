@@ -1,6 +1,5 @@
 .build_template:
   stage: build
-  extends: .machine-cpu-only
   script:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
@@ -8,9 +7,6 @@
   artifacts:
     paths:
       - build
-  needs:
-    - job: prerequisities-job
-      artifacts: true
 
 build-release:
   extends: .build_template

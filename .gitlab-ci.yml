@@ -1,19 +1,35 @@
+# inspired from https://gitlab.inria.fr/gitlabci_gallery/pipelines/complete_cpp_example/-/blob/main/.gitlab-ci.yml?ref_type=heads
+
 stages:
+  - init
   - build
   - test
 
-.machine-cpu-only:
-    tags:
+# defaults for linux docker jobs
+default:
+  interruptible: true
+  image: $CI_REGISTRY_IMAGE/gitlabci
+  tags:
     - ci.inria.fr
     - large
     - linux
     - v2025
 
-prerequisities-job:
-  extends: .machine-cpu-only
+# build the docker image used for tests
+docker_buildenv:
+  stage: init
+  image: docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - .gitlab/Dockerfile
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - apt-get install cmake
-  stage: build
+    - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE/gitlabci
+
+.machine-cpu-only:
 
 include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
