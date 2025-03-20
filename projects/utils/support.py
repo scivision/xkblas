@@ -3,6 +3,9 @@
 import os
 import sys
 
+print(sys.argv)
+print(len(sys.argv))
+
 if len(sys.argv) != 8:
     print("usage: {} [DST-DIR] [DST-FILE] [USE_CUDA] [USE_ZE] [USE_SYCL] [USE_CL] [USE_STATS]".format(sys.argv[0]))
     sys.exit(0)

@@ -19,8 +19,6 @@ option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Z
 option(USE_CL "Whether to build the OpenCL driver." OFF)
 option(STRICT "Enable strict compilation mode" ON)
 
-
-
 ###############
 # DEPENDENCES #
 ###############
