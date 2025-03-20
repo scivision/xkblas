@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:15:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 00:17:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -18,7 +18,7 @@
 #  include <xkrt/sync/spinlock.h>
 #  include <xkrt/task/task.hpp>
 
-// #  include <xkrt/thread/deque.hpp>
+#  include <xkrt/thread/deque.hpp>
 #  include <xkrt/thread/naive-queue.hpp>
 
 #  include <pthread.h>
@@ -47,9 +47,12 @@ typedef struct  xkrt_thread_t
         /* the tid in the team */
         int tid;
 
+        /* the device global id attached to that thread */
+        xkrt_device_global_id_t device_global_id;
+
         /* the thread deque */
-        xkrt_deque_t<task_t *, 4096> deque;
-        // NaiveQueue<task_t *> deque;
+        // xkrt_deque_t<task_t *, 4096> deque;
+        NaiveQueue<task_t *> deque;
 
     private:
 
@@ -62,7 +65,18 @@ typedef struct  xkrt_thread_t
 
     public:
 
-        xkrt_thread_t(int tid) : state(XKRT_THREAD_INITIALIZED), pthread(0), tid(tid), deque()
+        xkrt_thread_t(int tid) : xkrt_thread_t(tid, 0, UNSPECIFIED_DEVICE_GLOBAL_ID) {}
+
+        xkrt_thread_t(
+            int tid,
+            pthread_t pthread,
+            xkrt_device_global_id_t device_global_id
+        ) :
+            state(XKRT_THREAD_INITIALIZED),
+            pthread(pthread),
+            tid(tid),
+            device_global_id(device_global_id),
+            deque()
         {
             pthread_mutex_init(&this->sleep.lock, 0);
             pthread_cond_init (&this->sleep.cond, 0);
@@ -133,6 +147,12 @@ typedef enum    xkrt_team_binding_places_t
     XKRT_TEAM_BINDING_PLACES_MACHINE,
 }               xkrt_team_binding_places_t;
 
+typedef enum    xkrt_team_binding_flag_t
+{
+    XKRT_TEAM_BINDING_FLAG_NONE         = 0,
+    XKRT_TEAM_BINDING_FLAG_EXCLUDE_HOST = (1 << 0)
+}               xkrt_team_binding_flag_t;
+
 /**
  *  The supported combinations are:
  *    (mode = COMPACT, places = DEVICE)
@@ -145,7 +165,7 @@ typedef struct  xkrt_team_binding_t
 {
     xkrt_team_binding_mode_t mode;
     xkrt_team_binding_places_t places;
-
+    xkrt_team_binding_flag_t flags;
 }               xkrt_team_binding_t;
 
 /* team description */

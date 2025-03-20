@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/06 03:09:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/19 23:49:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -55,6 +55,7 @@ main(void)
             .binding = {
                 .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
                 .places = XKRT_TEAM_BINDING_PLACES_CORE,
+                .flags = XKRT_TEAM_BINDING_FLAG_NONE
             }
         }
     };

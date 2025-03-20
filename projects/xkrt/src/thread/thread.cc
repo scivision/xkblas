@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:32:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/19 23:57:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -86,6 +86,8 @@ typedef struct  team_recursive_args_t
 {
     xkrt_runtime_t * runtime;
     xkrt_team_t * team;
+    pthread_t pthread;
+    xkrt_device_global_id_t device_global_id;
     cpu_set_t cpuset;
     int from;
     int to;
@@ -93,7 +95,7 @@ typedef struct  team_recursive_args_t
 
 /** Set the cpuset for the given thread */
 static void inline
-team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, cpu_set_t * cpuset)
+team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, xkrt_device_global_id_t * device_global_id, cpu_set_t * cpuset)
 {
     switch (team->desc.binding.mode)
     {
@@ -103,7 +105,8 @@ team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, cp
             {
                 case (XKRT_TEAM_BINDING_PLACES_DEVICE):
                 {
-                    const xkrt_device_t * device = runtime->device_get((xkrt_device_global_id_t) tid);
+                    *device_global_id = (team->desc.binding.flags == XKRT_TEAM_BINDING_FLAG_EXCLUDE_HOST) ? (xkrt_device_global_id_t) (tid + 1) : (xkrt_device_global_id_t) tid;
+                    const xkrt_device_t * device = runtime->device_get(*device_global_id);
                     assert(device);
                     *cpuset = device->thread->cpuset;
                     return ;
@@ -120,6 +123,7 @@ team_create_get_cpuset(xkrt_runtime_t * runtime, xkrt_team_t * team, int tid, cp
                             sizeof(cpu_set_t)
                         )
                     );
+                    *device_global_id = HOST_DEVICE_GLOBAL_ID;
                     return ;
                 }
 
@@ -148,8 +152,7 @@ team_create_recursive(void * vargs)
         xkrt_team_t * team = args->team;
         int tid = args->from;
         xkrt_thread_t * thread = team->priv.threads + tid;
-        new (thread) xkrt_thread_t(tid);
-        thread->pthread = pthread_self();
+        new (thread) xkrt_thread_t(tid, args->pthread, args->device_global_id);
 
         tls->team = team;
         tls->thread = thread;
@@ -194,11 +197,14 @@ team_create_recursive_fork(
     cpu_set_t save_set;
     xkrt_runtime_t::thread_getaffinity(save_set);
 
-    // retrieve cpuset
+    // retrieve cpuset and the global device id
     const int tid = from;
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    team_create_get_cpuset(runtime, team, tid, &cpuset);
+
+    xkrt_device_global_id_t device_global_id;
+
+    team_create_get_cpuset(runtime, team, tid, &device_global_id, &cpuset);
 
     // move thread before allocating future thread-private memory
     xkrt_runtime_t::thread_setaffinity(cpuset);
@@ -207,12 +213,13 @@ team_create_recursive_fork(
     args->runtime = runtime;
     args->team = team;
     args->from = from;
+    args->device_global_id = device_global_id;
     args->to = to;
     args->cpuset = cpuset;
 
     // fork
-    pthread_t pthread;
-    pthread_create(&pthread, NULL, team_create_recursive, args);
+    int r = pthread_create(&args->pthread, NULL, team_create_recursive, args);
+    assert(r == 0);
 
     // restore calling thread cpu set
     xkrt_runtime_t::thread_setaffinity(save_set);
@@ -223,8 +230,9 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
 {
     // only supported modes currently
     assert(
-        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_DEVICE) ||
-        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_CORE)
+        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_DEVICE && team->desc.binding.flags == XKRT_TEAM_BINDING_FLAG_NONE)         ||
+        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_DEVICE && team->desc.binding.flags == XKRT_TEAM_BINDING_FLAG_EXCLUDE_HOST) ||
+        (team->desc.binding.mode == XKRT_TEAM_BINDING_MODE_COMPACT && team->desc.binding.places == XKRT_TEAM_BINDING_PLACES_CORE   && team->desc.binding.flags == XKRT_TEAM_BINDING_FLAG_NONE)
     );
 
     // set all to zero
@@ -233,9 +241,8 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     // allocate thread array
     const int nthreads = team->desc.nthreads;   // TODO : this should be a func of the team desc
     team->priv.nthreads = nthreads;
-    team->priv.threads = (xkrt_thread_t *) malloc(sizeof(xkrt_thread_t) * team->priv.nthreads);
+    team->priv.threads = (xkrt_thread_t *) calloc(team->priv.nthreads, sizeof(xkrt_thread_t));
     assert(team->priv.threads);
-    memset(team->priv.threads, 0, sizeof(xkrt_thread_t) * team->priv.nthreads);
 
     // init barrier with nthreads + 1 to avoid early barrier release
     team->priv.barrier.n.store(team->priv.nthreads + 1, std::memory_order_seq_cst);
@@ -426,7 +433,8 @@ xkrt_runtime_t::team_join(xkrt_team_t * team)
         while ((volatile xkrt_thread_state_t) team->priv.threads[i].state != XKRT_THREAD_INITIALIZED)
             ;
         assert(team->priv.threads[i].state == XKRT_THREAD_INITIALIZED);
-        pthread_join(team->priv.threads[i].pthread, NULL);
+        int r = pthread_join(team->priv.threads[i].pthread, NULL);
+        assert(r == 0);
         team->priv.threads[i].state = XKRT_THREAD_UNINITIALIZED;
     }
     free(team->priv.threads);

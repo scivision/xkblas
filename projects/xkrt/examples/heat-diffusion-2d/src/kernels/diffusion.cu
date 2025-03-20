@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:45:52 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/13 13:58:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/19 20:27:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -114,7 +114,7 @@ diffusion_cuda(
     const unsigned int dtsy = (32 < (tsy) ? 32 : (tsy));
 
     // how many threads we need in total
-    dim3 T = {tsx, tsy, 1};
+    dim3 T = {(unsigned int) tsx, (unsigned int) tsy, 1};
 
     // block dim
     dim3 B(dtsx, dtsy, 1);

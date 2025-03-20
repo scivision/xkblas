@@ -29,17 +29,16 @@ template <void * (*func)(xkrt_team_t * team, xkrt_thread_t * thread)>
 static void
 foreach_device(benchmark_node_t * bench)
 {
-    // TODO: Update this benchmark if GPU has several memories
-
     tls_t tls;
     xkrt_team_t team = {
         .desc = {
             .routine = func,
             .args = &tls,
-            .nthreads = runtime.drivers.devices.n,
+            .nthreads = runtime.drivers.devices.n - 1,
             .binding = {
                 .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
                 .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+                .flags = XKRT_TEAM_BINDING_FLAG_EXCLUDE_HOST
             }
         }
     };
@@ -181,9 +180,9 @@ template<bool task>
 static void
 kernel_launch_latency_launch(benchmark_node_t * bench)
 {
-    time_array_t time(runtime.drivers.devices.n, 1001);
+    time_array_t time(runtime.drivers.devices.n - 1, 1001);
 
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
+    for (xkrt_device_global_id_t device_global_id = 1 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
     {
         xkrt_device_t * device = runtime.device_get(device_global_id);
         assert(device);
@@ -198,11 +197,11 @@ kernel_launch_latency_launch(benchmark_node_t * bench)
             device->offloader_stream_instructions_progress<true>(XKRT_STREAM_TYPE_KERN);
             uint64_t tf = xkrt_get_nanotime();
             if (iter >= 0)
-                time.set(device_global_id, iter, tf - t0);
+                time.set(device_global_id - 1, iter, tf - t0);
         }
     }
 
-    auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", i); };
+    auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", i + 1); };
     time.report<METRIC_TIME>("Device ID", convert);
 }
 
@@ -263,7 +262,7 @@ kernel_launch_latency_init(void)
                 if (!dst)
                     continue ;
 
-                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size);
+                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size, XKRT_DRIVER_MODULE_FORMAT_NATIVE);
                 *dst = driver->f_module_get_fn(module, "empty_kernel");
                 // driver->f_module_unload(module);
                 assert(*dst);
@@ -300,7 +299,7 @@ template<alloc_mode_t mode>
 static void *
 alloc_device_run_fragmented(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
     srand(16112003);
 
@@ -383,7 +382,7 @@ template<alloc_mode_t mode>
 static void *
 alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
     time_array_t time_alloc(30, 5);
     time_array_t time_dealloc(30, 5);
@@ -487,7 +486,7 @@ template<alloc_mode_t mode, bool touch>
 static void *
 alloc_host_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
     time_array_t time_alloc(34, 5);
     time_array_t time_dealloc(34, 5);
@@ -577,7 +576,7 @@ static benchmark_node_t driver_notouch = {
 static void *
 alloc_parallel_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t device_global_id = thread->device_global_id;
     time_array_t time_alloc(34, 5);
 
     uint64_t t0, tf;
@@ -662,7 +661,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
     tls_t * tls = (tls_t *) team->desc.args;
     assert(tls);
 
-    xkrt_device_global_id_t src_device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t src_device_global_id = thread->device_global_id;
     xkrt_device_t * src_device = runtime.device_get(src_device_global_id);
     assert(src_device);
 
@@ -820,7 +819,7 @@ template <direction_t direction, int nchunks, transfer_mode_t transfer_mode>
 static void *
 mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) thread->tid;
+    xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);

@@ -26,6 +26,7 @@ main(void)
             .binding = {
                 .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
                 .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+                .flags = XKRT_TEAM_BINDING_FLAG_NONE,
             }
         }
     };

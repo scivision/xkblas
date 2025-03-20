@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 19:59:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 00:17:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,6 +15,11 @@
 # include <xkrt/thread/deque.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/sync/mem.h>
+
+// TODO : PROBLEM - this impl assumes `push` and `pop` are called from the same
+// 'producer' thread and `steal` from any other thread.
+// It does not support 'giving' tasks, that is, having a thread different from
+// the producer pushing a task into this queue
 
 template <typename T, int C>
 void

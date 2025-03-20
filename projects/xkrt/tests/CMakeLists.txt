@@ -6,7 +6,10 @@ include(CTest)
 project(tests)
 
 # list of tests
-file(GLOB TEST_SOURCES "*.cc" "khp-tree/*.cc")
+set(TEST_SOURCES
+    fib.cc team-cpus.cc xkrt-deinit.cc xkrt-init.cc
+    xkrt-sync.cc xkrt-task-dependency.cc xkrt-task-format.cc
+    xkrt-task-gpu-empty.cc xkrt-task-format-host.cc xkrt-team-device.cc)
 
 # Loop over each test source file
 foreach(TEST_FILE ${TEST_SOURCES})

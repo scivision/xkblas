@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 20:32:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/19 23:48:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -135,10 +135,12 @@ main(int argc, char ** argv)
 {
     if (argc != 2)
     {
-        LOGGER_ERROR("usage: %s [n]", argv[0]);
-        return 1;
+        LOGGER_WARN("usage: %s [n]", argv[0]);
+        N = 34;
     }
-    N = atoi(argv[1]);
+    else
+        N = atoi(argv[1]);
+
     assert(N < sizeof(fib_values) / sizeof(int));
 
     assert(xkrt_init(&runtime) == 0);
@@ -158,6 +160,7 @@ main(int argc, char ** argv)
             .binding = {
                 .mode = XKRT_TEAM_BINDING_MODE_COMPACT,
                 .places = XKRT_TEAM_BINDING_PLACES_CORE,
+                .flags = XKRT_TEAM_BINDING_FLAG_NONE
             }
         }
     };
