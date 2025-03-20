@@ -1,6 +1,11 @@
 stages:
+  - prerequisities
   - build
   - test
+
+prerequisities-job:
+  script:
+    - apt-get install cmake
 
 include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
