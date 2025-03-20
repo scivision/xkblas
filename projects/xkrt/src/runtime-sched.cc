@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:06:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 23:23:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -30,6 +30,11 @@
 # include <cassert>
 # include <cstring>
 # include <cerrno>
+
+# ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+# endif /* _GNU_SOURCE */
+# include <sched.h> /* getcpu */
 
 # pragma message(TODO "Move these initializer into class member functions")
 
@@ -142,9 +147,6 @@ xkrt_device_thread_main(void * vruntime, xkrt_thread_t * thread, xkrt_driver_typ
 
     xkrt_driver_t * driver = runtime->driver_get(driver_type);
 
-    unsigned int cpu, node;
-    getcpu(&cpu, &node);
-
     // create device
     assert(driver->f_device_create);
     xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
@@ -204,6 +206,8 @@ xkrt_device_thread_main(void * vruntime, xkrt_thread_t * thread, xkrt_driver_typ
     assert(device->state == XKRT_DEVICE_STATE_CREATE);
     device->state = XKRT_DEVICE_STATE_INIT;
 
+    unsigned int cpu, node;
+    getcpu(&cpu, &node);
     LOGGER_INFO("Starting thread for %s device (device_driver_id=%d, device_global_id=%d) on cpu %d of node %d",
             driver->f_get_name(), device_driver_id, device->global_id, cpu, node);
 
