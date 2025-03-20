@@ -12,6 +12,9 @@
   artifacts:
     paths:
       - build
+  needs:
+    - job: prerequisities-job
+      artifacts: true
 
 build-release:
   extends: .build_template
