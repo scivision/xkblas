@@ -7,8 +7,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
     apk update
 
-RUN apk add bash clang cmake curl g++ gcc git jq make vim valgrind python3
-
+RUN apk add bash clang cmake curl g++ gcc git jq make vim valgrind python3 hwloc-dev hwloc-tools
 
 # Create a group and user
 RUN addgroup -S gitlab && adduser -S gitlab -G gitlab

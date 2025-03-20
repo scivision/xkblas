@@ -4,10 +4,13 @@ stages:
   - build
   - test
 
+variables:
+    IMAGE_NAME: "$CI_REGISTRY_IMAGE:latest"
+
 # defaults for linux docker jobs
 default:
   interruptible: true
-  image: $CI_REGISTRY_IMAGE/gitlabci
+  image: $IMAGE_NAME
   tags:
     - ci.inria.fr
     - large
@@ -21,8 +24,8 @@ docker_buildenv:
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
-    - docker push $CI_REGISTRY_IMAGE/gitlabci
+    - docker build --cache-from="$IMAGE_NAME" -t $IMAGE_NAME -f .gitlab/Dockerfile .
+    - docker push $IMAGE_NAME
 
 include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
