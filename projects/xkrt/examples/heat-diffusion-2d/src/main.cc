@@ -205,7 +205,7 @@ body_cuda(
         args->tile_x, args->tile_y,
         TSX, TSY
     );
-    CUDA_SAFE_CALL(cudaEventRecord(stream->cu.events.buffer[idx], custream));
+    CU_SAFE_CALL(cuEventRecord(stream->cu.events.buffer[idx], custream));
 }
 # endif /* XKRT_SUPPORT_CUDA */
 

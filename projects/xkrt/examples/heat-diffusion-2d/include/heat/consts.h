@@ -47,7 +47,7 @@
 /* Number of points per dimension in the grid */
 //#  define NX (16384)
 //#  define NX (32768+8192)
-#  define NX (4096)
+#  define NX (256)
 #  define NY NX
 
 /* Size of a cell (m) */

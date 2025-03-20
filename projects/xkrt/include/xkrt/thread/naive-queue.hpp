@@ -47,30 +47,26 @@ class NaiveQueue : IQueue<T>
         T
         pop(void)
         {
-            if (!this->list.empty())
+            SPINLOCK_LOCK(this->lock);
+
+            if (this->is_empty())
             {
-                SPINLOCK_LOCK(this->lock);
-
-                # if 0          /* FIFO */
-                T t = this->list.front();
-                this->list.pop_front();
-                # else          /* LIFO */
-                T t = this->list.back();
-                this->list.pop_back();
-                # endif
-
                 SPINLOCK_UNLOCK(this->lock);
-
-                return t;
+                return nullptr;
             }
-            return nullptr;
+
+            T t = this->list.back();
+            this->list.pop_back();
+
+            SPINLOCK_UNLOCK(this->lock);
+
+            return t;
         }
 
         T
         steal(void)
         {
-            assert(0); // no workstealing implemented
-            return nullptr;
+            return this->pop();
         }
 
         bool
