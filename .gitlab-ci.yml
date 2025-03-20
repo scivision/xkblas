@@ -2,33 +2,20 @@
 
 stages:
   - build
-  - test-build
 
 # defaults for linux docker jobs
 default:
   interruptible: true
-  image: $CI_REGISTRY_IMAGE/gitlabci
   tags:
     - ci.inria.fr
     - large
     - linux
     - v2025
 
-# build the docker image used for tests
-docker_buildenv:
-  stage: build
-  image: docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-      changes:
-        - .gitlab/Dockerfile
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-  script:
-    - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
-    - docker push $CI_REGISTRY_IMAGE/gitlabci
+# This section runs before each job in the pipeline.
+before_script:
+  - apt-get update -qq && apt-get install -qqy cmake
 
-include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
   # - local: 'projects/xkblas/.gitlab-ci.yml'
   # - local: 'projects/xkbm/.gitlab-ci.yml'

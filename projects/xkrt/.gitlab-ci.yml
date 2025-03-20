@@ -1,5 +1,5 @@
 .build_template:
-  stage: test-build
+  stage: build
   script:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
