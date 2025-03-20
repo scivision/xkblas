@@ -7,6 +7,20 @@ SET(XKRT xkrt)
 # Project name
 project(${XKRT})
 
+###########
+# OPTIONS #
+###########
+option(ENABLE_HEAVY_DEBUG "Heavy assertion tests in the khp-tree structure, setting this variable to 'ON' will considerably slowdown task insertion, but can help debugging the khp-trees" OFF)
+option(USE_STATS "Whether to compile the built-in stat system." ON)
+option(USE_CUDA "Whether to build the CUDA driver." OFF)
+option(USE_HIP "Whether to build the HIP driver." OFF)
+option(USE_ZE "Whether to build the Level Zero driver." OFF)
+option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" OFF)
+option(USE_CL "Whether to build the OpenCL driver." OFF)
+option(STRICT "Enable strict compilation mode" ON)
+
+
+
 ###############
 # DEPENDENCES #
 ###############
@@ -33,7 +47,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/thread/deque.cc
 )
 
-# XKRT version
+# XKRT version and supports
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
@@ -41,9 +55,8 @@ add_custom_command(
 )
 
 add_custom_target(${XKRT}_generated_files ALL DEPENDS always-run)
+message(STATUS "ENABLE_FEATURE_X = ${USE_CUDA}")
 
-# uncomment to disable kinterval tree heavy debug
-option(ENABLE_HEAVY_DEBUG "Heavy assertion tests in the khp-tree structure, setting this variable to 'ON' will considerably slowdown task insertion, but can help debugging the khp-trees" OFF)
 if (ENABLE_HEAVY_DEBUG)
     add_compile_definitions(KHP_TREE_ENABLE_COHERENCY_CHECKS=1)
 endif()
@@ -51,7 +64,6 @@ endif()
 ################
 # STATS SYSTEM #
 ################
-option(USE_STATS "Whether to compile the built-in stat system." ON)
 if (USE_STATS)
     LIST(APPEND SOURCE_FILES src/stats.cc)
     message(STATUS "Using built-in stats system")
@@ -87,7 +99,6 @@ target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_host)
 install(TARGETS ${XKRT}_driver_host LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 # CUDA
-option(USE_CUDA "Whether to build the CUDA driver." OFF)
 if (USE_CUDA)
 
     find_package(CUDA_DRIVER REQUIRED)
@@ -107,7 +118,6 @@ if (USE_CUDA)
 endif()
 
 # HIP
-option(USE_HIP "Whether to build the HIP driver." OFF)
 if (USE_HIP)
 
     find_package(HIP REQUIRED)
@@ -124,7 +134,6 @@ if (USE_HIP)
 endif()
 
 # Level Zero
-option(USE_ZE "Whether to build the Level Zero driver." OFF)
 if (USE_ZE)
 
     find_package(ZE REQUIRED)
@@ -138,7 +147,6 @@ if (USE_ZE)
 endif()
 
 # SYCL
-option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" OFF)
 if (USE_SYCL)
     find_package(SYCL REQUIRED)
     include_directories(${SYCL_INCLUDE_DIRS})
@@ -147,7 +155,6 @@ if (USE_SYCL)
 endif()
 
 # OpenCL
-option(USE_CL "Whether to build the OpenCL driver." OFF)
 if (USE_CL)
 
     find_package(CL REQUIRED)
@@ -158,8 +165,6 @@ if (USE_CL)
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
-
-option(STRICT "Enable strict compilation mode" ON)
 if (STRICT)
     SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
