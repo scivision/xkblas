@@ -29,8 +29,6 @@ docker_buildenv:
     - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE/gitlabci
 
-.machine-cpu-only:
-
 include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
   # - local: 'projects/xkblas/.gitlab-ci.yml'
