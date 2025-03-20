@@ -19,10 +19,6 @@ default:
 docker_buildenv:
   stage: build
   image: docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-      changes:
-        - .gitlab/Dockerfile
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
