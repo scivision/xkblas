@@ -35,8 +35,8 @@ include_directories("${XKRT_INCLUDE_DIRS}")
 target_link_libraries(${HEAT_NAME} PRIVATE ${XKRT_LIBRARIES})
 
 # Cuda kernels
-option(ENABLE_CU "Enable the compilation of cuda kernels" ON)
-if (ENABLE_CU)
+option(USE_CUDA "Enable the compilation of cuda kernels" ON)
+if (USE_CUDA)
     find_package(CUDA_RT REQUIRED)
     include_directories("${CUDA_RT_INCLUDE_DIRS}")
     target_link_libraries(${HEAT_NAME} PRIVATE ${CUDA_RT_LIBRARIES})
@@ -50,9 +50,19 @@ if (ENABLE_CU)
 endif()
 
 # Level Zero
-option(ENABLE_ZE "Enable the compilation of ze kernels" ON)
-if (ENABLE_ZE)
+option(USE_ZE "Enable the compilation of ze kernels" ON)
+if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
     target_link_libraries(${HEAT_NAME} PRIVATE ${ZE_LIBRARIES})
 endif()
+
+# SYCL
+option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero dri    ver" ON)
+if (USE_SYCL)
+    find_package(SYCL REQUIRED)
+    include_directories(${SYCL_INCLUDE_DIRS})
+    target_compile_options(${HEAT_NAME} PRIVATE -fsycl)
+    target_link_libraries(${HEAT_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
+endif()
+
