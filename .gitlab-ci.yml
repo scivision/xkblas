@@ -1,12 +1,8 @@
 stages:
   - build
+  - test
 
-build-job:
-  stage: build
-  script:
-    - echo "Hello, $GITLAB_USER_LOGIN!"i
-  tags:
-    - ci.inria.fr
-    - large
-    - linux
-    - v2025
+include:
+  - local: 'projects/xkrt/.gitlab-ci.yml'
+  # - local: 'projects/xkblas/.gitlab-ci.yml'
+  # - local: 'projects/xkbm/.gitlab-ci.yml'

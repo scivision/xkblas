@@ -87,7 +87,7 @@ target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_host)
 install(TARGETS ${XKRT}_driver_host LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 # CUDA
-option(USE_CUDA "Whether to build the CUDA driver." ON)
+option(USE_CUDA "Whether to build the CUDA driver." OFF)
 if (USE_CUDA)
 
     find_package(CUDA_DRIVER REQUIRED)
@@ -107,7 +107,7 @@ if (USE_CUDA)
 endif()
 
 # HIP
-option(USE_HIP "Whether to build the HIP driver." ON)
+option(USE_HIP "Whether to build the HIP driver." OFF)
 if (USE_HIP)
 
     find_package(HIP REQUIRED)
@@ -124,7 +124,7 @@ if (USE_HIP)
 endif()
 
 # Level Zero
-option(USE_ZE "Whether to build the Level Zero driver." ON)
+option(USE_ZE "Whether to build the Level Zero driver." OFF)
 if (USE_ZE)
 
     find_package(ZE REQUIRED)
@@ -138,7 +138,7 @@ if (USE_ZE)
 endif()
 
 # SYCL
-option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" ON)
+option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" OFF)
 if (USE_SYCL)
     find_package(SYCL REQUIRED)
     include_directories(${SYCL_INCLUDE_DIRS})
@@ -147,7 +147,7 @@ if (USE_SYCL)
 endif()
 
 # OpenCL
-option(USE_CL "Whether to build the OpenCL driver." ON)
+option(USE_CL "Whether to build the OpenCL driver." OFF)
 if (USE_CL)
 
     find_package(CL REQUIRED)

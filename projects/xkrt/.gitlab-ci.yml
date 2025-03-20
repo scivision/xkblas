@@ -1,0 +1,25 @@
+.build_template:
+  stage: build
+  tags:
+    - ci.inria.fr
+    - large
+    - linux
+    - v2025
+  script:
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+    - make -j
+  artifacts:
+    paths:
+      - build
+
+build-release:
+  extends: .build_template
+  variables:
+    BUILD_TYPE: "Release"
+
+build-debug:
+  extends: .build_template
+  variables:
+    BUILD_TYPE: "Debug"
+
