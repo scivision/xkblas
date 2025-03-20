@@ -1,9 +1,11 @@
 .build_template:
   stage: test
   script:
+    - cd "$CI_PROJECT_DIR/projects/xkrt/"
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
     - make -j
+    - cd "$CI_PROJECT_DIR"
   artifacts:
     paths:
       - build
