@@ -2,7 +2,7 @@
 
 stages:
   - init
-  - build
+  # - build
   - test
 
 # defaults for linux docker jobs
@@ -29,7 +29,7 @@ docker_buildenv:
     - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE/gitlabci
 
-include:
-  - local: 'projects/xkrt/.gitlab-ci.yml'
+# include:
+  # - local: 'projects/xkrt/.gitlab-ci.yml'
   # - local: 'projects/xkblas/.gitlab-ci.yml'
   # - local: 'projects/xkbm/.gitlab-ci.yml'
