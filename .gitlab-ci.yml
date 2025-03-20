@@ -5,6 +5,7 @@ stages:
 prerequisities-job:
   script:
     - apt-get install cmake
+  stage: build
 
 include:
   - local: 'projects/xkrt/.gitlab-ci.yml'
