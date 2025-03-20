@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 22:49:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 19:59:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -285,12 +285,23 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         }
 
         static inline void
+        __access_precedes(access_t * pred, access_t * succ)
+        {
+            pred->successors.push_back(succ);
+        }
+
+        static inline void
         precedence(access_t * pred, access_t * succ)
         {
             // succ must be a dependent task and have a wc != 0 at that point
             assert((succ->task->flags & TASK_FLAG_DEPENDENT) && TASK_DEP_INFO(succ->task)->wc > 0);
-            if (__task_precedes(pred->task, succ->task))
-                pred->successors.push_back(succ);
+
+            // avoid redundant edges
+            if (pred->successors.size() && pred->successors.back()->task == succ->task)
+                return ;
+
+            // set edge
+            __task_precedes(pred->task, succ->task, __access_precedes, pred, succ);
         }
 
         inline void
@@ -299,7 +310,6 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
             Search & search,
             const Cube & cube
         ) const {
-            (void) cube;
 
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);

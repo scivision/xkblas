@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 04:40:12 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 01:50:05 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 20:04:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -120,15 +120,7 @@ maybe_export(int step, TYPE * grid)
 
             static_assert(AC <= TASK_MAX_ACCESSES);
             access_t * accesses = TASK_ACCESSES(task, flags);
-            {
-                const ssize_t x0 = 0;
-                const ssize_t y0 = 0;
-                const ssize_t x1 = NX;
-                const ssize_t y1 = NY;
-                const  size_t sx = x1 - x0;
-                const  size_t sy = y1 - y0;
-                new(accesses + 0) access_t(task, MATRIX_COLMAJOR, grid, LD, x0, y0, sx, sy, sizeof(TYPE), ACCESS_MODE_R);
-            }
+            new(accesses + 0) access_t(task, MATRIX_COLMAJOR, grid, LD, 1, 1, NX-2, NY-2, sizeof(TYPE), ACCESS_MODE_R);
             thread->resolve<AC>(task, accesses);
             # undef AC
 
@@ -446,7 +438,7 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y, int step)
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr uint8_t ocr_access = 1;
+    constexpr uint8_t ocr_access = 0;
     new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -475,7 +467,6 @@ update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y, int step)
     }
     {
         const ssize_t x0 = MAX(x, 1);
-
         const ssize_t y0 = MAX(y, 1);
         const ssize_t x1 = MIN(x+TSX, NX-1);
         const ssize_t y1 = MIN(y+TSY, NY-1);
@@ -546,8 +537,8 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, NX, NY / ngpus, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, NX, NY / ngpus, sizeof(TYPE), 1, 1);
 
     uint64_t t0 = xkrt_get_nanotime();
 

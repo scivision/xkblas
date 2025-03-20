@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 22:28:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 19:52:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -186,6 +186,36 @@ class alignas(CACHE_LINE_SIZE) Thread
             __task_commit(task, F, args...);
         }
 
+
+        # ifndef NDEBUG
+        static void
+        dump_tasks(FILE * f, std::vector<task_t *> & tasks)
+        {
+            fprintf(f, "digraph G {\n");
+            for (task_t * & task : tasks)
+            {
+                if (task->flags & TASK_FLAG_DEPENDENT)
+                {
+                    task_dep_info_t * dep = TASK_DEP_INFO(task);
+                    access_t * accesses = TASK_ACCESSES(task);
+                    for (int i = 0 ; i < dep->ac ; ++i)
+                    {
+                        access_t * pred = accesses + i;
+                        fprintf(f, "    \"%p\" [label=\"%s - ac %d\"] ;\n", pred, task->label, i);
+                        for (access_t * succ : pred->successors)
+                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
+                    }
+                }
+            }
+            fprintf(f, "}\n");
+        }
+
+        void
+        dump_tasks(FILE * f)
+        {
+            Thread::dump_tasks(f, this->tasks);
+        }
+        # endif /* NDEBUG */
 };
 
 #endif /* __THREAD_HPP__ */

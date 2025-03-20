@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/27 22:35:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 18:43:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -67,7 +67,6 @@ extern "C" {
         size_t sizeof_type
     );
 
-    // TODO
     void xkrt_coherency_distribute_packed_2D_halo_async(
         xkrt_runtime_t * runtime,
         matrix_order_t order,

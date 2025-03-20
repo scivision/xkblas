@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 20:37:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 19:58:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -399,10 +399,15 @@ task_put_dependency_domain(task_t * task, DependencyDomain * domain)
     dom->domains.push_back(domain);
 }
 
-/* task task precedes the passed task */
-static inline int
-__task_precedes(task_t * pred, task_t * succ)
-{
+/* pred precedes succ - call 'F(args)' if 'pred' isnt completed yet in a lock region */
+template <typename... Args>
+static inline void
+__task_precedes(
+    task_t * pred,
+    task_t * succ,
+    void (*F)(Args...),
+    Args... args
+) {
     assert(pred);
     assert(succ);
     assert(pred->state.value >= TASK_STATE_ALLOCATED);
@@ -410,7 +415,6 @@ __task_precedes(task_t * pred, task_t * succ)
     assert(pred->flags & TASK_FLAG_DEPENDENT);
     assert(succ->flags & TASK_FLAG_DEPENDENT);
 
-    int r = 0;
     if (pred->state.value < TASK_STATE_COMPLETED)
     {
         SPINLOCK_LOCK(pred->state.lock);
@@ -419,12 +423,11 @@ __task_precedes(task_t * pred, task_t * succ)
             {
                 task_dep_info_t * sdep = TASK_DEP_INFO(succ);
                 sdep->wc.fetch_add(1, std::memory_order_seq_cst);
-                r = 1;
+                F(std::forward<Args>(args)...);
             }
         }
         SPINLOCK_UNLOCK(pred->state.lock);
     }
-    return r;
 }
 
 ////////////////////////////////////

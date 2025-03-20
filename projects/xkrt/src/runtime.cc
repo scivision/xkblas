@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:07:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 20:17:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -163,8 +163,7 @@ xkrt_sync(xkrt_runtime_t * runtime)
     assert(runtime);
     runtime->task_wait();
 
-# if 0
-# if !defined(NDEBUG)
+    # if 0
     // task dependency graph
     LOGGER_INFO("Exporting Dependency Tree...");
     Thread * thread = Thread::self();
@@ -172,8 +171,7 @@ xkrt_sync(xkrt_runtime_t * runtime)
     thread->dump_tasks(f);
     fclose(f);
     system("dot -Tpdf tasks.dot > tasks.pdf");
-# endif
-# endif
+    # endif
 
 # if 0
     LOGGER_INFO("Exporting memory tree...");
