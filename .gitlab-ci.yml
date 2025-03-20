@@ -1,4 +1,12 @@
+stages:
+  - build
+
 build-job:
   stage: build
   script:
-    - echo "Hello, $GITLAB_USER_LOGIN!"
+    - echo "Hello, $GITLAB_USER_LOGIN!"i
+  tags:
+    - ci.inria.fr
+    - large
+    - linux
+    - v2025
