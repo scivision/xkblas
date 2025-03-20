@@ -1,9 +1,8 @@
 # inspired from https://gitlab.inria.fr/gitlabci_gallery/pipelines/complete_cpp_example/-/blob/main/.gitlab-ci.yml?ref_type=heads
 
 stages:
-  - init
-  # - build
-  - test
+  - build
+  - test-build
 
 # defaults for linux docker jobs
 default:
@@ -17,7 +16,7 @@ default:
 
 # build the docker image used for tests
 docker_buildenv:
-  stage: init
+  stage: build
   image: docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
@@ -29,7 +28,7 @@ docker_buildenv:
     - docker build -t $CI_REGISTRY_IMAGE/gitlabci -f .gitlab/Dockerfile .
     - docker push $CI_REGISTRY_IMAGE/gitlabci
 
-# include:
-  # - local: 'projects/xkrt/.gitlab-ci.yml'
+include:
+  - local: 'projects/xkrt/.gitlab-ci.yml'
   # - local: 'projects/xkblas/.gitlab-ci.yml'
   # - local: 'projects/xkbm/.gitlab-ci.yml'
