@@ -1,10 +1,6 @@
 .build_template:
   stage: build
-  tags:
-    - ci.inria.fr
-    - large
-    - linux
-    - v2025
+  extends: .machine-cpu-only
   script:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..

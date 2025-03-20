@@ -2,7 +2,15 @@ stages:
   - build
   - test
 
+.machine-cpu-only:
+    tags:
+    - ci.inria.fr
+    - large
+    - linux
+    - v2025
+
 prerequisities-job:
+  extends: .machine-cpu-only
   script:
     - apt-get install cmake
   stage: build
