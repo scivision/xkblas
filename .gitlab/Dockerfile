@@ -9,3 +9,17 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
 
 RUN apk add bash clang cmake curl g++ gcc git jq make vim valgrind python3
 
+
+# Create a group and user
+RUN addgroup -S gitlab && adduser -S gitlab -G gitlab
+
+# Create a directory where ci jobs are performed
+RUN mkdir /builds && \
+    chown -R gitlab:gitlab /builds && \
+    chmod g+s /builds
+
+# default user
+USER gitlab
+
+# default working directory
+WORKDIR /builds
