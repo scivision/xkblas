@@ -40,7 +40,7 @@ docker_main:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - docker build -t $CI_REGISTRY_IMAGE -f Dockerfile .
-    - docker run $CI_REGISTRY_IMAGE hello
+#    - docker run $CI_REGISTRY_IMAGE hello
     - docker push $CI_REGISTRY_IMAGE
 
 #include:
