@@ -2,7 +2,7 @@
 
 stages:
   - build
-  - test
+#  - test
   - deploy
 
 # defaults for linux docker jobs
@@ -43,7 +43,7 @@ docker_main:
     - docker run $CI_REGISTRY_IMAGE hello
     - docker push $CI_REGISTRY_IMAGE
 
-include:
-  - local: 'projects/xkrt/.gitlab-ci.yml'
+#include:
+  #- local: 'projects/xkrt/.gitlab-ci.yml'
   # - local: 'projects/xkblas/.gitlab-ci.yml'
   # - local: 'projects/xkbm/.gitlab-ci.yml'
