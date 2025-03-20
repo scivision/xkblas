@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 19:33:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 01:47:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,10 +25,12 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
     size_t sizeof_type,
     size_t hx, size_t hy
 ) {
+    assert(runtime->drivers.devices.n >= 2);
+
     Thread * thread = Thread::self();
     assert(thread);
 
-    xkrt_device_global_id_t device_global_id = 0;
+    xkrt_device_global_id_t device_global_id = 1;
 
     // If there is only 1 device, just send one big access - which allows a
     // single buffer on the device with a LD large enough for all future tasks
@@ -76,7 +78,9 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
 
             runtime->task_commit(task);
 
-            device_global_id = (xkrt_device_global_id_t) ((device_global_id + 1) % runtime->drivers.devices.n);
+            ++device_global_id;
+            if (device_global_id == runtime->drivers.devices.n)
+                device_global_id = 1;
         }
     }
 }

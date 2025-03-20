@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/21 00:34:17 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 16:20:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/20 01:50:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -22,7 +22,7 @@
 #  define TYPE float
 
 /* Number of timesteps */
-#  define N_STEP 200
+#  define N_STEP 1000
 
 /* Number of vtk images to generate */
 #  define N_VTK MIN(0, N_STEP)
@@ -47,7 +47,7 @@
 /* Number of points per dimension in the grid */
 //#  define NX (16384)
 //#  define NX (32768+8192)
-#  define NX (256)
+#  define NX (4096)
 #  define NY NX
 
 /* Size of a cell (m) */
