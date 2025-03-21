@@ -162,6 +162,13 @@ team_create_recursive(void * vargs)
 
         // launch routine
         thread->state = XKRT_THREAD_INITIALIZED;
+
+        # if 0
+        // wait for all threads before starting
+        args->runtime->team_barrier<false>(team, NULL);
+        # endif
+
+        // starts
         void * r = args->team->desc.routine(team, thread);
 
         free(args);
@@ -310,6 +317,9 @@ worksteal(
     {
         const int victim_tid = get_ith_victim(tid, i, n);
         xkrt_thread_t * victim = team->priv.threads + victim_tid;
+        if (victim->state != XKRT_THREAD_INITIALIZED)
+            continue ;
+
         task_t * task = (victim_tid == tid) ? victim->deque.pop() : victim->deque.steal();
         if (task)
         {
