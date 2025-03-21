@@ -21,12 +21,6 @@ build-debug:
   variables:
     BUILD_TYPE: "Debug"
 
-build-release-stats:
-  extends: .build_template
-  variables:
-    BUILD_TYPE: "Release"
-    OPTIONS: "-DUSE_STATS=on"
-
 build-debug-stats:
   extends: .build_template
   variables:
