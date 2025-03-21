@@ -3,7 +3,7 @@
   script:
     - cd "$CI_PROJECT_DIR/projects/xkrt/"
     - mkdir build && cd build
-    - CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE $OPTIONS ..
+    - CC=clang-20 CXX=clang++-20 cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE $OPTIONS ..
     - make -j
     - make test
     - cd "$CI_PROJECT_DIR"
@@ -11,15 +11,15 @@
     paths:
       - build
 
-build-release:
-  extends: .build_template
-  variables:
-    BUILD_TYPE: "Release"
-
-build-debug:
-  extends: .build_template
-  variables:
-    BUILD_TYPE: "Debug"
+# build-release:
+#   extends: .build_template
+#   variables:
+#     BUILD_TYPE: "Release"
+# 
+# build-debug:
+#   extends: .build_template
+#   variables:
+#     BUILD_TYPE: "Debug"
 
 build-debug-stats:
   extends: .build_template

@@ -11,7 +11,7 @@ RUN apt-get install -y build-essential
 RUN apt-get install -y libc6-dev
 # RUN apt-get install -y linux-headers-$(uname -r)
 RUN apt-get install -y bash
-RUN apt-get install -y clang
+RUN apt-get install -y clang-20
 RUN apt-get install -y cmake
 RUN apt-get install -y curl
 RUN apt-get install -y g++ gcc
@@ -20,7 +20,7 @@ RUN apt-get install -y make cmake
 RUN apt-get install -y vim
 RUN apt-get install -y valgrind
 RUN apt-get install -y python3
-RUN apt-get install -y hwloc
+RUN apt-get install -y hwloc libhwloc-dev
 RUN apt-get install -y pkg-config
 # RUN apt-get install -y hwloc-nox
 RUN apt-get clean
