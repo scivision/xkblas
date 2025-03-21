@@ -4,24 +4,22 @@
 FROM ubuntu:20.04
 
 # Update and install necessary packages
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libc6-dev \
-    linux-headers-$(uname -r) \
-    bash \
-    clang \
-    cmake \
-    curl \
-    g++ \
-    gcc \
-    git \
-    make \
-    vim \
-    valgrind \
-    python3 \
-    hwloc \
-    hwloc-nox \
-    && apt-get clean
+RUN apt-get update
+RUN apt-get install -y build-essential
+RUN apt-get install -y libc6-dev
+RUN apt-get install -y linux-headers-$(uname -r)
+RUN apt-get install -y bash
+RUN apt-get install -y clang
+RUN apt-get install -y cmake
+RUN apt-get install -y curl
+RUN apt-get install -y g++ gcc
+RUN apt-get install -y git
+RUN apt-get install -y  make cmake
+RUN apt-get install -y vim
+RUN apt-get install -y valgrind
+RUN apt-get install -y python3
+RUN apt-get install -y hwloc hwloc-nox
+RUN apt-get clean
 
 # Create a group and user
 RUN groupadd -r gitlab && useradd -r -g gitlab gitlab
