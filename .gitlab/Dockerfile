@@ -21,7 +21,8 @@ RUN apt-get install -y make cmake
 RUN apt-get install -y vim
 RUN apt-get install -y valgrind
 RUN apt-get install -y python3
-RUN apt-get install -y hwloc hwloc-nox
+RUN apt-get install -y hwloc
+# RUN apt-get install -y hwloc-nox
 RUN apt-get clean
 
 # Create a group and user
