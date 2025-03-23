@@ -61,7 +61,7 @@ if (USE_ZE)
 endif()
 
 # SYCL
-option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero dri    ver" ON)
+option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" ON)
 if (USE_SYCL)
     find_package(SYCL REQUIRED)
     include_directories(${SYCL_INCLUDE_DIRS})

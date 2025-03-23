@@ -18,7 +18,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
     #  ${CMAKE_SOURCE_DIR}/src/cuda/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/hwloc/benchmarks.cc
-  # ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
+    ${CMAKE_SOURCE_DIR}/src/ze/benchmarks.cc
     ${CMAKE_SOURCE_DIR}/src/xkrt/benchmarks.cc
   # ${CMAKE_SOURCE_DIR}/src/aml/benchmarks.cc
 )
@@ -75,10 +75,11 @@ if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
     target_link_libraries(${XKBM} PRIVATE ${ZE_LIBRARIES})
+    target_compile_options(${XKBM} PRIVATE -fsycl)
 endif()
 
 # AML
-option(USE_AML "Whether to build AML benchs." ON)
+option(USE_AML "Whether to build AML benchs." OFF)
 if (USE_AML)
     find_package(AML REQUIRED)
     find_package(EXCIT REQUIRED)
