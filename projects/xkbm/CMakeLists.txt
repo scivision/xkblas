@@ -12,7 +12,6 @@ project(${XKBM})
 ###############
 
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/include/xkbm/xkbm-version-always-run.h
     ${CMAKE_SOURCE_DIR}/src/main.cc
     ${CMAKE_SOURCE_DIR}/src/benchmark.cc
     ${CMAKE_SOURCE_DIR}/src/allocator.cc
@@ -27,11 +26,11 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 # XKBM version
 add_custom_command(
-    OUTPUT
-        ${CMAKE_SOURCE_DIR}/include/xkbm/xkbm-version-always-run.h # set invalid name so its always generated
-    COMMAND
-        python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkbm xkbm-version
+    OUTPUT  always-run
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkbm xkbm-version
+    COMMENT "Always generate version/support file before building the project"
 )
+add_custom_target(always_generate_files ALL DEPENDS always-run)
 
 ########
 # XKBM #
@@ -39,6 +38,7 @@ add_custom_command(
 
 # XKBM Lib
 add_executable(${XKBM} ${SOURCE_FILES})
+add_dependencies(${XKBM} always_generate_files)
 
 # Include directory
 include_directories(include/)
