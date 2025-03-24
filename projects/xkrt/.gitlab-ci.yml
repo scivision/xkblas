@@ -11,15 +11,15 @@
     paths:
       - build
 
-build-release:
-  extends: .build_template
-  variables:
-    BUILD_TYPE: "Release"
-
-build-debug:
-  extends: .build_template
-  variables:
-    BUILD_TYPE: "Debug"
+# build-release:
+#   extends: .build_template
+#   variables:
+#     BUILD_TYPE: "Release"
+# 
+# build-debug:
+#   extends: .build_template
+#   variables:
+#     BUILD_TYPE: "Debug"
 
 build-debug-stats:
   extends: .build_template

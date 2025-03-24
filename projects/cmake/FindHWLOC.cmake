@@ -17,8 +17,13 @@
 #  HWLOC_LIBRARIES          The HWLOC library
 #  HWLOC_INCLUDE_DIRS       The location of HWLOC headers
 
-find_library(HWLOC_LIBRARIES NAMES libhwloc.so)
-find_path(HWLOC_INCLUDE_DIRS NAMES hwloc.h)
+find_library(
+    HWLOC_LIBRARIES NAMES libhwloc.so
+)
+
+find_path(
+    HWLOC_INCLUDE_DIRS NAMES hwloc.h
+)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HWLOC DEFAULT_MSG
@@ -30,3 +35,4 @@ mark_as_advanced(
     HWLOC_LIBRARIES
     HWLOC_INCLUDE_DIRS
 )
+
