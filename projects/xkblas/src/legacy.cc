@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:36:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/24 21:59:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,12 +29,14 @@ xkblas_set_modemath(xkblas_mode_math_t mode)
 
 extern "C"
 int
-xkblas_get_ngpus(int * count)
+xkblas_get_ngpus(void)
 {
     xkblas_context_t * context = xkblas_context_get();
     assert(context);
 
-    return xkrt_get_ndevices(&(context->runtime), count);
+    int count = 0;
+    xkrt_get_ndevices(&(context->runtime), &count);
+    return count;
 }
 
 extern "C"
