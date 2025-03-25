@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 18:43:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/24 22:17:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -119,6 +119,15 @@ extern "C" {
 
     /* see cudaHostUnregister */
     int xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, uint64_t size);
+
+    /* see cudaHostRegister */
+    int xkrt_memory_register_async(xkrt_runtime_t * runtime, void * ptr, uint64_t size);
+
+    /* see cudaHostUnregister */
+    int xkrt_memory_unregister_async(xkrt_runtime_t * runtime, void * ptr, uint64_t size);
+
+    /* see cudaHostUnregister */
+    int xkrt_memory_register_waitall(xkrt_runtime_t * runtime);
 
 };
 

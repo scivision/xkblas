@@ -5,11 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/02/26 05:05:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/24 22:16:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
+
+# include <xkrt/logger/todo.h>
+# pragma message(TODO "Replace uint64_t with size_t")
 
 # include <xkrt/runtime.h>
 

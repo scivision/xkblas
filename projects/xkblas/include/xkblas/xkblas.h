@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:03:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/24 22:00:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -66,7 +66,7 @@ extern "C" {
     int xkblas_unregister_memory(void * ptr, uint64_t sz);
     int xkblas_register_memory_waitall(void);
 
-    int xkblas_get_ngpus(int * count);
+    int xkblas_get_ngpus(void);
 
     //////////////////////////////////
     // DEPRECATED LEGACY INTERFACES //
