@@ -10,9 +10,14 @@ list(APPEND GENERATED_SOURCES
   stesting_gemm.c stesting_trsm.c stesting_trmm.c stesting_symm.c stesting_syrk.c stesting_syr2k.c splgsy.c stesting_auxiliary.h stesting_auxiliary.c
   dtesting_gemm.c dtesting_trsm.c dtesting_trmm.c dtesting_symm.c dtesting_syrk.c dtesting_syr2k.c dplgsy.c dtesting_auxiliary.h dtesting_auxiliary.c
   ctesting_gemm.c ctesting_trsm.c ctesting_trmm.c ctesting_hemm.c ctesting_symm.c ctesting_syrk.c ctesting_syr2k.c ctesting_herk.c ctesting_her2k.c cplghe.c cplgsy.c ctesting_auxiliary.h ctesting_auxiliary.c
-  stesting_copyscale.c dtesting_copyscale.c ctesting_copyscale.c
-  stesting_mumps_like.c dtesting_mumps_like.c ctesting_mumps_like.c 
-) 
+)
+
+if(XKBLAS_BUILD_COPYSCALE)
+	list(APPEND GENERATED_SOURCES 
+  	stesting_copyscale.c dtesting_copyscale.c ctesting_copyscale.c
+  	stesting_mumps_like.c dtesting_mumps_like.c ctesting_mumps_like.c 
+	)
+endif()	
 
 
 foreach(file IN LISTS GENERATED_SOURCES)
@@ -39,12 +44,14 @@ set(SOURCES_TESTING_Z
   ztesting_syr2k.c
   ztesting_herk.c
   ztesting_her2k.c
-  ztesting_copyscale.c
-  ztesting_mumps_like.c
   zplghe.c
   zplgsy.c
   ztesting_auxiliary.h ztesting_auxiliary.c
   )
+
+if(XKBLAS_BUILD_COPYSCALE)
+				list(APPEND SOURCES_TESTING_Z ztesting_copyscale.c ztesting_mumps_like.c)
+endif()
 
 add_executable(ztesting ${SOURCES_TESTING_Z})
 target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z=1 -UPRECISION_c) 
@@ -62,12 +69,14 @@ set(SOURCES_TESTING_C
   ctesting_syr2k.c
   ctesting_herk.c
   ctesting_her2k.c
-  ctesting_copyscale.c
-  ctesting_mumps_like.c
   cplghe.c
   cplgsy.c
   ctesting_auxiliary.h ctesting_auxiliary.c
   )
+
+if(XKBLAS_BUILD_COPYSCALE)
+				list(APPEND SOURCES_TESTING_C ctesting_copyscale.c ctesting_mumps_like.c)
+endif()
 
 add_executable(ctesting ${SOURCES_TESTING_C})
 target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c=1) 
@@ -82,11 +91,13 @@ set(SOURCES_TESTING_D
   dtesting_symm.c
   dtesting_syrk.c
   dtesting_syr2k.c
-  dtesting_copyscale.c
-  dtesting_mumps_like.c
   dplgsy.c
   dtesting_auxiliary.h dtesting_auxiliary.c
   )
+
+if(XKBLAS_BUILD_COPYSCALE)
+				list(APPEND SOURCES_TESTING_D dtesting_copyscale.c dtesting_mumps_like.c)
+endif()
 
 add_executable(dtesting ${SOURCES_TESTING_D})
 target_compile_options(dtesting PUBLIC -DPRECISION_d=1 -UPRECISION_s -UPRECISION_z -UPRECISION_c) 
@@ -102,11 +113,13 @@ set(SOURCES_TESTING_S
   stesting_symm.c
   stesting_syrk.c
   stesting_syr2k.c
-  stesting_copyscale.c
-  stesting_mumps_like.c
   splgsy.c
   stesting_auxiliary.h stesting_auxiliary.c
   )
+
+if(XKBLAS_BUILD_COPYSCALE)
+				list(APPEND SOURCES_TESTING_S stesting_copyscale.c stesting_mumps_like.c)
+endif()
 
 add_executable(stesting ${SOURCES_TESTING_S})
 target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION_z -UPRECISION_c) 
