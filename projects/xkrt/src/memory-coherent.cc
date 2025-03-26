@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:07:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 05:16:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -99,55 +99,93 @@ xkrt_coherency_host_async(
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
     /* create one task per conflict responsible to fetch that chunk */
-    # define AC 4
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t);
 
     for (access_t * & conflict : conflicts)
     {
-        task_t * task = thread->allocate_task(task_size + args_size);
-        new(task) task_t(TASK_FORMAT_NULL, flags);
+        assert(access.host_view.ld          == conflict->host_view.ld);
+        assert(access.host_view.sizeof_type == conflict->host_view.sizeof_type);
+
+        task_t * task;
+
+        # pragma message(TODO "How to test if 2 BLAS matrices are included in one-another ?")
+        // if the conflict is included in the passed access, just setup 1 copy
+        // access (fast way out)
+        // if (access.host_view.includes(conflict->host_view))
+        if (access.host_view.equals(conflict->host_view))
+        {
+            # define AC 1
+
+            constexpr size_t task_size = task_compute_size(flags, AC);
+            task = thread->allocate_task(task_size + args_size);
+            new(task) task_t(TASK_FORMAT_NULL, flags);
+
+            task_dev_info_t * dev = TASK_DEV_INFO(task);
+            new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+            args_t * args = (args_t *) TASK_ARGS(task, task_size);
+            new (args) args_t(runtime);
+
+            access_t * access = TASK_ACCESSES(task, flags);
+
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(AC);
+            new (access) access_t(task, conflict, ACCESS_MODE_R);
+            deptree->precedence(conflict, access);
+
+            // insert for future tasks dependencies
+            thread->insert<AC>(task, access);
+
+            # undef AC
+        }
+        // else, compute the 4 potential cubes
+        else
+        {
+            # define AC 4
+            constexpr size_t task_size = task_compute_size(flags, AC);
+            task = thread->allocate_task(task_size + args_size);
+            new(task) task_t(TASK_FORMAT_NULL, flags);
+
+            task_dev_info_t * dev = TASK_DEV_INFO(task);
+            new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+            args_t * args = (args_t *) TASK_ARGS(task, task_size);
+            new (args) args_t(runtime);
+
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(AC);
+
+            // setup the 4 accesses resulsting from the intersection of 'access' and 'conflict'
+            access_t * accesses = TASK_ACCESSES(task, flags);
+
+            for (int i = 0 ; i < 2 ; ++i)
+            {
+                for (int j = 0 ; j < 2 ; ++j)
+                {
+                    Cube cube;
+                    access_t::Cube::intersection(&cube, access.cubes[i], conflict->cubes[j]);
+                    const int k = i * 2 + j;
+                    new (accesses + k) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
+                    if (!cube.is_empty())
+                        deptree->precedence(conflict, accesses + i);
+                }
+            }
+
+            // insert for future tasks dependencies
+            thread->insert<AC>(task, accesses);
+
+            # undef AC
+        }
+
+        // commit the task
+        runtime->task_commit(task);
 
         #ifndef NDEBUG
         strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
         #endif /* NDEBUG */
 
-        task_dep_info_t * dep = TASK_DEP_INFO(task);
-        new (dep) task_dep_info_t(AC);
-
-        task_dev_info_t * dev = TASK_DEV_INFO(task);
-        new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
-
-        args_t * args = (args_t *) TASK_ARGS(task, task_size);
-        new (args) args_t(runtime);
-
-        // setup the two accesses resulsting from the intersection of 'access' and 'conflict'
-        access_t * accesses = TASK_ACCESSES(task, flags);
-
-        // compute the 4 potential cubes
-        assert(access.host_view.ld          == conflict->host_view.ld);
-        assert(access.host_view.sizeof_type == conflict->host_view.sizeof_type);
-        for (int i = 0 ; i < 2 ; ++i)
-        {
-            for (int j = 0 ; j < 2 ; ++j)
-            {
-                Cube cube;
-                access_t::Cube::intersection(&cube, access.cubes[i], conflict->cubes[j]);
-                const int k = i * 2 + j;
-                new (accesses + k) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
-                if (!cube.is_empty())
-                    deptree->precedence(conflict, accesses + i);
-            }
-        }
-
-        // insert for future tasks dependencies
-        thread->insert<4>(task, accesses);
-
-        // commit the task
-        runtime->task_commit(task);
     }
-    # undef AC
 
     # endif
 }

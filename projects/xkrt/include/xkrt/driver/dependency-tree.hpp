@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 19:59:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 05:02:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -329,10 +329,13 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
                 case (Search::Type::SEARCH_TYPE_CONFLICTING):
                 {
-                    if (node->last_write)
+                    access_t * access = node->last_write;
+                    if (access)
                     {
                         assert(search.conflicts);
-                        search.conflicts->push_back(node->last_write);
+                        if (search.conflicts->size() && search.conflicts->back() == access)
+                            return ;
+                        search.conflicts->push_back(access);
                     }
 
                     break ;

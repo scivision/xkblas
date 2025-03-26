@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 00:06:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 04:52:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -318,6 +318,29 @@ class access_t
                 new (this->cubes + 0) Cube(cube);
             }
         }
+
+        access_t(
+            task_t * task,
+            const access_t * other,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) :
+            access_t(
+                task,
+                other->host_view.order,
+                (void *) other->host_view.addr,
+                other->host_view.ld,
+                other->host_view.offset_m,
+                other->host_view.offset_n,
+                other->host_view.m,
+                other->host_view.n,
+                other->host_view.sizeof_type,
+                mode,
+                concurrency,
+                scope
+            )
+        {}
 
         ~access_t() {}
 };

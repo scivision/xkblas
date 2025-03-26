@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 00:16:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 04:29:28 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -758,7 +758,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         fetch_list_reduce(fetch_list_t * list)
         {
             /* fast way out */
-            if (list->n == 1)
+            if (list->n <= 1)
                 return ;
 
             /* array of 'n' fetches */
