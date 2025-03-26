@@ -130,7 +130,7 @@ if (${CUDA_DRIVER_FOUND})
 endif()
 
 if (${CUDA_RT_FOUND})
-  include_directories(${CUDA_RT_INCLUDE_DIRS})
+				include_directories(${CUDA_RT_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
 endif()
 
