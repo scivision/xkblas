@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:12:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/25 23:55:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -162,6 +162,30 @@ typedef struct  matrix_tile_t
                     (((size_t)this->offset_m + this->m) * this->sizeof_type);
         }
         abort();
+    }
+
+    /**
+     *  Merge the two matrix tiles m1 and m2 so that m1 := m1 u m2 - where m1 == this
+     *
+     * in:
+     *  --------------------
+     *  | m1 |     m2      |
+     *  --------------------
+     * out:
+     *  --------------------
+     *  |        m1        |
+     *  --------------------
+     */
+    inline void
+    merge(matrix_tile_t & m2)
+    {
+        assert(this->order       == m2.order);
+        assert(this->ld          == m2.ld);
+        assert(this->addr        <  m2.addr);
+        assert(this->sizeof_type == m2.sizeof_type);
+        assert(this->end_addr()  <= m2.begin_addr());
+        this->m += m2.m;
+        this->n += m2.n;
     }
 
 }               matrix_tile_t;

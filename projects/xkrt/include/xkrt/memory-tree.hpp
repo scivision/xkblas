@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 22:45:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 00:16:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,6 +32,7 @@
 # include <algorithm>  // std::sort
 # include <cstdint>
 # include <functional>
+# include <numeric> // std::iota
 
 /*
  *  Set to '1' to enable the following heuristic :
@@ -433,47 +434,6 @@ class KMemoryTreeNodeSearch {
                     return this->partites[j];
                 }
 
-                inline memory_view_t
-                create_host_view(
-                    const size_t ld,
-                    const size_t sizeof_type,
-                    const std::vector<size_t> sorted_partition_indices
-                ) const {
-
-                    const Partite & p0 = this->partites[sorted_partition_indices[0]];
-                    const Partite & pf = this->partites[sorted_partition_indices[this->partites.size() - 1]];
-                    assert(p0 < pf);
-
-                    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) p0.cube[ACCESS_CUBE_ROW_DIM].a;
-                    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) pf.cube[ACCESS_CUBE_ROW_DIM].b;
-                    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) p0.cube[ACCESS_CUBE_COL_DIM].a;
-                    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) pf.cube[ACCESS_CUBE_COL_DIM].b;
-                    assert(0 <= x0 && x0 <= ld * sizeof_type);
-                    assert(0 <= xf && xf <= ld * sizeof_type);
-                    assert(y0 < yf);
-
-                    INTERVAL_DIFF_TYPE_T n = yf - y0;
-                    INTERVAL_DIFF_TYPE_T m = xf - x0;
-                    if (m < 0)
-                    {
-                        m += ld * sizeof_type;
-                        n -= 1;
-                    }
-                    m = m / sizeof_type;
-
-                    memory_view_t host_view;
-                    host_view.order        = MATRIX_COLMAJOR;
-                    host_view.addr         = x0 + y0 * ld * sizeof_type;
-                    host_view.ld           = ld;
-                    host_view.offset_m     = 0;
-                    host_view.offset_n     = 0;
-                    host_view.m            = (size_t) m;
-                    host_view.n            = (size_t) n;
-                    host_view.sizeof_type  = sizeof_type;
-
-                    return host_view;
-                }
-
         }; /* Partition */
 
    public:
@@ -722,8 +682,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
         typedef struct  fetch_t
         {
-            /* logical cubes representing that fetch */
-            std::vector<Cube> cubes;
+            /* the logical cubes representing that fetch */
+            Cube cubes[2];
 
             /* the host memory view */
             memory_view_t host_view;
@@ -742,6 +702,9 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             /* dst view */
             memory_replicate_view_t dst_view;
+
+            /* whether this fetch had been merged, and can therefore be skipped */
+            bool merged;
 
         }               fetch_t;
 
@@ -771,7 +734,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 fetch_t * fetch = this->fetches + this->n;
                 ++this->n;
                 assert(this->n <= this->capacity);
-                new (fetch) fetch_t();
                 return fetch;
             }
 
@@ -791,6 +753,80 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             }
         }               fetch_list_t;
 
+        /* if merging is enabled, merge consecutive transfers to a single transfer */
+        static inline void
+        fetch_list_reduce(fetch_list_t * list)
+        {
+            /* fast way out */
+            if (list->n == 1)
+                return ;
+
+            /* array of 'n' fetches */
+            fetch_t * fetches = (fetch_t *) (list + 1);
+
+            /* create vector [0, 1, ..., n-1] */
+            std::vector<int> indices(list->n);
+            std::iota(indices.begin(), indices.end(), 0);
+
+            /* sort the vector so fetches[indices[i]] < fetches[indices[i+1]] */
+            std::sort(
+                std::begin(indices),
+                std::end(indices),
+                [fetches](size_t i, size_t j) {
+                    assert(i != j);
+                    const fetch_t * fi = fetches + i;
+                    const fetch_t * fj = fetches + j;
+                    return fi->host_view.begin_addr() < fj->host_view.begin_addr();
+                }
+            );
+
+            # pragma message(TODO "Remove the `fetch->merged` flag and instead, memmove() the `fetch` and shrink 'fetch_list->n'")
+
+            // TODO : optimize me, impl is terrible
+
+            /* find continuous fetches and merge them */
+            size_t i = 0;
+            fetch_t * fi = fetches + indices[i];
+            assert(fi->merged == false);
+
+            for (size_t j = 1 ; j < list->n ; ++j)
+            {
+                fetch_t * fj = fetches + indices[j];
+
+                /* if we can merge j-th to i-th */
+                if (    fi->src_device_global_id                == fj->src_device_global_id                 &&
+                        fi->dst_device_global_id                == fj->dst_device_global_id                 &&
+                        fi->dst_chunk                           == fj->dst_chunk                            &&
+                        fj->src_view.addr - fi->src_view.addr   == fj->dst_view.addr - fi->dst_view.addr
+                ) {
+                    /* nothing to do yet, keep incrementing 'j' */
+                    fj->merged = true;
+
+                    /* merge the two cubes to a single memory_view */
+                    assert(!fi->cubes[0].is_empty());
+                    assert(!fj->cubes[0].is_empty());
+                    assert( fi->cubes[1].is_empty());
+                    assert( fj->cubes[1].is_empty());
+                    memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fj->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
+
+                    /* copy the second cube */
+                    fi->cubes[1] = fj->cubes[0];
+                    // memory_view_to_cubes<K>(fi->host_view, fi->cubes);
+
+                    # pragma message(TODO "Lots of back and forth on that counter, should be set only once when fully done")
+                    list->fetched();
+                }
+                /* else */
+                else
+                {
+                    /* i := j */
+                    i = j;
+                    fi = fj;
+                    assert(fi->merged == false);
+                }
+            }
+        }
+
         static inline void
         fetch_callback_task(
             xkrt_runtime_t * runtime,
@@ -799,6 +835,15 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         ) {
             LOGGER_DEBUG("task `%s` fetched `%p`", task->label, (void *) (fetch->dst_chunk ? fetch->dst_chunk->ptr : NULL));
             __task_fetched(1, task, xkrt_device_task_submit, runtime, fetch->dst_device_global_id);
+        }
+
+        static inline fetch_list_t *
+        fetch_list_new(KMemoryTree * tree, size_t capacity)
+        {
+            fetch_list_t * list = (fetch_list_t *) calloc(1, sizeof(fetch_list_t) + capacity * sizeof(fetch_t));
+            assert(list);
+            new (list) fetch_list_t(tree, (fetch_t *) (list + 1), capacity);
+            return list;
         }
 
         static void
@@ -840,8 +885,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 search.prepare_search_awaiting(fetch->dst_chunk);
                 tree->lock();
                 {
-                    for (Cube & cube : fetch->cubes)
-                        tree->intersect(search, cube);
+                    tree->intersect(search, fetch->cubes[0]);
+                    tree->intersect(search, fetch->cubes[1]);
                 }
                 tree->unlock();
 
@@ -853,11 +898,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 size_t nforwards = search.awaiting.forwards.size();
                 if (nforwards)
                 {
-                    fetch_list_t * forward_list = (fetch_list_t *) malloc(sizeof(fetch_list_t) + nforwards * sizeof(fetch_t));
-                    assert(forward_list);
-
-                    new (forward_list) fetch_list_t(tree, (fetch_t *) (forward_list + 1), nforwards);
-                    forward_list->fetching();
+                    fetch_list_t * forward_list = fetch_list_new(tree, nforwards);
 
                     # pragma message(TODO "Forwards consecutive in memory should be merged")
                     for (size_t i = 0 ; i < nforwards ; ++i)
@@ -873,7 +914,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         forward_list->fetching();
 
                         // upcoming copy only needs m, n, sizeof_type
-                        memory_view_from_cube(&forward_fetch->host_view, forward.dst_cube, tree->ld, tree->sizeof_type);
+                        memory_view_from_cube(forward_fetch->host_view, forward.dst_cube, tree->ld, tree->sizeof_type);
 
                         // the chunk to use
                         forward_fetch->dst_chunk = forward.chunk;
@@ -885,11 +926,17 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         forward_fetch->dst_view = forward.device_view;
 
                         // only 1 cube representing the forward view
-                        forward_fetch->cubes.push_back(forward.dst_cube);
+                        forward_fetch->cubes[0] = forward.dst_cube;
 
                         // the just-fetched 'dst' is the new 'src'
                         forward_fetch->src_device_global_id = fetch->dst_device_global_id;
 
+                        // this fetch maybe got a larger region than the one to forward, for instance
+                        //      fetch->dst = [                                                      ]
+                        //  while maybe
+                        //    forward->dst =                    [                   ]
+                        // in such case, we only need to forward the sub-region.
+                        //
                         // the just-fetched 'dst' is the new 'src' - offset it to the begining of the forward view
                         assert(fetch->host_view.begin_addr() <= forward_fetch->host_view.begin_addr());
                         const size_t offset = forward_fetch->host_view.begin_addr() - fetch->host_view.begin_addr();
@@ -897,6 +944,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                         // can launch the forward already
                         tree->fetch_list_launch_ith(forward.task, forward_list, i);
+
+                        // no need to reduce the list, we already have only 1 copy per dst device
                     }
                 }
             }
@@ -914,83 +963,11 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             Partition & partition
         ) {
             size_t capacity = partition.partites.size();
-            fetch_list_t * list = (fetch_list_t *) malloc(sizeof(fetch_list_t) + capacity * sizeof(fetch_t));
+            if (capacity == 0)
+                return NULL;
+
+            fetch_list_t * list = fetch_list_new(this, capacity);
             assert(list);
-
-            new (list) fetch_list_t(this, (fetch_t *) (list + 1), capacity);
-
-            # pragma message(TODO "The current heuristic only merges if ALL partites are consecutive on the same devices, and all must be fetched, to a single fetch")
-
-            /* if transfers merge is enabled */
-            if (this->merge_transfers)
-            {
-                if (capacity > 1)
-                {
-                    bool merge_to_a_single_fetch = true;
-
-                    std::vector<size_t> partition_indices(capacity);
-                    for (size_t i = 0 ; i < capacity ; ++i)
-                        partition_indices[i] = i;
-
-                    std::sort(
-                        std::begin(partition_indices),
-                        std::end(partition_indices),
-                        [partition](size_t i, size_t j) {
-                            assert(i != j);
-                            return partition.partites[i] < partition.partites[j];
-                        }
-                    );
-                    for (size_t i = 0 ; i < capacity - 1 ; ++i)
-                    {
-                        Partite & pi = partition.partites[i];
-
-                        size_t j = i + 1;
-                        Partite & pj = partition.partites[j];
-
-                        if (    pi.must_fetch               == false                        ||
-                                pi.src_device_global_id     != pj.src_device_global_id      ||
-                                pi.dst_device_global_id     != pj.dst_device_global_id      ||
-                                pi.src_chunk                != pj.src_chunk
-                        ) {
-                            merge_to_a_single_fetch = false;
-                            break ;
-                        }
-                    }
-
-                    /* can be merged to a single fetch */
-                    if (merge_to_a_single_fetch)
-                    {
-                        Partite & p0 = partition.partites[0];
-
-                        /* set the views */
-                        const memory_view_t host_view = partition.create_host_view(this->ld, this->sizeof_type, partition_indices);
-                        const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
-                        const memory_replicate_view_t dst_view = (p0.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.dst_view;
-                        const memory_replicate_view_t src_view = (p0.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : p0.src_view;
-
-                        /* allocate fetch info for the callback argument */
-                        fetch_t * fetch = list->prepare_next_fetch();
-                        fetch->host_view            = host_view;
-                        fetch->src_device_global_id = p0.src_device_global_id;
-                        fetch->src_view             = src_view;
-                        fetch->dst_chunk            = partition.chunk;
-                        fetch->dst_device_global_id = p0.dst_device_global_id;
-                        fetch->dst_view             = dst_view;
-
-                        # pragma message(TODO "Here, we could minimize the number of cubes in the logical view")
-                        for (Partite & partite : partition.partites)
-                            fetch->cubes.push_back(partite.cube);
-
-                        list->fetching();
-                        return list;
-                    }
-                    else
-                    {
-                        /* cannot be merged, fallback to default case */
-                    }
-
-                } /* only 1 partite anyway */
-            } /* if enabled transfers merging */
 
             for (Partite & partite : partition.partites)
             {
@@ -1003,14 +980,14 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                 /* set the views */
                 memory_view_t host_view;
-                memory_view_from_cube(&host_view, partite.cube, this->ld, this->sizeof_type);
+                memory_view_from_cube(host_view, partite.cube, this->ld, this->sizeof_type);
                 const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
                 const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
                 const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
 
                 /* allocate fetch info for the callback argument */
                 fetch_t * fetch = list->prepare_next_fetch();
-                fetch->cubes.push_back(partite.cube);
+                fetch->cubes[0]             = partite.cube;
                 fetch->host_view            = host_view;
                 fetch->src_device_global_id = partite.src_device_global_id;
                 fetch->src_view             = src_view;
@@ -1020,6 +997,9 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                 list->fetching();
             }
+
+            if (this->merge_transfers)
+                this->fetch_list_reduce(list);
 
             return list;
         }
@@ -1458,7 +1438,7 @@ next_view:
                         assert(src_replicate.nallocations > 0);
                         assert(src_replicate.valid);
 
-                        # pragma message(TODO "Instead of getting the first valid, maybe try to get the LARGEST valid, so we maximize chances to merge with future allocations (the logic is not implemented yet, though)")
+                        # pragma message(TODO "Instead of getting the first valid, maybe get the LARGEST valid, so we maximize odds to merge with future allocations (the logic is not implemented yet, though)")
                         memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
                         assert(src_replicate.valid & (1 << src_allocation_view_id));
                         assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
@@ -1489,7 +1469,6 @@ next_view:
 
                         // TODO : maybe there is several fetching alloc ?
                         // in such case, which one to pick ? currently select the first one
-
                         memory_allocation_view_id_t fetching_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(fetching_replicate.fetching) - 1);
                         assert(0 <= fetching_allocation_view_id && fetching_allocation_view_id < fetching_replicate.nallocations);
                         assert(fetching_replicate.fetching & (1 << fetching_allocation_view_id));
@@ -1580,9 +1559,14 @@ next_view:
             size_t i
         ) {
             assert(task);
+            assert(i >= 0);
+            assert(i < list->n);
+            assert(i < list->capacity);
 
-            assert(i >= 0 && i < list->n);
+            /* retrieve the fetch, and cancel if it got merged */
             fetch_t * fetch = list->fetches + i;
+            if (fetch->merged)
+                return ;
 
             /* callback setup */
             assert(XKRT_CALLBACK_ARGS_MAX >= 4);
@@ -1712,7 +1696,7 @@ next_view:
             // if there is fetch to perform, launch them
             if (list)
             {
-                __task_fetching(list->n, task);
+                __task_fetching(list->pending, task);
                 this->fetch_list_launch(task, list);
             }
         }

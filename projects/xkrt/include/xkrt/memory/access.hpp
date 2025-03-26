@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 22:41:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/26 00:06:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,11 +38,12 @@ struct task_t;
 template<int K>
 static inline void
 memory_view_from_cube(
-    memory_view_t * view,
+    memory_view_t & view,
     const KCube<K> & cube,
     const size_t ld,
     const size_t sizeof_type
 ) {
+    static_assert(K == 2);
 
     const INTERVAL_TYPE_T       x = cube[ACCESS_CUBE_ROW_DIM].a;
     const INTERVAL_DIFF_TYPE_T dx = cube[ACCESS_CUBE_ROW_DIM].length();
@@ -51,17 +52,140 @@ memory_view_from_cube(
     assert(dx > 0);
     assert(dy > 0);
 
-    view->order         = MATRIX_COLMAJOR;
-    view->addr          = x + y * ld * sizeof_type;
-    view->ld            = ld;
-    view->offset_m      = 0;
-    view->offset_n      = 0;
-    view->m             = dx / sizeof_type;
-    view->n             = dy;
-    view->sizeof_type   = sizeof_type;
+    view.order         = MATRIX_COLMAJOR;
+    view.addr          = x + y * ld * sizeof_type;
+    view.ld            = ld;
+    view.offset_m      = 0;
+    view.offset_n      = 0;
+    view.m             = dx / sizeof_type;
+    view.n             = dy;
+    view.sizeof_type   = sizeof_type;
 
     // accesses must be aligned on sizeof(type)
-    assert(view->m * sizeof_type == dx);
+    assert(view.m * sizeof_type == dx);
+}
+
+template<int K>
+static inline void
+memory_view_from_cubes(
+    memory_view_t & view,
+    const KCube<K> & cube0,
+    const KCube<K> & cube1,
+    const size_t ld,
+    const size_t sizeof_type
+) {
+    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) cube0[ACCESS_CUBE_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_ROW_DIM].b;
+    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) cube0[ACCESS_CUBE_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_COL_DIM].b;
+    assert(0 <= x0 && x0 <= ld * sizeof_type);
+    assert(0 <= xf && xf <= ld * sizeof_type);
+    assert(y0 < yf);
+
+    INTERVAL_DIFF_TYPE_T n = yf - y0;
+    INTERVAL_DIFF_TYPE_T m = xf - x0;
+    if (m < 0)
+    {
+        m += ld * sizeof_type;
+        n -= 1;
+    }
+    m = m / sizeof_type;
+
+    view.order        = MATRIX_COLMAJOR;
+    view.addr         = x0 + y0 * ld * sizeof_type;
+    view.ld           = ld;
+    view.offset_m     = 0;
+    view.offset_n     = 0;
+    view.m            = (size_t) m;
+    view.n            = (size_t) n;
+    view.sizeof_type  = sizeof_type;
+}
+
+template<int K>
+static inline void
+memory_view_to_cubes(
+    const memory_view_t & view,
+    KCube<K> (& cubes) [2]
+) {
+    static_assert(K == 2);
+
+    const size_t  A = view.begin_addr();
+    const size_t ld = view.ld;
+    const size_t  m = view.m;
+    const size_t  n = view.n;
+    const size_t  s = view.sizeof_type;
+
+    # if ACCESS_FORCE_ALIGNMENT
+    assert((A % (ld * s)) + (m * s) <= ld * s);
+    # endif /* ACCESS_FORCE_ALIGNMENT */
+
+    // only 1 cube is needed
+    if ((A % (ld * s)) + m * s <= ld * s)
+    {
+        /**
+         *        ^               y0       y1
+         *        |         |  .   .   .   .   .
+         *        |      x0 |  .   x   x   x   .
+         *   ld.s |         |  .   x   x   x   .
+         *        |         |  .   x   x   x   .
+         *        |      x1 |  .   x   x   x   .
+         *        v         v  .   .   .   .   .
+         */
+        const uintptr_t x0 = A % (ld * s);
+        const uintptr_t x1 = x0 + m * s;
+        const uintptr_t y0 = A / (ld * s);
+        const uintptr_t y1 = y0 + n;
+
+        {
+            Interval list[2];
+            list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
+            list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
+            cubes[0].set_list(list);
+            assert(!cubes[0].is_empty());
+        }
+
+        assert(cubes[1].is_empty());
+    }
+    // 2 cubes are needed
+    else
+    {
+        /**
+         *                     y2          y3
+         *      x2   |  .   .   x   x   x   x   .
+         *      x3   |  .   .   x   x   x   x   .
+         *           |  .   .   .   .   .   .   .
+         *           |  .   .   .   .   .   .   .
+         *      x0   |  .   x   x   x   x   .   .
+         *      x1   v  .   x   x   x   x   .   .
+         *                 y0          y1
+         */
+        const uintptr_t x0 = A % (ld * s);
+        const uintptr_t x1 = ld * s;
+        const uintptr_t x2 = 0;
+        const uintptr_t x3 = m*s - (x1 - x0);
+
+        const uintptr_t y0 = A / (ld * s);
+        const uintptr_t y1 = y0 + n;
+        const uintptr_t y2 = y0 + 1;
+        const uintptr_t y3 = y1 + 1;
+
+        {
+            Interval list0[2];
+            list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
+            list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
+
+            cubes[0].set_list(list0);
+            assert(!cubes[0].is_empty());
+        }
+
+        {
+            Interval list1[2];
+            list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
+            list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
+            cubes[1].set_list(list1);
+            assert(!cubes[1].is_empty());
+        }
+    }
 }
 
 class access_t
@@ -159,79 +283,9 @@ class access_t
 
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
-            const size_t A = host_view.begin_addr();
 
-            # if ACCESS_FORCE_ALIGNMENT
-            assert((A % (ld * s)) + (m * s) <= ld * s);
-            # endif /* ACCESS_FORCE_ALIGNMENT */
-
-            // only 1 cube is needed
-            if ((A % (ld * s)) + m * s <= ld * s)
-            {
-                /**
-                 *        ^               y0       y1
-                 *        |         |  .   .   .   .   .
-                 *        |      x0 |  .   x   x   x   .
-                 *   ld.s |         |  .   x   x   x   .
-                 *        |         |  .   x   x   x   .
-                 *        |      x1 |  .   x   x   x   .
-                 *        v         v  .   .   .   .   .
-                 */
-                const uintptr_t x0 = A % (ld * s);
-                const uintptr_t x1 = x0 + m * s;
-                const uintptr_t y0 = A / (ld * s);
-                const uintptr_t y1 = y0 + n;
-
-                {
-                    Interval list[2];
-                    list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
-                    list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
-                    this->cubes[0].set_list(list);
-                    assert(!this->cubes[0].is_empty());
-                }
-
-                assert( this->cubes[1].is_empty());
-            }
-            // 2 cubes are needed
-            else
-            {
-                /**
-                 *                     y2          y3
-                 *      x2   |  .   .   x   x   x   x   .
-                 *      x3   |  .   .   x   x   x   x   .
-                 *           |  .   .   .   .   .   .   .
-                 *           |  .   .   .   .   .   .   .
-                 *      x0   |  .   x   x   x   x   .   .
-                 *      x1   v  .   x   x   x   x   .   .
-                 *                 y0          y1
-                 */
-                const uintptr_t x0 = A % (ld * s);
-                const uintptr_t x1 = ld * s;
-                const uintptr_t x2 = 0;
-                const uintptr_t x3 = m*s - (x1 - x0);
-
-                const uintptr_t y0 = A / (ld * s);
-                const uintptr_t y1 = y0 + n;
-                const uintptr_t y2 = y0 + 1;
-                const uintptr_t y3 = y1 + 1;
-
-                {
-                    Interval list0[2];
-                    list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
-                    list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
-
-                    this->cubes[0].set_list(list0);
-                    assert(!this->cubes[0].is_empty());
-                }
-
-                {
-                    Interval list1[2];
-                    list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
-                    list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
-                    this->cubes[1].set_list(list1);
-                    assert(!this->cubes[1].is_empty());
-                }
-            }
+            // creates the two cubes of that memory view
+            memory_view_to_cubes(host_view, cubes);
         }
 
         access_t(
@@ -260,7 +314,7 @@ class access_t
             assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
             if (!cube.is_empty())
             {
-                memory_view_from_cube(&this->host_view, cube, ld, s);
+                memory_view_from_cube(this->host_view, cube, ld, s);
                 new (this->cubes + 0) Cube(cube);
             }
         }
