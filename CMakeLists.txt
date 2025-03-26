@@ -30,6 +30,8 @@ option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
 
 option(KAAPI_USE_HWLOC "To set if Kaapi should be compiled with support for HWLOC." ON)
 
+option(XKBLAS_BUILD_COPYSCALE "Build the copyscale function" OFF)
+
 #--
 if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")

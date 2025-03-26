@@ -23,6 +23,7 @@ if (HIP_FOUND)
 endif()
 
 
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 
@@ -67,26 +68,30 @@ add_custom_command(
 list(APPEND SOURCES_S
   sgemm.c sgemmt.c strsm.c strmm.c ssymm.c ssyrk.c ssyr2k.c sxkblas.h sxkblas_f77.h
   stask_gemm.c stask_symm.c stask_gemmt.c stask_trsm.c stask_trmm.c stask_syrk.c stask_syr2k.c stask.h  stask_internal.h
-  scopyscale.c stask_copyscale.c scopyscale.cu
 )
 
 list(APPEND SOURCES_D
   dgemm.c dgemmt.c dtrsm.c dtrmm.c dsymm.c dsyrk.c dsyr2k.c dxkblas.h dxkblas_f77.h 
   dtask_gemm.c dtask_symm.c dtask_gemmt.c dtask_trsm.c dtask_trmm.c dtask_syrk.c dtask_syr2k.c dtask.h dtask_internal.h
-  dcopyscale.c dtask_copyscale.c dcopyscale.cu
 )
 
 list(APPEND SOURCES_C
   cgemm.c cgemmt.c ctrsm.c ctrmm.c csymm.c csyrk.c csyr2k.c chemm.c cherk.c cher2k.c cxkblas.h cxkblas_f77.h 
   ctask_gemm.c ctask_symm.c ctask_gemmt.c ctask_trsm.c ctask_trmm.c ctask_syrk.c ctask_syr2k.c ctask_hemm.c ctask_herk.c ctask_her2k.c ctask.h ctask_internal.h
-  ccopyscale.c ctask_copyscale.c ccopyscale.cu
 )
 
 list(APPEND SOURCES_Z
   zgemm.c zgemmt.c ztrsm.c ztrmm.c zsymm.c zsyrk.c zsyr2k.c zhemm.c zherk.c zher2k.c zswap.c zxkblas.h zxkblas_f77.h 
   ztask_gemm.c ztask_symm.c ztask_gemmt.c ztask_trsm.c ztask_trmm.c ztask_syrk.c ztask_syr2k.c ztask_hemm.c ztask_herk.c ztask_her2k.c ztask_swap.c ztask.h ztask_internal.h
-  zcopyscale.c ztask_copyscale.c zcopyscale.cu
 )
+
+if (XKBLAS_BUILD_COPYSCALE)
+	add_compile_options("-DXKBLAS_COPYSCALE=1")
+	list(APPEND SOURCES_S scopyscale.c stask_copyscale.c scopyscale.cu)
+	list(APPEND SOURCES_D dcopyscale.c dtask_copyscale.c dcopyscale.cu)
+	list(APPEND SOURCES_C ccopyscale.c ctask_copyscale.c ccopyscale.cu)
+	list(APPEND SOURCES_Z zcopyscale.c ztask_copyscale.c zcopyscale.cu)
+endif()
 
 list(APPEND GENERATED_SOURCES ${SOURCES_S} ${SOURCES_D} ${SOURCES_C})
 
@@ -131,12 +136,14 @@ set(GENERATED_SOURCES ${AGENERATED_SOURCES})
 
 #--- XKBLAS
 
+if (XKBLAS_BUILD_COPYSCALE)
 set(CUDA_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
 	${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
 	${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
 	${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
 )
+endif()
 
 add_custom_target(task_internal_headers DEPENDS
 	${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
@@ -209,7 +216,7 @@ if (${HIP_FOUND})
   add_dependencies(xkblas task_internal_headers)
 else()
 
-        if (${CUDA_RT_FOUND})
+        if (${CUDA_RT_FOUND} AND XKBLAS_BUILD_COPYSCALE)
           # TODO cuda compile, make generic
           set(CUDA_SOURCES
             ${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
