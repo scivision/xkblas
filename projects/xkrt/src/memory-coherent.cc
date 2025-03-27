@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 05:16:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/27 21:12:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -109,11 +109,11 @@ xkrt_coherency_host_async(
 
         task_t * task;
 
+        # if 1
         # pragma message(TODO "How to test if 2 BLAS matrices are included in one-another ?")
-        // if the conflict is included in the passed access, just setup 1 copy
-        // access (fast way out)
-        // if (access.host_view.includes(conflict->host_view))
-        if (access.host_view.equals(conflict->host_view))
+        // if the conflict is included in the passed access, just setup 1 copy access (fast way out)
+     //   if (access.host_view.includes(conflict->host_view))
+      if (access.host_view.equals(conflict->host_view))
         {
             # define AC 1
 
@@ -141,6 +141,7 @@ xkrt_coherency_host_async(
         }
         // else, compute the 4 potential cubes
         else
+        # endif
         {
             # define AC 4
             constexpr size_t task_size = task_compute_size(flags, AC);

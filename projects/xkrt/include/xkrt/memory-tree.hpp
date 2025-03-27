@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 04:29:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/27 20:46:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -42,7 +42,6 @@
  *
  *  Set to '0' so multiple H2D are submitted concurrently
  *
- *  D2D forwarding makes heat 2D crash
  *  This should be reworked to have a smarter routing mechanism too
  *  For instance, on Aurora:
  *      - H2D = PCIe5 = 50GB/s on 1 tile = 320GB/s if every tile are concurrently fetching
@@ -739,17 +738,17 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             /* the list can be deleted if this returns '0' */
             size_t
-            fetched(void)
+            fetched(task_wait_counter_t decr = 1)
             {
-                const size_t p = this->pending.fetch_sub(1, std::memory_order_relaxed);
+                const size_t p = this->pending.fetch_sub(decr, std::memory_order_relaxed);
                 assert(p >= 0);
                 return p;
             }
 
             void
-            fetching(void)
+            fetching(task_wait_counter_t inc = 1)
             {
-                this->pending.fetch_add(1, std::memory_order_relaxed);
+                this->pending.fetch_add(inc, std::memory_order_relaxed);
             }
         }               fetch_list_t;
 
@@ -776,13 +775,12 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                     assert(i != j);
                     const fetch_t * fi = fetches + i;
                     const fetch_t * fj = fetches + j;
-                    return fi->host_view.begin_addr() < fj->host_view.begin_addr();
+                    return fi->host_view.end_addr() < fj->host_view.end_addr();
                 }
             );
 
-            # pragma message(TODO "Remove the `fetch->merged` flag and instead, memmove() the `fetch` and shrink 'fetch_list->n'")
-
-            // TODO : optimize me, impl is terrible
+            # pragma message(TODO "Remove the `fetch->merged` flag and instead, memmove() the `fetch` and shrink 'fetch_list->n' ?")
+            # pragma message(TODO "Double check correctness of this when it fuses more than 2 blocks")
 
             /* find continuous fetches and merge them */
             size_t i = 0;
@@ -801,24 +799,29 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 ) {
                     /* nothing to do yet, keep incrementing 'j' */
                     fj->merged = true;
-
-                    /* merge the two cubes to a single memory_view */
-                    assert(!fi->cubes[0].is_empty());
-                    assert(!fj->cubes[0].is_empty());
-                    assert( fi->cubes[1].is_empty());
-                    assert( fj->cubes[1].is_empty());
-                    memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fj->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
-
-                    /* copy the second cube */
-                    fi->cubes[1] = fj->cubes[0];
-                    // memory_view_to_cubes<K>(fi->host_view, fi->cubes);
-
-                    # pragma message(TODO "Lots of back and forth on that counter, should be set only once when fully done")
                     list->fetched();
                 }
                 /* else */
                 else
                 {
+                    /* merge [i+1..j-1] to i */
+                    if (j - i > 1)
+                    {
+                        size_t k = j - 1;
+                        fetch_t * fk = fetches + indices[k];
+                        /* merge the two cubes to a single memory_view */
+                        assert(!fi->cubes[0].is_empty());
+                        assert(!fk->cubes[0].is_empty());
+                        assert( fi->cubes[1].is_empty());
+                        assert( fk->cubes[1].is_empty());
+                        memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fk->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
+
+                        /* copy the second cube */
+                     // memory_view_to_cubes<K>(fi->host_view, fi->cubes); // this can be optimized by simply copying fk->cubes[0] , right ?
+                        fi->cubes[1] = fk->cubes[0];
+                        LOGGER_WARN("Merged %zu transfers in 1", j - i);
+                    }
+
                     /* i := j */
                     i = j;
                     fi = fj;
@@ -994,9 +997,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 fetch->dst_chunk            = partition.chunk;
                 fetch->dst_device_global_id = partite.dst_device_global_id;
                 fetch->dst_view             = dst_view;
-
-                list->fetching();
             }
+            list->fetching(list->n.load());
 
             if (this->merge_transfers)
                 this->fetch_list_reduce(list);

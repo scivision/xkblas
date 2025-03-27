@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 04:49:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/27 21:10:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -169,6 +169,12 @@ typedef struct  matrix_tile_t
     equals(const matrix_tile_t & x)
     {
         return this->begin_addr() == x.begin_addr() && this->end_addr() == x.end_addr() && this->ld == x.ld && this->sizeof_type == x.sizeof_type;
+    }
+
+    inline bool
+    includes(const matrix_tile_t & x)
+    {
+        abort();
     }
 
 }               matrix_tile_t;
