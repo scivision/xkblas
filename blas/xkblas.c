@@ -115,8 +115,9 @@ xkblas_context_t* xkblas_context_get(void)
 
   if (*handle_self_context ==0)
   {
-    *handle_self_context = xkblas_context_alloc();
-    *handle_self_context->handle = handle_self_context;
+    xkblas_context_t* ctxt = xkblas_context_alloc();
+    ctxt->handle = handle_self_context;
+    *handle_self_context = ctxt;
   }
 
   return *handle_self_context;
@@ -139,14 +140,9 @@ xkblas_pthread_context_free(xkblas_context_t* xkblas_ctxt)
   {
     /* remove context for its list and delete it
     */
-    if( xkblas_ctxt->prev != NULL )
-        xkblas_ctxt->prev->next = xkblas_ctxt->next;
-    if( xkblas_ctxt->next != NULL )
-        xkblas_ctxt->next->prev = xkblas_ctxt->prev;
+    xkblas_ctxt->next = NULL;
     if( _xkblas_list_context == xkblas_ctxt )
         _xkblas_list_context = xkblas_ctxt->next;
-    xkblas_ctxt->next = NULL;
-    xkblas_ctxt->prev = NULL;
 
     kaapi_team_deattach(xkblas_ctxt->kteam, xkblas_ctxt->kthread);
     kaapi_thread_unbind(xkblas_ctxt->kthread);
@@ -1472,7 +1468,8 @@ int xkblas_finalize(void)
   /* TG: with several thread calling xkblas it is not possible to form the correct team
      only call end_dfg for local synchronisation
   */
-  kaapi_end_dfg( _xkblas_self_context->kthread );
+  xkblas_context_t* ctxt =  xkblas_context_get();
+  kaapi_end_dfg( ctxt->kthread );
   kaapi_memory_synchronize();
 
   /* reset some global variable(s) to default value(s) */
@@ -1588,9 +1585,9 @@ int xkblas_finalize(void)
   kaapi_atomic_unlock(&_xkblas_list_lock);
 
   /* can only doit for the main thread ! */
-  _xkblas_self_context = 0;
-  //kaapi_team_dealloc(_xkblas_global_team);
-  //_xkblas_global_team = 0;
+  xkblas_context_t** handle = (xkblas_context_t**)pthread_getspecific(_pthread_xkblas_context_key);
+  *handle = 0;
+  pthread_setspecific(_pthread_xkblas_context_key, 0);
 
 #if 00
   xkblas_free_curr_blochandle();
