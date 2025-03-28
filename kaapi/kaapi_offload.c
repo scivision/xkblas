@@ -284,7 +284,9 @@ kaapi_offload_config_devices(kaapi_driver_t* driver)
     int err = driver->f_device_set_cpuset(&schedset, i);
     if (err ==0)
     {
+#if KAAPI_DEBUG
 printf("New CPU set is  : "); print_cpuset( &schedset ); printf("\n");
+#endif
       err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
       kaapi_assert(err == 0);
 

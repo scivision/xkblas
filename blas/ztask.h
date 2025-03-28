@@ -132,6 +132,7 @@ void INSERT_TASK_zswap(
 );
 void register_format_zswap(void);
 
+#if XKBLAS_BUILD_COPYSCALE==1
 void INSERT_TASK_zcopyscale(
 	size_t m, size_t n, bool should_copy,
 	xkblas_matrix_descr_t *D, size_t Dm, size_t Dn, size_t ldd,
@@ -139,6 +140,6 @@ void INSERT_TASK_zcopyscale(
 	xkblas_matrix_descr_t *U, size_t Um, size_t Un, size_t ldu
 );
 void register_format_zcopyscale(void);
-
+#endif // XKBLAS_BUILD_COPYSCALE
 #endif
 

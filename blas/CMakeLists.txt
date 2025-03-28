@@ -34,12 +34,16 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BL
 #${HIP_INCLUDE_DIRS} 
 
 # Bootstrap 
+set(BLAS_FUNCTION_LIST gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm)
+if (XKBLAS_BUILD_COPYSCALE)
+	list(APPEND BLAS_FUNCTION_LIST copyscale)
+endif()
 
 # internal_register.h
 # Current implementation generates explicit call to register function for each known task.
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/internal_register.h
-    COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/gen_internal_register.sh gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm copyscale
+		COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/gen_internal_register.sh ${BLAS_FUNCTION_LIST}
     DEPENDS ${CMAKE_SOURCE_DIR}/gen_internal_register.sh ${CMAKE_CURRENT_SOURCE_DIR}/task_format.h
 )
 

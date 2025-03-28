@@ -164,12 +164,14 @@ int main (int argc, char **argv)
     else if ( strcmp(func, "SYR2K") == 0 ) {
         info += testing_zsyr2k( argc, argv );
     }
+#if XKBLAS_BUILD_COPYSCALE==1
     else if ( strcmp(func, "COPYSCALE") == 0 ) {
     	info += testing_zcopyscale( argc, argv );
     }
     else if ( strcmp(func, "MUMPSLIKE") == 0 ) {
     	info += testing_zmumps_like( argc, argv );
     }
+#endif
 #if (PRECISION_z==1) || (PRECISION_c==1)
     else if ( strcmp(func, "HEMM") == 0 ) {
         info += testing_zhemm( argc, argv );
