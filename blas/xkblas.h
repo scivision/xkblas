@@ -69,16 +69,9 @@ typedef double CFloat64_t;
 struct xkblas_context;
 typedef struct xkblas_context xkblas_context_t;
 
-/*
+/* Return the thread specific xkblas context
 */
-extern __thread xkblas_context_t* _xkblas_self_context;
-extern xkblas_context_t* xkblas_context_alloc(void);
-static inline xkblas_context_t* xkblas_context_get(void)
-{
-  if (_xkblas_self_context ==0)
-    xkblas_context_alloc();
-  return _xkblas_self_context;
-}
+extern xkblas_context_t* xkblas_context_get(void);
 
 
 /* Xblas mode math

@@ -76,13 +76,13 @@ static int use_partition_thread_strategy = 0;
 
 static kaapi_team_t*       _xkblas_global_team = 0;
 static kaapi_atomic_t      _xkblas_thread_idx = {0};
-__thread xkblas_context_t* _xkblas_self_context = 0;
 pthread_key_t _pthread_xkblas_context_key;
 
 /* deprecated variable */
 __thread kaapi_thread_t*   _xkblas_self_thread = 0;
 
-/* list of all contexts declared */
+/* list of all contexts declared and attributed to thread
+ */
 static kaapi_lock_t        _xkblas_list_lock = KAAPI_LOCK_INITIALIZER;
 static xkblas_context_t*   _xkblas_list_context = 0;
 
@@ -95,114 +95,139 @@ static const char* get_xkblas_info(void);
 /* default tile size */
 static size_t NB = 0;
 
+/* Return the current context where to call XKBlas BLAS routine
+   The posix key is a pointer to a handle to the xkblas_context_t struture.
+   The runtime store the list of handle that will be destroyed by the
+   clean up pthread routine attached to the key.
+   On finalization, the runtime free the xkblas_context_t pointed by the handle.
+*/
+static xkblas_context_t* xkblas_context_alloc(void);
+xkblas_context_t* xkblas_context_get(void)
+{
+  xkblas_context_t** handle_self_context = (xkblas_context_t**)pthread_getspecific(_pthread_xkblas_context_key);
+
+  if (handle_self_context ==0)
+  { /* allocate handle */
+    handle_self_context = (xkblas_context_t**)malloc(sizeof(xkblas_context_t*));
+    *handle_self_context = 0;
+    pthread_setspecific(_pthread_xkblas_context_key, handle_self_context);
+  }
+
+  if (*handle_self_context ==0)
+  {
+    *handle_self_context = xkblas_context_alloc();
+    *handle_self_context->handle = handle_self_context;
+  }
+
+  return *handle_self_context;
+}
+
 /* Deallocate the current xkblas_context */
 static void
 xkblas_pthread_context_clean(void* arg)
 {
-    xkblas_context_t* xkblas_ctxt = _xkblas_self_context;
-    kaapi_atomic_lock(&_xkblas_list_lock);
-    if( xkblas_ctxt != NULL )
-    {
-      if( xkblas_ctxt->prev != NULL )
-          xkblas_ctxt->prev->next = xkblas_ctxt->next;
-      if( xkblas_ctxt->next != NULL )
-          xkblas_ctxt->next->prev = xkblas_ctxt->prev;
-      if( _xkblas_list_context == xkblas_ctxt )
-          _xkblas_list_context = xkblas_ctxt->next;
-      xkblas_ctxt->next = NULL;
-      xkblas_ctxt->prev = NULL;
+  xkblas_context_t** handle = (xkblas_context_t**)arg;
+  if (handle !=0) free(handle);
+}
 
-      kaapi_team_deattach(xkblas_ctxt->kteam, xkblas_ctxt->kthread);
-      kaapi_thread_unbind(xkblas_ctxt->kthread);
-      kaapi_team_dealloc(xkblas_ctxt->kteam);
-      xkblas_ctxt->kteam = 0;
+/* free context - called on finalization */
+static void
+xkblas_pthread_context_free(xkblas_context_t* xkblas_ctxt)
+{
+  kaapi_atomic_lock(&_xkblas_list_lock);
+  if( xkblas_ctxt != NULL )
+  {
+    /* remove context for its list and delete it
+    */
+    if( xkblas_ctxt->prev != NULL )
+        xkblas_ctxt->prev->next = xkblas_ctxt->next;
+    if( xkblas_ctxt->next != NULL )
+        xkblas_ctxt->next->prev = xkblas_ctxt->prev;
+    if( _xkblas_list_context == xkblas_ctxt )
+        _xkblas_list_context = xkblas_ctxt->next;
+    xkblas_ctxt->next = NULL;
+    xkblas_ctxt->prev = NULL;
 
-      int err = kaapi_hashmap_clear(&xkblas_ctxt->xkblas_ptr2handle);
-      kaapi_assert(err == 0);
-      err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
-      kaapi_assert(err == 0);
+    kaapi_team_deattach(xkblas_ctxt->kteam, xkblas_ctxt->kthread);
+    kaapi_thread_unbind(xkblas_ctxt->kthread);
+    kaapi_team_dealloc(xkblas_ctxt->kteam);
+    xkblas_ctxt->kteam = 0;
 
-      *xkblas_ctxt->self = 0; // equivalent to _xkblas_self_context == NULL
-      free(xkblas_ctxt);
-    }
-    kaapi_atomic_unlock(&_xkblas_list_lock);
+    int err = kaapi_hashmap_clear(&xkblas_ctxt->xkblas_ptr2handle);
+    kaapi_assert(err == 0);
+    err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
+    kaapi_assert(err == 0);
+
+    free(xkblas_ctxt);
+  }
+  kaapi_atomic_unlock(&_xkblas_list_lock);
 }
 
 /* Return the current xkblas_context (
 */
 xkblas_context_t* xkblas_context_alloc(void)
 {
-  if (_xkblas_self_context ==0)
+  /* todo: data structure compaction: between kaapi context and xkblas context
+   |------------------|
+   |                  |
+   | kaapi_context_t  |
+   |                  |
+   |------------------|
+   |                  |
+   | xkblas_context_t |
+   |                  |
+   |------------------|
+   
+   Todo that-> use user_size extra context in thread_bind.
+   
+   Use low level kaapi thread routines and do explicit register to be able
+   to free/unbind data on finalize
+   */
+  kaapi_context_t* kctxt = _kaapi_self_context = kaapi_init_get_context();
+  kaapi_thread_t* kthread = kaapi_context2thread(kctxt);
+  kaapi_assert( kthread != 0);
+  _xkblas_self_thread = kthread;
+  
+  xkblas_context_t* ctxt = (xkblas_context_t*)malloc(sizeof(xkblas_context_t));
+  int err = kaapi_hashmap_init(&ctxt->xkblas_ptr2handle, ctxt->xkblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
+  kaapi_assert(err ==0);
+  ctxt->xkblas_list_sync0 = 0;
+  ctxt->xkblas_list_sync0_tail = 0;
+  ctxt->xkblas_generation_cache = 0;
+  ctxt->xkblas_matrix_descr_list = 0;
+  ctxt->xkblas_modemath = xkblas_default_math;
+  ctxt->kctxt = kctxt;
+  ctxt->kthread = kthread;
+  ctxt->NB = NB; /* copie defaut value */
+  if (use_partition_thread_strategy ==1)
   {
-    /* todo: data structure compaction: between kaapi context and xkblas context
-         |------------------|
-         |                  |
-         | kaapi_context_t  |
-         |                  |
-         |------------------|
-         |                  |
-         | xkblas_context_t |
-         |                  |
-         |------------------|
-
-      Todo that-> use user_size extra context in thread_bind.
-
-      Use low level kaapi thread routines and do explicit register to be able
-      to free/unbind data on finalize
-    */
-    kaapi_context_t* kctxt = _kaapi_self_context = kaapi_init_get_context();
-    kaapi_thread_t* kthread = kaapi_context2thread(kctxt);
-    kaapi_assert( kthread != 0);
-    _xkblas_self_thread = kthread;
-
-    xkblas_context_t* ctxt = (xkblas_context_t*)malloc(sizeof(xkblas_context_t));
-    int err = kaapi_hashmap_init(&ctxt->xkblas_ptr2handle, ctxt->xkblas_mapentries, KAAPI_SIZE_DSM_MAP, 0);
-    kaapi_assert(err ==0);
-    ctxt->xkblas_list_sync0 = 0;
-    ctxt->xkblas_list_sync0_tail = 0;
-    ctxt->xkblas_generation_cache = 0;
-    ctxt->xkblas_matrix_descr_list = 0;
-    ctxt->xkblas_modemath = xkblas_default_math;
-    ctxt->kctxt = kctxt;
-    ctxt->kthread = kthread;
-    ctxt->NB = NB; /* copie defaut value */
-    if (use_partition_thread_strategy ==1)
-    {
-      ctxt->ngpus = -1;    /* no gpu defined, take all of them */
-      ctxt->ngpus  = kaapi_default_param.ngpus;
-      kaapi_assert( ctxt->ngpus < XKBLAS_MAX_NGPUS);
-      for (int i=0; i<ctxt->ngpus; ++i)
-        ctxt->gpuset[i] = i;
-    }
-    else
-    {
-      ctxt->ngpus = -1;    /* each XKBLAS is mapped to 1 GPU */
-      ctxt->ngpus  = kaapi_default_param.ngpus;
-      for (int i=0; i<XKBLAS_MAX_NGPUS; ++i)
-        ctxt->gpuset[i] = i;
-    }
-
-    /* create default kaapi context & thread */
-    int idx = KAAPI_ATOMIC_INCR(&_xkblas_thread_idx);
-    ctxt->kteam = kaapi_team_alloc();
-    kaapi_team_attach(ctxt->kteam, kthread, 0 ); /* idx. But with 1 team per thread: all threads have idx 0 */
-    kaapi_begin_dfg( kthread, KAAPI_FRAME_FLAG_DFG_OK );
-
-    /* link all context */
-    kaapi_atomic_lock(&_xkblas_list_lock);
-    ctxt->prev = NULL;
-    ctxt->next = _xkblas_list_context;
-    if(ctxt->next != NULL)
-      ctxt->next->prev = ctxt;
-
-    _xkblas_list_context = ctxt;
-    ctxt->self = &_xkblas_self_context;
-    kaapi_atomic_unlock(&_xkblas_list_lock);
-    _xkblas_self_context = ctxt;
-
-    pthread_setspecific( _pthread_xkblas_context_key, _xkblas_self_context);
+    ctxt->ngpus = -1;    /* no gpu defined, take all of them */
+    ctxt->ngpus  = kaapi_default_param.ngpus;
+    kaapi_assert( ctxt->ngpus < XKBLAS_MAX_NGPUS);
+    for (int i=0; i<ctxt->ngpus; ++i)
+      ctxt->gpuset[i] = i;
   }
-  return _xkblas_self_context;
+  else
+  {
+    ctxt->ngpus = -1;    /* each XKBLAS is mapped to 1 GPU */
+    ctxt->ngpus  = kaapi_default_param.ngpus;
+    for (int i=0; i<XKBLAS_MAX_NGPUS; ++i)
+      ctxt->gpuset[i] = i;
+  }
+  
+  /* create default kaapi context & thread */
+  int idx = KAAPI_ATOMIC_INCR(&_xkblas_thread_idx);
+  ctxt->kteam = kaapi_team_alloc();
+  kaapi_team_attach(ctxt->kteam, kthread, 0 ); /* idx. But with 1 team per thread: all threads have idx 0 */
+  kaapi_begin_dfg( kthread, KAAPI_FRAME_FLAG_DFG_OK );
+  
+  /* link all contexts together */
+  kaapi_atomic_lock(&_xkblas_list_lock);
+  ctxt->next = _xkblas_list_context;
+  _xkblas_list_context = ctxt;
+  kaapi_atomic_unlock(&_xkblas_list_lock);
+  
+  return ctxt;
 }
 
 
@@ -1549,27 +1574,17 @@ int xkblas_finalize(void)
   }
 #endif
 
+  /* free all context
+     - free the data structure and reset all declared hanles to 0
+     - handle are freed by the cleanup pthread data specific function
+  */
   while (_xkblas_list_context !=0)
   {
     xkblas_context_t* xkblas_ctxt = _xkblas_list_context;
-    kaapi_team_deattach(xkblas_ctxt->kteam, xkblas_ctxt->kthread);
-    kaapi_thread_unbind(xkblas_ctxt->kthread);
-    kaapi_team_dealloc( xkblas_ctxt->kteam );
-    xkblas_ctxt->kteam = 0;
-
-    err = kaapi_hashmap_clear(&xkblas_ctxt->xkblas_ptr2handle);
-    kaapi_assert(err ==0);
-    err = kaapi_hashmap_destroy(&xkblas_ctxt->xkblas_ptr2handle);
-    kaapi_assert(err ==0);
-
-/* TG: comment. PPolet has detected bug because xkblas_ctxt->self may points to pthread' stack
-  address already finalized.
-    *xkblas_ctxt->self = 0;
-*/
+    *xkblas_ctxt->handle = 0;
     _xkblas_list_context = xkblas_ctxt->next;
-    free(xkblas_ctxt);
+    xkblas_pthread_context_free(xkblas_ctxt);
   }
-
   kaapi_atomic_unlock(&_xkblas_list_lock);
 
   /* can only doit for the main thread ! */
@@ -1586,7 +1601,6 @@ int xkblas_finalize(void)
     kaapi_stackallocator_dealloc(&ctxt->st_allocator, bloc );
   }
 #endif
-
 
   if (handle_cpublas != 0) 
     dlclose(handle_cpublas);
