@@ -101,7 +101,8 @@ extern void BLAS_NAME(zgemmt)(
                               B, ldb,
                        beta, C, ldc);
   }
-  else {
+  else
+  {
     xkblas_zgemmt_async(xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_trans(transb),
       *n, *k,
       alpha, A, *lda,
@@ -133,7 +134,8 @@ extern void BLAS_NAME(ztrsm)(
                              B, ldb
     );
   }
-  else {
+  else
+  {
     xkblas_ztrsm_async(xkblas_blas2cblas_side(side), xkblas_blas2cblas_fill(uplo), xkblas_blas2cblas_trans(transa), xkblas_blas2cblas_diag(diag),
       *m, *n,
       alpha, A, *lda,
@@ -142,7 +144,7 @@ extern void BLAS_NAME(ztrsm)(
     xkblas_memory_coherent_async(0, 0, *m, *n, B, *ldb, sizeof(Complex64_t));
     xkblas_sync();
     xkblas_memory_invalidate_caches();
- }
+  }
 }
 
 
