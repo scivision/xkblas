@@ -1585,6 +1585,7 @@ int xkblas_finalize(void)
   /* can only doit for the main thread ! */
   xkblas_context_t** handle = (xkblas_context_t**)pthread_getspecific(_pthread_xkblas_context_key);
   *handle = 0;
+  free(handle);
   pthread_setspecific(_pthread_xkblas_context_key, 0);
 
 #if 00
