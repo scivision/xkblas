@@ -3108,7 +3108,7 @@ int kaapi_dsm_unregister_device(
   kaapi_the_dsm.nodes[lid] = 0;
 
 #if KAAPI_DEBUG
-  if (kaapi_default_param.verbose)
+  if (kaapi_default_param.verbose >2)
   {
     printf("%i::Memory Device unregister, memory alloc:%li, free:%li\n", lid, device->size_alloc, device->size_free);
   }

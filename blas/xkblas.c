@@ -135,7 +135,6 @@ xkblas_pthread_context_clean(void* arg)
 static void
 xkblas_pthread_context_free(xkblas_context_t* xkblas_ctxt)
 {
-  kaapi_atomic_lock(&_xkblas_list_lock);
   if( xkblas_ctxt != NULL )
   {
     /* remove context for its list and delete it
@@ -156,7 +155,6 @@ xkblas_pthread_context_free(xkblas_context_t* xkblas_ctxt)
 
     free(xkblas_ctxt);
   }
-  kaapi_atomic_unlock(&_xkblas_list_lock);
 }
 
 /* Return the current xkblas_context (
