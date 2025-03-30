@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:15:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/03/30 04:34:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -204,7 +204,7 @@ main_gemm(char ** args)
     # define CImpl ((TYPE *)matrices[4])
     prepare_n_matrices(matrices, 5, ld);
 
-    srand(2024);
+    srand(2023);
 
     // for small matrices
     if (m <= 64)
@@ -219,7 +219,7 @@ main_gemm(char ** args)
             B[i * ld + i] = 1.0;
             for (int j = 0 ; j < ld ; ++j)
             {
-                A[i * ld + j] = rand() % 8;
+                A[i * ld + j] = (i * m + j) % 9;
                 // A[i * ld + j] = (7 * i * j) % 13;
                 // A[i * ld + j] = (i + j);
             }
@@ -229,16 +229,16 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 0;
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
             // printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             uint64_t t0 = get_nanotime();
             impl.set_tile(ts);
-            impl.gemm(TRANS[t2], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
+            impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
             impl.coherent(CImpl, m, n, ld);
             uint64_t tt = get_nanotime();
             impl.wait();
