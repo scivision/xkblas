@@ -321,12 +321,12 @@ ze_benchmark_push(benchmark_node_t * parent)
     # define LINK(X, Y) benchmark_push_children(&X, &Y)
     LINK(ze, cmdlist);
 
-    LINK(cmdlist, immediate);
+    LINK(cmdlist,   immediate);
     LINK(immediate, immediate_h2d);
     LINK(immediate, immediate_d2h);
     LINK(immediate, immediate_kernel);
 
-    LINK(cmdlist, non_immediate);
+    LINK(cmdlist,       non_immediate);
     LINK(non_immediate, non_immediate_h2d);
     LINK(non_immediate, non_immediate_d2h);
     LINK(non_immediate, non_immediate_kernel);

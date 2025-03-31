@@ -398,9 +398,6 @@ xkrt_device_t::offloader_stream_instruction_commit(
 
     /* wakeup device worker thread */
     this->thread->thread->wakeup();
-
-    /* unlock the stream */
-    stream->unlock();
 }
 
 void

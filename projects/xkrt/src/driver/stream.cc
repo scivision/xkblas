@@ -144,6 +144,8 @@ xkrt_stream_t::commit(xkrt_stream_instruction_t * instr)
         this->pending.size()
     );
 
+    this->unlock();
+
     return 0;
 }
 

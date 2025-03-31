@@ -294,9 +294,9 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id, xkrt_device_global_i
     return 0;
 }
 
-////////////////
+////////////
 // STREAM //
-/////////////
+////////////
 
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
@@ -553,7 +553,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 
     // Round robin over copy engines
 
-    # if 1
+    # if 0
     // convert xkrt stream type to a command queue group flag
     ze_command_queue_group_property_flag_t flag;
     switch (type)

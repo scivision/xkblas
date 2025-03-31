@@ -697,7 +697,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     // size of memory to transfer
     // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) 1 * 512 * 1024 * 1024 : 0;
+    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) src_device->memories[0].capacity / (runtime.drivers.devices.n.load() - 1) / 64 : 0;
     assert(size);
     const size_t chunk_size = size / nchunks;
     for (xkrt_device_global_id_t device_global_id = 1 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
@@ -716,7 +716,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     for (int i = 0 ; i < src_device->nmemories ; ++i)
     {
-        constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 5 : 0;
+        constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 21 : 0;
         static_assert(niters);
         time_array_t time(runtime.drivers.devices.n*XKRT_DEVICE_MEMORIES_MAX, niters);
 
@@ -742,7 +742,6 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                     {
                         for (int c = 0 ; c < nchunks ; ++c)
                         {
-                            // TODO : call driver directly
                             xkrt_memory_copy_async(
                                &runtime,
                                 src_device_global_id,
@@ -755,6 +754,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                         }
                         xkrt_sync(&runtime);
                     }
+
                     uint64_t tf = xkrt_get_nanotime();
 
                     if (iter >= 0)
