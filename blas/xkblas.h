@@ -189,12 +189,52 @@ extern int xkblas_init(void);
 */
 extern int xkblas_finalize(void);
 
-/** Returns the total number of devices that can be used by Kaapi 
-    to offload task computation
+/** Returns the total number of devices that can be used by Kaapi  to offload task computation
    Returns 0 in case of success else an error code.
    Error code: EINVAL bad value for count (e.g. null pointer)
 */
 extern int xkblas_get_device_count(int* count);
+
+
+/** Returns the an aggregate information for all available devices to offload task computation.
+  On success, the data structure xkblas_dev_prop_t is filled with following information :
+     - arch: an integer decribing the architecture, see enumeration value xkblas_dev_arch_t
+     - has_uvm: !=0 if uvm is available to the the client code.
+     - device_count: same as if the client code has called xkblas_get_device_count.
+  The function returns aggregate values for field: has_uvm. If some available devices define by XKBLAS_GPUSET
+  have not the same capability for UVM then the function returns the smalest capability.
+  The arch field contains XKBLAS_ARCH_UNKNOWN if at least one device differs in the set defined by XKBLAS_GPUSET,
+  else the field value is the common architecture encoding by xkblas_dev_arch_t.
+  Returns 0 in case of success else an error code.
+  Error code: EINVAL if null pointer is passed to the call
+    WARNING: must be coherent with Kaapi definitions.
+*/
+//@{
+typedef struct xkblas_dev_prop_t {
+  int has_uvm_software; /* 1 iff the underlaying librairy (cuda,hip,...) allows uvm */
+  int arch;             /* architecture version */
+  int has_uvm;          /* 0: no uvm capability available; !=0: uvm is availabe */
+  int device_count;     /* same as xkblas_get_device_count */
+} xkblas_dev_prop_t;
+
+typedef enum xkblas_dev_arch_t {
+  XKBLAS_ARCH_UNKNOWN = 0,
+  XKBLAS_ARCH_V100 = 1,
+  XKBLAS_ARCH_A100 = 2,
+  XKBLAS_ARCH_H100 = 3,
+  XKBLAS_ARCH_GRACEHOPPER= 4,
+  XKBLAS_ARCH_MI50= 5,
+  XKBLAS_ARCH_MI100= 7,
+  XKBLAS_ARCH_MI200= 8,
+  XKBLAS_ARCH_MI250= 9,
+  XKBLAS_ARCH_MI300= 10,
+  XKBLAS_ARCH_MI300A= 11
+} xkblas_dev_arch_t;
+
+/*
+*/
+extern int xkblas_get_device_properties( struct xkblas_dev_prop_t* prop );
+//@}
 
 /*
 */

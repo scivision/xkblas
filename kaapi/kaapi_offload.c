@@ -493,7 +493,6 @@ kaapi_offload_find_plugins(void)
   //kaapi_offload_config_devices(current);
 }
 #endif
-
 #if KAAPI_USE_CUDA
 {
   current = malloc(sizeof(kaapi_driver_t));
@@ -563,6 +562,47 @@ unsigned int kaapi_offload_ndevices(void)
   }
   return ndevices;
 }
+
+
+/*
+*/
+int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
+{
+  if (prop ==0) return EINVAL;
+
+  /* Get all the drivers installed */
+  kaapi_offload_init(0);
+
+  /* initialize the field */
+  prop->has_uvm_software =0;
+  prop->arch = -1;
+  prop->has_uvm = 0;
+  prop->device_count = 0;
+  unsigned int ndevices = 0;
+
+  /* */
+  kaapi_driver_t* current = kaapi_list_drivers;
+  while (current !=0)
+  {
+    int ndevice_per_driver = 0;
+    if (current->f_get_type() != KAAPI_PROC_TYPE_HOST)
+    {
+      int has_uvm
+      ndevices_per_driver = current->f_get_ndevices();
+      /* get_devices_info accumulate value in has_uvm and arch as it is
+      described in the documentation in kaapi.h for kaapi_offload_properties.
+      */
+      current->f_get_devices_info( &arch, &has_uvm )
+      ndevices += ndevices_per_driver;
+    }
+    current = current->next;
+  }
+  
+  prop->device_count = ndevices
+  return 0;
+}
+
+
 
 /* This function is  make all communications progress through all the stream.
    A a thread or a set of threads management communication progress for the device, this

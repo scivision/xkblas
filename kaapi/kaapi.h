@@ -172,7 +172,48 @@ typedef enum
 /* ========================================================================= */
 /* Initialization & environement functions                                   */
 /* ========================================================================= */
-/* Main function: initialization of the library; terminaison and abort        
+/** Returns the an aggregate information for all available devices to offload task computation.
+  On success, the data structure kaapi_dev_prop_t is filled with following information :
+     - arch: an integer decribing the architecture, see enumeration value kaapi_dev_arch_t
+     - has_uvm: !=0 if uvm is available to the the client code.
+     - device_count: same as if the client code has called kaapi_get_device_count.
+  The function returns aggregate values for field: has_uvm. If some available devices define by KAAPI_GPUSET
+  have not the same capability for UVM then the function returns the smalest capability. If has_uvm is !=0 then
+    bit0 (has_uvm & 0x1) is non null iff the underlaying library has API for UVM.
+    bit1 (has_uvm & 0x1) is non null iff the hardware is identified by the library to have hardware efficient support for UVM
+  The arch field contains KAAPI_ARCH_UNKNOWN if at least one device differs in the set defined by KAAPI_GPUSET,
+  else the field value is the common architecture encoding by kaapi_dev_arch_t.
+  Returns 0 in case of success else an error code.
+  Error code: EINVAL if null pointer is passed to the call
+*/
+//@{
+typedef struct kaapi_dev_prop_t {
+  int arch;             /* architecture version */
+  int has_uvm;          /* 0: no uvm capability available; !=0: see comment */
+  int device_count;     /* same as kaapi_get_device_count */
+} kaapi_dev_prop_t;
+
+typedef enum kaapi_dev_arch_t {
+  KAAPI_ARCH_UNKNOWN      = 0,
+  KAAPI_ARCH_V100         = 1,
+  KAAPI_ARCH_A100         = 2,
+  KAAPI_ARCH_H100         = 3,
+  KAAPI_ARCH_GRACEHOPPER  = 4,
+  KAAPI_ARCH_MI50         = 5,
+  KAAPI_ARCH_MI100        = 7,
+  KAAPI_ARCH_MI200        = 8,
+  KAAPI_ARCH_MI250        = 9,
+  KAAPI_ARCH_MI300        = 10,
+  KAAPI_ARCH_MI300A       = 11
+} kaapi_dev_arch_t;
+
+/*
+*/
+extern int kaapi_offload_properties( struct kaapi_dev_prop_t* prop );
+//@}
+
+
+/* Main function: initialization of the library; terminaison and abort
    In case of normal terminaison, all internal objects are (I hope so !) deleted.
    The abort function is used in order to try to flush most of the internal buffer.
    kaapi_init should be called before any other kaapi function.

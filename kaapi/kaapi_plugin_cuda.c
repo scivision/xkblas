@@ -1815,6 +1815,65 @@ KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
   return (unsigned int)device_count;
 }
 
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int
+KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
+{
+  int device_count;
+  CudaCheckError(cudaGetDeviceCount(&device_count));
+  
+  struct cudaDeviceProp prop;
+  cudaError_t res;
+  
+  for (int i=0; i<device_count; ++i)
+  {
+    res = cudaSetDevice(i);
+    CudaCheckError(res);
+
+    res = cudaGetDeviceProperties(&prop, i);
+    CudaCheckError(res);
+    
+    if (prop.unifiedAddressing ==0) *has_uvm = 0;
+
+    
+    /*  directManagedMemAccessFromHost : Host can directly access managed memory on the device without migration.
+        managedMemory:Device supports allocating managed memory on this system
+        pageableMemoryAccess: Device supports coherently accessing pageable memory without calling cudaHostRegister on it
+        pageableMemoryAccessUsesHostPageTables: Device accesses pageable memory via the host's page tables
+        unifiedAddressing: Device shares a unified address space with the host
+        concurrentManagedAccess: is 1 if the device can coherently access managed memory concurrently with the CPU, and 0 otherwise.
+        
+        Note on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#unified-memory-programming
+        "pageableMemoryAccess: This property is set to 1 on systems with CUDA Unified Memory support where all threads may access System-Allocated Memory and CUDA Managed Memory. These systems include NVIDIA Grace Hopper, IBM Power9 + Volta, and modern Linux systems with HMM enabled (see next bullet), among others."
+        
+        Note 19.2.2.2.2 on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#unified-memory-programming
+        "Some devices have hardware support for coherent reads, stores and atomic accesses from the host on GPU-resident unified memory. These devices have the attribute cudaDevAttrDirectManagedMemAccessFromHost set to 1. Note that all hardware coherent systems have this attribute set for NVLink-connected devices. On these systems, the host has direct access to GPU-resident memory without page faults and data migration (see Data Usage Hints for more details on memory usage hints). Note that with CUDA Managed Memory, the cudaMemAdviseSetAccessedBy hint with cudaCpuDeviceId is necessary to enable this direct access without page faults."
+        
+        Note 19.2.2.1.2 on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#um-hw-coherency
+        "Hardware coherent systems such as NVIDIA Grace Hopper offer a logically combined page table for both CPUs and GPUs. This is important because in order to access System-Allocated Memory from the GPU, the GPU uses whichever page table entry was created by the CPU for the requested memory. If that page table entry uses the default CPU page size of 4KiB or 64KiB, accesses to large virtual memory areas will cause significant TLB misses, thus significant slowdowns.
+
+          See the section on configuring huge pages for examples on how to ensure System-Allocated Memory uses large enough page sizes to avoid this type of issue.
+        "
+
+
+        
+        cudaDevAttrPageableMemoryAccess: 1 if the device supports coherently accessing pageable memory without calling cudaHostRegister on it, and 0 otherwise
+        cudaDevAttrConcurrentManagedAccess: 1 if the device can coherently access managed memory concurrently with the CPU, and 0 otherwise
+        cudaDevAttrCanUseHostPointerForRegisteredMem: 1 if the device can access host registered memory at the same virtual address as the CPU, and 0 otherwise
+        cudaDevAttrPageableMemoryAccessUsesHostPageTables: 1 if the device accesses pageable memory via the host's page tables, and 0 otherwise
+        cudaDevAttrDirectManagedMemAccessFromHost: 1 if the host can directly access managed memory on the device without migration, and 0 otherwise
+        cudaDevAttrIntegrated: 1 if the device is integrated with the memory subsystem, or 0 if not
+        cudaDevAttrCanMapHostMemory: 1 if the device can map host memory into the CUDA address space, or 0 if not
+        cudaDevAttrManagedMemory: 1 if device supports allocating managed memory, 0 if not
+    */
+    res = 	cudaDeviceGetAttribute(&value, attr, i);
+    CudaCheckError(res);
+  }
+
+  return 0;
+}
+
 
 /*
 */
@@ -2398,6 +2457,7 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (get_type);
   EP (get_number);
   EP (get_ndevices);
+  EP (get_devices_info);
   EP (init);
   EP (finalize);
   EP (host_register);
