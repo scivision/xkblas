@@ -58,6 +58,11 @@
 #define _OFFLOAD_DEBUG  0
 #endif
 
+#ifdef KAAPI_NVTX
+#include <nvtx3/nvToolsExt.h>
+#else
+#endif
+
 #if _OFFLOAD_DEBUG
 #include <stdio.h>
 extern void _kaapi_lock_print(void);

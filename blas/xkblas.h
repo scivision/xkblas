@@ -64,6 +64,17 @@ typedef double complex Complex64_t;
 typedef double CFloat64_t;
 #endif
 
+// Symbols are exported in both version (unified and not) for testing purpose 
+//#if defined(KAAPI_UNIFIED)
+// Function used to deactivate malloc interception (by preloaded library) will be removed in futur versions
+void xkblas_activate_custom_alloc();
+void xkblas_deactivate_custom_alloc();
+
+// Allocate and deallocate managed memory
+void xkblas_malloc_unified(void** ptr, size_t size);
+void xkblas_free_unified(void* ptr);
+//#endif // defined(KAAPI_UNIFIED)
+
 /* xkblas context
 */
 struct xkblas_context;
@@ -460,6 +471,18 @@ extern uint64_t xkblas_elapsedns(void);
 */
 extern double xkblas_elapsedtime(void);
 
+extern void xkblas_memset(void*,int,size_t);
+extern void xkblas_memcpy(void*,void*,size_t);
+
+extern void  xkblas_register_work_buffer( void*, size_t );
+extern void  xkblas_unregister_work_buffer( void* );
+extern void* xkblas_get_work_pos(size_t);
+extern void  xkblas_free_work_pos( void* );
+
+extern void xkblas_bind_cpu(void*, size_t);
+
+extern void xkblas_host_register_direct(void*,size_t);
+extern void xkblas_host_unregister_direct(void*);
 
 #include "zxkblas.h"
 #include "cxkblas.h"

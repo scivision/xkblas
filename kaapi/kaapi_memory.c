@@ -3017,7 +3017,6 @@ int kaapi_dsm_register_device(
   device->free_chunk_list = 0;
   device->main_chunk = 0;
 #endif
-
   uint16_t lid = kaapi_memory_asid_get_lid(device->asid);
   if (lid >= KAAPI_MEMORY_MAX_NODES)
   {
@@ -3032,8 +3031,8 @@ int kaapi_dsm_register_device(
  #if KAAPI_DEBUG
     if (dsm->nodes[lid] !=0) {
       _kaapi_lock_print();
-      printf("%x:: In %s: device lid:%i seems to be already initialized to device:%p, try to initialize it againto device:%p\n", 
-         pthread_self(), lid, dsm->nodes[lid], device );
+      printf("%x:: In %s: device lid:%i seems to be already initialized to device:%p, try to initialize it againto devie:%p\n", 
+         pthread_self(), __func__, lid, dsm->nodes[lid], device );
       _kaapi_unlock_print();
     }
 #endif

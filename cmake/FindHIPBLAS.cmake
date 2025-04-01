@@ -18,7 +18,7 @@
 #  HIPBLAS_INCLUDE_DIRS       The location of HIPBLAS headers
 
 find_path(HIPBLAS_PREFIX
-    NAMES include/hipblas.h
+    NAMES include/hipblas/hipblas.h
     HINTS $ENV{HIPBLAS_PATH} $ENV{ROCM_PATH}/hipblas
 )
 
@@ -30,7 +30,7 @@ find_library(HIPBLAS_LIBRARIES
 
 find_path(HIPBLAS_INCLUDE_DIRS
     NAMES hipblas.h
-    HINTS ${HIPBLAS_PREFIX}/include ${HILTIDEPS}/include
+    HINTS ${HIPBLAS_PREFIX}/include ${HILTIDEPS}/include ${HIPBLAS_PREFIX}/include/hipblas
 )
 
 include(FindPackageHandleStandardArgs)

@@ -233,7 +233,7 @@ static void __kaapi_hip_CheckError( hipError_t err,  char *file, const int line 
    for which the device d has link with performance i.
 */
 static int hip_device_count = 0;    
-static int* hip_perf_topo = 0;    
+static uint64_t* hip_perf_topo = 0;
 static int hip_count_perfrank = 0;
 static uint64_t* hip_perf_device = 0;
 static int* hip_routing_table = 0;
@@ -309,7 +309,7 @@ static void _kaapi_get_gpu_topo(void)
 
   if (device_count ==0) return;
   hip_device_count = device_count;
-  hip_perf_topo = (int*)malloc(sizeof(int)*device_count*device_count);
+  hip_perf_topo = (uint64_t*)malloc(sizeof(uint64_t)*device_count*device_count);
 
   RSMI_IO_LINK_TYPE type;
   // Enumerates Device <-> Device links and store perfRank
@@ -486,6 +486,9 @@ static inline void kaapi_hip_plugin_unlock(void)
 */
 static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
+#if defined(KAAPI_UNIFIED)
+	return (uintptr_t) NULL;
+#else
   void* ptr;
   hipError_t res;
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
@@ -521,6 +524,7 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
+#endif // else of: defined(KAAPI_UNIFIED)
 }
 
 
@@ -954,6 +958,12 @@ void* kaapi_hip_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
+#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
+          err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
+				 // TODO check errors	
+#else
           err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
           //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
           if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
@@ -961,15 +971,22 @@ void* kaapi_hip_register_thread(void* dummy )
             printf("***[%s]: hipHostRegister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#endif // defined(KAAPI_UNIFIED)
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-          err = hipHostUnregister(req.ptr);
+#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetPreferredLocation, 0); // Data should migrate on GPU sooner
+					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetAccessedBy, 0);        // Data should migrate on GPU sooner
+					// No need to go back to fine-grain cache coherency policy
+#else
+					err = hipHostUnregister(req.ptr);
           if (!( (hipSuccess == err) || (hipErrorHostMemoryNotRegistered == err)))
           {
             printf("***[%s]: hipHostUnregister error: %i\n", __func__, err);
             req.err = EALREADY;
           }
+#endif // defined(KAAPI_UNIFIED)
         }
       }
 #if KAAPI_USE_PERFCOUNTER
@@ -1130,6 +1147,7 @@ static int kaapi_hip_stream_decode(
       {
         case KAAPI_MEMORY_VIEW_1D:
         {
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
 #ifdef NOT_REENTRANT
@@ -1183,10 +1201,12 @@ pthread_mutex_unlock(&access_lock);
 }
 #endif
           kaapi_hip_CheckError(res);
+#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_2D:
         {
+#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           size_t width, height, dpitch, spitch;
           if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
           {
@@ -1235,6 +1255,7 @@ pthread_mutex_lock(&access_lock);
 pthread_mutex_unlock(&access_lock);
 }
 #endif
+#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -1825,7 +1846,9 @@ return_rsmi_error:
   err = ENOTSUP;
 
 retval:
-#if KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
+#if KAAPI_USE_ROCSMI && KAAPI_USE_LIBNUMA
+  // Do not free cpuset if not created
+#elif KAAPI_USE_HWLOC && KAAPI_USE_HWLOCROCSMI
   hwloc_bitmap_free(cpuset);
 #endif
 
@@ -2417,6 +2440,22 @@ KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
   return 0;
 }
 
+#if defined(KAAPI_UNIFIED)
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
+{
+	// TODO add checks
+	hipMallocManaged( pptr, size, hipMemAttachGlobal );
+}
+
+KAAPI_CLASS_ENTRYPOINT void
+KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void* ptr )
+{
+	// TODO add checks
+	hipFree( ptr );
+}
+#endif //defined(KAAPI_UNIFIED)
+
 
 /*
 */
@@ -2481,5 +2520,10 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(kaapi_driver_t* driver)
   EP (device_attach);
   EP (device_detach);
   EP (get_gpublas_handle);
+
+#if defined(KAAPI_UNIFIED)
+  EP (malloc_unified);
+  EP (free_unified);
+#endif //defined(KAAPI_UNIFIED)
 }
 #endif

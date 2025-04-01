@@ -168,3 +168,11 @@ extern int xkblas_zcopyscale_native(
 	Complex64_t* D, size_t ldd,
 	Complex64_t* L, size_t ldl,
 	Complex64_t* U, size_t ldu);
+
+extern int xkblas_zniv12_sync(
+	int nrows,
+	int nass, int nelim,
+	int* IW,
+	Complex64_t* A, int nfront,
+	Complex64_t* A_SON, int ncols, int cb_compressed);
+

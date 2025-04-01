@@ -106,6 +106,7 @@ int xkblas_ztrsm_async(
     const Complex64_t* alpha, const Complex64_t* A, int LDA,
                               Complex64_t* B, int LDB )
 {
+    NVTX_PUSH
     int NA;
     int status;
 
@@ -122,39 +123,50 @@ int xkblas_ztrsm_async(
     /* Check input arguments */
     if (side != CblasLeft && side != CblasRight) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of side");
+	NVTX_POP
         return -1;
     }
     if ((uplo != CblasUpper) && (uplo != CblasLower)) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of uplo");
+	NVTX_POP
         return -2;
     }
     if (((transA < CblasNoTrans) || (transA > CblasConjTrans)) ) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of transA");
+	NVTX_POP
         return -3;
     }
     if ((diag != CblasUnit) && (diag != CblasNonUnit)) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of diag");
+	NVTX_POP
         return -4;
     }
     if (N < 0) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of N");
+	NVTX_POP
         return -5;
     }
     if (NRHS < 0) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of NRHS");
+	NVTX_POP
         return -6;
     }
     if (LDA < kaapi_max(1, NA)) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of LDA");
+	NVTX_POP
         return -8;
     }
     if (LDB < kaapi_max(1, N)) {
         kaapi_error("CHAMELEON_ztrsm", "illegal value of LDB");
+	NVTX_POP
         return -10;
     }
     /* Quick return */
     if (kaapi_min(N, NRHS) == 0)
+    {
+	NVTX_POP
         return 0;
+    }
 
     /* get default tile size and initialize internal descriptor if not yet */
     xkblas_context_t* xkctxt = xkblas_context_get();
@@ -482,6 +494,7 @@ int xkblas_ztrsm_async(
             }
         }
     }
+    NVTX_POP
     return 0;
 }
 

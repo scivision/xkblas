@@ -121,6 +121,7 @@ int xkblas_zgemm_async(
                               const Complex64_t *B, int LDB,
     const Complex64_t* beta,        Complex64_t *C, int LDC )
 {
+    NVTX_PUSH
 #if 0
 		printf("[XKBLAS] gemm M %d, N %d, K %d, A %p, LDA %d, B %p, LDB %d, C %p, LDC %d\n",
 										M, N, K, A, LDA, B, LDB, C, LDC );
@@ -130,10 +131,12 @@ int xkblas_zgemm_async(
     /* Check input arguments */
     if ((transA < CblasNoTrans) || (transA > CblasConjTrans)) {
         kaapi_error("zgemm", "illegal value of transA");
+	NVTX_POP
         return -1;
     }
     if ((transB < CblasNoTrans) || (transB > CblasConjTrans)) {
         kaapi_error("zgemm", "illegal value of transB");
+	NVTX_POP
         return -2;
     }
     if ( transA == CblasNoTrans ) {
@@ -148,33 +151,42 @@ int xkblas_zgemm_async(
     }
     if (M < 0) {
         kaapi_error("zgemm",  "illegal value of M");
+	NVTX_POP
         return -3;
     }
     if (N < 0) {
         kaapi_error("zgemm", "illegal value of N");
+	NVTX_POP
         return -4;
     }
     if (K < 0) {
         kaapi_error("zgemm", "illegal value of N");
+	NVTX_POP
         return -5;
     }
     if (LDA < kaapi_max(1, Am)) {
         kaapi_error("zgemm", "illegal value of LDA");
+	NVTX_POP
         return -8;
     }
     if (LDB < kaapi_max(1, Bm)) {
         kaapi_error("zgemm", "illegal value of LDB");
+	NVTX_POP
         return -10;
     }
     if (LDC < kaapi_max(1, M)) {
         kaapi_error("zgemm", "illegal value of LDC");
+	NVTX_POP
         return -13;
     }
 
     /* Quick return */
     if (M == 0 || N == 0 ||
       ((*alpha == 0.0 || K == 0) && *beta == 1.0))
+    {
+	NVTX_POP
         return 0;
+    }
 
     size_t Cmb = 0;
     size_t Cnb = 0;
@@ -186,6 +198,10 @@ int xkblas_zgemm_async(
     /* get default tile size and initialize internal descriptor if not yet */
     xkblas_context_t* xkctxt = xkblas_context_get();
     size_t NB = xkblas_auto_tilesize(xkctxt, KERN_GEMM,M,N,K);
+
+#if 0
+    printf("[XKBLAS] NB =: %lu\n", NB);
+#endif
 
 #if 0
     printf("[XKBLAS] NB =: %lu\n", NB);
@@ -349,6 +365,7 @@ int xkblas_zgemm_async(
             }
         }
     }
+    NVTX_POP
     return 0;
 }
 

@@ -24,7 +24,7 @@ endif()
 
 
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 
 #message(STATUS "----------- INCLUDE DIR: BLAS_INCLUDE_DIRS:" ${BLAS_INCLUDE_DIRS})
@@ -228,6 +228,7 @@ else()
             ${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
             ${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
           )
+	  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch=native --ptxas-options=\"-v\"") #-G -g")
           set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
           cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
         endif()

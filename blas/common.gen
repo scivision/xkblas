@@ -48,7 +48,7 @@ typedef double CFloat64_t;
 #endif
 
 #ifndef KAAPI_NO_INCLUDE_BLAS_H
-#if defined(KAAPI_BLAS_USE_OPENBLAS) || defined(KAAPI_BLAS_USE_CRAYBLAS)
+#if defined(KAAPI_BLAS_USE_OPENBLAS) || defined(KAAPI_BLAS_USE_CRAYBLAS) || defined(KAAPI_BLAS_USE_AOCL)
 #  include <cblas.h>
 #  include <lapacke.h>
 #elif defined(KAAPI_BLAS_USE_MKL)
@@ -60,6 +60,9 @@ typedef double CFloat64_t;
 #  include <mkl_types.h>
 #  include <mkl_cblas.h>
 #  include <mkl_lapacke.h>
+#elif defined(KAAPI_BLAS_USE_NVPL)
+#  include <nvpl_blas_cblas.h>
+#  include <nvpl_lapack.h>
 #else
 #  error "Blas library undefined"
 #endif
@@ -82,6 +85,15 @@ typedef double CFloat64_t;
 #else
 #define KBLAS_INT int
 #endif
+
+
+#if defined(KAAPI_NVTX)
+#define NVTX_PUSH nvtxRangePushA( __func__ );
+#define NVTX_POP  nvtxRangePop();
+#else
+#define NVTX_PUSH 
+#define NVTX_POP  
+#endif //defined(KAAPI_NVTX)
 
 /* Get the mode math for the next kernel.
 */

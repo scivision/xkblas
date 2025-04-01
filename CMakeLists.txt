@@ -4,7 +4,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 set(CMAKE_CXX_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1 ")
 set(CMAKE_CC_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1 ")
-set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 ")
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 -Wfatal-errors ")
 
 #set(CMAKE_CXX_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1 -D_OFFLOAD_DEBUG=1")
 #set(CMAKE_CC_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1 -D_OFFLOAD_DEBUG=1")
@@ -12,6 +12,10 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 ")
 
 #
 project (XKblas)
+
+# More detailled information to know what we are doing
+message( STATUS "C Compiler:   ${CMAKE_C_COMPILER}" )
+message( STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}" )
 
 
 # Global options
@@ -24,6 +28,8 @@ option(KAAPI_USE_PERFCTR "Add support for performance counter in the trace of ex
 option(KAAPI_USE_MKL "Use MKL" OFF)
 option(KAAPI_USE_OPENBLAS "Use OpenBLAS" OFF)
 option(KAAPI_USE_CRAYBLAS "Use Cray LIBSCI" OFF)
+option(KAAPI_USE_NVPL "Use Nvidia NVPL from NVHPC" OFF)
+option(KAAPI_USE_AOCL "Use AMD AOCL as BLAS" OFF)
 
 option(KAAPI_USE_SLEEP "Sleep thread is nothing to do" ON)
 option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
@@ -31,6 +37,18 @@ option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
 option(KAAPI_USE_HWLOC "To set if Kaapi should be compiled with support for HWLOC." ON)
 
 option(XKBLAS_BUILD_COPYSCALE "Build the copyscale function" OFF)
+option(ENABLE_KAAPI_UNIFIED "Enable KAAPI_UNIFIED_MACRO" OFF)
+option(ENABLE_KAAPI_NVTX "Enable NVTX profiling for the CPU threads" OFF)
+
+#--
+if(ENABLE_KAAPI_UNIFIED)
+  add_definitions(-DKAAPI_UNIFIED)
+  #add_definitions(-DKAAPI_UNIFIED_PARTIAL)
+endif()
+
+if(ENABLE_KAAPI_NVTX)
+  add_definitions(-DKAAPI_NVTX)
+endif()
 
 #--
 if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
@@ -173,24 +191,46 @@ endif()
 if (KAAPI_USE_OPENBLAS)
   set(BLA_VENDOR OpenBLAS)
 endif()
-if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS AND NOT KAAPI_USE_CRAYBLAS)
+#if (KAAPI_USE_NVPL)
+#  set(BLA_VENDOR NVHPC)
+#endif()
+if (KAAPI_USE_OPENBLAS)
+  set(BLA_VENDOR AOCL)
+endif()
+if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS AND NOT KAAPI_USE_CRAYBLAS AND NOT KAAPI_USE_NVPL AND NOT KAAPI_USE_AOCL)
   message(FATAL_ERROR "XKblas requires you specify the BLAS Vendor library.")
 endif()
 
-find_package(BLAS REQUIRED)
+# Find BLAS Package
+if (KAAPI_USE_NVPL)
+  # NVPL is not supported by the default CMakelist.txt
+  message(STATUS "Searching NVPL as BLAS library")
+  find_library(BLAS_LIB libnvpl_blas_core.so)
+  find_path(BLAS_INCLUDE_DIR nvpl_blas_cblas.h include/)
+  if(BLAS_LIB AND BLAS_INCLUDE_DIR)
+    set(BLAS_FOUND TRUE)
+    set(BLAS_LIBRARIES ${BLAS_LIB})
+    set(BLAS_INCLUDE_DIRS ${BLAS_INCLUDE_DIR})
+  else()
+    message(FATAL_ERROR "XKblas failed to find NVPL, check CMAKE_PREFIX_PATH ?")
+  endif()
+else()
+  find_package(BLAS REQUIRED)
+  if (KAAPI_USE_MKL)
+    find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h $ENV{MKLROOT}/include)
+  endif()
+  if (KAAPI_USE_CRAYBLAS)
+    find_path(BLAS_INCLUDE_DIRS lapacke.h ${CRAY_LIBSCI_PREFIX_DIR}/include)
+  endif()
+  if (KAAPI_USE_AOCL)
+    find_path(BLAS_INCLUDE_DIRS lapacke.h)
+  endif()
+endif()
 if (NOT ${BLAS_FOUND})
   message(FATAL_ERROR "XKblas requires a BLAS library.")
 endif()
-if (KAAPI_USE_MKL)
-  find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h
-    $ENV{MKLROOT}/include
-  )
-endif()
-if (KAAPI_USE_CRAYBLAS)
-  find_path(BLAS_INCLUDE_DIRS lapacke.h
-    ${CRAY_LIBSCI_PREFIX_DIR}/include 
-  )
-endif()
+message("BLAS_INCLUDE_DIRS : ${BLAS_INCLUDE_DIRS}")
+message("BLAS_LIBRARIES    : ${BLAS_LIBRARIES}")
 
 add_compile_options(${BLAS_LINKER_FLAGS})
 
@@ -259,10 +299,18 @@ if (KAAPI_USE_OPENBLAS)
   add_compile_options("-DKAAPI_BLAS_USE_OPENBLAS=1")
   add_compile_options("-DXKBLAS_BLASLIB=\"libopenblas.so\"")
 endif()
-find_package(BLAS REQUIRED)
-if (NOT ${BLAS_FOUND})
-  message(FATAL_ERROR "XKblas requires a BLAS library.")
+if (KAAPI_USE_AOCL)
+  add_compile_options("-DKAAPI_BLAS_USE_AOCL=1")
+  add_compile_options("-DXKBLAS_BLASLIB=\"libblis.so\"")
 endif()
+if (KAAPI_USE_NVPL)
+  add_compile_options("-DKAAPI_BLAS_USE_NVPL=1")
+  add_compile_options("-DXKBLAS_BLASLIB=\"libnvpl_blas_ilp64.so\"")
+endif()
+#find_package(BLAS REQUIRED)
+#if (NOT ${BLAS_FOUND})
+#  message(FATAL_ERROR "XKblas requires a BLAS library.")
+#endif()
 
 #--- Subdirectories
 include_directories ("kaapi")

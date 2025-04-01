@@ -86,8 +86,10 @@ static void callback_epilogue_perparam(
     uint64_t arg
 )
 {
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
   kaapi_device_t* device = (kaapi_device_t*)arg;
   kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
+#endif//KAAPI_UNIFIED
 }
 
 
@@ -99,6 +101,9 @@ static void callback_epilogue(
     void* arg0, void* arg1, void* arg2
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+#endif
   KAAPI_OFFLOAD_TRACE_IN
 #if _OFFLOAD_DEBUG
   fprintf(stdout, "%s\n", __FUNCTION__);
@@ -211,6 +216,10 @@ static void callback_epilogue(
 //printf("incr: @p\n",task->frame);
   task->flags |= KAAPI_TASK_FLAG_EXEC;
   KAAPI_OFFLOAD_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 }
 
 
@@ -334,6 +343,10 @@ int kaapi_offload_device_execute_task(
      void* handle
  )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   KAAPI_OFFLOAD_TRACE_IN
   kaapi_context_t* ctxt = device->ctxt;
   kaapi_format_t* fmt = kaapi_task_getformat_ref(task);
@@ -356,6 +369,10 @@ int kaapi_offload_device_execute_task(
 #endif
 
   KAAPI_OFFLOAD_TRACE_OUT
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 
   return 0;
 }
@@ -548,6 +565,7 @@ static int kaapi_offload_device_prepare_execute_task(
         &view
     );
 
+#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
     do {
       /* findaccess has already allocated the replica for asid with the right view.
           error code ENOMEM should be processed inside the dsm_acuire data that
@@ -599,6 +617,8 @@ static int kaapi_offload_device_prepare_execute_task(
       kaapi_task_getargs(task),
       &mdi->replicas[lid]->view
     );
+#else
+#endif//KAAPI_UNIFIED
   }
 
 #if KAAPI_USE_PREFETCH
@@ -835,6 +855,10 @@ int kaapi_sched_idle_offload(
     int (*f_fini)(void*), void* arg
 )
 {
+#ifdef KAAPI_NVTX
+  nvtxRangePushA( __func__ );
+  //nvtxRangePop();
+#endif
   int err;
   kaapi_context_t* ctxt = kaapi_thread2context(thread);
   kaapi_device_t* device = ctxt->device;
@@ -1175,6 +1199,10 @@ prepare_execute:
   } while (f_fini && !f_fini(arg));
 
 r_exit:
+#ifdef KAAPI_NVTX
+  //nvtxRangePushA( __func__ );
+  nvtxRangePop();
+#endif
 
   return EINTR;
 }
@@ -1301,6 +1329,12 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   int err = 0;
 
   kaapi_driver_t* driver = device->driver;
+  if( ld != 0 )
+  {
+    ld->device = device;
+    device->ld = ld;
+  }
+
   err = driver->f_device_init(device);
   if (err != 0)
   {
@@ -1312,11 +1346,10 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   /* initialize the locality domain */
   if (ld != 0)
   {
-    ld->device = device;
-    device->ld = ld;
     KAAPI_OFFLOAD_INIT_TRACE_MSG("kaapi_dsm_register_device:: device_id:%i, device@:%X register to localitydomain ldid: %i\n", device->device_id, device, ld->ldid );
     kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
   }
+
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */
