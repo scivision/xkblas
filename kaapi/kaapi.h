@@ -144,11 +144,6 @@ typedef struct kaapi_localitydomain kaapi_localitydomain_t;
 
 typedef struct kaapi_listrequest_iterator kaapi_listrequest_iterator_t;
 
-#ifdef KAAPI_UNIFIED
-void* kaapi_unified_get_data( size_t size );
-void kaapi_unified_retrieve_data( void* dst, void* src, size_t size );
-#endif // KAAPI_UNIFIED
-
 
 /** \ingroup Kaapi
     Identifier to a locality domain 
@@ -182,6 +177,7 @@ typedef enum
      - arch: an integer decribing the architecture, see enumeration value kaapi_dev_arch_t
      - has_uvm: !=0 if uvm is available to the the client code.
      - device_count: same as if the client code has called kaapi_get_device_count.
+  A call to kaapi_offload_properties could occurs before kaapi is initialized.
   The function returns aggregate values for field: has_uvm. If some available devices define by KAAPI_GPUSET
   have not the same capability for UVM then the function returns the smalest capability. If has_uvm is !=0 then
     bit0 (has_uvm & 0x1) is non null iff the underlaying library has API for UVM.
@@ -189,7 +185,7 @@ typedef enum
   The arch field contains KAAPI_ARCH_UNKNOWN if at least one device differs in the set defined by KAAPI_GPUSET,
   else the field value is the common architecture encoding by kaapi_dev_arch_t.
   Returns 0 in case of success else an error code.
-  Error code: EINVAL if null pointer is passed to the call
+  Error code: EINVAL if null pointer is passed to the call.
 */
 //@{
 typedef struct kaapi_dev_prop_t {
@@ -199,6 +195,7 @@ typedef struct kaapi_dev_prop_t {
 } kaapi_dev_prop_t;
 
 typedef enum kaapi_dev_arch_t {
+  KAAPI_ARCH_UNDEF        = -1, /* internal usage only */
   KAAPI_ARCH_UNKNOWN      = 0,
   KAAPI_ARCH_V100         = 1,
   KAAPI_ARCH_A100         = 2,
@@ -216,6 +213,22 @@ typedef enum kaapi_dev_arch_t {
 */
 extern int kaapi_offload_properties( struct kaapi_dev_prop_t* prop );
 //@}
+
+/* Return !=0 iff the library could have device using the UVM.
+   The device will use uvm if kaapi_get_uvm_state() returns !=0 and
+   after a call to kaapi_set_forced_uvm().
+   A call to kaapi_get_uvm_state could occurs before initialization of kaapi.
+*/
+int kaapi_offload_get_uvm_capacity(void);
+
+/* Return !=0 iff the library has been configured to force device to use uvm.
+   By default the use the old approach with memory copy between adress space.
+   A call to kaapi_set_force_uvm could occurs before initialization of kaapi.
+   Returns 0 if the library is configured for using uvm.
+   Returns EINVAL if the library cannot be configured for using uvm.
+*/
+int kaapi_offload_set_force_uvm(void);
+
 
 
 /* Main function: initialization of the library; terminaison and abort

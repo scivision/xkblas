@@ -111,7 +111,6 @@ else()
   message(STATUS "XKblas is configured without support for HWLOC")
 endif()
 
-
 if (KAAPI_USE_ROCSMI)
   include_directories(${ROCSMI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${ROCSMI_LIBRARIES})
@@ -130,7 +129,7 @@ if (${CUDA_DRIVER_FOUND})
 endif()
 
 if (${CUDA_RT_FOUND})
-				include_directories(${CUDA_RT_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS})
+  include_directories(${CUDA_RT_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
 endif()
 
@@ -138,6 +137,10 @@ if (${HIP_FOUND})
 	include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
 	#include_directories(${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+endif()
+
+if (ENABLE_KAAPI_UNIFIED)
+  message(STATUS "Kaapi configured with support for UVM")
 endif()
 
 if (${PAPI_FOUND})

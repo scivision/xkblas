@@ -86,10 +86,9 @@ static void callback_epilogue_perparam(
     uint64_t arg
 )
 {
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
   kaapi_device_t* device = (kaapi_device_t*)arg;
-  kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
-#endif//KAAPI_UNIFIED
+  if (device->use_uvm == 0)
+    kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
 }
 
 
@@ -565,60 +564,60 @@ static int kaapi_offload_device_prepare_execute_task(
         &view
     );
 
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
-    do {
-      /* findaccess has already allocated the replica for asid with the right view.
-          error code ENOMEM should be processed inside the dsm_acuire data that
-          should only return iff memory has been allocated and transfer done.
-      */
-      kaapi_assert_debug(device == kaapi_offload_self_device());
-      err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
-          task,
-          mp,
-          mdi,
-          callback_set_valid,
-          (void*)device, (void*)task, (void*)(uintptr_t)index
-      );
-      KAAPI_DEBUG_INST(if (err ==EINPROGRESS) KAAPI_ATOMIC_INCR(&count_valid));
-
-      kaapi_assert((err ==0)||(err == ENOMEM)||(err ==EINPROGRESS));
-      if (err == ENOMEM)
-        kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
-    } while (err == ENOMEM);
-    kaapi_assert((err ==0) || (err ==EINPROGRESS));
-
-#if KAAPI_USE_PREFETCH
-    if (KAAPI_ACCESS_IS_WRITE(mp))
+    if (device->use_uvm == 0)
     {
-      /* look for next dependent in order to prefetch data */
-      kaapi_access_t* an = access->sync->next;
-      if ((an !=0))// && KAAPI_ACCESS_IS_READ(an->mode))
+      do {
+        /* findaccess has already allocated the replica for asid with the right view.
+            error code ENOMEM should be processed inside the dsm_acuire data that
+            should only return iff memory has been allocated and transfer done.
+        */
+        kaapi_assert_debug(device == kaapi_offload_self_device());
+        err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
+            task,
+            mp,
+            mdi,
+            callback_set_valid,
+            (void*)device, (void*)task, (void*)(uintptr_t)index
+        );
+        KAAPI_DEBUG_INST(if (err ==EINPROGRESS) KAAPI_ATOMIC_INCR(&count_valid));
+
+        kaapi_assert((err ==0)||(err == ENOMEM)||(err ==EINPROGRESS));
+        if (err == ENOMEM)
+          kaapi_offload_wait_stream( &device->stream, KAAPI_IO_STREAM_D2H);
+      } while (err == ENOMEM);
+      kaapi_assert((err ==0) || (err ==EINPROGRESS));
+
+  #if KAAPI_USE_PREFETCH
+      if (KAAPI_ACCESS_IS_WRITE(mp))
       {
-        kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
-        if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW)) 
+        /* look for next dependent in order to prefetch data */
+        kaapi_access_t* an = access->sync->next;
+        if ((an !=0))// && KAAPI_ACCESS_IS_READ(an->mode))
         {
-          prefetch_tasklist[prefetch_taskcnt++] = an->task;
+          kaapi_ldid_t ldid = kaapi_task_get_ld(an->task);
+          if ((ldid == device->ld->ldid) && (prefetch_taskcnt < KAAPI_MAX_PREFETCH_WINDOW))
+          {
+            prefetch_tasklist[prefetch_taskcnt++] = an->task;
+          }
+          if (an->sync) an = (kaapi_access_t*)an->sync->next;
+          else an = an->next;
         }
-        if (an->sync) an = (kaapi_access_t*)an->sync->next;
-        else an = an->next;
       }
-    }
-#endif
+  #endif
 
-    /* store in the data access the pointer translated by the original offset */
-    new_data = kaapi_memory_view2pointer(
-      kaapi_pointer2void(mdi->replicas[lid]->ptr),
-      &mdi->replicas[lid]->view);
+      /* store in the data access the pointer translated by the original offset */
+      new_data = kaapi_memory_view2pointer(
+        kaapi_pointer2void(mdi->replicas[lid]->ptr),
+        &mdi->replicas[lid]->view);
 
-    /* update pointer in the task arguments */
-    access->data    = new_data;
-    kaapi_format_set_access_param(fmt, ith, kaapi_task_getargs(task), access );
-    kaapi_format_set_view_param(fmt, ith,
-      kaapi_task_getargs(task),
-      &mdi->replicas[lid]->view
-    );
-#else
-#endif//KAAPI_UNIFIED
+      /* update pointer in the task arguments */
+      access->data    = new_data;
+      kaapi_format_set_access_param(fmt, ith, kaapi_task_getargs(task), access );
+      kaapi_format_set_view_param(fmt, ith,
+        kaapi_task_getargs(task),
+        &mdi->replicas[lid]->view
+      );
+    } //end device->use_uvm==0
   }
 
 #if KAAPI_USE_PREFETCH
@@ -1350,6 +1349,9 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
     kaapi_dsm_register_device(&kaapi_the_dsm, &device->memdev, device->driver->f_get_type(), ld->ldid );
   }
 
+  /* inherit global value */
+  if (kaapi_default_param.use_uvm)
+    device->use_uvm = 1;
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */

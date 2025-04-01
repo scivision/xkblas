@@ -40,15 +40,6 @@ option(XKBLAS_BUILD_COPYSCALE "Build the copyscale function" OFF)
 option(ENABLE_KAAPI_UNIFIED "Enable KAAPI_UNIFIED_MACRO" OFF)
 option(ENABLE_KAAPI_NVTX "Enable NVTX profiling for the CPU threads" OFF)
 
-#--
-if(ENABLE_KAAPI_UNIFIED)
-  add_definitions(-DKAAPI_UNIFIED)
-  #add_definitions(-DKAAPI_UNIFIED_PARTIAL)
-endif()
-
-if(ENABLE_KAAPI_NVTX)
-  add_definitions(-DKAAPI_NVTX)
-endif()
 
 #--
 if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
@@ -62,6 +53,17 @@ if (OPENMP_FOUND)
   #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+#--- Unified
+if(ENABLE_KAAPI_UNIFIED)
+  add_definitions(-DKAAPI_UNIFIED)
+  #add_definitions(-DKAAPI_UNIFIED_PARTIAL)
+endif()
+
+if(ENABLE_KAAPI_NVTX)
+  add_definitions(-DKAAPI_NVTX)
+endif()
+
+
 #--- CUDA
 if (KAAPI_USE_CUDA_RT)
   find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
@@ -73,6 +75,7 @@ if (KAAPI_USE_CUDA_RT)
   if (NOT ${CUBLAS_FOUND})
     message(FATAL_ERROR "Kaapi is configured with CUDA API but CUBLAS is not found for XKblas !")
   endif()
+
 #  find_path(BLAS_INCLUDE_DIRS cblas.h
 #    /usr/include
 #    /usr/local/include

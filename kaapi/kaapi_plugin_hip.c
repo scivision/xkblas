@@ -486,9 +486,9 @@ static inline void kaapi_hip_plugin_unlock(void)
 */
 static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
-#if defined(KAAPI_UNIFIED)
-	return (uintptr_t) NULL;
-#else
+  if (dev->device->use_uvm)
+    return (uintptr_t) 0;
+
   void* ptr;
   hipError_t res;
   kaapi_device_hip_t* device = (kaapi_device_hip_t*)dev->device;
@@ -524,7 +524,6 @@ static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* f
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
-#endif // else of: defined(KAAPI_UNIFIED)
 }
 
 
@@ -958,7 +957,7 @@ void* kaapi_hip_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
-#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+#if defined(KAAPI_UNIFIED)
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
           err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
@@ -975,7 +974,7 @@ void* kaapi_hip_register_thread(void* dummy )
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-#if defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
+#if defined(KAAPI_UNIFIED) 
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetPreferredLocation, 0); // Data should migrate on GPU sooner
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetAccessedBy, 0);        // Data should migrate on GPU sooner
 					// No need to go back to fine-grain cache coherency policy
@@ -1147,7 +1146,6 @@ static int kaapi_hip_stream_decode(
       {
         case KAAPI_MEMORY_VIEW_1D:
         {
-#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
 #ifdef NOT_REENTRANT
@@ -1201,12 +1199,10 @@ pthread_mutex_unlock(&access_lock);
 }
 #endif
           kaapi_hip_CheckError(res);
-#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_2D:
         {
-#if !defined(KAAPI_UNIFIED) //#endif // defined(KAAPI_UNIFIED)
           size_t width, height, dpitch, spitch;
           if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
           {
@@ -1255,7 +1251,6 @@ pthread_mutex_lock(&access_lock);
 pthread_mutex_unlock(&access_lock);
 }
 #endif
-#endif // defined(KAAPI_UNIFIED)
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -2504,6 +2499,7 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_hip_driver)(kaapi_driver_t* driver)
   EP (get_type);
   EP (get_number);
   EP (get_ndevices);
+  EP (get_devices_info);
   EP (init);
   EP (finalize);
   EP (host_register);

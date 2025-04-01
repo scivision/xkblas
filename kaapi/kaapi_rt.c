@@ -96,6 +96,7 @@ const char* get_kaapi_info(void)
             "  NSTREAMS : %i\n"
             "  NKERNELS : %i\n" 
             "  PREFETCH : %i\n" 
+            "  UVM      : %s - %s\n"
 #if KAAPI_USE_OCR
             "  MAPPING  : OCR\n" 
 #else
@@ -149,7 +150,13 @@ const char* get_kaapi_info(void)
          KAAPI_MAX_PREFETCH_WINDOW,
 #else
          0,
-#endif 
+#endif
+#if defined(KAAPI_UNIFIED)
+         "yes",
+#else
+         "no",
+#endif
+         (kaapi_default_param.use_uvm ? "used" : "unused"),
 #if KAAPI_USE_STREAM_D2D
          "yes",
 #else

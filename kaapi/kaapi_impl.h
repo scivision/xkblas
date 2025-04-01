@@ -151,6 +151,7 @@ typedef struct kaapi_rtparam_t {
   uint8_t               cuda_conc_d2h;     /* number of concurrent cuda d2h stream per device*/
   uint8_t               cuda_conc_d2d;     /* number of concurrent cuda d2d stream per device*/
   float                 cuda_cache_limit;  /* percent reserved for cache */
+  int                   use_uvm;           /* set to 1 if device should be used with uvm */
 } kaapi_rtparam_t;
 
 extern kaapi_rtparam_t kaapi_default_param;

@@ -168,11 +168,6 @@ static bool kaapi_offload_load_plugin(
   DLSYM (device_attach);
   DLSYM (device_detach);
   DLSYM (get_gpublas_handle);
-#if defined(KAAPI_PSEUDO_UNIFIED) && defined(KAAPI_UNIFIED)
-  // TODO check if this part is used
-  DLSYM (unified_get_data);
-  DLSYM (unified_retrieve_data);
-#endif // KAAPI_PSEUDO_UNIFIED
 
 out:
   if(err != NULL){
@@ -582,32 +577,65 @@ int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
   kaapi_offload_init(0);
 
   /* initialize the field */
-  prop->has_uvm_software =0;
-  prop->arch = -1;
+  prop->arch = KAAPI_ARCH_UNKNOWN;
   prop->has_uvm = 0;
   prop->device_count = 0;
   unsigned int ndevices = 0;
 
   /* */
+  int arch = KAAPI_ARCH_UNDEF;
+  int has_uvm = 0;
   kaapi_driver_t* current = kaapi_list_drivers;
   while (current !=0)
   {
     int ndevice_per_driver = 0;
     if (current->f_get_type() != KAAPI_PROC_TYPE_HOST)
     {
-      int has_uvm
-      ndevices_per_driver = current->f_get_ndevices();
+      int ndevices_per_driver = current->f_get_ndevices();
       /* get_devices_info accumulate value in has_uvm and arch as it is
-      described in the documentation in kaapi.h for kaapi_offload_properties.
+         described in the documentation in kaapi.h for kaapi_offload_properties.
       */
-      current->f_get_devices_info( &arch, &has_uvm )
+      current->f_get_devices_info( &arch, &has_uvm );
       ndevices += ndevices_per_driver;
     }
     current = current->next;
   }
-  
-  prop->device_count = ndevices
+
+#if !defined(KAAPI_UNIFIED)
+  /* we let the runtime to determine uvm and arch and then reset it if KAAPI_UNFIED not defined */
+  prop->has_uvm = 0;
+#else
+  prop->has_uvm = has_uvm;
+#endif
+
+  prop->arch = arch;
+  prop->device_count = ndevices;
   return 0;
+}
+
+
+/* Return 1 iff hardware can be used with UVM
+*/
+int kaapi_offload_get_uvm_capacity(void)
+{
+  struct kaapi_dev_prop_t prop;
+  int err = kaapi_offload_properties( &prop );
+  if ((err==0) && (prop.has_uvm & 0x1))
+    return 1;
+  return 0;
+}
+
+/*
+*/
+int kaapi_offload_set_force_uvm(void)
+{
+  if (kaapi_offload_get_uvm_capacity() !=0)
+  {
+    kaapi_default_param.use_uvm = 1;
+    return 0;
+  }
+  kaapi_default_param.use_uvm = 0;
+  return EINVAL;
 }
 
 
@@ -627,18 +655,18 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
   int err =0;
   kaapi_assert_debug( kaapi_offload_self_device() == device );
 
-#ifndef KAAPI_UNIFIED
+  if (device->use_uvm ==0)
+  {
 #if KAAPI_USE_STREAM_D2D
-  err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
-  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+    err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
+    kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 #endif
+    err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_H2D);
+    kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 
-  err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_H2D);
-  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-
-  err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
-  kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-#endif // KAAPI_UNIFIED
+    err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
+    kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
+  } // device->use_uvm ==0
 
   err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -646,7 +674,6 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
   err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_KERN);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
 
-#ifndef KAAPI_UNIFIED
 #if KAAPI_USE_STREAM_D2D
   err = kaapi_offload_test_stream(&device->stream, KAAPI_IO_STREAM_D2D);
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
@@ -656,7 +683,7 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
 
   err = kaapi_offload_test_stream( &device->stream, KAAPI_IO_STREAM_D2H );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-#endif //KAAPI_UNIFIED
+
 #ifdef KAAPI_NVTX
   //nvtxRangePushA( __func__ );
   nvtxRangePop();

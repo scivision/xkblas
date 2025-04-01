@@ -2899,7 +2899,7 @@ void xkblas_free_work_pos( void* ptr )
 		{
 			break;
 		}
-		if((uintptr_t) curr->ptr > ptr)
+		if((uintptr_t) curr->ptr > (uintptr_t)ptr)
 		{
 			curr = NULL;
 			break;
@@ -3014,6 +3014,9 @@ struct memory_buffer_args {
 	size_t element_size;
 };
 
+
+/*
+*/
 void* memset_init_thread_function(void* args)
 {
 	struct memory_buffer_args* bargs = (struct memory_buffer_args*) args;
@@ -3040,6 +3043,10 @@ void* memset_init_thread_function(void* args)
 	free( args );
 	return NULL;
 }	
+
+
+/*
+*/
 void xkblas_register_work_buffer( void* ptr, size_t size )
 {
 	pthread_mutex_lock( &work_buffer_mutex );
@@ -3073,7 +3080,7 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 	printf("advise ok\n");
 	
 	struct memory_buffer_args *bargs = (struct memory_buffer_args*) malloc(sizeof(struct memory_buffer_args));
-	bargs->pos =  (uintptr_t) ptr;
+	bargs->pos =  ptr;
 	bargs->size = size;
 	bargs->element_size = 1024L * 1024L * 1024L;
 

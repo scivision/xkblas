@@ -495,9 +495,10 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 	/*
 	 * - If unified memory is activated, we does not need to allocate on the GPU
 	 */
-#if defined(KAAPI_UNIFIED) // Unified memory, nothing to do
-  return NULL;
-#else // We need to allocate something
+  if (dev->device->use_uvm)
+    return 0;
+
+  /* else We need to allocate something */
   void* ptr;
   cudaError_t res;
   kaapi_device_cuda_t* device = (kaapi_device_cuda_t*)dev->device;
@@ -533,7 +534,6 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
       *flag = KAAPI_MEMORY_DEVICE_FLAG_MOSTLY_FULL;
   }
   return (uintptr_t)ptr;
-#endif // else of: defined(KAAPI_UNIFIED)
 }
 
 
@@ -952,44 +952,47 @@ void* kaapi_cuda_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
-#if defined(KAAPI_UNIFIED)
-		// We need to prefetch the data
-	  struct cudaMemLocation loc;
-	  loc.type = cudaMemLocationTypeDevice;
-	  loc.id = 0;
-	  err = cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
-	  //err = cudaMemPrefetchAsync( req.ptr, req.size, 0, NULL );
-#endif //defined(KAAPI_UNIFIED)
-
-#if !defined(KAAPI_UNIFIED)
-		// Register
-          err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
-          if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
+          /* TG: todo if we want to have perdevice use_uvm.
+             this global test should be changed.
+          */
+          if (kaapi_default_param.use_uvm)
           {
-            printf("***[%s]: cudaHostRegister error: %i : %s\n", __func__, err,cudaGetErrorString(err));
-            req.err = EALREADY;
+            // We need to prefetch the data
+            struct cudaMemLocation loc;
+            loc.type = cudaMemLocationTypeDevice;
+            loc.id = 0;
+            err = cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
+      //err = cudaMemPrefetchAsync( req.ptr, req.size, 0, NULL );
+          } else {
+            err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
+            if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
+            {
+              printf("***[%s]: cudaHostRegister error: %i : %s\n", __func__, err,cudaGetErrorString(err));
+              req.err = EALREADY;
+            }
           }
-#endif //!defined(KAAPI_UNIFIED)
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-#if defined(KAAPI_UNIFIED)
-	  struct cudaMemLocation loc;
-	  loc.type = cudaMemLocationTypeHost;
-	  loc.id = 0;
-	  cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
-	  //cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc);
-	  //err = cudaMemPrefetchAsync( req.ptr, req.size, cudaCpuDeviceId, NULL );
-#endif //defined(KAAPI_UNIFIED)
-
-#if !defined(KAAPI_UNIFIED)
-          err = cudaHostUnregister(req.ptr);
-          if (!( (cudaSuccess == err) || (cudaErrorHostMemoryNotRegistered == err)))
+          if (req.op == DEVICE_REGISTER_REQUEST)
           {
-            printf("***[%s]: cudaHostUnregister error: %i: %s\n", __func__, err, cudaGetErrorString(err));
-            req.err = EALREADY;
+            /* TG: todo if we want to have perdevice use_uvm.
+               this global test should be changed.
+            */
+            struct cudaMemLocation loc;
+            loc.type = cudaMemLocationTypeHost;
+            loc.id = 0;
+            cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
+      //cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc);
+      //err = cudaMemPrefetchAsync( req.ptr, req.size, cudaCpuDeviceId, NULL );
+          } else {
+            err = cudaHostUnregister(req.ptr);
+            if (!( (cudaSuccess == err) || (cudaErrorHostMemoryNotRegistered == err)))
+            {
+              printf("***[%s]: cudaHostUnregister error: %i: %s\n", __func__, err, cudaGetErrorString(err));
+              req.err = EALREADY;
+            }
           }
-#endif //!defined(KAAPI_UNIFIED)
         }
       }
 #if KAAPI_USE_PERFCOUNTER
@@ -1094,13 +1097,6 @@ static int cuda_stream_decode_ioinstruction(
         stream = &cios->stream;
       kaapi_assert_debug(*stream !=0);
 
-#if 0
-      /* todo in an efficient way: implicit synchro between host_register_async and here */
-      /* wait end of pining operation if any */
-      while (rrl->posw != rrl->reg_sig)
-        kaapi_slowdown_cpu();
-#endif
-
 #if CONFIG_USE_EVENT && (KAAPI_USE_PERFCOUNTER || KAAPI_USE_TRACELIB)
       instr->t1 = kaapi_get_elapsedtime();
       res = cudaEventRecord(cios->start_events[ ios->pos_wp % ios->count ], *stream );
@@ -1138,7 +1134,6 @@ static int cuda_stream_decode_ioinstruction(
         case KAAPI_MEMORY_VIEW_1D:
         {
 
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           KAAPI_PLUGIN_TRACE_MSG("%s: instr '%s' 1D data\n", __FUNCTION__, name_io[instr->type]);
           //printf("%f: instr '%s' 1D data\n", kaapi_get_elapsedtime(), name_io[instr->type]);
           switch (instr->type)
@@ -1151,11 +1146,6 @@ static int cuda_stream_decode_ioinstruction(
               res = 0;
             break;
             case KAAPI_IO_COPY_H2D:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy1D H2D %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
@@ -1165,11 +1155,6 @@ _kaapi_unlock_print();
               COUNTER_SIZE_H2D(dev) += size;
             break;
             case KAAPI_IO_COPY_D2H:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy1D D2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpyAsync( dest,
                                      src,
                                      size,
@@ -1180,11 +1165,6 @@ _kaapi_unlock_print();
             break;
 
             case KAAPI_IO_COPY_D2D:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy1D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpyPeerAsync( dest,
                                          kaapi_device_ids[op->dev_dest->device->device_id],
                                          src,
@@ -1198,12 +1178,10 @@ _kaapi_unlock_print();
               kaapi_assert_debug(0);
           };
           CudaCheckError(res);
-#endif//KAAPI_UNIFIED
         } break;
 
         case KAAPI_MEMORY_VIEW_2D:
         {
-#ifndef KAAPI_UNIFIED //#endif//KAAPI_UNIFIED
           size_t width, height, dpitch, spitch;
           if (storage == KAAPI_MEMORY_STORAGE_ROWMAJOR)
           {
@@ -1223,39 +1201,19 @@ _kaapi_unlock_print();
           switch (instr->type)
           {
             case KAAPI_IO_COPY_H2H:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy2D H2H %p %p %i %p\n", pthread_self(), dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToHost, *stream );
             break;
             case KAAPI_IO_COPY_H2D:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy2D H2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyHostToDevice, *stream );
               COUNTER_CNT_H2D(dev)++;
               COUNTER_SIZE_H2D(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2H:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy2D D2H: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, op->dev_dest->device->device_id, dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToHost, *stream );
               COUNTER_CNT_D2H(dev)++;
               COUNTER_SIZE_D2H(dev)   += size;
             break;
             case KAAPI_IO_COPY_D2D:
-#if 0// KAAPI_DEBUG
-_kaapi_lock_print();
-	      printf("%x:: Memcpy2D D2D: %i -> %i:: dest: %p, src: %p, size: %i, stream: %p\n", pthread_self(), 1+op->dev_src->device->device_id, 1+op->dev_dest->device->device_id, dest, src, size, *stream);
-_kaapi_unlock_print();
-#endif
               res = cudaMemcpy2DAsync ( dest, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, *stream );
               COUNTER_CNT_D2D(dev)++;
               COUNTER_SIZE_D2D(dev) += size;
@@ -1263,8 +1221,7 @@ _kaapi_unlock_print();
             default:
               kaapi_assert(0);
           };
-	CudaCheckError(res);
-#endif//KAAPI_UNIFIED
+	        CudaCheckError(res);
         } break;
 
         case KAAPI_MEMORY_VIEW_3D:
@@ -1893,6 +1850,21 @@ KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
   return (unsigned int)device_count;
 }
 
+struct _kaapi_known_arch {
+  const char* name;
+  kaapi_dev_arch_t arch;
+  int has_uvm;
+};
+
+static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
+  {"Tesla V100-SXM", KAAPI_ARCH_V100, 0},
+  {"NVIDIA A100-SXM", KAAPI_ARCH_A100, 0},
+  {"H100", KAAPI_ARCH_H100, 0},
+  {"GH200", KAAPI_ARCH_GRACEHOPPER, 1},
+  { 0, KAAPI_ARCH_UNKNOWN, 0}
+};
+#define KAAPI_KNOWN_DEVICE 4
+
 /*
 */
 KAAPI_CLASS_ENTRYPOINT int
@@ -1912,42 +1884,45 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
     res = cudaGetDeviceProperties(&prop, i);
     CudaCheckError(res);
     
-    if (prop.unifiedAddressing ==0) *has_uvm = 0;
-
-    
-    /*  directManagedMemAccessFromHost : Host can directly access managed memory on the device without migration.
-        managedMemory:Device supports allocating managed memory on this system
-        pageableMemoryAccess: Device supports coherently accessing pageable memory without calling cudaHostRegister on it
-        pageableMemoryAccessUsesHostPageTables: Device accesses pageable memory via the host's page tables
-        unifiedAddressing: Device shares a unified address space with the host
-        concurrentManagedAccess: is 1 if the device can coherently access managed memory concurrently with the CPU, and 0 otherwise.
-        
-        Note on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#unified-memory-programming
-        "pageableMemoryAccess: This property is set to 1 on systems with CUDA Unified Memory support where all threads may access System-Allocated Memory and CUDA Managed Memory. These systems include NVIDIA Grace Hopper, IBM Power9 + Volta, and modern Linux systems with HMM enabled (see next bullet), among others."
-        
-        Note 19.2.2.2.2 on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#unified-memory-programming
-        "Some devices have hardware support for coherent reads, stores and atomic accesses from the host on GPU-resident unified memory. These devices have the attribute cudaDevAttrDirectManagedMemAccessFromHost set to 1. Note that all hardware coherent systems have this attribute set for NVLink-connected devices. On these systems, the host has direct access to GPU-resident memory without page faults and data migration (see Data Usage Hints for more details on memory usage hints). Note that with CUDA Managed Memory, the cudaMemAdviseSetAccessedBy hint with cudaCpuDeviceId is necessary to enable this direct access without page faults."
-        
-        Note 19.2.2.1.2 on: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#um-hw-coherency
-        "Hardware coherent systems such as NVIDIA Grace Hopper offer a logically combined page table for both CPUs and GPUs. This is important because in order to access System-Allocated Memory from the GPU, the GPU uses whichever page table entry was created by the CPU for the requested memory. If that page table entry uses the default CPU page size of 4KiB or 64KiB, accesses to large virtual memory areas will cause significant TLB misses, thus significant slowdowns.
-
-          See the section on configuring huge pages for examples on how to ensure System-Allocated Memory uses large enough page sizes to avoid this type of issue.
-        "
-
-
-        
-        cudaDevAttrPageableMemoryAccess: 1 if the device supports coherently accessing pageable memory without calling cudaHostRegister on it, and 0 otherwise
-        cudaDevAttrConcurrentManagedAccess: 1 if the device can coherently access managed memory concurrently with the CPU, and 0 otherwise
-        cudaDevAttrCanUseHostPointerForRegisteredMem: 1 if the device can access host registered memory at the same virtual address as the CPU, and 0 otherwise
-        cudaDevAttrPageableMemoryAccessUsesHostPageTables: 1 if the device accesses pageable memory via the host's page tables, and 0 otherwise
-        cudaDevAttrDirectManagedMemAccessFromHost: 1 if the host can directly access managed memory on the device without migration, and 0 otherwise
-        cudaDevAttrIntegrated: 1 if the device is integrated with the memory subsystem, or 0 if not
-        cudaDevAttrCanMapHostMemory: 1 if the device can map host memory into the CUDA address space, or 0 if not
-        cudaDevAttrManagedMemory: 1 if device supports allocating managed memory, 0 if not
+    /* UVM:
+        MASK_SOFT_UVM = 0x1
+        MASK_HARD_UVM = 0x2 (implicitlyy imply performance)
     */
-    res = 	cudaDeviceGetAttribute(&value, attr, i);
-    CudaCheckError(res);
+    if (prop.unifiedAddressing ==1) *has_uvm |= 0x1;
+    else *has_uvm &= ~0x1;
+
+    if (prop.managedMemory == 1) *has_uvm |= 0x1;
+    else *has_uvm &= ~0x1;
+
+    if (prop.concurrentManagedAccess == 1) *has_uvm |= 0x1;
+    else *has_uvm &= ~0x1;
+
+    if (prop.pageableMemoryAccess == 1) *has_uvm |= 0x2; /* ??? */
+    else *has_uvm &= ~0x2;
+    
+    /* look if known name */
+    int j;
+    for (j=0; j<KAAPI_KNOWN_DEVICE; ++j)
+    {
+      if (kaapi_known_devicebyname[j].name == 0) break;
+      size_t len = strlen(kaapi_known_devicebyname[j].name);
+      if (strncmp(prop.name, kaapi_known_devicebyname[j].name, len)==0)
+      {
+        if (kaapi_known_devicebyname[j].has_uvm) *has_uvm |= 0x2;
+        else *has_uvm &= ~0x2;
+        if (*arch == KAAPI_ARCH_UNDEF) *arch = kaapi_known_devicebyname[j].arch;
+        else if (*arch != kaapi_known_devicebyname[j].arch) *arch = KAAPI_ARCH_UNKNOWN;
+        break;
+      }
+    }
+    if (j == KAAPI_KNOWN_DEVICE)
+      *arch = KAAPI_ARCH_UNKNOWN;
   }
+  
+  /* if software UVM capability is 0 then reset
+     the hardware performance capability to 0
+  */
+  if ((*has_uvm & 0x1) ==0) *has_uvm = 0;
 
   return 0;
 }
@@ -2492,15 +2467,17 @@ KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
 {
-	// TODO add checks
-	cudaMallocManaged( pptr, size, cudaMemAttachGlobal );
+  cudaError_t res;
+  res = cudaMallocManaged( pptr, size, cudaMemAttachGlobal );
+  CudaCheckError(res);
 }
 
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void* ptr )
 {
-	// TODO add checks
-	cudaFree( ptr );
+  cudaError_t res;
+  res = cudaFree( ptr );
+  CudaCheckError(res);
 }
 #endif //defined(KAAPI_UNIFIED)
 
@@ -2595,6 +2572,7 @@ KAAPI_PLUGIN_ENTRYPOINT(host_unregister_direct)(void* ptr)
         cudaHostUnregister(ptr);
 }
 
+#if 0
 // TODO clean this, temporary
 extern void cuda_sniv12(cudaStream_t,float*,float*,int*,int,int,int,int,int,int);
 KAAPI_CLASS_ENTRYPOINT void
@@ -2609,6 +2587,7 @@ KAAPI_PLUGIN_ENTRYPOINT(sniv12_sync)( int nrows, int nass1, int nelim,
 	cuda_sniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
   cudaStreamSynchronize( local_thread_stream );
 }
+
 extern void cuda_dniv12(cudaStream_t,double*,double*,int*,int,int,int,int,int,int);
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(dniv12_sync)( int nrows, int nass1, int nelim,
@@ -2622,6 +2601,9 @@ KAAPI_PLUGIN_ENTRYPOINT(dniv12_sync)( int nrows, int nass1, int nelim,
 	cuda_dniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
   cudaStreamSynchronize( local_thread_stream );
 }
+#endif
+
+#if 0
 extern void cuda_cniv12(cudaStream_t,cuComplex*,cuComplex*,int*,int,int,int,int,int,int);
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(cniv12_sync)( int nrows, int nass1, int nelim,
@@ -2648,6 +2630,7 @@ KAAPI_PLUGIN_ENTRYPOINT(zniv12_sync)( int nrows, int nass1, int nelim,
 	cuda_zniv12( local_thread_stream, A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
   cudaStreamSynchronize( local_thread_stream );
 }
+#endif
 
 #if KAAPI_USE_DYNLOADER==0
   /* */
@@ -2684,16 +2667,5 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
   EP (malloc_unified);
   EP (free_unified);
 #endif //defined(KAAPI_UNIFIED)
-  EP (memset);
-  EP (memcpy);
-  EP (advise_gpu);
-  EP (advise_cpu);
-  EP (host_register_direct);
-  EP (host_unregister_direct);
-
-	EP (sniv12_sync);
-	EP (dniv12_sync);
-	EP (cniv12_sync);
-	EP (zniv12_sync);
 }
 #endif
