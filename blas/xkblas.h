@@ -50,7 +50,7 @@
 
 /* VERION */
 #define __XKBLAS__ 0
-#define __XKBLAS_MINOR__ 4
+#define __XKBLAS_MINOR__ 6
 #define __XKBLAS_PATCHLEVEL__ 0
 
 
