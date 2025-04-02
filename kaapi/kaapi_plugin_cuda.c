@@ -2666,6 +2666,8 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
 #if defined(KAAPI_UNIFIED)
   EP (malloc_unified);
   EP (free_unified);
+  EP (advise_gpu);
+  EP (advise_cpu);
 #endif //defined(KAAPI_UNIFIED)
 }
 #endif
