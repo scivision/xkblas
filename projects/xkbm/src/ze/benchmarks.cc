@@ -52,7 +52,8 @@ typedef enum    immediate_t
 typedef enum    test_mode_t
 {
     KERNEL,
-    H2D
+    H2D,
+    D2H
 }               test_mode_t;
 
 template<immediate_t immediate, test_mode_t mode>
@@ -67,7 +68,9 @@ cmdlist_run(benchmark_node_t * node)
         .pNext      = NULL,
         .ordinal    = ordinal,
         .index      = index,
+        // .flags      = ZE_COMMAND_QUEUE_FLAG_IN_ORDER,
         .flags      = ZE_COMMAND_QUEUE_FLAG_EXPLICIT_ONLY,
+        // .mode       = ZE_COMMAND_QUEUE_MODE_SYNCHRONOUS,
         .mode       = ZE_COMMAND_QUEUE_MODE_ASYNCHRONOUS,
         .priority   = ZE_COMMAND_QUEUE_PRIORITY_PRIORITY_LOW
     };
@@ -80,12 +83,20 @@ cmdlist_run(benchmark_node_t * node)
     {
         ZE_SAFE_CALL(zeCommandQueueCreate(context, device, &queue_desc, &queue));
 
-        const int queue_ordinal = 0;
+        // on ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT
+        // driver may perform additional optimizations that increase execution
+        // throughput. using this flag may increase Host overhead of
+        // zeCommandListClose and zeCommandQueueExecuteCommandLists. therefore,
+        // this flag should not be set for low-latency usage-models.
+
+        const uint32_t queue_ordinal = ordinal;
         ze_command_list_desc_t list_desc {
             .stype = ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC,
             .pNext = NULL,
             .commandQueueGroupOrdinal = queue_ordinal,
-            .flags = ZE_COMMAND_LIST_FLAG_RELAXED_ORDERING | ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT
+            .flags = ZE_COMMAND_LIST_FLAG_RELAXED_ORDERING,
+            //  .flags = ZE_COMMAND_LIST_FLAG_MAXIMIZE_THROUGHPUT,
+            // .flags = ZE_COMMAND_LIST_FLAG_IN_ORDER
         };
         ZE_SAFE_CALL(zeCommandListCreate(context, device, &list_desc, &list));
     }
@@ -93,7 +104,7 @@ cmdlist_run(benchmark_node_t * node)
         LOGGER_FATAL("error");
 
     // timing
-    constexpr int n = immediate == IMMEDIATE ? 1 : 12;
+    constexpr int n = immediate == IMMEDIATE ? 1 : 8;
     time_array_t time(n, 100);
 
     // event pool
@@ -119,6 +130,28 @@ cmdlist_run(benchmark_node_t * node)
 
     const uint32_t n_wait_events = 0;
     ze_event_handle_t * wait_events = nullptr;
+    ze_group_count_t launch = { 1, 0, 0 };
+
+    // allocate memory for latency test
+    const size_t size = 1 << n;
+    unsigned char * hostptr = (unsigned char *) calloc(1, size);
+    const size_t alignment = 4 * sizeof(double);
+    unsigned char * deviceptr = NULL;
+    const ze_device_mem_alloc_desc_t device_desc = {
+        .stype = ZE_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
+        .pNext = NULL,
+        .flags = 0,
+        .ordinal = 0
+    };
+    ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device, (void **) &deviceptr));
+    assert(deviceptr);
+    ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device, deviceptr, size));
+
+    unsigned char * src = (mode == H2D) ? hostptr   : (mode == D2H) ? deviceptr : NULL;
+    unsigned char * dst = (mode == H2D) ? deviceptr : (mode == D2H) ? hostptr   : NULL;
+
+    const uint32_t n_list = 1;
+    ze_fence_handle_t fence = NULL;
 
     if (immediate == IMMEDIATE)
     {
@@ -129,7 +162,6 @@ cmdlist_run(benchmark_node_t * node)
             for (int iter = -10 ; iter < time.niters ; ++iter)
             {
                 uint64_t t0 = xkrt_get_nanotime();
-                ze_group_count_t launch = { 1, 0, 0 };
                 ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(list, kernel, &launch, event, n_wait_events, wait_events));
                 ZE_SAFE_CALL(zeCommandListHostSynchronize(list, UINT64_MAX));
                 uint64_t tf = xkrt_get_nanotime();
@@ -138,22 +170,8 @@ cmdlist_run(benchmark_node_t * node)
                 ZE_SAFE_CALL(zeEventHostReset(event));
             }
         }
-        else if (mode == H2D)
+        else if (mode == H2D || mode == D2H)
         {
-            // allocate memory for latency test
-            const size_t size = 1;
-            void * src = calloc(1, size);
-            const size_t alignment = 4 * sizeof(double);
-            void * dst = NULL;
-            const ze_device_mem_alloc_desc_t device_desc = {
-                .stype = ZE_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
-                .pNext = NULL,
-                .flags = 0,
-                .ordinal = 0
-            };
-            ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device, &dst));
-            assert(dst);
-            ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device, dst, size));
             // run the test
             for (int iter = -10 ; iter < time.niters ; ++iter)
             {
@@ -165,29 +183,24 @@ cmdlist_run(benchmark_node_t * node)
                     time.set(0, iter, tf-t0);
                 ZE_SAFE_CALL(zeEventHostReset(event));
             }
-            free(src);
-            ZE_SAFE_CALL(zeMemFree(context, dst));
         }
         else
             LOGGER_FATAL("error");
     }
     else if (immediate == NON_IMMEDIATE)
     {
-        const uint32_t n_list = 1;
-
         if (mode == KERNEL)
         {
             for (int i = 0 ; i < n ; ++i)
             {
+                const int n_op = 1 << i;
                 for (int iter = -10 ; iter < time.niters ; ++iter)
                 {
-                    const int n_op = 1 << i;
                     uint64_t t0 = xkrt_get_nanotime();
-                    ze_group_count_t launch = { 1, 0, 0 };
                     for (int j = 0 ; j < n_op ; ++j)
                         ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(list, kernel, &launch, events[j], n_wait_events, wait_events));
                     ZE_SAFE_CALL(zeCommandListClose(list));
-                    ZE_SAFE_CALL(zeCommandQueueExecuteCommandLists(queue, n_list, &list, NULL));
+                    ZE_SAFE_CALL(zeCommandQueueExecuteCommandLists(queue, n_list, &list, fence));
                     ZE_SAFE_CALL(zeCommandQueueSynchronize(queue, UINT64_MAX));
                     uint64_t tf = xkrt_get_nanotime();
                     if (iter >= 0)
@@ -198,30 +211,13 @@ cmdlist_run(benchmark_node_t * node)
                 }
             }
         }
-        else if (mode == H2D)
+        else if (mode == H2D || mode == D2H)
         {
-            // allocate memory for latency test
-            const size_t size = 1 << n;
-            char * src = (char *) calloc(1, size);
-            const size_t alignment = 4 * sizeof(double);
-            char * dst = NULL;
-            const ze_device_mem_alloc_desc_t device_desc = {
-                .stype = ZE_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
-                .pNext = NULL,
-                .flags = 0,
-                .ordinal = 0
-            };
-            ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device, (void **) &dst));
-            assert(dst);
-            ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device, dst, size));
-
-            ze_fence_handle_t fence = NULL;
-
             for (int i = 0 ; i < n ; ++i)
             {
+                const int n_op = 1 << i;
                 for (int iter = -10 ; iter < time.niters ; ++iter)
                 {
-                    const int n_op = 1 << i;
                     uint64_t t0 = xkrt_get_nanotime();
                     for (int j = 0 ; j < n_op ; ++j)
                         ZE_SAFE_CALL(zeCommandListAppendMemoryCopy(list, dst + j, src + j, 1, events[j], n_wait_events, wait_events));
@@ -236,12 +232,14 @@ cmdlist_run(benchmark_node_t * node)
                     ZE_SAFE_CALL(zeCommandListReset(list));
                 }
             }
-            free(src);
-            ZE_SAFE_CALL(zeMemFree(context, dst));
         }
     }
     else
         LOGGER_FATAL("error");
+
+    // release memory
+    free(hostptr);
+    ZE_SAFE_CALL(zeMemFree(context, deviceptr));
 
     // report
     auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", 1<<i); };
@@ -250,6 +248,8 @@ cmdlist_run(benchmark_node_t * node)
     // release stuff
     ZE_SAFE_CALL(zeEventPoolDestroy(pool));
     ZE_SAFE_CALL(zeCommandListDestroy(list));
+    if (immediate == NON_IMMEDIATE)
+        ZE_SAFE_CALL(zeCommandQueueDestroy(queue));
 }
 
 static benchmark_node_t non_immediate_kernel = {
@@ -258,10 +258,16 @@ static benchmark_node_t non_immediate_kernel = {
     .run = cmdlist_run<NON_IMMEDIATE, KERNEL>
 };
 
-static benchmark_node_t non_immediate_copy = {
-    .name = "copy",
+static benchmark_node_t non_immediate_h2d = {
+    .name = "h2d",
     .desc = "Latency of a H2D copy to an non-immediate command list",
     .run = cmdlist_run<NON_IMMEDIATE, H2D>
+};
+
+static benchmark_node_t non_immediate_d2h = {
+    .name = "d2h",
+    .desc = "Latency of a D2H copy to an non-immediate command list",
+    .run = cmdlist_run<NON_IMMEDIATE, D2H>
 };
 
 static benchmark_node_t non_immediate = {
@@ -275,10 +281,16 @@ static benchmark_node_t immediate_kernel = {
     .run = cmdlist_run<IMMEDIATE, KERNEL>
 };
 
-static benchmark_node_t immediate_copy = {
-    .name = "copy",
+static benchmark_node_t immediate_h2d = {
+    .name = "h2d",
     .desc = "Latency of a H2D copy to an immediate command list",
     .run = cmdlist_run<IMMEDIATE, H2D>
+};
+
+static benchmark_node_t immediate_d2h = {
+    .name = "d2h",
+    .desc = "Latency of a D2H copy to an immediate command list",
+    .run = cmdlist_run<IMMEDIATE, D2H>
 };
 
 static benchmark_node_t immediate = {
@@ -309,12 +321,14 @@ ze_benchmark_push(benchmark_node_t * parent)
     # define LINK(X, Y) benchmark_push_children(&X, &Y)
     LINK(ze, cmdlist);
 
-    LINK(cmdlist, immediate);
-    LINK(immediate, immediate_copy);
+    LINK(cmdlist,   immediate);
+    LINK(immediate, immediate_h2d);
+    LINK(immediate, immediate_d2h);
     LINK(immediate, immediate_kernel);
 
-    LINK(cmdlist, non_immediate);
-    LINK(non_immediate, non_immediate_copy);
+    LINK(cmdlist,       non_immediate);
+    LINK(non_immediate, non_immediate_h2d);
+    LINK(non_immediate, non_immediate_d2h);
     LINK(non_immediate, non_immediate_kernel);
 }
 

@@ -138,11 +138,7 @@ bench_pointer_get_attribute(benchmark_node_t * node)
 static benchmark_node_t pointer_get_attribute = {
     .name = "pointer_get_attribute",
     .desc = "cuPointerGetAttribute overheads",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
     .run = bench_pointer_get_attribute,
-    .enabled = 1
 };
 
 /////////////////////
@@ -213,24 +209,16 @@ bench_register_memory(benchmark_node_t * bench)
 static benchmark_node_t register_memory = {
     .name = "register-memory",
     .desc = "Host memory registration cost",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = bench_register_memory,
-    .enabled = 1
+    .run = bench_register_memory
 };
 
 /////////////////////
 // CUDA BENCHMARKS //
 /////////////////////
 
-static benchmark_node_t cuda_benchmarks = {
+static benchmark_node_t cuda = {
     .name = "cuda",
     .desc = "Metrics on Cuda-supported devices",
-    .parent = NULL,
-    .children = { NULL },
-    .nchildren = 0,
-    .run = NULL,
     .enabled = 1
 };
 
@@ -244,9 +232,11 @@ cuda_benchmark_push(benchmark_node_t * parent)
         return ;
     }
 
-    benchmark_push_children(parent, &cuda_benchmarks);
-    benchmark_push_children(&cuda_benchmarks, &register_memory);
-    benchmark_push_children(&cuda_benchmarks, &pointer_get_attribute);
+    benchmark_push_children(parent, &cuda);
+    # define LINK(X, Y) benchmark_push_children(&X, &Y)
+
+    LINK(cuda, register_memory);
+    LINK(cuda, pointer_get_attribute);
 }
 
 void

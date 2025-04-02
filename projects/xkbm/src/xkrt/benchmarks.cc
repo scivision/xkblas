@@ -56,7 +56,6 @@ foreach_device(benchmark_node_t * bench)
 #  include <xkrt/logger/logger-cu.h>
 #  include <xkrt/driver/driver-cu.h>
 
-# if 1
 const char PTX_EMPTY_KERNEL[] = "       \
 .version 6.4                            \
 .target sm_52                           \
@@ -67,11 +66,6 @@ const char PTX_EMPTY_KERNEL[] = "       \
     ret;                                \
 }                                       \
 ";
-# else
-const uint8_t PTX_EMPTY_KERNEL[] = {
-#  include <xkbm/kernels/empty.ptxbin>
-};
-# endif
 
 static xkrt_driver_module_fn_t XKBM_CU_KERNEL_EMPTY[XKRT_DEVICES_MAX];
 
@@ -87,6 +81,28 @@ const uint8_t SPIRV_EMPTY_KERNEL[] = {
 };
 
 static xkrt_driver_module_fn_t XKBM_ZE_KERNEL_EMPTY[XKRT_DEVICES_MAX];
+
+int
+read_from_binary(unsigned char **output, size_t * size, const char *name)
+{
+    FILE *fp = fopen(name, "rb");
+    if (!fp)
+        return -1;
+
+    fseek(fp, 0, SEEK_END);
+    *size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    *output = (unsigned char *)malloc(*size * sizeof(unsigned char));
+    if (!*output) {
+        fclose(fp);
+        return -1;
+    }
+
+    fread(*output, *size, 1, fp);
+    fclose(fp);
+    return 0;
+}
 
 # endif
 
@@ -235,8 +251,14 @@ kernel_launch_latency_init(void)
                     # if XKRT_SUPPORT_ZE
                     case (XKRT_DRIVER_TYPE_ZE):
                     {
+                        # if 0
+                        const char * name = "../include/xkbm/kernels/empty.ar";
+                        if (read_from_binary(&bin, &size, name))
+                            LOGGER_FATAL("Could not find the kernel binary file, have you precompiled the kernel ?");
+                        # else
                         bin  = (uint8_t *) SPIRV_EMPTY_KERNEL;
                         size = sizeof(SPIRV_EMPTY_KERNEL);
+                        # endif
                         dst  = XKBM_ZE_KERNEL_EMPTY + device_driver_id;
                         break ;
                     }
@@ -262,7 +284,7 @@ kernel_launch_latency_init(void)
                 if (!dst)
                     continue ;
 
-                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size, XKRT_DRIVER_MODULE_FORMAT_NATIVE);
+                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size, XKRT_DRIVER_MODULE_FORMAT_SPIRV);
                 *dst = driver->f_module_get_fn(module, "empty_kernel");
                 // driver->f_module_unload(module);
                 assert(*dst);
@@ -664,6 +686,10 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
     xkrt_device_global_id_t src_device_global_id = thread->device_global_id;
     xkrt_device_t * src_device = runtime.device_get(src_device_global_id);
     assert(src_device);
+    assert(src_device->nmemories);
+
+    xkrt_driver_t * driver = runtime.driver_get(src_device->driver_type);
+    assert(driver);
 
     ////////////////////////////////////
     // Allocate memory on each device //
@@ -671,11 +697,10 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     // size of memory to transfer
     // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) 1 * 512 * 1024 * 1024 : 0;
+    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) src_device->memories[0].capacity / (runtime.drivers.devices.n.load() - 1) / 64 : 0;
     assert(size);
     const size_t chunk_size = size / nchunks;
-
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
+    for (xkrt_device_global_id_t device_global_id = 1 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
         for (int i = 0 ; i < src_device->nmemories ; ++i)
             for (int j = 0 ; j < 2 ; ++j)
                 if ((tls->areas[src_device_global_id][device_global_id][i][j] = src_device->memory_allocate_on(size, i)) == NULL)
@@ -691,11 +716,11 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     for (int i = 0 ; i < src_device->nmemories ; ++i)
     {
-        constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 5 : 0;
+        constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 21 : 0;
         static_assert(niters);
         time_array_t time(runtime.drivers.devices.n*XKRT_DEVICE_MEMORIES_MAX, niters);
 
-        for (xkrt_device_global_id_t dst_device_global_id = 0 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
+        for (xkrt_device_global_id_t dst_device_global_id = 1 ; dst_device_global_id < runtime.drivers.devices.n ; ++dst_device_global_id)
         {
             xkrt_device_t * dst_device = runtime.device_get(dst_device_global_id);
             assert(dst_device);
@@ -729,6 +754,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                         }
                         xkrt_sync(&runtime);
                     }
+
                     uint64_t tf = xkrt_get_nanotime();
 
                     if (iter >= 0)
@@ -823,6 +849,7 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     assert(device);
+    assert(device->nmemories);
 
     constexpr int niters = (transfer_mode == LATENCY) ? 1001 : (transfer_mode == BANDWIDTH) ? 11 : 0;
     static_assert(niters);

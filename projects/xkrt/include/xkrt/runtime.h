@@ -18,7 +18,7 @@
 # include <xkrt/driver/driver.h>
 # include <xkrt/thread/thread.h>
 # include <xkrt/memory/coherency-controller.hpp>
-# include <xkrt/router-affinity.hpp>
+# include <xkrt/memory/router-affinity.hpp>
 # include <xkrt/stats/stats.h>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/task/task.hpp>
