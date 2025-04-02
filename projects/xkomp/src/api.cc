@@ -1,7 +1,6 @@
-# include <stdint.h>
 # include <xkrt/logger/logger.h>
-
-# include <xkomp/kmp.h>
+# include <kmp.h>
+# include <stdint.h>
 
 extern "C"
 kmp_int32

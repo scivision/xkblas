@@ -1,7 +1,7 @@
 # include <xkrt/logger/logger.h>
-# include <xkomp/kmp.h>
 
 # include <assert.h>
+# include <kmp.h>
 
 extern "C"
 kmp_task_t *
