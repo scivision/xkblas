@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 21:01:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:33:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,14 +47,8 @@ typedef struct  xkrt_driver_t
     /* devices */
     xkrt_device_t * devices[XKRT_DEVICES_MAX];
 
-    /* number of devices targeted, used in initialization */
-    volatile std::atomic<int> ndevices_targeted;
-
-    /* number of devices in the INIT state */
-    volatile std::atomic<int> ndevices_inited;
-
-    /* number of devices in the COMMIT state */
-    volatile std::atomic<int> ndevices_commited;
+    /* number of devices commited */
+    std::atomic<int> ndevices_commited;
 
     /////////////////////////////////////
     //  API TO IMPLEMENT BY THE DRIVER //
@@ -162,6 +156,12 @@ typedef struct  xkrt_drivers_t
 
     struct {
 
+        /* devices team */
+        xkrt_team_t team;
+
+        /* a barrier to synchronize all threads of the team and the main thread */
+        pthread_barrier_t barrier;
+
         /* list of devices */
         xkrt_device_t * list[XKRT_DEVICES_MAX];
 
@@ -174,15 +174,5 @@ typedef struct  xkrt_drivers_t
     } devices;
 
 }               xkrt_drivers_t;
-
-void
-xkrt_drivers_init(
-    xkrt_drivers_t * drivers,
-    int ndevices,
-    int drivers_mask,
-    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
-    void * vargs
-);
-void xkrt_drivers_deinit(xkrt_drivers_t * drivers);
 
 #endif /* __DRIVER_H__ */

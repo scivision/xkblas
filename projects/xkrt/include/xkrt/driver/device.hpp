@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/10 16:18:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 03:13:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,7 +19,6 @@
 # include <xkrt/xkrt-support.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver-type.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/area.h>
 # include <xkrt/memory/cache-line-size.hpp>
@@ -76,9 +75,6 @@ typedef struct  xkrt_device_t
 
     /* the device state */
     std::atomic<xkrt_device_state_t> state;
-
-    /* the device worker thread */
-    Thread * thread;
 
     /* affinity[i] - j-th bit is set to '1' if this device has an affinity 'i'
      * with 'j' (the lowest affinity, the better perf) */
@@ -330,6 +326,29 @@ typedef struct  xkrt_device_t
         # undef IS_1D
         # undef IS_2D
     }
+
+    //////////////////////
+    // TASKS SUBMISSION //
+    //////////////////////
+
+    /* worker threads for that device */
+    xkrt_thread_t * threads[XKRT_MAX_THREADS_PER_DEVICE];
+
+    /* total number of threads */
+    std::atomic<uint8_t> nthreads;
+
+    /* the next thread to receive a task */
+    std::atomic<uint8_t> thread_next;
+
+    /* push a task to a thread of the device */
+    void push(task_t * const & task)
+    {
+        uint8_t tid = this->thread_next.fetch_add(1, std::memory_order_relaxed);
+        xkrt_thread_t * thread = this->threads[tid];
+        thread->deque.push(task);
+        thread->wakeup();
+    }
+
 }               xkrt_device_t;
 
 #endif /* __XKRT_DEVICE_HPP__ */

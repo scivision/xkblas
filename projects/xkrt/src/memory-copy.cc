@@ -5,14 +5,13 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 21:57:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 01:59:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread.hpp>
 
 typedef struct  copy_args_t
 {
@@ -82,7 +81,7 @@ xkrt_memory_copy_async(
     const uintptr_t src_device_mem,
     const size_t size
 ) {
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DETACHABLE | TASK_FLAG_DEVICE;

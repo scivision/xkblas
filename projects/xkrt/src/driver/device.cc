@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 21:42:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 02:22:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -372,7 +372,6 @@ int
 xkrt_device_t::offloader_poll(void)
 {
     int err = 0;
-    assert(Thread::self() == this->thread);
 
     err = this->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_ALL);
     assert((err == 0) || (err == EINPROGRESS));
@@ -397,7 +396,7 @@ xkrt_device_t::offloader_stream_instruction_commit(
     stream->commit(instr);
 
     /* wakeup device worker thread */
-    this->thread->thread->wakeup();
+    stream->thread->wakeup();
 }
 
 void

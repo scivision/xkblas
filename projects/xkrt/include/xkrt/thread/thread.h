@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 00:17:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 03:01:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -30,64 +30,6 @@ typedef enum    xkrt_thread_state_t
     XKRT_THREAD_UNINITIALIZED   = 0,
     XKRT_THREAD_INITIALIZED     = 1
 }               xkrt_thread_state_t;
-
-struct xkrt_team_node_t;
-
-/* a thread */
-typedef struct  xkrt_thread_t
-{
-    public:
-
-        /* the thread state, use for synchronizing */
-        xkrt_thread_state_t state;
-
-        /* the pthread */
-        pthread_t pthread;
-
-        /* the tid in the team */
-        int tid;
-
-        /* the device global id attached to that thread */
-        xkrt_device_global_id_t device_global_id;
-
-        /* the thread deque */
-        // xkrt_deque_t<task_t *, 4096> deque;
-        NaiveQueue<task_t *> deque;
-
-    private:
-
-        /* lock and condition to sleep the mutex */
-        struct {
-            pthread_mutex_t lock;
-            pthread_cond_t  cond;
-            volatile bool   sleeping;
-        } sleep;
-
-    public:
-
-        xkrt_thread_t(int tid) : xkrt_thread_t(tid, 0, UNSPECIFIED_DEVICE_GLOBAL_ID) {}
-
-        xkrt_thread_t(
-            int tid,
-            pthread_t pthread,
-            xkrt_device_global_id_t device_global_id
-        ) :
-            state(XKRT_THREAD_INITIALIZED),
-            pthread(pthread),
-            tid(tid),
-            device_global_id(device_global_id),
-            deque()
-        {
-            pthread_mutex_init(&this->sleep.lock, 0);
-            pthread_cond_init (&this->sleep.cond, 0);
-            this->sleep.sleeping = false;
-        }
-        ~xkrt_thread_t() {}
-
-        void pause(void);
-        void wakeup(void);
-
-}               xkrt_thread_t;
 
 //  NOTES
 //
@@ -117,17 +59,6 @@ typedef enum    xkrt_team_node_type_t
     XKRT_TEAM_NODE_TYPE_MACHINE     = 7     // multi socket system
 }               xkrt_team_node_type_t;
 
-/* a node in the topology graph */
-typedef struct  xkrt_team_node_t
-{
-    /* the node type */
-    xkrt_team_node_type_t type;
-
-    /* the thread owning that node */
-    xkrt_thread_t * thread;
-
-}               xkrt_team_node_t;
-
 typedef enum    xkrt_team_binding_mode_t
 {
     XKRT_TEAM_BINDING_MODE_COMPACT,
@@ -145,6 +76,7 @@ typedef enum    xkrt_team_binding_places_t
     XKRT_TEAM_BINDING_PLACES_DEVICE,
     XKRT_TEAM_BINDING_PLACES_SOCKET,
     XKRT_TEAM_BINDING_PLACES_MACHINE,
+    XKRT_TEAM_BINDING_PLACES_EXPLICIT,
 }               xkrt_team_binding_places_t;
 
 typedef enum    xkrt_team_binding_flag_t
@@ -152,6 +84,216 @@ typedef enum    xkrt_team_binding_flag_t
     XKRT_TEAM_BINDING_FLAG_NONE         = 0,
     XKRT_TEAM_BINDING_FLAG_EXCLUDE_HOST = (1 << 0)
 }               xkrt_team_binding_flag_t;
+
+/* a place */
+typedef cpu_set_t xkrt_thread_place_t;
+
+struct xkrt_team_t;
+
+/* a thread */
+typedef struct  xkrt_thread_t
+{
+    public:
+
+        /* set the TLS */
+        static void save_tls(xkrt_thread_t * thread);
+
+        /* get the TLS */
+        static xkrt_thread_t * get_tls(void);
+
+    public:
+
+        /* the thread team */
+        xkrt_team_t * team;
+
+        /* the place assigned to that thread */
+        xkrt_thread_place_t place;
+
+        /* the thread implicit task */
+        union {
+            task_t implicit_task;
+            char _implicit_task_buffer[task_compute_size(TASK_FLAG_DOMAIN, 0)];
+        };
+
+        /* the current task */
+        task_t * current_task;
+
+        # ifndef NDEBUG
+        std::vector<task_t *> tasks;
+        # endif /* NDEBUG */
+
+        /* the thread state, use for synchronizing */
+        xkrt_thread_state_t state;
+
+        /* the pthread */
+        pthread_t pthread;
+
+        /* the tid in the team */
+        int tid;
+
+        /* the device global id attached to that thread */
+        xkrt_device_global_id_t device_global_id;
+
+        /* the thread deque */
+        // xkrt_deque_t<task_t *, 4096> deque;
+        NaiveQueue<task_t *> deque;
+
+        /* tasks stack */
+        uint8_t * memory_stack_bottom;
+
+        /* next free task pointer in the stack */
+        uint8_t * memory_stack_ptr;
+
+        /* memory capacity */
+        size_t memory_stack_capacity;
+
+    private:
+
+        /* lock and condition to sleep the mutex */
+        struct {
+            pthread_mutex_t lock;
+            pthread_cond_t  cond;
+            volatile bool   sleeping;
+        } sleep;
+
+
+    public:
+
+        // xkrt_thread_t(int tid) : xkrt_thread_t(tid, 0, UNSPECIFIED_DEVICE_GLOBAL_ID) {}
+
+        xkrt_thread_t(
+            xkrt_team_t * team,
+            int tid,
+            pthread_t pthread,
+            xkrt_device_global_id_t device_global_id,
+            xkrt_thread_place_t place
+        ) :
+            team(team),
+            state(XKRT_THREAD_INITIALIZED),
+            pthread(pthread),
+            tid(tid),
+            device_global_id(device_global_id),
+            deque(),
+            place(place),
+            implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
+            current_task(&this->implicit_task),
+            memory_stack_bottom(NULL),
+            memory_stack_capacity(THREAD_MAX_MEMORY)
+        {
+            // initialize sync primitives
+            pthread_mutex_init(&this->sleep.lock, 0);
+            pthread_cond_init (&this->sleep.cond, 0);
+            this->sleep.sleeping = false;
+
+            // initialize implicit task dependency domain
+            task_dom_info_t * dom = TASK_DOM_INFO(&this->implicit_task);
+            new (dom) task_dom_info_t();
+            # ifndef NDEBUG
+            snprintf(this->implicit_task.label, sizeof(this->implicit_task.label), "implicit");
+            # endif
+
+            // initialize memory allocator
+            while (1)
+            {
+                this->memory_stack_bottom = (uint8_t *) malloc(this->memory_stack_capacity);
+                if (this->memory_stack_bottom)
+                    break ;
+
+                this->memory_stack_capacity = (size_t) (this->memory_stack_capacity * 2 / 3);
+                if (this->memory_stack_capacity == 0)
+                    this->memory_stack_bottom = NULL;
+            }
+            this->memory_stack_ptr = this->memory_stack_bottom;
+            assert(this->memory_stack_bottom);
+        }
+
+        ~xkrt_thread_t()
+        {
+            free(this->memory_stack_ptr);
+        }
+
+    public:
+        void pause(void);
+        void wakeup(void);
+        void warmup(void);
+        task_t * allocate_task(const size_t size);
+        void deallocate_all_tasks(void);
+
+    /////////////////
+    // TASK HELPER //
+    /////////////////
+
+    public:
+
+        # define __Thread_task_execute(T, t, F, ...)                                                \
+            do {                                                                                    \
+                assert(T && t);                                                                     \
+                task_format_t * format = runtime->formats.list.list + t->fmtid;                     \
+                assert(format->f[TASK_FORMAT_TARGET_HOST]);                                         \
+                task_t * current = T->current_task;                                                 \
+                T->current_task = t;                                                                \
+                void (*f)(task_t *) = (void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST];      \
+                f(t);                                                                               \
+                __task_executed(t, F, __VA_ARGS__);                                                 \
+                T->current_task = current;                                                          \
+            } while (0)
+
+        template <typename... Args>
+        inline void
+        commit(
+            task_t * task,
+            void (*F)(Args..., task_t *),
+            Args... args
+        ) {
+            assert(this->current_task);
+            ++this->current_task->cc;
+            task->parent = this->current_task;
+            __task_commit(task, F, args...);
+        }
+
+
+        # ifndef NDEBUG
+        static void
+        dump_tasks(FILE * f, std::vector<task_t *> & tasks)
+        {
+            fprintf(f, "digraph G {\n");
+            for (task_t * & task : tasks)
+            {
+                if (task->flags & TASK_FLAG_DEPENDENT)
+                {
+                    task_dep_info_t * dep = TASK_DEP_INFO(task);
+                    access_t * accesses = TASK_ACCESSES(task);
+                    for (int i = 0 ; i < dep->ac ; ++i)
+                    {
+                        access_t * pred = accesses + i;
+                        fprintf(f, "    \"%p\" [label=\"%s - ac %d\"] ;\n", pred, task->label, i);
+                        for (access_t * succ : pred->successors)
+                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
+                    }
+                }
+            }
+            fprintf(f, "}\n");
+        }
+
+        void
+        dump_tasks(FILE * f)
+        {
+            xkrt_thread_t::dump_tasks(f, this->tasks);
+        }
+        # endif /* NDEBUG */
+
+}               xkrt_thread_t;
+
+/* a node in the topology graph */
+typedef struct  xkrt_team_node_t
+{
+    /* the node type */
+    xkrt_team_node_type_t type;
+
+    /* the thread owning that node */
+    xkrt_thread_t * thread;
+
+}               xkrt_team_node_t;
 
 /**
  *  The supported combinations are:
@@ -163,13 +305,20 @@ typedef enum    xkrt_team_binding_flag_t
  */
 typedef struct  xkrt_team_binding_t
 {
+    /* how to distribute threads among places */
     xkrt_team_binding_mode_t mode;
+
+    /* the places, if XKRT_TEAM_BINDING_PLACES_EXPLICIT - then `xkrt_thread_place_t` must be not null */
     xkrt_team_binding_places_t places;
+    xkrt_thread_place_t * places_list;
+    int nplaces;
+
+    /* additional flags */
     xkrt_team_binding_flag_t flags;
+
 }               xkrt_team_binding_t;
 
 /* team description */
-struct xkrt_team_t;
 typedef struct  xkrt_team_desc_t
 {
     // routine that will be executed by each thread
@@ -201,6 +350,7 @@ typedef struct  xkrt_team_t
         int nthreads;
 
         // barrier
+     // pthread_barrier_t barrier;
         struct {
             std::atomic<int> n;     /* for spawned threads to sync */
             volatile int version;

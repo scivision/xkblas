@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:07:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:41:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -92,6 +92,25 @@ __parse_offloader_capacity(xkrt_conf_t * conf, char const * value)
 }
 
 static void
+__parse_nthreads_per_device(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.nthreads_per_device = (uint8_t) atoi(value);
+
+    if (conf->device.offloader.nthreads_per_device < 1)
+    {
+        conf->device.offloader.nthreads_per_device = 1;
+        LOGGER_WARN("Invalid number of threads per device, set it to 1");
+    }
+
+    if (conf->device.offloader.nthreads_per_device > XKRT_MAX_THREADS_PER_DEVICE)
+    {
+        conf->device.offloader.nthreads_per_device = XKRT_MAX_THREADS_PER_DEVICE;
+        LOGGER_WARN("Requested too many threads per device, increase `XKRT_MAX_THREADS_PER_DEVICE` and recompile if you want more threads per device");
+    }
+}
+
+static void
 __parse_stats(xkrt_conf_t * conf, char const * value)
 {
     conf->report_stats_on_deinit = value ? atoi(value) : 0;
@@ -116,23 +135,24 @@ typedef struct  xkrt_conf_parse_t
 
 // variables are parsed in-order
 static xkrt_conf_parse_t CONF_PARSE[] = {
-    {"XKRT_HELP",                 __parse_help,               "Show this helper"},
-    {"XKRT_VERBOSE",              __parse_verbose,            "Verbosity level (the higher the most)"},
-    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,    "Merge memory transfers over continuous virtual memory"},
-    {"XKRT_PRECISION",            NULL,                       NULL},
-    {"XKRT_NGPUS",                __parse_ngpus,              "Number of gpus to use"},
-    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,    "%% of total memory to allocate initially per GPU (in ]0..100["},
-    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,       "Number of concurrent H2D streams per GPU"},
-    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,       "Number of concurrent D2H streams per GPU"},
-    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,       "Number of concurrent D2D streams per GPU"},
-    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,      "Number of concurrent kernel streams per GPU"},
-    {"XKRT_NKERNELS_PER_STREAM",  __parse_nkernels_per_stream,"Number of concurrent kernels per stream"},
-    {"XKRT_CACHE_LIMIT",          NULL,                       NULL},
-    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity, "Maximum number of pending instructions per stream"},
-    {"XKRT_DEFAULT_MATH",         NULL,                       NULL},
-    {"XKRT_STATS",                __parse_stats,              "Boolean to dump stats on deinit"},
-    {"XKRT_DRIVERS",              __parse_drivers,            "A bitmask to set enabled drivers"},
-    {NULL,                       NULL,                       NULL}
+    {"XKRT_HELP",                 __parse_help,                "Show this helper"},
+    {"XKRT_VERBOSE",              __parse_verbose,             "Verbosity level (the higher the most)"},
+    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,     "Merge memory transfers over continuous virtual memory"},
+    {"XKRT_PRECISION",            NULL,                        NULL},
+    {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
+    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
+    {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
+    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of concurrent H2D streams per GPU"},
+    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of concurrent D2H streams per GPU"},
+    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of concurrent D2D streams per GPU"},
+    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of concurrent kernel streams per GPU"},
+    {"XKRT_NKERNELS_PER_STREAM",  __parse_nkernels_per_stream, "Number of concurrent kernels per stream"},
+    {"XKRT_CACHE_LIMIT",          NULL,                        NULL},
+    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
+    {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
+    {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
+    {"XKRT_DRIVERS",              __parse_drivers,             "A bitmask to set enabled drivers"},
+    {NULL,                       NULL,                         NULL}
 };
 
 void
@@ -151,13 +171,14 @@ xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
     conf->report_stats_on_deinit    = 0;
-    conf->device.ngpus           = (uint8_t)-1;
+    conf->device.ngpus              = (uint8_t)-1;
     conf->device.gpu_mem_percent    = (float) 50.0;
 
     //////////////////
     //  KERNEL CONF //
     //////////////////
     conf->device.offloader.capacity = 512;
+    conf->device.offloader.nthreads_per_device = 1;
 
     // set to -1 so the driver's stream-suggest API fills these values if not
     // set by an env variable

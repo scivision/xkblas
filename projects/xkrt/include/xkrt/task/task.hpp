@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 19:58:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 01:41:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -115,24 +115,11 @@ typedef struct  task_t
 
         /** Tasks currently do not support 'OpenMP private data' or 'kaapi/cilk stack' */
 
-# if 1
-
-        // TODO : remove these too, we only use parent to count children for sync()
-        // but we could instead increment a uint8_t counter, where threads stealing
-        // increment on first steal, decrement when stealing fails done
-        // -> complexity goes from n of child tasks to n of threads
-
         /* parent task */
         task_t * parent;
 
         /* children counter - number of threads with uncompleted tasks scheduled */
         std::atomic<uint32_t> cc;
-
-        # else
-
-        std::atomic_uint_least8_t tc;
-
-        # endif
 
         # ifndef NDEBUG
         char label[128];
@@ -209,6 +196,7 @@ typedef struct  task_dom_info_t
         domains.clear();
     }
 }               task_dom_info_t;
+
 
 /* fallback if wrong flags parameter - https://stackoverflow.com/questions/20461121/constexpr-error-at-compile-time-but-no-overhead-at-run-time */
 static size_t
@@ -376,28 +364,6 @@ TASK_ARGS(const task_t * task)
 ///////////////////////////////////
 // Methods to setup dependencies //
 ///////////////////////////////////
-
-/* retrieve the domain to use for the given access */
-static inline DependencyDomain *
-task_get_dependency_domain(task_t * task, const access_t * access)
-{
-    assert(task->flags & TASK_FLAG_DOMAIN);
-    task_dom_info_t * dom = TASK_DOM_INFO(task);
-
-    /* find previous deptree for that ld */
-    for (DependencyDomain * domain : dom->domains)
-        if (domain->can_resolve(access))
-            return domain;
-    return NULL;
-}
-
-static inline void
-task_put_dependency_domain(task_t * task, DependencyDomain * domain)
-{
-    assert(task->flags & TASK_FLAG_DOMAIN);
-    task_dom_info_t * dom = TASK_DOM_INFO(task);
-    dom->domains.push_back(domain);
-}
 
 /* pred precedes succ - call 'F(args)' if 'pred' isnt completed yet in a lock region */
 template <typename... Args>
@@ -583,4 +549,10 @@ __task_executed(
         __task_complete(task, F, args...);
 }
 
-#endif /* __XKRT_TASK_HPP__ */
+/**
+ * Retrieve or (insert and return) the dependency domain of the passed access
+ * on the currently executing task
+ */
+DependencyDomain * task_get_dependency_domain(task_t * task, const access_t * access);
+
+# endif /* __XKRT_TASK_HPP__ */

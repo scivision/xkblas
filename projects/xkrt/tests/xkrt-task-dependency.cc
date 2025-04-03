@@ -1,7 +1,7 @@
 # include <xkrt/xkrt.h>
+# include <xkrt/task/dependency-tree.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/task/task.hpp>
-# include <xkrt/driver/thread.hpp>
 
 # include <assert.h>
 # include <string.h>
@@ -30,7 +30,7 @@ main(void)
     }
     assert(FORMAT);
 
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
     // Create a task
@@ -65,7 +65,9 @@ main(void)
                 mem[i*ld+j] = 42;
 
         new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
-        thread->resolve<AC>(task, accesses);
+
+        DependencyTree * deptree = (DependencyTree *) task_get_dependency_domain(thread->current_task, accesses);
+        deptree->insert<AC>(accesses);
         # undef AC
     }
 

@@ -1,7 +1,6 @@
 # include <xkrt/xkrt.h>
 # include <xkrt/task/task-format.h>
 # include <xkrt/task/task.hpp>
-# include <xkrt/driver/thread.hpp>
 
 # include <assert.h>
 # include <string.h>
@@ -31,7 +30,7 @@ main(void)
     assert(FORMAT);
 
     // create an host task
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
     // Submit the task

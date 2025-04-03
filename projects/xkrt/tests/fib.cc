@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/19 23:48:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 02:15:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -47,10 +47,11 @@ fib(int n, int depth = 0)
     }
     else
     {
-        Thread * tls = Thread::self();
+        xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+        assert(thread);
 
         // shared(fn1) firstprivate(n, depth)
-        task_t * t1 = tls->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
+        task_t * t1 = thread->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
         new(t1) task_t(fmtid, flags);
         int ** shared1        = (int **) ((char*)t1 + sizeof(task_t));
         int *  firstprivate11 = (int *)  ((char*)t1 + sizeof(task_t) + sizeof(int *));
@@ -58,10 +59,10 @@ fib(int n, int depth = 0)
         *shared1        = &fn1;
         *firstprivate11 = n - 1;
         *firstprivate12 = depth+1;
-        tls->commit(t1, xkrt_team_thread_task_enqueue, &runtime, tls->team, tls->thread);
+        thread->commit(t1, xkrt_team_thread_task_enqueue, &runtime, thread->team, thread);
 
         // shared(fn2) firstprivate(n, depth)
-        task_t * t2 = tls->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
+        task_t * t2 = thread->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
         new(t2) task_t(fmtid, flags);
         int ** shared2        = (int **) ((char*)t2 + sizeof(task_t));
         int *  firstprivate21 = (int *)  ((char*)t2 + sizeof(task_t) + sizeof(int *));
@@ -69,7 +70,7 @@ fib(int n, int depth = 0)
         *shared2        = &fn2;
         *firstprivate21 = n - 2;
         *firstprivate22 = depth+1;
-        tls->commit(t2, xkrt_team_thread_task_enqueue, &runtime, tls->team, tls->thread);
+        thread->commit(t2, xkrt_team_thread_task_enqueue, &runtime, thread->team, thread);
 
         runtime.task_wait();
     }

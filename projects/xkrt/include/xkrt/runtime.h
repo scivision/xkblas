@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:08:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:36:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -50,9 +50,6 @@ typedef struct  xkrt_runtime_t
 
     /* mutex for accessing the memcontroller list */
     spinlock_t memcontrollers_lock;
-
-    /* host thread */
-    Thread * host_thread;
 
     /* user conf */
     xkrt_conf_t conf;
@@ -213,11 +210,14 @@ void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 /* memory async thread management */
 void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 
-void xkrt_host_thread_init(xkrt_runtime_t * runtime);
-void * xkrt_host_thread_main_loop(xkrt_runtime_t * runtime);
-
 /* Main entry thread created per device */
-void xkrt_device_thread_main(void * vruntime, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
+void * xkrt_device_thread_main(xkrt_team_t * team, xkrt_thread_t * thread);
+
+/* initialize drivers */
+void xkrt_drivers_init(xkrt_runtime_t * runtime);
+
+/* deinitialize drivers */
+void xkrt_drivers_deinit(xkrt_runtime_t * runtime);
 
 /* must be call once task accesses were all fetched */
 void xkrt_device_task_execute(
@@ -238,5 +238,19 @@ void xkrt_device_task_submit(
 
 /* report some stats about the runtime */
 void xkrt_runtime_stats_report(xkrt_runtime_t * runtime);
+
+/* arguments passed to the device team */
+typedef struct  xkrt_device_thread_args_t
+{
+    xkrt_driver_type_t driver_type;
+    uint8_t device_driver_id;
+}               xkrt_device_thread_args_t;
+
+typedef struct  xkrt_device_team_args_t
+{
+    xkrt_runtime_t * runtime;
+    xkrt_device_thread_args_t devices[XKRT_DEVICES_MAX];
+    int ndevices;
+}               xkrt_device_team_args_t;
 
 #endif /* __XKRT_RUNTIME_H__ */

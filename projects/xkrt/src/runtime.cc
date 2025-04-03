@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 20:17:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 01:46:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,7 +15,6 @@
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/driver/driver.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/memory/alignedas.h>
 # include <xkrt/sync/spinlock.h>
 
@@ -43,7 +42,7 @@ xkrt_runtimes_cleanup(void)
     xkrt_runtime_t * runtime = runtimes.list;
     while (runtime)
     {
-        xkrt_drivers_deinit(&runtime->drivers);
+        xkrt_drivers_deinit(runtime);
         runtime = runtime->next;
     }
 }
@@ -92,7 +91,7 @@ xkrt_init(xkrt_runtime_t * runtime)
 
     // the '+1' is to enforce the host device, always
     const int ndevices = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus + 1);
-    xkrt_drivers_init(&(runtime->drivers), ndevices, runtime->conf.drivers_mask, xkrt_device_thread_main, runtime);
+    xkrt_drivers_init(runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
     // register signal and exit function for cleaning up drivers
@@ -144,7 +143,7 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     SPINLOCK_UNLOCK(runtimes.lock);
 
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
-    xkrt_drivers_deinit(&runtime->drivers);
+    xkrt_drivers_deinit(runtime);
     hwloc_topology_destroy(runtime->topology);
 
     return 0;

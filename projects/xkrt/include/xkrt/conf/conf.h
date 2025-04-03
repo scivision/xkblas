@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:08:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/02 22:50:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -39,6 +39,7 @@ typedef struct  xkrt_conf_offloader_t
 {
     xkrt_conf_stream_t streams[XKRT_STREAM_TYPE_ALL];
     uint16_t capacity;
+    uint8_t nthreads_per_device;
 
 }               xkrt_conf_offloader_t;
 
@@ -47,7 +48,6 @@ typedef struct  xkrt_conf_device_t
     float gpu_mem_percent;              /* % of gpu memory to allocate initially */
     int ngpus;                          /* number of GPU for this node */
     xkrt_conf_offloader_t offloader;    /* offloader conf */
-
 }               xkrt_conf_device_t;
 
 //////////////////////////////////////////////////////////////////

@@ -5,16 +5,16 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/27 21:12:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 01:58:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/memory-tree.hpp>
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread.hpp>
+# include <xkrt/memory-tree.hpp>
 # include <xkrt/memory/alignedas.h>
+# include <xkrt/task/dependency-tree.hpp>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;
@@ -83,14 +83,15 @@ xkrt_coherency_host_async(
     // implementation with 1 copy per partite, launched as soon as they are ready
 
     // TODO : allocate instead on the thread thread ? creates a concurrency issue in the allocator though
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
+    assert(thread->current_task);
 
     /* create an access, and retrieve all tasks that are in conflict */
     std::vector<access_t *> conflicts;
     access_t access(NULL, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
-    DependencyDomain * domain = thread->get_dependency_domain(&access);
+    DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
     assert(domain);
 
     DependencyTree * deptree = (DependencyTree *) domain;
@@ -135,7 +136,7 @@ xkrt_coherency_host_async(
             deptree->precedence(conflict, access);
 
             // insert for future tasks dependencies
-            thread->insert<AC>(task, access);
+            deptree->insert<AC>(access);
 
             # undef AC
         }
@@ -174,7 +175,7 @@ xkrt_coherency_host_async(
             }
 
             // insert for future tasks dependencies
-            thread->insert<AC>(task, accesses);
+            deptree->insert<AC>(accesses);
 
             # undef AC
         }

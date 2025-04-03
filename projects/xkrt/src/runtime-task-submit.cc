@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 23:06:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 01:10:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,7 +23,7 @@ xkrt_runtime_submit_task_host(xkrt_runtime_t * runtime, task_t * task)
     xkrt_device_t * device = driver->devices[0];
     assert(device);
 
-    device->thread->push(task);
+    device->push(task);
 }
 
 void
@@ -37,7 +37,7 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     assert((dev->ocr_access_index != UNSPECIFIED_TASK_ACCESS) + (dev->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID) <= 1);
 
     // Find the worker to offload the task
-    Thread * worker = nullptr;
+    xkrt_device_t * device = NULL;
     xkrt_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
 
     // if an ocr parameter is set, retrieve the device accordingly
@@ -90,16 +90,12 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     if (device_id == HOST_DEVICE_GLOBAL_ID)
         return xkrt_runtime_submit_task_host(runtime, task);
 
-    if (worker == nullptr)
-    {
-        assert((device_id >= 0 && device_id < runtime->drivers.devices.n));
-        worker = runtime->drivers.devices.list[device_id]->thread;
-    }
+    assert((device_id >= 0 && device_id < runtime->drivers.devices.n));
+    device = runtime->drivers.devices.list[device_id];
+    assert(device);
 
     LOGGER_DEBUG("Enqueuing task `%s` to device %d", task->label, device_id);
-
-    assert(worker);
-    worker->push(task);
+    device->push(task);
 }
 
 void

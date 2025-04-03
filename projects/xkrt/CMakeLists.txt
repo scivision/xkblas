@@ -42,7 +42,6 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
     ${CMAKE_SOURCE_DIR}/src/driver/stream.cc
-    ${CMAKE_SOURCE_DIR}/src/driver/thread.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/bits-to-str.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
@@ -55,6 +54,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/stats.cc
+    ${CMAKE_SOURCE_DIR}/src/task/task.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
     ${CMAKE_SOURCE_DIR}/src/thread/thread.cc
     ${CMAKE_SOURCE_DIR}/src/thread/deque.cc

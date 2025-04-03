@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 22:59:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 02:23:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -155,7 +155,7 @@ xkrt_runtime_stats_tasks_report(xkrt_runtime_t * runtime)
     }
 
     # ifndef NDEBUG
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     int counter[TASK_STATE_MAX];
     memset(counter, 0, sizeof(counter));
     for (task_t * & task : thread->tasks)

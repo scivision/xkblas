@@ -5,18 +5,18 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 02:54:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 02:03:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/driver/thread.hpp>
 
 static inline void
-xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
-{
+xkrt_memory_deallocate_all(
+    xkrt_runtime_t * runtime
+) {
     for (xkrt_device_global_id_t device_global_id = 0 ;
             device_global_id < runtime->drivers.devices.n ;
             ++device_global_id)
@@ -28,25 +28,14 @@ xkrt_memory_deallocate_all(xkrt_runtime_t * runtime)
         device->memory_reset();
 
         // thread thread memory
-        Thread * thread = device->thread;
-        assert(thread);
-        thread->deallocate_all_tasks();
+        uint8_t nthreads = device->nthreads.load(std::memory_order_acq_rel);
+        for (uint8_t i = 0 ; i < nthreads ; ++i)
+        {
+            xkrt_thread_t * thread = device->threads[i];
+            assert(thread);
+            thread->deallocate_all_tasks();
+        }
     }
-
-    # pragma message(TODO "deallocating threads memory causes error: why ?")
-    # if 0
-
-    // coherent thread
-    Thread * thread = runtime->memory_coherent_thread_thread;
-    assert(thread);
-    thread->deallocate_all();
-
-    // producer incoming thread
-    Thread * producer = Thread::self();
-    assert(producer);
-    producer->deallocate_all();
-
-    # endif
 }
 
 extern "C"

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 22:30:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:37:36 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,121 +48,23 @@ trampoline(void * vargs)
     return NULL;
 }
 
-static void
-xkrt_driver_init(
-    xkrt_drivers_t * drivers,
-    int ndevices,
-    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
-    void * vargs,
-    xkrt_driver_type_t driver_type
-) {
-    xkrt_driver_t * driver = drivers->list[driver_type];
-    assert(driver);
-
-    driver->type = driver_type;
-    driver->ndevices_targeted = 0;
-    driver->ndevices_inited = 0;
-    driver->ndevices_commited = 0;
-
-    const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
-    LOGGER_INFO("Loading driver `%s`", driver_name);
-
-    if (driver->f_init == NULL || driver->f_init(ndevices))
-    {
-        LOGGER_WARN("Failed to load");
-        return ;
-    }
-
-    assert(driver->f_get_ndevices_max);
-    unsigned int n_devices_max = driver->f_get_ndevices_max();
-    LOGGER_DEBUG("Found %u devices", n_devices_max);
-
-    unsigned int n_devices = MIN(ndevices, n_devices_max);
-
-    driver->ndevices_targeted = n_devices;
-    driver->ndevices_inited   = 0;
-    driver->ndevices_commited = 0;
-
-    if (n_devices < 1)
-        return ;
-
-    # pragma message(TODO "Move that to the 'Thread' interfaces")
-    cpu_set_t save_schedset;
-    xkrt_runtime_t::thread_getaffinity(save_schedset);
-
-    hwloc_topology_t topology;
-    hwloc_topology_init(&topology);
-    hwloc_topology_load(topology);
-
-    /* init each device of that driver */
-    for (uint8_t i = 0; i < n_devices; ++i)
-    {
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-
-        // move the current thread to the device cpu set
-        cpu_set_t schedset;
-        assert(driver->f_device_cpuset);
-        int err = driver->f_device_cpuset(topology, &schedset, i);
-        if (err)
-        {
-            LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
-            --driver->ndevices_targeted;
-        }
-        else
-        {
-            err = pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &schedset);
-            if (err)
-            {
-                LOGGER_ERROR("Invalid cpuset returned by the driver for device %d", i);
-                --driver->ndevices_targeted;
-                continue ;
-            }
-        }
-
-        // bind the current thread before allocating
-        xkrt_runtime_t::thread_setaffinity(schedset);
-
-        // start the device thread
-        xkrt_driver_device_thread_arg_t * arg = (xkrt_driver_device_thread_arg_t *) malloc(sizeof(xkrt_driver_device_thread_arg_t));
-        assert(arg);
-        new (&arg->thread) xkrt_thread_t(-1);
-        arg->driver_type = driver_type;
-        arg->device_driver_id = i;
-        arg->routine = routine;
-        arg->vargs = vargs;
-
-        err = pthread_create(&arg->thread.pthread, &attr, trampoline, arg);
-        if (err)
-        {
-            LOGGER_ERROR("could not create a thread for the device %d", i);
-            --driver->ndevices_targeted;
-            continue ;
-        }
-    }
-
-    // move back the current thread to its initial cpu set
-    xkrt_runtime_t::thread_setaffinity(save_schedset);
-
-    hwloc_topology_destroy(topology);
-}
-
 /* initialize drivers and create 1 thread per gpu starting on the passed routine */
 void
-xkrt_drivers_init(
-    xkrt_drivers_t * drivers,
-    int ndevices,
-    int drivers_mask,
-    void (*routine)(void * args, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id),
-    void * args
-) {
+xkrt_drivers_init(xkrt_runtime_t * runtime)
+{
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
+    // PARAMETERS
+    int ndevices_requested  = runtime->conf.device.ngpus + 1;
+    int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
+    int drivers_mask        = runtime->conf.drivers_mask;
+    assert(ndevices_requested < XKRT_DEVICES_MAX);
+
     // SET MEMBERS
-    memset(drivers->list, 0, sizeof(drivers->list));
-    memset(drivers->devices.list, 0, sizeof(drivers->devices.list));
-    drivers->devices.n = 0;
-    drivers->devices.round_robin_device_global_id = 0;
+    memset(runtime->drivers.list, 0, sizeof(runtime->drivers.list));
+    memset(runtime->drivers.devices.list, 0, sizeof(runtime->drivers.devices.list));
+    runtime->drivers.devices.n = 0;
+    runtime->drivers.devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
     xkrt_driver_t * (*creators[XKRT_DRIVER_TYPE_MAX])(void);
@@ -193,57 +95,133 @@ xkrt_drivers_init(
     creators[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
 # endif /* XKRT_SUPPORT_HIP */
 
-    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX && drivers->devices.n < ndevices ; ++driver_type)
+    # if 0
+    typedef struct  xkrt_thread_device_args_t
     {
-        // TODO : do not load if conf
+        xkrt_driver_type_t driver_type;
+        int driver_device_id;
+    }               xkrt_thread_device_args_t;
+    # endif
+
+    // number of devices
+    unsigned int ndevices = 0;
+
+    // ALLOCATE DEVICE THREAD PLACES
+    xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_requested);
+    assert(places);
+
+    // ARGS PASSED TO FORKED THREADS
+    xkrt_device_team_args_t args = { .runtime = runtime };
+
+    // FOR EACH DRIVER
+    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX && ndevices < ndevices_requested ; ++driver_type)
+    {
+        // if the driver is enabled
         xkrt_driver_t * (*creator)(void) = creators[driver_type];
         if (drivers_mask & (1 << driver_type) && creator)
         {
+            // create it
             xkrt_driver_t * driver = creator();
-            drivers->list[driver_type] = driver;
+            runtime->drivers.list[driver_type] = driver;
+            if (driver == NULL)
+                continue ;
+            driver->type = (xkrt_driver_type_t) driver_type;
 
-            xkrt_driver_init(drivers, ndevices - drivers->devices.n, routine, args, (xkrt_driver_type_t) driver_type);
-            while (driver->ndevices_commited != driver->ndevices_targeted)
-                mem_pause();
+            // load devices
+            const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
+            LOGGER_INFO("Loading driver `%s`", driver_name);
 
-            assert(drivers->devices.n <= ndevices);
-            if (drivers->devices.n == ndevices)
-                break ;
+            driver->ndevices_commited = 0;
+            if (driver->f_init == NULL || driver->f_init(ndevices_requested - ndevices))
+            {
+                LOGGER_WARN("Failed to load");
+                return ;
+            }
+
+            assert(driver->f_get_ndevices_max);
+            unsigned int ndevices_max = driver->f_get_ndevices_max();
+            LOGGER_DEBUG("Driver has up to %u devices", ndevices_max);
+
+            unsigned int ndevices_for_driver = MIN(ndevices_requested - ndevices, ndevices_max);
+            assert(ndevices_for_driver);
+
+            // get cpuset for the device
+            for (uint8_t i = 0; i < ndevices_for_driver && ndevices < ndevices_requested; ++i)
+            {
+                assert(driver->f_device_cpuset);
+                int err = driver->f_device_cpuset(runtime->topology, &places[ndevices], i);
+                if (err)
+                    LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
+                else
+                {
+                    // TODO : save device info and pass it to forked thread
+                    args.devices[ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
+                    args.devices[ndevices].device_driver_id = i;
+                    ++ndevices;
+                }
+            }
         }
+        // driver disabled or couldnt init
         else
-            drivers->list[driver_type] = NULL;
+            runtime->drivers.list[driver_type] = NULL;
     }
+    assert(ndevices <= ndevices_requested);
 
     // DEBUG OUTPUT
-    if (drivers->devices.n == 0 && ndevices != 0)
+    if (ndevices == 0)
+    {
         LOGGER_WARN("No devices found :-(");
+        return ;
+    }
+    LOGGER_INFO("Found %d devices (with %d requested)", ndevices, ndevices_requested);
 
-    LOGGER_INFO("Enabled %d GPUs (with %d requested)", drivers->devices.n.load()-1, ndevices-1);
-    assert(drivers->devices.n <= ndevices);
+    // TODO : wait for all threads to start
+    runtime->drivers.devices.team.desc.routine              = xkrt_device_thread_main;
+    runtime->drivers.devices.team.desc.args                 = &args;
+    runtime->drivers.devices.team.desc.nthreads             = ndevices * nthreads_per_device;
+    runtime->drivers.devices.team.desc.binding.mode         = XKRT_TEAM_BINDING_MODE_COMPACT;
+    runtime->drivers.devices.team.desc.binding.places       = XKRT_TEAM_BINDING_PLACES_EXPLICIT;
+    runtime->drivers.devices.team.desc.binding.places_list  = places;
+    runtime->drivers.devices.team.desc.binding.nplaces      = ndevices;
+    runtime->drivers.devices.team.desc.binding.flags        = XKRT_TEAM_BINDING_FLAG_NONE;
+
+    // create a team of thread
+    pthread_barrier_t * barrier = &runtime->drivers.devices.barrier;
+    args.ndevices = ndevices;
+    if (pthread_barrier_init(barrier, NULL, runtime->drivers.devices.team.desc.nthreads + 1))
+        LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
+    runtime->team_create(&runtime->drivers.devices.team);
+
+    // wait for all devices to be created
+    pthread_barrier_wait(barrier);    // init
+    pthread_barrier_wait(barrier);    // commit
 }
 
 void
-xkrt_drivers_deinit(xkrt_drivers_t * drivers)
+xkrt_drivers_deinit(xkrt_runtime_t * runtime)
 {
     // notify each thread to stop
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
+    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
     {
-        xkrt_device_t * device = drivers->devices.list[device_global_id];
+        xkrt_device_t * device = runtime->drivers.devices.list[device_global_id];
         device->state = XKRT_DEVICE_STATE_STOP;
-        device->thread->thread->wakeup();
+
+        int nthreads = device->nthreads.load(std::memory_order_acq_rel);
+        for (int i = 0 ; i < nthreads ; ++i)
+            device->threads[i]->wakeup();
     }
 
     // wait for each thread
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < drivers->devices.n ; ++device_global_id)
-    {
-        xkrt_device_t * device = drivers->devices.list[device_global_id];
-        pthread_join(device->thread->thread->pthread, NULL);
-    }
+    runtime->team_join(&runtime->drivers.devices.team);
+    free(runtime->drivers.devices.team.desc.binding.places_list);
+
+    // can destroy the barrier now
+    pthread_barrier_destroy(&runtime->drivers.devices.barrier);
 
     // finalize each driver
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
-        xkrt_driver_t * driver = drivers->list[driver_type];
+        xkrt_driver_t * driver = runtime->drivers.list[driver_type];
         if (driver)
         {
             if (driver->f_finalize)
