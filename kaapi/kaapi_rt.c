@@ -156,7 +156,7 @@ const char* get_kaapi_info(void)
 #else
          "no",
 #endif
-         (kaapi_default_param.use_uvm ? "used" : "unused"),
+         (kaapi_default_param.use_unified ? "used" : "unused"),
 #if KAAPI_USE_STREAM_D2D
          "yes",
 #else

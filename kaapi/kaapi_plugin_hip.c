@@ -486,7 +486,7 @@ static inline void kaapi_hip_plugin_unlock(void)
 */
 static uintptr_t kaapi_hip_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 {
-  if (dev->device->use_uvm)
+  if (dev->device->use_unified)
     return (uintptr_t) 0;
 
   void* ptr;

@@ -206,7 +206,7 @@ kaapi_rtparam_t kaapi_default_param = {
   .cuda_conc_d2d         = 0,   /* output: D2D */
 #endif
   .cuda_cache_limit      = 0.98,
-  .use_uvm               = 0
+  .use_unified           = 0
 };
 
 kaapi_address_space_id_t kaapi_local_asid = 0;
@@ -244,7 +244,7 @@ int kaapi_setup_param(void)
   kaapi_default_param.cuda_conc_d2d         = 0;
 #endif
   kaapi_default_param.cuda_cache_limit      = 0.98;
-  kaapi_default_param.use_uvm               = 0
+  kaapi_default_param.use_unified           = 0;
 
   if (getenv("KAAPI_HELP")) kaapi_usage();
 
@@ -323,7 +323,7 @@ int kaapi_setup_param(void)
     if (kaapi_default_param.verbose <0) kaapi_default_param.verbose = 0;
   }
 
-  kaapi_default_param.use_uvm=0;
+  kaapi_default_param.use_unified=0;
   if (getenv("KAAPI_UNIFIED"))
   {
     int val = atoi(getenv("KAAPI_UNIFIED"));

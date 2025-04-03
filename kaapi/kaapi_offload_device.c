@@ -87,7 +87,7 @@ static void callback_epilogue_perparam(
 )
 {
   kaapi_device_t* device = (kaapi_device_t*)arg;
-  if (device->use_uvm == 0)
+  if (device->use_unified == 0)
     kaapi_dsm_release_data(a->mdi, device->memdev.asid, a );
 }
 
@@ -564,7 +564,7 @@ static int kaapi_offload_device_prepare_execute_task(
         &view
     );
 
-    if (device->use_uvm == 0)
+    if (device->use_unified == 0)
     {
       do {
         /* findaccess has already allocated the replica for asid with the right view.
@@ -617,7 +617,7 @@ static int kaapi_offload_device_prepare_execute_task(
         kaapi_task_getargs(task),
         &mdi->replicas[lid]->view
       );
-    } //end device->use_uvm==0
+    } //end device->use_unified==0
   }
 
 #if KAAPI_USE_PREFETCH
@@ -1350,8 +1350,8 @@ int kaapi_offload_device_init(kaapi_device_t* const device, kaapi_localitydomain
   }
 
   /* inherit global value */
-  if (kaapi_default_param.use_uvm)
-    device->use_uvm = 1;
+  if (kaapi_default_param.use_unified)
+    device->use_unified = 1;
 
 #if KAAPI_PIPELINE_GPUTASK
   /* */

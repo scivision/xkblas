@@ -126,7 +126,7 @@ enum {
 */
 struct kaapi_device {
     kaapi_memory_device_t       memdev;            /* casted to kaapi_device */
-    int                         use_uvm;           /* set to 1 if UVM is activated for the device */
+    int                         use_unified;       /* set to 1 if UVM is activated for the device */
     kaapi_offload_stream_t      stream;            /* communication streams host<->device */
     kaapi_localitydomain_t*     ld;                /* the device locality domain */
     kaapi_context_t*            ctxt;              /* running thread */

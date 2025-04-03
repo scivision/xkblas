@@ -130,7 +130,7 @@ printf("%p:: %30.30s: thread: %p, task: %p, READ(%p,%i,%i)/handle: %p, READWRITE
     taskarg->Bn = Bn;
 #endif
 #if KAAPI_USE_OCR 
-    /* OCR on the third parameter */
+    /* OCR on the second parameter */
     kaapi_task_set_ld(task, KAAPI_TASK_OCR_PARAM, 1);
 #else
     uint16_t ldid = xkblas_get_ld(Bh, Bm, Bn);

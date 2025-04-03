@@ -152,7 +152,7 @@ int xkblas_malloc_unified(void** ptr, size_t size)
 {
   if (ptr ==0) return EINVAL;
 #if defined(KAAPI_UNIFIED)
-  if (kaapi_default_param.has_unified)
+  if (kaapi_default_param.use_unified)
   {
 #if KAAPI_USE_CUDA
     kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
@@ -178,7 +178,7 @@ int xkblas_free_unified(void* ptr)
 {
   if (ptr ==0) return 0;
 #if defined(KAAPI_UNIFIED)
-  if (kaapi_default_param.has_unified)
+  if (kaapi_default_param.use_unified)
   {
     //printf("Free unified %p %p\n", ptr, _last_used_driver);
 #if KAAPI_USE_CUDA
@@ -2211,19 +2211,15 @@ size_t xkblas_auto_tilesize(
   if (use_partition_thread_strategy ==0)
   {
     force_todefault_mapping = 1;
-    if (NB !=0)
-    {
-#if 0
-      _kaapi_lock_print();
-      printf("%s:: NB fixed to:%i, #GPUS=%i M:%i, N:%i, K:%i\n", __func__, NB, xkctxt->ngpus, M,N,K);
-      _kaapi_unlock_print();
-#endif
+    if (NB !=0) 
+    { 
+      /* predefined global NB, returned it */
       return NB;
     }
   }
   else
   { /* use or defined xkctxt->ngpus & xkctxt->gpuset
-       Current prototype only detec concurrent BLAS call if xkblas thread are in a parallel OpenMP region
+       Current prototype only detect concurrent BLAS call if xkblas thread are in a parallel OpenMP region
     */
 #if XKBLAS_ADAPTATIVE==0
     /* not configure, so this case could never occurs */
@@ -2256,7 +2252,7 @@ size_t xkblas_auto_tilesize(
       _kaapi_unlock_print();
 #endif
 #if 1
-      size_t minNB = 2048; 
+      size_t minNB = 1024; 
       force_todefault_mapping = 0;
       if (NB==0) NB = minNB;
       fact =1;
@@ -2276,7 +2272,7 @@ size_t xkblas_auto_tilesize(
           }
         }
       }
-#else
+#else /*other strategy */
       /* number of worker is :omp_get_num_threads() */
       if (cntzero > SW_ngpus/2)
       {
@@ -2294,27 +2290,22 @@ size_t xkblas_auto_tilesize(
         }
         minNB *=1;
 
-#if 1
         if (NB !=0)
-        {
           return 2*NB;
-        }
-#endif
       }
       else /* favor coarse grain local submission with pipelining comm */
       {
-	minNB *=2;
+	      minNB *=2;
         if (NB !=0)
           return NB*2;
       }
 #endif // end if 1
     }
     else {
-      // In // OpenMP region 
+      // outside OpenMP region 
 #if 1// 
       force_todefault_mapping = 0;
-      size_t minNB = 2048; //xkctxt->NB; //1024; 
-      if (NB==0) NB = minNB;
+      size_t minNB = 1024; //xkctxt->NB; //1024; 
       fact =1;
       double Pavrg = W/D; /* 1GPU max */
       xkctxt->ngpus = (Pavrg < SW_ngpus ? (int)Pavrg : SW_ngpus);
@@ -2363,7 +2354,7 @@ size_t xkblas_auto_tilesize(
             double ffact = 4; // fact
             double k =  W/(ffact * (double)xkctxt->ngpus);
             double fNB = pow(k,1.0/3.0);
-	    size_t cntb  = ceil(M/fNB);
+	          size_t cntb  = ceil(M/fNB);
             NB = M/cntb;
             //if ((omp_get_num_threads() >1) && (NB > minNB)) NB = minNB;
             if (NB > 8192) NB = 8192; /* on MI50, TRSM has an error due to insufficient memory allocation */
@@ -2379,7 +2370,7 @@ size_t xkblas_auto_tilesize(
             NB = ceil(fNB);
 #  endif
          }
-#else
+#else // XKBLAS_ADAPTATIVE
           NB = M / (fact*xkctxt->ngpus);
           NB = (NB + 63) & ~63UL;
 #endif

@@ -199,7 +199,7 @@ typedef enum kaapi_dev_arch_t {
   KAAPI_ARCH_UNKNOWN      = 0,
   KAAPI_ARCH_V100         = 1,
   KAAPI_ARCH_A100         = 2,
-  KAAPI_ARCH_RESERVED0    = 3,
+  KAAPI_ARCH_H100         = 3,
   KAAPI_ARCH_GRACEHOPPER  = 4,
   KAAPI_ARCH_MI50         = 101,
   KAAPI_ARCH_RESERVED1    = 102,

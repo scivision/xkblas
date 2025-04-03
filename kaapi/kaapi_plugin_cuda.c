@@ -495,7 +495,7 @@ static uintptr_t cuda_alloc(kaapi_memory_device_t* dev, size_t size, int* flag)
 	/*
 	 * - If unified memory is activated, we does not need to allocate on the GPU
 	 */
-  if (dev->device->use_uvm)
+  if (dev->device->use_unified)
     return 0;
 
   /* else We need to allocate something */
@@ -952,10 +952,10 @@ void* kaapi_cuda_register_thread(void* dummy )
       {
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
-          /* TG: todo if we want to have perdevice use_uvm.
+          /* TG: todo if we want to have perdevice use_unified.
              this global test should be changed.
           */
-          if (kaapi_default_param.use_uvm)
+          if (kaapi_default_param.use_unified)
           {
             // We need to prefetch the data
             struct cudaMemLocation loc;
@@ -974,9 +974,9 @@ void* kaapi_cuda_register_thread(void* dummy )
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-          if (kaapi_default_param.use_uvm)
+          if (kaapi_default_param.use_unified)
           {
-            /* TG: todo if we want to have perdevice use_uvm.
+            /* TG: todo if we want to have perdevice use_unified.
                this global test should be changed.
             */
             struct cudaMemLocation loc;
@@ -1944,7 +1944,7 @@ KAAPI_PLUGIN_ENTRYPOINT(init)(void)
   }
   
   /* to check: only from cuda >= 12.0 ? */
-  cudaInitDevice();
+  //cudaInitDevice();
   
   int device_count;
   res = cudaGetDeviceCount(&device_count);

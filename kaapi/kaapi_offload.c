@@ -631,10 +631,10 @@ int kaapi_offload_set_force_uvm(void)
 {
   if (kaapi_offload_get_uvm_capacity() !=0)
   {
-    kaapi_default_param.use_uvm = 1;
+    kaapi_default_param.use_unified = 1;
     return 0;
   }
-  kaapi_default_param.use_uvm = 0;
+  kaapi_default_param.use_unified = 0;
   return EINVAL;
 }
 
@@ -655,7 +655,7 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
   int err =0;
   kaapi_assert_debug( kaapi_offload_self_device() == device );
 
-  if (device->use_uvm ==0)
+  if (device->use_unified ==0)
   {
 #if KAAPI_USE_STREAM_D2D
     err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
@@ -666,7 +666,7 @@ int kaapi_offload_poll_device( kaapi_device_t* device)
 
     err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_D2H );
     kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
-  } // device->use_uvm ==0
+  } // device->use_unified ==0
 
   err = kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
   kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));
