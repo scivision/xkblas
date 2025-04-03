@@ -974,7 +974,7 @@ void* kaapi_cuda_register_thread(void* dummy )
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-          if (req.op == DEVICE_REGISTER_REQUEST)
+          if (kaapi_default_param.use_uvm)
           {
             /* TG: todo if we want to have perdevice use_uvm.
                this global test should be changed.

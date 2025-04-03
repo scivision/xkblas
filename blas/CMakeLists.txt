@@ -90,7 +90,7 @@ list(APPEND SOURCES_Z
 )
 
 if (XKBLAS_BUILD_COPYSCALE)
-	add_compile_options("-DXKBLAS_COPYSCALE=1")
+	add_compile_options("-DXKBLAS_BUILD_COPYSCALE=1")
 	list(APPEND SOURCES_S scopyscale.c stask_copyscale.c scopyscale.cu)
 	list(APPEND SOURCES_D dcopyscale.c dtask_copyscale.c dcopyscale.cu)
 	list(APPEND SOURCES_C ccopyscale.c ctask_copyscale.c ccopyscale.cu)
