@@ -1857,10 +1857,10 @@ struct _kaapi_known_arch {
 };
 
 static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
-  {"Tesla V100-SXM", KAAPI_ARCH_V100, 0},
-  {"NVIDIA A100-SXM", KAAPI_ARCH_A100, 0},
-  {"H100", KAAPI_ARCH_H100, 0},
-  {"GH200", KAAPI_ARCH_GRACEHOPPER, 1},
+  {"Tesla V100", KAAPI_ARCH_V100, 0},
+  {"NVIDIA A100", KAAPI_ARCH_A100, 0},
+  {"NVIDIA H100", KAAPI_ARCH_H100, 0},
+  {"NVIDIA GH200", KAAPI_ARCH_GRACEHOPPER, 1},
   { 0, KAAPI_ARCH_UNKNOWN, 0}
 };
 #define KAAPI_KNOWN_DEVICE 4
@@ -1883,6 +1883,9 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_unified)
 
     res = cudaGetDeviceProperties(&prop, i);
     CudaCheckError(res);
+    
+    /* delete primary context */
+    cudaDeviceReset();
     
     /* UVM:
         MASK_SOFT_UVM = 0x1
@@ -1939,6 +1942,9 @@ KAAPI_PLUGIN_ENTRYPOINT(init)(void)
       kaapi_cuda_plugin_unlock();
       return 0;
   }
+  
+  /* to check: only from cuda >= 12.0 ? */
+  cudaInitDevice();
   
   int device_count;
   res = cudaGetDeviceCount(&device_count);

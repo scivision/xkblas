@@ -74,6 +74,7 @@ void xkblas_deactivate_custom_alloc();
    If XKBlas/Kaapi is configured to and it can exploit unified memory, then the function returns managed memory
    for CUDA NVidia and HIP AMD. Else the function returns a pageable block using malloc function call.
    Return 0 in case of success.
+   Return EINVAL if allocation failed to return a block containing size bytes.
 */
 extern int xkblas_malloc_unified(void** ptr, size_t size);
 
