@@ -1170,7 +1170,7 @@ prepare_execute:
           ctxt->queue);
       )
       
-#if 1
+#if 0
 #if KAAPI_USE_STREAM_D2D
       err = kaapi_offload_stream_process_instruction(&device->stream, KAAPI_IO_STREAM_D2D);
       kaapi_assert_debug( (err == 0) || (err == EINPROGRESS));

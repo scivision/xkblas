@@ -578,13 +578,13 @@ int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
 
   /* initialize the field */
   prop->arch = KAAPI_ARCH_UNKNOWN;
-  prop->has_uvm = 0;
+  prop->has_unified = 0;
   prop->device_count = 0;
   unsigned int ndevices = 0;
 
   /* */
   int arch = KAAPI_ARCH_UNDEF;
-  int has_uvm = 0;
+  int has_unified = 0;
   kaapi_driver_t* current = kaapi_list_drivers;
   while (current !=0)
   {
@@ -592,10 +592,10 @@ int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
     if (current->f_get_type() != KAAPI_PROC_TYPE_HOST)
     {
       int ndevices_per_driver = current->f_get_ndevices();
-      /* get_devices_info accumulate value in has_uvm and arch as it is
+      /* get_devices_info accumulate value in has_unified and arch as it is
          described in the documentation in kaapi.h for kaapi_offload_properties.
       */
-      current->f_get_devices_info( &arch, &has_uvm );
+      current->f_get_devices_info( &arch, &has_unified );
       ndevices += ndevices_per_driver;
     }
     current = current->next;
@@ -603,9 +603,9 @@ int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
 
 #if !defined(KAAPI_UNIFIED)
   /* we let the runtime to determine uvm and arch and then reset it if KAAPI_UNFIED not defined */
-  prop->has_uvm = 0;
+  prop->has_unified = 0;
 #else
-  prop->has_uvm = has_uvm;
+  prop->has_unified = has_unified;
 #endif
 
   prop->arch = arch;
@@ -620,7 +620,7 @@ int kaapi_offload_get_uvm_capacity(void)
 {
   struct kaapi_dev_prop_t prop;
   int err = kaapi_offload_properties( &prop );
-  if ((err==0) && (prop.has_uvm & 0x1))
+  if ((err==0) && (prop.has_unified & 0x1))
     return 1;
   return 0;
 }

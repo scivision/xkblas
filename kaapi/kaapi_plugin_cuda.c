@@ -974,7 +974,7 @@ void* kaapi_cuda_register_thread(void* dummy )
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
-          if (req.op == DEVICE_REGISTER_REQUEST)
+          if (kaapi_default_param.use_uvm)
           {
             /* TG: todo if we want to have perdevice use_uvm.
                this global test should be changed.
@@ -1853,14 +1853,14 @@ KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
 struct _kaapi_known_arch {
   const char* name;
   kaapi_dev_arch_t arch;
-  int has_uvm;
+  int has_unified;
 };
 
 static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
-  {"Tesla V100-SXM", KAAPI_ARCH_V100, 0},
-  {"NVIDIA A100-SXM", KAAPI_ARCH_A100, 0},
-  {"H100", KAAPI_ARCH_H100, 0},
-  {"GH200", KAAPI_ARCH_GRACEHOPPER, 1},
+  {"Tesla V100", KAAPI_ARCH_V100, 0},
+  {"NVIDIA A100", KAAPI_ARCH_A100, 0},
+  {"NVIDIA H100", KAAPI_ARCH_H100, 0},
+  {"NVIDIA GH200", KAAPI_ARCH_GRACEHOPPER, 1},
   { 0, KAAPI_ARCH_UNKNOWN, 0}
 };
 #define KAAPI_KNOWN_DEVICE 4
@@ -1868,7 +1868,7 @@ static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
 /*
 */
 KAAPI_CLASS_ENTRYPOINT int
-KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
+KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_unified)
 {
   int device_count;
   CudaCheckError(cudaGetDeviceCount(&device_count));
@@ -1884,21 +1884,24 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
     res = cudaGetDeviceProperties(&prop, i);
     CudaCheckError(res);
     
+    /* delete primary context */
+    cudaDeviceReset();
+    
     /* UVM:
         MASK_SOFT_UVM = 0x1
         MASK_HARD_UVM = 0x2 (implicitlyy imply performance)
     */
-    if (prop.unifiedAddressing ==1) *has_uvm |= 0x1;
-    else *has_uvm &= ~0x1;
+    if (prop.unifiedAddressing ==1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
 
-    if (prop.managedMemory == 1) *has_uvm |= 0x1;
-    else *has_uvm &= ~0x1;
+    if (prop.managedMemory == 1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
 
-    if (prop.concurrentManagedAccess == 1) *has_uvm |= 0x1;
-    else *has_uvm &= ~0x1;
+    if (prop.concurrentManagedAccess == 1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
 
-    if (prop.pageableMemoryAccess == 1) *has_uvm |= 0x2; /* ??? */
-    else *has_uvm &= ~0x2;
+    if (prop.pageableMemoryAccess == 1) *has_unified |= 0x2; /* ??? */
+    else *has_unified &= ~0x2;
     
     /* look if known name */
     int j;
@@ -1908,8 +1911,8 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
       size_t len = strlen(kaapi_known_devicebyname[j].name);
       if (strncmp(prop.name, kaapi_known_devicebyname[j].name, len)==0)
       {
-        if (kaapi_known_devicebyname[j].has_uvm) *has_uvm |= 0x2;
-        else *has_uvm &= ~0x2;
+        if (kaapi_known_devicebyname[j].has_unified) *has_unified |= 0x2;
+        else *has_unified &= ~0x2;
         if (*arch == KAAPI_ARCH_UNDEF) *arch = kaapi_known_devicebyname[j].arch;
         else if (*arch != kaapi_known_devicebyname[j].arch) *arch = KAAPI_ARCH_UNKNOWN;
         break;
@@ -1922,7 +1925,7 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_uvm)
   /* if software UVM capability is 0 then reset
      the hardware performance capability to 0
   */
-  if ((*has_uvm & 0x1) ==0) *has_uvm = 0;
+  if ((*has_unified & 0x1) ==0) *has_unified = 0;
 
   return 0;
 }
@@ -1939,6 +1942,9 @@ KAAPI_PLUGIN_ENTRYPOINT(init)(void)
       kaapi_cuda_plugin_unlock();
       return 0;
   }
+  
+  /* to check: only from cuda >= 12.0 ? */
+  cudaInitDevice();
   
   int device_count;
   res = cudaGetDeviceCount(&device_count);

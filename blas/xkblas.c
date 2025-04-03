@@ -148,47 +148,57 @@ void xkblas_memcpy(void* dst, void* src, size_t count)
 void (*_last_free_to_use)(void*) = NULL;
 #endif
 
-void xkblas_malloc_unified(void** ptr, size_t size)
+int xkblas_malloc_unified(void** ptr, size_t size)
 {
+  if (ptr ==0) return EINVAL;
 #if defined(KAAPI_UNIFIED)
+  if (kaapi_default_param.has_unified)
+  {
 #if KAAPI_USE_CUDA
-	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
 #endif
 #if KAAPI_USE_HIP
-	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
-	_last_free_to_use = driver->f_free_unified;
-	//_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
+    _last_free_to_use = driver->f_free_unified;
+    //_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
 
-	driver->f_malloc_unified( ptr, size );
-	//printf("Allocate unified %p %p\n", *ptr, _last_used_driver);
+    driver->f_malloc_unified( ptr, size );
+    //printf("Allocate unified %p %p\n", *ptr, _last_used_driver);
+  }
+  else *ptr = malloc(size);
 #else // KAAPI_UNIFIED
-  if (ptr != 0)
-    *ptr = malloc(size);
+  *ptr = malloc(size);
 #endif
+  if (*ptr ==0) return ENOMEM;
+  return 0;
 }
 
-void xkblas_free_unified(void* ptr)
+int xkblas_free_unified(void* ptr)
 {
+  if (ptr ==0) return 0;
 #if defined(KAAPI_UNIFIED)
-	//printf("Free unified %p %p\n", ptr, _last_used_driver);
+  if (kaapi_default_param.has_unified)
+  {
+    //printf("Free unified %p %p\n", ptr, _last_used_driver);
 #if KAAPI_USE_CUDA
-	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
 #endif
 #if KAAPI_USE_HIP
-	kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
-	if(driver == 0)
-	{
-	//	driver = _last_used_driver; // xkblas has been cleaned but data are still allocated... TODO FIX
-		_last_free_to_use( ptr );
-	}
-	else
-	{
-		driver->f_free_unified( ptr );
-	}
+    if (driver == 0)
+    {
+    //	driver = _last_used_driver; // xkblas has been cleaned but data are still allocated... TODO FIX
+      _last_free_to_use( ptr );
+    }
+    else
+    {
+      driver->f_free_unified( ptr );
+    }
+  } else free(ptr);
 #else // KAAPI_UNIFIED
-  if (ptr) free(ptr);
+  free(ptr);
 #endif
 }
 
@@ -2511,8 +2521,8 @@ int xkblas_auto_map(
     case KERN_SYR2K:
     case KERN_SYMM:
     case KERN_GEMM:
-    case KERN_TRMM:
     case KERN_GEMMT:
+    case KERN_TRMM:
     case KERN_TRSM:
     case KERN_HEMM:
     case KERN_HERK:
@@ -2606,7 +2616,6 @@ int xkblas_auto_map(
   }
   return 0;
 }
-
 
 
 /* kaapi_get_elapsedtime
