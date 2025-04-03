@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/25 21:57:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:51:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,7 +18,6 @@
 # include "xkblas/xkblas-experimental.h"
 
 # include <xkrt/xkrt-support.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -60,7 +59,8 @@ xkblas_£copyscale_tile_async(
           TYPE * L, const size_t Lm, const size_t Ln, int ldl,
           TYPE * U, const size_t Um, const size_t Un, int ldu
 ) {
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
     # define AC 3
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;

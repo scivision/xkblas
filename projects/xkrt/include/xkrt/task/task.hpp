@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 01:41:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:01:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -548,11 +548,5 @@ __task_executed(
     else
         __task_complete(task, F, args...);
 }
-
-/**
- * Retrieve or (insert and return) the dependency domain of the passed access
- * on the currently executing task
- */
-DependencyDomain * task_get_dependency_domain(task_t * task, const access_t * access);
 
 # endif /* __XKRT_TASK_HPP__ */

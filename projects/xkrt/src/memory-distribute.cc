@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 02:02:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:02:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,9 +69,7 @@ xkrt_coherency_distribute_cyclic_2D_halo_async(
                 const  size_t sy = y1 - y0;
                 new(accesses + 0) access_t(task, order, ptr, ld, x0, y0, sx, sy, sizeof_type, ACCESS_MODE_RW);
             }
-
-            DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(task, accesses + 0);
-            tree->resolve<AC>(accesses);
+            thread->resolve<AC>(task, accesses);
             # undef AC
 
             #ifndef NDEBUG

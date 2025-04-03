@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:36:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 06:15:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -124,9 +124,6 @@ typedef struct  xkrt_runtime_t
     /////////////////////
     // SYNCHRONIZATION //
     /////////////////////
-
-    /* wait until all instructions of the devices completed */
-    void wait_device(xkrt_device_global_id_t device_global_id);
 
     /////////////
     // TASKING //

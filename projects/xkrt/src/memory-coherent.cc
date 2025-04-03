@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 01:58:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:00:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -91,10 +91,9 @@ xkrt_coherency_host_async(
     std::vector<access_t *> conflicts;
     access_t access(NULL, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
 
-    DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
-    assert(domain);
+    DependencyTree * deptree = (DependencyTree *) thread->get_dependency_domain(&access);
+    assert(deptree);
 
-    DependencyTree * deptree = (DependencyTree *) domain;
     deptree->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/25 21:57:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:05:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,7 +21,6 @@
 # include "xkblas/xkblas-experimental.h"
 
 # include <xkrt/xkrt-support.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -72,7 +71,8 @@ xkblas_£gemmt_tile_async(
     const TYPE * beta,
           TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
 ) {
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
     # define AC 3
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;

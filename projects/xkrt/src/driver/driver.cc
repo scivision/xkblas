@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:37:36 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 07:01:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -195,6 +195,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     // wait for all devices to be created
     pthread_barrier_wait(barrier);    // init
     pthread_barrier_wait(barrier);    // commit
+    pthread_barrier_wait(barrier);    // offloader streams
 }
 
 void
@@ -211,12 +212,18 @@ xkrt_drivers_deinit(xkrt_runtime_t * runtime)
             device->threads[i]->wakeup();
     }
 
-    // wait for each thread
-    runtime->team_join(&runtime->drivers.devices.team);
-    free(runtime->drivers.devices.team.desc.binding.places_list);
+    // wait for threads stream deletion
+    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+
+    // wait for main thread driver deinitialization
+    pthread_barrier_wait(&runtime->drivers.devices.barrier);
 
     // can destroy the barrier now
     pthread_barrier_destroy(&runtime->drivers.devices.barrier);
+
+    // join threads
+    runtime->team_join(&runtime->drivers.devices.team);
+    free(runtime->drivers.devices.team.desc.binding.places_list);
 
     // finalize each driver
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)

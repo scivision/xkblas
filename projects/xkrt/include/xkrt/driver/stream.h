@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 00:53:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:31:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,9 +62,6 @@ class xkrt_stream_instruction_queue_t
 class xkrt_stream_t : public Lockable
 {
     public:
-
-        /* the thread that owns that stream */
-        xkrt_thread_t * thread;
 
         /* the type of that stream */
         xkrt_stream_type_t type;

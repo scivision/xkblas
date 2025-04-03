@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 02:23:38 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 06:16:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -113,27 +113,33 @@ xkrt_runtime_stats_device_report(xkrt_runtime_t * runtime, device_stats_t * stat
 }
 
 static void
-xkrt_runtime_stats_device_gather(xkrt_runtime_t * runtime, xkrt_device_t * device, device_stats_t * stats)
-{
+xkrt_runtime_stats_device_gather(
+    xkrt_runtime_t * runtime,
+    xkrt_device_t * device,
+    device_stats_t * stats
+) {
     memset(stats, 0, sizeof(device_stats_t));
 
     stats->memory.freed = device->stats.memory.freed.load();
     stats->memory.allocated.total = device->stats.memory.allocated.total.load();
     stats->memory.allocated.currently = device->stats.memory.allocated.currently.load();
 
-    for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
+    for (uint8_t device_tid = 0 ; device_tid < device->nthreads ; ++device_tid)
     {
-        for (int stream_id = 0 ; stream_id < device->count[stype] ; ++stream_id)
+        for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
         {
-            xkrt_stream_t * stream = device->streams[stype][stream_id];
-            for (int instr_type = 0 ; instr_type < XKRT_STREAM_INSTR_TYPE_MAX ; ++instr_type)
+            for (int stream_id = 0 ; stream_id < device->count[stype] ; ++stream_id)
             {
-                stats->instructions[instr_type].commited += stream->stats.instructions[instr_type].commited.load();
-                stats->instructions[instr_type].completed += stream->stats.instructions[instr_type].completed.load();
+                xkrt_stream_t * stream = device->streams[device_tid][stype][stream_id];
+                for (int instr_type = 0 ; instr_type < XKRT_STREAM_INSTR_TYPE_MAX ; ++instr_type)
+                {
+                    stats->instructions[instr_type].commited += stream->stats.instructions[instr_type].commited.load();
+                    stats->instructions[instr_type].completed += stream->stats.instructions[instr_type].completed.load();
+                }
+                stats->streams[stype].transfered += stream->stats.transfered.load();
             }
-            stats->streams[stype].transfered += stream->stats.transfered.load();
+            stats->streams[stype].n += device->count[stype];
         }
-        stats->streams[stype].n += device->count[stype];
     }
 }
 

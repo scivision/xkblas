@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 03:01:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 04:57:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -16,6 +16,7 @@
 
 #  include <xkrt/consts.h>
 #  include <xkrt/sync/spinlock.h>
+#  include <xkrt/task/dependency-tree.hpp>
 #  include <xkrt/task/task.hpp>
 
 #  include <xkrt/thread/deque.hpp>
@@ -225,8 +226,74 @@ typedef struct  xkrt_thread_t
 
     public:
 
+        /**
+         * Retrieve or (insert and return) the dependency domain of the passed access
+         * on the currently executing task
+         */
+        DependencyDomain *
+        get_dependency_domain(const access_t * access)
+        {
+            assert(this->current_task);
+            assert(this->current_task->flags & TASK_FLAG_DOMAIN);
+
+            task_dom_info_t * dom = TASK_DOM_INFO(this->current_task);
+            assert(dom);
+
+            /* find previous deptree for that ld */
+            for (DependencyDomain * domain : dom->domains)
+            {
+                DependencyTree * tree = (DependencyTree *) domain;
+                if (tree->can_resolve(access))
+                    return domain;
+            }
+
+            /* create a new domain */
+            DependencyDomain * domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+            dom->domains.push_back(domain);
+
+            return domain;
+        }
+
+        /**
+         * Find conflicts and insert accesses int he dependency tree
+         */
+        template <int AC>
+        inline void
+        resolve(task_t * task, access_t * accesses)
+        {
+            assert(task->flags & TASK_FLAG_DEPENDENT);
+            assert(AC > 0);
+
+            // TODO
+            // 1) we assume that all accesses use that same dependency domain
+            // 2) C++ pure virtual function cannot be templated. To still
+            //    benefits from compile-time optimization, we force the casting to
+            //    a DependencyTree, as it is the only DependencyDomain currently.
+            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(accesses + 0);
+            tree->resolve<AC>(accesses);
+        }
+
+        /**
+         * Insert a task and its access in the dependency tree, without finding conflicts
+         */
+        template <int AC>
+        inline void
+        insert(task_t * task, access_t * accesses)
+        {
+            assert(task->flags & TASK_FLAG_DEPENDENT);
+            assert(AC > 0);
+
+            // TODO
+            // 1) we assume that all accesses use that same dependency domain
+            // 2) C++ pure virtual function cannot be templated. To still
+            //    benefits from compile-time optimization, we force the casting to
+            //    a DependencyTree, as it is the only DependencyDomain currently.
+            DependencyTree * tree = (DependencyTree *) this->get_dependency_domain(accesses + 0);
+            tree->insert<AC>(accesses);
+        }
+
         # define __Thread_task_execute(T, t, F, ...)                                                \
-            do {                                                                                    \
+        do {                                                                                    \
                 assert(T && t);                                                                     \
                 task_format_t * format = runtime->formats.list.list + t->fmtid;                     \
                 assert(format->f[TASK_FORMAT_TARGET_HOST]);                                         \

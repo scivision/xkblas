@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 02:22:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 07:14:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -252,60 +252,80 @@ xkrt_device_t::memory_allocate(const size_t user_size)
 
 void
 xkrt_device_t::offloader_init(
-    int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type),
-    xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity)
+    int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type)
 ) {
     /* next stream to use (round robin) */
-    memset(this->next, 0, sizeof(this->next));
+    this->next_thread = 0;
+    memset(this->next_stream, 0, sizeof(this->next_stream));
 
     /* count total number of stream */
-    int cnt = 0;
+    this->nstreams_per_thread = 0;
+
+    // TODO : hardcoded ugly stuff here
+    if (this->driver_type == XKRT_DRIVER_TYPE_HOST)
+        return ;
+
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
         this->count[stype] = (this->conf->offloader.streams[stype].n > 0) ? this->conf->offloader.streams[stype].n : f_stream_suggest ? f_stream_suggest(this->driver_id, (xkrt_stream_type_t) stype) : 4;
-        cnt += this->count[stype];
+        this->nstreams_per_thread += this->count[stype];
     }
+}
 
-    if (cnt == 0)
+void
+xkrt_device_t::offloader_init_thread(
+    uint8_t device_tid,
+    xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity)
+) {
+    if (this->nstreams_per_thread == 0)
         return ;
 
+    /* retrieve the thread that is initializing its streams */
+    xkrt_thread_t * thread = this->threads[device_tid];
+    assert(thread);
+
     /* allocate streams array */
-    xkrt_stream_t ** all_streams = (xkrt_stream_t **) malloc(sizeof(xkrt_stream_t *) * cnt);
+    assert(this->nstreams_per_thread);
+    xkrt_stream_t ** all_streams = (xkrt_stream_t **) malloc(sizeof(xkrt_stream_t *) * this->nstreams_per_thread);
     assert(all_streams);
 
     /* retrieve stream offset per type */
     uint16_t i = 0;
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
-        this->streams[stype] = all_streams + i;
+        this->streams[device_tid][stype] = all_streams + i;
         for (int j = 0 ; j < this->count[stype] ; ++j, ++i)
         {
+            // create a new stream
             all_streams[i] = f_stream_create(this, static_cast<xkrt_stream_type_t>(stype), this->conf->offloader.capacity);
             assert(all_streams[i]);
         }
     }
-
-    assert(i == cnt);
+    assert(i == this->nstreams_per_thread);
 }
 
 bool
-xkrt_device_t::offloader_streams_are_empty(const xkrt_stream_type_t stype) const
-{
+xkrt_device_t::offloader_streams_are_empty(
+    uint8_t device_tid,
+    const xkrt_stream_type_t stype
+) const {
     int err = 0;
 
     unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
     unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
-            if (!this->streams[s][i]->is_empty())
+            if (!this->streams[device_tid][s][i]->is_empty())
                 return false;
 
     return true;
 }
 
 int
-xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t stype)
-{
+xkrt_device_t::offloader_stream_instructions_launch(
+    uint8_t device_tid,
+    const xkrt_stream_type_t stype
+) {
     # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
 
     int err = 0;
@@ -316,7 +336,7 @@ xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t sty
     {
         for (unsigned int i = 0 ; i < this->count[s] ; ++i)
         {
-            xkrt_stream_t * stream = this->streams[s][i];
+            xkrt_stream_t * stream = this->streams[device_tid][s][i];
             assert(stream);
 
             stream->lock();
@@ -348,35 +368,33 @@ xkrt_device_t::offloader_stream_instructions_launch(const xkrt_stream_type_t sty
 }
 
 xkrt_stream_t *
-xkrt_device_t::offloader_stream_next(xkrt_stream_type_t stype)
-{
-    /* find native stream to use */
+xkrt_device_t::offloader_stream_next(
+    xkrt_stream_type_t stype,
+    xkrt_thread_t ** pthread,       /* OUT */
+    xkrt_stream_t ** pstream        /* OUT */
+) {
+    // round robin on the thread for this stream type
+    uint8_t next_thread = this->next_thread.fetch_add(1, std::memory_order_relaxed) % this->nthreads;
+
+    // round robin on streams for the streams of the given type on the choosen thread
     int count = this->count[stype];
-    switch (count)
-    {
-        case (0):
-            LOGGER_FATAL("No stream of type %d", stype);
+    assert(count);
+    int snext = this->next_stream[next_thread][stype].fetch_add(1, std::memory_order_relaxed) % count;
 
-        case (1):
-            return this->streams[stype][0];
-
-        default:
-        {
-            int snext = this->next[stype].fetch_add(1, std::memory_order_relaxed) % count;
-            return this->streams[stype][snext];
-        }
-    }
+    // save thread/stream
+    *pthread = this->threads[next_thread];
+    *pstream  = this->streams[next_thread][stype][snext];
 }
 
 int
-xkrt_device_t::offloader_poll(void)
+xkrt_device_t::offloader_poll(uint8_t device_tid)
 {
     int err = 0;
 
-    err = this->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_ALL);
+    err = this->offloader_stream_instructions_launch(device_tid, XKRT_STREAM_TYPE_ALL);
     assert((err == 0) || (err == EINPROGRESS));
 
-    err = this->offloader_stream_instructions_progress<false>(XKRT_STREAM_TYPE_ALL);
+    err = this->offloader_stream_instructions_progress<false>(device_tid, XKRT_STREAM_TYPE_ALL);
     assert((err == 0) || (err == EINPROGRESS));
 
     return err;
@@ -389,6 +407,7 @@ xkrt_device_t::offloader_poll(void)
 /* commit a stream instruction and wakeup thread */
 void
 xkrt_device_t::offloader_stream_instruction_commit(
+    xkrt_thread_t * thread,
     xkrt_stream_t * stream,
     xkrt_stream_instruction_t * instr
 ) {
@@ -396,12 +415,13 @@ xkrt_device_t::offloader_stream_instruction_commit(
     stream->commit(instr);
 
     /* wakeup device worker thread */
-    stream->thread->wakeup();
+    thread->wakeup();
 }
 
 void
 xkrt_device_t::offloader_stream_instruction_new(
     const xkrt_stream_type_t stype,             /* IN  */
+          xkrt_thread_t ** pthread,             /* OUT */
           xkrt_stream_t ** pstream,             /* OUT */
     const xkrt_stream_instruction_type_t itype, /* IN  */
           xkrt_stream_instruction_t ** pinstr,  /* OUT */
@@ -411,31 +431,26 @@ xkrt_device_t::offloader_stream_instruction_new(
     assert(pinstr);
 
     /* retrieve native stream */
-    xkrt_stream_t * stream = this->offloader_stream_next(stype);
-    assert(stream->type == stype);
+    this->offloader_stream_next(stype, pthread, pstream);
+    assert(*pthread);
+    assert(*pstream);
+    assert((*pstream)->type == stype);
 
     /* allocate the instruction */
-    xkrt_stream_instruction_t * instr;
 try_instruction_new:
 
     do {
-        stream->lock();
-        instr = stream->instruction_new(itype, callback);
-        if (instr)
+        (*pstream)->lock();
+        (*pinstr) = (*pstream)->instruction_new(itype, callback);
+        if (*pinstr)
             break ;
-        stream->unlock();
+        (*pstream)->unlock();
 
         LOGGER_FATAL("Stream is full, increase 'XKRT_OFFLOADER_CAPACITY' or implement support for full-queue management yourself :-) (sorry)");
 
     } while (1);
 
     /* stream is locked, will be unlocked in the commit */
-
-    /* out */
-    assert(stream);
-    assert(instr);
-    *pstream = stream;
-    *pinstr  = instr;
 }
 
 void
@@ -445,15 +460,18 @@ xkrt_device_t::offloader_stream_instruction_submit_kernel(
     const xkrt_callback_t & callback
 ) {
     /* create a new instruction and retrieve its offload stream */
+    xkrt_thread_t * thread;
     xkrt_stream_t * stream;
     xkrt_stream_instruction_t * instr;
     this->offloader_stream_instruction_new(
         XKRT_STREAM_TYPE_KERN,          /* IN */
+       &thread,                         /* OUT */
        &stream,                         /* OUT */
         XKRT_STREAM_INSTR_TYPE_KERN,    /* IN */
        &instr,                          /* OUT */
         callback
     );
+    assert(thread);
     assert(stream);
     assert(instr);
     assert(stream->is_locked());
@@ -462,5 +480,5 @@ xkrt_device_t::offloader_stream_instruction_submit_kernel(
     instr->kern.launch = launch;
     instr->kern.vargs = vargs;
 
-    this->offloader_stream_instruction_commit(stream, instr);
+    this->offloader_stream_instruction_commit(thread, stream, instr);
 }

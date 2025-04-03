@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/25 21:57:57 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:05:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,7 +18,6 @@
 # include "xkblas/xkblas-experimental.h"
 
 # include <xkrt/xkrt-support.h>
-# include <xkrt/driver/thread.hpp>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>
@@ -70,7 +69,8 @@ xkblas_£trsm_tile_async(
     const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
           TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
 ) {
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
     # define AC 2
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;

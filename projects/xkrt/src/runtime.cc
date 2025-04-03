@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 01:46:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 05:12:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -70,6 +70,17 @@ int
 xkrt_init(xkrt_runtime_t * runtime)
 {
     LOGGER_INFO("Initializing XKRT");
+
+    // set TLS
+    xkrt_team_t * team = NULL;
+    int tid = 0;
+    pthread_t pthread = pthread_self();
+    xkrt_device_global_id_t device_global_id = HOST_DEVICE_GLOBAL_ID;
+    xkrt_thread_place_t place;
+    xkrt_runtime_t::thread_getaffinity(place);
+    xkrt_thread_t * thread = new xkrt_thread_t(team, tid, pthread_self(), device_global_id, place);
+    assert(thread);
+    xkrt_thread_t::save_tls(thread);
 
     # if XKRT_SUPPORT_STATS
     memset(&runtime->stats, 0, sizeof(runtime->stats));

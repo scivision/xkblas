@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:42:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 07:13:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -99,25 +99,28 @@ xkrt_device_prepare_task(
 static inline int
 xkrt_device_thread_main_loop(
     xkrt_runtime_t * runtime,
-    xkrt_device_t * device
+    xkrt_device_t * device,
+    xkrt_thread_t * thread,
+    uint8_t device_tid
 ) {
-    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
-    while (device->state == XKRT_DEVICE_STATE_RUNNING)
+    assert(thread == xkrt_thread_t::get_tls());
+
+    while (device->state == XKRT_DEVICE_STATE_COMMIT)
     {
         task_t * task;
         while ((task = thread->deque.pop()) == NULL &&
-                device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL) &&
-                device->state == XKRT_DEVICE_STATE_RUNNING)
+                device->offloader_streams_are_empty(device_tid, XKRT_STREAM_TYPE_ALL) &&
+                device->state == XKRT_DEVICE_STATE_COMMIT)
             thread->pause();
 
-        if (device->state != XKRT_DEVICE_STATE_RUNNING)
+        if (device->state != XKRT_DEVICE_STATE_COMMIT)
         {
             assert(device->state == XKRT_DEVICE_STATE_STOP);
             break ;
         }
 
-        if (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-            device->offloader_poll();
+        if (!device->offloader_streams_are_empty(device_tid, XKRT_STREAM_TYPE_ALL))
+            device->offloader_poll(device_tid);
 
         if (task)
             xkrt_device_prepare_task(runtime, device, device->global_id, task);
@@ -222,9 +225,6 @@ xkrt_device_thread_main(
     // 'commit' all devices
     if (is_device_main_thread)
     {
-        // initialize offloader
-        device->offloader_init(driver->f_stream_suggest, driver->f_stream_create);
-
         // commit
         assert(driver->f_device_commit);
         xkrt_device_global_id_bitfield_t * affinity = &(runtime->router.affinity[device->global_id][0]);
@@ -236,8 +236,6 @@ xkrt_device_thread_main(
         device->state = XKRT_DEVICE_STATE_COMMIT;
         ++driver->ndevices_commited;
 
-        device->state = XKRT_DEVICE_STATE_RUNNING;
-
         // print affinity
         for (int i = 0 ; i < XKRT_DEVICES_PERF_RANK_MAX ; ++i)
         {
@@ -247,15 +245,33 @@ xkrt_device_thread_main(
             xkrt_bits_to_str(buffer, (unsigned char *) &bf, nbytes);
             LOGGER_DEBUG("Device `%2u` affinity mask for perf `%2u` is `%s`", device->global_id, i, buffer);
         }
+
+        // init offloader
+        device->offloader_init(driver->f_stream_suggest);
     }
 
-    // wait for all devices to be in the 'commit' state
+    // wait for all devices to be in the 'commit' state with the offloader init
+    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+
+    // initialize offloader thread
+    device->offloader_init_thread(device_tid, driver->f_stream_create);
+
+    // wait for all threads to have streams initialized
     pthread_barrier_wait(&runtime->drivers.devices.barrier);
     // cannot use 'args->barrier' after this point
 
     /* infinite loop with the device context */
-    int err = xkrt_device_thread_main_loop(runtime, device);
+    int err = xkrt_device_thread_main_loop(runtime, device, thread, device_tid);
     assert((err==0) || (err==EINTR));
+
+    // delete streams
+    if (driver->f_stream_delete)
+        for (uint8_t j = 0 ; j < XKRT_STREAM_TYPE_ALL ; ++j)
+            for (int k = 0 ; k < device->count[j] ; ++k)
+                driver->f_stream_delete(device->streams[device_tid][j][k]);
+
+    // wait for all thread to delete their streams
+    pthread_barrier_wait(&runtime->drivers.devices.barrier);
 
     /* deinitialize driver */
     if (is_device_main_thread)
@@ -272,25 +288,16 @@ xkrt_device_thread_main(
         else
             LOGGER_WARN("Driver `%u` is missing `f_device_memory_deallocate`", driver_type);
 
-        // delete streams
-        if (driver->f_stream_delete)
-        {
-            for (uint8_t j = 0 ; j < XKRT_STREAM_TYPE_ALL ; ++j)
-            {
-                for (int k = 0 ; k < device->count[j] ; ++k)
-                {
-                    xkrt_stream_t * stream = device->streams[j][k];
-                    driver->f_stream_delete(stream);
-                }
-            }
-        }
-
         // delete device
         if (driver->f_device_destroy)
             driver->f_device_destroy(device->driver_id);
         else
             LOGGER_WARN("Driver `%u` is missing `f_device_destroy`", driver_type);
     }
+
+    /* wait for all the main thread to deinit */
+    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+
     return NULL;
 }
 
@@ -586,14 +593,6 @@ xkrt_runtime_t::copy(
         src_device_addr,
         callback
     );
-}
-
-void
-xkrt_runtime_t::wait_device(xkrt_device_global_id_t device_global_id)
-{
-    const xkrt_device_t * device = this->device_get(device_global_id);
-    while (!device->offloader_streams_are_empty(XKRT_STREAM_TYPE_ALL))
-        usleep(5);
 }
 
 //////////

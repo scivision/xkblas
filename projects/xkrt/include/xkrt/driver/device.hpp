@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 03:13:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 06:08:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,10 +32,9 @@ typedef enum    xkrt_device_state_t : uint8_t
     XKRT_DEVICE_STATE_CREATE      = 1,
     XKRT_DEVICE_STATE_INIT        = 2,
     XKRT_DEVICE_STATE_COMMIT      = 3,
-    XKRT_DEVICE_STATE_RUNNING     = 4,
-    XKRT_DEVICE_STATE_STOP        = 5,
-    XKRT_DEVICE_STATE_STOPPED     = 6,
-    XKRT_DEVICE_STATE_DESTROYED   = 7
+    XKRT_DEVICE_STATE_STOP        = 4,
+    XKRT_DEVICE_STATE_STOPPED     = 5,
+    XKRT_DEVICE_STATE_DESTROYED   = 6
 
 }               xkrt_device_state_t;
 
@@ -129,37 +128,54 @@ typedef struct  xkrt_device_t
     // STREAM MANAGEMENT //
     ///////////////////////
 
-    /* number of iostream per type */
+    /* total number of stream (sum of count[:]) */
+    int nstreams_per_thread;
+
+    /* number of stream per type */
     int count[XKRT_STREAM_TYPE_ALL];
 
-    /* next stream fifo */
-    std::atomic<int> next[XKRT_STREAM_TYPE_ALL];
+    /* next thread to use for offloading an instruction */
+    std::atomic<uint8_t> next_thread;
+
+    /* next stream to use for the given thread and type */
+    std::atomic<int> next_stream[XKRT_MAX_THREADS_PER_DEVICE][XKRT_STREAM_TYPE_ALL];
 
     /* basic stream */
-    xkrt_stream_t ** streams[XKRT_STREAM_TYPE_ALL];
+    xkrt_stream_t ** streams[XKRT_MAX_THREADS_PER_DEVICE][XKRT_STREAM_TYPE_ALL];
 
-    /* initialize the offloader */
+    /* initialize the offloader (must be called once before any thread called the 'thread' version) */
     void offloader_init(
-        int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type),
+        int (*f_stream_suggest)(int device_driver_id, xkrt_stream_type_t type)
+    );
+
+    /* initialize a thread of the offloader */
+    void offloader_init_thread(
+        uint8_t device_tid,
         xkrt_stream_t * (*f_stream_create)(xkrt_device_t * device, xkrt_stream_type_t type, xkrt_stream_instruction_counter_t capacity)
     );
 
     /* poll the device for launching and progressing pending instructions in every streams */
-    int offloader_poll(void);
+    int offloader_poll(uint8_t device_tid);
 
     /* return true if the the streams for the given type are all empty */
-    bool offloader_streams_are_empty(const xkrt_stream_type_t stype) const;
+    bool offloader_streams_are_empty(uint8_t device_id, const xkrt_stream_type_t stype) const;
 
     /* get next stream to use for submitting an instruction for the given type */
-    xkrt_stream_t * offloader_stream_next(const xkrt_stream_type_t type);
+    xkrt_stream_t * offloader_stream_next(
+        const xkrt_stream_type_t type,
+        xkrt_thread_t ** pthread,       /* OUT */
+        xkrt_stream_t ** pstream        /* OUT */
+    );
 
     /* launch ready instructions dispatching them in streams of the given type */
-    int offloader_stream_instructions_launch(const xkrt_stream_type_t stype);
+    int offloader_stream_instructions_launch(uint8_t device_id, const xkrt_stream_type_t stype);
 
-    /* progress pending instructions in streams of the given type. If blocking is true, also waits for the completion of pending instructions */
+    /* progress pending instructions in streams of the given type of the given thread.
+     * If blocking is true, also waits for the completion of pending instructions */
     template <bool blocking>
     int
     offloader_stream_instructions_progress(
+        uint8_t device_tid,
         const xkrt_stream_type_t stype
     ) {
         int err = 0;
@@ -169,7 +185,7 @@ typedef struct  xkrt_device_t
         {
             for (unsigned int i = 0 ; i < this->count[s] ; ++i)
             {
-                xkrt_stream_t * stream = this->streams[s][i];
+                xkrt_stream_t * stream = this->streams[device_tid][s][i];
                 assert(stream);
 
                 if (stream->pending.is_empty())
@@ -197,6 +213,7 @@ typedef struct  xkrt_device_t
     /* create a new instruction and lock the stream */
     void offloader_stream_instruction_new(
         const xkrt_stream_type_t stype,             /* IN  */
+              xkrt_thread_t ** pthread,             /* OUT */
               xkrt_stream_t ** pstream,             /* OUT */
         const xkrt_stream_instruction_type_t itype, /* IN  */
               xkrt_stream_instruction_t ** pinstr,  /* OUT */
@@ -205,7 +222,11 @@ typedef struct  xkrt_device_t
 
     /* commit an instruction previously returned with
      * "offloader_stream_instruction_new" and unlock the stream */
-    void offloader_stream_instruction_commit(xkrt_stream_t * stream, xkrt_stream_instruction_t * instr);
+    void offloader_stream_instruction_commit(
+        xkrt_thread_t * thread,
+        xkrt_stream_t * stream,
+        xkrt_stream_instruction_t * instr
+    );
 
     /* submit a kernel execution instruction */
     void offloader_stream_instruction_submit_kernel(
@@ -300,9 +321,11 @@ typedef struct  xkrt_device_t
         }
 
         /* create a new instruction and retrieve its offload stream */
+        xkrt_thread_t * thread;
         xkrt_stream_t * stream;
         xkrt_stream_instruction_t * instr;
-        this->offloader_stream_instruction_new(stype, &stream, itype, &instr, callback);
+        this->offloader_stream_instruction_new(stype, &thread, &stream, itype, &instr, callback);
+        assert(thread);
         assert(stream);
         assert(instr);
 
@@ -321,7 +344,7 @@ typedef struct  xkrt_device_t
             XKRT_STATS_INCR(stream->stats.transfered, host_view.m * host_view.n * host_view.sizeof_type);
         }
 
-        this->offloader_stream_instruction_commit(stream, instr);
+        this->offloader_stream_instruction_commit(thread, stream, instr);
 
         # undef IS_1D
         # undef IS_2D
@@ -343,7 +366,7 @@ typedef struct  xkrt_device_t
     /* push a task to a thread of the device */
     void push(task_t * const & task)
     {
-        uint8_t tid = this->thread_next.fetch_add(1, std::memory_order_relaxed);
+        uint8_t tid = this->thread_next.fetch_add(1, std::memory_order_relaxed) % this->nthreads;
         xkrt_thread_t * thread = this->threads[tid];
         thread->deque.push(task);
         thread->wakeup();

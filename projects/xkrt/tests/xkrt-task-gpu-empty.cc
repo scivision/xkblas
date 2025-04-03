@@ -68,8 +68,7 @@ main(void)
     access_t * accesses = TASK_ACCESSES(task);
     new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
 
-    DependencyTree * deptree = (DependencyTree *) task_get_dependency_domain(thread->current_task, accesses);
-    deptree->insert<AC>(accesses);
+    thread->resolve<AC>(task, accesses);
 
     # undef AC
 
