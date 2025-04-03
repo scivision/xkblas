@@ -185,8 +185,8 @@ void _kaapi_unlock_print(void)
 #else
 #define KAAPI_GPU_CONC_D2H 1
 #define KAAPI_GPU_CONC_H2D 1
-#define KAAPI_GPU_CONC_D2D 2
-#define KAAPI_GPU_CONC_KER 2
+#define KAAPI_GPU_CONC_D2D 4
+#define KAAPI_GPU_CONC_KER 4
 #define KAAPI_GPU_CONC_KER_COUNT 8
 #endif
 

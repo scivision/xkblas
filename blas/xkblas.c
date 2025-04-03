@@ -68,7 +68,7 @@
 */
 static int use_partition_thread_strategy = 0;
 
-#define XKBLAS_ADAPTATIVE 1
+#define XKBLAS_ADAPTATIVE 0
 
 #if XKBLAS_ADAPTATIVE==1
 #include <omp.h>
@@ -2347,7 +2347,7 @@ size_t xkblas_auto_tilesize(
       default:
         {
           /* take max */
-#if 1
+#if XKBLAS_ADAPTATIVE==1
           if (omp_get_num_threads() >1)
           {
             double ffact = 4; // fact
@@ -2471,7 +2471,7 @@ printf("%s::%s L0: (M,N,K)=(%llu, %llu, %llu), (W,Wt,D,Pavrg)=(%g,%g,%g,%g) => N
     }
   }
 
-#if 0
+#if 1
   if (force_todefault_mapping==0)
     printf("%s:: Under L0: #GPUS=%i, GPU[0]:%i, M:%i, N:%i, K:%i -> NB=%i\n", __func__, xkctxt->ngpus, xkctxt->gpuset[0], M,N,K,NB);
   else
@@ -2573,7 +2573,7 @@ int xkblas_auto_map(
           //if (g==0) { Gm = 1; Gn = ngpus; }
           else { Gm = g; Gn = ngpus/g; }
         }
-        //printf("Block2D cyclic: Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", Blkm, Blkn, Gm, Gn);
+        printf("Block2D cyclic: #gpu:%i, Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", ngpus, Blkm, Blkn, Gm, Gn);
         xkblas_map_2Dblock_cyclic(
           xkctxt,
           1, CblasColMajor,
