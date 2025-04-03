@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 18:49:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 19:03:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -167,6 +167,8 @@ xkrt_device_thread_main(
         xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
         if (device == NULL)
             LOGGER_FATAL("Could not create a device");
+
+        runtime->drivers.devices.n.fetch_add(1, std::memory_order_relaxed);
 
         // initialize device attributes
         device->state       = XKRT_DEVICE_STATE_CREATE;

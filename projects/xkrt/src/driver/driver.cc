@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 18:50:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 18:59:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -190,7 +190,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     args.ndevices = ndevices;
     if (pthread_barrier_init(barrier, NULL, runtime->drivers.devices.team.desc.nthreads + 1))
         LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
-    runtime->drivers.devices.n.store(ndevices, std::memory_order_acq_rel);
 
     // create a team of thread
     runtime->team_create(&runtime->drivers.devices.team);
