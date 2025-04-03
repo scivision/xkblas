@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 18:30:07 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 18:49:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -165,14 +165,15 @@ xkrt_device_thread_main(
 
         // create the device
         xkrt_device_t * device = driver->f_device_create(driver, device_driver_id);
-        assert(device);
+        if (device == NULL)
+            LOGGER_FATAL("Could not create a device");
 
         // initialize device attributes
         device->state       = XKRT_DEVICE_STATE_CREATE;
         device->driver_type = driver_type;
         device->driver_id   = device_driver_id;
-        device->global_id   = (driver_type == XKRT_DRIVER_TYPE_HOST) ? 0 : 1 + runtime->drivers.devices.n.fetch_add(1, std::memory_order_relaxed);
         device->conf        = &(runtime->conf.device);
+        device->global_id   = (driver_type == XKRT_DRIVER_TYPE_HOST) ? 0 : runtime->drivers.devices.next_id.fetch_add(1, std::memory_order_relaxed);
 
         // register device to the global list
         runtime->drivers.devices.list[device->global_id] = device;

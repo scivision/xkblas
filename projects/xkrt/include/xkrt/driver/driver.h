@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:52:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 18:49:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -167,6 +167,9 @@ typedef struct  xkrt_drivers_t
 
         /* number of devices */
         std::atomic<uint8_t> n;
+
+        /* next device id to use */
+        std::atomic<uint8_t> next_id;
 
         /* next worker to offload round robin mode */
         std::atomic<uint8_t> round_robin_device_global_id;

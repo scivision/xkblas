@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 07:01:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 18:50:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -55,15 +55,15 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
     // PARAMETERS
-    int ndevices_requested  = runtime->conf.device.ngpus + 1;
+    int ndevices_requested  = runtime->conf.device.ngpus + 1;                               // host device + ngpus
     int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
-    int drivers_mask        = runtime->conf.drivers_mask;
+    int drivers_mask        = runtime->conf.drivers_mask | (1 << XKRT_DRIVER_TYPE_HOST);    // always force host driver
     assert(ndevices_requested < XKRT_DEVICES_MAX);
 
     // SET MEMBERS
     memset(runtime->drivers.list, 0, sizeof(runtime->drivers.list));
     memset(runtime->drivers.devices.list, 0, sizeof(runtime->drivers.devices.list));
-    runtime->drivers.devices.n = 0;
+    runtime->drivers.devices.next_id = 1;   // host device is always 0
     runtime->drivers.devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
@@ -104,7 +104,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     # endif
 
     // number of devices
-    unsigned int ndevices = 0;
+    uint8_t ndevices = 0;
 
     // ALLOCATE DEVICE THREAD PLACES
     xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_requested);
@@ -185,11 +185,14 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     runtime->drivers.devices.team.desc.binding.nplaces      = ndevices;
     runtime->drivers.devices.team.desc.binding.flags        = XKRT_TEAM_BINDING_FLAG_NONE;
 
-    // create a team of thread
+    // prepare the barrier for the devices team
     pthread_barrier_t * barrier = &runtime->drivers.devices.barrier;
     args.ndevices = ndevices;
     if (pthread_barrier_init(barrier, NULL, runtime->drivers.devices.team.desc.nthreads + 1))
         LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
+    runtime->drivers.devices.n.store(ndevices, std::memory_order_acq_rel);
+
+    // create a team of thread
     runtime->team_create(&runtime->drivers.devices.team);
 
     // wait for all devices to be created
