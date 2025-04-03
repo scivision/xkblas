@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 01:10:00 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:06:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,16 +69,16 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     // fallback to round robin if no devices found
     if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID)
     {
-        // must have at least one device
+        // must have at least one non-host device
         if (runtime->drivers.devices.n > 1)
         {
             while (1)
             {
                 device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
-                device_id = device_id % runtime->drivers.devices.n;
+                device_id = 1 + (device_id % (runtime->drivers.devices.n - 1));
 
                 xkrt_device_t * device = runtime->drivers.devices.list[device_id];
-                if (device && device->driver_type != XKRT_DRIVER_TYPE_HOST)
+                if (device)
                     break ;
             }
         }

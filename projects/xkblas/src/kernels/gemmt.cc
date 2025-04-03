@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:05:11 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:36:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -66,13 +66,20 @@ xkblas_£gemmt_tile_async(
     int transA, int transB,
     const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
-    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
 ) {
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
+
+    const size_t A_offset_m = Atm * Amb;
+    const size_t A_offset_n = Atn * Anb;
+    const size_t B_offset_m = Btm * Bmb;
+    const size_t B_offset_n = Btn * Bnb;
+    const size_t C_offset_m = Ctm * Cmb;
+    const size_t C_offset_n = Ctn * Cnb;
 
     # define AC 3
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
@@ -125,10 +132,10 @@ xkblas_£gemm_tile_async(
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
-    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
 );
 
 extern "C"
@@ -238,9 +245,9 @@ xkblas_£gemmt_async(
 
     const TYPE one = (TYPE) 1.0;
 
-    # define A(I, J) A, (I)*Amb, (J)*Anb, lda
-    # define B(I, J) B, (I)*Bmb, (J)*Bnb, ldb
-    # define C(I, J) C, (I)*Cmb, (J)*Cnb, ldc
+    # define A(I, J) A, (I), (J), Amb, Anb, lda
+    # define B(I, J) B, (I), (J), Bmb, Bnb, ldb
+    # define C(I, J) C, (I), (J), Cmb, Cnb, ldc
 
     // iterator on tiles
     for (size_t tm = 0; tm < Cmt; ++tm)

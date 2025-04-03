@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 19:20:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:55:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,6 +21,7 @@
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
 
+# include <hwloc.h>
 # include <hwloc/glibc-sched.h>
 
 # include <cassert>
@@ -35,10 +36,26 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
     return 0;
 }
 
-const char *
-XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
-{
-    return "HOST";
+void
+XKRT_DRIVER_ENTRYPOINT(device_info)(
+    int device_driver_id,
+    char * buffer,
+    size_t size
+) {
+    // Initialize and load topology
+    hwloc_topology_t topology;
+    hwloc_topology_init(&topology);
+    hwloc_topology_load(topology);
+
+    // Get the first PU (Processing Unit) and move up to the package (CPU)
+    hwloc_obj_t obj = hwloc_get_obj_by_type(topology, HWLOC_OBJ_PACKAGE, 0);
+    if (obj && obj->name)
+        snprintf(buffer, size, obj->name);
+    else
+        snprintf(buffer, size, "Unknown CPU");
+
+    // Destroy topology
+    hwloc_topology_destroy(topology);
 }
 
 static void

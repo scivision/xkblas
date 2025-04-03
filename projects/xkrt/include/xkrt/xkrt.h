@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/24 22:17:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:13:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,7 +32,7 @@ extern "C" {
     int xkrt_deinit(xkrt_runtime_t * runtime);
 
     /* return the number of gpus running */
-    int xkrt_get_ndevices(xkrt_runtime_t * runtime, int * count);
+    int xkrt_get_ndevices_max(xkrt_runtime_t * runtime, int * count);
 
     //////////////////////
     // SYNCHRONIZATIONS //

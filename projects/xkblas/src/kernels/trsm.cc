@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:05:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:41:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -66,11 +66,16 @@ xkblas_£trsm_tile_async(
     int transA, int diag,
     const size_t m, const size_t n,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
-          TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+          TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb
 ) {
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
+
+    const size_t A_offset_m = Atm * Amb;
+    const size_t A_offset_n = Atn * Anb;
+    const size_t B_offset_m = Btm * Bmb;
+    const size_t B_offset_n = Btn * Bnb;
 
     # define AC 2
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
@@ -120,10 +125,10 @@ xkblas_£gemm_tile_async(
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
-    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
 );
 
 // A*X = B or X*A = B
@@ -221,8 +226,8 @@ xkblas_£trsm_async(
 
     # pragma message(TODO "Block sizes truncation are suspicious to me here, double check")
 
-    # define A(I, J) A, (I)*Amb, (J)*Anb, lda
-    # define B(I, J) B, (I)*Bmb, (J)*Bnb, ldb
+    # define A(I, J) A, (I), (J), Amb, Anb, lda
+    # define B(I, J) B, (I), (J), Bmb, Bnb, ldb
 
     /* CblasLeft / CblasUpper / CblasNoTrans  */
     if (side == CblasLeft) {
@@ -425,8 +430,8 @@ xkblas_£trsm_async(
                             transA, diag,
                             bs_mm, bs_kn,
                             alpha,
-                            A, (Bnt-1-tk)*Amb, (Bnt-1-tk)*Anb, lda,
-                            B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
+                            A(Bnt-1-tk, Bnt-1-tk),
+                            B(tm, Bnt-1-tk)
                         );
 
                         for (int tn = tk+1; tn < Bnt; ++tn) {
@@ -435,10 +440,10 @@ xkblas_£trsm_async(
                                 CblasNoTrans, transA,
                                 bs_mm, Bnb, bs_kn,
                                 &minvalpha,
-                                B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb,
-                                A, (Bnt-1-tn)*Amb, (Bnt-1-tk)*Anb, lda,
+                                B(tm, Bnt-1-tk),
+                                A(Bnt-1-tn, Bnt-1-tk),
                                 &one,
-                                B,         tm*Bmb, (Bnt-1-tn)*Bnb, ldb
+                                B(tm, Bnt-1-tn)
                             );
                         }
                     }
@@ -461,8 +466,8 @@ xkblas_£trsm_async(
                             transA, diag,
                             bs_mm, bs_kn,
                             &lalpha,
-                            A, (Bnt-1-tk)*Amb, (Bnt-1-tk)*Anb, lda,
-                            B,         tm*Bmb, (Bnt-1-tk)*Bnb, ldb
+                            A(Bnt-1-tk, Bnt-1-tk),
+                            B(tm, Bnt-1-tk)
                         );
 
                         for (int tn = tk+1; tn < Bnt; ++tn) {
@@ -471,10 +476,10 @@ xkblas_£trsm_async(
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
                                 &mone,
-                                B, tm*Bmb,         (Bnt-1-tk)*Bnb, ldb,
-                                A, (Bnt-1-tk)*Amb, (Bnt-1-tn)*Anb, lda,
+                                B(tm, Bnt-1-tk),
+                                A(Bnt-1-tk, Bnt-1-tn),
                                 &lalpha,
-                                B, tm*Bmb,         (Bnt-1-tn)*Bnb, ldb
+                                B(tm, Bnt-1-tn)
                             );
                         }
                     }
@@ -491,8 +496,8 @@ xkblas_£trsm_async(
                             transA, diag,
                             bs_mm, bs_kn,
                             alpha,
-                            A, tk*Amb, tk*Anb, lda,
-                            B, tm*Bmb, tk*Bnb, ldb
+                            A(tk, tk),
+                            B(tm, tk)
                         );
 
                         for (int tn = tk+1; tn < Bnt; ++tn) {
@@ -502,10 +507,10 @@ xkblas_£trsm_async(
                                 CblasNoTrans, transA,
                                 bs_mm, bs_nn, Bmb,
                                 &minvalpha,
-                                B, tm*Bmb, tk*Bnb, ldb,
-                                A, tn*Amb, tk*Anb, lda,
+                                B(tm, tk),
+                                A(tn, tk),
                                 &one,
-                                B, tm*Bmb, tn*Bnb, ldb
+                                B(tm, tn)
                             );
                         }
                     }

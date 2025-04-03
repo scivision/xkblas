@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:23:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:54:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -163,16 +163,17 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
     return 0;
 }
 
-const char *
-XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
-{
-    static char buffer[512];
-
+void
+XKRT_DRIVER_ENTRYPOINT(device_info)(
+    int device_driver_id,
+    char * buffer,
+    size_t size
+) {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
     snprintf(
         buffer,
-        sizeof(buffer),
+        size,
         "Level Zero device %2d - %s with %d slices of %d subslices of %d EUs of "
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
         "timer resolution of %luns - deviceId(pci)=%d - uuid[%d]=%x",
@@ -797,8 +798,11 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
-{
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
+    int device_driver_id,
+    xkrt_device_memory_info_t info[XKRT_DEVICES_MAX],
+    int * nmemories
+) {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     info->capacity = device->ze.device_properties.maxMemAllocSize;
     *nmemories = device->ze.memory.pcount;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 06:16:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:56:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -189,7 +189,10 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
 
         xkrt_driver_t * driver = runtime->driver_get(device->driver_type);
         LOGGER_WARN("Device %u", device->global_id);
-        LOGGER_WARN("  Info: %s", driver->f_device_info(device->driver_id));
+
+        char info[512];
+        driver->f_device_info(device->driver_id, info, sizeof(info));
+        LOGGER_WARN("  Info: %s", info);
 
         device_stats_t stats;
         xkrt_runtime_stats_device_gather(runtime, device, &stats);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 00:04:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:53:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -679,16 +679,16 @@ _print_mask(char * buffer, ssize_t size, uint64_t v)
         buffer[size-1-i] = (v & (1ULL<<i)) ? '1' : '0';
 }
 
-
-const char *
-XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
-{
-    static char buffer[512];
-
+void
+XKRT_DRIVER_ENTRYPOINT(device_info)(
+    int device_driver_id,
+    char * buffer,
+    size_t size
+) {
     xkrt_device_hip_t * device = __get_device_hip(device_driver_id);
     assert(device);
 
-    snprintf(buffer, 256, "%s, hip device: %i, pci: %02x:%02x, %.2f (GB)",
+    snprintf(buffer, size, "%s, hip device: %i, pci: %02x:%02x, %.2f (GB)",
         device->prop.name,
         device->inherited.global_id,
         device->prop.pciBusID,

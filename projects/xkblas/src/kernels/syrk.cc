@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:05:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:36:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -64,14 +64,19 @@ xkblas_£syrk_tile_async(
     int uplo, int trans,
     size_t n, size_t k,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
     const TYPE * beta,
-          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
 ) {
-    LOGGER_INFO("Submitting tile C=(%zu,%zu) of size (%zu,%zu)", C_offset_m, C_offset_n, n, k);
-
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
+
+    const size_t A_offset_m = Atm * Amb;
+    const size_t A_offset_n = Atn * Anb;
+    const size_t C_offset_m = Ctm * Cmb;
+    const size_t C_offset_n = Ctn * Cnb;
+
+    LOGGER_INFO("Submitting tile C=(%zu,%zu) of size (%zu,%zu)", C_offset_m, C_offset_n, n, k);
 
     # define AC 2
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
@@ -122,10 +127,10 @@ xkblas_£gemm_tile_async(
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, const ssize_t A_offset_m, const ssize_t A_offset_n, const size_t lda,
-    const TYPE * B, const ssize_t B_offset_m, const ssize_t B_offset_n, const size_t ldb,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, const ssize_t C_offset_m, const ssize_t C_offset_n, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
 );
 
 extern "C"
@@ -207,8 +212,8 @@ xkblas_£syrk_async(
 
     const TYPE one = (TYPE) 1.0;
 
-    # define A(tm, tn) A, tm*Amb, tn*Anb
-    # define C(tm, tn) C, tm*Cmb, tn*Cnb
+    # define A(tm, tn) A, tm, tn, Amb, Anb
+    # define C(tm, tn) C, tm, tn, Cmb, Cnb
 
     for (int tn = 0; tn < Cnt; ++tn)
     {

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:00:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 17:13:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -200,7 +200,7 @@ xkrt_sync(xkrt_runtime_t * runtime)
 
 extern "C"
 int
-xkrt_get_ndevices(xkrt_runtime_t * runtime, int * count)
+xkrt_get_ndevices_max(xkrt_runtime_t * runtime, int * count)
 {
     assert(count);
 

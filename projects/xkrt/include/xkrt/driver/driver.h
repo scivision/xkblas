@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:33:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:52:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -83,7 +83,7 @@ typedef struct  xkrt_driver_t
     int (*f_device_destroy)(int device_driver_id);
 
     /* get device infos */
-    const char * (*f_device_info)(int device_driver_id);
+    void (*f_device_info)(int device_driver_id, char * buffer, size_t size);
 
     ////////////////////////////////
     //  MEMORY MANAGEMENT         //

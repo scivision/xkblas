@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 07:13:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 18:30:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -171,7 +171,7 @@ xkrt_device_thread_main(
         device->state       = XKRT_DEVICE_STATE_CREATE;
         device->driver_type = driver_type;
         device->driver_id   = device_driver_id;
-        device->global_id   = runtime->drivers.devices.n.fetch_add(1, std::memory_order_seq_cst);
+        device->global_id   = (driver_type == XKRT_DRIVER_TYPE_HOST) ? 0 : 1 + runtime->drivers.devices.n.fetch_add(1, std::memory_order_relaxed);
         device->conf        = &(runtime->conf.device);
 
         // register device to the global list
@@ -182,7 +182,10 @@ xkrt_device_thread_main(
 
         // init device by the driver
         driver->f_device_init(device->driver_id);
-        LOGGER_INFO("%s", driver->f_device_info(device_driver_id));
+
+        char buffer[512];
+        driver->f_device_info(device_driver_id, buffer, sizeof(buffer));
+        LOGGER_INFO("  global id = %2u | %s", device->global_id, buffer);
 
         /* get total memory and allocate chunk0 */
         if (driver->f_memory_device_info)
@@ -235,6 +238,9 @@ xkrt_device_thread_main(
         assert(device->state == XKRT_DEVICE_STATE_INIT);
         device->state = XKRT_DEVICE_STATE_COMMIT;
         ++driver->ndevices_commited;
+
+        // can only have 1 host device, that is the device 0
+        assert(driver_type != XKRT_DRIVER_TYPE_HOST || driver->ndevices_commited == 1);
 
         // print affinity
         for (int i = 0 ; i < XKRT_DEVICES_PERF_RANK_MAX ; ++i)

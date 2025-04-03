@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:31:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:53:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -246,11 +246,12 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id, xkrt_device_global_i
     return 0;
 }
 
-const char *
-XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
-{
-    static char buffer[512];
-
+void
+XKRT_DRIVER_ENTRYPOINT(device_info)(
+    int device_driver_id,
+    char * buffer,
+    size_t size
+) {
     xkrt_device_cl_t * device = device_cl_get(device_driver_id);
 
     char name[64];
@@ -264,14 +265,13 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(int device_driver_id)
 
     snprintf(
         buffer,
-        sizeof(buffer),
+        size,
         "XKRT device %d named %s of vendor %s - max-mem-alloc-size=%.2lfGB",
         device_driver_id,
         name,
         vendor,
         max_mem_alloc_size / 1e9
     );
-    return buffer;
 }
 
 ////////////
