@@ -29,4 +29,7 @@
 /* If the kernel was compiled with run-time statistics enabled */
 # define XKRT_SUPPORT_STATS __XKRT_SUPPORT_STATS_VALUE__
 
+/* If runtime was compiled with cairo support */
+# define XKRT_SUPPORT_CAIRO __XKRT_SUPPORT_CAIRO_VALUE__
+
 #endif /* __XKRT_SUPPORT_H__ */

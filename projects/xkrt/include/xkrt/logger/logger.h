@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/30 06:06:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 16:04:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -92,6 +92,7 @@ extern volatile uint64_t LOGGER_LAST_TIME;
         }                                                                       \
     } while (0)
 
+# define LOGGER_NOT_SUPPORTED()   LOGGER_NOT_IMPLEMENTED_WARN("Not supported")
 # define LOGGER_NOT_IMPLEMENTED() LOGGER_NOT_IMPLEMENTED_WARN("Not implemented")
 
 # define LOGGER_NOT_IMPLEMENTED_WARN(S)                                 \

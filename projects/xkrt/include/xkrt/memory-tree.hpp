@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/27 20:46:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 15:27:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -633,17 +633,18 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
 template <int K>
 class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Lockable, public MemoryCoherencyController {
 
-    using Base = KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>;
-    using Cube = KCube<K>;
-    using MemoryBlock = KMemoryBlock<K>;
-    using MemoryForward = KMemoryForward<K>;
-    using MemoryReplicate = KMemoryReplicate<K>;
-    using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
-    using Node = KMemoryTreeNode<K>;
-    using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
-    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
-    using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
-    using Search = KMemoryTreeNodeSearch<K>;
+    public:
+        using Base = KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>;
+        using Cube = KCube<K>;
+        using MemoryBlock = KMemoryBlock<K>;
+        using MemoryForward = KMemoryForward<K>;
+        using MemoryReplicate = KMemoryReplicate<K>;
+        using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
+        using Node = KMemoryTreeNode<K>;
+        using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
+        using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
+        using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
+        using Search = KMemoryTreeNodeSearch<K>;
 
     public:
 

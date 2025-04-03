@@ -18,13 +18,14 @@ option(USE_HIP "Whether to build the HIP driver." OFF)
 option(USE_ZE "Whether to build the Level Zero driver." OFF)
 option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" OFF)
 option(USE_CL "Whether to build the OpenCL driver." OFF)
+option(USE_CAIRO "Use Cairo to generate images (memory-tree debugging purposes mostly)." OFF)
 option(STRICT "Enable strict compilation mode" ON)
 
 # XKRT version and supports
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
@@ -38,6 +39,7 @@ endif()
 ########
 
 SET(SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/cairo.cc
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
@@ -156,6 +158,13 @@ if (USE_CL)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_cl ${CL_LIBRARIES})
     install(TARGETS ${XKRT}_driver_cl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
+endif()
+
+# Cairo
+if (USE_CAIRO)
+    find_package(CAIRO REQUIRED)
+    include_directories("${CAIRO_INCLUDE_DIRS}")
+    target_link_libraries(${XKRT} PRIVATE ${CAIRO_LIBRARIES})
 endif()
 
 if (STRICT)
