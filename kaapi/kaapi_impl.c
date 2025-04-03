@@ -226,6 +226,26 @@ static void kaapi_usage(void)
 */
 int kaapi_setup_param(void)
 {
+  /* default value.
+     WARNING Please keep coherence with finalize and static init until
+     better solution is implemented
+  */ 
+  kaapi_default_param.stackblocsize = KAAPI_STACKBLOCSIZE;
+  kaapi_default_param.ngpus                 = (uint8_t)-1;
+  kaapi_default_param.gpu_set               = ~0;
+  kaapi_default_param.cuda_stream_capacity  = 64;
+  kaapi_default_param.cuda_conc_d2h         = KAAPI_GPU_CONC_D2H;
+  kaapi_default_param.cuda_conc_stream_kernel= KAAPI_GPU_CONC_KER;
+  kaapi_default_param.cuda_conc_kernel      = KAAPI_GPU_CONC_KER_COUNT;
+  kaapi_default_param.cuda_conc_h2d         = KAAPI_GPU_CONC_H2D;
+#if KAAPI_USE_STREAM_D2D
+  kaapi_default_param.cuda_conc_d2d         = KAAPI_GPU_CONC_D2D;
+#else
+  kaapi_default_param.cuda_conc_d2d         = 0;
+#endif
+  kaapi_default_param.cuda_cache_limit      = 0.98;
+  kaapi_default_param.use_uvm               = 0
+
   if (getenv("KAAPI_HELP")) kaapi_usage();
 
   if (getenv("KAAPI_NUM_GPUS"))
@@ -304,9 +324,9 @@ int kaapi_setup_param(void)
   }
 
   kaapi_default_param.use_uvm=0;
-  if (getenv("KAAPI_FORCED_UVM"))
+  if (getenv("KAAPI_UNIFIED"))
   {
-    int val = atoi(getenv("KAAPI_FORCED_UVM"));
+    int val = atoi(getenv("KAAPI_UNIFIED"));
     if (val !=0)
       kaapi_offload_set_force_uvm();
   }
@@ -345,24 +365,6 @@ uint64_t kaapi_get_elapsedns(void)
 */
 int kaapi_init(void)
 {
-  /* default value. Please keep coherence with finalize and static init until
-     better solution is implemented
-  */ 
-  kaapi_default_param.stackblocsize = KAAPI_STACKBLOCSIZE;
-  kaapi_default_param.ngpus                 = (uint8_t)-1;
-  kaapi_default_param.gpu_set               = ~0;
-  kaapi_default_param.cuda_stream_capacity  = 64;
-  kaapi_default_param.cuda_conc_d2h         = KAAPI_GPU_CONC_D2H;
-  kaapi_default_param.cuda_conc_stream_kernel= KAAPI_GPU_CONC_KER;
-  kaapi_default_param.cuda_conc_kernel      = KAAPI_GPU_CONC_KER_COUNT;
-  kaapi_default_param.cuda_conc_h2d         = KAAPI_GPU_CONC_H2D;
-#if KAAPI_USE_STREAM_D2D
-  kaapi_default_param.cuda_conc_d2d         = KAAPI_GPU_CONC_D2D;
-#else
-  kaapi_default_param.cuda_conc_d2d         = 0;
-#endif
-  kaapi_default_param.cuda_cache_limit      = 0.98;
-
   /* set up runtime parameters */
   kaapi_assert( 0 == kaapi_setup_param() );
 

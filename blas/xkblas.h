@@ -70,9 +70,17 @@ typedef double CFloat64_t;
 void xkblas_activate_custom_alloc();
 void xkblas_deactivate_custom_alloc();
 
-// Allocate and deallocate managed memory
-void xkblas_malloc_unified(void** ptr, size_t size);
-void xkblas_free_unified(void* ptr);
+/* Allocate managed memory
+   If XKBlas/Kaapi is configured to and it can exploit unified memory, then the function returns managed memory
+   for CUDA NVidia and HIP AMD. Else the function returns a pageable block using malloc function call.
+   Return 0 in case of success.
+*/
+extern int xkblas_malloc_unified(void** ptr, size_t size);
+
+/* Deallocate memory allocated by xkblas_malloc_unified
+   Return 0 in case of success.
+ */
+extern int xkblas_free_unified(void* ptr);
 //#endif // defined(KAAPI_UNIFIED)
 
 /* xkblas context
@@ -222,24 +230,24 @@ extern int xkblas_get_device_count(int* count);
 */
 //@{
 typedef struct xkblas_dev_prop_t {
-  int has_uvm_software; /* 1 iff the underlaying librairy (cuda,hip,...) allows uvm */
   int arch;             /* architecture version */
-  int has_uvm;          /* 0: no uvm capability available; !=0: uvm is availabe */
+  int has_unified;      /* 0: no unified memory capability available; !=0: unified memory is availabe */
   int device_count;     /* same as xkblas_get_device_count */
 } xkblas_dev_prop_t;
 
 typedef enum xkblas_dev_arch_t {
-  XKBLAS_ARCH_UNKNOWN = 0,
-  XKBLAS_ARCH_V100 = 1,
-  XKBLAS_ARCH_A100 = 2,
-  XKBLAS_ARCH_H100 = 3,
-  XKBLAS_ARCH_GRACEHOPPER= 4,
-  XKBLAS_ARCH_MI50= 5,
-  XKBLAS_ARCH_MI100= 7,
-  XKBLAS_ARCH_MI200= 8,
-  XKBLAS_ARCH_MI250= 9,
-  XKBLAS_ARCH_MI300= 10,
-  XKBLAS_ARCH_MI300A= 11
+  XKBLAS_ARCH_UNDEF        = -1, /* internal usage only */
+  XKBLAS_ARCH_UNKNOWN      = 0,
+  XKBLAS_ARCH_V100         = 1,
+  XKBLAS_ARCH_A100         = 2,
+  XKBLAS_ARCH_RESERVED0    = 3,
+  XKBLAS_ARCH_GRACEHOPPER  = 4,
+  XKBLAS_ARCH_MI50         = 101,
+  XKBLAS_ARCH_RESERVED1    = 102,
+  XKBLAS_ARCH_RESERVED2    = 103,
+  XKBLAS_ARCH_MI250        = 104,
+  XKBLAS_ARCH_RESERVED3    = 105,
+  XKBLAS_ARCH_MI300A       = 106
 } xkblas_dev_arch_t;
 
 /*
