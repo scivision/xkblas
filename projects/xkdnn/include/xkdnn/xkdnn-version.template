@@ -1,0 +1,6 @@
+#ifndef __XKDNN_VERSION_H__
+# define __XKDNN_VERSION_H__
+
+# define XKDNN_VERSION_GITHASH "£GIT_HASH"
+
+#endif /* __XKDNN_VERSION_H__ */

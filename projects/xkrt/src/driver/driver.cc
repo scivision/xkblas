@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 18:59:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/03 23:53:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -64,6 +64,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     memset(runtime->drivers.list, 0, sizeof(runtime->drivers.list));
     memset(runtime->drivers.devices.list, 0, sizeof(runtime->drivers.devices.list));
     runtime->drivers.devices.next_id = 1;   // host device is always 0
+    runtime->drivers.devices.n = 0;
     runtime->drivers.devices.round_robin_device_global_id = 0;
 
     // LOAD DRIVERS
@@ -207,6 +208,7 @@ xkrt_drivers_deinit(xkrt_runtime_t * runtime)
     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
     {
         xkrt_device_t * device = runtime->drivers.devices.list[device_global_id];
+        assert(device);
         device->state = XKRT_DEVICE_STATE_STOP;
 
         int nthreads = device->nthreads.load(std::memory_order_acq_rel);
