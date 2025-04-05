@@ -219,7 +219,7 @@ extern int kaapi_offload_properties( struct kaapi_dev_prop_t* prop );
    after a call to kaapi_set_forced_uvm().
    A call to kaapi_get_uvm_state could occurs before initialization of kaapi.
 */
-int kaapi_offload_get_uvm_capacity(void);
+int kaapi_offload_get_unified_capacity(void);
 
 /* Return !=0 iff the library has been configured to force device to use uvm.
    By default the use the old approach with memory copy between adress space.
@@ -227,7 +227,7 @@ int kaapi_offload_get_uvm_capacity(void);
    Returns 0 if the library is configured for using uvm.
    Returns EINVAL if the library cannot be configured for using uvm.
 */
-int kaapi_offload_set_force_uvm(void);
+int kaapi_offload_force_set_unified(void);
 
 
 

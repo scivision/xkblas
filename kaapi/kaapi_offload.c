@@ -616,7 +616,7 @@ int kaapi_offload_properties( struct kaapi_dev_prop_t* prop )
 
 /* Return 1 iff hardware can be used with UVM
 */
-int kaapi_offload_get_uvm_capacity(void)
+int kaapi_offload_get_unified_capacity(void)
 {
   struct kaapi_dev_prop_t prop;
   int err = kaapi_offload_properties( &prop );
@@ -625,11 +625,12 @@ int kaapi_offload_get_uvm_capacity(void)
   return 0;
 }
 
+
 /*
 */
-int kaapi_offload_set_force_uvm(void)
+int kaapi_offload_force_set_unified(void)
 {
-  if (kaapi_offload_get_uvm_capacity() !=0)
+  if (kaapi_offload_get_unified_capacity() !=0)
   {
     kaapi_default_param.use_unified = 1;
     return 0;
