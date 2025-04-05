@@ -71,8 +71,9 @@ void xkblas_activate_custom_alloc();
 void xkblas_deactivate_custom_alloc();
 
 /* Allocate managed memory
-   If XKBlas/Kaapi is configured to and it can exploit unified memory, then the function returns managed memory
-   for CUDA NVidia and HIP AMD. Else the function returns a pageable block using malloc function call.
+   If XKBlas/Kaapi is configured to and it can exploit unified memory,
+   then thefunction returns managed memory for CUDA NVidia and HIP AMD.
+   Else the function returns a pageable block using malloc function call.
    Return 0 in case of success.
    Return EINVAL if allocation failed to return a block containing size bytes.
 */
@@ -216,23 +217,10 @@ extern int xkblas_finalize(void);
 extern int xkblas_get_device_count(int* count);
 
 
-/** Returns the an aggregate information for all available devices to offload task computation.
-  On success, the data structure xkblas_dev_prop_t is filled with following information :
-     - arch: an integer decribing the architecture, see enumeration value xkblas_dev_arch_t
-     - has_uvm: !=0 if uvm is available to the the client code.
-     - device_count: same as if the client code has called xkblas_get_device_count.
-  The function returns aggregate values for field: has_uvm. If some available devices define by XKBLAS_GPUSET
-  have not the same capability for UVM then the function returns the smalest capability.
-  The arch field contains XKBLAS_ARCH_UNKNOWN if at least one device differs in the set defined by XKBLAS_GPUSET,
-  else the field value is the common architecture encoding by xkblas_dev_arch_t.
-  Returns 0 in case of success else an error code.
-  Error code: EINVAL if null pointer is passed to the call
-    WARNING: must be coherent with Kaapi definitions.
-*/
 //@{
 typedef struct xkblas_dev_prop_t {
   int arch;             /* architecture version */
-  int has_unified;      /* 0: no unified memory capability available; !=0: unified memory is availabe */
+  int has_unified;      /* see @xkblas_get_device_properties */
   int device_count;     /* same as xkblas_get_device_count */
 } xkblas_dev_prop_t;
 
@@ -251,10 +239,39 @@ typedef enum xkblas_dev_arch_t {
   XKBLAS_ARCH_MI300A       = 106
 } xkblas_dev_arch_t;
 
-/*
+/** Returns the an aggregate information for all available devices to offload task computation.
+  On success, the data structure xkblas_dev_prop_t is filled with following information :
+     - arch: an integer decribing the architecture, see enumeration value xkblas_dev_arch_t
+     - has_unified: !=0 if unified memory is available by the undelaying library (CUDA, HIP, ...)
+     - device_count: same value to those returned by  xkblas_get_device_count
+  The function returns aggregate values for the field 'has_unified'.
+  If some available devices defined by XKBLAS_GPUSET have not the same capability for unified memory
+  then the function returns the smalest capability.
+  The arch field contains XKBLAS_ARCH_UNKNOWN if at least one device differs among the devices
+  accessible to XKBlas.Else the field value is the common architecture encoding by xkblas_dev_arch_t.
+  Returns 0 in case of success else returns an error code.
+  Error code: EINVAL if null pointer is passed to the call
+    WARNING: must be coherent with Kaapi definitions.
 */
 extern int xkblas_get_device_properties( struct xkblas_dev_prop_t* prop );
+
+/* Return !=0 iff the call succeed in forcing the library to use unified memory.
+   By default, whatever is the configuration of the XKBLAS library
+   to enable unified memory, the data transfers rely on memory copies between GPUs
+   and CPU.
+   A call to xkblas_force_set_unified must occurs before initialization of kaapi
+   or after the finalization.
+   Returns 0 if the library is configured for using unfied memory.
+   Returns EINVAL if the library cannot be configured for using unfied memory.
+*/
+extern int xkblas_force_set_unified(void);
 //@}
+
+
+/* Return compact string containing configuration flags for XKblas
+*/
+extern const char* xkblas_get_configuration(void);
+
 
 /*
 */

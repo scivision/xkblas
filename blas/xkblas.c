@@ -1412,6 +1412,22 @@ int xkblas_get_device_count(int* count)
 
 /*
 */
+int xkblas_get_device_properties( struct xkblas_dev_prop_t* prop )
+{
+  int err = kaapi_offload_properties( (struct kaapi_dev_prop_t*)prop );
+  return err;
+}
+
+/*
+*/
+int xkblas_force_set_unified(void)
+{
+  return kaapi_offload_force_set_unified();
+}
+
+
+/*
+*/
 static int init_count = 0;
 int xkblas_init(void)
 {
@@ -1498,6 +1514,9 @@ int xkblas_init(void)
 
   if (getenv("XKBLAS_CACHE_LIMIT"))
     setenv("KAAPI_CUDA_CACHE_LIMIT",getenv("XKBLAS_CACHE_LIMIT"),1);
+
+  if (getenv("XKBLAS_UNIFIED"))
+    setenv("KAAPI_UNIFIED",getenv("XKBLAS_UNIFIED"),1);
 
   const char* m = getenv("XKBLAS_DEFAULT_MATH");
   if (m !=0)
