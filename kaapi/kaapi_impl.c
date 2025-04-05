@@ -328,7 +328,7 @@ int kaapi_setup_param(void)
   {
     int val = atoi(getenv("KAAPI_UNIFIED"));
     if (val !=0)
-      kaapi_offload_set_force_uvm();
+      kaapi_offload_force_set_unified();
   }
 
   return 0;
