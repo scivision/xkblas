@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 19:03:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/04 21:16:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -146,7 +146,9 @@ xkrt_device_thread_main(
     xkrt_device_team_args_t * args = (xkrt_device_team_args_t *) team->desc.args;
     assert(args);
 
-    // get the device id of that thread in the args->devices list
+    // get the id of that thread in the args->devices list
+    // attach threads in a compact manner, similarly to how the team is
+    // created, so the thread hits a device topologically close
     int id = thread->tid % args->ndevices;
 
     // unpack args runtime

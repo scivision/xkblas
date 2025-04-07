@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 04:52:57 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 16:23:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -55,8 +55,6 @@ memory_view_from_cube(
     view.order         = MATRIX_COLMAJOR;
     view.addr          = x + y * ld * sizeof_type;
     view.ld            = ld;
-    view.offset_m      = 0;
-    view.offset_n      = 0;
     view.m             = dx / sizeof_type;
     view.n             = dy;
     view.sizeof_type   = sizeof_type;
@@ -94,8 +92,6 @@ memory_view_from_cubes(
     view.order        = MATRIX_COLMAJOR;
     view.addr         = x0 + y0 * ld * sizeof_type;
     view.ld           = ld;
-    view.offset_m     = 0;
-    view.offset_n     = 0;
     view.m            = (size_t) m;
     view.n            = (size_t) n;
     view.sizeof_type  = sizeof_type;
@@ -250,8 +246,8 @@ class access_t
             const matrix_order_t & order,
             const void * addr,
             const size_t ld,
-            const ssize_t offset_m,
-            const ssize_t offset_n,
+            const size_t offset_m,
+            const size_t offset_n,
             const size_t m,
             const size_t n,
             const size_t s, // sizeof_type,
@@ -287,6 +283,19 @@ class access_t
             // creates the two cubes of that memory view
             memory_view_to_cubes(host_view, cubes);
         }
+
+         access_t(
+            task_t * task,
+            const matrix_order_t & order,
+            const void * addr,
+            const size_t ld,
+            const size_t m,
+            const size_t n,
+            const size_t s, // sizeof_type,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) : access_t(task, order, addr, ld, 0, 0, m, n, s, mode, concurrency, scope) {}
 
         access_t(
             task_t * task,
@@ -331,8 +340,6 @@ class access_t
                 other->host_view.order,
                 (void *) other->host_view.addr,
                 other->host_view.ld,
-                other->host_view.offset_m,
-                other->host_view.offset_n,
                 other->host_view.m,
                 other->host_view.n,
                 other->host_view.sizeof_type,

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/27 21:10:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 18:24:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,10 +51,6 @@ typedef struct  matrix_tile_t
     /* matrix ld */
     size_t ld;
 
-    /* beginning of the tile accessed */
-    ssize_t offset_m; // offset begin row
-    ssize_t offset_n; // offset begin col
-
     /* tile size (number of element per row/col) */
     size_t m;   // size row
     size_t n;   // size col
@@ -69,8 +65,8 @@ typedef struct  matrix_tile_t
         const matrix_order_t & order,
         const void * & addr,
         const size_t & ld,
-        const ssize_t & offset_m,
-        const ssize_t & offset_n,
+        const size_t & offset_m,
+        const size_t & offset_n,
         const size_t & m,
         const size_t & n,
         const size_t & sizeof_type
@@ -82,8 +78,8 @@ typedef struct  matrix_tile_t
         const matrix_order_t & order,
         const uintptr_t & addr,
         const size_t & ld,
-        const ssize_t & offset_m,
-        const ssize_t & offset_n,
+        const size_t & offset_m,
+        const size_t & offset_n,
         const size_t & m,
         const size_t & n,
         const size_t & sizeof_type
@@ -91,23 +87,23 @@ typedef struct  matrix_tile_t
         order(order),
         addr(addr),
         ld(ld),
-        offset_m(offset_m),
-        offset_n(offset_n),
         m(m),
         n(n),
         sizeof_type(sizeof_type)
-    {}
+    {
+        assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
+        this->addr = this->offset_addr(offset_m, offset_n);
+    }
 
     matrix_tile_t(const matrix_tile_t & src) :
         order(src.order),
         addr(src.addr),
         ld(src.ld),
-        offset_m(src.offset_m),
-        offset_n(src.offset_n),
         m(src.m),
         n(src.n),
         sizeof_type(src.sizeof_type)
-    {}
+    {
+    }
 
     ~matrix_tile_t() {}
 
@@ -122,23 +118,29 @@ typedef struct  matrix_tile_t
     inline uintptr_t
     begin_addr(void) const
     {
-        assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
-        assert(this->offset_n >= 0);
-        assert(this->offset_m >= 0);
+        return this->addr;
+    }
 
+    inline uintptr_t
+    offset_addr(const size_t offset_m, const size_t offset_n) const
+    {
+        assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
+        assert(offset_n >= 0);
+        assert(offset_m >= 0);
+
+        size_t addr = this->addr;
         switch (this->order)
         {
             case (MATRIX_ROWMAJOR):
-                return this->addr +
-                    ((size_t)this->offset_n * this->sizeof_type) +
-                    ((size_t)this->offset_m * this->sizeof_type * this->ld);
+                return this->addr + ((size_t)offset_n * this->sizeof_type) +
+                                    ((size_t)offset_m * this->sizeof_type * this->ld);
 
             case (MATRIX_COLMAJOR):
-                return this->addr +
-                    ((size_t)this->offset_n * this->sizeof_type * this->ld) +
-                    ((size_t)this->offset_m * this->sizeof_type);
+                return this->addr + ((size_t)offset_n * this->sizeof_type * this->ld) +
+                                    ((size_t)offset_m * this->sizeof_type);
+            default:
+                abort();
         }
-        abort();
     }
 
     /* return end address */
@@ -146,29 +148,28 @@ typedef struct  matrix_tile_t
     end_addr(void) const
     {
         assert(this->order == MATRIX_ROWMAJOR || this->order == MATRIX_COLMAJOR);
-        assert(this->offset_n >= 0);
-        assert(this->offset_m >= 0);
-
         switch (this->order)
         {
             case (MATRIX_ROWMAJOR):
                 return this->addr +
-                    (((size_t)this->offset_n + this->n) * this->sizeof_type) +
-                    (((size_t)this->offset_m + this->m) * this->sizeof_type * this->ld);
+                    (this->n * this->sizeof_type) +
+                    (this->m * this->sizeof_type * this->ld);
 
             case (MATRIX_COLMAJOR):
                 return this->addr +
-                    (((size_t)this->offset_n + this->n) * this->sizeof_type * this->ld) +
-                    (((size_t)this->offset_m + this->m) * this->sizeof_type);
+                    (this->n * this->sizeof_type * this->ld) +
+                    (this->m * this->sizeof_type);
+
+            default:
+                abort();
         }
-        abort();
     }
 
     /* return true if this includes the other tile */
     inline bool
     equals(const matrix_tile_t & x)
     {
-        return this->begin_addr() == x.begin_addr() && this->end_addr() == x.end_addr() && this->ld == x.ld && this->sizeof_type == x.sizeof_type;
+        return this->addr == x.addr && this->ld == x.ld && this->sizeof_type == x.sizeof_type && this->m == x.m && this->n == x.n;
     }
 
     inline bool

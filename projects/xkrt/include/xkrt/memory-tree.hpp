@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:11:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 19:00:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -611,14 +611,8 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
         dump_cube_str(FILE * f) const
         {
             // KHPTree<K, DeviceInvalidCubes>::Node::dump_cube_str(f);
-            # if 0
-            fprintf(f, "\\\\ host-addr=%p", (void *) this->block.host_view.addr);
-            fprintf(f, "\\\\ block size (m, n)=(%d, %d) - ld=%d", this->block.host_view.m, this->block.host_view.n, this->block.host_view.ld);
-            fprintf(f, "\\\\ tile (m, n)=(%d, %d)",  this->block.host_view.offset_m, this->block.host_view.offset_n);
-            # endif
 
-         // for (uint8_t device_global_id = 0 ; device_global_id < ctx->drivers.devices.n ; ++device_global_id)
-            for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX+1 ; ++device_global_id)
+            for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
                 fprintf(f, "\\\\ dev %d - valid=%d",
@@ -751,6 +745,48 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             {
                 this->pending.fetch_add(inc, std::memory_order_relaxed);
             }
+
+            inline bool
+            fetches_are_continuous(int i, int j)
+            {
+                const fetch_t * fi = this->fetches + i;
+                const fetch_t * fj = this->fetches + j;
+
+
+
+                LOGGER_FATAL("IMPL ME");
+                return fj->src_view.addr - fi->src_view.addr   == fj->dst_view.addr - fi->dst_view.addr;
+            }
+
+            inline bool
+            fetches_merge(int i, int j)
+            {
+                assert(fetches_are_continuous(i, j));
+
+                fetch_t * fi = this->fetches + i;
+                fetch_t * fj = this->fetches + j;
+
+                assert(fi->merged == false);
+                fj->merged = true;
+
+                /* remember: the list is a partition */
+                assert(!fi->cubes[0].is_empty());
+                assert(!fj->cubes[0].is_empty());
+                assert( fi->cubes[1].is_empty());
+                assert( fj->cubes[1].is_empty());
+
+                LOGGER_FATAL("TODO: MERGE");
+
+                # if 0
+                /* create the merged memory-host view from the two cubes */
+                memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fk->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
+
+                /* copy the second cube */
+                // memory_view_to_cubes<K>(fi->host_view, fi->cubes); // this can be optimized by simply copying fk->cubes[0] , right ?
+                fi->cubes[1] = fk->cubes[0];
+                # endif
+            }
+
         }               fetch_list_t;
 
         /* if merging is enabled, merge consecutive transfers to a single transfer */
@@ -758,17 +794,38 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         fetch_list_reduce(fetch_list_t * list)
         {
             /* fast way out */
-            if (list->n <= 1)
+            const size_t n = list->n;
+            if (n <= 1)
                 return ;
+
+           /**
+            *  Given two regions 'a' and 'b' we note 'a -> b' if 'a' and 'b'
+            *  are consecutive in memory, with 'b' being right-after 'a'.
+            *  We note a+b the merged (continuous) memory region.
+            *
+            *  Given a passed list of region
+            *      L = [a, b, c, d, e]
+            *  with a->c and e->d, this routine updates the list so that it becomes
+            *      L = [a+c, b, e+d]
+            *
+            *  A fetch list element is not only a region, but also has a:
+            *      - a source device
+            *      - a destinatary device
+            *  which needs to match between elements so they are merged.
+            *
+            *   Note at this point, the list is a partition of an access,
+            *   so there cannot be overlap between represented regions
+            *
+            */
 
             /* array of 'n' fetches */
             fetch_t * fetches = (fetch_t *) (list + 1);
 
             /* create vector [0, 1, ..., n-1] */
-            std::vector<int> indices(list->n);
+            std::vector<int> indices(n);
             std::iota(indices.begin(), indices.end(), 0);
 
-            /* sort the vector so fetches[indices[i]] < fetches[indices[i+1]] */
+            /* sort the vector so fetches[indices[i]] < fetches[indices[i+1]] in memory */
             std::sort(
                 std::begin(indices),
                 std::end(indices),
@@ -776,57 +833,84 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                     assert(i != j);
                     const fetch_t * fi = fetches + i;
                     const fetch_t * fj = fetches + j;
-                    return fi->host_view.end_addr() < fj->host_view.end_addr();
+                    return fi->host_view.begin_addr() < fj->host_view.begin_addr();
                 }
             );
 
-            # pragma message(TODO "Remove the `fetch->merged` flag and instead, memmove() the `fetch` and shrink 'fetch_list->n' ?")
-            # pragma message(TODO "Double check correctness of this when it fuses more than 2 blocks")
-
             /* find continuous fetches and merge them */
-            size_t i = 0;
-            fetch_t * fi = fetches + indices[i];
+            fetch_t * fi = fetches + indices[0];
             assert(fi->merged == false);
-
-            for (size_t j = 1 ; j < list->n ; ++j)
+            for (size_t j = 1 ; j < n ; ++j)
             {
                 fetch_t * fj = fetches + indices[j];
+                assert(fi->host_view.sizeof_type == fj->host_view.sizeof_type);
 
-                /* if we can merge j-th to i-th */
-                if (    fi->src_device_global_id                == fj->src_device_global_id                 &&
-                        fi->dst_device_global_id                == fj->dst_device_global_id                 &&
-                        fi->dst_chunk                           == fj->dst_chunk                            &&
-                        fj->src_view.addr - fi->src_view.addr   == fj->dst_view.addr - fi->dst_view.addr
-                ) {
-                    /* nothing to do yet, keep incrementing 'j' */
-                    fj->merged = true;
-                    list->fetched();
-                }
-                /* else */
-                else
+                /* already merged */
+                if (fj->merged)
+                    continue ;
+
+                /* fetches must occur between the same devices */
+                if (    fi->src_device_global_id == fj->src_device_global_id    &&
+                        fi->dst_device_global_id == fj->dst_device_global_id    &&
+                        fi->dst_chunk            == fj->dst_chunk)
                 {
-                    /* merge [i+1..j-1] to i */
-                    if (j - i > 1)
+                    /**
+                     *  case (1)
+                     *              n
+                     *  ----------------->
+                     *  |   |       |
+                     *  |   |_ _ _ _|
+                     *  |
+                     *  |  _ _ _ _
+                     *  | |_ _ _ _|
+                     *  v
+                     *
+                     *  or
+                     *              n
+                     *  ----------------->
+                     *  |  _ _ _ _
+                     *  | |       |
+                     *  | |_ _ _ _|
+                     *  | |_______|
+                     *  |
+                     *  v
+                     *
+                     *  or
+                     *              n
+                     *  ----------------->
+                     *  |  _ _ _ _ _ _
+                     *  | |       |   |
+                     *  | |_ _ _ _|_ _|
+                     *  |
+                     *  v
+                     */
+                    const size_t dm = fi->host_view.m;
+                    const size_t dn = fj->host_view.n;
+                    if (fi->host_view.ld == fj->host_view.ld && (fi->host_view.offset_addr(dm,  0) == fj->host_view.begin_addr() || fi->host_view.offset_addr( 0, dn) == fj->host_view.begin_addr()))
                     {
-                        size_t k = j - 1;
-                        fetch_t * fk = fetches + indices[k];
-                        /* merge the two cubes to a single memory_view */
                         assert(!fi->cubes[0].is_empty());
-                        assert(!fk->cubes[0].is_empty());
+                        assert(!fj->cubes[0].is_empty());
                         assert( fi->cubes[1].is_empty());
-                        assert( fk->cubes[1].is_empty());
-                        memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fk->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
+                        assert( fj->cubes[1].is_empty());
 
-                        /* copy the second cube */
-                     // memory_view_to_cubes<K>(fi->host_view, fi->cubes); // this can be optimized by simply copying fk->cubes[0] , right ?
-                        fi->cubes[1] = fk->cubes[0];
-                        LOGGER_WARN("Merged %zu transfers in 1", j - i);
+                        memory_view_from_cubes<K>(
+                            fi->host_view,
+                            fi->cubes[0], fj->cubes[0],
+                            fi->host_view.ld,
+                            fi->host_view.sizeof_type
+                        );
+
+                        fi->cubes[1] = fj->cubes[0];
+
+                        fj->merged = true;
+                        list->fetched();
                     }
-
-                    /* i := j */
-                    i = j;
-                    fi = fj;
-                    assert(fi->merged == false);
+                    /* else, try to merge next fetches */
+                    else
+                    {
+                        assert(fj->merged == false);
+                        fi = fj;
+                    }
                 }
             }
         }
@@ -1000,9 +1084,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 fetch->dst_view             = dst_view;
             }
             list->fetching(list->n.load());
-
-            if (this->merge_transfers)
-                this->fetch_list_reduce(list);
 
             return list;
         }
@@ -1621,11 +1702,9 @@ next_view:
 
                 # if 1
                 LOGGER_DEBUG(
-                    "access_t<2>(MATRIX_COLMAJOR, (void *) %p, %lu, %lu, %lu, %lu, %lu, %lu, %s),",
+                    "access_t<2>(MATRIX_COLMAJOR, (void *) %p, %lu, %lu, %lu, %lu, %s),",
                     (void *) access->host_view.addr,
                     access->host_view.ld,
-                    access->host_view.offset_m,
-                    access->host_view.offset_n,
                     access->host_view.m,
                     access->host_view.n,
                     access->host_view.sizeof_type,
@@ -1699,6 +1778,11 @@ next_view:
             // if there is fetch to perform, launch them
             if (list)
             {
+                // reduce them
+                if (this->merge_transfers)
+                    this->fetch_list_reduce(list);
+
+                // increase task wait counter
                 __task_fetching(list->pending, task);
                 this->fetch_list_launch(task, list);
             }
