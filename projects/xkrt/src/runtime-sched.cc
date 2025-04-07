@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/04 21:16:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 19:32:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -68,26 +68,32 @@ xkrt_device_prepare_task(
         task_dep_info_t * dep = TASK_DEP_INFO(task);
         assert(TASK_DEP_INFO(task)->wc == 0);
 
-        /* increase task 'fetching' counter so it does not get ready early
-         * (eg before we processed all accesses bellow) */
-        __task_fetching(1, task);
-
-        /* for each access */
-        assert(dep->ac <= TASK_MAX_ACCESSES);
-        access_t * accesses = TASK_ACCESSES(task);
-        for (int i = 0 ; i < dep->ac ; ++i)
+        /* if there is at least one access */
+        if (dep->ac > 0)
         {
-            access_t * access = accesses + i;
+            /* increase task 'fetching' counter so it does not get ready early
+             * (eg before we processed all accesses bellow) */
+            __task_fetching(1, task);
 
-            MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
-            assert(memcontroller);
+            /* for each access */
+            assert(dep->ac <= TASK_MAX_ACCESSES);
+            access_t * accesses = TASK_ACCESSES(task);
+            for (int i = 0 ; i < dep->ac ; ++i)
+            {
+                access_t * access = accesses + i;
+                if (access->mode == ACCESS_MODE_V)
+                    continue ;
 
-            memcontroller->fetch(task, access, device_global_id);
+                MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
+                assert(memcontroller);
+
+                memcontroller->fetch(task, access, device_global_id);
+            }
+
+            /* decrease the task 'fetching' counter to detect early-fetch completion */
+            __task_fetched(1, task, xkrt_device_task_execute, runtime, device);
+            /* else the task will be launched in a callback while all accesses were fetched */
         }
-
-        /* decrease the task 'fetching' counter to detect early-fetch completion */
-        __task_fetched(1, task, xkrt_device_task_execute, runtime, device);
-        /* else the task will be launched in a callback while all accesses were fetched */
     }
     else
     {

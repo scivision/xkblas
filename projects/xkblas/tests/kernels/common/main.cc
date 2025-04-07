@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:52:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 19:45:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -469,7 +469,7 @@ main_mumps(char ** args)
     /**
      *           n         m
      *      .-------.-----------.
-     *      |   D   |    U      |
+     *  n   |   D   |    U      |
      *      |       |           |
      *      .-------.-----------.
      *      |       |           |
@@ -478,7 +478,6 @@ main_mumps(char ** args)
      *      |       |           |
      *      |       |           |
      *      .-------.-----------.
-     *          n
      */
 
     TYPE alpha, beta;
@@ -494,52 +493,37 @@ main_mumps(char ** args)
     bool should_copy = true;
     int * IW = NULL;
 
-    puts("Submitting kernels");
-    uint64_t tcompute = 0;
+    /* parse arguments */
+    int m  = rand_int(200, 32768);
+    int n  = rand_int(200,  8192);
+    int ts = 2048;
+    impl.set_tile(ts);
+    int ld = m + n;
+    printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
+
+    /* allocate matrices */
+    uintptr_t matrices[4];
+    # define D  ((TYPE *)matrices[0])
+    # define L  ((TYPE *)matrices[1])
+    # define U  ((TYPE *)matrices[2])
+    # define G  ((TYPE *)matrices[3])
+    prepare_n_matrices(matrices, 4, ld);
+
     uint64_t t0 = get_nanotime();
-    for (int i = 0 ; i < 8 ; ++i)
-    {
-        /* parse arguments */
-        int m  = rand_int(200, 16384);
-        int n  = rand_int(200,  4096);
-        int ts = 1024;
-        int ld = m + n;
-        printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
-
-        /* allocate matrices */
-        uintptr_t matrices[4];
-        # define D  ((TYPE *)matrices[0])
-        # define L  ((TYPE *)matrices[1])
-        # define U  ((TYPE *)matrices[2])
-        # define G  ((TYPE *)matrices[3])
-        prepare_n_matrices(matrices, 4, ld);
-
-        impl.reset();
-        impl.set_tile(ts);
-
-        uint64_t t0 = get_nanotime();
-        impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, D, ld, L, ld);
-        impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
-        impl.gemm(TRANS[t1], TRANS[t2], m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
-        // impl.coherent(D, n, n, ld);
-        // impl.coherent(L, m, n, ld);
-        // impl.coherent(U, n, m, ld);
-        impl.coherent(G, m, m, ld);
-        uint64_t tt = get_nanotime();
-        impl.wait();
-        uint64_t tf = get_nanotime();
-        printf("[%d] Compute took %lf s. (graph construction took %lf s.)\n",
-                i, (tf-t0)/1e9, (tt-t0)/1e9);
-        tcompute += (tf - t0);
-
-
-        # undef D
-        # undef L
-        # undef U
-        # undef G
-    }
+    impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, D, ld, L, ld);
+    impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
+    impl.gemm(TRANS[t1], TRANS[t2], m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
+    impl.coherent(G, m, m, ld);
+    uint64_t tt = get_nanotime();
+    impl.wait();
     uint64_t tf = get_nanotime();
-    printf("Total took %lf s. (compute took %lf s.)\n", (tf-t0)/1e9, tcompute/1e9);
+    printf("Compute took %lf s. (graph construction took %lf s.)\n",
+            (tf-t0)/1e9, (tt-t0)/1e9);
+
+    # undef D
+    # undef L
+    # undef U
+    # undef G
 
     return 0;
 }

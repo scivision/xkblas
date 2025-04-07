@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:00:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/07 19:35:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -55,7 +55,8 @@ xkrt_coherency_host_async(
 
     # if 0
     // implementation with a single copy once all partites are ready
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
     # define AC 1
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
@@ -73,7 +74,7 @@ xkrt_coherency_host_async(
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
-    new(accesses + 0) access_t(task, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    new(accesses + 0) access_t(task, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
     thread->resolve<AC>(task, accesses);
     # undef AC
 
@@ -89,7 +90,7 @@ xkrt_coherency_host_async(
 
     /* create an access, and retrieve all tasks that are in conflict */
     std::vector<access_t *> conflicts;
-    access_t access(NULL, order, ptr, ld, 0, 0, m, n, sizeof_type, ACCESS_MODE_R);
+    access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
 
     DependencyTree * deptree = (DependencyTree *) thread->get_dependency_domain(&access);
     assert(deptree);
@@ -111,9 +112,11 @@ xkrt_coherency_host_async(
 
         # if 1
         # pragma message(TODO "How to test if 2 BLAS matrices are included in one-another ?")
-        // if the conflict is included in the passed access, just setup 1 copy access (fast way out)
-     //   if (access.host_view.includes(conflict->host_view))
-      if (access.host_view.equals(conflict->host_view))
+        // fast-way-out : if the conflict is included in the passed access, just setup 1 copy access (fast way out)
+   //   TODO : how to test if (A, m, n, LD) includes (A', m', n', ld) ?
+   //       if (access.host_view.includes(conflict->host_view))i
+   //   for now, only use this path is rigourously equals
+        if (access.host_view.equals(conflict->host_view))
         {
             # define AC 1
 
@@ -164,12 +167,21 @@ xkrt_coherency_host_async(
             {
                 for (int j = 0 ; j < 2 ; ++j)
                 {
+                    const int k = i * 2 + j;
+
                     Cube cube;
                     access_t::Cube::intersection(&cube, access.cubes[i], conflict->cubes[j]);
-                    const int k = i * 2 + j;
-                    new (accesses + k) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
-                    if (!cube.is_empty())
+
+                    if (cube.is_empty())
+                    {
+                        (accesses + k)->task = task;
+                        (accesses + k)->mode = ACCESS_MODE_V;
+                    }
+                    else
+                    {
+                        new (accesses + k) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
                         deptree->precedence(conflict, accesses + i);
+                    }
                 }
             }
 
