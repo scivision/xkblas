@@ -1440,7 +1440,7 @@ static int kaapi_hip_stream_advance_pending(
             float gpu_delay; /* ms */
             res = hipEventElapsedTime ( &gpu_delay, cios->start_events[idx], cios->end_events[idx] );
             if (res != hipSuccess) {
-              printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+              printf("   invalid Hip event state at: %d non fifo order ?\n", idx );
               gpu_delay = 0;
               kaapi_assert(0);
             }
@@ -1573,7 +1573,7 @@ static int kaapi_hip_stream_process_pending(
 #  endif
           res = hipEventElapsedTime ( &status.gpu_delay, cios->start_events[idx], cios->end_events[idx] );
           if (res != hipSuccess) {
-            printf("   invalid Cuda event state at: %d non fifo order ?\n", idx );
+            printf("   invalid Hip event state at: %d non fifo order ?\n", idx );
             status.gpu_delay = 0;
             kaapi_assert(0);
           }
@@ -1902,6 +1902,89 @@ KAAPI_PLUGIN_ENTRYPOINT(get_ndevices)(void)
   int device_count;
   kaapi_hip_CheckError(hipGetDeviceCount(&device_count));
   return (unsigned int)device_count;
+}
+
+
+struct _kaapi_known_arch {
+  const char* name;
+  kaapi_dev_arch_t arch;
+  int has_unified;
+};
+
+static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
+  {"AMD Instinct MI250X", KAAPI_ARCH_MI250, 0},
+  {"AMD Instinct MI250",  KAAPI_ARCH_MI250, 0},
+  {"AMD Instinct MI300A", KAAPI_ARCH_MI300A, 0},
+  { 0, KAAPI_ARCH_UNKNOWN, 0}
+};
+#define KAAPI_KNOWN_DEVICE 2
+
+/*
+*/
+KAAPI_CLASS_ENTRYPOINT int
+KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_unified)
+{
+  int device_count;
+  kaapi_hip_CheckError(hipGetDeviceCount(&device_count));
+  
+  struct hipDeviceProp_t prop;
+  hipError_t res;
+  
+  for (int i=0; i<device_count; ++i)
+  {
+    res = hipSetDevice(i);
+    kaapi_hip_CheckError(res);
+
+    res = hipGetDeviceProperties(&prop, i);
+    kaapi_hip_CheckError(res);
+    
+    /* delete primary context */
+    hipDeviceReset();
+    
+    /* UVM:
+        MASK_SOFT_UVM = 0x1
+        MASK_HARD_UVM = 0x2 (implicitlyy imply performance)
+    */
+    if (prop.unifiedAddressing ==1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
+
+    if (prop.managedMemory == 1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
+
+    if (prop.concurrentManagedAccess == 1) *has_unified |= 0x1;
+    else *has_unified &= ~0x1;
+
+    if (prop.pageableMemoryAccess == 1) *has_unified |= 0x2; /* ??? */
+    else *has_unified &= ~0x2;
+    
+    /* look if known name */
+    int j;
+    for (j=0; j<KAAPI_KNOWN_DEVICE; ++j)
+    {
+      if (kaapi_known_devicebyname[j].name == 0) break;
+      size_t len = strlen(kaapi_known_devicebyname[j].name);
+      if (strncmp(prop.name, kaapi_known_devicebyname[j].name, len)==0)
+      {
+printf("Driver HIP: device %i is %s::  Unified value:%i \n", j, prop.name, prop.name, kaapi_known_devicebyname[j].has_unified);
+        if (kaapi_known_devicebyname[j].has_unified) *has_unified |= 0x2;
+        else *has_unified &= ~0x2;
+        if (*arch == KAAPI_ARCH_UNDEF) *arch = kaapi_known_devicebyname[j].arch;
+        else if (*arch != kaapi_known_devicebyname[j].arch) *arch = KAAPI_ARCH_UNKNOWN;
+        break;
+      }
+    }
+    if (j == KAAPI_KNOWN_DEVICE)
+      *arch = KAAPI_ARCH_UNKNOWN;
+  }
+  
+  /* if software UVM capability is 0 then reset
+     the hardware performance capability to 0
+  */
+  if ((*has_unified & 0x1) ==0) *has_unified = 0;
+
+printf("Driver HIP: devices has uvm value: %i\n", *has_unified);
+
+  return 0;
 }
 
 
@@ -2439,15 +2522,15 @@ KAAPI_PLUGIN_ENTRYPOINT(device_attach)(kaapi_device_t* dev)
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
 {
-	// TODO add checks
-	hipMallocManaged( pptr, size, hipMemAttachGlobal );
+  // TODO add checks
+  hipMallocManaged( pptr, size, hipMemAttachGlobal );
 }
 
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(free_unified)( void* ptr )
 {
-	// TODO add checks
-	hipFree( ptr );
+  // TODO add checks
+  hipFree( ptr );
 }
 #endif //defined(KAAPI_UNIFIED)
 
