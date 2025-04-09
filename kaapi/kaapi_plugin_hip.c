@@ -958,19 +958,24 @@ void* kaapi_hip_register_thread(void* dummy )
         if (req.op == DEVICE_REGISTER_REQUEST)
         {
 #if defined(KAAPI_UNIFIED)
-					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
-					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
-          err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
-				 // TODO check errors	
-#else
-          err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
-          //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
-          if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
+          if (kaapi_default_param.use_unified)
           {
-            printf("***[%s]: hipHostRegister error: %i\n", __func__, err);
-            req.err = EALREADY;
+	    err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
+	    err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
+            err = hipMemAdvise(req.ptr, req.size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
+				 // TODO check errors	
           }
+          else 
 #endif // defined(KAAPI_UNIFIED)
+          {
+            err = hipHostRegister(req.ptr, req.size, hipHostRegisterPortable);
+            //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
+            if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
+            {
+              printf("***[%s]: hipHostRegister error: %i. Ptr:%X, size:%lu\n", __func__, err, req.ptr, req.size);
+              req.err = EALREADY;
+            }
+          }
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {

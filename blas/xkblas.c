@@ -620,22 +620,26 @@ int xkblas_set_ngpus(int ngpus)
 void* xkblas_malloc( size_t size )
 {
 #if defined(KAAPI_UNIFIED)
-  //return malloc(size);
-  void* ptr = 0;
-  kaapi_assert_m(0== xkblas_malloc_unified(&ptr, size),"xkblas_malloc_unified");
-  return ptr;
-#else
-#  if KAAPI_USE_HIP
+  if (kaapi_default_param.use_unified)
+  {
+    //return malloc(size);
+    void* ptr = 0;
+    kaapi_assert_m(0== xkblas_malloc_unified(&ptr, size),"xkblas_malloc_unified");
+    return ptr;
+  }
+#endif
+#if KAAPI_USE_HIP
   void* ptr = 0;
   kaapi_assert_m(hipSuccess== hipHostMalloc(&ptr, size, hipHostMallocPortable),"hipHostAlloc failed");
+  printf("Allocate hipHostMalloc %p\n", ptr);
   return ptr;
-#  elif KAAPI_USE_CUDA  
+#elif KAAPI_USE_CUDA  
   void* ptr = 0;
   kaapi_assert_m(cudaSuccess== cudaHostAlloc(&ptr, size, cudaHostAllocPortable),"cudaHostAlloc failed");
+  printf("Allocate cudaHostAlloc %p\n", ptr);
   return ptr;
-#  else
+#else
   return malloc(size);
-#  endif
 #endif
 }
 
@@ -644,16 +648,17 @@ void* xkblas_malloc( size_t size )
 void xkblas_free( void* ptr, size_t sz )
 {
 #if defined(KAAPI_UNIFIED)
-  //free(ptr);
-  //return;
-  kaapi_assert_m(0== xkblas_free_unified(ptr),"call to xkblas_free_unified");
-#else
-#  if KAAPI_USE_CUDA || KAAPI_USE_HIP
+  if (kaapi_default_param.use_unified)
+  {
+    kaapi_assert_m(0== xkblas_free_unified(ptr),"call to xkblas_free_unified");
+    return;
+  }
+#endif
+#if KAAPI_USE_CUDA || KAAPI_USE_HIP
   //kaapi_assert_m(CUDA_SUCCESS==  cuMemFreeHost(ptr),"cuMemFreeHost failed");
   kaapi_assert_m(cudaSuccess== cudaFreeHost(ptr),"cudaFreeHost failed");
-#  else
+#else
   free(ptr);
-#  endif
 #endif
 }
 
