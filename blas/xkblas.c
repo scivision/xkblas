@@ -164,9 +164,18 @@ int xkblas_malloc_unified(void** ptr, size_t size)
     //_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
 
     driver->f_malloc_unified( ptr, size );
-    //printf("Allocate unified %p %p\n", *ptr, _last_used_driver);
+    printf("Allocate unified %p %p\n", *ptr, driver);
   }
-  else *ptr = malloc(size);
+  else {
+#if KAAPI_USE_CUDA
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_CUDA );
+#endif
+#if KAAPI_USE_HIP
+    kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
+#endif
+    *ptr = malloc(size);
+    printf("Allocate malloc %p %p\n", *ptr, driver);
+  }
 #else // KAAPI_UNIFIED
   *ptr = malloc(size);
 #endif
@@ -200,6 +209,7 @@ int xkblas_free_unified(void* ptr)
 #else // KAAPI_UNIFIED
   free(ptr);
 #endif
+  return 0;
 }
 
 /* Return the current context where to call XKBlas BLAS routine
@@ -609,16 +619,23 @@ int xkblas_set_ngpus(int ngpus)
  */
 void* xkblas_malloc( size_t size )
 {
-#if KAAPI_USE_HIP
+#if defined(KAAPI_UNIFIED)
+  //return malloc(size);
+  void* ptr = 0;
+  kaapi_assert_m(0== xkblas_malloc_unified(&ptr, size),"xkblas_malloc_unified");
+  return ptr;
+#else
+#  if KAAPI_USE_HIP
   void* ptr = 0;
   kaapi_assert_m(hipSuccess== hipHostMalloc(&ptr, size, hipHostMallocPortable),"hipHostAlloc failed");
   return ptr;
-#elif KAAPI_USE_CUDA  
+#  elif KAAPI_USE_CUDA  
   void* ptr = 0;
   kaapi_assert_m(cudaSuccess== cudaHostAlloc(&ptr, size, cudaHostAllocPortable),"cudaHostAlloc failed");
   return ptr;
-#else
+#  else
   return malloc(size);
+#  endif
 #endif
 }
 
@@ -626,11 +643,17 @@ void* xkblas_malloc( size_t size )
  */
 void xkblas_free( void* ptr, size_t sz )
 {
-#if KAAPI_USE_CUDA || KAAPI_USE_HIP
+#if defined(KAAPI_UNIFIED)
+  //free(ptr);
+  //return;
+  kaapi_assert_m(0== xkblas_free_unified(ptr),"call to xkblas_free_unified");
+#else
+#  if KAAPI_USE_CUDA || KAAPI_USE_HIP
   //kaapi_assert_m(CUDA_SUCCESS==  cuMemFreeHost(ptr),"cuMemFreeHost failed");
   kaapi_assert_m(cudaSuccess== cudaFreeHost(ptr),"cudaFreeHost failed");
-#else
+#  else
   free(ptr);
+#  endif
 #endif
 }
 
@@ -2593,7 +2616,9 @@ int xkblas_auto_map(
           //if (g==0) { Gm = 1; Gn = ngpus; }
           else { Gm = g; Gn = ngpus/g; }
         }
+#if 0
         printf("Block2D cyclic: #gpu:%i, Blkm: %i, Blkn: %i, Gm: %i, Gn: %i\n", ngpus, Blkm, Blkn, Gm, Gn);
+#endif
         xkblas_map_2Dblock_cyclic(
           xkctxt,
           1, CblasColMajor,
