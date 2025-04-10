@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 07:14:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 00:11:30 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -367,7 +367,7 @@ xkrt_device_t::offloader_stream_instructions_launch(
     return err;
 }
 
-xkrt_stream_t *
+void
 xkrt_device_t::offloader_stream_next(
     xkrt_stream_type_t stype,
     xkrt_thread_t ** pthread,       /* OUT */

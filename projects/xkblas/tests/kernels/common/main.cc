@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/07 19:45:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 01:10:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -235,7 +235,7 @@ main_gemm(char ** args)
         {
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
-            // printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
+            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
             uint64_t t0 = get_nanotime();
             impl.set_tile(ts);
             impl.gemm(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
@@ -243,9 +243,9 @@ main_gemm(char ** args)
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
-            // printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
-            //         (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
-            // );
+            printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
+                    (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
+            );
             if (!SKIP_CHECK)
             {
                 memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
@@ -484,20 +484,12 @@ main_mumps(char ** args)
     FILL(&alpha, 1);
     FILL(&beta, 1);
 
-    int s = 0;
-    int u = 0;
-    int d = 0;
-    int t = 0;
-    int t1 = 0;
-    int t2 = 0;
     bool should_copy = true;
     int * IW = NULL;
 
     /* parse arguments */
-    int m  = rand_int(200, 32768);
-    int n  = rand_int(200,  8192);
-    int ts = 2048;
-    impl.set_tile(ts);
+    int m  = 16384; // rand_int(200, 32768);
+    int n  = 16384; // rand_int(200,  8192);
     int ld = m + n;
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
@@ -509,16 +501,38 @@ main_mumps(char ** args)
     # define G  ((TYPE *)matrices[3])
     prepare_n_matrices(matrices, 4, ld);
 
-    uint64_t t0 = get_nanotime();
-    impl.trsm(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, D, ld, L, ld);
-    impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
-    impl.gemm(TRANS[t1], TRANS[t2], m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
-    impl.coherent(G, m, m, ld);
-    uint64_t tt = get_nanotime();
-    impl.wait();
-    uint64_t tf = get_nanotime();
-    printf("Compute took %lf s. (graph construction took %lf s.)\n",
-            (tf-t0)/1e9, (tt-t0)/1e9);
+    int ts[][3] = {
+        {2048, 2048, 2048},
+        {2048, 1024, 2048},
+        {2048, 1024, 4096},
+    };
+
+    for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
+    {
+        printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
+
+        for (int j = 0 ; j < 5 ; ++j)
+        {
+            uint64_t t0 = get_nanotime();
+
+            impl.set_tile(ts[i][0]);
+            impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, m, n, &alpha, D, ld, L, ld);
+
+            impl.set_tile(ts[i][1]);
+            impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
+
+            impl.set_tile(ts[i][2]);
+            impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
+
+            impl.coherent(G, m, m, ld);
+
+            uint64_t tt = get_nanotime();
+            impl.wait();
+            uint64_t tf = get_nanotime();
+            printf("Compute took %lf s. (graph construction took %lf s.)\n",
+                    (tf-t0)/1e9, (tt-t0)/1e9);
+        }
+    }
 
     # undef D
     # undef L
@@ -554,16 +568,16 @@ main_trsm_copyscale_gemm(char ** args)
     int u = 0;
     int d = 0;
     int t = 0;
-    int t1 = 0;
-    int t2 = 0;
     bool should_copy = true;
     int * IW = NULL;
 
     // trsm en CblasLeft, CblasUpper, CBlasTrans, CBlasUnit et le gemm CBlasNoTrans, CBlasNoTrans
+    int t1 = 0;
+    int t2 = 0;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+//    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+//        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             impl.set_tile(ts);

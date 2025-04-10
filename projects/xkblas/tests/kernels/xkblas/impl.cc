@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 21:15:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 00:46:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,12 +45,16 @@ impl_t::deinit(void)
 uintptr_t
 impl_t::alloc(size_t size)
 {
+    # if 1
+    return (uintptr_t) xkblas_malloc(size);
+    # else
     # if XKBLAS_ACCESS_SCOPE == ACCESS_SCOPE_NONUNIFIED
     return (uintptr_t) xkblas_host_alloc(size);
     # elif XKBLAS_ACCESS_SCOPE == ACCESS_SCOPE_UNIFIED
     return (uintptr_t) xkblas_unified_alloc(size);
     # else
     LOGGER_FATAL("Wtf");
+    # endif
     # endif
 }
 

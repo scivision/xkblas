@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/02 17:01:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 00:44:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,24 +29,9 @@
 
 extern "C"
 void *
-xkblas_malloc(size_t size)
-{
-    return malloc(size);
-}
-
-extern "C"
-void
-xkblas_free(void * ptr, size_t size)
-{
-    (void) size;
-    free(ptr);
-}
-
-extern "C"
-void *
 xkblas_host_alloc(size_t size)
 {
-    void * ptr = xkblas_malloc(size);
+    void * ptr = malloc(size);
     if (ptr == NULL)
         return NULL;
 
@@ -62,7 +47,7 @@ xkblas_host_free(void * ptr, size_t size)
 {
     xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
     xkrt_memory_unregister(runtime, ptr, size);
-    xkblas_free(ptr, size);
+    free(ptr);
 }
 
 extern "C"
@@ -79,6 +64,20 @@ xkblas_unified_free(void * ptr, size_t size)
 {
     xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
     return runtime->memory_unified_deallocate(0, ptr, size);
+}
+
+extern "C"
+void *
+xkblas_malloc(size_t size)
+{
+    return xkblas_host_alloc(size);
+}
+
+extern "C"
+void
+xkblas_free(void * ptr, size_t size)
+{
+    xkblas_host_free(ptr, size);
 }
 
 // Added symbols for compatibility with previous version and unified version

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 06:08:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 00:11:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -161,7 +161,7 @@ typedef struct  xkrt_device_t
     bool offloader_streams_are_empty(uint8_t device_id, const xkrt_stream_type_t stype) const;
 
     /* get next stream to use for submitting an instruction for the given type */
-    xkrt_stream_t * offloader_stream_next(
+    void offloader_stream_next(
         const xkrt_stream_type_t type,
         xkrt_thread_t ** pthread,       /* OUT */
         xkrt_stream_t ** pstream        /* OUT */

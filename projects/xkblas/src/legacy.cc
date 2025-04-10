@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:13:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 01:09:28 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,7 +43,7 @@ extern "C"
 int
 xkblas_get_device_count(int * count)
 {
-    printf("RETURNED 1 lol\n");
+    LOGGER_IMPL("RETURNED 1 lol");
     *count = 1;
     return 0;
 
@@ -56,7 +56,7 @@ void
 xkblas_set_param(size_t nb, size_t p)
 {
     (void) p;
-    LOGGER_IMPL("`p` unused");
+//    LOGGER_IMPL("`p` unused");
 
     xkblas_context_t * context = xkblas_context_get();
     assert(context);

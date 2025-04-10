@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 03:01:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/10 18:12:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -316,7 +316,8 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     pthread_mutex_init(&team->priv.critical.mtx, NULL);
 
     // fork thread 0
-    team_create_recursive_fork(this, team, 0, team->priv.nthreads - 1);
+    if (team->priv.nthreads)
+        team_create_recursive_fork(this, team, 0, team->priv.nthreads - 1);
 
     // decrement barrier
     team_barrier_fetch(team, 1);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:06:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/10 17:51:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,7 +75,7 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
             while (1)
             {
                 device_id = runtime->drivers.devices.round_robin_device_global_id.fetch_add(1, std::memory_order_relaxed);
-                device_id = 1 + (device_id % (runtime->drivers.devices.n - 1));
+                device_id = (xkrt_device_global_id_t) (1 + (device_id % (runtime->drivers.devices.n - 1)));
 
                 xkrt_device_t * device = runtime->drivers.devices.list[device_id];
                 if (device)
