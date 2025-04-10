@@ -161,10 +161,8 @@ int xkblas_malloc_unified(void** ptr, size_t size)
     kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
     _last_free_to_use = driver->f_free_unified;
-    //_last_used_driver = driver; // Assume allocation is always done when xkblas is initialized ... TODO FIX
-
     driver->f_malloc_unified( ptr, size );
-    printf("Allocate unified %p %p\n", *ptr, driver);
+    //printf("Allocate unified %p %p\n", *ptr, driver);
   }
   else {
 #if KAAPI_USE_CUDA
@@ -174,7 +172,7 @@ int xkblas_malloc_unified(void** ptr, size_t size)
     kaapi_driver_t* driver = kaapi_offload_driver_bytype( KAAPI_PROC_TYPE_HIP );
 #endif
     *ptr = malloc(size);
-    printf("Allocate malloc %p %p\n", *ptr, driver);
+    //printf("Allocate malloc %p %p\n", *ptr, driver);
   }
 #else // KAAPI_UNIFIED
   *ptr = malloc(size);
@@ -631,12 +629,10 @@ void* xkblas_malloc( size_t size )
 #if KAAPI_USE_HIP
   void* ptr = 0;
   kaapi_assert_m(hipSuccess== hipHostMalloc(&ptr, size, hipHostMallocPortable),"hipHostAlloc failed");
-  printf("Allocate hipHostMalloc %p\n", ptr);
   return ptr;
 #elif KAAPI_USE_CUDA  
   void* ptr = 0;
   kaapi_assert_m(cudaSuccess== cudaHostAlloc(&ptr, size, cudaHostAllocPortable),"cudaHostAlloc failed");
-  printf("Allocate cudaHostAlloc %p\n", ptr);
   return ptr;
 #else
   return malloc(size);
