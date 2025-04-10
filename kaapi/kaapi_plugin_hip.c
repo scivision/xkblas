@@ -2528,7 +2528,16 @@ KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(malloc_unified)( void** pptr, size_t size )
 {
   // TODO add checks
-  hipMallocManaged( pptr, size, hipMemAttachGlobal );
+  // TODO select the best choice of function call
+  // - posix_mem_align seems to have the best compromise on MI300A
+  hipError_t err;
+  //kaapi_assert_m(hipSuccess== hipHostMalloc(pptr, size, hipHostMallocPortable),"hipHostAlloc failed");
+  int e = posix_memalign( pptr, 4*1024, size );
+  //err = hipMalloc( pptr, size );
+  //err = hipMallocManaged( pptr, size, hipMemAttachGlobal );
+  err = hipMemAdvise(*pptr, size, hipMemAdviseSetPreferredLocation, 0); // Data should migrate on GPU sooner
+  err = hipMemAdvise(*pptr, size, hipMemAdviseSetAccessedBy, 0);        // Data should migrate on GPU sooner
+  //err = hipMemAdvise(*pptr, size, hipMemAdviseSetCoarseGrain, 0);       // Coherency handled outside of kernels (after sync)
 }
 
 KAAPI_CLASS_ENTRYPOINT void
