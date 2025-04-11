@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 01:10:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 17:31:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -488,8 +488,15 @@ main_mumps(char ** args)
     int * IW = NULL;
 
     /* parse arguments */
-    int m  = 16384; // rand_int(200, 32768);
-    int n  = 16384; // rand_int(200,  8192);
+
+    int   I = atoi(args[0]);
+    int   m = atoi(args[1]);
+    int   n = atoi(args[2]);
+    int ts1 = atoi(args[3]);
+    int ts2 = atoi(args[4]);
+    int ts3 = atoi(args[5]);
+//    int m  = 16384; // rand_int(200, 32768);
+//    int n  = 16384; // rand_int(200,  8192);
     int ld = m + n;
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
@@ -501,17 +508,27 @@ main_mumps(char ** args)
     # define G  ((TYPE *)matrices[3])
     prepare_n_matrices(matrices, 4, ld);
 
+    # if 1
     int ts[][3] = {
-        {2048, 2048, 2048},
-        {2048, 1024, 2048},
-        {2048, 1024, 4096},
+        {ts1, ts2, ts3}
     };
+    # else
+    int ts[][3] = {
+        {5120/2, 5120, 5120/2},
+        {2048, 2048, 2048},
+        {2048, 5120, 4096},
+        {4096, 5120, 4096},
+        {1536, 5120, 4096},
+        {4096, 4096, 4096},
+        {1024, 1024, 1024},
+    };
+    # endif
 
     for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
     {
         printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
-        for (int j = 0 ; j < 5 ; ++j)
+        for (int j = 0 ; j < I ; ++j)
         {
             uint64_t t0 = get_nanotime();
 
@@ -524,13 +541,21 @@ main_mumps(char ** args)
             impl.set_tile(ts[i][2]);
             impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
 
+            # if 0
+            impl.coherent(D, 4*ld, 4*ld, ld);
+            # else
+            impl.coherent(D, n, n, ld);
+            impl.coherent(L, m, n, ld);
+            impl.coherent(U, n, m, ld);
             impl.coherent(G, m, m, ld);
+            # endif
 
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
             printf("Compute took %lf s. (graph construction took %lf s.)\n",
                     (tf-t0)/1e9, (tt-t0)/1e9);
+            impl.reset();
         }
     }
 
@@ -704,9 +729,15 @@ static func_t funcs[] = {
     {
         .name = "MUMPS",
         .f = main_mumps,
-        .nargs = 0,
+        .nargs = 6,
         .descr = "???",
-        .usage =    "\n"
+        .usage =    "I M N K TS\n"
+                    "  -   I : number of iterations\n"
+                    "  -   M : ?\n"
+                    "  -   N : ?\n"
+                    "  - TS1 : tile size for trsm\n"
+                    "  - TS2 : tile size for copyscale\n"
+                    "  - TS3 : tile size for gemm\n",
     },
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
