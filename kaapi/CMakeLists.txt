@@ -52,10 +52,11 @@ if (KAAPI_USE_TRACE)
 else()
 endif()
 
-#if (KAAPI_USE_PERFCTR)
-#else()
-#endif()
-#
+if (KAAPI_USE_PERFCTR)
+  list(APPEND ADDITIONAL_SOURCES kaapi_trace.h kaapi_perfctr.h kaapi_trace_lib.c kaapi_trace_recorder.c kaapi_trace_parser.c)
+else()
+endif()
+
 #if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 #  if (${PAPI_FOUND})
 #  else()

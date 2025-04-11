@@ -299,7 +299,7 @@ typedef struct kaapi_event_buffer_t {
 /* Context per thread for tracing and measuring some performance counters    */
 /* ========================================================================= */
 typedef struct kaapi_tracelib_thread_t {
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   kaapi_perf_idset_t       perfset;
   kaapi_perf_idset_t       task_perfset; /* subset of perfset */
 #endif
@@ -313,7 +313,7 @@ typedef struct kaapi_tracelib_thread_t {
   kaapi_task_id_t          task;            /* current running task or 0 */
   kaapi_event_buffer_t*    eventbuffer;
   uint64_t                 event_mask;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   int                      papi_event_set;
   unsigned int	           papi_event_count;
   kaapi_perf_idset_t	     papi_event_mask;
@@ -331,7 +331,7 @@ typedef struct {
   int                       numaplacecount;
   uint64_t                  eventmask;
   const char*               recordfilename;      /* prefix for record filenames */
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   kaapi_perf_idset_t        perfctr_idset;       /* per thread events */
   kaapi_perf_idset_t        taskperfctr_idset;   /* per task events */
   kaapi_perf_idset_t        uncoreperfctr_idset; /* uncore events */
@@ -346,8 +346,27 @@ typedef struct {
 
 extern kaapi_tracelib_param_t kaapi_tracelib_param;
 
+#if KAAPI_USE_PERFCOUNTER||KAAPI_USE_TRACE
+/* Returns the name of the performance counter id */
+extern const char* kaapi_tracelib_perfid_to_name(kaapi_perf_id_t id);
 
-#if KAAPI_USE_TRACELIB==1 /* until ~ the end of the file ... */
+/* Read the current value of counters and report them in regs
+   regs should have enough size to store all events defined in the kproc set 
+*/
+extern void kaapi_tracelib_thread_read(
+    kaapi_tracelib_thread_t*     kproc,
+    kaapi_perf_idset_t           idset,
+    kaapi_perf_counter_t*        regs
+);
+
+/** Flush the event buffer evb and return and new buffer.
+    \param evb the event buffer to flush
+    \retval the new event buffer to use for futur records.
+*/
+extern kaapi_event_buffer_t* kaapi_event_flushbuffer( kaapi_event_buffer_t* evb );
+#endif
+
+
 
 /* Initialize Kaapi sublibrary
    Initialize different masks from KAAPI_RECORD_MASK & KAAPI_RECORD_TRACE
@@ -383,7 +402,7 @@ extern int kaapi_tracelib_thread_init (
 );
 
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* Return the size of events defined to be captured.
 */
 static inline unsigned int kaapi_tracelib_thread_idsetsize(
@@ -411,18 +430,6 @@ extern void kaapi_tracelib_thread_start (
 extern void kaapi_tracelib_thread_stop (
     kaapi_tracelib_thread_t*     kproc
 );
-
-
-#if KAAPI_USE_PERFCOUNTER==1
-/* Read the current value of counters and report them in regs
-   regs should have enough size to store all events defined in the kproc set 
-*/
-extern void kaapi_tracelib_thread_read(
-    kaapi_tracelib_thread_t*     kproc,
-    kaapi_perf_idset_t           idset,
-    kaapi_perf_counter_t*        regs
-);
-#endif
 
 
 /* Switch to count time from tidle to twork
@@ -487,7 +494,7 @@ extern void kaapi_tracelib_task_end(
     kaapi_task_id_t              parent
 );
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* Returns the name of the performance counter id */
 extern const char* kaapi_tracelib_perfid_to_name(kaapi_perf_id_t id);
 
@@ -604,18 +611,13 @@ typedef struct kaapi_eventfile_header {
   uint64_t       uncore_perf_period;
   uint32_t       perfcounter_count;   /* (idmax & 0xFF) | (base  & 0xFF for papi << 8) | (base uncore & 0xFF << 16) */
   uint32_t       taskfmt_count;       /* number of task's formats */
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   char           perfcounter_name[KAAPI_PERF_ID_MAX][128]; /* name for each perf counter */
 #endif
   kaapi_fmttrace_def fmtdefs[KAAPI_FORMAT_MAX]; /* of size taskfmt_count */
 } kaapi_eventfile_header_t;
 
-/** Flush the event buffer evb and return and new buffer.
-    \param evb the event buffer to flush
-    \retval the new event buffer to use for futur records.
-*/
-extern kaapi_event_buffer_t* kaapi_event_flushbuffer( kaapi_event_buffer_t* evb );
-
+#if KAAPI_USE_TRACELIB
 
 /** Return a new event into the eventbuffer of the kprocessor.
 */
@@ -788,7 +790,7 @@ static inline kaapi_event_buffer_t*  kaapi_event_push4(
   return evb;
 }
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* Write event counter values in idset to the trace file
 */
 extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
@@ -830,7 +832,7 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
       kaapi_event_push4((kproc), kaapi_event_date(), eventno, kind, (uint64_t)(p1), (uint64_t)(p2), (uint64_t)(p3), (uint64_t)(p4) ): 0)
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 #define KAAPI_EVENT_PUSH_PERFCTR(kproc, eventno, kind, pc, idset, perfctr ) \
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
       kaapi_event_push_perfctr((kproc), kaapi_event_date(), eventno, kind, (uintptr_t)pc, idset, perfctr ) : 0)
@@ -858,7 +860,7 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
     ( ((kproc) && ((kproc)->eventbuffer) && ((kproc)->event_mask & KAAPI_EVT_MASK(eventno))) ? \
       kaapi_event_push3((kproc), tclock, eventno, kind, (uint64_t)(p1), (uint64_t)(p2), (uint64_t)(p3)) : 0)
 
-#else // #if KAAPI_USE_TRACELIB==1
+#else // #if KAAPI_USE_TRACELIB
 
 #define KAAPI_IFUSE_TRACE(kproc,inst)
 #define KAAPI_EVENT_GET(kproc, eventno, kind ) 0
@@ -880,11 +882,11 @@ extern kaapi_event_buffer_t* kaapi_event_push_perfctr(
 #define KAAPI_EVENT_PUSH2_AT(kproc, tclock, eventno, kind, p1, p2 )
 #define KAAPI_EVENT_PUSH3_AT(kproc, tclock, eventno, kind, p1, p2, p3 )
 
-#endif // #if KAAPI_USE_TRACELIB==1
+#endif // #if KAAPI_USE_TRACELIB
 
 
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* Human readable name for event mask */
 extern size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t ssize, char* buffer);
 

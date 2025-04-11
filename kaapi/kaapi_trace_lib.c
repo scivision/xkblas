@@ -241,7 +241,7 @@ size_t kaapi_event_get_name_mask( uint64_t eventmask, size_t size, char* buffer)
   return save_size - size;
 }
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* Human readable name for event mask */
 size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t size, char* buffer)
 {
@@ -287,7 +287,7 @@ size_t kaapi_perfctr_get_name_mask( kaapi_perf_idset_t  perfctr_idset, size_t si
    Meta data about performance counter
 */
 /* ------------------------------------------------------------------------------------------- */
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 typedef struct {
   const char*            name;         /* human readable */
   const char*            cmdlinename;  /* command line name */
@@ -506,7 +506,7 @@ static kaapi_perfctr_group_t kaapi_perfctr_group[] = {
     .mask_pertask = 0
   },
 };
-#endif //#if KAAPI_USE_PERFCOUNTER==1
+#endif //#if KAAPI_USE_PERFCOUNTER
 
 /* log2 of the size of hashmaps
 */
@@ -519,7 +519,7 @@ static kaapi_hashentries_t*           fdescr_mapentries[1<<KAAPI_SIZE_DFGCTXT];
 static kaapi_hashentries_bloc_t       fdescr_mapbloc;
 static kaapi_lock_t                   fdescr_map_lock = KAAPI_LOCK_INITIALIZER;
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /* internal */
 static unsigned int user_event_count = 0;
 static unsigned int papi_event_count = 0;
@@ -573,7 +573,7 @@ static const char* _get_group( int event)
     return "CALL";
   if (KAAPI_EVT_MASK(event) & KAAPI_EVT_MASK_SCHED)
     return "SCHED";
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (KAAPI_EVT_MASK(event) & KAAPI_EVT_MASK_PERFCOUNTER)
     return "PERFCTR";
 #endif
@@ -602,7 +602,7 @@ static void _kaapi_print_help(void)
    "  For more information, please visit http://kaapi.gforge.inria.fr\n"
    "  All options are controlled by environement variables. The list is the following:\n"
    "  * KAAPI_HELP | KAAPI_HELPME       : show this help\n"
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
    "  * KAAPI_PERF_EVENTS <perflist>    : defines performance counters to be captured by threads\n"
    "  * KAAPI_TASKPERF_EVENTS <perflist>: defines performance counters to be captured by tasks\n"
    "  * KAAPI_UNCOREPERF_EVENTS <perflist>: defines uncore performance counters to be capture by socket\n"
@@ -614,7 +614,7 @@ static void _kaapi_print_help(void)
    "<perflist>: is a list (separator ',') of perf counter' names or names of perf counters' groups.\n"
    "    Kaapi following names are available:\n "
   );
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   for (int i=0; i<KAAPI_PERF_ID_ENDSOFTWARE; ++i)
   {
     if (kaapi_perfctr_info[i].cmdlinename ==0) continue;
@@ -668,7 +668,7 @@ static void _kaapi_print_help(void)
      "related to all events concerning call to xkblas routines.\n"
      "\t                  This group is mandatory to evaluate performance of blas routines.\n"
   );
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   fprintf(stdout,"\t%16.16s: %s", "PERFCTR",
       "to be used to include performance counters in the trace.\n"
   );
@@ -711,7 +711,7 @@ int kaapi_tracelib_init(
   if (++once_init >1) return 0;
   int i, error;
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   /* Update counters: undefined code */
   for (i=0; i<KAAPI_PERF_ID_ENDSOFTWARE; ++i)
     kaapi_perfctr_info[i].eventcode = i;
@@ -763,7 +763,7 @@ int kaapi_tracelib_init(
     kaapi_tracelib_param.recordfilename = strdup(filename);
   }
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   /* perf counters initialization */
   kaapi_perf_idset_zero( &kaapi_tracelib_param.perfctr_idset ) ;
   kaapi_perf_idset_zero( &kaapi_tracelib_param.taskperfctr_idset ) ;
@@ -796,7 +796,7 @@ int kaapi_tracelib_init(
     error = kaapi_parse_delay(&str, &kaapi_tracelib_param.uncore_period);
     kaapi_assert(0 != error);
   }
-#else // #if KAAPI_USE_PERFCOUNTER==1
+#else // #if KAAPI_USE_PERFCOUNTER
   if ( (0!=getenv("KAAPI_UNCOREPERF_PERIOD"))
     || (0!=getenv("KAAPI_UNCOREPERF_EVENTS"))
     || (0!=getenv("KAAPI_PERF_EVENTS"))
@@ -852,7 +852,7 @@ int kaapi_tracelib_init(
   /* init recorder module */
   kaapi_eventrecorder_init();
 
-#if (KAAPI_USE_PERFCOUNTER==1) && (LIBOMP_USE_NUMA==1)
+#if (KAAPI_USE_PERFCOUNTER) && (LIBOMP_USE_NUMA)
   /* Start Monitoring thread uncore event that should be collected once... */
   if (kaapi_tracelib_param.uncoreperfctr_idset || papi_uncore_event_mask)
   {
@@ -941,14 +941,14 @@ int kaapi_tracelib_thread_init(
   kproc->cpu          = cpu;
   kproc->ptype        = proctype;
   kproc->task         = 0;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   kproc->papi_event_count  = 0;
 #endif
 
   switch (proctype) {
     case 2: /* uncore collector */
       kproc->event_mask      = kaapi_tracelib_param.eventmask;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
       kproc->perfset         = kaapi_tracelib_param.uncoreperfctr_idset;
       kproc->task_perfset    = 0;
       kproc->papi_event_mask = papi_uncore_event_mask;
@@ -958,7 +958,7 @@ int kaapi_tracelib_thread_init(
 
     case 1: /* GPU */
       kproc->event_mask      = kaapi_tracelib_param.eventmask;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
       kproc->perfset         = kaapi_tracelib_param.perfctr_idset;
       kproc->task_perfset    = kaapi_tracelib_param.taskperfctr_idset;
       kproc->papi_event_mask = 0;
@@ -969,7 +969,7 @@ int kaapi_tracelib_thread_init(
     case 0:  /* CPU */
     default:
       kproc->event_mask      = kaapi_tracelib_param.eventmask;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
       kproc->perfset         = kaapi_tracelib_param.perfctr_idset;
       kproc->task_perfset    = kaapi_tracelib_param.taskperfctr_idset;
       kproc->papi_event_mask = papi_event_mask;
@@ -981,7 +981,7 @@ int kaapi_tracelib_thread_init(
   if (kaapi_tracelib_param.eventmask)
     kproc->eventbuffer = kaapi_event_openbuffer((int)kid, proctype );
 
-#if (KAAPI_USE_PERFCOUNTER==1) && (KAAPI_USE_PAPI==1)
+#if (KAAPI_USE_PERFCOUNTER) && (KAAPI_USE_PAPI)
   int papi_event_codes[KAAPI_MAX_HWCOUNTERS];
   if (kproc->papi_event_mask)  /* papi_event_count */
   {
@@ -1106,7 +1106,7 @@ void kaapi_tracelib_thread_start( kaapi_tracelib_thread_t* kproc )
 #else
   KAAPI_EVENT_PUSH2(kproc, KAAPI_EVT_KPROC, 0 /*start*/, kproc->ptype, 0 );
 #endif
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   /* capture perfcounter */
   if (kproc->perfset & KAAPI_EVT_MASK(KAAPI_EVT_PERFCOUNTER))
   {
@@ -1126,7 +1126,7 @@ void kaapi_tracelib_thread_stop(
     kaapi_tracelib_thread_t*     kproc
 )
 {
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (kproc->perfset & KAAPI_EVT_MASK(KAAPI_EVT_PERFCOUNTER))
   {
     kaapi_tracelib_thread_read( kproc,
@@ -1143,7 +1143,7 @@ void kaapi_tracelib_thread_stop(
 }
 
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 /*
 */
 void kaapi_tracelib_thread_read(
@@ -1206,7 +1206,7 @@ int kaapi_tracelib_thread_switchstate(
     kaapi_tracelib_thread_t*     kproc
 )
 {
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (kproc->perfset & KAAPI_EVT_MASK(KAAPI_EVT_PERFCOUNTER))
   {
     kaapi_tracelib_thread_read( kproc,
@@ -1290,7 +1290,7 @@ void kaapi_tracelib_task_begin(
 )
 {
   KAAPI_EVENT_PUSH3(kproc, KAAPI_EVT_TASK_EXEC, 2/*begin */, task, fmtid, kproc->numaid );
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (kproc->task_perfset)
   {
     kaapi_tracelib_thread_read( kproc,
@@ -1310,7 +1310,7 @@ void kaapi_tracelib_task_end(
     kaapi_task_id_t              parent
 )
 {
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   /* incr before counter is dumped into the event */
   KAAPI_PERFCTR_INCR(kproc, KAAPI_PERF_ID_TASKEXEC, 1);
   if (kproc->task_perfset)
@@ -1369,7 +1369,7 @@ static unsigned int kaapi_numa_getpage_id(const void* addr)
 #endif
 
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 static const uint64_t MASK_PERF_READWRITE_ACCESS = 
    KAAPI_PERF_ID_MASK(KAAPI_PERF_ID_LOCAL_READ)  | KAAPI_PERF_ID_MASK(KAAPI_PERF_ID_LOCAL_WRITE) |
    KAAPI_PERF_ID_MASK(KAAPI_PERF_ID_REMOTE_READ) | KAAPI_PERF_ID_MASK(KAAPI_PERF_ID_REMOTE_WRITE);
@@ -1413,7 +1413,7 @@ static void __kaapi_dump_access(
     /* how to count remote access if numa information not available ? */
     if (numaid == (unsigned int)-1) return;
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
     if (kaapi_perf_idset_test_mask(&kproc->perfset, MASK_PERF_READWRITE_ACCESS))
     {
       if ((numaid == local_numaid) || (numaid == (unsigned int)-1))
@@ -1449,7 +1449,7 @@ void kaapi_tracelib_task_access(
 )
 {
   if ( 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
        !kaapi_perf_idset_test_mask(&kproc->perfset, MASK_PERF_READWRITE_ACCESS) && 
 #endif
        !(kproc->event_mask & KAAPI_EVT_MASK(KAAPI_EVT_TASK_INFO))
@@ -1479,7 +1479,7 @@ void kaapi_tracelib_taskwait_begin(
 )
 {
   KAAPI_EVENT_PUSH2(kproc, KAAPI_EVT_TASKSYNC, 0/* begin*/, task, kproc->numaid );
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (kproc->task_perfset)
   {
     kaapi_tracelib_thread_read( kproc,
@@ -1497,7 +1497,7 @@ void kaapi_tracelib_taskwait_end(
     kaapi_task_id_t              task
 )
 {
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   KAAPI_PERFCTR_INCR(kproc, KAAPI_PERF_ID_SYNCINST, 1);
   if (kproc->task_perfset)
   {
@@ -1594,7 +1594,7 @@ void _kaapi_signal_dump_counters(int xxdummy)
 }
 
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
 static kaapi_perf_id_t kaapi_tracelib_create_perfid(
   const char* name,
   int kind
@@ -1687,7 +1687,7 @@ static int kaapi_get_events(
   if (s == NULL)
     return 0;
 
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   if (task_set == 1)
     kaapi_perf_idset_zero( &kaapi_tracelib_param.taskperfctr_idset );
 #endif
@@ -1704,7 +1704,7 @@ static int kaapi_get_events(
       return -1;
 
 
-#if (KAAPI_USE_PERFCOUNTER==1) && (KAAPI_USE_PAPI==1)
+#if (KAAPI_USE_PERFCOUNTER) && (KAAPI_USE_PAPI)
     /* Register PAPI counter to be at KAAPI_PERF_ID_PAPI_BASE+cnt in kaapi_perfctr_info
     */
     if (type == KAAPI_PCTR_PAPI)
@@ -1742,7 +1742,7 @@ static int kaapi_get_events(
       }
     } else
 #endif
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
     if (type == KAAPI_PCTR_LIBRARY)
     {
       if (event_code <KAAPI_PERF_ID_MAX)
@@ -1790,7 +1790,7 @@ static int kaapi_get_events(
 int get_kaapi_code( char* name )
 {
   int i;
-#if KAAPI_USE_PERFCOUNTER==1
+#if KAAPI_USE_PERFCOUNTER
   /* group of events */
   for (i=0; i<sizeof(kaapi_perfctr_group)/sizeof(kaapi_perfctr_group_t); ++i)
   {
@@ -1824,7 +1824,7 @@ static int get_event_code(char* name, int* code, uint8_t* type)
   *code = -1;
   if (strncasecmp(name, "PAPI", 4) !=0)
   {
-#if (KAAPI_USE_PERFCOUNTER==1) && (KAAPI_USE_PAPI==1)
+#if (KAAPI_USE_PERFCOUNTER) && (KAAPI_USE_PAPI)
     int c = get_kaapi_code(name);
     if (c != -1)
     {
@@ -1841,7 +1841,7 @@ static int get_event_code(char* name, int* code, uint8_t* type)
     }
   }
   /* else assume that its PAPI counter (included native counter) */
-#if (KAAPI_USE_PERFCOUNTER==1) && (KAAPI_USE_PAPI==1)
+#if (KAAPI_USE_PERFCOUNTER) && (KAAPI_USE_PAPI)
   int err = PAPI_event_name_to_code(name, code);
   if (err != PAPI_OK)
   {
@@ -1850,7 +1850,7 @@ static int get_event_code(char* name, int* code, uint8_t* type)
   }
   *type = KAAPI_PCTR_PAPI;
   return 0;
-#elif KAAPI_USE_PERFCOUNTER==1
+#elif KAAPI_USE_PERFCOUNTER
   fprintf(stderr, "*** KAAPI bad event name:%s. May be because PerCounter is not configured\n", name);
   return -1;
 #else
@@ -1860,7 +1860,7 @@ static int get_event_code(char* name, int* code, uint8_t* type)
 }
 
 
-#if (KAAPI_USE_PERFCOUNTER==1) && (LIBOMP_USE_NUMA==1)
+#if (KAAPI_USE_PERFCOUNTER) && (LIBOMP_USE_NUMA)
 /* Each uncore thread is attached to a socket (i.e. to a core to a socket).
 */
 void* _kaapi_uncore_collector(void* arg )
