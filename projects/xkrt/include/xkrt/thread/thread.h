@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:57:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:45:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -263,6 +263,8 @@ typedef struct  xkrt_thread_t
         inline void
         resolve(task_t * task, access_t * accesses)
         {
+            (void) task;
+
             assert(task->flags & TASK_FLAG_DEPENDENT);
             assert(AC > 0);
 
@@ -282,6 +284,7 @@ typedef struct  xkrt_thread_t
         inline void
         insert(task_t * task, access_t * accesses)
         {
+            (void) task;
             assert(task->flags & TASK_FLAG_DEPENDENT);
             assert(AC > 0);
 
