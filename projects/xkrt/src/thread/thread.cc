@@ -303,6 +303,7 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
 
     // allocate thread array
     const int nthreads = team->desc.nthreads;   // TODO : this should be a func of the team desc
+    assert(nthreads);
     team->priv.nthreads = nthreads;
     team->priv.threads = (xkrt_thread_t *) calloc(team->priv.nthreads, sizeof(xkrt_thread_t));
     assert(team->priv.threads);

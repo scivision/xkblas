@@ -171,7 +171,7 @@ xkrt_runtime_stats_tasks_report(xkrt_runtime_t * runtime)
     }
 
     for (int i = 0 ; i < TASK_STATE_MAX ; ++i)
-        LOGGER_WARN("  `%8zu` tasks in state `%12s`", counter[i], task_state_to_str((task_state_t)i));
+        LOGGER_WARN("  `%8d` tasks in state `%12s`", counter[i], task_state_to_str((task_state_t)i));
 
     # endif /* NDEBUG */
 }

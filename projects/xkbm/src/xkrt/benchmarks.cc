@@ -42,6 +42,31 @@ foreach_device(benchmark_node_t * bench)
             }
         }
     };
+    runtime.team_create(&team);
+    runtime.team_join(&team);
+}
+
+template <void * (*func)(xkrt_team_t * team, xkrt_thread_t * thread)>
+static void
+foreach_core(benchmark_node_t * bench)
+{
+    // get the number of available cores
+    int ncores = hwloc_get_nbobjs_by_depth(runtime.topology, hwloc_get_type_depth(runtime.topology, HWLOC_OBJ_CORE));
+
+    // create team
+    tls_t tls;
+    xkrt_team_t team = {
+        .desc = {
+            .routine = func,
+            .args = &tls,
+            .nthreads = ncores,
+            .binding = {
+                .mode   = XKRT_TEAM_BINDING_MODE_COMPACT,
+                .places = XKRT_TEAM_BINDING_PLACES_DEVICE,
+                .flags  = XKRT_TEAM_BINDING_FLAG_NONE
+            }
+        }
+    };
 
     runtime.team_create(&team);
     runtime.team_join(&team);
@@ -727,6 +752,9 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
             for (int j = 0 ; j < dst_device->nmemories ; ++j)
             {
+                if (src_device == dst_device)
+                    continue ;
+
                 xkrt_area_chunk_t * src_chunk = tls->areas[src_device_global_id][dst_device_global_id][i][1];
                 assert(src_chunk);
 
@@ -735,9 +763,6 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
                 for (int iter = -1 ; iter < time.niters ; ++iter)
                 {
-                    if (mode == ALL)
-                        runtime.team_barrier(team);
-
                     uint64_t t0 = xkrt_get_nanotime();
                     {
                         for (int c = 0 ; c < nchunks ; ++c)

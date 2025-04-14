@@ -55,10 +55,7 @@ device_ze_get(int device_driver_id)
     return DEVICES + device_driver_id;
 }
 
-// set to '1' if Intel's subdevices should be mapped to a single xkrt device
-// if '0', then Intel's devices are mapped
-# define SUBDEVICE_TO_XKRT_DEVICE 1
-
+// see `ZE_FLAT_DEVICE_HIERARCHY` env variable
 static int
 XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 {
@@ -86,7 +83,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
         return 1;
 
     // get all drivers
-    uint32_t ze_n_drivers = ndevices_requested; // i believe Intel API ensure at least 1 gpu per driver ?
+    uint32_t ze_n_drivers = 0;
+    ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, NULL));
+    assert(ze_n_drivers < sizeof(ze_drivers) / sizeof(*ze_drivers));
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, ze_drivers));
 
     // get all device handles per driver
@@ -117,46 +116,32 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
         {
             ze_device_handle_t ze_device = ze_devices[i];
 
-            # if SUBDEVICE_TO_XKRT_DEVICE
-            ze_device_handle_t ze_subdevices[XKRT_DEVICES_MAX];
-            uint32_t nsubdevices = ndevices - ze_n_devices;
-            zeDeviceGetSubDevices(ze_device, &nsubdevices, ze_subdevices);
+            // save handles
+            xkrt_device_ze_t * device = DEVICES + ze_n_devices;
+            device->ze.context = ze_contextes[ze_driver_id];
+            device->ze.driver  = ze_drivers[ze_driver_id];
+            device->ze.device  = ze_device;
 
-            for (unsigned int j = 0; j < nsubdevices ; ++j)
-            {
-                ze_device_handle_t ze_device = ze_subdevices[j];
-            # endif
+            // get subdevice properties
+            device->ze.device_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
+            ZE_SAFE_CALL(zeDeviceGetProperties(device->ze.device, &device->ze.device_properties));
 
-                xkrt_device_ze_t * device = DEVICES + ze_n_devices;
+            // get memory properties
+            device->ze.memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
+            ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.device, &device->ze.memory.pcount, device->ze.memory.properties));
 
-                // save handles
-                device->ze.context = ze_contextes[ze_driver_id];
-                device->ze.driver  = ze_drivers[ze_driver_id];
-                device->ze.device  = ze_device;
+            # if XKRT_SUPPORT_SYCL
+            // sycl interop
+            device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
 
-                // get subdevice properties
-                device->ze.device_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
-                ZE_SAFE_CALL(zeDeviceGetProperties(device->ze.device, &device->ze.device_properties));
+            std::vector<sycl::device> sycl_devices(1);
+            sycl_devices[0] = device->sycl.device;
+            device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
+            # endif /* XKRT_SUPPORT_SYCL */
 
-                // get memory properties
-                device->ze.memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
-                ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.device, &device->ze.memory.pcount, device->ze.memory.properties));
+            if (++ze_n_devices == ndevices_requested)
+                return 0;
 
-                # if XKRT_SUPPORT_SYCL
-                // sycl interop
-                device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
-
-                std::vector<sycl::device> sycl_devices(1);
-                sycl_devices[0] = device->sycl.device;
-                device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
-                # endif /* XKRT_SUPPORT_SYCL */
-
-                if (++ze_n_devices == ndevices_requested)
-                    return 0;
-
-            # if SUBDEVICE_TO_XKRT_DEVICE
-            }
-            # endif
         }
     }
 
@@ -171,12 +156,18 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(
 ) {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
+    char uuid[2 + 2 * ZE_MAX_DEVICE_UUID_SIZE + 1];
+    size_t pos = 0;
+    pos += snprintf(uuid + pos, sizeof(uuid) - pos, "0x");
+    for (int i = 0 ; i < ZE_MAX_DEVICE_UUID_SIZE ; ++i)
+        pos += snprintf(uuid + pos, sizeof(uuid) - pos, "%X", device->ze.device_properties.uuid.id[i]);
+
     snprintf(
         buffer,
         size,
         "Level Zero device %2d - %s with %d slices of %d subslices of %d EUs of "
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
-        "timer resolution of %luns - deviceId(pci)=%d - uuid[%d]=%x",
+        "timer resolution of %luns - deviceId(pci)=%d - uuid=%s",
         device_driver_id,
         device->ze.device_properties.name,
         device->ze.device_properties.numSlices,
@@ -187,10 +178,8 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(
         device->ze.device_properties.coreClockRate / 1e3,
         device->ze.device_properties.timerResolution,
         device->ze.device_properties.deviceId,
-        ZE_MAX_DEVICE_UUID_SIZE - 1,
-        device->ze.device_properties.uuid.id[ZE_MAX_DEVICE_UUID_SIZE - 1]
+        uuid
     );
-    return buffer;
 }
 
 static void
@@ -361,7 +350,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 .originZ = 0,
                 .width   = (uint32_t) width,
                 .height  = (uint32_t) height,
-                .depth   = 0
+                .depth   = 1
             };
 
             const uint32_t src_slice_pitch = 0;
@@ -371,7 +360,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 .originZ = 0,
                 .width   = (uint32_t) width,
                 .height  = (uint32_t) height,
-                .depth   = 0
+                .depth   = 1
             };
 
             ZE_SAFE_CALL(

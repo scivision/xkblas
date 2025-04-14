@@ -66,6 +66,8 @@ SET(SOURCE_FILES
 # XKRT Lib
 add_library(${XKRT} SHARED ${SOURCE_FILES})
 add_dependencies(${XKRT} always_generate_files)
+set_target_properties(${XKRT} PROPERTIES BUILD_RPATH "${CMAKE_SOURCE_DIR}/lib")
+set_target_properties(${XKRT} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
 
 # Include directory
 include_directories(include/)

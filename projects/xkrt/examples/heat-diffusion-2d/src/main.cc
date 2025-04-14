@@ -13,7 +13,6 @@
 
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/metric.h>
-# include <xkrt/driver/thread.hpp>
 
 # include <stdio.h>
 # include <stdlib.h>
@@ -98,7 +97,8 @@ maybe_export(int step, TYPE * grid)
             int frame = step / (N_STEP / N_VTK);
 
             # if 1
-            Thread * thread = Thread::self();
+            xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+            assert(thread);
 
             # define AC 1
             constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
@@ -424,7 +424,8 @@ initialize(TYPE * grid1, TYPE * grid2)
 static void
 update_tile(TYPE * src, TYPE * dst, int tile_x, int tile_y, int step)
 {
-    Thread * thread = Thread::self();
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
     # define AC 2
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
