@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 19:44:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:28:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,10 +69,9 @@ typedef struct  xkrt_device_ze_t
     struct {
         struct {
             zes_pwr_handle_t handle;
-            zes_power_energy_counter_t e1, e2;
-            uint64_t t1, t2;
         } pwr;
     } zes;
+
     # endif /* XKRT_SUPPORT_ZES */
 
 }               xkrt_device_ze_t;

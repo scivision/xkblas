@@ -54,7 +54,7 @@ struct  time_array_t
         const std::function<void (char *, size_t, int)>& convert_label
     ) {
 
-        LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s", label, "avg", "stdev", "min", "med", "max");
+        LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s | %6s", label, "avg", "stdev", "min", "med", "max", "n");
         for (size_t i = 0 ; i < nelements ; ++i)
         {
             qsort(this->values + i * this->niters, niters, sizeof(size_t), size_t_cmp);
@@ -86,14 +86,14 @@ struct  time_array_t
             func[metric](buffer[3], sizeof(buffer[3]), this->get(i, niters/2));
             func[metric](buffer[4], sizeof(buffer[4]), this->get(i, niters-1));
             convert_label(&buffer[5][0], sizeof(buffer[5]), i);
-            LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s", buffer[5], buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+            LOGGER_INFO("%26s | %10s +/- %10s | %10s | %10s | %10s | %6d", buffer[5], buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], niters);
         }
     }
 
     template <void (*REPORT_ELEMENT)(time_array_t *, size_t)>
     inline void report(const char * label)
     {
-        LOGGER_INFO("%12s | %10s +/- %10s | %10s | %10s | %10s", label, "avg", "stdev", "min", "med", "max");
+        LOGGER_INFO("%12s | %10s +/- %10s | %10s | %10s | %10s | %6s", label, "avg", "stdev", "min", "med", "max", "n");
         for (size_t i = 0 ; i < nelements ; ++i)
         {
             qsort(this->values + i * niters, niters, sizeof(size_t), size_t_cmp);
@@ -125,7 +125,7 @@ struct  time_array_t
         xkrt_metric_time(buffer[2], sizeof(buffer[2]), time->get(i, 0));
         xkrt_metric_time(buffer[3], sizeof(buffer[3]), time->get(i, time->niters/2));
         xkrt_metric_time(buffer[4], sizeof(buffer[4]), time->get(i, time->niters-1));
-        LOGGER_INFO("%12zu | %10s +/- %10s | %10s | %10s | %10s", i, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+        LOGGER_INFO("%12zu | %10s +/- %10s | %10s | %10s | %10s | %6d", i, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], time->niters);
     }
 
     static void
@@ -138,7 +138,7 @@ struct  time_array_t
         xkrt_metric_time(buffer[3], sizeof(buffer[3]), time->get(i, 0));
         xkrt_metric_time(buffer[4], sizeof(buffer[4]), time->get(i, time->niters/2));
         xkrt_metric_time(buffer[5], sizeof(buffer[5]), time->get(i, time->niters-1));
-        LOGGER_INFO("%12s | %10s +/- %10s | %10s | %10s | %10s", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5]);
+        LOGGER_INFO("%12s | %10s +/- %10s | %10s | %10s | %10s | %6d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], time->niters);
     }
 
     static void
@@ -150,7 +150,7 @@ struct  time_array_t
         xkrt_metric_bandwidth(buffer[2], sizeof(buffer[2]), time->get(i, 0));
         xkrt_metric_bandwidth(buffer[3], sizeof(buffer[3]), time->get(i, time->niters/2));
         xkrt_metric_bandwidth(buffer[4], sizeof(buffer[4]), time->get(i, time->niters-1));
-        LOGGER_INFO("%12zu | %10s +/- %10s | %10s | %10s | %10s", i, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+        LOGGER_INFO("%12zu | %10s +/- %10s | %10s | %10s | %10s | %6d", i, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], time->niters);
     }
 
 

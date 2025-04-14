@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/18 15:08:36 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 16:53:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:29:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -32,5 +32,28 @@ typedef enum    metric_t
     METRIC_BW,
     METRIC_MAX
 }               metric_t;
+
+typedef struct  xkrt_power_counter_t
+{
+    uint64_t b1, b2, b3 ,b4;
+}               xkrt_power_counter_t;
+
+typedef struct  xkrt_power_t
+{
+    struct {
+        /* start/stop times */
+        uint64_t t1, t2;
+
+        /* power values */
+        xkrt_power_counter_t c1, c2;
+    } priv;
+
+    /* delta time between a start/stop */
+    double dt;
+
+    /* power (J/s <=> Watt) between a start/stop */
+    double P;
+
+}               xkrt_power_t;
 
 # endif /* __METRICS_H__ */

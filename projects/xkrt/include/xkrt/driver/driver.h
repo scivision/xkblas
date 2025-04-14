@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 18:49:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:29:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,6 +24,7 @@
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver-type.h>
 # include <xkrt/driver/stream.h>
+# include <xkrt/logger/metric.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/sync/mutex.h>
 
@@ -146,10 +147,10 @@ typedef struct  xkrt_driver_t
     /////////////////////
 
     /* start power recording on the given device */
-    void (*f_power_start)(int device_driver_id);
+    void (*f_power_start)(int device_driver_id, xkrt_power_t * pwr);
 
     /* return time elapsed (in s.) and the power (in Watt) since last 'f_energy_power_start' call */
-    void (*f_power_stop)(int device_driver_id, double * dt, double * P);
+    void (*f_power_stop)(int device_driver_id, xkrt_power_t * pwr);
 
 }               xkrt_driver_t;
 

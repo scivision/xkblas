@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:54:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:31:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -913,32 +913,37 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
 # if XKRT_SUPPORT_ZES
 
 void
-XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id)
+XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_device_power_t * pwr)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
+    assert(pwr);
 
-    device->zes.pwr.t1 = xkrt_get_nanotime();
-    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, &device->zes.pwr.e1));
+    pwr->priv.t1 = xkrt_get_nanotime();
+    zes_power_energy_counter_t * e1 = &pwr->priv.c1;
+    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, e1));
+
+    // if this fails, increase sizeof pwr->priv.c1
+    static_assert(sizeof(zes_power_energy_counter_t) <= sizeof(pwr->priv.c1));
 }
 
 void
-XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, double * dt, double * P)
+XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_device_power_t * pwr)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
 
-    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, &device->zes.pwr.e2));
-    device->zes.pwr.t2 = xkrt_get_nanotime();
+    zes_power_energy_counter_t * e1 = &pwr->priv.c1;
+    zes_power_energy_counter_t * e2 = &pwr->priv.c2;
 
-    double uJ = (double) (device->zes.pwr.e2.energy - device->zes.pwr.e2.energy);
-    double J = uJ / (double)1e6;
-    double s = (device->zes.pwr.t2 - device->zes.pwr.t1) / (double) 1e9;
+    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, e2));
+    pwr->priv.t2 = xkrt_get_nanotime();
 
-    if (dt)
-        *dt = s;
-    if (P)
-        *P = J / s;
+    double uJ = (double) (e2->energy - e1->energy);
+    double  J = uJ / (double)1e6;
+
+    pwr->dt = (pwr->priv.t2 - pwr->priv.t1) / (double) 1e9;
+    pwr->P  = J / s;
 }
 
 # endif /* XKRT_SUPPORT_ZES */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/09 22:12:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 16:52:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1198,9 +1198,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
-            (void) size;
             size_t freed = 0;
-            auto f = [this, device_global_id, &freed](NodeBase * nodebase, void * args, bool & stop) {
+            auto f = [this, size, device_global_id, &freed](NodeBase * nodebase, void * args, bool & stop) {
                 (void) args;
 
                 Node * node = reinterpret_cast<Node *>(nodebase);
@@ -1247,8 +1246,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                     block.valid &= (memory_allocation_view_id_bitfield_t) ~devbit;
 
-                    // stop = freed >= 2*size;
-                    stop = false;
+                    stop = freed >= 16*size;
+                    // stop = false;
                 }
                 else if (valid_on_device && replicate.nallocations > 1)
                 {

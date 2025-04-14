@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 06:15:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:29:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -178,10 +178,10 @@ typedef struct  xkrt_runtime_t
     ////////////
 
     /* start recording energy usage */
-    void power_start(const xkrt_device_global_id_t device_global_id);
+    void power_start(const xkrt_device_global_id_t device_global_id, xkrt_power_t * pwr);
 
     /* stop recording and return energy usage */
-    void power_stop(const xkrt_device_global_id_t device_global_id, double * dt, double * P);
+    void power_stop(const xkrt_device_global_id_t device_global_id, xkrt_power_t * pwr);
 
     ///////////////
     // UTILITIES //

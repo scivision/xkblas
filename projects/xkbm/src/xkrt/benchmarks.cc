@@ -271,6 +271,8 @@ kernel_launch_latency_init(void)
                 xkrt_driver_module_fn_t * dst = NULL;
                 uint8_t * bin;
                 size_t size;
+                xkrt_driver_module_format_t format;
+
                 switch (driver_type)
                 {
                     # if XKRT_SUPPORT_ZE
@@ -285,6 +287,7 @@ kernel_launch_latency_init(void)
                         size = sizeof(SPIRV_EMPTY_KERNEL);
                         # endif
                         dst  = XKBM_ZE_KERNEL_EMPTY + device_driver_id;
+                        format = XKRT_DRIVER_MODULE_FORMAT_SPIRV;
                         break ;
                     }
                     # endif /* XKRT_SUPPORT_ZE */
@@ -295,6 +298,7 @@ kernel_launch_latency_init(void)
                         bin  = (uint8_t *) PTX_EMPTY_KERNEL;
                         size = sizeof(PTX_EMPTY_KERNEL);
                         dst  = XKBM_CU_KERNEL_EMPTY + device_driver_id;
+                        format = XKRT_DRIVER_MODULE_FORMAT_NATIVE;
                         break ;
                     }
                     # endif /* XKRT_SUPPORT_CUDA */
@@ -309,7 +313,7 @@ kernel_launch_latency_init(void)
                 if (!dst)
                     continue ;
 
-                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size, XKRT_DRIVER_MODULE_FORMAT_SPIRV);
+                xkrt_driver_module_t module = driver->f_module_load(device->driver_id, bin, size, format);
                 *dst = driver->f_module_get_fn(module, "empty_kernel");
                 // driver->f_module_unload(module);
                 assert(*dst);

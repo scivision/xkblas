@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 15:42:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 20:34:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -26,6 +26,7 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/logger-cu.h>
 # include <xkrt/logger/logger-cublas.h>
+# include <xkrt/logger/metric.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
 
@@ -801,6 +802,25 @@ XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
     return fn;
 }
 
+# if XKRT_SUPPORT_NVML
+void
+XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_power_t * pwr)
+{
+    (void) device_driver_id;
+    (void) pwr;
+    LOGGER_FATAL("impl me");
+}
+
+void
+XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_power_t * pwr)
+{
+    (void) device_driver_id;
+    (void) pwr;
+    LOGGER_FATAL("impl me");
+}
+
+# endif /* XKRT_SUPPORT_NVML */
+
 xkrt_driver_t *
 XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
@@ -841,6 +861,11 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
     REGISTER(module_load);
     REGISTER(module_unload);
     REGISTER(module_get_fn);
+
+    # if XKRT_SUPPORT_NVML
+    REGISTER(power_start);
+    REGISTER(power_stop);
+    # endif /* XKRT_SUPPORT_NVML */
 
     # undef REGISTER
 
