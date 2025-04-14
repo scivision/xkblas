@@ -913,14 +913,14 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
 # if XKRT_SUPPORT_ZES
 
 void
-XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_device_power_t * pwr)
+XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_power_t * pwr)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
     assert(pwr);
 
     pwr->priv.t1 = xkrt_get_nanotime();
-    zes_power_energy_counter_t * e1 = &pwr->priv.c1;
+    zes_power_energy_counter_t * e1 = (zes_power_energy_counter_t *) &pwr->priv.c1;
     ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, e1));
 
     // if this fails, increase sizeof pwr->priv.c1
@@ -928,21 +928,21 @@ XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_device_power_t * 
 }
 
 void
-XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_device_power_t * pwr)
+XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_power_t * pwr)
 {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
 
-    zes_power_energy_counter_t * e1 = &pwr->priv.c1;
-    zes_power_energy_counter_t * e2 = &pwr->priv.c2;
+    zes_power_energy_counter_t * e1 = (zes_power_energy_counter_t *) &pwr->priv.c1;
+    zes_power_energy_counter_t * e2 = (zes_power_energy_counter_t *) &pwr->priv.c2;
 
     ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, e2));
     pwr->priv.t2 = xkrt_get_nanotime();
 
     double uJ = (double) (e2->energy - e1->energy);
     double  J = uJ / (double)1e6;
-
-    pwr->dt = (pwr->priv.t2 - pwr->priv.t1) / (double) 1e9;
+    double  s = (pwr->priv.t2 - pwr->priv.t1) / (double) 1e9;
+    pwr->dt = s;
     pwr->P  = J / s;
 }
 
