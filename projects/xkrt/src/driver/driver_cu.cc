@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/09 23:16:34 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 15:42:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -195,10 +195,10 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
     err = cuDeviceGetCount(&ndevices_max);
     if (err)
         return 1;
-    ndevices = MIN(ndevices, ndevices_max);
+    ndevices = MIN((int)ndevices, ndevices_max);
 
     assert(ndevices <= XKRT_DEVICES_MAX);
-    for (int i = 0 ; i < ndevices ; ++i)
+    for (unsigned int i = 0 ; i < ndevices ; ++i)
     {
         xkrt_device_cu_t * device = device_cu_get(i);
         device->inherited.state = XKRT_DEVICE_STATE_DEALLOCATED;
@@ -257,6 +257,8 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
 static xkrt_device_t *
 XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_id)
 {
+    (void) driver;
+
     assert(device_driver_id >= 0 && device_driver_id < XKRT_DEVICES_MAX);
 
     xkrt_device_cu_t * device = device_cu_get(device_driver_id);
@@ -298,6 +300,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
+    (void) size;
     assert(area_idx == 0);
     cu_set_context(device_driver_id);
     CU_SAFE_CALL(cuMemFree((CUdeviceptr) ptr));
@@ -306,6 +309,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
 static void *
 XKRT_DRIVER_ENTRYPOINT(memory_unified_allocate)(int device_driver_id, const size_t size)
 {
+    (void) device_driver_id;
     CUdeviceptr device_ptr;
     CU_SAFE_CALL(cuMemAllocManaged(&device_ptr, size, CU_MEM_ATTACH_GLOBAL));
     return (void *) device_ptr;
@@ -314,6 +318,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_unified_allocate)(int device_driver_id, const size
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_unified_deallocate)(int device_driver_id, void * ptr, const size_t size)
 {
+    (void) device_driver_id;
+    (void) size;
     CU_SAFE_CALL(cuMemFree((CUdeviceptr) ptr));
 }
 
@@ -333,6 +339,7 @@ static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
     xkrt_device_cu_t * device = device_cu_get(device_driver_id);
+    (void) device;
     return 0;
 }
 
@@ -445,12 +452,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
     int device_driver_id,
     xkrt_stream_type_t stype
 ) {
+    (void) device_driver_id;
+
     switch (stype)
     {
         case (XKRT_STREAM_TYPE_KERN):
             return 8;
         default:
-            return 2;
+            return 4;
     }
 }
 
@@ -699,8 +708,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     stream->cu.events.buffer = (CUevent *) (stream + 1);
     stream->cu.events.capacity = capacity;
 
-    CUresult err;
-    for (int i = 0 ; i < capacity ; ++i)
+    for (unsigned int i = 0 ; i < capacity ; ++i)
         CU_SAFE_CALL(cuEventCreate(stream->cu.events.buffer + i, CU_EVENT_DISABLE_TIMING));
 
     /* streams */
@@ -766,6 +774,7 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
     size_t binsize,
     xkrt_driver_module_format_t format
 ) {
+    (void) binsize;
     assert(format == XKRT_DRIVER_MODULE_FORMAT_NATIVE);
     cu_set_context(device_driver_id);
     xkrt_driver_module_t module = NULL;

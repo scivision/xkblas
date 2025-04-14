@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/07 19:32:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 15:27:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -116,11 +116,11 @@ xkrt_device_thread_main_loop(
             break ;
         }
 
-        if (!device->offloader_streams_are_empty(device_tid, XKRT_STREAM_TYPE_ALL))
-            device->offloader_poll(device_tid);
-
         if (task)
             xkrt_device_prepare_task(runtime, device, device->global_id, task);
+
+        if (!device->offloader_streams_are_empty(device_tid, XKRT_STREAM_TYPE_ALL))
+            device->offloader_poll(device_tid);
     }
 
     return EINTR;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/04/03 16:00:29 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:01:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 15:43:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -47,8 +47,9 @@ xkrt_cairo_memory_trees(
             cairo_rectangle(rec_ctx, x1, y1, x2-x1, y2-y1);
             cairo_stroke(rec_ctx);
             LOGGER_WARN("Drawing %lf %lf %lf %lf", x1, y1, x2-x1, y2-y1);
+            (void) args;
         };
-        memtree->foreach_node(f, rec_ctx);
+        memtree->foreach_node(f, NULL);
 
         // Step 3: Get the bounding box of everything drawn
         double x1, y1, x2, y2;
