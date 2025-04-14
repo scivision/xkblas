@@ -134,7 +134,7 @@ typedef struct  task_t
 
 }               task_t;
 
-typedef int16_t task_wait_counter_type_t;
+typedef uint16_t task_wait_counter_type_t;
 typedef std::atomic<task_wait_counter_type_t> task_wait_counter_t;
 
 # define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)

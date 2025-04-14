@@ -179,7 +179,7 @@ if (USE_CAIRO)
 endif()
 
 if (STRICT)
-    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
+    SET(STRICT_OPTIONS -Wall -Werror -Wextra -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKRT} PRIVATE ${STRICT_OPTIONS})
     if (${CUDA_DRIVER_FOUND})
         target_compile_options(${XKRT}_driver_cu PRIVATE ${STRICT_OPTIONS})

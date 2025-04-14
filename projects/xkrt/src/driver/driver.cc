@@ -33,21 +33,6 @@ typedef struct  xkrt_driver_device_thread_arg_t
     void * vargs;
 }               xkrt_driver_device_thread_arg_t;
 
-static void *
-trampoline(void * vargs)
-{
-    xkrt_driver_device_thread_arg_t * args = (xkrt_driver_device_thread_arg_t *) vargs;
-    assert(args);
-
-    // launch thread
-    args->routine(args->vargs, &args->thread, args->driver_type, args->device_driver_id);
-
-    // cannot free args here, because the main thread may `join` onto `args->thread->pthread` - TODO: fix me
-    // free(args);
-
-    return NULL;
-}
-
 /* initialize drivers and create 1 thread per gpu starting on the passed routine */
 void
 xkrt_drivers_init(xkrt_runtime_t * runtime)
@@ -55,7 +40,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     # pragma message(TODO "Dynamic driver loading not implemented (with dlopen). Only supporting built-in drivers")
 
     // PARAMETERS
-    int ndevices_requested  = runtime->conf.device.ngpus + 1;                               // host device + ngpus
+    unsigned int ndevices_requested  = runtime->conf.device.ngpus + 1;                      // host device + ngpus
     int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
     int drivers_mask        = runtime->conf.drivers_mask | (1 << XKRT_DRIVER_TYPE_HOST);    // always force host driver
     assert(ndevices_requested < XKRT_DEVICES_MAX);
@@ -112,7 +97,11 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     assert(places);
 
     // ARGS PASSED TO FORKED THREADS
-    xkrt_device_team_args_t args = { .runtime = runtime };
+    xkrt_device_team_args_t args = {
+        .runtime = runtime,
+        .devices = {},
+        .ndevices = 0
+    };
 
     // FOR EACH DRIVER
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX && ndevices < ndevices_requested ; ++driver_type)

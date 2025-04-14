@@ -60,7 +60,7 @@ memory_view_from_cube(
     view.sizeof_type   = sizeof_type;
 
     // accesses must be aligned on sizeof(type)
-    assert(view.m * sizeof_type == dx);
+    assert((INTERVAL_DIFF_TYPE_T) (view.m * sizeof_type) == dx);
 }
 
 template<int K>
@@ -76,8 +76,8 @@ memory_view_from_cubes(
     const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_ROW_DIM].b;
     const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) cube0[ACCESS_CUBE_COL_DIM].a;
     const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_COL_DIM].b;
-    assert(0 <= x0 && x0 <= ld * sizeof_type);
-    assert(0 <= xf && xf <= ld * sizeof_type);
+    assert(0 <= x0 && x0 <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
+    assert(0 <= xf && xf <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
     assert(y0 < yf);
 
     INTERVAL_DIFF_TYPE_T n = yf - y0;

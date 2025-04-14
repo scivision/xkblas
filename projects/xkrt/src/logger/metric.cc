@@ -29,7 +29,7 @@ void
 xkrt_metric_byte(char * buffer, int bufsize, size_t nbytes)
 {
     const char * suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
-    int i = 0;
+    unsigned int i = 0;
     double size = (double) nbytes;
     while (size >= 1000 && i < sizeof(suffixes) / sizeof(*suffixes))
     {
@@ -44,7 +44,7 @@ void
 xkrt_metric_time(char * buffer, int bufsize, uint64_t ns)
 {
     const char * suffixes[] = {"ns", "us", "ms", "s"};
-    int i = 0;
+    unsigned int i = 0;
     double size = (double) ns;
     while (size >= 1000 && i < sizeof(suffixes) / sizeof(*suffixes))
     {
@@ -59,7 +59,7 @@ void
 xkrt_metric_bandwidth(char * buffer, int bufsize, size_t byte_per_sec)
 {
     const char * suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
-    int i = 0;
+    unsigned int i = 0;
     double size = (double) byte_per_sec;
     while (size >= 1000 && i < sizeof(suffixes) / sizeof(*suffixes))
     {

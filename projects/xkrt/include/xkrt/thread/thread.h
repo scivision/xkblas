@@ -170,17 +170,19 @@ typedef struct  xkrt_thread_t
             xkrt_thread_place_t place
         ) :
             team(team),
+            place(place),
+            implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
             state(XKRT_THREAD_INITIALIZED),
             pthread(pthread),
             tid(tid),
             device_global_id(device_global_id),
             deque(),
-            place(place),
-            implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
-            current_task(&this->implicit_task),
             memory_stack_bottom(NULL),
             memory_stack_capacity(THREAD_MAX_MEMORY)
         {
+            // set current task
+            this->current_task = &this->implicit_task;
+
             // initialize sync primitives
             pthread_mutex_init(&this->sleep.lock, 0);
             pthread_cond_init (&this->sleep.cond, 0);

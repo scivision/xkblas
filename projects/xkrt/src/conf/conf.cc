@@ -22,6 +22,7 @@
 static void
 __parse_verbose(xkrt_conf_t * conf, char const * value)
 {
+    (void) conf;
     if (value)
         LOGGER_VERBOSE = atoi(value);
 }
@@ -158,6 +159,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
 void
 __parse_help(xkrt_conf_t * conf, char const * value)
 {
+    (void) conf;
     if (value)
     {
         LOGGER_INFO("Available environment variables");
@@ -207,7 +209,6 @@ xkrt_init_conf(xkrt_conf_t * conf)
         int len = (int)(ss - *s);
         for (xkrt_conf_parse_t * var = CONF_PARSE ; var->name ; ++var)
         {
-            char const * env;
             if (strncmp(*s, var->name, len))
             {
                 error = 0;

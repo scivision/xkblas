@@ -300,7 +300,6 @@ xkrt_stream_t::progress_pending_instructions(void)
         return 0;
 
     int err;
-    xkrt_stream_instruction_counter_t size = this->pending.pos.w - this->pending.pos.r;
     xkrt_stream_instruction_counter_t p    = this->pending.pos.r;
     xkrt_stream_instruction_counter_t okp  = this->pending.pos.r - 1;
 

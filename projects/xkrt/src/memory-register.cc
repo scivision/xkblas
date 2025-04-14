@@ -76,5 +76,6 @@ int
 xkrt_memory_register_waitall(xkrt_runtime_t * runtime)
 {
     // nothing to do, as we are synchronous
+    (void) runtime;
     return 0;
 }

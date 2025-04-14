@@ -72,7 +72,6 @@ xkrt_thread_t::warmup(void)
 {
     // touches every pages to avoid minor page faults later during the execution
     size_t pagesize = (size_t) getpagesize();
-    uint8_t * ptr = this->memory_stack_ptr;
     for (uint8_t * ptr = this->memory_stack_ptr ; ptr < this->memory_stack_bottom + THREAD_MAX_MEMORY ; ptr += pagesize)
         *ptr = 42;
 }
@@ -435,7 +434,7 @@ xkrt_runtime_t::task_wait(void)
     int backoff = initial_backoff;          // Initial backoff time in nanoseconds
     assert(max_backoff < 1000000);          // nanosleep condition
 
-    struct timespec ts = { .tv_sec = 0 };
+    struct timespec ts = { .tv_sec = 0, .tv_nsec = 0 };
     while (1)
     {
         // work steal

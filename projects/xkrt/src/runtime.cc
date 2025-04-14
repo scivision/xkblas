@@ -36,6 +36,8 @@ static struct {
     spinlock_t lock;
 } runtimes;
 
+# if 0
+
 static void
 xkrt_runtimes_cleanup(void)
 {
@@ -53,6 +55,8 @@ xkrt_runtimes_cleanup_signal(int signum)
     LOGGER_WARN("Caught signal %d, cleaning up...", signum);
     xkrt_runtimes_cleanup();
 }
+
+# endif
 
 //////////////////////////////
 //  Runtime initialization  //
@@ -74,7 +78,6 @@ xkrt_init(xkrt_runtime_t * runtime)
     // set TLS
     xkrt_team_t * team = NULL;
     int tid = 0;
-    pthread_t pthread = pthread_self();
     xkrt_device_global_id_t device_global_id = HOST_DEVICE_GLOBAL_ID;
     xkrt_thread_place_t place;
     xkrt_runtime_t::thread_getaffinity(place);
@@ -101,7 +104,6 @@ xkrt_init(xkrt_runtime_t * runtime)
     task_format_register(runtime);
 
     // the '+1' is to enforce the host device, always
-    const int ndevices = MIN(XKRT_DEVICES_MAX, runtime->conf.device.ngpus + 1);
     xkrt_drivers_init(runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 

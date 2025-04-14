@@ -183,7 +183,7 @@ typedef struct  xkrt_device_t
         unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
         for (unsigned int s = bgn ; s < end ; ++s)
         {
-            for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+            for (int i = 0 ; i < this->count[s] ; ++i)
             {
                 xkrt_stream_t * stream = this->streams[device_tid][s][i];
                 assert(stream);

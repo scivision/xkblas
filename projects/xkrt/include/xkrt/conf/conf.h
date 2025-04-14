@@ -31,7 +31,7 @@ typedef struct  xkrt_conf_stream_t
     int8_t n;
 
     /* number of concurrent operations */
-    int8_t concurrency;
+    uint32_t concurrency;
 
 }               xkrt_conf_stream_t;
 

@@ -311,6 +311,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
             const Cube & cube
         ) const {
 
+            (void) cube;
+
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);
 
@@ -392,6 +394,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         void
         resolve(access_t * access, int naccesses)
         {
+            (void) access;
+            (void) naccesses;
             LOGGER_FATAL("not implemented");
         }
 

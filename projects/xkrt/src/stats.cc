@@ -18,22 +18,9 @@
 # include <xkrt/task/task.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/logger/logger.h>
+# include <xkrt/logger/metric.h>
 
 # include <string.h>
-
-static inline void
-human_readable_size(char * buffer, int bufsize, size_t nbytes)
-{
-    const char * suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
-    int i = 0;
-    double size = (double) nbytes;
-    while (size >= 1024 && i < sizeof(suffixes) / sizeof(*suffixes))
-    {
-        size /= 1024;
-        i++;
-    }
-    snprintf(buffer, bufsize, "%.0lf%s", size, suffixes[i]);
-}
 
 typedef struct  device_stats_t
 {
@@ -78,25 +65,25 @@ xkrt_runtime_stats_device_agg(device_stats_t * src, device_stats_t * agg)
 }
 
 static void
-xkrt_runtime_stats_device_report(xkrt_runtime_t * runtime, device_stats_t * stats)
+xkrt_runtime_stats_device_report(device_stats_t * stats)
 {
     char buffer[128];
 
     LOGGER_WARN("  Memory");
 
-    human_readable_size(buffer, sizeof(buffer), stats->memory.allocated.total.load());
+    xkrt_metric_byte(buffer, sizeof(buffer), stats->memory.allocated.total.load());
     LOGGER_WARN("    Allocated (total): %s", buffer);
 
-    human_readable_size(buffer, sizeof(buffer), stats->memory.allocated.currently.load());
+    xkrt_metric_byte(buffer, sizeof(buffer), stats->memory.allocated.currently.load());
     LOGGER_WARN("    Allocated (currently): %s", buffer);
 
-    human_readable_size(buffer, sizeof(buffer), stats->memory.freed.load());
+    xkrt_metric_byte(buffer, sizeof(buffer), stats->memory.freed.load());
     LOGGER_WARN("    Freed: %s", buffer);
 
     LOGGER_WARN("  Streams");
     for (int stype = 0 ; stype < XKRT_STREAM_TYPE_ALL ; ++stype)
     {
-        human_readable_size(buffer, sizeof(buffer), stats->streams[stype].transfered.load());
+        xkrt_metric_byte(buffer, sizeof(buffer), stats->streams[stype].transfered.load());
         LOGGER_WARN("    `%4s` - with %2lu streams - transfered %s", xkrt_stream_type_to_str((xkrt_stream_type_t) stype), stats->streams[stype].n.load(), buffer);
     }
 
@@ -114,7 +101,6 @@ xkrt_runtime_stats_device_report(xkrt_runtime_t * runtime, device_stats_t * stat
 
 static void
 xkrt_runtime_stats_device_gather(
-    xkrt_runtime_t * runtime,
     xkrt_device_t * device,
     device_stats_t * stats
 ) {
@@ -195,14 +181,14 @@ xkrt_runtime_stats_report(xkrt_runtime_t * runtime)
         LOGGER_WARN("  Info: %s", info);
 
         device_stats_t stats;
-        xkrt_runtime_stats_device_gather(runtime, device, &stats);
-        xkrt_runtime_stats_device_report(runtime, &stats);
+        xkrt_runtime_stats_device_gather(device, &stats);
+        xkrt_runtime_stats_device_report(&stats);
         xkrt_runtime_stats_device_agg(&stats, &agg);
     }
 
     LOGGER_WARN("-----------------------------------------");
     LOGGER_WARN("All Devices");
-    xkrt_runtime_stats_device_report(runtime, &agg);
+    xkrt_runtime_stats_device_report(&agg);
     LOGGER_WARN("-----------------------------------------");
     LOGGER_WARN("Tasks");
     xkrt_runtime_stats_tasks_report(runtime);

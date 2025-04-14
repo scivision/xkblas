@@ -178,15 +178,11 @@ body_cuda(
     const size_t ld_dst = a_dst->device_view.ld;
 
     // offset boundary access so the kernel receive the correct pointer
-    if (args->tile_x == 0)
-        dst = dst - 1;
-    else
-        src = src + 1;
+    if (args->tile_x == 0)  dst = dst - 1;
+    else                    src = src + 1;
 
-    if (args->tile_y == 0)
-        dst = dst - ld_dst;
-    else
-        src = src + ld_src;
+    if (args->tile_y == 0)  dst = dst - ld_dst;
+    else                    src = src + ld_src;
 
     // submit kernel
     cudaStream_t custream = stream->cu.handle.high;
@@ -247,19 +243,15 @@ body_ze(
 
     TYPE * src = (TYPE *) a_src->device_view.addr;
     TYPE * dst = (TYPE *) a_dst->device_view.addr;
-    const int ld_src = (int) a_src->device_view.ld;
-    const int ld_dst = (int) a_dst->device_view.ld;
+    const size_t ld_src = a_src->device_view.ld;
+    const size_t ld_dst = a_dst->device_view.ld;
 
     // offset boundary access so the kernel receive the correct pointer
-    if (args->tile_x == 0)
-        dst = dst - 1;
-    else
-        src = src + 1;
+    if (args->tile_x == 0)  dst = dst - 1;
+    else                    src = src + 1;
 
-    if (args->tile_y == 0)
-        dst = dst - ld_dst;
-    else
-        src = src + ld_src;
+    if (args->tile_y == 0)  dst = dst - ld_dst;
+    else                    src = src + ld_src;
 
     xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_ZE);
     assert(driver);
@@ -538,8 +530,8 @@ main(void)
     initialize(grid1, grid2);
 
     // Create tasks to distribute memory
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, NX, NY / ngpus, sizeof(TYPE), 1, 1);
-    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, NX, NY / ngpus, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid1, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
+    xkrt_coherency_distribute_cyclic_2D_halo_async(&runtime, MATRIX_COLMAJOR, grid2, LD, NX, NY, TSX, TSY, sizeof(TYPE), 1, 1);
 
     uint64_t t0 = xkrt_get_nanotime();
 

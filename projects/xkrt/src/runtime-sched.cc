@@ -41,15 +41,6 @@
 //  DEVICE PROGRESSION //
 /////////////////////////
 
-/* Return 1 iff device may accept new runing offloaded task  */
-static inline int
-xkrt_device_accept_new_task(xkrt_device_t * device)
-{
-    # pragma message(TODO "Add conditions here, like the number of kernel in-flight")
-    assert(device);
-    return 1;
-}
-
 inline void
 xkrt_device_prepare_task(
     xkrt_runtime_t * runtime,
@@ -257,7 +248,7 @@ xkrt_device_thread_main(
         for (int i = 0 ; i < XKRT_DEVICES_PERF_RANK_MAX ; ++i)
         {
             xkrt_device_global_id_bitfield_t bf = affinity[i];
-            int nbytes = sizeof(xkrt_device_global_id_bitfield_t);
+            constexpr int nbytes = sizeof(xkrt_device_global_id_bitfield_t);
             char buffer[8*nbytes + 1];
             xkrt_bits_to_str(buffer, (unsigned char *) &bf, nbytes);
             LOGGER_DEBUG("Device `%2u` affinity mask for perf `%2u` is `%s`", device->global_id, i, buffer);
@@ -671,6 +662,8 @@ xkrt_team_thread_task_enqueue(
     xkrt_thread_t * thread,
     task_t * task
 ) {
+    (void) runtime;
+    (void) team;
     thread->deque.push(task);
 }
 

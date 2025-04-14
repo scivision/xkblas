@@ -420,9 +420,9 @@ class KMemoryTreeNodeSearch {
                 get_leftmost_uppermost_block(void)
                 {
                     const size_t nblocks = this->partites.size();
-                    int j = 0;
+                    size_t j = 0;
 
-                    for (int i = 1 ; i < nblocks ; ++i)
+                    for (size_t i = 1 ; i < nblocks ; ++i)
                     {
                         const Partite & bi = this->partites[i];
                         const Partite & bj = this->partites[j];
@@ -574,7 +574,9 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
         ) :
             Base(r, k, color),
             block()
-        {}
+        {
+            (void) access;
+        }
 
         /**
          * A new node is being created from a split, make it inherit its original node 'src'
@@ -711,7 +713,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             fetch_t * fetches;
 
             /* 'fetches' capacity */
-            size_t capacity;
+            task_wait_counter_type_t capacity;
 
             /* number of 'fetches' set */
             task_wait_counter_t n;
@@ -719,7 +721,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             /* number of pending fetches */
             volatile task_wait_counter_t pending;
 
-            fetch_list_t(KMemoryTree * tree, fetch_t * fetches, size_t capacity) : tree(tree), fetches(fetches), capacity(capacity), n(0), pending(0) {}
+            fetch_list_t(KMemoryTree * tree, fetch_t * fetches, task_wait_counter_type_t capacity) : tree(tree), fetches(fetches), capacity(capacity), n(0), pending(0) {}
             ~fetch_list_t() {}
 
             fetch_t *
@@ -927,7 +929,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         }
 
         static inline fetch_list_t *
-        fetch_list_new(KMemoryTree * tree, size_t capacity)
+        fetch_list_new(KMemoryTree * tree, task_wait_counter_type_t capacity)
         {
             fetch_list_t * list = (fetch_list_t *) calloc(1, sizeof(fetch_list_t) + capacity * sizeof(fetch_t));
             assert(list);
@@ -984,7 +986,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                     fetch_callback_task(runtime, fetch, task);
 
                 /* callback to forward the data to other devices */
-                size_t nforwards = search.awaiting.forwards.size();
+                task_wait_counter_type_t nforwards = (task_wait_counter_type_t) search.awaiting.forwards.size();
                 if (nforwards)
                 {
                     fetch_list_t * forward_list = fetch_list_new(tree, nforwards);
@@ -1051,7 +1053,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         fetch_list_from_partition(
             Partition & partition
         ) {
-            size_t capacity = partition.partites.size();
+            task_wait_counter_type_t capacity = (task_wait_counter_type_t) partition.partites.size();
             if (capacity == 0)
                 return NULL;
 
@@ -1196,8 +1198,9 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
+            (void) size;
             size_t freed = 0;
-            auto f = [this, device_global_id, size, &freed](NodeBase * nodebase, void * args, bool & stop) {
+            auto f = [this, device_global_id, &freed](NodeBase * nodebase, void * args, bool & stop) {
                 (void) args;
 
                 Node * node = reinterpret_cast<Node *>(nodebase);
@@ -1344,7 +1347,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         /* look for a continuous allocation that can store 'access' for the given partition */
         inline xkrt_area_chunk_t *
         fetch_access_find_allocation_continuous(
-            const access_t * access,
             xkrt_device_global_id_t device_global_id,
             Partition & partition
         ) {
@@ -1405,7 +1407,7 @@ next_view:
             assert(this->is_locked());
 
             /* lookfor a continuous allocation already existing for that access block partitioning */
-            xkrt_area_chunk_t * chunk = this->fetch_access_find_allocation_continuous(access, device_global_id, partition);
+            xkrt_area_chunk_t * chunk = this->fetch_access_find_allocation_continuous(device_global_id, partition);
             if (chunk == nullptr)
             {
                 /* no continuous allocation found, make a new one */

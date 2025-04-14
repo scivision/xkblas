@@ -665,15 +665,19 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     const uint32_t ndevices = 1;
     ZE_SAFE_CALL(zeEventPoolCreate(device->ze.context, &ze_event_pool_desc, ndevices, &device->ze.device, &stream->ze.events.pool));
 
-    ze_event_desc_t event_desc = {
-        .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
-        .signal = ZE_EVENT_SCOPE_FLAG_HOST,
-        .wait   = ZE_EVENT_SCOPE_FLAG_HOST
-    };
     stream->ze.events.list = (ze_event_handle_t *) malloc(sizeof(ze_event_handle_t) * capacity);
     assert(stream->ze.events.list);
     for (xkrt_stream_instruction_counter_t i = 0 ; i < capacity ; ++i)
+    {
+        ze_event_desc_t event_desc = {
+            .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
+            .pNext  = NULL,
+            .index  = (uint32_t) i,
+            .signal = ZE_EVENT_SCOPE_FLAG_HOST,
+            .wait   = ZE_EVENT_SCOPE_FLAG_HOST
+        };
         ZE_SAFE_CALL(zeEventCreate(stream->ze.events.pool, &event_desc, stream->ze.events.list + i));
+    }
 
     return (xkrt_stream_t *) stream;
 }

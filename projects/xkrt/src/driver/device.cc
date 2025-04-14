@@ -309,15 +309,12 @@ xkrt_device_t::offloader_streams_are_empty(
     uint8_t device_tid,
     const xkrt_stream_type_t stype
 ) const {
-    int err = 0;
-
     unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
     unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
-        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+        for (int i = 0 ; i < this->count[s] ; ++i)
             if (!this->streams[device_tid][s][i]->is_empty())
                 return false;
-
     return true;
 }
 
@@ -334,7 +331,7 @@ xkrt_device_t::offloader_stream_instructions_launch(
     unsigned int end = (stype == XKRT_STREAM_TYPE_ALL) ? XKRT_STREAM_TYPE_ALL : stype + 1;
     for (unsigned int s = bgn ; s < end ; ++s)
     {
-        for (unsigned int i = 0 ; i < this->count[s] ; ++i)
+        for (int i = 0 ; i < this->count[s] ; ++i)
         {
             xkrt_stream_t * stream = this->streams[device_tid][s][i];
             assert(stream);
@@ -437,8 +434,6 @@ xkrt_device_t::offloader_stream_instruction_new(
     assert((*pstream)->type == stype);
 
     /* allocate the instruction */
-try_instruction_new:
-
     do {
         (*pstream)->lock();
         (*pinstr) = (*pstream)->instruction_new(itype, callback);

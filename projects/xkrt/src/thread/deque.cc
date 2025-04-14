@@ -81,4 +81,4 @@ xkrt_deque_t<T,C>::steal(void)
 }
 
 // Explicit instantiation
-template class xkrt_deque_t<task_t *, 4096>;
+template struct xkrt_deque_t<task_t *, 4096>;

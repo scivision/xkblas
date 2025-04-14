@@ -128,7 +128,6 @@ typedef struct  matrix_tile_t
         assert(offset_n >= 0);
         assert(offset_m >= 0);
 
-        size_t addr = this->addr;
         switch (this->order)
         {
             case (MATRIX_ROWMAJOR):
@@ -175,6 +174,7 @@ typedef struct  matrix_tile_t
     inline bool
     includes(const matrix_tile_t & x)
     {
+        (void) x;
         abort();
     }
 
