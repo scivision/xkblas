@@ -35,4 +35,10 @@
 /* If runtime was compiled with nvml support */
 # define XKRT_SUPPORT_NVML __XKRT_SUPPORT_NVML_VALUE__
 
+/* If the runtime was compiled with Intel's zes support */
+# define XKRT_SUPPORT_ZES __XKRT_SUPPORT_ZES_VALUE__
+
+/* If the runtime was compiled with AMD's rsmi support */
+# define XKRT_SUPPORT_RSMI __XKRT_SUPPORT_RSMI_VALUE__
+
 #endif /* __XKRT_SUPPORT_H__ */

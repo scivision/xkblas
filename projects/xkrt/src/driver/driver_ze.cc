@@ -22,6 +22,7 @@
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/logger/logger-ze.h>
+# include <xkrt/logger/metric.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
 # include <xkrt/xkrt-support.h>
@@ -88,6 +89,18 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
     assert(ze_n_drivers < sizeof(ze_drivers) / sizeof(*ze_drivers));
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, ze_drivers));
 
+    # if XKRT_SUPPORT_ZES
+    zes_init_flags_t zes_flags = ZES_INIT_FLAG_PLACEHOLDER;
+    ZE_SAFE_CALL(zesInit(zes_flags));
+
+    uint32_t zes_n_drivers;
+    ZE_SAFE_CALL(zesDriverGet(&zes_n_drivers, NULL));
+    assert(ze_n_drivers == zes_n_drivers);
+
+    zes_driver_handle_t zes_drivers[XKRT_DEVICES_MAX];
+    ZE_SAFE_CALL(zesDriverGet(&zes_n_drivers, zes_drivers));
+    # endif /* XKRT_SUPPORT_ZES */
+
     // get all device handles per driver
     for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < ndevices_requested ; ++ze_driver_id)
     {
@@ -106,6 +119,17 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
         uint32_t ndevices = ndevices_requested - ze_n_devices;
         ze_device_handle_t ze_devices[XKRT_DEVICES_MAX];
         ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ndevices, ze_devices));
+
+        # if XKRT_SUPPORT_ZES
+        zes_driver_handle_t zes_driver = zes_drivers[ze_driver_id];
+
+        uint32_t zes_n_devices;
+        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices, NULL));
+        assert(ze_n_devices == zes_n_devices);
+
+        zes_device_handle_t zes_devices[XKRT_DEVICES_MAX];
+        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices, zes_devices));
+        # endif /* XKRT_SUPPORT_ZES */
 
         // sycl interop
         # if XKRT_SUPPORT_SYCL
@@ -139,9 +163,16 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
             device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
             # endif /* XKRT_SUPPORT_SYCL */
 
-            if (++ze_n_devices == ndevices_requested)
-                return 0;
+            # if XKRT_SUPPORT_ZES
+            zes_device_handle_t zes_device = zes_devices[i];
+            uint32_t zes_pwr_handle_count;
+            ZE_SAFE_CALL(zesDeviceEnumPowerDomains(zes_device, &zes_pwr_handle_count, NULL));
+            assert(zes_pwr_handle_count == 1);
+            ZE_SAFE_CALL(zesDeviceEnumPowerDomains(zes_device, &zes_pwr_handle_count, &device->zes.pwr.handle));
+            # endif /* XKRT_SUPPORT_ZES */
 
+            if (++ze_n_devices == ndevices_requested)
+                break ;
         }
     }
 
@@ -879,6 +910,39 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
     return module;
 }
 
+# if XKRT_SUPPORT_ZES
+
+void
+XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id)
+{
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    assert(device);
+
+    device->zes.pwr.t1 = xkrt_get_nanotime();
+    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, &device->zes.pwr.e1));
+}
+
+void
+XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, double * dt, double * P)
+{
+    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+    assert(device);
+
+    ZE_SAFE_CALL(zesPowerGetEnergyCounter(device->zes.pwr.handle, &device->zes.pwr.e2));
+    device->zes.pwr.t2 = xkrt_get_nanotime();
+
+    double uJ = (double) (device->zes.pwr.e2.energy - device->zes.pwr.e2.energy);
+    double J = uJ / (double)1e6;
+    double s = (device->zes.pwr.t2 - device->zes.pwr.t1) / (double) 1e9;
+
+    if (dt)
+        *dt = s;
+    if (P)
+        *P = J / s;
+}
+
+# endif /* XKRT_SUPPORT_ZES */
+
 void
 XKRT_DRIVER_ENTRYPOINT(module_unload)(
     xkrt_driver_module_t module
@@ -946,6 +1010,11 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
     REGISTER(module_load);
     REGISTER(module_unload);
     REGISTER(module_get_fn);
+
+    # if XKRT_SUPPORT_ZES
+    REGISTER(power_start);
+    REGISTER(power_stop);
+    # endif /* XKRT_SUPPORT_ZES */
 
     # undef REGISTER
 

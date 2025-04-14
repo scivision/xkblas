@@ -173,6 +173,16 @@ typedef struct  xkrt_runtime_t
     /* end a critical section */
     void team_critical_end(xkrt_team_t * team);
 
+    ////////////
+    // ENERGY //
+    ////////////
+
+    /* start recording energy usage */
+    void power_start(const xkrt_device_global_id_t device_global_id);
+
+    /* stop recording and return energy usage */
+    void power_stop(const xkrt_device_global_id_t device_global_id, double * dt, double * P);
+
     ///////////////
     // UTILITIES //
     ///////////////

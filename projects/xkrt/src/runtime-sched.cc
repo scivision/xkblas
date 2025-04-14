@@ -440,6 +440,37 @@ xkrt_runtime_t::device_get(
     return this->drivers.devices.list[device_global_id];
 }
 
+////////////
+// Energy //
+////////////
+
+void
+xkrt_runtime_t::power_start(const xkrt_device_global_id_t device_global_id)
+{
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_power_start)
+        driver->f_power_start(device->driver_id);
+}
+
+void
+xkrt_runtime_t::power_stop(const xkrt_device_global_id_t device_global_id, double * dt, double * P)
+{
+    xkrt_device_t * device = this->device_get(device_global_id);
+    xkrt_driver_t * driver = this->driver_get(device->driver_type);
+    if (driver->f_power_stop)
+        driver->f_power_stop(device->driver_id, dt, P);
+    else
+    {
+        *dt = -1.0;
+        *P  = -1.0;
+    }
+}
+
+////////////
+// MEMORY //
+////////////
+
 MemoryCoherencyController *
 xkrt_runtime_t::get_or_insert_memory_controller(
     const size_t ld,

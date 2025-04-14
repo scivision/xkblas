@@ -24,6 +24,9 @@
 # if XKRT_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 # endif /* XKRT_SUPPORT_SYCL */
+# if XKRT_SUPPORT_ZES
+#  include <zes_api.h>
+# endif
 
 typedef struct  xkrt_device_ze_t
 {
@@ -61,6 +64,16 @@ typedef struct  xkrt_device_ze_t
         sycl::context context;
     } sycl;
     # endif /* XKRT_SUPPORT_SYCL */
+
+    # if XKRT_SUPPORT_ZES
+    struct {
+        struct {
+            zes_pwr_handle_t handle;
+            zes_power_energy_counter_t e1, e2;
+            uint64_t t1, t2;
+        } pwr;
+    } zes;
+    # endif /* XKRT_SUPPORT_ZES */
 
 }               xkrt_device_ze_t;
 

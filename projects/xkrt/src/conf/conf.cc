@@ -35,10 +35,31 @@ __parse_merge_transfers(xkrt_conf_t * conf, char const * value)
 }
 
 static void
-__parse_nkernels_per_stream(xkrt_conf_t * conf, char const * value)
+__parse_kern_per_stream(xkrt_conf_t * conf, char const * value)
 {
     if (value)
-        conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = (uint8_t) MAX(atoi(value), 1);
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = (uint32_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_h2d_per_stream(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = (uint32_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_d2h_per_stream(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = (uint32_t) MAX(atoi(value), 1);
+}
+
+static void
+__parse_d2d_per_stream(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = (uint32_t) MAX(atoi(value), 1);
 }
 
 static void
@@ -143,11 +164,14 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
     {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
     {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
-    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of concurrent H2D streams per GPU"},
-    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of concurrent D2H streams per GPU"},
-    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of concurrent D2D streams per GPU"},
-    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of concurrent kernel streams per GPU"},
-    {"XKRT_NKERNELS_PER_STREAM",  __parse_nkernels_per_stream, "Number of concurrent kernels per stream"},
+    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of H2D streams per GPU"},
+    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of D2H streams per GPU"},
+    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of D2D streams per GPU"},
+    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of KERN streams per GPU"},
+    {"XKRT_KERN_PER_STREAM",      __parse_kern_per_stream,     "Number of concurrent kernels per KERN stream before throttling device-thread"},
+    {"XKRT_H2D_PER_STREAM",       __parse_h2d_per_stream,      "Number of concurrent copies per H2D stream before throttling device-thread"},
+    {"XKRT_D2H_PER_STREAM",       __parse_d2h_per_stream,      "Number of concurrent copies per D2H stream before throttling device-thread"},
+    {"XKRT_D2D_PER_STREAM",       __parse_d2d_per_stream,      "Number of concurrent copies per D2D stream before throttling device-thread"},
     {"XKRT_CACHE_LIMIT",          NULL,                        NULL},
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},

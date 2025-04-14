@@ -20,13 +20,15 @@ option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Z
 option(USE_CL "Whether to build the OpenCL driver." OFF)
 option(USE_CAIRO "Use Cairo to generate images (memory-tree debugging purposes mostly)." OFF)
 option(USE_NVML "Use Nvidia's NVML management library." OFF)
+option(USE_ZES "Use Intel's ZES management library." OFF)
+option(USE_RSMI "Use AMD's RSMI management library." OFF)
 option(STRICT "Enable strict compilation mode" ON)
 
 # XKRT version and supports
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
@@ -153,7 +155,6 @@ endif()
 
 # OpenCL
 if (USE_CL)
-
     find_package(CL REQUIRED)
     include_directories("${CL_INCLUDE_DIRS}")
 
@@ -169,6 +170,18 @@ if (USE_NVML)
     find_package(NVML REQUIRED)
     include_directories("${NVML_INCLUDE_DIRS}")
     target_link_libraries(${XKRT} PRIVATE ${NVML_LIBRARIES})
+endif()
+
+# ZES (Intel energy)
+if (USE_ZES)
+    # nothing to do, but must USE_ZE to have any effects
+endif()
+
+# RSMI
+if (USE_RSMI)
+    find_package(RSMI REQUIRED)
+    include_directories("${RSMI_INCLUDE_DIRS}")
+    target_link_libraries(${XKRT} PRIVATE ${RSMI_LIBRARIES})
 endif()
 
 # Cairo

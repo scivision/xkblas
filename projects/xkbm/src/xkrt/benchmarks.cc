@@ -10,7 +10,6 @@
 # include <xkrt/runtime.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
-# include <xkrt/driver/thread.hpp>
 
 static xkrt_runtime_t runtime;
 
@@ -221,6 +220,7 @@ template<bool task>
 static void
 kernel_launch_latency_launch(benchmark_node_t * bench)
 {
+    constexpr int tid = 0;
     time_array_t time(runtime.drivers.devices.n - 1, 1001);
 
     for (xkrt_device_global_id_t device_global_id = 1 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
@@ -234,8 +234,8 @@ kernel_launch_latency_launch(benchmark_node_t * bench)
         {
             uint64_t t0 = xkrt_get_nanotime();
             device->offloader_stream_instruction_submit_kernel(launch, device, callback);
-            device->offloader_stream_instructions_launch(XKRT_STREAM_TYPE_KERN);
-            device->offloader_stream_instructions_progress<true>(XKRT_STREAM_TYPE_KERN);
+            device->offloader_stream_instructions_launch(tid, XKRT_STREAM_TYPE_KERN);
+            device->offloader_stream_instructions_progress<true>(tid, XKRT_STREAM_TYPE_KERN);
             uint64_t tf = xkrt_get_nanotime();
             if (iter >= 0)
                 time.set(device_global_id - 1, iter, tf - t0);
