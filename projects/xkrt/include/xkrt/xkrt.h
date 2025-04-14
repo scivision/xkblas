@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:13:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 16:41:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,6 +47,15 @@ extern "C" {
 
     /* Make all device memory non-coherent */
     void xkrt_coherency_reset(xkrt_runtime_t * runtime);
+
+    /* Submit 1 task per device to replicate the data */
+    void xkrt_coherency_replicate_2D_async(
+        xkrt_runtime_t * runtime,
+        matrix_order_t order,
+        void * ptr, size_t ld,
+        size_t m, size_t n,
+        size_t sizeof_type
+    );
 
     /* Submit a task that reads Region(order, m, n, addr, ld, sizeof_type) onto the host */
     void xkrt_coherency_host_async(

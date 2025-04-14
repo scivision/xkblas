@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 16:54:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,6 +75,13 @@ class impl_t
 
         void
         coherent(
+            TYPE * M,
+            int m, int n,
+            int ld
+        );
+
+        void
+        replicate(
             TYPE * M,
             int m, int n,
             int ld

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/24 22:00:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 16:57:21 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,6 +38,9 @@ extern "C" {
     /* Synchronize host memory with devices memory on the passed address space.
      * Restriction: concurrent 'xkblas_memory_coherent_async' on overlaping address spaces has an undefined behavior */
     void xkblas_memory_coherent_async(int uplo, int memflag, int m, int n, void * ptr, int ld, unsigned int sizeof_type);
+
+    /* create one task per device to replicate fully the passed matrix */
+    void xkblas_replicate_async(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
 
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);

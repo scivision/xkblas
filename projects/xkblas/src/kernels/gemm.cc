@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/04 23:36:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 00:07:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -228,7 +228,7 @@ xkblas_£gemm_async(
     size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_GEMM].tile;
     if (ts == 0)
     {
-        int args[2] = {m, n};
+        int args[3] = {m, n, k};
         xkblas_kernel_auto_tile(XKBLAS_KERNEL_TYPE_GEMM, args, &ts);
     }
 

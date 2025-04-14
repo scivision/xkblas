@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 05:01:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 21:21:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -134,7 +134,7 @@ typedef struct  task_t
 
 }               task_t;
 
-typedef int8_t task_wait_counter_type_t;
+typedef int16_t task_wait_counter_type_t;
 typedef std::atomic<task_wait_counter_type_t> task_wait_counter_t;
 
 # define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)

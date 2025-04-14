@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 19:36:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 00:08:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,12 @@
 
 # include <assert.h>
 # include <math.h>
+
+static int
+is_power_of_two(int n)
+{
+    return n && (n & (n - 1)) == 0;
+}
 
 void
 xkblas_kernel_auto_tile(

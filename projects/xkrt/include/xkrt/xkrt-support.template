@@ -32,4 +32,7 @@
 /* If runtime was compiled with cairo support */
 # define XKRT_SUPPORT_CAIRO __XKRT_SUPPORT_CAIRO_VALUE__
 
+/* If runtime was compiled with nvml support */
+# define XKRT_SUPPORT_NVML __XKRT_SUPPORT_NVML_VALUE__
+
 #endif /* __XKRT_SUPPORT_H__ */

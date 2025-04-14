@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:41:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/10 19:35:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -553,8 +553,7 @@ body_cuda(
     args_t * args = (args_t *) TASK_ARGS(task);
     assert(args);
 
-    # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%zu, B=%p, ldb=%zu) on task=`%s`",
+    LOGGER_DEBUG("Calling cublasTrsm(side=%d, uplo=%d, transA=%d, diag=%d, alpha=%lf, m=%lu, n=%lu, A=%p, lda=%zu, B=%p, ldb=%zu) on task=`%s`",
         args->side, args->uplo,
         args->transA, args->diag,
         args->alpha,
@@ -563,7 +562,6 @@ body_cuda(
         (void *) B->device_view.addr, B->device_view.ld,
         task->label
     );
-    #endif /* NDEBUG */
 
     XKBLAS_CUBLAS_CALL(
         cublas££trsm(

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 00:46:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 21:18:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,7 +16,7 @@
 
 # include "common/impl.hpp"
 
-# include <xkblas/xkblas.h>
+# include "xkblas/xkblas.h"
 # include <xkblas/skernels.h>
 # include <xkblas/xkblas-experimental.h>
 
@@ -144,6 +144,15 @@ impl_t::coherent(
     int memflag = 0;
     int uplo = 0;
     xkblas_memory_coherent_async(uplo, memflag, m, n, M, ld, sizeof(TYPE));
+}
+
+void
+impl_t::replicate(
+    TYPE * M,
+    int m, int n,
+    int ld
+) {
+    xkblas_replicate_async(M, ld, m, n, sizeof(TYPE));
 }
 
 void

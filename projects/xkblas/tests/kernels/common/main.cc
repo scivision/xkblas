@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 17:31:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/11 22:01:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -243,6 +243,7 @@ main_gemm(char ** args)
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
+
             printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
                     (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
             );
@@ -488,7 +489,6 @@ main_mumps(char ** args)
     int * IW = NULL;
 
     /* parse arguments */
-
     int   I = atoi(args[0]);
     int   m = atoi(args[1]);
     int   n = atoi(args[2]);
@@ -497,39 +497,155 @@ main_mumps(char ** args)
     int ts3 = atoi(args[5]);
 //    int m  = 16384; // rand_int(200, 32768);
 //    int n  = 16384; // rand_int(200,  8192);
-    int ld = m + n;
+    int ld = 2*(m + n);
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
     /* allocate matrices */
-    uintptr_t matrices[4];
-    # define D  ((TYPE *)matrices[0])
-    # define L  ((TYPE *)matrices[1])
-    # define U  ((TYPE *)matrices[2])
-    # define G  ((TYPE *)matrices[3])
-    prepare_n_matrices(matrices, 4, ld);
+    uintptr_t matrices[1];
+    prepare_n_matrices(matrices, 1, ld);
 
-    # if 1
+    TYPE * D = (TYPE *) matrices[0];
+    TYPE * L = (TYPE *) (D + n * sizeof(TYPE) * ld + 0 * sizeof(TYPE));
+    TYPE * U = (TYPE *) (D + 0 * sizeof(TYPE) * ld + n * sizeof(TYPE));
+    TYPE * G = (TYPE *) (D + n * sizeof(TYPE) * ld + n * sizeof(TYPE));
+
+    # if 0
     int ts[][3] = {
         {ts1, ts2, ts3}
     };
+    # elif 1
+    int ts[][3] = {
+        {512, 512, 512},
+        {1024, 1024, 1024},
+        {2048, 2048, 2048},
+        {512, 1024, 2048},
+        {1024, 2048, 4096},
+        {2048, 4096, 8192},
+        {m/1, m/2, m/4},
+        {n/1, n/2, n/4},
+        {m/8, m/16, 2048},
+        {n/8, 4096, 8192},
+        {1024, m/2, n/4},
+        {n/1, 512, m/2},
+        {1024, m/4, 2048},
+        {m/1, 1024, 4096},
+        {n/2, m/2, 8192},
+        {m/8, 512, n/8},
+        {m/16, n/16, 1024},
+        {4096, 2048, m/2},
+        {n/4, m/4, 2048},
+        {8192, n/8, m/8},
+        {m/2, 512, 1024},
+        {n/2, 4096, m/1},
+        {m/1, n/2, 512},
+        {1024, 1024, 1024},
+        {m/2, m/4, m/8},
+        {n/4, n/8, n/16},
+        {2048, 4096, m/16},
+        {8192, n/4, m/4},
+        {n/1, 1024, m/2},
+        {m/4, 1024, n/4},
+        {n/16, m/16, 2048},
+        {n/8, 512, m/8},
+        {512, 512, 512},
+        {2048, 2048, 2048},
+        {m/8, m/2, 1024},
+        {n/2, n/1, 4096},
+        {m/16, m/8, m/4},
+        {n/16, n/8, 512},
+        {512, m/1, m/16},
+        {n/4, 8192, 4096},
+        {m/2, 2048, 8192},
+        {4096, m/1, 2048},
+        {n/2, 1024, 1024},
+        {n/4, 512, 512},
+        {m/1, m/1, m/1},
+        {n/1, n/1, n/1},
+        {m/2, m/2, m/2},
+        {n/2, n/2, n/2},
+        {m/4, m/4, m/4},
+        {n/4, n/4, n/4},
+        {m/8, m/8, m/8},
+        {n/8, n/8, n/8},
+        {m/16, m/16, m/16},
+        {n/16, n/16, n/16},
+        {512, n/2, m/8},
+        {8192, m/4, n/8},
+        {1024, n/4, 2048},
+        {4096, n/2, m/2},
+        {m/1, 512, n/16},
+        {n/1, 8192, m/16},
+        {m/2, 2048, 512},
+        {m/4, n/2, 1024},
+        {n/8, 1024, 8192},
+        {512, m/8, 2048},
+        {n/2, 4096, 512},
+        {m/4, m/8, 4096},
+        {n/16, 2048, 1024},
+        {8192, n/1, m/2},
+        {1024, 4096, n/4},
+        {m/8, 2048, n/4},
+        {n/1, m/8, 8192},
+        {m/16, n/2, 4096},
+        {m/1, 8192, 1024},
+        {n/4, 2048, m/4},
+        {m/2, 1024, 512},
+        {n/8, 8192, 2048},
+        {m/4, 512, n/2},
+        {1024, m/16, n/8},
+        {2048, 4096, 512},
+        {8192, m/1, n/16},
+        {n/2, 1024, 512},
+        {m/4, 4096, 512},
+        {n/8, m/8, m/16},
+        {m/16, 1024, n/4},
+        {m/8, 8192, 2048},
+        {1024, 512, n/2},
+        {m/2, 4096, n/4},
+        {n/1, 1024, m/8},
+        {2048, n/2, m/16},
+        {m/1, n/2, n/4},
+        {n/16, 8192, 512},
+        {m/2, 8192, 1024},
+        {m/4, n/1, 4096},
+        {n/4, 1024, 2048},
+        {m/1, m/2, m/8},
+        {n/1, n/2, n/8},
+        {2048, m/4, m/16},
+        {512, n/4, n/16},
+        {1024, m/8, n/2},
+        {n/16, m/8, 4096},
+        {8192, m/16, n/2},
+        {m/2, 2048, n/1}
+    };
     # else
     int ts[][3] = {
-        {5120/2, 5120, 5120/2},
-        {2048, 2048, 2048},
-        {2048, 5120, 4096},
-        {4096, 5120, 4096},
-        {1536, 5120, 4096},
-        {4096, 4096, 4096},
+        {1024, 1024, 1024},
+        {1024, 1024, 1024},
+        {1024, 1024, 1024},
         {1024, 1024, 1024},
     };
     # endif
 
+    // if set to '1', do not account time for initial and write back transfers
+    # define REPLICATE  0
+    # define WRITE_BACK 1
+
+    uint64_t tmin = UINT64_MAX;
+    int imin = 0;
     for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
     {
         printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
         for (int j = 0 ; j < I ; ++j)
         {
+            # if REPLICATE
+            impl.replicate(D, ld, m+n, m+n);
+            impl.wait();
+            # endif /* ONLY_COMPUTE */
+
+            if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
+                continue ;
             uint64_t t0 = get_nanotime();
 
             impl.set_tile(ts[i][0]);
@@ -541,28 +657,33 @@ main_mumps(char ** args)
             impl.set_tile(ts[i][2]);
             impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
 
+            # if WRITE_BACK
             # if 0
-            impl.coherent(D, 4*ld, 4*ld, ld);
+            impl.coherent(D, m+n, m+n, ld);
             # else
-            impl.coherent(D, n, n, ld);
+            impl.coherent(D, m, m, ld);
             impl.coherent(L, m, n, ld);
             impl.coherent(U, n, m, ld);
             impl.coherent(G, m, m, ld);
+            # endif
             # endif
 
             uint64_t tt = get_nanotime();
             impl.wait();
             uint64_t tf = get_nanotime();
-            printf("Compute took %lf s. (graph construction took %lf s.)\n",
-                    (tf-t0)/1e9, (tt-t0)/1e9);
+            printf("Compute took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+
             impl.reset();
+
+            if (tf - t0 < tmin)
+            {
+                imin = i;
+                tmin = tf - t0;
+            }
         }
     }
 
-    # undef D
-    # undef L
-    # undef U
-    # undef G
+    printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n", ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
 
     return 0;
 }
@@ -602,7 +723,7 @@ main_trsm_copyscale_gemm(char ** args)
 
 //    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-//        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        // for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             impl.reset();
             impl.set_tile(ts);

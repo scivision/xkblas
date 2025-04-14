@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/07 19:00:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/09 22:12:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -825,6 +825,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             std::vector<int> indices(n);
             std::iota(indices.begin(), indices.end(), 0);
 
+            # pragma message(TODO "Do we really need that sort here ? Or can we (are we already?) traverse the KHP Tree so that it is already sorted")
             /* sort the vector so fetches[indices[i]] < fetches[indices[i+1]] in memory */
             std::sort(
                 std::begin(indices),

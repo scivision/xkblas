@@ -78,6 +78,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
     ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
+    ${CMAKE_SOURCE_DIR}/src/memory-replicate.cc
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 

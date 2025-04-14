@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:53:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/09 23:16:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,7 @@
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CU_ ## N
 
 # include <xkrt/runtime.h>
+# include <xkrt/xkrt-support.h>
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/driver-cu.h>
@@ -30,6 +31,12 @@
 
 # include <cuda.h>
 # include <cublas_v2.h>         // TODO : should cublas be part of xkrt's driver ? or as part of xkblas ?
+
+# if XKRT_SUPPORT_NVML
+#  include <nvml.h>
+#  include <xkrt/logger/logger-nvml.h>
+# endif /* XKRT_SUPPORT_NVML */
+
 # include <hwloc.h>
 # include <hwloc/cuda.h>
 # include <hwloc/glibc-sched.h>
@@ -75,10 +82,10 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
    for which the device d has link with performance i.
 */
 
-static int          cu_device_count   = 0;
-static int *        cu_perf_topo      = NULL;
-static int          cu_count_perfrank = 0;
-static uint64_t *   cu_perf_device    = NULL;
+static int        cu_device_count   = 0;
+static int *      cu_perf_topo      = NULL;
+static int        cu_count_perfrank = 0;
+static uint64_t * cu_perf_device    = NULL;
 
 static void
 get_gpu_topo(int ndevices)
@@ -201,12 +208,27 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
 
     get_gpu_topo(ndevices);
 
+    # if XKRT_SUPPORT_NVML
+    NVML_SAFE_CALL(nvmlInit());
+
+    // NVML_GPU_NVLINK_BW_MODE_FULL      = 0x0
+    // NVML_GPU_NVLINK_BW_MODE_OFF       = 0x1
+    // NVML_GPU_NVLINK_BW_MODE_MIN       = 0x2
+    // NVML_GPU_NVLINK_BW_MODE_HALF      = 0x3
+    // NVML_GPU_NVLINK_BW_MODE_3QUARTER  = 0x4
+    // NVML_GPU_NVLINK_BW_MODE_COUNT     = 0x5
+    // TODO NVML_SAFE_CALL(nvmlSystemSetNvlinkBwMode(0x3));
+    # endif /* XKRT_SUPPORT_NVML */
+
     return 0;
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(finalize)(void)
 {
+    # if XKRT_SUPPORT_NVML
+    NVML_SAFE_CALL(nvmlShutdown());
+    # endif /* XKRT_SUPPORT_NVML */
 }
 
 static const char *
