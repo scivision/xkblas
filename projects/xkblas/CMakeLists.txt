@@ -7,8 +7,8 @@ SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})
 
 SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
-#SET(XKBLAS_KERNELS_PRECISIONS s c d z)
-SET(XKBLAS_KERNELS_PRECISIONS s)
+SET(XKBLAS_KERNELS_PRECISIONS s c d z)
+#SET(XKBLAS_KERNELS_PRECISIONS s)
 
 # custom kernels
 SET(XKBLAS_CUDA_KERNELS copyscale)
