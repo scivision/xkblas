@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 21:21:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 23:49:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -134,10 +134,10 @@ typedef struct  task_t
 
 }               task_t;
 
-typedef uint16_t task_wait_counter_type_t;
+typedef uint8_t task_wait_counter_type_t;
 typedef std::atomic<task_wait_counter_type_t> task_wait_counter_t;
 
-# define UNSPECIFIED_TASK_ACCESS ((task_access_counter_t)-1)
+# define UNSPECIFIED_TASK_ACCESS ((task_wait_counter_type_t)-1)
 typedef uint8_t task_access_counter_t;
 # define TASK_MAX_ACCESSES (5)
 static_assert(TASK_MAX_ACCESSES < (1 << 8*sizeof(task_access_counter_t)));

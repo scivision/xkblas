@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 16:51:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 23:45:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -210,16 +210,16 @@ xkrt_init_conf(xkrt_conf_t * conf)
     // set to -1 so the driver's stream-suggest API fills these values if not
     // set by an env variable
     conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].n = -1;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = 16;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_KERN].concurrency = 8;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].n = -1;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 512;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2D].concurrency = 64;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].n = -1;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 512;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_D2H].concurrency = 64;
 
     conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].n = -1;
-    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 512;
+    conf->device.offloader.streams[XKRT_STREAM_TYPE_H2D].concurrency = 64;
 
     //////////////////
     //  DEVICE CONF //

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 16:52:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/14 23:55:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1194,7 +1194,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         ) {
 
             /* adapted from 'xkrt_memory_cache_evict_fromlist' */
-            LOGGER_WARN("Evicting memory...");
+            LOGGER_DEBUG("Evicting memory...");
 
             // TODO : currently deallocating as much as possible, maybe stop when there is a chunk big-enough of 'size'
 
@@ -1228,7 +1228,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         /* if only this block uses the allocation */
                         if (allocation->chunk->use_counter == 1)
                         {
-                            LOGGER_WARN("Evicted a block of size %zu MB", allocation->chunk->size/1024/1024);
+                            LOGGER_DEBUG("Evicted a block of size %zu MB", allocation->chunk->size/1024/1024);
                             this->runtime->memory_device_deallocate(device_global_id, allocation->chunk);
                             freed += allocation->chunk->size;
                         }
@@ -1246,7 +1246,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                     block.valid &= (memory_allocation_view_id_bitfield_t) ~devbit;
 
-                    stop = freed >= 16*size;
+                    stop = freed >= 2*size;
                     // stop = false;
                 }
                 else if (valid_on_device && replicate.nallocations > 1)
