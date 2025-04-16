@@ -489,7 +489,7 @@ main_mumps(char ** args)
     int * IW = NULL;
 
     /* parse arguments */
-    int   I = atoi(args[0]);
+    int   Ix = atoi(args[0]);
     int   m = atoi(args[1]);
     int   n = atoi(args[2]);
     int ts1 = atoi(args[3]);
@@ -505,9 +505,9 @@ main_mumps(char ** args)
     prepare_n_matrices(matrices, 1, ld);
 
     TYPE * D = (TYPE *) matrices[0];
-    TYPE * L = (TYPE *) (D + n * sizeof(TYPE) * ld + 0 * sizeof(TYPE));
-    TYPE * U = (TYPE *) (D + 0 * sizeof(TYPE) * ld + n * sizeof(TYPE));
-    TYPE * G = (TYPE *) (D + n * sizeof(TYPE) * ld + n * sizeof(TYPE));
+    TYPE * L = (TYPE *) (D + n * ld + 0 );
+    TYPE * U = (TYPE *) (D + 0 * ld + n );
+    TYPE * G = (TYPE *) (D + n * ld + n );
 
     # if 0
     int ts[][3] = {
@@ -637,7 +637,7 @@ main_mumps(char ** args)
     {
         printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
-        for (int j = 0 ; j < I ; ++j)
+        for (int j = 0 ; j < Ix ; ++j)
         {
             # if REPLICATE
             impl.replicate(D, ld, m+n, m+n);
@@ -658,14 +658,10 @@ main_mumps(char ** args)
             impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
 
             # if WRITE_BACK
-            # if 0
-            impl.coherent(D, m+n, m+n, ld);
-            # else
-            impl.coherent(D, m, m, ld);
+            //impl.coherent(D, m, m, ld);
             impl.coherent(L, m, n, ld);
-            impl.coherent(U, n, m, ld);
+            //impl.coherent(U, n, m, ld);
             impl.coherent(G, m, m, ld);
-            # endif
             # endif
 
             uint64_t tt = get_nanotime();

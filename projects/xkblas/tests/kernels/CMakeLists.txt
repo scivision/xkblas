@@ -59,7 +59,7 @@ add_executable(xkblas-kernels common/main.cc)
 target_link_libraries(xkblas-kernels ${XKBLAS_NAME} ${BLAS_LIBRARIES})
 
 if (USE_CUDA)
-    target_link_libraries(xkblas-kernels ${XKBLAS_NAME}_kernels_cuda)
+				target_link_libraries(xkblas-kernels ${XKBLAS_NAME}_kernels_cuda ${CUDA_DRIVER_LIBRARIES})
 endif()
 
 if (USE_SYCL)

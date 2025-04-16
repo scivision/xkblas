@@ -93,6 +93,65 @@ extern "C" {
     [[deprecated("No replacement available yet (`caches` name may not be the most appropriate here)")]]
         void xkblas_memory_invalidate_caches(void);
 
+#if defined(__STDC_NO_COMPLEX__)
+# error "Compiler support for complex number is required."
+#else
+# include <complex.h>
+typedef float _Complex Complex32_t;
+typedef double _Complex Complex64_t;
+typedef double CFloat64_t;
+#endif
+#include "kernels.h"
+#include "cblas.h"
+static inline int xkblas_blas2cblas_trans( const char* trans )
+{
+  switch (trans[0]) {
+    case 'n':
+    case 'N': return CblasNoTrans;
+    case 't':
+    case 'T': return CblasTrans;
+    case 'c':
+    case 'C': return CblasConjTrans;
+    default:
+      return -1;
+  }
+}
+
+static inline int xkblas_blas2cblas_side( const char* side )
+{
+  switch (side[0]) {
+    case 'l':
+    case 'L': return CblasLeft;
+    case 'r':
+    case 'R': return CblasRight;
+    default:
+      return -1;
+  }
+}
+
+static inline int xkblas_blas2cblas_fill( const char* uplo )
+{
+  switch (uplo[0]) {
+    case 'l':
+    case 'L': return CblasLower;
+    case 'u':
+    case 'U': return CblasUpper;
+    default:
+      return -1;
+  }
+}
+
+static inline int xkblas_blas2cblas_diag( const char* diag )
+{
+  switch (diag[0]) {
+    case 'n':
+    case 'N': return CblasNonUnit;
+    case 'u':
+    case 'U': return CblasUnit;
+    default:
+      return -1;
+  }
+}
 # ifdef __cplusplus
 }; /* extern "C" */
 # endif /* __cplusplus */

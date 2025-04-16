@@ -165,11 +165,11 @@ template<int K>
 class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public DependencyDomain
 {
     using Base     = KHPTree<K, KDependencyTreeSearch<K>, CUT>;
-    using Node     = KDependencyTreeNode<K>;
-    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
     using Cube     = KCube<K>;
 
     public:
+    using Node     = KDependencyTreeNode<K>;
+    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
 
         using Search = KDependencyTreeSearch<K>;
 

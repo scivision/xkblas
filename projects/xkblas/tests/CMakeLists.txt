@@ -10,7 +10,7 @@ add_executable(tests tests.cc)
 
 target_link_libraries(tests PRIVATE ${XKBLAS_NAME})
 if (USE_CUDA)
-    target_link_libraries(tests PRIVATE ${XKBLAS_NAME}_kernels_cuda)
+				target_link_libraries(tests PRIVATE ${XKBLAS_NAME}_kernels_cuda ${CUDA_DRIVER_LIBRARIES})
 endif()
 
 if (USE_SYCL)

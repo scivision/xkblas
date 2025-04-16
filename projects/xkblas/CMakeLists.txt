@@ -118,6 +118,7 @@ endif()
 
 option(USE_CUBLAS "Enable cublas" ON)
 if (USE_CUBLAS)
+		find_package(CUDA_DRIVER REQUIRED)
     find_package(CUBLAS REQUIRED)
     include_directories("${CUBLAS_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
