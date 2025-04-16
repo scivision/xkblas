@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 14:33:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 14:48:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -133,6 +133,7 @@ xkrt_coherency_host_async(
 
         /* as 'conflicts' are forming a partition of 'access', it must only
          * intersects with a single cubes of 'access' : find which of the two */
+        bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
             Cube cube;
@@ -142,11 +143,12 @@ xkrt_coherency_host_async(
             {
                 new (accesses + 0) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
                 deptree->precedence(write, accesses + 0);
+                found = true;
                 break ;
             }
         }
         /* assert to check that we did find a cube from 'access' that intersects with the node */
-        assert((accesses + 0)->task == task);
+        assert(found);
 
         // insert for future tasks dependencies
         deptree->insert<AC>(accesses);
