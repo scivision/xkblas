@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:45:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 17:39:17 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -322,7 +322,6 @@ typedef struct  xkrt_thread_t
             task->parent = this->current_task;
             __task_commit(task, F, args...);
         }
-
 
         # ifndef NDEBUG
         static void

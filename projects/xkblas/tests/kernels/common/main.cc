@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 22:01:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 18:31:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -489,7 +489,7 @@ main_mumps(char ** args)
     int * IW = NULL;
 
     /* parse arguments */
-    int   Ix = atoi(args[0]);
+    int  Ix = atoi(args[0]);
     int   m = atoi(args[1]);
     int   n = atoi(args[2]);
     int ts1 = atoi(args[3]);
@@ -497,19 +497,29 @@ main_mumps(char ** args)
     int ts3 = atoi(args[5]);
 //    int m  = 16384; // rand_int(200, 32768);
 //    int n  = 16384; // rand_int(200,  8192);
-    int ld = 2*(m + n);
+    int ld = (m + n);
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
     /* allocate matrices */
+    # if 1
     uintptr_t matrices[1];
     prepare_n_matrices(matrices, 1, ld);
 
     TYPE * D = (TYPE *) matrices[0];
-    TYPE * L = (TYPE *) (D + n * ld + 0 );
-    TYPE * U = (TYPE *) (D + 0 * ld + n );
-    TYPE * G = (TYPE *) (D + n * ld + n );
+    TYPE * L = (TYPE *) (D + n*ld + 0);
+    TYPE * U = (TYPE *) (D + 0*ld + n);
+    TYPE * G = (TYPE *) (D + n*ld + n);
+    # else
+    uintptr_t matrices[4];
+    prepare_n_matrices(matrices, 4, ld);
 
-    # if 0
+    TYPE * D = (TYPE *) matrices[0];
+    TYPE * L = (TYPE *) matrices[1];
+    TYPE * U = (TYPE *) matrices[2];
+    TYPE * G = (TYPE *) matrices[3];
+    # endif
+
+    # if 1
     int ts[][3] = {
         {ts1, ts2, ts3}
     };
@@ -620,9 +630,6 @@ main_mumps(char ** args)
     };
     # else
     int ts[][3] = {
-        {1024, 1024, 1024},
-        {1024, 1024, 1024},
-        {1024, 1024, 1024},
         {1024, 1024, 1024},
     };
     # endif

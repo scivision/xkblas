@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 14:48:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 18:10:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -128,6 +128,10 @@ xkrt_coherency_host_async(
         task_dep_info_t * dep = TASK_DEP_INFO(task);
         new (dep) task_dep_info_t(AC);
 
+        #ifndef NDEBUG
+        strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
+        #endif /* NDEBUG */
+
         access_t * accesses = TASK_ACCESSES(task, flags);
         assert(accesses);
 
@@ -155,10 +159,6 @@ xkrt_coherency_host_async(
 
         // commit the task
         runtime->task_commit(task);
-
-        #ifndef NDEBUG
-        strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
-        #endif /* NDEBUG */
     }
 
     # undef AC

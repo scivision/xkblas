@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 20:14:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 18:01:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -321,11 +321,10 @@ class access_t
 
             assert(order == MATRIX_COLMAJOR);
             assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
-            if (!cube.is_empty())
-            {
-                memory_view_from_cube(this->host_view, cube, ld, s);
-                new (this->cubes + 0) Cube(cube);
-            }
+            assert(!cube.is_empty());
+
+            memory_view_from_cube(this->host_view, cube, ld, s);
+            new (this->cubes + 0) Cube(cube);
         }
 
         access_t(
