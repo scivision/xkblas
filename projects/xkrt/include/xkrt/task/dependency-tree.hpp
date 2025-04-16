@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/26 05:02:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 14:20:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,7 +38,7 @@ class KDependencyTreeSearch
         access_t * access;
 
         // USED IF TYPE == SEARCH_TYPE_CONFLICTING
-        std::vector<access_t *> * conflicts;
+        std::vector<void *> * conflicts;
 
     public:
         KDependencyTreeSearch() {}
@@ -54,7 +54,7 @@ class KDependencyTreeSearch
 
         void
         prepare_conflicting(
-            std::vector<access_t *> * conflicts,
+            std::vector<void *> * conflicts,
             access_t * access
         ) {
             this->type = SEARCH_TYPE_CONFLICTING;
@@ -185,7 +185,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
         inline void
         conflicting(
-            std::vector<access_t *> * conflicts,
+            std::vector<void *> * conflicts,
             access_t * access
         ) {
             // impl assumes this
@@ -331,13 +331,10 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
                 case (Search::Type::SEARCH_TYPE_CONFLICTING):
                 {
-                    access_t * access = node->last_write;
-                    if (access)
+                    if (node->last_write)
                     {
                         assert(search.conflicts);
-                        if (search.conflicts->size() && search.conflicts->back() == access)
-                            return ;
-                        search.conflicts->push_back(access);
+                        search.conflicts->push_back(node);
                     }
 
                     break ;

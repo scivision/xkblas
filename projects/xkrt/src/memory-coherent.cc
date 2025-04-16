@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/07 19:35:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 14:33:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -55,6 +55,7 @@ xkrt_coherency_host_async(
 
     # if 0
     // implementation with a single copy once all partites are ready
+
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
@@ -81,115 +82,74 @@ xkrt_coherency_host_async(
     runtime->task_commit(task);
 
     # else
-    // implementation with 1 copy per partite, launched as soon as they are ready
 
-    // TODO : allocate instead on the thread thread ? creates a concurrency issue in the allocator though
+    // against memory-tree, dep-tree does not know where the data will be once the predecessor task executed.
+    // For instance, two continuous partites may end-up being coherent on two different devices, thus cannot be merged
+    // Therefore, this impl creates 1 copy per partite (it is not even trivial that merging can improve perf.)
+
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
     assert(thread->current_task);
 
-    /* create an access, and retrieve all tasks that are in conflict */
-    std::vector<access_t *> conflicts;
+    /* create an access, and retrieve all dependency tree nodes that are in conflict */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
-
     DependencyTree * deptree = (DependencyTree *) thread->get_dependency_domain(&access);
-    assert(deptree);
-
+    std::vector<void *> conflicts;
     deptree->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
-    /* create one task per conflict responsible to fetch that chunk */
+    /* create one task per conflict responsible to fetch the node */
+    # define AC 1
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
     constexpr size_t args_size = sizeof(args_t);
+    constexpr size_t task_size = task_compute_size(flags, AC);
 
-    for (access_t * & conflict : conflicts)
+    /* for each node of the dep tree conflicting */
+    for (void * & conflict : conflicts)
     {
-        assert(access.host_view.ld          == conflict->host_view.ld);
-        assert(access.host_view.sizeof_type == conflict->host_view.sizeof_type);
+        /* retrieve the node */
+        DependencyTree::Node * node = (DependencyTree::Node *) conflict;
+        access_t * write = node->last_write;
+        assert(write);
+        assert(access.host_view.ld          == write->host_view.ld);
+        assert(access.host_view.sizeof_type == write->host_view.sizeof_type);
 
-        task_t * task;
+        /* allocate a task with 1 access */
+        task_t * task = thread->allocate_task(task_size + args_size);
+        new(task) task_t(TASK_FORMAT_NULL, flags);
 
-        # if 1
-        # pragma message(TODO "How to test if 2 BLAS matrices are included in one-another ?")
-        // fast-way-out : if the conflict is included in the passed access, just setup 1 copy access (fast way out)
-   //   TODO : how to test if (A, m, n, LD) includes (A', m', n', ld) ?
-   //       if (access.host_view.includes(conflict->host_view))i
-   //   for now, only use this path is rigourously equals
-        if (access.host_view.equals(conflict->host_view))
+        task_dev_info_t * dev = TASK_DEV_INFO(task);
+        new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
+
+        args_t * args = (args_t *) TASK_ARGS(task, task_size);
+        new (args) args_t(runtime);
+
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        new (dep) task_dep_info_t(AC);
+
+        access_t * accesses = TASK_ACCESSES(task, flags);
+        assert(accesses);
+
+        /* as 'conflicts' are forming a partition of 'access', it must only
+         * intersects with a single cubes of 'access' : find which of the two */
+        for (int i = 0 ; i < 2 ; ++i)
         {
-            # define AC 1
+            Cube cube;
+            access_t::Cube::intersection(&cube, access.cubes[i], node->cube);
 
-            constexpr size_t task_size = task_compute_size(flags, AC);
-            task = thread->allocate_task(task_size + args_size);
-            new(task) task_t(TASK_FORMAT_NULL, flags);
-
-            task_dev_info_t * dev = TASK_DEV_INFO(task);
-            new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
-
-            args_t * args = (args_t *) TASK_ARGS(task, task_size);
-            new (args) args_t(runtime);
-
-            access_t * access = TASK_ACCESSES(task, flags);
-
-            task_dep_info_t * dep = TASK_DEP_INFO(task);
-            new (dep) task_dep_info_t(AC);
-            new (access) access_t(task, conflict, ACCESS_MODE_R);
-            deptree->precedence(conflict, access);
-
-            // insert for future tasks dependencies
-            deptree->insert<AC>(access);
-
-            # undef AC
-        }
-        // else, compute the 4 potential cubes
-        else
-        # endif
-        {
-            # define AC 4
-            constexpr size_t task_size = task_compute_size(flags, AC);
-            task = thread->allocate_task(task_size + args_size);
-            new(task) task_t(TASK_FORMAT_NULL, flags);
-
-            task_dev_info_t * dev = TASK_DEV_INFO(task);
-            new (dev) task_dev_info_t(HOST_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
-
-            args_t * args = (args_t *) TASK_ARGS(task, task_size);
-            new (args) args_t(runtime);
-
-            task_dep_info_t * dep = TASK_DEP_INFO(task);
-            new (dep) task_dep_info_t(AC);
-
-            // setup the 4 accesses resulsting from the intersection of 'access' and 'conflict'
-            access_t * accesses = TASK_ACCESSES(task, flags);
-
-            for (int i = 0 ; i < 2 ; ++i)
+            if (!cube.is_empty())
             {
-                for (int j = 0 ; j < 2 ; ++j)
-                {
-                    const int k = i * 2 + j;
-
-                    Cube cube;
-                    access_t::Cube::intersection(&cube, access.cubes[i], conflict->cubes[j]);
-
-                    if (cube.is_empty())
-                    {
-                        (accesses + k)->task = task;
-                        (accesses + k)->mode = ACCESS_MODE_V;
-                    }
-                    else
-                    {
-                        new (accesses + k) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
-                        deptree->precedence(conflict, accesses + i);
-                    }
-                }
+                new (accesses + 0) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
+                deptree->precedence(write, accesses + 0);
+                break ;
             }
-
-            // insert for future tasks dependencies
-            deptree->insert<AC>(accesses);
-
-            # undef AC
         }
+        /* assert to check that we did find a cube from 'access' that intersects with the node */
+        assert((accesses + 0)->task == task);
+
+        // insert for future tasks dependencies
+        deptree->insert<AC>(accesses);
 
         // commit the task
         runtime->task_commit(task);
@@ -197,8 +157,10 @@ xkrt_coherency_host_async(
         #ifndef NDEBUG
         strncpy(task->label, "xkrt_memory_coherent_async", sizeof(task->label));
         #endif /* NDEBUG */
-
     }
 
-    # endif
+    # undef AC
+
+    # endif /* single copy vs one per partite */
+
 }
