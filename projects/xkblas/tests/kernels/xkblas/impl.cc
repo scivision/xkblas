@@ -87,6 +87,28 @@ impl_t::gemm(
 }
 
 void
+impl_t::gemmt(
+    int uplo, int transa, int transb,
+    int m, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    xkblas_sgemmt_async(
+	uplo, transa, transb,
+	m, k,
+	alpha,
+	A, lda,
+	B, ldb,
+	beta,
+	C, ldc
+    );
+}
+
+
+void
 impl_t::syrk(
     int uplo, int trans,
     int n, int k,

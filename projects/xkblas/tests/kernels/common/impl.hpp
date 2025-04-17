@@ -44,6 +44,16 @@ class impl_t
                   TYPE * C, int ldc
         );
 
+	void gemmt(
+            int uplo, int transa, int transb,
+            int m, int k,
+            const TYPE * alpha,
+            const TYPE * A, int lda,
+            const TYPE * B, int ldb,
+            const TYPE * beta,
+                  TYPE * C, int ldc
+	);
+
         void
         trsm(
             int side, int uplo,
