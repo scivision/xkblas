@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:36:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/17 23:03:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -325,7 +325,7 @@ xkblas_£gemmt_async(
     # undef B
     # undef C
 
-    LOGGER_INFO("GEMMT dependency graph submitted");
+    LOGGER_DEBUG("GEMMT dependency graph submitted");
 
     return 0;
 }
@@ -361,7 +361,7 @@ body_cuda(
     assert(args);
 
     # ifndef NDEBUG
-    LOGGER_INFO("Calling cublasGemmt(m=%zu, n=%zu, k=%zu, A=%p, lda=%zu, B=%p, ldb=%zu, C=%p, ldc=%zu) on task=`%s`",
+    LOGGER_DEBUG("Calling cublasGemmt(m=%zu, n=%zu, k=%zu, A=%p, lda=%zu, B=%p, ldb=%zu, C=%p, ldc=%zu) on task=`%s`",
         args->n, args->n, args->k,
         (void *) A->device_view.addr,
         A->device_view.ld,

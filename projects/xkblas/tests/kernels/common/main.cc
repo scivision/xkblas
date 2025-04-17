@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 18:31:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/17 23:02:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -70,7 +70,7 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
     /* allocate matrices */
     const size_t s = sizeof(TYPE);
     const uintptr_t alignon = s * ld;
-    const uintptr_t memsize = n * (alignon + s * ld * ld);
+    const uintptr_t memsize = n * (alignon + alignon/2 + s * ld * ld);
     const uintptr_t mem     = impl.alloc(memsize);
 
     for (int i = 0 ; i < n ; ++i)
@@ -501,7 +501,7 @@ main_mumps(char ** args)
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
     /* allocate matrices */
-    # if 0
+    # if 1
     uintptr_t matrices[1];
     prepare_n_matrices(matrices, 1, ld);
 
@@ -509,7 +509,7 @@ main_mumps(char ** args)
     TYPE * L = (TYPE *) (D + n*ld + 0);
     TYPE * U = (TYPE *) (D + 0*ld + n);
     TYPE * G = (TYPE *) (D + n*ld + n);
-    #elif 1
+    #elif 0
     TYPE* A = (TYPE*) malloc( ld * ld * sizeof(TYPE) );
     TYPE* D = A;
     TYPE* L = D + ld * n;
@@ -525,7 +525,7 @@ main_mumps(char ** args)
     TYPE * G = (TYPE *) matrices[3];
     # endif
 
-    # if 1
+    # if 0
     int64_t ts[][3] = {
         {ts1, ts2, ts3}
     };
