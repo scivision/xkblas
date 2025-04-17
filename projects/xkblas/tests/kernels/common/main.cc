@@ -490,18 +490,18 @@ main_mumps(char ** args)
 
     /* parse arguments */
     int  Ix = atoi(args[0]);
-    int   m = atoi(args[1]);
-    int   n = atoi(args[2]);
-    int ts1 = atoi(args[3]);
-    int ts2 = atoi(args[4]);
-    int ts3 = atoi(args[5]);
+    int64_t   m = atoi(args[1]);
+    int64_t   n = atoi(args[2]);
+    int64_t ts1 = atoi(args[3]);
+    int64_t ts2 = atoi(args[4]);
+    int64_t ts3 = atoi(args[5]);
 //    int m  = 16384; // rand_int(200, 32768);
 //    int n  = 16384; // rand_int(200,  8192);
-    int ld = (m + n);
+    int64_t ld = (m + n);
     printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
     /* allocate matrices */
-    # if 1
+    # if 0
     uintptr_t matrices[1];
     prepare_n_matrices(matrices, 1, ld);
 
@@ -509,6 +509,12 @@ main_mumps(char ** args)
     TYPE * L = (TYPE *) (D + n*ld + 0);
     TYPE * U = (TYPE *) (D + 0*ld + n);
     TYPE * G = (TYPE *) (D + n*ld + n);
+    #elif 1
+    TYPE* A = (TYPE*) malloc( ld * ld * sizeof(TYPE) );
+    TYPE* D = A;
+    TYPE* L = D + ld * n;
+    TYPE* U = D + n;
+    TYPE* G = D + ld * n + n;
     # else
     uintptr_t matrices[4];
     prepare_n_matrices(matrices, 4, ld);
@@ -520,11 +526,11 @@ main_mumps(char ** args)
     # endif
 
     # if 1
-    int ts[][3] = {
+    int64_t ts[][3] = {
         {ts1, ts2, ts3}
     };
     # elif 1
-    int ts[][3] = {
+    int64_t ts[][3] = {
         {512, 512, 512},
         {1024, 1024, 1024},
         {2048, 2048, 2048},
@@ -629,7 +635,7 @@ main_mumps(char ** args)
         {m/2, 2048, n/1}
     };
     # else
-    int ts[][3] = {
+    int64_t ts[][3] = {
         {1024, 1024, 1024},
     };
     # endif
@@ -640,7 +646,7 @@ main_mumps(char ** args)
 
     uint64_t tmin = UINT64_MAX;
     int imin = 0;
-    for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
+    for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int64_t)) ; ++i)
     {
         printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
@@ -656,17 +662,23 @@ main_mumps(char ** args)
             uint64_t t0 = get_nanotime();
 
             impl.set_tile(ts[i][0]);
-            impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, m, n, &alpha, D, ld, L, ld);
+            impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
 
             impl.set_tile(ts[i][1]);
-            impl.copyscale(n, m, should_copy, IW, D, ld, L, ld, U, ld);
-
-            impl.set_tile(ts[i][2]);
-            impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, L, ld, U, ld, &beta, G, ld);
-
+            impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
             # if WRITE_BACK
             //impl.coherent(D, m, m, ld);
             impl.coherent(L, m, n, ld);
+            impl.coherent(U, n, m, ld); // U is retrieved even if we don't need it
+            //impl.coherent(G, m, m, ld);
+            # endif
+            impl.set_tile(ts[i][2]);
+            //impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+            impl.gemmt(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+
+            # if WRITE_BACK
+            //impl.coherent(D, m, m, ld);
+            //impl.coherent(L, m, n, ld);
             //impl.coherent(U, n, m, ld);
             impl.coherent(G, m, m, ld);
             # endif
