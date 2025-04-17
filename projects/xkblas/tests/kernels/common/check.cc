@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/17 22:54:05 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -76,7 +76,7 @@ gemm_cmp(
     {
         uint64_t t0 = get_nanotime();
         for (int i = 0 ; i < repeat ; ++i)
-            cblas_sgemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
+            native_gemm(CblasColMajor, transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, CRef, ldc);
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
@@ -90,10 +90,10 @@ gemm_cmp(
     const int Cm = Am;
     const int Cn = Bn;
 
-    double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
-    double Bnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,     ldb, work);
-    double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
-    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
+    double Anorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
+    double Bnorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', Bm, Bn, B,     ldb, work);
+    double CNorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
+    double CImplNorm = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
 
     assert(CRef != CImpl);
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
@@ -104,10 +104,10 @@ gemm_cmp(
     dump_matrix("CImpl", CImpl, Cm, Cn, ldc);
     dump_matrix_diff("CRef - CImpl", CRef, CImpl, Cm, Cn, ldc);
 
-    double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    double CRefNorm  = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;
-    cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
-    double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    native_axpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
+    double Rnorm = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     double eps = LAPACKE_slamch_work('e');
 
     printf("Rnorm %e, Anorm %e, Bnorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
@@ -167,7 +167,7 @@ syrk_cmp(
     {
         uint64_t t0 = get_nanotime();
         for (int i = 0 ; i < repeat ; ++i)
-            cblas_ssyrk(CblasColMajor, uplo, trans, n, k, alpha, A, lda, beta, CRef, ldc);
+            native_syrk(CblasColMajor, uplo, trans, n, k, alpha, A, lda, beta, CRef, ldc);
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
@@ -179,9 +179,9 @@ syrk_cmp(
     const int Cm = n;
     const int Cn = n;
 
-    double Anorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
-    double CNorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
-    double CImplNorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
+    double Anorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', Am, An, A,     lda, work);
+    double CNorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, C,     ldc, work);
+    double CImplNorm = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CImpl, ldc, work);
 
     printf("alpha=%lf, beta=%lf\n", alpha, beta);
     dump_matrix("A",     A,     Am, An, lda);
@@ -189,10 +189,10 @@ syrk_cmp(
     dump_matrix("CRef",  CRef,  Cm, Cn, ldc);
     dump_matrix("CImpl", CImpl, Cm, Cn, ldc);
 
-    double CRefNorm  = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    double CRefNorm  = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     TYPE beta_const = (TYPE) -1.0;
-    cblas_saxpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
-    double Rnorm = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
+    native_axpy(ldc * n, beta_const, CImpl, 1, CRef, 1);
+    double Rnorm = native_lange_work(LAPACK_COL_MAJOR, 'I', Cm, Cn, CRef, ldc, work);
     double eps = LAPACKE_slamch_work('e');
 
     printf("Rnorm %e, Anorm %e, CNorm %e, CImplNorm %e, CRefNorm %e\n",
@@ -235,7 +235,7 @@ trsm_cmp(
     printf("Running native...\n");
     {
         uint64_t t0 = get_nanotime();
-        cblas_strsm(CblasColMajor, side, uplo, transA, diag, m, n, alpha, A, lda, BRef, ldb);
+        native_trsm(CblasColMajor, side, uplo, transA, diag, m, n, alpha, A, lda, BRef, ldb);
         uint64_t tf = get_nanotime();
         printf("Native took %lf s.\n", (tf - t0) / (double)1e9);
     }
@@ -248,12 +248,12 @@ trsm_cmp(
 
     TYPE * work = (TYPE *)malloc(MAX(m, n) * sizeof(TYPE));
     assert(work);
-    double Anorm        = LAPACKE_slantr_work(LAPACK_COL_MAJOR, 'I', uplo, diag, Am, An, A, lda, work);
-    double Bnorm        = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
-    double BImplnorm    = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BImpl, ldb, work);
-    double BRefnorm     = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
-    cblas_saxpy(ldb * n, -1.0, BImpl, 1, BRef, 1);
-    double Rnorm        = LAPACKE_slange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+    double Anorm        = native_lantr_work(LAPACK_COL_MAJOR, 'I', uplo, diag, Am, An, A, lda, work);
+    double Bnorm        = native_lange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+    double BImplnorm    = native_lange_work(LAPACK_COL_MAJOR, 'I', m, n, BImpl, ldb, work);
+    double BRefnorm     = native_lange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
+    native_axpy(ldb * n, -1.0, BImpl, 1, BRef, 1);
+    double Rnorm        = native_lange_work(LAPACK_COL_MAJOR, 'I', m, n, BRef,  ldb, work);
 
     printf("Rnorm %e, Anorm %e, Bnorm %e, BImplnorm %e, BRefnorm %e\n",
            Rnorm, Anorm, Bnorm, BImplnorm, BRefnorm);

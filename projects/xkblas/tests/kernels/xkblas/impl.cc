@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 21:18:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/17 22:48:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,7 +75,11 @@ impl_t::gemm(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
+    # if PRECISION_s
     xkblas_sgemm_async(
+    # elif PRECISION_d
+    xkblas_dgemm_async(
+    # endif
         transA, transB,
         m, n, k,
         alpha,
@@ -96,14 +100,18 @@ impl_t::gemmt(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
+    # if PRECISION_s
     xkblas_sgemmt_async(
-	uplo, transa, transb,
-	m, k,
-	alpha,
-	A, lda,
-	B, ldb,
-	beta,
-	C, ldc
+    # elif PRECISION_d
+    xkblas_dgemmt_async(
+    # endif
+	    uplo, transa, transb,
+	    m, k,
+	    alpha,
+	    A, lda,
+	    B, ldb,
+	    beta,
+	    C, ldc
     );
 }
 
@@ -117,7 +125,11 @@ impl_t::syrk(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
+    # if PRECISION_s
     xkblas_ssyrk_async(
+    # elif PRECISION_d
+    xkblas_dsyrk_async(
+    # endif
         uplo, trans,
         n, k,
         alpha,
@@ -136,7 +148,11 @@ impl_t::trsm(
     const TYPE * A, const BLAS_INT lda,
           TYPE * B, const BLAS_INT ldb
 ) {
+    # if PRECISION_s
     xkblas_strsm_async(
+    # elif PRECISION_d
+    xkblas_dtrsm_async(
+    # endif
         side, uplo,
         transA, diag,
         m, n,
@@ -154,7 +170,17 @@ impl_t::copyscale(
           TYPE * L, const int ldl,
           TYPE * U, const int ldu
 ) {
-    xkblas_scopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+    # if PRECISION_s
+    xkblas_scopyscale_async(
+    # elif PRECISION_d
+    xkblas_dcopyscale_async(
+    # endif
+        m, n,
+        should_copy, IW,
+        D, ldd,
+        L, ldl,
+        U, ldu
+    );
 }
 
 void

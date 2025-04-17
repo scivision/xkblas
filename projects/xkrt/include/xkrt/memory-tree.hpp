@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 23:55:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 21:37:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1812,8 +1812,9 @@ next_view:
             search.prepare_search_owners();
             this->lock();
             {
-                this->intersect(search, access->cubes[0]);
-                this->intersect(search, access->cubes[1]);
+                for (int i = 0 ; i < 2 ; ++i)
+                    if (!access->cubes[i].is_empty())
+                        this->intersect(search, access->cubes[i]);
             }
             this->unlock();
 
@@ -2020,7 +2021,9 @@ next_view:
                 /* search for owners of the access */
                 case (Search::Type::SEARCH_OWNERS):
                 {
-                    const size_t bytes = cube.size();
+                    Cube intersect;
+                    Cube::intersection(&intersect, cube, node->cube);
+                    const size_t bytes = intersect.size();
                     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
                         if (node->block.valid & (1 << device_global_id))
                             search.bytes_owned[device_global_id] += bytes;

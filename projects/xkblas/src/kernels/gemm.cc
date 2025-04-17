@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 00:07:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/16 21:17:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -110,16 +110,15 @@ xkblas_£gemm_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    # if 1 /* using OCR placement */
+    # if 0
+    constexpr size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) (1 + (Atm % ngpus));
+    #else
     constexpr size_t ocr_access = 2;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
-    # else /* explicitly bind tasks to gpus */
-    constexpr size_t ocr_access = 2;
-    int ngpus = context->runtime.drivers.devices.n - 1;
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) (1 + (Atn % ngpus));
-    // xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) (1 + ((double)A_offset_n / (double)65536) * ngpus);
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
+    xkrt_device_global_id_t device_global_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
     # endif
+    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(transA, transB, m, n, k, *alpha, *beta);
