@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/17 23:02:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/18 03:43:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -361,16 +361,16 @@ main_trsm(char ** args)
 
     int s = 0;
     int u = 0;
-    int t = 1;
+    int t = 0;
     int d = 0;
 
-    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
         {
-            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
             {
-                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
                     impl.reset();
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
@@ -525,7 +525,7 @@ main_mumps(char ** args)
     TYPE * G = (TYPE *) matrices[3];
     # endif
 
-    # if 0
+    # if 1
     int64_t ts[][3] = {
         {ts1, ts2, ts3}
     };
@@ -657,8 +657,8 @@ main_mumps(char ** args)
             impl.wait();
             # endif /* ONLY_COMPUTE */
 
-            if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
-                continue ;
+           // if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
+           //     continue ;
             uint64_t t0 = get_nanotime();
 
             impl.set_tile(ts[i][0]);

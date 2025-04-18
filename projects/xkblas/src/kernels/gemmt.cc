@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/17 23:03:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/17 23:27:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -258,7 +258,7 @@ xkblas_£gemmt_async(
 
         for (size_t tn = tn_min ; tn < tn_max; ++tn)
         {
-            const size_t bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
+            const size_t bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
 
             // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
