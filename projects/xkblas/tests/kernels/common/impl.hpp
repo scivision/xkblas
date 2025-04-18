@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 16:54:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/18 13:47:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -78,7 +78,7 @@ class impl_t
         copyscale(
             const BLAS_INT m, const BLAS_INT n,
             bool should_copy, int * IW,
-            const TYPE * D, const int ldd,
+                  TYPE * D, const int ldd,
                   TYPE * L, const int ldl,
                   TYPE * U, const int ldu
         );

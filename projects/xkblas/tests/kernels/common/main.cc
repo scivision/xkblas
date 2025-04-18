@@ -5,14 +5,11 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/18 03:43:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/18 14:10:42 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
-
-// TODO : Add tests for each parameter combination possible (e.g.
-// CblasTrans/CblansNoTrans, CblasLeft/CblasRight, etc...
 
 extern "C" {
 
@@ -23,7 +20,9 @@ extern "C" {
     # include <time.h>
 };
 
-# include <xkblas/flops.h>
+// # include <xkblas/flops.h>
+
+# define KAAPI_NO_DEFAULT_BLAS_ENUM 1
 
 # include "common/blas.h"
 # include "common/blas-version.h"
@@ -244,8 +243,8 @@ main_gemm(char ** args)
             impl.wait();
             uint64_t tf = get_nanotime();
 
-            printf("Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s\n",
-                    (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
+            printf("Implementation took %lf s. (graph construction took %lf s.)\n", // - %.2lf TFlop/s\n",
+                    (tf-t0)/1e9, (tt-t0)/1e9 //, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
             );
             if (!SKIP_CHECK)
             {

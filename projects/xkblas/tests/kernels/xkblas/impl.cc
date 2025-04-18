@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/17 22:48:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/18 14:01:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,9 +16,9 @@
 
 # include "common/impl.hpp"
 
+extern "C" {
 # include "xkblas/xkblas.h"
-# include <xkblas/skernels.h>
-# include <xkblas/xkblas-experimental.h>
+};
 
 /* Implementation name */
 const char *
@@ -166,7 +166,7 @@ void
 impl_t::copyscale(
     const BLAS_INT m, const BLAS_INT n,
     bool should_copy, int * IW,
-    const TYPE * D, const int ldd,
+          TYPE * D, const int ldd,
           TYPE * L, const int ldl,
           TYPE * U, const int ldu
 ) {
@@ -200,7 +200,7 @@ impl_t::replicate(
     int m, int n,
     int ld
 ) {
-    xkblas_replicate_async(M, ld, m, n, sizeof(TYPE));
+    // xkblas_replicate_async(M, ld, m, n, sizeof(TYPE));
 }
 
 void
