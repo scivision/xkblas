@@ -1922,7 +1922,7 @@ static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
   {"AMD Instinct MI300A", KAAPI_ARCH_MI300A, 0},
   { 0, KAAPI_ARCH_UNKNOWN, 0}
 };
-#define KAAPI_KNOWN_DEVICE 2
+#define KAAPI_KNOWN_DEVICE 3
 
 /*
 */
