@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 21:17:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:00:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -78,6 +78,7 @@ static task_format_id_t format_id;
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
@@ -110,14 +111,8 @@ xkblas_£gemm_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    # if 0
-    constexpr size_t ocr_access = UNSPECIFIED_TASK_ACCESS;
-    const int ngpus = context->runtime.drivers.devices.n - 1;
-    xkrt_device_global_id_t device_global_id = (xkrt_device_global_id_t) (1 + (Atm % ngpus));
-    #else
     constexpr size_t ocr_access = 2;
-    xkrt_device_global_id_t device_global_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
-    # endif
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -246,6 +241,11 @@ xkblas_£gemm_async(
     const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
     const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
+    /* distribute C in a cyclic-block manner */
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_distribution_t d;
+    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
+
     const TYPE one = (TYPE) 1.0;
 
     # define A(I, J) A, (I), (J), Amb, Anb, lda
@@ -270,6 +270,7 @@ xkblas_£gemm_async(
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -289,6 +290,7 @@ xkblas_£gemm_async(
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_kn,
                                 alpha,
@@ -311,6 +313,7 @@ xkblas_£gemm_async(
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,
@@ -330,6 +333,7 @@ xkblas_£gemm_async(
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, transB,
                                 bs_mm, bs_nn, bs_km,
                                 alpha,

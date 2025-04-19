@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:51:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:18:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -49,15 +49,17 @@ static task_format_id_t format_id;
 
 /* m, n, k are matrix sizes
  * Am, An, ..., Cn are index of the tile begining */
-int
+inline int
 xkblas_£copyscale_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     size_t m, size_t n,
     int should_copy,
     int * IW,
     const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
           TYPE * L, const size_t Lm, const size_t Ln, int ldl,
-          TYPE * U, const size_t Um, const size_t Un, int ldu
+          TYPE * U, const size_t Um, const size_t Un, int ldu,
+    const size_t Ltm, const size_t Ltn
 ) {
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
@@ -75,7 +77,8 @@ xkblas_£copyscale_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ltm, Ltn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(m, n, should_copy, IW);
@@ -161,6 +164,11 @@ xkblas_£copyscale_async(
     const size_t Umt = NUM_OF_TILES(Um, Umb);
     const size_t Unt = NUM_OF_TILES(Un, Unb);
 
+    /* distribute C in a cyclic-block manner */
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_distribution_t d;
+    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Lm, Ln, Lmb, Lnb);
+
     # define D(i, j) D, i*Dmb, j*Dnb
     # define L(i, j) L, i*Lmb, j*Lnb
     # define U(i, j) U, i*Umb, j*Unb
@@ -173,11 +181,13 @@ xkblas_£copyscale_async(
             const size_t bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
             xkblas_£copyscale_tile_async(
                 context,
+                &d,
                 bs_m, bs_n,
                 should_copy, IW,
                 D(tn, tn), ldd,
                 L(tn, tm), ldl,
-                U(tm, tn), ldu
+                U(tm, tn), ldu,
+                tm, tn
             );
         }
     }

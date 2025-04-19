@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:36:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:04:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -61,6 +61,7 @@ static task_format_id_t format_id;
 int
 xkblas_£syrk_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int uplo, int trans,
     size_t n, size_t k,
     const TYPE * alpha,
@@ -91,7 +92,8 @@ xkblas_£syrk_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(uplo, trans, n, k, *alpha, *beta);
@@ -124,6 +126,7 @@ xkblas_£syrk_tile_async(
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
@@ -210,6 +213,11 @@ xkblas_£syrk_async(
     const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
     const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
+    /* distribute C in a cyclic-block manner */
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_distribution_t d;
+    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
+
     const TYPE one = (TYPE) 1.0;
 
     # define A(tm, tn) A, tm, tn, Amb, Anb
@@ -226,6 +234,7 @@ xkblas_£syrk_async(
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 xkblas_£syrk_tile_async(
                     context,
+                    &d,
                     uplo, trans,
                     bs_nn, bs_kn,
                     alpha,  A(tn, tk), lda,
@@ -244,6 +253,7 @@ xkblas_£syrk_async(
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
+                            &d,
                             trans, CblasTrans,
                             bs_mm, bs_nn, bs_kn,
                             alpha,
@@ -266,6 +276,7 @@ xkblas_£syrk_async(
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
+                            &d,
                             trans, CblasTrans,
                             bs_nn, bs_mm, bs_kn,
                             alpha,
@@ -286,6 +297,7 @@ xkblas_£syrk_async(
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 xkblas_£syrk_tile_async(
                     context,
+                    &d,
                     uplo, trans,
                     bs_nn, bs_km,
                     alpha,
@@ -307,6 +319,7 @@ xkblas_£syrk_async(
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
+                            &d,
                             trans, CblasNoTrans,
                             bs_mm, bs_nn, bs_km,
                             alpha,
@@ -329,6 +342,7 @@ xkblas_£syrk_async(
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         xkblas_£gemm_tile_async(
                             context,
+                            &d,
                             trans, CblasNoTrans,
                             bs_nn, bs_mm, bs_km,
                             alpha,

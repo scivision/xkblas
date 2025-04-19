@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 16:41:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:23:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -66,40 +66,60 @@ extern "C" {
         size_t sizeof_type
     );
 
-    /* Creates a partition of Region(order, ptr, ld, m, n, sizeof_type) with 1 partite per device
-     * and create 1 empty task on each device that reads its partite */
-    void xkrt_coherency_distribute_packed_2D_async(
-        xkrt_runtime_t * runtime,
-        matrix_order_t order,
-        void * ptr, size_t ld,
-        size_t m, size_t n,
-        size_t sizeof_type
+
+    ////////////////
+    // DISTRIBUTE //
+    ////////////////
+
+    // DISTRIBUTION //
+    typedef enum    xkrt_distribution_type_t
+    {
+        XKRT_DISTRIBUTION_TYPE_CYCLIC2D,
+        XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK,
+    }               xkrt_distribution_type_t;
+
+
+    typedef struct  xkrt_distribution_t
+    {
+        xkrt_distribution_type_t type;
+        size_t count;
+        size_t m, n;
+        size_t mb, nb;
+        size_t mt, nt;
+
+        union {
+
+            // for XKRT_DISTRIBUTION_TYPE_CYCLIC2D
+            struct {
+            };
+
+            // for XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK
+            struct {
+                size_t blkm, blkn;
+                size_t gm, gn;
+            };
+        };
+    }               xkrt_distribution_t;
+
+    xkrt_device_global_id_t xkrt_distribution_get(
+        xkrt_distribution_t * d,
+        size_t tm, size_t tn
     );
 
-    void xkrt_coherency_distribute_packed_2D_halo_async(
-        xkrt_runtime_t * runtime,
-        matrix_order_t order,
-        void * ptr, size_t ld,
+    void
+    xkrt_distribution_init(
+        xkrt_distribution_t * d,
+        xkrt_distribution_type_t type,
+        size_t count,
         size_t m, size_t n,
-        size_t sizeof_type,
-        size_t hx, size_t hy
+        size_t mb, size_t nb
     );
 
-    /* equivalent to xkrt_memory_distribute_cyclic_2D_halo_async(..., ox=0, oy=0) */
-    void xkrt_coherency_distribute_cyclic_2D_async(
-        xkrt_runtime_t * runtime,
-        matrix_order_t order,
-        void * ptr, size_t ld,
-        size_t m, size_t n,
-        size_t mb, size_t nb,
-        size_t sizeof_type
-    );
+    // DISTRIBUTE //
 
-    /* Create a partition of 'mb x nb' sub-regions (tiles) of Region(order, ptr, ld, m, n, sizeof_type)
-     * and create 1 task that reads each sub-region offseted by +/-(ox, oy)
-     * with a static schedule onto a device in a cyclic manner */
-    void xkrt_coherency_distribute_cyclic_2D_halo_async(
+    void xkrt_distribute_async(
         xkrt_runtime_t * runtime,
+        xkrt_distribution_type_t type,
         matrix_order_t order,
         void * ptr, size_t ld,
         size_t m, size_t n,

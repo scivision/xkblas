@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/10 19:35:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:07:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,6 +62,7 @@ static task_format_id_t format_id;
 int
 xkblas_£trsm_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int side, int uplo,
     int transA, int diag,
     const size_t m, const size_t n,
@@ -90,7 +91,8 @@ xkblas_£trsm_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Btm, Btn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(side, uplo, transA, diag, m, n, *alpha);
@@ -122,6 +124,7 @@ xkblas_£trsm_tile_async(
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
@@ -220,6 +223,11 @@ xkblas_£trsm_async(
     const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
     const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
 
+    /* distribute B in a cyclic-block manner */
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_distribution_t d;
+    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Bm, Bn, Bmb, Bnb);
+
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
@@ -240,6 +248,7 @@ xkblas_£trsm_async(
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
@@ -253,6 +262,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
                                 &mone,
@@ -276,6 +286,7 @@ xkblas_£trsm_async(
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
@@ -290,6 +301,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
@@ -315,6 +327,7 @@ xkblas_£trsm_async(
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
@@ -329,6 +342,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
@@ -352,6 +366,7 @@ xkblas_£trsm_async(
                         size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo, transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
@@ -364,6 +379,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 transA, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
                                 &mone,
@@ -391,6 +407,7 @@ xkblas_£trsm_async(
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo, transA, diag,
                             bs_mm, bs_kn,
                             &lalpha,
@@ -404,6 +421,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
                                 &mone,
@@ -426,6 +444,7 @@ xkblas_£trsm_async(
                         size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
@@ -437,6 +456,7 @@ xkblas_£trsm_async(
                         for (int tn = tk+1; tn < Bnt; ++tn) {
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, transA,
                                 bs_mm, Bnb, bs_kn,
                                 &minvalpha,
@@ -462,6 +482,7 @@ xkblas_£trsm_async(
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
@@ -473,6 +494,7 @@ xkblas_£trsm_async(
                         for (int tn = tk+1; tn < Bnt; ++tn) {
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
                                 &mone,
@@ -492,6 +514,7 @@ xkblas_£trsm_async(
                         size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         xkblas_£trsm_tile_async(
                             context,
+                            &d,
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
@@ -504,6 +527,7 @@ xkblas_£trsm_async(
                             size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                             xkblas_£gemm_tile_async(
                                 context,
+                                &d,
                                 CblasNoTrans, transA,
                                 bs_mm, bs_nn, Bmb,
                                 &minvalpha,

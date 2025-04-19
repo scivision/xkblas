@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 21:29:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 21:10:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -33,9 +33,6 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     assert(task->flags & TASK_FLAG_DEVICE);
     task_dev_info_t * dev = TASK_DEV_INFO(task);
 
-    // user should whether specify a target device id or an ocr, not both !
-    assert((dev->ocr_access_index != UNSPECIFIED_TASK_ACCESS) + (dev->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID) <= 1);
-
     // Find the worker to offload the task
     xkrt_device_t * device = NULL;
     xkrt_device_global_id_t device_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
@@ -60,11 +57,8 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
     }
 
     // if a target device is set
-    else if (dev->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID)
-    {
-        assert(dev->ocr_access_index == UNSPECIFIED_TASK_ACCESS);
+    if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID && dev->targeted_device_id != UNSPECIFIED_DEVICE_GLOBAL_ID)
         device_id = dev->targeted_device_id;
-    }
 
     // fallback to round robin if no devices found
     if (device_id == UNSPECIFIED_DEVICE_GLOBAL_ID)

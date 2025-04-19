@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/17 23:27:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 23:03:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -62,6 +62,7 @@ static task_format_id_t format_id;
 int
 xkblas_£gemmt_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int uplo,
     int transA, int transB,
     const size_t n, const size_t k,
@@ -94,7 +95,8 @@ xkblas_£gemmt_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 2;
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, ocr_access);
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new(args) args_t(uplo, transA, transB, n, k, *alpha, *beta);
@@ -129,6 +131,7 @@ xkblas_£gemmt_tile_async(
 int
 xkblas_£gemm_tile_async(
     xkblas_context_t * context,
+    xkrt_distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
@@ -243,6 +246,11 @@ xkblas_£gemmt_async(
     const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
     const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
+    /* distribute C in a cyclic-block manner */
+    const int ngpus = context->runtime.drivers.devices.n - 1;
+    xkrt_distribution_t d;
+    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
+
     const TYPE one = (TYPE) 1.0;
 
     # define A(I, J) A, (I), (J), Amb, Anb, lda
@@ -270,9 +278,9 @@ xkblas_£gemmt_async(
                         const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         if (tm == tn)
-                            xkblas_£gemmt_tile_async(context, uplo, transA, transB,        bs_nn, bs_kn, alpha, A(tm, tk), B(tk, tn), &zbeta, C(tm, tn));
+                            xkblas_£gemmt_tile_async(context, &d, uplo, transA, transB,        bs_nn, bs_kn, alpha, A(tm, tk), B(tk, tn), &zbeta, C(tm, tn));
                         else
-                             xkblas_£gemm_tile_async(context,       transA, transB, bs_mm, bs_nn, bs_kn, alpha, A(tm, tk), B(tk, tn), &zbeta, C(tm, tn));
+                             xkblas_£gemm_tile_async(context, &d,       transA, transB, bs_mm, bs_nn, bs_kn, alpha, A(tm, tk), B(tk, tn), &zbeta, C(tm, tn));
                     }
                 }
                 // A: CblasNoTrans / B: CBlasTrans
@@ -283,9 +291,9 @@ xkblas_£gemmt_async(
                         const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         if (tm == tn)
-                            xkblas_£gemmt_tile_async(context, uplo, transA, transB,        bs_nn, bs_kn, alpha, A(tm, tk), B(tn, tk), &zbeta, C(tm, tn));
+                            xkblas_£gemmt_tile_async(context, &d, uplo, transA, transB,        bs_nn, bs_kn, alpha, A(tm, tk), B(tn, tk), &zbeta, C(tm, tn));
                         else
-                             xkblas_£gemm_tile_async(context,       transA, transB, bs_mm, bs_nn, bs_kn, alpha, A(tm, tk), B(tn, tk), &zbeta, C(tm, tn));
+                             xkblas_£gemm_tile_async(context, &d,       transA, transB, bs_mm, bs_nn, bs_kn, alpha, A(tm, tk), B(tn, tk), &zbeta, C(tm, tn));
                     }
                 }
             }
@@ -299,9 +307,9 @@ xkblas_£gemmt_async(
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         if (tm == tn)
-                            xkblas_£gemmt_tile_async(context, uplo, transA, transB,        bs_nn, bs_km, alpha, A(tk, tm), B(tk, tn), &zbeta, C(tm, tn));
+                            xkblas_£gemmt_tile_async(context, &d, uplo, transA, transB,        bs_nn, bs_km, alpha, A(tk, tm), B(tk, tn), &zbeta, C(tm, tn));
                         else
-                             xkblas_£gemm_tile_async(context,       transA, transB, bs_mm, bs_nn, bs_km, alpha, A(tk, tm), B(tk, tn), &zbeta, C(tm, tn));
+                              xkblas_£gemm_tile_async(context, &d,      transA, transB, bs_mm, bs_nn, bs_km, alpha, A(tk, tm), B(tk, tn), &zbeta, C(tm, tn));
                     }
                 }
                 // A: CblasTrans / B: CBlasTrans
@@ -312,9 +320,9 @@ xkblas_£gemmt_async(
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         if (tm == tn)
-                            xkblas_£gemmt_tile_async(context, uplo, transA, transB,        bs_nn, bs_km, alpha, A(tk, tm), B(tn, tk), &zbeta, C(tm, tn));
+                            xkblas_£gemmt_tile_async(context, &d, uplo, transA, transB,        bs_nn, bs_km, alpha, A(tk, tm), B(tn, tk), &zbeta, C(tm, tn));
                         else
-                             xkblas_£gemm_tile_async(context,       transA, transB, bs_mm, bs_nn, bs_km, alpha, A(tk, tm), B(tn, tk), &zbeta, C(tm, tn));
+                             xkblas_£gemm_tile_async(context, &d,       transA, transB, bs_mm, bs_nn, bs_km, alpha, A(tk, tm), B(tn, tk), &zbeta, C(tm, tn));
                     }
                 }
             }
