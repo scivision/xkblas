@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/18 23:43:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/19 20:23:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -71,13 +71,13 @@ using namespace std::placeholders;
 # include <cstdint>
 
 static inline int
-log2(unsigned int n)
+khp_log2(unsigned int n)
 {
     return 31 - __builtin_clz(n);
 }
 
 static inline int
-twopow(int n)
+khp_twopow(int n)
 {
     return (1 << n);
 }
@@ -831,8 +831,8 @@ class KHPTree {
         static inline int
         vine_to_rbtree(Node * root, int k, int n)
         {
-            int h = log2(n + 1);
-            int m = twopow(h) - 1;
+            int h = khp_log2(n + 1);
+            int m = khp_twopow(h) - 1;
 
             compress(root, k, n - m);
 
@@ -932,7 +932,7 @@ class KHPTree {
         inline int
         requires_rebalance(const int nelements, const int height) const
         {
-            int ideal_height = log2(nelements + 1);
+            int ideal_height = khp_log2(nelements + 1);
             // return (height >= 8 && height > 2 * KDIM * ideal_height);
             return (height > 2 * KDIM * ideal_height);
         }
@@ -1378,7 +1378,7 @@ class KHPTree {
         {
             int height    = this->height();
             int nelements = this->size();
-            int ideal_height = log2(nelements + 1);
+            int ideal_height = khp_log2(nelements + 1);
             // tassert(height < 8 || height < 2 * K * ideal_height); // TODO : cut condition
             tassert(height <= 2 * K * ideal_height);
         }

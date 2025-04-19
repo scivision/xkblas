@@ -28,14 +28,10 @@ option(STRICT "Enable strict compilation mode" ON)
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
-
-if (ENABLE_HEAVY_DEBUG)
-    add_compile_definitions(KHP_TREE_ENABLE_COHERENCY_CHECKS=1)
-endif()
 
 ########
 # XKRT #

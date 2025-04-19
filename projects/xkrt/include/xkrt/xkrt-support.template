@@ -41,4 +41,10 @@
 /* If the runtime was compiled with AMD's rsmi support */
 # define XKRT_SUPPORT_RSMI __XKRT_SUPPORT_RSMI_VALUE__
 
+/* If the runtime should use heavy debug tests, that may significantly slowdown the execution */
+# define XKRT_SUPPORT_HEAVY_DEBUG __XKRT_SUPPORT_HEAVY_DEBUG_VALUE__
+# if XKRT_SUPPORT_HEAVY_DEBUG
+#  define KHP_TREE_ENABLE_COHERENCY_CHECKS 1
+# endif
+
 #endif /* __XKRT_SUPPORT_H__ */
