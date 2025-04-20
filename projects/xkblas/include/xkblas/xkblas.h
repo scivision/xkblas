@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 16:57:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:58:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -101,8 +101,8 @@ typedef float _Complex Complex32_t;
 typedef double _Complex Complex64_t;
 typedef double CFloat64_t;
 #endif
-#include "kernels.h"
-#include "cblas.h"
+#include "xkblas/kernels.h"
+#include "xkblas/cblas.h"
 static inline int xkblas_blas2cblas_trans( const char* trans )
 {
   switch (trans[0]) {

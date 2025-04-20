@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:46:24 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:59:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -510,6 +510,7 @@ main_mumps(char ** args)
         {7046, 2750},
         {3120, 1643},
         {5296, 784},
+        {20278, 2024}
     };
     for (int j = 0 ; j < sizeof(mn) / (2 * sizeof(int64_t)) ; ++j)
     {
