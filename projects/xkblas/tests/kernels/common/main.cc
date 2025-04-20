@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:59:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 23:09:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -493,6 +493,7 @@ main_mumps(char ** args)
 
     /* parse arguments */
     int  Ix = atoi(args[0]);
+    uint64_t t0 = get_nanotime();
 
     // MATRIX SIZE TO TEST
     # if USE_ARGS_MATRIX
@@ -701,11 +702,14 @@ main_mumps(char ** args)
             }
         }
 
-        printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n", ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
+        printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n",
+                ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
 
-        # if !USE_ARGS_MATRIX
+    # if !USE_ARGS_MATRIX
     }
     # endif
+    uint64_t tf = get_nanotime();
+    printf("Total transfer+compute took %lf s.\n", (tf-t0)/(double)1e9);
 
     return 0;
 }
