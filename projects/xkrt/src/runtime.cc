@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 17:13:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:06:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -91,9 +91,6 @@ xkrt_init(xkrt_runtime_t * runtime)
 
     // set affinities to 0
     memset(&runtime->router.affinity, 0, sizeof(runtime->router.affinity));
-
-    // init spinlock
-    runtime->memcontrollers_lock = SPINLOCK_INITIALIZER;
 
     // create topology
     hwloc_topology_init(&runtime->topology);

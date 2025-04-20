@@ -5,13 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 21:10:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:28:03 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
+# include <xkrt/memory-tree.hpp>
 # include <xkrt/sync/bits.h>
 
 static inline void
@@ -49,9 +50,9 @@ xkrt_runtime_submit_task_device(xkrt_runtime_t * runtime, task_t * task)
         access_t * access = TASK_ACCESSES(task) + dev->ocr_access_index;
 
         // looking for the device that owns the data
-        MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
-        assert(memcontroller);
-        const xkrt_device_global_id_bitfield_t owners = memcontroller->who_owns(access);
+        MemoryTree * memtree = (MemoryTree *) task_get_memory_controller(runtime, task->parent, access);
+        assert(memtree);
+        const xkrt_device_global_id_bitfield_t owners = memtree->who_owns(access);
         if (owners)
             device_id = (xkrt_device_global_id_t) (__random_set_bit(owners) - 1);
     }

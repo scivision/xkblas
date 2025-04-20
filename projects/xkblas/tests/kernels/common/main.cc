@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 20:36:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 02:39:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -228,9 +228,9 @@ main_gemm(char ** args)
     int t1 = 0;
     int t2 = 0;
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
 
@@ -363,13 +363,13 @@ main_trsm(char ** args)
     int t = 0;
     int d = 0;
 
-    // for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
     {
-        // for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
         {
-            // for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
             {
-                // for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                 {
                     impl.reset();
                     memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/01 23:28:04 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:11:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,13 +14,16 @@
 #ifndef __COHERENCY_CONTROLLER_HPP__
 # define __COHERENCY_CONTROLLER_HPP__
 
+# if 0
 # include <xkrt/consts.h>               // this should gtfo
 # include <xkrt/task/task.hpp>          // this should gtfo
 # include <xkrt/memory/access.hpp>      // this should gtfo
+# endif
 
 template<int K>
 class KMemoryCoherencyController {
 
+    # if 0
     public:
 
         /** all replicates must be invalidated */
@@ -31,7 +34,7 @@ class KMemoryCoherencyController {
 
         /* fetch the given access on the given device */
         virtual void fetch(task_t * task, access_t * access, xkrt_device_global_id_t device_global_id) = 0;
-
+    # endif
 };
 
 using MemoryCoherencyController = KMemoryCoherencyController<2>;

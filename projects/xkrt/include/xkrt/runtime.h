@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:29:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:27:40 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,20 +45,11 @@ typedef struct  xkrt_runtime_t
         task_format_id_t copy_async;
     } formats;
 
-    /* memory controller for coherency */
-    std::vector<MemoryCoherencyController *> memcontrollers;
-
-    /* mutex for accessing the memcontroller list */
-    spinlock_t memcontrollers_lock;
-
     /* user conf */
     xkrt_conf_t conf;
 
     /* memory router */
     RouterAffinity router;
-
-    /* get a memory controller for the given ld/type size */
-    MemoryCoherencyController * get_or_insert_memory_controller(const size_t ld, const size_t sizeof_type);
 
     /* hwloc topology, read only, initialized at init */
     hwloc_topology_t topology;
@@ -259,5 +250,11 @@ typedef struct  xkrt_device_team_args_t
     xkrt_device_thread_args_t devices[XKRT_DEVICES_MAX];
     int ndevices;
 }               xkrt_device_team_args_t;
+
+MemoryCoherencyController * task_get_memory_controller(
+    xkrt_runtime_t * runtime,
+    task_t * task,
+    const access_t * access
+);
 
 #endif /* __XKRT_RUNTIME_H__ */

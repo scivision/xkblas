@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 18:10:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:10:53 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -93,7 +93,7 @@ xkrt_coherency_host_async(
 
     /* create an access, and retrieve all dependency tree nodes that are in conflict */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
-    DependencyTree * deptree = (DependencyTree *) thread->get_dependency_domain(&access);
+    DependencyTree * deptree = (DependencyTree *) task_get_dependency_domain(thread->current_task, &access);
     std::vector<void *> conflicts;
     deptree->conflicting(&conflicts, &access);
 

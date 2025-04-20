@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 21:37:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:23:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1798,6 +1798,13 @@ next_view:
         {
             // empty the tree
             this->clear();
+        }
+
+        bool
+        can_resolve(const access_t * access) const
+        {
+            assert(access);
+            return (this->ld == access->host_view.ld) && (this->sizeof_type == access->host_view.sizeof_type);
         }
 
         //////////////

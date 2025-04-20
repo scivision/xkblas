@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 23:49:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:27:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,6 +29,7 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/access.hpp>
 # include <xkrt/memory/cache-line-size.hpp>
+# include <xkrt/memory/coherency-controller.hpp>
 # include <xkrt/sync/spinlock.h>
 
 /* task states */
@@ -84,7 +85,7 @@ typedef enum    task_flags_t
     TASK_FLAG_DEPENDENT     = (1 << 0), // the task may have dependencies
     TASK_FLAG_DETACHABLE    = (1 << 1), // the task completion is associated with the completion of user-defined external events
     TASK_FLAG_DEVICE        = (1 << 2), // task task may execute on a device
-    TASK_FLAG_DOMAIN        = (1 << 3), // if this task may have dependent children tasks - in such case, it will have dependency domains
+    TASK_FLAG_DOMAIN        = (1 << 3), // if this task may have dependent children tasks - in such case, it will have a dependency and a memory domain
 
     // TODO : support me in the future
   // TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
@@ -189,14 +190,24 @@ typedef struct  task_dev_info_t
 /* info about domain of dependencies */
 typedef struct  task_dom_info_t
 {
-    /* the dependency domains */
-    std::vector<DependencyDomain *> domains;
+    /* dependency controller - only the thread currently executing the task may read this list */
+    std::vector<DependencyDomain *> deps;
 
-    task_dom_info_t() : domains(1) {
-        domains.clear();
+    /* memory controller for coherency - all threads may try to access this list */
+    std::vector<MemoryCoherencyController *> mems;
+    spinlock_t mems_lock;
+
+    task_dom_info_t() : deps(1), mems(1), mems_lock() {
+        deps.clear();
+        mems.clear();
     }
+
 }               task_dom_info_t;
 
+DependencyDomain * task_get_dependency_domain(
+    task_t * task,
+    const access_t * access
+);
 
 /* fallback if wrong flags parameter - https://stackoverflow.com/questions/20461121/constexpr-error-at-compile-time-but-no-overhead-at-run-time */
 static size_t

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 02:03:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:22:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,15 +38,25 @@ xkrt_memory_deallocate_all(
     }
 }
 
+# pragma message(TODO "This interface definition is fucked: deallocating all device memory is not safe here if there is multiple threads submitting tasks to the device")
 extern "C"
 void
 xkrt_coherency_reset(xkrt_runtime_t * runtime)
 {
-    LOGGER_INFO("Invalidate XKBlas devices memory");
+    LOGGER_DEBUG("Invalidate XKBlas devices memory");
 
-    // memory tree and device memory
-    for (MemoryCoherencyController * memcontroller : runtime->memcontrollers)
-        memcontroller->invalidate();
+    // remove all memory controllers of the current task
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
 
+    task_dom_info_t * dom = TASK_DOM_INFO(thread->current_task);
+    assert(dom);
+
+    for (MemoryCoherencyController * mem : dom->mems)
+        delete mem;
+
+    dom->mems.clear();
+
+    // deallocate all device memory
     xkrt_memory_deallocate_all(runtime);
 }

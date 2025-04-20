@@ -56,6 +56,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/memory-replicate.cc
     ${CMAKE_SOURCE_DIR}/src/stats.cc
+    ${CMAKE_SOURCE_DIR}/src/task/task.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
     ${CMAKE_SOURCE_DIR}/src/thread/thread.cc
     ${CMAKE_SOURCE_DIR}/src/thread/deque.cc

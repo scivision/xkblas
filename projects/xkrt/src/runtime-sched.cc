@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:30:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:28:37 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,10 +75,9 @@ xkrt_device_prepare_task(
                 if (access->mode == ACCESS_MODE_V)
                     continue ;
 
-                MemoryCoherencyController * memcontroller = runtime->get_or_insert_memory_controller(access->host_view.ld, access->host_view.sizeof_type);
-                assert(memcontroller);
-
-                memcontroller->fetch(task, access, device_global_id);
+                MemoryTree * memtree = (MemoryTree *) task_get_memory_controller(runtime, task->parent, access);
+                assert(memtree);
+                memtree->fetch(task, access, device_global_id);
             }
 
             /* decrease the task 'fetching' counter to detect early-fetch completion */
@@ -474,37 +473,6 @@ xkrt_runtime_t::power_stop(const xkrt_device_global_id_t device_global_id, xkrt_
 ////////////
 // MEMORY //
 ////////////
-
-MemoryCoherencyController *
-xkrt_runtime_t::get_or_insert_memory_controller(
-    const size_t ld,
-    const size_t sizeof_type
-) {
-    SPINLOCK_LOCK(this->memcontrollers_lock);
-
-    /* find previous memtree for that ld */
-    for (MemoryCoherencyController * memcontroller : this->memcontrollers)
-    {
-        MemoryTree * memtree = (MemoryTree *) memcontroller;
-        if (memtree->ld == ld && memtree->sizeof_type == sizeof_type)
-        {
-            SPINLOCK_UNLOCK(this->memcontrollers_lock);
-            return memcontroller;
-        }
-    }
-
-    LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
-            ld, sizeof_type, this->conf.merge_transfers ? "true" : "false");
-
-    /* if not found, create a new memtree */
-    MemoryCoherencyController * memcontroller = new MemoryTree(this, ld, sizeof_type, this->conf.merge_transfers);
-    assert(memcontroller);
-    this->memcontrollers.push_back(memcontroller);
-
-    SPINLOCK_UNLOCK(this->memcontrollers_lock);
-
-    return memcontroller;
-}
 
 xkrt_area_chunk_t *
 xkrt_runtime_t::memory_device_allocate(
