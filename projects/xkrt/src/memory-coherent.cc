@@ -5,15 +5,15 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:10:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:50:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory-tree.hpp>
 # include <xkrt/memory/alignedas.h>
+# include <xkrt/memory/memory-tree.hpp>
 # include <xkrt/task/dependency-tree.hpp>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;

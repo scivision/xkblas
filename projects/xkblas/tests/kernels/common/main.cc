@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 02:39:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:46:24 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -480,6 +480,10 @@ main_mumps(char ** args)
      *      .-------.-----------.
      */
 
+    # define USE_WRITE_BACK     1
+    # define USE_ARGS_MATRIX    0
+    # define USE_TS_TUNER       0
+
     TYPE alpha, beta;
     FILL(&alpha, 1);
     FILL(&beta, 1);
@@ -489,215 +493,218 @@ main_mumps(char ** args)
 
     /* parse arguments */
     int  Ix = atoi(args[0]);
-    int64_t   m = atoi(args[1]);
-    int64_t   n = atoi(args[2]);
-    int64_t ts1 = atoi(args[3]);
-    int64_t ts2 = atoi(args[4]);
-    int64_t ts3 = atoi(args[5]);
-//    int m  = 16384; // rand_int(200, 32768);
-//    int n  = 16384; // rand_int(200,  8192);
-    int64_t ld = (m + n);
-    printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
 
-    /* allocate matrices */
-    # if 1
-    uintptr_t matrices[1];
-    prepare_n_matrices(matrices, 1, ld);
-
-    TYPE * D = (TYPE *) matrices[0];
-    TYPE * L = (TYPE *) (D + n*ld + 0);
-    TYPE * U = (TYPE *) (D + 0*ld + n);
-    TYPE * G = (TYPE *) (D + n*ld + n);
-    #elif 0
-    TYPE* A = (TYPE*) malloc( ld * ld * sizeof(TYPE) );
-    TYPE* D = A;
-    TYPE* L = D + ld * n;
-    TYPE* U = D + n;
-    TYPE* G = D + ld * n + n;
+    // MATRIX SIZE TO TEST
+    # if USE_ARGS_MATRIX
+    int64_t m = atoi(args[1]);
+    int64_t n = atoi(args[2]);
     # else
-    uintptr_t matrices[4];
-    prepare_n_matrices(matrices, 4, ld);
-
-    TYPE * D = (TYPE *) matrices[0];
-    TYPE * L = (TYPE *) matrices[1];
-    TYPE * U = (TYPE *) matrices[2];
-    TYPE * G = (TYPE *) matrices[3];
-    # endif
-
-    # if 1
-    int64_t ts[][3] = {
-        {ts1, ts2, ts3}
+    int64_t mn[][2] = {
+        {3860, 1536},
+        {7581, 2189},
+        {2631, 3972},
+        {6075, 894},
+        {1810, 3002},
+        {7994, 1340},
+        {4912, 3891},
+        {7046, 2750},
+        {3120, 1643},
+        {5296, 784},
     };
-    # elif 1
-    int64_t ts[][3] = {
-        {512, 512, 512},
-        {1024, 1024, 1024},
-        {2048, 2048, 2048},
-        {512, 1024, 2048},
-        {1024, 2048, 4096},
-        {2048, 4096, 8192},
-        {m/1, m/2, m/4},
-        {n/1, n/2, n/4},
-        {m/8, m/16, 2048},
-        {n/8, 4096, 8192},
-        {1024, m/2, n/4},
-        {n/1, 512, m/2},
-        {1024, m/4, 2048},
-        {m/1, 1024, 4096},
-        {n/2, m/2, 8192},
-        {m/8, 512, n/8},
-        {m/16, n/16, 1024},
-        {4096, 2048, m/2},
-        {n/4, m/4, 2048},
-        {8192, n/8, m/8},
-        {m/2, 512, 1024},
-        {n/2, 4096, m/1},
-        {m/1, n/2, 512},
-        {1024, 1024, 1024},
-        {m/2, m/4, m/8},
-        {n/4, n/8, n/16},
-        {2048, 4096, m/16},
-        {8192, n/4, m/4},
-        {n/1, 1024, m/2},
-        {m/4, 1024, n/4},
-        {n/16, m/16, 2048},
-        {n/8, 512, m/8},
-        {512, 512, 512},
-        {2048, 2048, 2048},
-        {m/8, m/2, 1024},
-        {n/2, n/1, 4096},
-        {m/16, m/8, m/4},
-        {n/16, n/8, 512},
-        {512, m/1, m/16},
-        {n/4, 8192, 4096},
-        {m/2, 2048, 8192},
-        {4096, m/1, 2048},
-        {n/2, 1024, 1024},
-        {n/4, 512, 512},
-        {m/1, m/1, m/1},
-        {n/1, n/1, n/1},
-        {m/2, m/2, m/2},
-        {n/2, n/2, n/2},
-        {m/4, m/4, m/4},
-        {n/4, n/4, n/4},
-        {m/8, m/8, m/8},
-        {n/8, n/8, n/8},
-        {m/16, m/16, m/16},
-        {n/16, n/16, n/16},
-        {512, n/2, m/8},
-        {8192, m/4, n/8},
-        {1024, n/4, 2048},
-        {4096, n/2, m/2},
-        {m/1, 512, n/16},
-        {n/1, 8192, m/16},
-        {m/2, 2048, 512},
-        {m/4, n/2, 1024},
-        {n/8, 1024, 8192},
-        {512, m/8, 2048},
-        {n/2, 4096, 512},
-        {m/4, m/8, 4096},
-        {n/16, 2048, 1024},
-        {8192, n/1, m/2},
-        {1024, 4096, n/4},
-        {m/8, 2048, n/4},
-        {n/1, m/8, 8192},
-        {m/16, n/2, 4096},
-        {m/1, 8192, 1024},
-        {n/4, 2048, m/4},
-        {m/2, 1024, 512},
-        {n/8, 8192, 2048},
-        {m/4, 512, n/2},
-        {1024, m/16, n/8},
-        {2048, 4096, 512},
-        {8192, m/1, n/16},
-        {n/2, 1024, 512},
-        {m/4, 4096, 512},
-        {n/8, m/8, m/16},
-        {m/16, 1024, n/4},
-        {m/8, 8192, 2048},
-        {1024, 512, n/2},
-        {m/2, 4096, n/4},
-        {n/1, 1024, m/8},
-        {2048, n/2, m/16},
-        {m/1, n/2, n/4},
-        {n/16, 8192, 512},
-        {m/2, 8192, 1024},
-        {m/4, n/1, 4096},
-        {n/4, 1024, 2048},
-        {m/1, m/2, m/8},
-        {n/1, n/2, n/8},
-        {2048, m/4, m/16},
-        {512, n/4, n/16},
-        {1024, m/8, n/2},
-        {n/16, m/8, 4096},
-        {8192, m/16, n/2},
-        {m/2, 2048, n/1}
-    };
-    # else
-    int64_t ts[][3] = {
-        {1024, 1024, 1024},
-    };
-    # endif
-
-    // if set to '1', do not account time for initial and write back transfers
-    # define REPLICATE  0
-    # define WRITE_BACK 1
-
-    uint64_t tmin = UINT64_MAX;
-    int imin = 0;
-    for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int64_t)) ; ++i)
+    for (int j = 0 ; j < sizeof(mn) / (2 * sizeof(int64_t)) ; ++j)
     {
-        printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
+        int64_t  m = mn[j][0];
+        int64_t  n = mn[j][1];
+    # endif
 
-        for (int j = 0 ; j < Ix ; ++j)
+        int64_t ld = m+n;
+
+        printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
+
+        /* allocate matrices */
+        uintptr_t matrices[1];
+        prepare_n_matrices(matrices, 1, ld);
+
+        TYPE * D = (TYPE *) matrices[0];
+        TYPE * L = (TYPE *) (D + n*ld + 0);
+        TYPE * U = (TYPE *) (D + 0*ld + n);
+        TYPE * G = (TYPE *) (D + n*ld + n);
+
+        // TILE SIZES TO TEST
+
+        # if !USE_TS_TUNER
+        int64_t ts1 = atoi(args[3]);
+        int64_t ts2 = atoi(args[4]);
+        int64_t ts3 = atoi(args[5]);
+        int64_t ts[][3] = {
+            {ts1, ts2, ts3}
+        };
+        # else
+        int64_t ts[][3] = {
+            {512, 512, 512},
+            {1024, 1024, 1024},
+            {2048, 2048, 2048},
+            {512, 1024, 2048},
+            {1024, 2048, 4096},
+            {2048, 4096, 8192},
+            {m/1, m/2, m/4},
+            {n/1, n/2, n/4},
+            {m/8, m/16, 2048},
+            {n/8, 4096, 8192},
+            {1024, m/2, n/4},
+            {n/1, 512, m/2},
+            {1024, m/4, 2048},
+            {m/1, 1024, 4096},
+            {n/2, m/2, 8192},
+            {m/8, 512, n/8},
+            {m/16, n/16, 1024},
+            {4096, 2048, m/2},
+            {n/4, m/4, 2048},
+            {8192, n/8, m/8},
+            {m/2, 512, 1024},
+            {n/2, 4096, m/1},
+            {m/1, n/2, 512},
+            {1024, 1024, 1024},
+            {m/2, m/4, m/8},
+            {n/4, n/8, n/16},
+            {2048, 4096, m/16},
+            {8192, n/4, m/4},
+            {n/1, 1024, m/2},
+            {m/4, 1024, n/4},
+            {n/16, m/16, 2048},
+            {n/8, 512, m/8},
+            {512, 512, 512},
+            {2048, 2048, 2048},
+            {m/8, m/2, 1024},
+            {n/2, n/1, 4096},
+            {m/16, m/8, m/4},
+            {n/16, n/8, 512},
+            {512, m/1, m/16},
+            {n/4, 8192, 4096},
+            {m/2, 2048, 8192},
+            {4096, m/1, 2048},
+            {n/2, 1024, 1024},
+            {n/4, 512, 512},
+            {m/1, m/1, m/1},
+            {n/1, n/1, n/1},
+            {m/2, m/2, m/2},
+            {n/2, n/2, n/2},
+            {m/4, m/4, m/4},
+            {n/4, n/4, n/4},
+            {m/8, m/8, m/8},
+            {n/8, n/8, n/8},
+            {m/16, m/16, m/16},
+            {n/16, n/16, n/16},
+            {512, n/2, m/8},
+            {8192, m/4, n/8},
+            {1024, n/4, 2048},
+            {4096, n/2, m/2},
+            {m/1, 512, n/16},
+            {n/1, 8192, m/16},
+            {m/2, 2048, 512},
+            {m/4, n/2, 1024},
+            {n/8, 1024, 8192},
+            {512, m/8, 2048},
+            {n/2, 4096, 512},
+            {m/4, m/8, 4096},
+            {n/16, 2048, 1024},
+            {8192, n/1, m/2},
+            {1024, 4096, n/4},
+            {m/8, 2048, n/4},
+            {n/1, m/8, 8192},
+            {m/16, n/2, 4096},
+            {m/1, 8192, 1024},
+            {n/4, 2048, m/4},
+            {m/2, 1024, 512},
+            {n/8, 8192, 2048},
+            {m/4, 512, n/2},
+            {1024, m/16, n/8},
+            {2048, 4096, 512},
+            {8192, m/1, n/16},
+            {n/2, 1024, 512},
+            {m/4, 4096, 512},
+            {n/8, m/8, m/16},
+            {m/16, 1024, n/4},
+            {m/8, 8192, 2048},
+            {1024, 512, n/2},
+            {m/2, 4096, n/4},
+            {n/1, 1024, m/8},
+            {2048, n/2, m/16},
+            {m/1, n/2, n/4},
+            {n/16, 8192, 512},
+            {m/2, 8192, 1024},
+            {m/4, n/1, 4096},
+            {n/4, 1024, 2048},
+            {m/1, m/2, m/8},
+            {n/1, n/2, n/8},
+            {2048, m/4, m/16},
+            {512, n/4, n/16},
+            {1024, m/8, n/2},
+            {n/16, m/8, 4096},
+            {8192, m/16, n/2},
+            {m/2, 2048, n/1}
+        };
+        # endif
+
+        uint64_t tmin = UINT64_MAX;
+        int imin = 0;
+        for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int64_t)) ; ++i)
         {
-            # if REPLICATE
-            impl.replicate(D, ld, m+n, m+n);
-            impl.wait();
-            # endif /* ONLY_COMPUTE */
+            printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
-           // if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
-           //     continue ;
-            uint64_t t0 = get_nanotime();
-
-            impl.set_tile(ts[i][0]);
-            impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
-
-            impl.set_tile(ts[i][1]);
-            impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
-            # if WRITE_BACK
-            //impl.coherent(D, m, m, ld);
-            impl.coherent(L, m, n, ld);
-            impl.coherent(U, n, m, ld); // U is retrieved even if we don't need it
-            //impl.coherent(G, m, m, ld);
-            # endif
-            impl.set_tile(ts[i][2]);
-            //impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
-            impl.gemmt(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
-
-            # if WRITE_BACK
-            //impl.coherent(D, m, m, ld);
-            //impl.coherent(L, m, n, ld);
-            //impl.coherent(U, n, m, ld);
-            impl.coherent(G, m, m, ld);
-            # endif
-
-            uint64_t tt = get_nanotime();
-            impl.wait();
-            uint64_t tf = get_nanotime();
-            printf("Compute took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
-
-            impl.reset();
-
-            if (tf - t0 < tmin)
+            for (int j = 0 ; j < Ix ; ++j)
             {
-                imin = i;
-                tmin = tf - t0;
+                # if REPLICATE
+                impl.replicate(D, ld, m+n, m+n);
+                impl.wait();
+                # endif /* ONLY_COMPUTE */
+
+                // if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
+                //     continue ;
+                uint64_t t0 = get_nanotime();
+
+                impl.set_tile(ts[i][0]);
+                impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
+
+                impl.set_tile(ts[i][1]);
+                impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+                # if USE_WRITE_BACK
+                //impl.coherent(D, m, m, ld);
+                impl.coherent(L, m, n, ld);
+                impl.coherent(U, n, m, ld); // U is retrieved even if we don't need it
+                                            //impl.coherent(G, m, m, ld);
+                # endif
+                impl.set_tile(ts[i][2]);
+                //impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+                impl.gemmt(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+
+                # if USE_WRITE_BACK
+                //impl.coherent(D, m, m, ld);
+                //impl.coherent(L, m, n, ld);
+                //impl.coherent(U, n, m, ld);
+                impl.coherent(G, m, m, ld);
+                # endif
+
+                uint64_t tt = get_nanotime();
+                impl.wait();
+                uint64_t tf = get_nanotime();
+                printf("Compute took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+
+                impl.reset();
+
+                if (tf - t0 < tmin)
+                {
+                    imin = i;
+                    tmin = tf - t0;
+                }
             }
         }
-    }
 
-    printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n", ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
+        printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n", ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
+
+        # if !USE_ARGS_MATRIX
+    }
+    # endif
 
     return 0;
 }

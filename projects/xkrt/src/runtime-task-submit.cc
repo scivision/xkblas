@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:28:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:50:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory-tree.hpp>
+# include <xkrt/memory/memory-tree.hpp>
 # include <xkrt/sync/bits.h>
 
 static inline void

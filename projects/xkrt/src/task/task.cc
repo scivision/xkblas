@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/04/20 03:00:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:26:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:50:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory-tree.hpp>
+# include <xkrt/memory/memory-tree.hpp>
 
 /**
  * Retrieve or (insert and return) the memory controller of the passed task for the given access

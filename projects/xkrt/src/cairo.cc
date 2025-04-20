@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/04/03 16:00:29 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 15:43:17 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:51:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -16,7 +16,7 @@
 # if XKRT_SUPPORT_CAIRO
 #  include <cairo/cairo.h>
 #  include <cairo/cairo-svg.h>
-#  include <xkrt/memory-tree.hpp>
+#  include <xkrt/memory/memory-tree.hpp>
 void
 xkrt_cairo_memory_trees(
     xkrt_runtime_t * runtime

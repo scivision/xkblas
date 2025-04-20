@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:06:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 03:50:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -163,7 +163,7 @@ xkrt_deinit(xkrt_runtime_t * runtime)
 //  Runtime synchronize     //
 //////////////////////////////
 
-# include <xkrt/memory-tree.hpp>
+# include <xkrt/memory/memory-tree.hpp>
 
 extern "C"
 int
