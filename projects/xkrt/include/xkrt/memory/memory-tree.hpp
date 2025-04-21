@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:23:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 03:01:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1159,22 +1159,27 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         }
 
         /* create a list of fetch request to perform for the given cubes */
-        template <int NC>
         fetch_list_t *
-        fetch_list_to_host_from_cubes(
-            const Cube * cubes
+        fetch_list_to_host(
+            access_t * access
         ) {
             # pragma message(TODO "merge continuous partites using the same 'chunk'")
 
             Search search(HOST_DEVICE_GLOBAL_ID);
             this->lock();
             {
-                /* find all blocks that intersects with that access */
-                search.prepare_search_blocks();
-                for (int i = 0 ; i < NC ; ++i)
-                    this->intersect(search, cubes[i]);
+                // no need to insert, but gotta intersect access' cubes with
+                // memory-tree nodes cubes to take only the minimal
+                // incoherent data
 
-                /*  setup partition for D2H copies */
+                // TODO : move the intersect from the search to outside the lock
+
+                search.prepare_search_blocks();
+                this->intersect(search, access->cubes[0]);
+                this->intersect(search, access->cubes[1]);
+                assert(search.partition.partites.size() >= 1);
+
+                /* setup partition for D2H copies */
                 this->fetch_list_to_host_setup_partition(search.partition);
             }
             this->unlock();
@@ -1769,7 +1774,7 @@ next_view:
             if (device_global_id == HOST_DEVICE_GLOBAL_ID)
             {
                 assert(access->mode == ACCESS_MODE_R);
-                list = this->fetch_list_to_host_from_cubes<2>(access->cubes);
+                list = this->fetch_list_to_host(access);
             }
             // long-path if targetting a device
             else
@@ -1939,7 +1944,7 @@ next_view:
         }
 
         /**
-         * The passed access is intersecting with 'this'
+         * The passed cube is intersecting with 'this'
          */
         inline void
         on_intersect(
@@ -1957,8 +1962,7 @@ next_view:
                 case (Search::Type::SEARCH_FOR_PARTITION):
                 {
                     /* intersecting against 'cube' that had been inserted
-                     * previously, so 'node' must be a sub-block of 'cube'
-                     */
+                     * previously, so 'node' must be a sub-block of 'cube' */
                     assert(cube.includes(node->cube));
                     search.partition.partites.push_back(Partite(&(node->block), node->cube));
                     break ;
@@ -1966,7 +1970,12 @@ next_view:
 
                 case (Search::Type::SEARCH_FOR_BLOCKS):
                 {
-                    search.partition.partites.push_back(Partite(&(node->block), node->cube));
+                    /* the 'cube' may not have been inserted in the memory tree previously */
+                    // TODO: lots of constructor calls here... optimize me
+                    Cube c;
+                    access_t::Cube::intersection(&c, cube, node->cube);
+                    const Partite partite(&(node->block), c);
+                    search.partition.partites.push_back(partite);
                     break ;
                 }
 
