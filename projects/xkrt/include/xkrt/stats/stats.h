@@ -14,7 +14,7 @@
 #ifndef __STATS_H__
 # define __STATS_H__
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # if XKRT_SUPPORT_STATS
 

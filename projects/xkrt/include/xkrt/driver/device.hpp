@@ -16,7 +16,7 @@
 
 # include <stdint.h>    /* uint64_t */
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver-type.h>
 # include <xkrt/logger/todo.h>

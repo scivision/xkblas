@@ -25,7 +25,7 @@
 # include <xkrt/logger/metric.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # include <ze_api.h>
 # include <hwloc/levelzero.h>

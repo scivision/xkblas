@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 23:23:53 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:16:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,7 +31,7 @@ extern "C" {
     /* Deinitialize the runtime interface */
     int xkrt_deinit(xkrt_runtime_t * runtime);
 
-    /* return the number of gpus running */
+    /* return the maximum number of devices available */
     int xkrt_get_ndevices_max(xkrt_runtime_t * runtime, int * count);
 
     //////////////////////
@@ -77,7 +77,6 @@ extern "C" {
         XKRT_DISTRIBUTION_TYPE_CYCLIC2D,
         XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK,
     }               xkrt_distribution_type_t;
-
 
     typedef struct  xkrt_distribution_t
     {

@@ -7,9 +7,17 @@ project(tests)
 
 # list of tests
 set(TEST_SOURCES
-    fib.cc team-cpus.cc xkrt-deinit.cc xkrt-init.cc
-    xkrt-sync.cc xkrt-task-dependency.cc xkrt-task-format.cc
-    xkrt-task-gpu-empty.cc xkrt-task-format-host.cc xkrt-team-device.cc)
+    deinit.cc
+    fib.cc
+    init.cc
+    sync.cc
+    task-dependency.cc
+    task-format-host.cc
+    task-format.cc
+    task-gpu-empty.cc
+    team-cpus.cc
+    team-device.cc
+)
 
 # Loop over each test source file
 foreach(TEST_FILE ${TEST_SOURCES})

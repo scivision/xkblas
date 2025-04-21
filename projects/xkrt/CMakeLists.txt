@@ -27,8 +27,8 @@ option(STRICT "Enable strict compilation mode" ON)
 # XKRT version and supports
 add_custom_command(
     OUTPUT  always-run
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt xkrt-support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt version
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
@@ -38,24 +38,27 @@ add_custom_target(always_generate_files ALL DEPENDS always-run)
 ########
 
 SET(SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/src/cairo.cc
+    ${CMAKE_SOURCE_DIR}/src/driver.cc
+    ${CMAKE_SOURCE_DIR}/src/memory.cc
+    ${CMAKE_SOURCE_DIR}/src/power.cc
+    ${CMAKE_SOURCE_DIR}/src/runtime.cc
+    ${CMAKE_SOURCE_DIR}/src/sched.cc
+    ${CMAKE_SOURCE_DIR}/src/task.cc
     ${CMAKE_SOURCE_DIR}/src/conf/conf.cc
+    ${CMAKE_SOURCE_DIR}/src/debug/cairo.cc
     ${CMAKE_SOURCE_DIR}/src/driver/device.cc
     ${CMAKE_SOURCE_DIR}/src/driver/driver.cc
     ${CMAKE_SOURCE_DIR}/src/driver/stream.cc
     ${CMAKE_SOURCE_DIR}/src/logger/logger.cc
     ${CMAKE_SOURCE_DIR}/src/logger/bits-to-str.cc
     ${CMAKE_SOURCE_DIR}/src/logger/metric.cc
-    ${CMAKE_SOURCE_DIR}/src/runtime.cc
-    ${CMAKE_SOURCE_DIR}/src/runtime-task-submit.cc
-    ${CMAKE_SOURCE_DIR}/src/runtime-sched.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-copy.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-distribute.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-invalidate.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-register.cc
-    ${CMAKE_SOURCE_DIR}/src/memory-replicate.cc
-    ${CMAKE_SOURCE_DIR}/src/stats.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/coherent.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/copy.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/distribute.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/invalidate.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/register.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/replicate.cc
+    ${CMAKE_SOURCE_DIR}/src/stats/stats.cc
     ${CMAKE_SOURCE_DIR}/src/task/task.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
     ${CMAKE_SOURCE_DIR}/src/thread/thread.cc

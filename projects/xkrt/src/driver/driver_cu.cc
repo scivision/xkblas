@@ -18,7 +18,7 @@
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CU_ ## N
 
 # include <xkrt/runtime.h>
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # include <xkrt/driver/device.hpp>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/driver-cu.h>

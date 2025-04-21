@@ -14,7 +14,7 @@
 #ifndef __STREAM_HPP__
 # define __STREAM_HPP__
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # include <xkrt/driver/stream-instruction.h>
 # include <xkrt/driver/stream-type.h>
 # include <xkrt/stats/stats.h>

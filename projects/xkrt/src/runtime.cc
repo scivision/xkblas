@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:50:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 20:49:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,39 +24,6 @@
 # include <signal.h>
 
 # include <hwloc.h>
-
-/////////////////////////////////////////////////////////////////////
-//  All runtimes instances, for cleaning up if crash / interupting //
-/////////////////////////////////////////////////////////////////////
-
-// TODO : cannot do that, runtime may not be reachable memory :-(
-
-static struct {
-    xkrt_runtime_t * list;
-    spinlock_t lock;
-} runtimes;
-
-# if 0
-
-static void
-xkrt_runtimes_cleanup(void)
-{
-    xkrt_runtime_t * runtime = runtimes.list;
-    while (runtime)
-    {
-        xkrt_drivers_deinit(runtime);
-        runtime = runtime->next;
-    }
-}
-
-static void
-xkrt_runtimes_cleanup_signal(int signum)
-{
-    LOGGER_WARN("Caught signal %d, cleaning up...", signum);
-    xkrt_runtimes_cleanup();
-}
-
-# endif
 
 //////////////////////////////
 //  Runtime initialization  //
@@ -104,29 +71,6 @@ xkrt_init(xkrt_runtime_t * runtime)
     xkrt_drivers_init(runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
 
-    // register signal and exit function for cleaning up drivers
-    SPINLOCK_LOCK(runtimes.lock);
-    {
-        if (runtimes.list)
-        {
-            runtimes.list->prev = runtime;
-            runtime->next = runtimes.list;
-            runtime->prev = NULL;
-        }
-        else
-        {
-            runtime->next = NULL;
-            runtime->prev = NULL;
-            # if 0
-            signal(SIGINT,  xkrt_runtimes_cleanup_signal);
-            signal(SIGTERM, xkrt_runtimes_cleanup_signal);
-            atexit(xkrt_runtimes_cleanup);
-            # endif
-        }
-        runtimes.list = runtime;
-    }
-    SPINLOCK_UNLOCK(runtimes.lock);
-
     return 0;
 }
 
@@ -143,15 +87,6 @@ xkrt_deinit(xkrt_runtime_t * runtime)
         xkrt_runtime_stats_report(runtime);
     # endif /* XKRT_SUPPORT_STATS */
 
-    SPINLOCK_LOCK(runtimes.lock);
-    {
-        if (runtimes.list == runtime)
-            runtimes.list = runtime->next;
-        if (runtime->next)
-            runtime->next->prev = NULL;
-    }
-    SPINLOCK_UNLOCK(runtimes.lock);
-
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
     xkrt_drivers_deinit(runtime);
     hwloc_topology_destroy(runtime->topology);
@@ -163,8 +98,6 @@ xkrt_deinit(xkrt_runtime_t * runtime)
 //  Runtime synchronize     //
 //////////////////////////////
 
-# include <xkrt/memory/memory-tree.hpp>
-
 extern "C"
 int
 xkrt_sync(xkrt_runtime_t * runtime)
@@ -172,24 +105,6 @@ xkrt_sync(xkrt_runtime_t * runtime)
     assert(runtime);
     runtime->task_wait();
 
-    # if 0
-    // task dependency graph
-    LOGGER_INFO("Exporting Dependency Tree...");
-    Thread * thread = Thread::self();
-    FILE * f = fopen("tasks.dot", "w");
-    thread->dump_tasks(f);
-    fclose(f);
-    system("dot -Tpdf tasks.dot > tasks.pdf");
-    # endif
-
-# if 0
-    LOGGER_INFO("Exporting memory tree...");
-
-    // memory kinterval btree
-    MemoryTree * memtree = (MemoryTree *) runtime->memcontrollers[0];
-    memtree->export_pdf("memory");
-
-# endif
     return 0;
 }
 

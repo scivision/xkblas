@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # if XKRT_SUPPORT_ZE
 #  include <xkrt/driver/driver-ze.h>
@@ -26,7 +26,7 @@
 # include <xkrt/min-max.h>
 # include <xkrt/memory/access.hpp>
 # include <xkrt/memory/cache-line-size.hpp>
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # include <cassert>
 

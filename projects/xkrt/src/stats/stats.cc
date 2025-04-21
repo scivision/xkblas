@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # if XKRT_SUPPORT_STATS
 
 # include <xkrt/runtime.h>

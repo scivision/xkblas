@@ -17,7 +17,7 @@
 # include "xkblas/cblas.h"
 # include "xkblas/xkblas-experimental.h"
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/min-max.h>

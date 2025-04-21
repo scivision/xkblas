@@ -14,7 +14,7 @@
 #ifndef __XKRT_CAIRO_H__
 # define __XKRT_CAIRO_H__
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # if XKRT_SUPPORT_CAIRO
 void xkrt_cairo_memory_trees(xkrt_runtime_t * runtime);

@@ -18,7 +18,7 @@
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
 
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 
 # include <ze_api.h>
 # if XKRT_SUPPORT_SYCL

@@ -15,7 +15,7 @@
 # pragma message(TODO "Should we instead use an abstract interface on a specific device ? to fallback onto the driver")
 
 # include <xkrt/xkrt.h>
-# include <xkrt/xkrt-support.h>
+# include <xkrt/support.h>
 # if XKRT_SUPPORT_CUDA
 #  include <cuda_runtime.h>
 # endif /* XKRT_SUPPORT_CUDA */
