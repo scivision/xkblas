@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/12 21:51:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:55:04 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,8 +17,6 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/driver/stream.h>
 # include <xkrt/logger/todo.h>
-
-# pragma message(TODO "Make 'init' and 'deinit' methods too ? They are used by drivers, idk if we want C++ drivers...")
 
 const char *
 xkrt_stream_type_to_str(xkrt_stream_type_t type)
@@ -64,9 +62,6 @@ xkrt_stream_instruction_queue_init(
     queue->pos.w = 0;
 }
 
-// TODO : move methods to the driver instead
-
-# pragma message(TODO "Implement and use constructors instead of this routine")
 void
 xkrt_stream_init(
     xkrt_stream_t * stream,

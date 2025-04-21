@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/02 22:50:29 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:58:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,8 +18,6 @@
 
 # include <xkrt/logger/todo.h>
 # include <xkrt/driver/stream.h>
-
-# pragma message(TODO "Rename 'cuda' conf variables to something vendor-agnostic")
 
 //////////////////
 //  DEVICE CONF //

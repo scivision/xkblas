@@ -1,19 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   memory-register.cc                                                       */
+/*   register.cc                                                              */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/24 22:16:02 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:57:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/logger/todo.h>
-# pragma message(TODO "Replace uint64_t with size_t")
-
 # include <xkrt/runtime.h>
 
 //  Some ideas:
@@ -25,7 +23,7 @@
 
 extern "C"
 int
-xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
+xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
     for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
     {
@@ -42,7 +40,7 @@ xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
 
 extern "C"
 int
-xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
+xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
     for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
     {
@@ -58,15 +56,15 @@ xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
 }
 
 extern "C"
-uint64_t
-xkrt_memory_register_async(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
+size_t
+xkrt_memory_register_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
     return xkrt_memory_register(runtime, ptr, size); // not async for now
 }
 
 extern "C"
 int
-xkrt_memory_unregister_async(xkrt_runtime_t * runtime, void * ptr, uint64_t size)
+xkrt_memory_unregister_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
     return xkrt_memory_unregister(runtime, ptr, size); // not async for now
 }

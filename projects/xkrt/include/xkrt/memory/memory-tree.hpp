@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 03:01:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:22:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -36,7 +36,7 @@
 
 /*
  *  Set to '1' to enable the following heuristic :
- *      If some memory is not valid on any devices, but a device A is already
+ *      If some memory is not coherent on any devices, but a device A is already
  *      fetching it, then if a device B wants to fetch concurrently, it defer
  *      the fetch to a D2D A->B submitted when A fetched.
  *
@@ -52,15 +52,9 @@
  */
 # define USE_D2D_FORWARDING 1
 
-# pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking issues + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
+# pragma message(TODO "Memory allocation is currently performed within a critical section... If memory eviction must be performed, this creates double-locking + a lot of time spent in the critical section. Reason is : we need a partition (in the memory tree) of the access to write the allocation information on each block of the partition")
 
-# pragma message(TODO "'fetch' implementation could be optimize by reducing critical sections")
-
-# pragma message(TODO "merge 'Replicate' on continuous "        \
-        "memory addresses - for now, just perform one data "    \
-        "transfer per block")
-
-# pragma message(TODO "Nest classes into a 'KMemory' templated class - corresponding to a global view of the memory in 'K' dimensions")
+# pragma message(TODO "'fetch' implementation should be optimize by reducing critical sections to the minimum number of instructions. We could also consider making the structure lock-free but im concerned of actual performances (will lead to a lot of false-sharing...)")
 
 # define MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX   (8)
 # define MEMORY_REPLICATE_ALLOCATION_VIEW_NONE   (MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
@@ -197,8 +191,8 @@ class KMemoryReplicate
         MemoryReplicateAllocationView * allocations[MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX];
         volatile memory_allocation_view_id_t nallocations;
 
-        /* valid allocations */
-        volatile memory_allocation_view_id_bitfield_t valid;
+        /* coherent allocations */
+        volatile memory_allocation_view_id_bitfield_t coherency;
 
         /* fetching allocations */
         volatile memory_allocation_view_id_bitfield_t fetching;
@@ -206,7 +200,7 @@ class KMemoryReplicate
         static_assert(sizeof(memory_allocation_view_id_bitfield_t) * 8 >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX);
 
     public:
-        KMemoryReplicate() : allocations(), nallocations(0), valid(0), fetching(0) {}
+        KMemoryReplicate() : allocations(), nallocations(0), coherency(0), fetching(0) {}
         KMemoryReplicate(const KMemoryReplicate & r)
         {
             (void) r;
@@ -229,18 +223,18 @@ class KMemoryBlock {
         /* per device replicate info */
         MemoryReplicate replicates[XKRT_DEVICES_MAX];
 
-        /* valid devices (i.e. devices with at least one valid allocation) */
-        volatile xkrt_device_global_id_bitfield_t valid;
+        /* coherent devices (i.e. devices with at least one coherent allocation) */
+        volatile xkrt_device_global_id_bitfield_t coherency;
 
         /* fetching devices (i.e. devices with at least one fetching allocation) */
         volatile xkrt_device_global_id_bitfield_t fetching;
 
     public:
 
-        /* a new memory block, assume it is valid on the host */
+        /* a new memory block, assume it is coherent on the host */
         KMemoryBlock() :
             replicates(),
-            valid(0),
+            coherency(0),
             fetching(0)
         {}
 
@@ -284,16 +278,16 @@ class KMemoryBlock {
                     // allocation->awaiting must remain empty, tasks will be notified through the shrinked block
                 }
 
-                // dupplicate fetching / valid infos
-                replicate->fetching = inheriting_replicate->fetching;
-                replicate->valid    = inheriting_replicate->valid;
+                // dupplicate fetching / coherency infos
+                replicate->fetching  = inheriting_replicate->fetching;
+                replicate->coherency = inheriting_replicate->coherency;
             }
 
             //////////////////////////////
             //  VALID BITS ARE STILL OK //
             //////////////////////////////
 
-            this->valid = inheriting_block.valid;
+            this->coherency = inheriting_block.coherency;
             this->fetching = inheriting_block.fetching;
         }
 
@@ -455,7 +449,7 @@ class KMemoryTreeNodeSearch {
        /* type of search performing */
        Type type;
 
-        /* device global id, on which we are looking for invalid blocks or validating blocks */
+        /* device global id, on which we are looking for coherent blocks or making coherent blocks */
        const xkrt_device_global_id_t device_global_id;
 
        //////////////////////////////////////////////////////
@@ -617,9 +611,9 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
             for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
             {
                 const int devbit = (1 << device_global_id);
-                fprintf(f, "\\\\ dev %d - valid=%d",
+                fprintf(f, "\\\\ dev %d - coherent=%d",
                     device_global_id,
-                    this->block.valid & devbit ? 1 : 0
+                    this->block.coherency & devbit ? 1 : 0
                 );
             }
         }
@@ -748,47 +742,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 this->pending.fetch_add(inc, std::memory_order_relaxed);
             }
 
-            inline bool
-            fetches_are_continuous(int i, int j)
-            {
-                const fetch_t * fi = this->fetches + i;
-                const fetch_t * fj = this->fetches + j;
-
-
-
-                LOGGER_FATAL("IMPL ME");
-                return fj->src_view.addr - fi->src_view.addr   == fj->dst_view.addr - fi->dst_view.addr;
-            }
-
-            inline bool
-            fetches_merge(int i, int j)
-            {
-                assert(fetches_are_continuous(i, j));
-
-                fetch_t * fi = this->fetches + i;
-                fetch_t * fj = this->fetches + j;
-
-                assert(fi->merged == false);
-                fj->merged = true;
-
-                /* remember: the list is a partition */
-                assert(!fi->cubes[0].is_empty());
-                assert(!fj->cubes[0].is_empty());
-                assert( fi->cubes[1].is_empty());
-                assert( fj->cubes[1].is_empty());
-
-                LOGGER_FATAL("TODO: MERGE");
-
-                # if 0
-                /* create the merged memory-host view from the two cubes */
-                memory_view_from_cubes<K>(fi->host_view, fi->cubes[0], fk->cubes[0], fi->host_view.ld, fi->host_view.sizeof_type);
-
-                /* copy the second cube */
-                // memory_view_to_cubes<K>(fi->host_view, fi->cubes); // this can be optimized by simply copying fk->cubes[0] , right ?
-                fi->cubes[1] = fk->cubes[0];
-                # endif
-            }
-
         }               fetch_list_t;
 
         /* if merging is enabled, merge consecutive transfers to a single transfer */
@@ -827,7 +780,11 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             std::vector<int> indices(n);
             std::iota(indices.begin(), indices.end(), 0);
 
-            # pragma message(TODO "Do we really need that sort here ? Or can we (are we already?) traverse the KHP Tree so that it is already sorted")
+            // Sadly, we need to sort here.
+            // Even though data are partially ordered in the KHP tree, the search does not necessarily creates a sorted list.
+            // To remove the 'sort' here, the best way might be to implement a
+            // 'sorted-search' in the KHP-Tree, that search intersecting nodes in-order (left-to-right, bottom-to-top)
+
             /* sort the vector so fetches[indices[i]] < fetches[indices[i+1]] in memory */
             std::sort(
                 std::begin(indices),
@@ -1101,8 +1058,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             {
                 MemoryBlock * block = partite.block;
 
-                /* not valid on any device, then assume valid on the host */
-                if (block->valid == 0)
+                /* not coherent on any device, then assume coherent on the host */
+                if (block->coherency == 0)
                 {
                     partite.must_fetch = false;
                     continue ;
@@ -1112,25 +1069,25 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                 // SRC - FIND BEST SRC //
                 /////////////////////////
 
-                // take first valid device, and first valid allocation for all partites,
+                // take first device with a coherent replicate, and the first coherent allocation for all partites,
                 // so continuous partites are on the same device and allocation
                 // for merging them later
 
-                // xkrt_device_global_id_t src = __random_set_bit(partite.block->valid) - 1;
-                xkrt_device_global_id_t src = (xkrt_device_global_id_t) (__builtin_ffs(partite.block->valid) - 1);
+                // xkrt_device_global_id_t src = __random_set_bit(partite.block->coherency) - 1;
+                xkrt_device_global_id_t src = (xkrt_device_global_id_t) (__builtin_ffs(partite.block->coherency) - 1);
                 assert(src >= 0);
 
-                // Get a valid allocation on that device
+                // Get a coherent allocation on that device
                 MemoryReplicate & src_replicate = partite.block->replicates[src];
                 assert(src_replicate.nallocations > 0);
-                assert(src_replicate.valid);
+                assert(src_replicate.coherency);
 
                 # if 0
-                // Heuristic : get the first valid
-                const memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
+                // Heuristic : get the first coherent
+                const memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.coherency) - 1);
                 assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
                 # else
-                // Heuristic: use the largest valid allocation on that device to reduce D2D copies when trying to merge later
+                // Heuristic: use the largest coherent allocation on that device to reduce D2D copies when trying to merge later
                 memory_allocation_view_id_t src_allocation_view_id = 0;
                 for (memory_allocation_view_id_t allocation_view_id = 1 ; allocation_view_id < src_replicate.nallocations ; ++allocation_view_id)
                 {
@@ -1163,8 +1120,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         fetch_list_to_host(
             access_t * access
         ) {
-            # pragma message(TODO "merge continuous partites using the same 'chunk'")
-
             Search search(HOST_DEVICE_GLOBAL_ID);
             this->lock();
             {
@@ -1214,15 +1169,15 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
                 const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
 
-                const bool valid_on_any_device        = block.valid != 0;
-                const bool valid_on_device            = block.valid &  devbit;
-                const bool valid_on_any_other_devices = block.valid & ~devbit;
+                const bool coherent_on_any_device        = block.coherency != 0;
+                const bool coherent_on_device            = block.coherency &  devbit;
+                const bool coherent_on_any_other_devices = block.coherency & ~devbit;
 
                 MemoryReplicate & replicate = block.replicates[device_global_id];
                 if (replicate.fetching)
                     return ;
 
-                if (!valid_on_any_device || valid_on_any_other_devices)
+                if (!coherent_on_any_device || coherent_on_any_other_devices)
                 {
                     /* evict all allocations */
                     for (int i = 0 ; i < replicate.nallocations ; ++i)
@@ -1240,25 +1195,24 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
                         /* else: what to do ? */
                         else
                         {
-                            // LOGGER_FATAL("Couldn't evict a chunk that is used in several allocation view - valid_on_any_device=%d, valid_on_any_other_devices=%d", valid_on_any_device, valid_on_any_other_devices);
+                            // LOGGER_FATAL("Couldn't evict a chunk that is used in several allocation view - coherent_on_any_device=%d, coherent_on_any_other_devices=%d", coherent_on_any_device, coherent_on_any_other_devices);
                         }
 
                         // delete allocation;
                     }
                     replicate.nallocations  = 0;
-                    replicate.valid         = 0;
+                    replicate.coherency     = 0;
                     assert(replicate.fetching == 0);
 
-                    block.valid &= (memory_allocation_view_id_bitfield_t) ~devbit;
+                    block.coherency &= (memory_allocation_view_id_bitfield_t) ~devbit;
 
-                    stop = freed >= 2*size;
+                    stop = freed >= 16*size;
                     // stop = false;
                 }
-                else if (valid_on_device && replicate.nallocations > 1)
+                else if (coherent_on_device && replicate.nallocations > 1)
                 {
-                    // TODO : only keep 1 valid allocation
-                    LOGGER_FATAL("valid_on_device=%d, nallocations=%d",
-                            valid_on_device, replicate.nallocations);
+                    // TODO : only keep 1 coherent allocation
+                    LOGGER_FATAL("coherent_on_device=%d, nallocations=%d", coherent_on_device, replicate.nallocations);
                 }
             };
 
@@ -1274,9 +1228,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             // Allocate a new chunk //
             //////////////////////////
 
-            # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
             const size_t size = access->host_view.m * access->host_view.n * access->host_view.sizeof_type;
-
             xkrt_area_chunk_t * chunk = nullptr;
             int retry_cnt = 0;
 
@@ -1312,7 +1264,6 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
 
             /* allocate continuous memory for that access */
             # pragma message(TODO "Can we manage row/col major in a better way ? hardcoded col major here for cuda")
-
             const size_t          ld = access->host_view.m;            // cuda is col major
             const size_t sizeof_type = access->host_view.sizeof_type;
 
@@ -1471,15 +1422,15 @@ next_view:
                     assert(dst_allocation_view_id != MEMORY_REPLICATE_ALLOCATION_VIEW_NONE);
                     const memory_allocation_view_id_bitfield_t dst_allocbit = (memory_allocation_view_id_bitfield_t) (1 << dst_allocation_view_id);
 
-                    /* partite and its view are already valid on that device */
+                    /* partite and its view are already coherent on that device */
                     MemoryReplicate & dst_replicate = partite.block->replicates[device_global_id];
-                    if (dst_replicate.valid & dst_allocbit)
+                    if (dst_replicate.coherency & dst_allocbit)
                     {
                         partite.must_fetch = false;
                         continue ;
                     }
 
-                    /* retrieve the invalid view */
+                    /* retrieve an incoherent allocation view */
                     MemoryReplicateAllocationView * dst_allocation_view = dst_replicate.allocations[dst_allocation_view_id];
 
                     /* increment task fetch counter */
@@ -1508,11 +1459,11 @@ next_view:
                     ///////////////
 
                     // find source:
-                    //  - if its already valid on a device, use it as a source
+                    //  - if its already coherent on a device, use it as a source
                     //  - else, its already transfering to any device, wait for it and forward using D2D
                     //  - else, transfer H2D
 
-                    if (partite.block->valid)
+                    if (partite.block->coherency)
                     {
                         partite.must_fetch = true;
 
@@ -1520,18 +1471,18 @@ next_view:
                         partite.dst_device_global_id = device_global_id;
                         partite.dst_view = dst_allocation_view->view;
 
-                        /* get a valid source */
-                        xkrt_device_global_id_t src = this->runtime->router.get_source(device_global_id, partite.block->valid);
-                        assert(partite.block->valid & (1 << src));
+                        /* get a coherent source */
+                        xkrt_device_global_id_t src = this->runtime->router.get_source(device_global_id, partite.block->coherency);
+                        assert(partite.block->coherency & (1 << src));
 
-                        /* Get the first valid allocation on that device */
+                        /* Get the first coherent allocation on that device */
                         MemoryReplicate & src_replicate = partite.block->replicates[src];
                         assert(src_replicate.nallocations > 0);
-                        assert(src_replicate.valid);
+                        assert(src_replicate.coherency);
 
-                        # pragma message(TODO "Instead of getting the first valid, maybe get the LARGEST valid, so we maximize odds to merge with future allocations (the logic is not implemented yet, though)")
-                        memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.valid) - 1);
-                        assert(src_replicate.valid & (1 << src_allocation_view_id));
+                        # pragma message(TODO "Instead of getting the first coherent, maybe get the LARGEST coherent, so we maximize odds to merge with future allocations")
+                        memory_allocation_view_id_t src_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(src_replicate.coherency) - 1);
+                        assert(src_replicate.coherency & (1 << src_allocation_view_id));
                         assert(0 <= src_allocation_view_id && src_allocation_view_id < src_replicate.nallocations);
 
                         /* Retrieve and set src view infos */
@@ -1558,8 +1509,8 @@ next_view:
                         MemoryReplicate & fetching_replicate = partite.block->replicates[fetching_device_global_id];
                         assert(fetching_replicate.fetching);
 
-                        // TODO : maybe there is several fetching alloc ?
-                        // in such case, which one to pick ? currently select the first one
+                        // Maybe there is several fetching alloc ? in such case, which one to pick ?
+                        // Currently select the first one
                         memory_allocation_view_id_t fetching_allocation_view_id = (memory_allocation_view_id_t) (__builtin_ffs(fetching_replicate.fetching) - 1);
                         assert(0 <= fetching_allocation_view_id && fetching_allocation_view_id < fetching_replicate.nallocations);
                         assert(fetching_replicate.fetching & (1 << fetching_allocation_view_id));
@@ -1576,7 +1527,7 @@ next_view:
                     # endif /* USE_D2D_FORWARDING */
                     else
                     {
-                        assert(!partite.block->valid);
+                        assert(!partite.block->coherency);
                         # if USE_D2D_FORWARDING
                         assert(!partite.block->fetching);
                         # endif /* !USE_D2D_FORWARDING */
@@ -1587,7 +1538,7 @@ next_view:
                         partite.dst_device_global_id = device_global_id;
                         partite.dst_view = dst_allocation_view->view;
 
-                        /* using host as src, which is assumed valid */
+                        /* using host as src, which is assumed coherent */
                         partite.src_device_global_id    = HOST_DEVICE_GLOBAL_ID;
                         partite.src_allocation_view_id  = MEMORY_REPLICATE_ALLOCATION_VIEW_NONE;
                     }
@@ -1607,14 +1558,14 @@ next_view:
         }
 
         inline void
-        fetch_access_set_valid(
+        fetch_access_set_coherent(
             access_t * access,
             xkrt_device_global_id_t device_global_id,
             Partition & partition
         ) {
             assert(this->is_locked());
 
-            /* if access has a write mode, invalidate all copies */
+            /* if access has a write mode, make all copies incoherent */
             if (access->mode & ACCESS_MODE_W)
             {
                 const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
@@ -1622,22 +1573,22 @@ next_view:
                 {
                     const memory_allocation_view_id_bitfield_t allocbit = (memory_allocation_view_id_bitfield_t) (1 << partite.dst_allocation_view_id);
 
-                    /* invalidate all replicates */
-                    # pragma message(TODO "Can validity be managed in a more lazy way ?")
+                    /* make all replicates incoherent */
+                    # pragma message(TODO "Can coherency be managed in a lazier way ?")
                     for (xkrt_device_global_id_t device_global_id = 0 ;
                             device_global_id < XKRT_DEVICES_MAX ;
                             ++device_global_id)
                     {
                         MemoryReplicate & replicate = partite.block->replicates[device_global_id];
-                        replicate.valid = 0;
+                        replicate.coherency = 0;
                     }
-                    partite.block->valid = 0;
+                    partite.block->coherency = 0;
 
-                    /* There is no concurrent access anyway, so make data valid now
-                     * (even though the kernel has not executed, and the data is not rigourously valid yet) */
+                    /* There is no concurrent access anyway, so make memory coherent now
+                     * (even though the kernel has not executed, and the data is not rigourously coherent yet) */
                     MemoryReplicate & replicate = partite.block->replicates[device_global_id];
-                    replicate.valid = allocbit;
-                    partite.block->valid = devbit;
+                    replicate.coherency = allocbit;
+                    partite.block->coherency = devbit;
                 }
             }
         }
@@ -1739,8 +1690,8 @@ next_view:
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
                 this->fetch_access_setup_copies(task, access, device_global_id, search.partition);
 
-                /* step (6) if write access, invalidate other copies */
-                this->fetch_access_set_valid(access, device_global_id, search.partition);
+                /* step (6) if write access, make all other replicates incoherent */
+                this->fetch_access_set_coherent(access, device_global_id, search.partition);
 
             } /* this->lock(); */
             this->unlock();
@@ -1752,7 +1703,6 @@ next_view:
             return list;
         }
 
-        // TODO : remove the task parameter, as it is now implicit with the given access
         /** Fetch the access on the given device */
         void
         fetch(
@@ -1938,7 +1888,7 @@ next_view:
             (void) search;
             (void) cube;
 
-            // TODO : can we fasten intersection by keeping track of an included 'valid' bitmask ?
+            // TODO : can we fasten intersection by keeping track of an included 'coherency' bitmask ?
 
             return false;
         }
@@ -2010,12 +1960,12 @@ next_view:
                             );
                             allocation_view->awaiting.forwards.clear();
 
-                            /* this replicate just got fetched and is now valid */
+                            /* this replicate just got fetched and is now coherent */
 
                             // this assertion is not always true, if coming from
-                            // an ACCESS_MODE_W, the data was already set valid
-                            // assert((replicate.valid & allocbit) == 0);
-                            replicate.valid |= (memory_allocation_view_id_bitfield_t) allocbit;
+                            // an ACCESS_MODE_W, the data was already set coherent
+                            // assert((replicate.coherency & allocbit) == 0);
+                            replicate.coherency |= (memory_allocation_view_id_bitfield_t) allocbit;
 
                             assert(replicate.fetching & allocbit);
                             replicate.fetching &= (memory_allocation_view_id_bitfield_t) ~allocbit;
@@ -2025,8 +1975,8 @@ next_view:
                     }
 
                     /* set device bits */
-                    assert(replicate.valid);
-                    node->block.valid |= devbit;
+                    assert(replicate.coherency);
+                    node->block.coherency |= devbit;
 
                     if (replicate.fetching == 0)
                         node->block.fetching &= ~devbit;
@@ -2041,7 +1991,7 @@ next_view:
                     Cube::intersection(&intersect, cube, node->cube);
                     const size_t bytes = intersect.size();
                     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
-                        if (node->block.valid & (1 << device_global_id))
+                        if (node->block.coherency & (1 << device_global_id))
                             search.bytes_owned[device_global_id] += bytes;
                     break ;
                 }

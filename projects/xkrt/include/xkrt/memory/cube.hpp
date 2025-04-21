@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:35:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:59:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,8 +23,6 @@
 # include <ostream>
 # include <iostream>
 # include <cstring>
-
-// TODO : ensure loops are enrolled, else use constexpr recursive
 
 /* K is the number of dimensions */
 template<int K>
@@ -59,14 +57,12 @@ class KCube {
         void
         set_list(const Interval src[K])
         {
-            // TODO : I'd rather memcpy the whole thing
+            // TODO : I'd rather memcpy the whole thing, but not standard c++
             # if 0
             memcpy(this->list, src, sizeof(this->list));
             # else
             for (int k = 0 ; k < K ; ++k)
-            {
                 this->list[k] = src[k];
-            }
             # endif
         }
 

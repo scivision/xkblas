@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 20:57:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:55:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,8 +32,6 @@
 #  define _GNU_SOURCE
 # endif /* _GNU_SOURCE */
 # include <sched.h> /* getcpu */
-
-# pragma message(TODO "Move these initializer into class member functions")
 
 /////////////////////////
 //  DEVICE PROGRESSION //
@@ -133,9 +131,6 @@ xkrt_device_thread_main(
     xkrt_team_t * team,
     xkrt_thread_t * thread
 ) {
-    // xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id)
-    # pragma message(TODO "Implement device thread")
-
     // unpack args
     xkrt_device_team_args_t * args = (xkrt_device_team_args_t *) team->desc.args;
     assert(args);

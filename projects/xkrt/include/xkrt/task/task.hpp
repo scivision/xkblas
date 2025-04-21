@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:27:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:19:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -87,7 +87,7 @@ typedef enum    task_flags_t
     TASK_FLAG_DEVICE        = (1 << 2), // task task may execute on a device
     TASK_FLAG_DOMAIN        = (1 << 3), // if this task may have dependent children tasks - in such case, it will have a dependency and a memory domain
 
-    // TODO : support me in the future
+    // support me in the future
   // TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
   // TASK_FLAG_PERSISTENT    = (1 << 5), // persistence
 
@@ -170,12 +170,10 @@ typedef struct  task_det_info_t
 
 typedef struct  task_dev_info_t
 {
-    // TODO : targeted_device_id and ocr_access_index could share bits, because if 'targeted_device_id' is set, then 'ocr' is ignored
-
     /* worker id on where to schedule once ready (or 'UNSPECIFIED_DEVICE_GLOBAL_ID' if leaving the decision to the scheduler) */
     xkrt_device_global_id_t targeted_device_id;
 
-    // TODO : the 'ocr' field could be removed for tasks with no accesses
+    // TODO : move the 'ocr' field to the 'dep_info' : it is tight to accesses, not to a device
 
     /* execute on the device that owns a copy of the access at accesses[ocr_access_index]
      * If 'UNSPECIFIED_TASK_ACCESS', leave the decision to the scheduler */

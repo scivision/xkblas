@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:05:49 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:21:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -244,7 +244,7 @@ typedef struct  xkrt_thread_t
             // 1) we assume that all accesses use that same dependency domain
             // 2) C++ pure virtual function cannot be templated. To still
             //    benefits from compile-time optimization, we force the casting to
-            //    a DependencyTree, as it is the only DependencyDomain currently.
+            //    a DependencyTree, as it is the only DependencyDomain implemented currently.
             DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
             tree->resolve<AC>(accesses);
         }
@@ -260,11 +260,6 @@ typedef struct  xkrt_thread_t
             assert(task->flags & TASK_FLAG_DEPENDENT);
             assert(AC > 0);
 
-            // TODO
-            // 1) we assume that all accesses use that same dependency domain
-            // 2) C++ pure virtual function cannot be templated. To still
-            //    benefits from compile-time optimization, we force the casting to
-            //    a DependencyTree, as it is the only DependencyDomain currently.
             DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
             tree->insert<AC>(accesses);
         }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 00:11:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:49:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -323,8 +323,6 @@ xkrt_device_t::offloader_stream_instructions_launch(
     uint8_t device_tid,
     const xkrt_stream_type_t stype
 ) {
-    # pragma message(TODO "Better handling of error in case 'STREAM_ALL'")
-
     int err = 0;
 
     unsigned int bgn = (stype == XKRT_STREAM_TYPE_ALL) ?                    0 : stype;
@@ -337,14 +335,19 @@ xkrt_device_t::offloader_stream_instructions_launch(
             assert(stream);
 
             stream->lock();
-            err = stream->launch_ready_instructions();
+            int r = stream->launch_ready_instructions();
             stream->unlock();
 
             switch (err)
             {
                 case (0):
-                case (EINPROGRESS):
                     break ;
+
+                case (EINPROGRESS):
+                {
+                    err = EINPROGRESS;
+                    break ;
+                }
 
                 case (ENOSYS):
                 {

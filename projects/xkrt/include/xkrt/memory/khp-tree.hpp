@@ -5,22 +5,15 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 20:23:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:02:00 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 // TODO PERFORMANCES IDEA
-//  - when inserting, it currently queue tasks to propagates 'includes' info before returning doing a bottom-up traversal
-//    Instead, 'includes' info could be updated when
-//      - 'going-down' during the insertion,
-//      - 'rotating'
-//    so there is no need for the bottom-up traversal...
-//
+//  - read-only references when possible, lots of 'Cube' copies atm
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
-//
-//  - check loop unrolling
 
 #ifndef __KHP_TREE_H__
 # define __KHP_TREE_H__
@@ -1379,8 +1372,10 @@ class KHPTree {
             int height    = this->height();
             int nelements = this->size();
             int ideal_height = khp_log2(nelements + 1);
-            // tassert(height < 8 || height < 2 * K * ideal_height); // TODO : cut condition
-            tassert(height <= 2 * K * ideal_height);
+            if constexpr(CUT)
+                tassert(height <  2 * K * ideal_height || height < 8);
+            else
+                tassert(height <= 2 * K * ideal_height);
         }
 
         void

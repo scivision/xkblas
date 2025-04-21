@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:31:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:54:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -416,9 +416,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         default:
             return EINVAL;
     }
-
-    // TODO : how to use this ?
-    // ZE_SAFE_CALL(zeCommandListAppendEventReset(stream->ze.command.list, ze_event_handle));
 
     return err;
 }

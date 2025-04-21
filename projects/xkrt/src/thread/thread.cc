@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/10 18:12:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:55:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -301,7 +301,7 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
     memset(&team->priv, 0, sizeof(team->priv));
 
     // allocate thread array
-    const int nthreads = team->desc.nthreads;   // TODO : this should be a func of the team desc
+    const int nthreads = team->desc.nthreads;
     assert(nthreads);
     team->priv.nthreads = nthreads;
     team->priv.threads = (xkrt_thread_t *) calloc(team->priv.nthreads, sizeof(xkrt_thread_t));

@@ -1,11 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   memory-distribute.cc                                                     */
+/*   distribute.cc                                                            */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 23:26:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:57:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,8 +43,8 @@ xkrt_distribution_init(
     {
         case (XKRT_DISTRIBUTION_TYPE_CYCLIC2D):
         {
-                // nothing to do
-                break ;
+            // nothing to do
+            break ;
         }
 
         case (XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK):

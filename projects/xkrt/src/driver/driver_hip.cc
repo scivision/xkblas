@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:53:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:53:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,7 +25,7 @@
 # include <xkrt/sync/mutex.h>
 
 # include <hip/hip_runtime.h>
-// # include <hipblas.h>         // TODO : should cublas be part of xkrt's driver ? or as part of xkblas ?
+// # include <hipblas.h>
 # include <hwloc.h>
 # include <hwloc/rsmi.h>
 # include <hwloc/glibc-sched.h>
@@ -166,8 +166,6 @@ __get_gpu_topo(void)
         }
     }
 
-    #pragma message(TODO "Not sure to get all the logic here")
-
     /* if there is no link, set to the minmum perf */
     ++min_perf;
     for (int i = 0 ; i < hip_device_count*hip_device_count ; ++i)
@@ -306,50 +304,6 @@ XKRT_DRIVER_ENTRYPOINT(device_destroy)(xkrt_device_t * device)
     free(device);
     return 0;
 }
-
-# if 0
-
-/**
- * @params
- *      'dst_global_id' is where to send the data
- *      'valid'         is a bitmask of 'device_global_id' where '1' means the device holds valid data
- *  @return
- *      the source device to use for a valid transfer
- */
-static xkrt_device_global_id_t
-XKRT_DRIVER_ENTRYPOINT(get_source)(
-    xkrt_device_global_id_t dst_global_id,
-    xkrt_device_global_id_bitfield_t bitfield
-) {
-    # pragma message(TODO "Improve this heuristic, naive currently")
-
-    assert(bitfield);
-
-    /* retrieve dst device */
-    xkrt_device_hip_t * device = (xkrt_device_hip_t *) xkrt_device_get(dst_global_id);
-    assert(device);
-
-    /* fast way out: good on that device already */
-    if (bitfield & (1 << dst_global_id))
-        return dst_global_id;
-
-    /* lowest rank <=> best performance - find a device for P2P transfer with most perf */
-    for (int rank = 0 ; rank < hip_count_perfrank -1 ; ++rank)
-    {
-        /* get valid devices for this affinity */
-        const xkrt_device_global_id_bitfield_t mask = bitfield & device->affinity[rank];
-        if (mask == 0)
-            continue ;
-
-        /* return a random device with this affinity */
-        return (xkrt_device_global_id_t) (__random_set_bit(mask) - 1);
-    }
-
-    /* no nvlink, get any random device */
-    return (xkrt_device_global_id_t) (__random_set_bit(bitfield) - 1);
-}
-
-# endif
 
 /* Called for each device of the driver once they all have been initialized */
 static int

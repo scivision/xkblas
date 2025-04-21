@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:16:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:21:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __XKRT_H__
 # define __XKRT_H__
 
-// TODO : This file should become the C interface of XKaapi
+// TODO : xkrt.h should become the C interface of XKaapi
 
 // TODO : this include the whole world, including C++ this is bad
 # include <xkrt/runtime.h>

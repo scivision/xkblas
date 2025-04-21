@@ -5,14 +5,12 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:34:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:53:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-// TODO
-// Reimplement using only Cuda's driver API
 // https://docs.nvidia.com/cu/cu-driver-api/
 
 # define XKRT_DRIVER_ENTRYPOINT(N) XKRT_DRIVER_TYPE_CU_ ## N
@@ -31,7 +29,7 @@
 # include <xkrt/sync/mutex.h>
 
 # include <cuda.h>
-# include <cublas_v2.h>         // TODO : should cublas be part of xkrt's driver ? or as part of xkblas ?
+# include <cublas_v2.h>
 
 # if XKRT_SUPPORT_NVML
 #  include <nvml.h>
@@ -148,8 +146,6 @@ get_gpu_topo(int ndevices)
         }
     }
 
-    #pragma message(TODO "Not sure to get all the logic here")
-
     /* if there is no link, set to the minmum perf */
     ++min_perf;
     for (int i = 0 ; i < cu_device_count*cu_device_count ; ++i)
@@ -212,6 +208,8 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
     # if XKRT_SUPPORT_NVML
     NVML_SAFE_CALL(nvmlInit());
 
+    // TODO : that shit may allow to control nvlink power use, could be interesting in the future
+
     // NVML_GPU_NVLINK_BW_MODE_FULL      = 0x0
     // NVML_GPU_NVLINK_BW_MODE_OFF       = 0x1
     // NVML_GPU_NVLINK_BW_MODE_MIN       = 0x2
@@ -219,6 +217,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
     // NVML_GPU_NVLINK_BW_MODE_3QUARTER  = 0x4
     // NVML_GPU_NVLINK_BW_MODE_COUNT     = 0x5
     // TODO NVML_SAFE_CALL(nvmlSystemSetNvlinkBwMode(0x3));
+
     # endif /* XKRT_SUPPORT_NVML */
 
     return 0;

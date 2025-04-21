@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 23:53:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 21:51:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,7 +48,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     // SET MEMBERS
     memset(runtime->drivers.list, 0, sizeof(runtime->drivers.list));
     memset(runtime->drivers.devices.list, 0, sizeof(runtime->drivers.devices.list));
-    runtime->drivers.devices.next_id = 1;   // host device is always 0
+    runtime->drivers.devices.next_id = 1;                                                   // host device is always 0
     runtime->drivers.devices.n = 0;
     runtime->drivers.devices.round_robin_device_global_id = 0;
 
@@ -144,7 +144,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
                     LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
                 else
                 {
-                    // TODO : save device info and pass it to forked thread
                     args.devices[ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
                     args.devices[ndevices].device_driver_id = i;
                     ++ndevices;
@@ -165,7 +164,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     }
     LOGGER_INFO("Found %d devices (with %d requested)", ndevices, ndevices_requested);
 
-    // TODO : wait for all threads to start
     runtime->drivers.devices.team.desc.routine              = xkrt_device_thread_main;
     runtime->drivers.devices.team.desc.args                 = &args;
     runtime->drivers.devices.team.desc.nthreads             = ndevices * nthreads_per_device;
