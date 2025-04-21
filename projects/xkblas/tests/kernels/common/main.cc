@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 23:09:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 00:20:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -93,9 +93,9 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
         }
 
         matrices[i] = M;
+        FILL((TYPE *)M, ld*ld);
+        assert(M + ld*ld <= mem + memsize);
     }
-
-    FILL((TYPE *)mem, memsize/s);
 }
 
 // GEMM - GEMM //
@@ -490,40 +490,42 @@ main_mumps(char ** args)
 
     bool should_copy = true;
     int * IW = NULL;
+    uint64_t tt0;
 
     /* parse arguments */
     int  Ix = atoi(args[0]);
-    uint64_t t0 = get_nanotime();
 
     // MATRIX SIZE TO TEST
     # if USE_ARGS_MATRIX
-    int64_t m = atoi(args[1]);
-    int64_t n = atoi(args[2]);
-    # else
-    int64_t mn[][2] = {
-        {3860, 1536},
-        {7581, 2189},
-        {2631, 3972},
-        {6075, 894},
-        {1810, 3002},
-        {7994, 1340},
-        {4912, 3891},
-        {7046, 2750},
-        {3120, 1643},
-        {5296, 784},
-        {20278, 2024}
+    int mn[][2] = {
+        {atoi(args[1]), atoi(args[2])}
     };
-    for (int j = 0 ; j < sizeof(mn) / (2 * sizeof(int64_t)) ; ++j)
+    # else
+    srand(2025);
+    int mn[50][2];
+    for (int k = 0; k < sizeof(mn) / (2 * sizeof(int)); ++k)
     {
-        int64_t  m = mn[j][0];
-        int64_t  n = mn[j][1];
+        mn[k][0] = 1024 + rand() % (16384 - 1024 + 1);
+        mn[k][1] =  512 + rand() % ( 4096 -  512 + 1);
+    }
     # endif
+    constexpr int nmatrices = sizeof(mn) / (2 * sizeof(int));
+    TYPE * D_matrices[nmatrices];
+    TYPE * L_matrices[nmatrices];
+    TYPE * U_matrices[nmatrices];
+    TYPE * G_matrices[nmatrices];
+    for (int k = 0 ; k < nmatrices ; ++k)
+    {
+        // do not account for first matrix in measurement
+        int  m = mn[k][0];
+        int  n = mn[k][1];
 
-        int64_t ld = m+n;
+        int ld = m+n;
 
-        printf("allocating and filling matrices with (m, n) = (%d, %d)\n", m, n);
+        printf("allocating and filling matrices %d/%d with (m, n) = (%d, %d)\n", k+1, nmatrices, m, n);
 
         /* allocate matrices */
+        # if 1
         uintptr_t matrices[1];
         prepare_n_matrices(matrices, 1, ld);
 
@@ -531,126 +533,156 @@ main_mumps(char ** args)
         TYPE * L = (TYPE *) (D + n*ld + 0);
         TYPE * U = (TYPE *) (D + 0*ld + n);
         TYPE * G = (TYPE *) (D + n*ld + n);
-
-        // TILE SIZES TO TEST
-
-        # if !USE_TS_TUNER
-        int64_t ts1 = atoi(args[3]);
-        int64_t ts2 = atoi(args[4]);
-        int64_t ts3 = atoi(args[5]);
-        int64_t ts[][3] = {
-            {ts1, ts2, ts3}
-        };
         # else
-        int64_t ts[][3] = {
-            {512, 512, 512},
-            {1024, 1024, 1024},
-            {2048, 2048, 2048},
-            {512, 1024, 2048},
-            {1024, 2048, 4096},
-            {2048, 4096, 8192},
-            {m/1, m/2, m/4},
-            {n/1, n/2, n/4},
-            {m/8, m/16, 2048},
-            {n/8, 4096, 8192},
-            {1024, m/2, n/4},
-            {n/1, 512, m/2},
-            {1024, m/4, 2048},
-            {m/1, 1024, 4096},
-            {n/2, m/2, 8192},
-            {m/8, 512, n/8},
-            {m/16, n/16, 1024},
-            {4096, 2048, m/2},
-            {n/4, m/4, 2048},
-            {8192, n/8, m/8},
-            {m/2, 512, 1024},
-            {n/2, 4096, m/1},
-            {m/1, n/2, 512},
-            {1024, 1024, 1024},
-            {m/2, m/4, m/8},
-            {n/4, n/8, n/16},
-            {2048, 4096, m/16},
-            {8192, n/4, m/4},
-            {n/1, 1024, m/2},
-            {m/4, 1024, n/4},
-            {n/16, m/16, 2048},
-            {n/8, 512, m/8},
-            {512, 512, 512},
-            {2048, 2048, 2048},
-            {m/8, m/2, 1024},
-            {n/2, n/1, 4096},
-            {m/16, m/8, m/4},
-            {n/16, n/8, 512},
-            {512, m/1, m/16},
-            {n/4, 8192, 4096},
-            {m/2, 2048, 8192},
-            {4096, m/1, 2048},
-            {n/2, 1024, 1024},
-            {n/4, 512, 512},
-            {m/1, m/1, m/1},
-            {n/1, n/1, n/1},
-            {m/2, m/2, m/2},
-            {n/2, n/2, n/2},
-            {m/4, m/4, m/4},
-            {n/4, n/4, n/4},
-            {m/8, m/8, m/8},
-            {n/8, n/8, n/8},
-            {m/16, m/16, m/16},
-            {n/16, n/16, n/16},
-            {512, n/2, m/8},
-            {8192, m/4, n/8},
-            {1024, n/4, 2048},
-            {4096, n/2, m/2},
-            {m/1, 512, n/16},
-            {n/1, 8192, m/16},
-            {m/2, 2048, 512},
-            {m/4, n/2, 1024},
-            {n/8, 1024, 8192},
-            {512, m/8, 2048},
-            {n/2, 4096, 512},
-            {m/4, m/8, 4096},
-            {n/16, 2048, 1024},
-            {8192, n/1, m/2},
-            {1024, 4096, n/4},
-            {m/8, 2048, n/4},
-            {n/1, m/8, 8192},
-            {m/16, n/2, 4096},
-            {m/1, 8192, 1024},
-            {n/4, 2048, m/4},
-            {m/2, 1024, 512},
-            {n/8, 8192, 2048},
-            {m/4, 512, n/2},
-            {1024, m/16, n/8},
-            {2048, 4096, 512},
-            {8192, m/1, n/16},
-            {n/2, 1024, 512},
-            {m/4, 4096, 512},
-            {n/8, m/8, m/16},
-            {m/16, 1024, n/4},
-            {m/8, 8192, 2048},
-            {1024, 512, n/2},
-            {m/2, 4096, n/4},
-            {n/1, 1024, m/8},
-            {2048, n/2, m/16},
-            {m/1, n/2, n/4},
-            {n/16, 8192, 512},
-            {m/2, 8192, 1024},
-            {m/4, n/1, 4096},
-            {n/4, 1024, 2048},
-            {m/1, m/2, m/8},
-            {n/1, n/2, n/8},
-            {2048, m/4, m/16},
-            {512, n/4, n/16},
-            {1024, m/8, n/2},
-            {n/16, m/8, 4096},
-            {8192, m/16, n/2},
-            {m/2, 2048, n/1}
-        };
+        uintptr_t matrices[4];
+        prepare_n_matrices(matrices, 4, ld);
+
+        TYPE * D = (TYPE *) matrices[0];
+        TYPE * L = (TYPE *) matrices[1];
+        TYPE * U = (TYPE *) matrices[2];
+        TYPE * G = (TYPE *) matrices[3];
         # endif
+
+        D_matrices[k] = D;
+        L_matrices[k] = L;
+        U_matrices[k] = U;
+        G_matrices[k] = G;
+
+        printf("(init) Dumping some values of G : %lf %lf %lf %lf\n",
+                G[0], G[m*m/2], G[m*m*3/4], G[3]);
+    }
+
+    // TILE SIZES TO TEST
+    # if !USE_TS_TUNER
+    int ts1 = atoi(args[3]);
+    int ts2 = atoi(args[4]);
+    int ts3 = atoi(args[5]);
+    int ts[][3] = {
+        {ts1, ts2, ts3}
+    };
+    # else
+    int ts[][3] = {
+        {512, 512, 512},
+        {1024, 1024, 1024},
+        {2048, 2048, 2048},
+        {512, 1024, 2048},
+        {1024, 2048, 4096},
+        {2048, 4096, 8192},
+        {m/1, m/2, m/4},
+        {n/1, n/2, n/4},
+        {m/8, m/16, 2048},
+        {n/8, 4096, 8192},
+        {1024, m/2, n/4},
+        {n/1, 512, m/2},
+        {1024, m/4, 2048},
+        {m/1, 1024, 4096},
+        {n/2, m/2, 8192},
+        {m/8, 512, n/8},
+        {m/16, n/16, 1024},
+        {4096, 2048, m/2},
+        {n/4, m/4, 2048},
+        {8192, n/8, m/8},
+        {m/2, 512, 1024},
+        {n/2, 4096, m/1},
+        {m/1, n/2, 512},
+        {1024, 1024, 1024},
+        {m/2, m/4, m/8},
+        {n/4, n/8, n/16},
+        {2048, 4096, m/16},
+        {8192, n/4, m/4},
+        {n/1, 1024, m/2},
+        {m/4, 1024, n/4},
+        {n/16, m/16, 2048},
+        {n/8, 512, m/8},
+        {512, 512, 512},
+        {2048, 2048, 2048},
+        {m/8, m/2, 1024},
+        {n/2, n/1, 4096},
+        {m/16, m/8, m/4},
+        {n/16, n/8, 512},
+        {512, m/1, m/16},
+        {n/4, 8192, 4096},
+        {m/2, 2048, 8192},
+        {4096, m/1, 2048},
+        {n/2, 1024, 1024},
+        {n/4, 512, 512},
+        {m/1, m/1, m/1},
+        {n/1, n/1, n/1},
+        {m/2, m/2, m/2},
+        {n/2, n/2, n/2},
+        {m/4, m/4, m/4},
+        {n/4, n/4, n/4},
+        {m/8, m/8, m/8},
+        {n/8, n/8, n/8},
+        {m/16, m/16, m/16},
+        {n/16, n/16, n/16},
+        {512, n/2, m/8},
+        {8192, m/4, n/8},
+        {1024, n/4, 2048},
+        {4096, n/2, m/2},
+        {m/1, 512, n/16},
+        {n/1, 8192, m/16},
+        {m/2, 2048, 512},
+        {m/4, n/2, 1024},
+        {n/8, 1024, 8192},
+        {512, m/8, 2048},
+        {n/2, 4096, 512},
+        {m/4, m/8, 4096},
+        {n/16, 2048, 1024},
+        {8192, n/1, m/2},
+        {1024, 4096, n/4},
+        {m/8, 2048, n/4},
+        {n/1, m/8, 8192},
+        {m/16, n/2, 4096},
+        {m/1, 8192, 1024},
+        {n/4, 2048, m/4},
+        {m/2, 1024, 512},
+        {n/8, 8192, 2048},
+        {m/4, 512, n/2},
+        {1024, m/16, n/8},
+        {2048, 4096, 512},
+        {8192, m/1, n/16},
+        {n/2, 1024, 512},
+        {m/4, 4096, 512},
+        {n/8, m/8, m/16},
+        {m/16, 1024, n/4},
+        {m/8, 8192, 2048},
+        {1024, 512, n/2},
+        {m/2, 4096, n/4},
+        {n/1, 1024, m/8},
+        {2048, n/2, m/16},
+        {m/1, n/2, n/4},
+        {n/16, 8192, 512},
+        {m/2, 8192, 1024},
+        {m/4, n/1, 4096},
+        {n/4, 1024, 2048},
+        {m/1, m/2, m/8},
+        {n/1, n/2, n/8},
+        {2048, m/4, m/16},
+        {512, n/4, n/16},
+        {1024, m/8, n/2},
+        {n/16, m/8, 4096},
+        {8192, m/16, n/2},
+        {m/2, 2048, n/1}
+    };
+    # endif
+
+    // for each matrices
+    for (int k = 0 ; k < nmatrices ; ++k)
+    {
+        TYPE * D = D_matrices[k];
+        TYPE * L = L_matrices[k];
+        TYPE * U = U_matrices[k];
+        TYPE * G = G_matrices[k];
+
+        int  m = mn[k][0];
+        int  n = mn[k][1];
+        int ld = m+n;
+        printf("running matrices with (m, n) = (%d, %d)\n", m, n);
 
         uint64_t tmin = UINT64_MAX;
         int imin = 0;
-        for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int64_t)) ; ++i)
+        for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
         {
             printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
 
@@ -699,17 +731,22 @@ main_mumps(char ** args)
                     imin = i;
                     tmin = tf - t0;
                 }
+
+                // start accounting for time after 1st iteration
+                if (k == 0 && i == 0 && j == 0)
+                    tt0 = get_nanotime();
             }
         }
 
         printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n",
                 ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
+        printf("(done) Dumping some values of G : %lf %lf %lf %lf\n", G[0], G[m*m/2], G[m*m*3/4], G[3]);
 
     # if !USE_ARGS_MATRIX
     }
     # endif
-    uint64_t tf = get_nanotime();
-    printf("Total transfer+compute took %lf s.\n", (tf-t0)/(double)1e9);
+    uint64_t ttf = get_nanotime();
+    printf("Total transfer+compute took %lf s. (excluding first matrix)\n", (ttf-tt0)/(double)1e9);
 
     return 0;
 }

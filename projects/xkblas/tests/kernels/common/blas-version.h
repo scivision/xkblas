@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/17 22:58:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/20 23:57:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -40,14 +40,14 @@
 #  define native_lange_work(...)    LAPACKE_dlange_work(__VA_ARGS__)
 #  define native_lantr_work(...)    LAPACKE_dlantr_work(__VA_ARGS__)
 #  define native_larnv_work(...)    LAPACKE_dlarnv_work(__VA_ARGS__)
+#  define native_larnv(...)         LAPACKE_dlarnv(__VA_ARGS__)
 # endif
 
-
-int IONE       = 1;
-int PAD[2048]  = {0,0,0,0,0,0,0}; /* pad : Romain, why ? */
-lapack_int ISEED[5] = { 7, 1, 2, 1, 1 };
-int PAD2[2048] = {0,0,0,0,0,0,0}; /* pad : Romain, why ? */
-
-# define FILL(PTR, N) native_larnv_work(IONE, ISEED, N, PTR)
-
+// 1: uniform (0,1), 2: normal (0,1), 3: uniform (-1,1)
+// Seed for the random number generator (4 integers)
+# define FILL(PTR, N)                               \
+    do {                                            \
+        lapack_int seed[4] = { 1, 2, 3, 4 };        \
+        native_larnv_work(1, seed, N, PTR);         \
+    } while (0)
 #endif
