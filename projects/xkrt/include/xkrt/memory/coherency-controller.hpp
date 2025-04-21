@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:06:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 22:26:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,6 +24,8 @@ template<int K>
 class KMemoryCoherencyController {
 
     public:
+
+        virtual ~KMemoryCoherencyController() {}
 
         /* returns a bitfield of devices that owns the most bytes of the given access */
         virtual xkrt_device_global_id_bitfield_t who_owns(access_t * access) = 0;
