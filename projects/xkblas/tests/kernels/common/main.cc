@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 00:20:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/21 02:37:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -508,7 +508,8 @@ main_mumps(char ** args)
         mn[k][0] = 1024 + rand() % (16384 - 1024 + 1);
         mn[k][1] =  512 + rand() % ( 4096 -  512 + 1);
     }
-    # endif
+    # endif /*USE_ARGS_MATRIX */
+
     constexpr int nmatrices = sizeof(mn) / (2 * sizeof(int));
     TYPE * D_matrices[nmatrices];
     TYPE * L_matrices[nmatrices];
@@ -703,19 +704,14 @@ main_mumps(char ** args)
                 impl.set_tile(ts[i][1]);
                 impl.copyscale(m, n, should_copy, IW, D, ld, L, ld, U, ld);
                 # if USE_WRITE_BACK
-                //impl.coherent(D, m, m, ld);
-                impl.coherent(L, m, n, ld);
-                impl.coherent(U, n, m, ld); // U is retrieved even if we don't need it
-                                            //impl.coherent(G, m, m, ld);
+             // impl.coherent(D, m, m, ld);
+                impl.coherent(L, n, m, ld);
+                impl.coherent(U, m, n, ld);
                 # endif
                 impl.set_tile(ts[i][2]);
-                //impl.gemm(CblasNoTrans, CblasNoTrans, m, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
                 impl.gemmt(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
 
                 # if USE_WRITE_BACK
-                //impl.coherent(D, m, m, ld);
-                //impl.coherent(L, m, n, ld);
-                //impl.coherent(U, n, m, ld);
                 impl.coherent(G, m, m, ld);
                 # endif
 
@@ -742,9 +738,7 @@ main_mumps(char ** args)
                 ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
         printf("(done) Dumping some values of G : %lf %lf %lf %lf\n", G[0], G[m*m/2], G[m*m*3/4], G[3]);
 
-    # if !USE_ARGS_MATRIX
     }
-    # endif
     uint64_t ttf = get_nanotime();
     printf("Total transfer+compute took %lf s. (excluding first matrix)\n", (ttf-tt0)/(double)1e9);
 
