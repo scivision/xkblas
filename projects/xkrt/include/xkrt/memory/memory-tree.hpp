@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/22 04:24:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/22 12:21:28 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -437,7 +437,6 @@ class KMemoryTreeNodeSearch {
            SEARCH_FOR_PARTITION = 1,    // search for a partition
            SEARCH_AWAITING      = 2,    // search tasks awaiting on blocks (to be transfered onto a gpu, typically)
            SEARCH_OWNERS        = 3,    // search how many bytes owns each device
-           SEARCH_FOR_BLOCKS    = 4     // search for blocks intersecting, but not necessarily being a partition (access can be larger than the ones inserted)
        };
 
    public:
@@ -512,14 +511,6 @@ class KMemoryTreeNodeSearch {
            assert(this->partition.partites.size() == 0);
            this->partition.partites.clear();
            this->type = SEARCH_FOR_PARTITION;
-       }
-
-       void
-       prepare_search_blocks(void)
-       {
-           assert(this->partition.partites.size() == 0);
-           this->partition.partites.clear();
-           this->type = SEARCH_FOR_BLOCKS;
        }
 
        void
@@ -1129,18 +1120,18 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
             Search search(HOST_DEVICE_GLOBAL_ID);
             this->lock();
             {
-                // no need to insert, but gotta intersect access' cubes with
-                // memory-tree nodes cubes to take only the minimal
-                // incoherent data
+                /* step (1) ensure the access is represented in the tree as blocks */
+                search.prepare_insert(access);
+                this->insert(search, access->cubes[0]);
+                this->insert(search, access->cubes[1]);
 
-                // TODO : move the intersect from the search to outside the lock
-
-                search.prepare_search_blocks();
+                /* step (2) find all blocks representing the access */
+                search.prepare_search_partition();
                 this->intersect(search, access->cubes[0]);
                 this->intersect(search, access->cubes[1]);
                 assert(search.partition.partites.size() >= 1);
 
-                /* setup partition for D2H copies */
+                /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
                 this->fetch_list_to_host_setup_partition(search.partition);
             }
             this->unlock();
@@ -1922,17 +1913,6 @@ next_view:
                      * previously, so 'node' must be a sub-block of 'cube' */
                     assert(cube.includes(node->cube));
                     search.partition.partites.push_back(Partite(&(node->block), node->cube));
-                    break ;
-                }
-
-                case (Search::Type::SEARCH_FOR_BLOCKS):
-                {
-                    /* the 'cube' may not have been inserted in the memory tree previously */
-                    // TODO: lots of constructor calls here... optimize me
-                    Cube c;
-                    access_t::Cube::intersection(&c, cube, node->cube);
-                    const Partite partite(&(node->block), c);
-                    search.partition.partites.push_back(partite);
                     break ;
                 }
 
