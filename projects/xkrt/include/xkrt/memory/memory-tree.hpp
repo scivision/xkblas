@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 22:22:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/22 04:24:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1052,18 +1052,24 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Loc
         fetch_list_to_host_setup_partition(Partition & partition)
         {
             assert(this->is_locked());
+            const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << HOST_DEVICE_GLOBAL_ID);
 
             /* launch fetch on each device */
             for (Partite & partite : partition.partites)
             {
                 MemoryBlock * block = partite.block;
 
-                /* not coherent on any device, then assume coherent on the host */
-                if (block->coherency == 0)
+                /* we can skip the transfer if whether:
+                 *  - the block is not coherent on any devices, then assume it is coherent on the host
+                 *  - the host already has a coherent replicate
+                 *  - the host is already fetching
+                 */
+                if (block->coherency == 0 || (block->coherency & devbit) || (block->fetching & devbit))
                 {
                     partite.must_fetch = false;
                     continue ;
                 }
+                block->fetching |= devbit;
 
                 /////////////////////////
                 // SRC - FIND BEST SRC //
@@ -1378,7 +1384,7 @@ next_view:
         }
 
         inline void
-        fetch_access_set_device_view(
+        fetch_access_setup_replicates(
             access_t * access,
             xkrt_device_global_id_t device_global_id,
             Search & search
@@ -1460,10 +1466,10 @@ next_view:
 
                     // find source:
                     //  - if its already coherent on a device, use it as a source
-                    //  - else, its already transfering to any device, wait for it and forward using D2D
+                    //  - else, if its already transfering from the host to any device, wait for it and forward using D2D (PCI contention heuristic)
                     //  - else, transfer H2D
 
-                    if (partite.block->coherency)
+                    if (partite.block->coherency & ~(1 << HOST_DEVICE_GLOBAL_ID))
                     {
                         partite.must_fetch = true;
 
@@ -1493,7 +1499,8 @@ next_view:
                         partite.src_chunk               = src_allocation_view->chunk;
                     }
                     # if USE_D2D_FORWARDING
-                    else if (partite.block->fetching)
+                    /* heuristic: if another device is already fetching from the host, register a forward callback instead to reduce PCI contention */
+                    else if (partite.block->fetching & ~(1 << HOST_DEVICE_GLOBAL_ID))
                     {
                         /* the fetch will be initiated by the other device that
                          * is already fetching that data for a D2D transfer.
@@ -1685,7 +1692,7 @@ next_view:
                 this->fetch_access_find_allocation(access, device_global_id, search.partition);
 
                 /* step (4) set the access view on the device (that will be used by the kernel) */
-                this->fetch_access_set_device_view(access, device_global_id, search);
+                this->fetch_access_setup_replicates(access, device_global_id, search);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
                 this->fetch_access_setup_copies(task, access, device_global_id, search.partition);
