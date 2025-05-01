@@ -66,7 +66,6 @@ extern "C" {
         size_t sizeof_type
     );
 
-
     ////////////////
     // DISTRIBUTE //
     ////////////////
@@ -89,8 +88,7 @@ extern "C" {
         union {
 
             // for XKRT_DISTRIBUTION_TYPE_CYCLIC2D
-            struct {
-            };
+            // struct { } ;
 
             // for XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK
             struct {

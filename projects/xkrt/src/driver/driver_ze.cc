@@ -52,7 +52,7 @@ static xkrt_device_ze_t *
 device_ze_get(int device_driver_id)
 {
     assert(device_driver_id >= 0);
-    assert(device_driver_id < ze_n_devices);
+    assert((uint32_t) device_driver_id < ze_n_devices);
     return DEVICES + device_driver_id;
 }
 
@@ -254,6 +254,7 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
 static xkrt_device_t *
 XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_id)
 {
+    (void) driver;
     assert(device_driver_id >= 0 && device_driver_id < XKRT_DEVICES_MAX);
 
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
@@ -437,6 +438,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
     int device_driver_id,
     xkrt_stream_type_t stype
 ) {
+    (void) device_driver_id;
+
     switch (stype)
     {
         case (XKRT_STREAM_TYPE_KERN):
@@ -816,6 +819,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
+    (void) size;
+    (void) area_idx;
+
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
 }
@@ -829,7 +835,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     info->capacity = device->ze.device_properties.maxMemAllocSize;
     *nmemories = device->ze.memory.pcount;
-    for (int i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+    for (uint32_t i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
         info[i].capacity = device->ze.memory.properties[i].totalSize;
         strncpy(info[i].name, device->ze.memory.properties[i].name, MIN(sizeof(device->ze.memory.properties[i].name), sizeof(info[i].name)));

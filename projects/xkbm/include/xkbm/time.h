@@ -58,9 +58,9 @@ struct  time_array_t
         for (size_t i = 0 ; i < nelements ; ++i)
         {
             qsort(this->values + i * this->niters, niters, sizeof(size_t), size_t_cmp);
-            size_t min = this->get(i, 0);
-            size_t med = this->get(i, niters / 2);
-            size_t max = this->get(i, niters - 1);
+            // size_t min = this->get(i, 0);
+            // size_t med = this->get(i, niters / 2);
+            // size_t max = this->get(i, niters - 1);
 
             this->avg = 0;
             for (int j = 0 ; j < niters ; ++j)
@@ -97,9 +97,9 @@ struct  time_array_t
         for (size_t i = 0 ; i < nelements ; ++i)
         {
             qsort(this->values + i * niters, niters, sizeof(size_t), size_t_cmp);
-            size_t min = this->get(i, 0);
-            size_t med = this->get(i, niters / 2);
-            size_t max = this->get(i, niters - 1);
+            // size_t min = this->get(i, 0);
+            // size_t med = this->get(i, niters / 2);
+            // size_t max = this->get(i, niters - 1);
 
             this->avg = 0;
             for (int j = 0 ; j < niters ; ++j)

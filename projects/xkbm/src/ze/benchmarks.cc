@@ -59,11 +59,15 @@ typedef struct  module_t
 
 static module_t modules[N_KERNELS] = {
     {
+        .module = nullptr,
+        .kernel = nullptr,
         .bytes = (const uint8_t *) SPIRV_EMPTY_KERNEL,
         .nbytes = sizeof(SPIRV_EMPTY_KERNEL),
         .funcname = "empty_kernel"
     },
     {
+        .module = nullptr,
+        .kernel = nullptr,
         .bytes = (const uint8_t *) SPIRV_SLEEP_KERNEL,
         .nbytes = sizeof(SPIRV_SLEEP_KERNEL),
         .funcname = "sleep_kernel"
@@ -98,6 +102,8 @@ template<immediate_t immediate, test_mode_t mode>
 static void
 cmdlist_run(benchmark_node_t * node)
 {
+    (void) node;
+
     // command list
     const uint32_t ordinal = (mode == KERNEL) ? ordinal_compute : ordinal_copy;
     const uint32_t index   = 0;
@@ -157,14 +163,18 @@ cmdlist_run(benchmark_node_t * node)
     ZE_SAFE_CALL(zeEventPoolCreate(context, &pool_desc, ndevices, &device, &pool));
 
     // event
-    ze_event_desc_t event_desc = {
-        .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
-        .signal = ZE_EVENT_SCOPE_FLAG_HOST,
-        .wait   = ZE_EVENT_SCOPE_FLAG_HOST
-    };
     ze_event_handle_t * events = (ze_event_handle_t *) malloc(sizeof(ze_event_handle_t) * pool_desc.count);
-    for (int j = 0 ; j < pool_desc.count ; ++j)
+    for (unsigned int j = 0 ; j < pool_desc.count ; ++j)
+    {
+        ze_event_desc_t event_desc = {
+            .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
+            .pNext  = NULL,
+            .index  = j,
+            .signal = ZE_EVENT_SCOPE_FLAG_HOST,
+            .wait   = ZE_EVENT_SCOPE_FLAG_HOST
+        };
         ZE_SAFE_CALL(zeEventCreate(pool, &event_desc, events + j));
+    }
 
     const uint32_t n_wait_events = 0;
     ze_event_handle_t * wait_events = nullptr;
@@ -294,6 +304,7 @@ template<immediate_t immediate>
 static void
 relaxed_ordering_run(benchmark_node_t * node)
 {
+    (void) node;
     assert(immediate == NON_IMMEDIATE);
 
     // command list
@@ -352,14 +363,18 @@ relaxed_ordering_run(benchmark_node_t * node)
     ZE_SAFE_CALL(zeEventPoolCreate(context, &pool_desc, ndevices, &device, &pool));
 
     // event
-    ze_event_desc_t event_desc = {
-        .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
-        .signal = ZE_EVENT_SCOPE_FLAG_HOST,
-        .wait   = ZE_EVENT_SCOPE_FLAG_HOST
-    };
     ze_event_handle_t * events = (ze_event_handle_t *) malloc(sizeof(ze_event_handle_t) * pool_desc.count);
-    for (int j = 0 ; j < pool_desc.count ; ++j)
+    for (uint32_t j = 0 ; j < pool_desc.count ; ++j)
+    {
+        ze_event_desc_t event_desc = {
+            .stype  = ZE_STRUCTURE_TYPE_EVENT_DESC,
+            .pNext  = NULL,
+            .index  = j,
+            .signal = ZE_EVENT_SCOPE_FLAG_HOST,
+            .wait   = ZE_EVENT_SCOPE_FLAG_HOST
+        };
         ZE_SAFE_CALL(zeEventCreate(pool, &event_desc, events + j));
+    }
 
     ze_group_count_t launch = { 1, 1, 1 };
 
@@ -381,11 +396,11 @@ relaxed_ordering_run(benchmark_node_t * node)
     //  If serial, we expect total time to 3.w
     //  If concurrent, we expect total time to be 2.w
     //
-    const unsigned long int w = 123456;
+    const unsigned long int w = 100000;
 
     // timing
     constexpr int n = 2;        // 0 == serial, 1 == concurrent
-    constexpr int niter = 1;
+    constexpr int niter = 100;
     constexpr int warmup_iters = 0;
     time_array_t time(n, niter);
 
@@ -397,7 +412,7 @@ relaxed_ordering_run(benchmark_node_t * node)
     {
         for (int iter = warmup_iters ; iter < time.niters ; ++iter)
         {
-            for (int mode = 0 ; mode < time.nelements ; ++mode)
+            for (unsigned int mode = 0 ; mode < time.nelements ; ++mode)
             {
                 uint64_t t0 = xkrt_get_nanotime();
 
@@ -448,7 +463,7 @@ relaxed_ordering_run(benchmark_node_t * node)
 
     // report
     auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%s", i == SERIAL ? "Serial" : i == CONCURRENT ? "Concurrent" : "Unknown"); };
-    time.report<METRIC_TIME>("toto", convert);
+    time.report<METRIC_TIME>("Time", convert);
 
     // release stuff
     ZE_SAFE_CALL(zeEventPoolDestroy(pool));
@@ -460,58 +475,102 @@ relaxed_ordering_run(benchmark_node_t * node)
 static benchmark_node_t non_immediate_kernel = {
     .name = "kernel",
     .desc = "Latency of a kernel launch to an non-immediate command list",
-    .run = cmdlist_run<NON_IMMEDIATE, KERNEL>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<NON_IMMEDIATE, KERNEL>,
+    .enabled = 0
+
 };
 
 static benchmark_node_t non_immediate_h2d = {
     .name = "h2d",
     .desc = "Latency of a H2D copy to an non-immediate command list",
-    .run = cmdlist_run<NON_IMMEDIATE, H2D>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<NON_IMMEDIATE, H2D>,
+    .enabled = 0
 };
 
 static benchmark_node_t non_immediate_d2h = {
     .name = "d2h",
     .desc = "Latency of a D2H copy to an non-immediate command list",
-    .run = cmdlist_run<NON_IMMEDIATE, D2H>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<NON_IMMEDIATE, D2H>,
+    .enabled = 0
 };
 
 static benchmark_node_t non_immediate = {
     .name = "non-immediate",
     .desc = "Cost of non-immediate command list",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = NULL,
+    .enabled = 0
 };
 
 static benchmark_node_t non_immediate_relaxed_ordering = {
     .name = "relaxed_ordering",
-    .desc = "Test if relaxed ordering avoid bubbles in command queues with non-immediate lists",
-    .run = relaxed_ordering_run<NON_IMMEDIATE>
+    .desc = "Test if relaxed ordering avoid bubbles in command queues with non-immediate lists. Serial is 'T1 -> T2 -> T3' while Concurrent is 'T1 -> T2' and 'T3' - submitting in the same order (T1, T2, T3) in both",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = relaxed_ordering_run<NON_IMMEDIATE>,
+    .enabled = 0
 };
 
 static benchmark_node_t immediate_kernel = {
     .name = "kernel",
     .desc = "Latency of a kernel launch to an immediate command list",
-    .run = cmdlist_run<IMMEDIATE, KERNEL>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<IMMEDIATE, KERNEL>,
+    .enabled = 0
 };
 
 static benchmark_node_t immediate_h2d = {
     .name = "h2d",
     .desc = "Latency of a H2D copy to an immediate command list",
-    .run = cmdlist_run<IMMEDIATE, H2D>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<IMMEDIATE, H2D>,
+    .enabled = 0
 };
 
 static benchmark_node_t immediate_d2h = {
     .name = "d2h",
     .desc = "Latency of a D2H copy to an immediate command list",
-    .run = cmdlist_run<IMMEDIATE, D2H>
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<IMMEDIATE, D2H>,
+    .enabled = 0
 };
 
 static benchmark_node_t immediate = {
     .name = "immediate",
     .desc = "Cost of immediate command list",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = NULL,
+    .enabled = 0
 };
 
 static benchmark_node_t cmdlist = {
     .name = "cmdlist",
     .desc = "Latency of using command lists",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = NULL,
+    .enabled = 0
 };
 
 ///////////////////
@@ -521,6 +580,10 @@ static benchmark_node_t cmdlist = {
 static benchmark_node_t ze = {
     .name = "ze",
     .desc = "Metrics on ZE-supported devices",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = NULL,
     .enabled = 1
 };
 
@@ -559,7 +622,11 @@ ze_benchmark_init(void)
     ZE_SAFE_CALL(zeDeviceGet(driver, &deviceCount, &device));
 
     // context
-    ze_context_desc_t contextDesc = {ZE_STRUCTURE_TYPE_CONTEXT_DESC};
+    ze_context_desc_t contextDesc = {
+        .stype = ZE_STRUCTURE_TYPE_CONTEXT_DESC,
+        .pNext = NULL,
+        .flags = 0
+    };
     ZE_SAFE_CALL(zeContextCreate(driver, &contextDesc, &context));
 
     for (int i = 0 ; i < N_KERNELS ; ++i)
