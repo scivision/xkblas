@@ -1,11 +1,11 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   memory-coherent.cc                                                       */
+/*   coherent.cc                                                              */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:50:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 21:00:56 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -140,12 +140,12 @@ xkrt_coherency_host_async(
         bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
-            Cube cube;
-            access_t::Cube::intersection(&cube, access.cubes[i], node->cube);
+            Hypercube h;
+            access_t::Hypercube::intersection(&h, access.hypercubes[i], node->hypercube);
 
-            if (!cube.is_empty())
+            if (!h.is_empty())
             {
-                new (accesses + 0) access_t(task, MATRIX_COLMAJOR, cube, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
+                new (accesses + 0) access_t(task, MATRIX_COLMAJOR, h, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
                 deptree->precedence(write, accesses + 0);
                 found = true;
                 break ;

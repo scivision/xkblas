@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:23:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 20:52:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -69,10 +69,10 @@ class KDependencyTreeSearch
 template <int K>
 class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node {
 
-    using Base   = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
-    using Node   = KDependencyTreeNode<K>;
-    using Cube   = KCube<K>;
-    using Search = KDependencyTreeSearch<K>;
+    using Base      = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
+    using Node      = KDependencyTreeNode<K>;
+    using Hypercube = KHypercube<K>;
+    using Search    = KDependencyTreeSearch<K>;
 
     public:
 
@@ -88,11 +88,11 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
     public:
 
         KDependencyTreeNode<K>(
-            const Cube & r,
+            const Hypercube & h,
             const int k,
             const Color color
         ) :
-            Base(r, k, color),
+            Base(h, k, color),
             last_reads(),
             last_write(),
             nwrites(0)
@@ -101,12 +101,12 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
 
         /* a new node from a split, inherit 'src' accesses */
         KDependencyTreeNode<K>(
-            const Cube & r,
+            const Hypercube & h,
             const int k,
             const Color color,
             const Node * inherit
         ) :
-            Base(r, k, color),
+            Base(h, k, color),
             last_reads(),
             last_write(),
             nwrites(0)
@@ -148,9 +148,9 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
         }
 
         void
-        dump_cube_str(FILE * f) const
+        dump_hypercube_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_cube_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_hypercube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -164,8 +164,8 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
 template<int K>
 class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public DependencyDomain
 {
-    using Base     = KHPTree<K, KDependencyTreeSearch<K>, CUT>;
-    using Cube     = KCube<K>;
+    using Base      = KHPTree<K, KDependencyTreeSearch<K>, CUT>;
+    using Hypercube = KHypercube<K>;
 
     public:
     using Node     = KDependencyTreeNode<K>;
@@ -194,8 +194,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
 
             Search search;
             search.prepare_conflicting(conflicts, access);
-            Base::intersect(search, access->cubes[0]);
-            Base::intersect(search, access->cubes[1]);
+            Base::intersect(search, access->hypercubes[0]);
+            Base::intersect(search, access->hypercubes[1]);
         }
 
         //////////////
@@ -234,34 +234,34 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         Node *
         new_node(
             Search & search,
-            const Cube & cube,
+            const Hypercube & h,
             const int k,
             const Color color
         ) const {
             (void) search;
-            return new Node(cube, k, color);
+            return new Node(h, k, color);
         }
 
         Node *
         new_node(
             Search & search,
-            const Cube & cube,
+            const Hypercube & h,
             const int k,
             const Color color,
             const NodeBase * inherit
         ) const {
             (void) search;
-            return new Node(cube, k, color, reinterpret_cast<const Node *>(inherit));
+            return new Node(h, k, color, reinterpret_cast<const Node *>(inherit));
         }
 
         inline bool
         should_cut(
             Search & search,
-            Cube & cube,
+            Hypercube & h,
             NodeBase * parent,
             int k
         ) const {
-            (void) cube;
+            (void) h;
             (void) parent;
             (void) k;
             return search.access->mode & ACCESS_MODE_W;
@@ -274,9 +274,9 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube
+            const Hypercube & h
         ) const {
-            (void) cube;
+            (void) h;
 
             Node * node = reinterpret_cast<Node *>(nodebase);
             assert(node);
@@ -309,10 +309,10 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Cube & cube
+            const Hypercube & h
         ) const {
 
-            (void) cube;
+            (void) h;
 
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);
@@ -360,8 +360,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
                 assert(this->can_resolve(access));
 
                 search.prepare_resolve(access);
-                Base::intersect(search, access->cubes[0]);
-                Base::intersect(search, access->cubes[1]);
+                Base::intersect(search, access->hypercubes[0]);
+                Base::intersect(search, access->hypercubes[1]);
             }
         }
 
@@ -375,8 +375,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
                 access_t * access = accesses + i;
 
                 search.prepare_resolve(access);
-                Base::insert(search, access->cubes[0]);
-                Base::insert(search, access->cubes[1]);
+                Base::insert(search, access->hypercubes[0]);
+                Base::insert(search, access->hypercubes[1]);
             }
         }
 

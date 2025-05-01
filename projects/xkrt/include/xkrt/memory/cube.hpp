@@ -5,17 +5,16 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:59:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/23 14:48:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __INTERVALS_HPP__
-# define __INTERVALS_HPP__
+#ifndef __CUBE_HPP__
+# define __CUBE_HPP__
 
 # include <xkrt/min-max.h>
-# include <xkrt/memory/matrix-tile.h>
 # include <xkrt/memory/interval.hpp>
 
 # include <cassert>
@@ -26,7 +25,7 @@
 
 /* K is the number of dimensions */
 template<int K>
-class KCube {
+class KHypercube {
 
     public:
 
@@ -34,22 +33,22 @@ class KCube {
 
     public:
 
-        KCube() : list() {}
+        KHypercube() : list() {}
 
-        KCube(const Interval list[K])
+        KHypercube(const Interval list[K])
         {
             this->set_list(list);
         }
 
-        KCube(const KCube & copy)
+        KHypercube(const KHypercube & copy)
         {
             this->set_list(copy.list);
         }
 
-        virtual ~KCube() {}
+        virtual ~KHypercube() {}
 
         void
-        copy(const KCube & other)
+        copy(const KHypercube & other)
         {
             this->set_list(other.list);
         }
@@ -85,7 +84,7 @@ class KCube {
 
         // return true if intervals intersects on each dimension
         inline bool
-        intersects(const KCube & intervals) const
+        intersects(const KHypercube & intervals) const
         {
             for (int k = 0 ; k < K ; ++k)
             {
@@ -98,9 +97,9 @@ class KCube {
 
         static inline void
         intersection(
-            KCube * dst,
-            const KCube & x,
-            const KCube & y
+            KHypercube * dst,
+            const KHypercube & x,
+            const KHypercube & y
         ) {
             for (int k = 0 ; k < K ; ++k)
             {
@@ -110,13 +109,13 @@ class KCube {
         }
 
         inline bool
-        intersects(const KCube * & intervals) const
+        intersects(const KHypercube * & intervals) const
         {
             return this->intersects(*intervals);
         }
 
         inline bool
-        equals(const KCube & intervals) const
+        equals(const KHypercube & intervals) const
         {
             for (int k = 0 ; k < K ; ++k)
             {
@@ -128,7 +127,7 @@ class KCube {
         }
 
         inline bool
-        includes(const KCube & intervals, int k) const
+        includes(const KHypercube & intervals, int k) const
         {
             for ( ; k < K ; ++k)
             {
@@ -140,7 +139,7 @@ class KCube {
         }
 
         inline bool
-        includes(const KCube & intervals) const
+        includes(const KHypercube & intervals) const
         {
             return this->includes(intervals, 0);
         }
@@ -167,8 +166,8 @@ class KCube {
          * dimensions of the interval */
         static inline void
         distance_manhattan(
-            const KCube & x,
-            const KCube & y,
+            const KHypercube & x,
+            const KHypercube & y,
             INTERVAL_DIFF_TYPE_T d[K]
         ) {
             for (int k = 0 ; k < K ; ++k)
@@ -176,7 +175,7 @@ class KCube {
         }
 
         friend std::ostream &
-        operator<<(std::ostream & os, const KCube & intervals)
+        operator<<(std::ostream & os, const KHypercube & intervals)
         {
             for (int k = 0 ; k < K ; ++k)
             {
@@ -187,8 +186,8 @@ class KCube {
             return os;
         }
 
-}; /* class KCube */
+}; /* class KHypercube */
 
-using Cube = KCube<2>;
+using Hypercube = KHypercube<2>;
 
-#endif /* __INTERVALS_HPP__ */
+#endif /* __CUBE_HPP__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/04/29 19:53:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,6 +13,9 @@
 
 #ifndef __INTERVAL_HPP__
 # define __INTERVAL_HPP__
+
+# include <assert.h>
+# include <stddef.h>
 
 # define INTERVAL_TYPE_T        uintptr_t
 # define INTERVAL_DIFF_TYPE_T   ptrdiff_t

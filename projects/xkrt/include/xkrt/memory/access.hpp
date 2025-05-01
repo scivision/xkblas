@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/16 18:01:37 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 20:47:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -39,16 +39,16 @@ template<int K>
 static inline void
 memory_view_from_cube(
     memory_view_t & view,
-    const KCube<K> & cube,
+    const KHypercube<K> & h,
     const size_t ld,
     const size_t sizeof_type
 ) {
     static_assert(K == 2);
 
-    const INTERVAL_TYPE_T       x = cube[ACCESS_CUBE_ROW_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dx = cube[ACCESS_CUBE_ROW_DIM].length();
-    const INTERVAL_TYPE_T       y = cube[ACCESS_CUBE_COL_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dy = cube[ACCESS_CUBE_COL_DIM].length();
+    const INTERVAL_TYPE_T       x = h[ACCESS_CUBE_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dx = h[ACCESS_CUBE_ROW_DIM].length();
+    const INTERVAL_TYPE_T       y = h[ACCESS_CUBE_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dy = h[ACCESS_CUBE_COL_DIM].length();
     assert(dx > 0);
     assert(dy > 0);
 
@@ -65,17 +65,17 @@ memory_view_from_cube(
 
 template<int K>
 static inline void
-memory_view_from_cubes(
+memory_view_from_hypercubes(
     memory_view_t & view,
-    const KCube<K> & cube0,
-    const KCube<K> & cube1,
+    const KHypercube<K> & h0,
+    const KHypercube<K> & h1,
     const size_t ld,
     const size_t sizeof_type
 ) {
-    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) cube0[ACCESS_CUBE_ROW_DIM].a;
-    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_ROW_DIM].b;
-    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) cube0[ACCESS_CUBE_COL_DIM].a;
-    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) cube1[ACCESS_CUBE_COL_DIM].b;
+    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_CUBE_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_CUBE_ROW_DIM].b;
+    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_CUBE_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_CUBE_COL_DIM].b;
     assert(0 <= x0 && x0 <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
     assert(0 <= xf && xf <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
     assert(y0 < yf);
@@ -99,9 +99,9 @@ memory_view_from_cubes(
 
 template<int K>
 static inline void
-memory_view_to_cubes(
+memory_view_to_hypercubes(
     const memory_view_t & view,
-    KCube<K> (& cubes) [2]
+    KHypercube<K> (& hypercubes) [2]
 ) {
     static_assert(K == 2);
 
@@ -136,13 +136,13 @@ memory_view_to_cubes(
             Interval list[2];
             list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
-            cubes[0].set_list(list);
-            assert(!cubes[0].is_empty());
+            hypercubes[0].set_list(list);
+            assert(!hypercubes[0].is_empty());
         }
 
-        assert(cubes[1].is_empty());
+        assert(hypercubes[1].is_empty());
     }
-    // 2 cubes are needed
+    // 2 hypercubes are needed
     else
     {
         /**
@@ -170,16 +170,16 @@ memory_view_to_cubes(
             list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
 
-            cubes[0].set_list(list0);
-            assert(!cubes[0].is_empty());
+            hypercubes[0].set_list(list0);
+            assert(!hypercubes[0].is_empty());
         }
 
         {
             Interval list1[2];
             list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
             list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
-            cubes[1].set_list(list1);
-            assert(!cubes[1].is_empty());
+            hypercubes[1].set_list(list1);
+            assert(!hypercubes[1].is_empty());
         }
     }
 }
@@ -187,7 +187,7 @@ memory_view_to_cubes(
 class access_t
 {
     public:
-        using Cube = KCube<2>;
+        using Hypercube = KHypercube<2>;
 
     public:
 
@@ -208,9 +208,9 @@ class access_t
         // the region //
         ////////////////
 
-        /* Currently always 2 cubes that represents a matrix in an XKTree
-         * (1 cube if access is aligned on ld x sizeof_type, else 2 cubes) */
-        Cube cubes[2];
+        /* Currently always 2 hypercubes that represents a matrix in an XKTree
+         * (1 cube if access is aligned on ld x sizeof_type, else 2 hypercubes) */
+        Hypercube hypercubes[2];
 
         ////////////////////////////////////////////////////
 
@@ -258,7 +258,7 @@ class access_t
             mode(mode),
             concurrency(concurrency),
             scope(scope),
-            cubes(),
+            hypercubes(),
             successors(8),
             task(task),
             host_view(order, addr, ld, offset_m, offset_n, m, n, s),
@@ -280,8 +280,8 @@ class access_t
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
 
-            // creates the two cubes of that memory view
-            memory_view_to_cubes(host_view, cubes);
+            // creates the two hypercubes of that memory view
+            memory_view_to_hypercubes(host_view, hypercubes);
         }
 
          access_t(
@@ -300,7 +300,7 @@ class access_t
         access_t(
             task_t * task,
             const matrix_order_t & order,
-            const Cube & cube,
+            const Hypercube & h,
             const size_t ld,
             const size_t s,
             access_mode_t mode,
@@ -310,7 +310,7 @@ class access_t
             mode(mode),
             concurrency(concurrency),
             scope(scope),
-            cubes(),
+            hypercubes(),
             successors(8),
             task(task),
             host_view(order, 0, ld, 0, 0, 0, 0, s),
@@ -321,10 +321,10 @@ class access_t
 
             assert(order == MATRIX_COLMAJOR);
             assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
-            assert(!cube.is_empty());
+            assert(!h.is_empty());
 
-            memory_view_from_cube(this->host_view, cube, ld, s);
-            new (this->cubes + 0) Cube(cube);
+            memory_view_from_cube(this->host_view, h, ld, s);
+            new (this->hypercubes + 0) Hypercube(h);
         }
 
         access_t(
