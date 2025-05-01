@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 20:59:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 21:45:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,13 +14,18 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
+# define KHP_TREE_REBALANCE         0
+# define KHP_TREE_CUT_ON_INSERT     0
+# define KHP_TREE_MAINTAIN_SIZE     0
+# define KHP_TREE_MAINTAIN_HEIGHT   0
+# include <xkrt/memory/khp-tree.hpp>
+
 //  TODO : the design of this is terrible with a cyclic ownership with 'xkrt_runtime_t'
 //  Redesign me !! This should be fully independent with callbacks that can be parametrized, raised with global device ids
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/coherency-controller.hpp>
-# include <xkrt/memory/khp-tree.hpp>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/lockable.hpp>
 
@@ -529,12 +534,10 @@ class KMemoryTreeNodeSearch {
 
 }; /* KMemoryTreeNodeSearch */
 
-# define CUT false
-
 template <int K>
-class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
+class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
 
-    using Base = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
+    using Base = typename KHPTree<K, KMemoryTreeNodeSearch<K>>::Node;
     using Hypercube = KHypercube<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
@@ -591,7 +594,7 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node::dump_str(f);
+            KHPTree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
         }
 
         void
@@ -612,17 +615,17 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node {
 }; /* KMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>, public Lockable, public MemoryCoherencyController {
+class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable, public MemoryCoherencyController {
 
     public:
-        using Base = KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>;
+        using Base = KHPTree<K, KMemoryTreeNodeSearch<K>>;
         using Hypercube = KHypercube<K>;
         using MemoryBlock = KMemoryBlock<K>;
         using MemoryForward = KMemoryForward<K>;
         using MemoryReplicate = KMemoryReplicate<K>;
         using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
         using Node = KMemoryTreeNode<K>;
-        using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>, CUT>::Node;
+        using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>>::Node;
         using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
         using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
         using Search = KMemoryTreeNodeSearch<K>;
@@ -1856,20 +1859,6 @@ next_view:
                     }
                 }
             }
-        }
-
-        bool
-        should_cut(
-            Search & search,
-            Hypercube & h,
-            NodeBase * parent,
-            int k
-        ) const {
-            (void) search;
-            (void) h;
-            (void) parent;
-            (void) k;
-            return false;
         }
 
         //////////////////

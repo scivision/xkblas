@@ -5,21 +5,67 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 20:57:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 21:45:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
+//  Usage recommendation
+//
+//  Implement a new structure on top of a khp-tree, lets say `toto-tree.hpp`
+//  In `toto-tree.hpp` , before including `khp-tree.hpp`, explicitely define
+//  all of these depending on your need:
+//      - KHP_TREE_REBALANCE
+//      - KHP_TREE_CUT_ON_INSERT
+//      - KHP_TREE_MAINTAIN_SIZE
+//      - KHP_TREE_MAINTAIN_HEIGHT
+//
+//  See each variable definition in this file for details.
+//
+//  If you are scare to break the data structure, or suspect a bug, you should
+//  set `KHP_TREE_ENABLE_COHERENCY_CHECKS`.  It adds several coherency checks
+//  on each operations, but severely slowdowns the execution making most operations O(n^2).
+
+
 // TODO PERFORMANCES IDEA
-//  - read-only references when possible, lots of 'Hypercube' copies atm
 //  - remove the use of 'virtual' to replace with template 'node' type and inlined functions
 
 #ifndef __KHP_TREE_H__
 # define __KHP_TREE_H__
 
+// Whether to automatically rebalance the tree.
+// This only makes sense if cutting the tree.
+// If this is set, you should also set `KHP_TREE_MAINTAIN_SIZE` and
+// `KHP_TREE_MAINTAIN_HEIGHT` to avoid O(n) on each imbalance checks
+# ifndef KHP_TREE_REBALANCE
+#  define KHP_TREE_REBALANCE 0
+# endif
+
+# ifndef KHP_TREE_CUT_ON_INSERT
+#  define KHP_TREE_CUT_ON_INSERT 0
+# endif /* KHP_TREE_CUT_ON_INSERT */
+
+# if KHP_TREE_CUT_ON_INSERT && !KHP_TREE_REBALANCE
+#  pragma message("`KHP_TREE_CUT_ON_INSERT` is set but not `KHP_TREE_REBALANCE` - it means the tree might get imbalanced if cutting occurs")
+# endif
+
+// whether 'height' and 'size' should be computed lazily (i.e. O(n) on each
+// call) or maintained after insertion/rotations
+# ifndef KHP_TREE_MAINTAIN_SIZE
+#  define KHP_TREE_MAINTAIN_SIZE 0
+# endif /* KHP_TREE_MAINTAIN_SIZE */
+
+# ifndef KHP_TREE_MAINTAIN_HEIGHT
+#  define KHP_TREE_MAINTAIN_HEIGHT 0
+# endif /* KHP_TREE_MAINTAIN_HEIGHT */
+
+# if KHP_TREE_REBALANCE && (!KHP_TREE_MAINTAIN_SIZE || !KHP_TREE_MAINTAIN_HEIGHT)
+#  pragma message("`KHP_TREE_REBALANCE` but `KHP_TREE_MAINTAIN_SIZE` and `KHP_TREE_MAINTAIN_HEIGHT` are not. Consider setting them too to avoid O(n) on each operation")
+# endif
+
 // tree assert, must be called within a member function
-# ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
+# if KHP_TREE_ENABLE_COHERENCY_CHECKS
 #  pragma message("Unset `KHP_TREE_ENABLE_COHERENCY_CHECKS` for max performance")
 #  define tassert(expr)                                                         \
     do {                                                                        \
@@ -49,17 +95,6 @@ using namespace std::placeholders;
 
 # include <ostream>
 # include <iostream>
-
-#ifdef DEBUG
-# undef DEBUG
-# define DEBUG(...)             \
-    do {                        \
-        printf(__VA_ARGS__);    \
-        printf("\n");           \
-    } while (0);
-#else
-# define DEBUG(...)
-#endif
 
 # include <cstdint>
 
@@ -109,7 +144,7 @@ do {                                                                    \
  *  T is search type
  *  C is whether to cut included nodes or not
  */
-template<int K, typename T, bool CUT>
+template<int K, typename T>
 class KHPTree {
 
     public:
@@ -147,11 +182,15 @@ class KHPTree {
 
                 struct {
                     Hypercube hypercube;    // subtree englobing cube
-                    int nelements[K];       // subtree number of elements
+                    # if KHP_TREE_MAINTAIN_SIZE
+                    int size[K];            // subtree number of elements
+                    # endif /* KHP_TREE_MAINTAIN_SIZE */
+                    # if KHP_TREE_MAINTAIN_HEIGHT
                     int height[K];          // subtree height
+                    # endif /* KHP_TREE_MAINTAIN_SIZE */
                 } includes;
 
-                #ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
+                #if KHP_TREE_ENABLE_COHERENCY_CHECKS
                 struct {
                     int id;
                 } checks;
@@ -178,12 +217,16 @@ class KHPTree {
 
                     this->includes.hypercube.copy(h);
 
-                    memset(this->includes.nelements, 0, sizeof(this->includes.nelements));
-                    this->includes.nelements[k] = 1;
+                    # if KHP_TREE_MAINTAIN_SIZE
+                    memset(this->includes.size, 0, sizeof(this->includes.size));
+                    this->includes.size[k] = 1;
+                    # endif /* KHP_TREE_MAINTAIN_SIZE */
 
+                    # if KHP_TREE_MAINTAIN_HEIGHT
                     memset(this->includes.height, 0, sizeof(this->includes.height));
                     for (int i = k ; i < K ; ++i)
                         this->includes.height[i] = 1;
+                    # endif /* KHP_TREE_MAINTAIN_HEIGHT */
 
                     this->colors[k] = color;
                 }
@@ -200,6 +243,7 @@ class KHPTree {
                     return reinterpret_cast<Node *>(this->st[k].children[dir]);
                 }
 
+                # if KHP_TREE_MAINTAIN_HEIGHT
                 inline void
                 update_includes_height(void)
                 {
@@ -211,6 +255,34 @@ class KHPTree {
                     }
                 }
 
+                inline int
+                height(int k) const
+                {
+                    return this->includes.height[k];
+                }
+
+                # else /* KHP_TREE_MAINTAIN_HEIGHT */
+
+                inline int
+                height(int k) const
+                {
+                    int hleft  = this->st[k].left  ? this->st[k].left->height(k)  : 0;
+                    int hright = this->st[k].right ? this->st[k].right->height(k) : 0;
+                    return 1 + MAX(hleft, hright);
+                }
+
+                # endif /* KHP_TREE_MAINTAIN_HEIGHT */
+
+                inline int
+                height(void) const
+                {
+                    int height = 0;
+                    for (int k = 0 ; k < K ; ++k)
+                        height = MAX(height, this->height(k));
+                    return height;
+                }
+
+                # if KHP_TREE_MAINTAIN_SIZE
                 // TODO : maintaining the size (n-k) per k-tree is a bothersome O(K²)
                 // It is currently used to detecting imbalance on a k-subtree
                 //
@@ -218,21 +290,53 @@ class KHPTree {
                 // and if load imbalance is detected - h >=2*K*log(n) - then compute
                 // the n-k's and rebalance where it needs
                 inline void
-                update_includes_nelements(void)
+                update_includes_size(void)
                 {
                     for (int k = 0 ; k < K ; ++k)
-                        this->includes.nelements[k] = 0;
-                    this->includes.nelements[this->k] = 1;
+                        this->includes.size[k] = 0;
+                    this->includes.size[this->k] = 1;
 
                     for (int k = this->k ; k < K ; ++k)
                     {
                         for (int kk = 0 ; kk < K ; ++kk)
                         {
-                            int nl = this->st[kk].left  ? this->st[kk].left->includes.nelements[k]  : 0;
-                            int nr = this->st[kk].right ? this->st[kk].right->includes.nelements[k] : 0;
-                            this->includes.nelements[k] += nr + nl;
+                            int nl = this->st[kk].left  ? this->st[kk].left->includes.size[k]  : 0;
+                            int nr = this->st[kk].right ? this->st[kk].right->includes.size[k] : 0;
+                            this->includes.size[k] += nr + nl;
                         }
                     }
+                }
+
+                inline int
+                size(const int k) const
+                {
+                    return this->includes.size[k];
+                }
+
+                # else /* KHP_TREE_MAINTAIN_SIZE */
+
+                inline int
+                size(const int k) const
+                {
+                    int s = (k == this->k) ? 1 : 0;
+                    for (int kk = 0 ; kk < K ; ++kk)
+                    {
+                        int nl = this->st[kk].left  ? this->st[kk].left->size(k)  : 0;
+                        int nr = this->st[kk].right ? this->st[kk].right->size(k) : 0;
+                        s += nr + nl;
+                    }
+                    return s;
+                }
+
+                # endif /* KHP_TREE_MAINTAIN_SIZE */
+
+                inline int
+                size(void) const
+                {
+                    int s = 0;
+                    for (int k = 0 ; k < K ; ++k)
+                        s += this->size(k);
+                    return s;
                 }
 
                 inline void
@@ -263,26 +367,14 @@ class KHPTree {
                 update_includes(void)
                 {
                     this->update_includes_interval();
-                    this->update_includes_nelements();
+
+                    # if KHP_TREE_MAINTAIN_SIZE
+                    this->update_includes_size();
+                    # endif /* KHP_TREE_MAINTAIN_SIZE */
+
+                    # if KHP_TREE_MAINTAIN_HEIGHT
                     this->update_includes_height();
-                }
-
-                inline int
-                size(void) const
-                {
-                    int nelements = 0;
-                    for (int k = 0 ; k < K ; ++k)
-                        nelements += this->includes.nelements[k];
-                    return nelements;
-                }
-
-                inline int
-                height(void) const
-                {
-                    int height = 0;
-                    for (int k = 0 ; k < K ; ++k)
-                        height = MAX(height, this->includes.height[k]);
-                    return height;
+                    # endif /* KHP_TREE_MAINTAIN_HEIGHT */
                 }
 
                 void
@@ -328,13 +420,11 @@ class KHPTree {
 
                     if (K == 2)
                     {
-                        fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nnelements={%d, %d}\\nheight=%d",
+                        fprintf(f, "k=%d\\n%s\\n\\n--- includes ---\\n%s\\nsize=%d\\nheight=%d",
                             this->k,
                             cube,
                             include_cube,
                             this->size(),
-                            this->includes.nelements[0],
-                            this->includes.nelements[1],
                             this->height()
                         );
                     }
@@ -803,7 +893,7 @@ class KHPTree {
             this->insert_finalize(node, t);
         }
 
-# ifdef KHP_TREE_REBALANCE
+# if KHP_TREE_REBALANCE
         static inline void
         compress(Node * root, int k, int m)
         {
@@ -884,7 +974,7 @@ class KHPTree {
             pseudo_root.st[k].right = root;
 
             rbtree_to_vine(&pseudo_root, k);
-            int height = vine_to_rbtree(&pseudo_root, k, root->includes.nelements[k]);
+            int height = vine_to_rbtree(&pseudo_root, k, root->size(k));
 
             // fixup the tree
             Node * new_root = pseudo_root.st[k].right;
@@ -898,7 +988,7 @@ class KHPTree {
 
             rebalance_fixup(nullptr, new_root, k, 0, height);
 
-# ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
+# if KHP_TREE_ENABLE_COHERENCY_CHECKS
             this->coherency(root->includes.hypercube);
 # endif /* KHP_TREE_ENABLE_COHERENCY_CHECKS */
         }
@@ -923,9 +1013,9 @@ class KHPTree {
         // heuristic to determine whether the tree needs rebalancing
         template<int KDIM>
         inline int
-        requires_rebalance(const int nelements, const int height) const
+        requires_rebalance(const int size, const int height) const
         {
-            int ideal_height = khp_log2(nelements + 1);
+            int ideal_height = khp_log2(size + 1);
             // return (height >= 8 && height > 2 * KDIM * ideal_height);
             return (height > 2 * KDIM * ideal_height);
         }
@@ -934,18 +1024,18 @@ class KHPTree {
         inline int
         requires_rebalance(Node * root, int k)
         {
-            const int nelements = root->includes.nelements[k];
-            const int height = root->includes.height[k];
-            return this->requires_rebalance<1>(nelements, height);
+            const int   size = root->size(k);
+            const int height = root->height(k);
+            return this->requires_rebalance<1>(size, height);
         }
 
         // if the btree at 'root' requires rebalance
         inline int
         requires_rebalance(Node * root) const
         {
-            const int nelements = root->size();
+            const int size = root->size();
             const int height = root->height();
-            return this->requires_rebalance<K>(nelements, height);
+            return this->requires_rebalance<K>(size, height);
         }
 
         // if 'this' btree requires rebalance
@@ -960,7 +1050,7 @@ class KHPTree {
         void
         post_insert(const Hypercube & h)
         {
-# ifdef KHP_TREE_REBALANCE
+# if KHP_TREE_REBALANCE
 #  pragma message("Automatic rebalance enabled.")
             if (this->requires_rebalance())
                 this->rebalance();
@@ -968,7 +1058,7 @@ class KHPTree {
 #  pragma message("Automatic rebalance disabled. Enable it with '-DKHP_TREE_REBALANCE'")
 # endif /* KHP_TREE_REBALANCE */
 
-# ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
+# if KHP_TREE_ENABLE_COHERENCY_CHECKS
             this->coherency(h);
 # else
             (void) h;
@@ -1004,21 +1094,20 @@ class KHPTree {
             {
                 // quick-way out, if the cube includes all subcube with an
                 // 'out' access, we can discard all children
-                if constexpr(CUT)
+                # if KHP_TREE_CUT_ON_INSERT
+                if (h.includes(parent->includes.hypercube, k))
                 {
-                    if (h.includes(parent->includes.hypercube, k))
+                    // the includes test is accelerated as we know we are
+                    // already matching dimensions <k
+                    if (this->should_cut(t, h, parent, k))
                     {
-                        // the includes test is accelerated as we know we are
-                        // already matching dimensions <k
-                        if (this->should_cut(t, h, parent, k))
-                        {
-                            // TODO : what if 'node' is not null ?  probably want to
-                            // return something to callee for the case (3)
-                            this->insert_from_cut(t, h, parent);
-                            break ;
-                        }
+                        // TODO : what if 'node' is not null ?  probably want to
+                        // return something to callee for the case (3)
+                        this->insert_from_cut(t, h, parent);
+                        break ;
                     }
                 }
+                # endif /* KHP_TREE_CUT_ON_INSERT */
 
                 // case (1)    J << I
                 if (h[k].b <= parent->hypercube[k].a)
@@ -1222,7 +1311,7 @@ class KHPTree {
             fprintf(f, "\\end{document}\n");
         }
 
-#ifdef KHP_TREE_ENABLE_COHERENCY_CHECKS
+#if KHP_TREE_ENABLE_COHERENCY_CHECKS
 
     public:
         //////////////////////
@@ -1283,14 +1372,14 @@ class KHPTree {
         coherency_hypercube_includes_foreach(Node * node, void * args) const
         {
             (void) args;
-            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_hypercube_includes_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_hypercube_includes_check, this, _1, _2);
             foreach_node(node, f, node);
         }
 
         void
         coherency_hypercube_includes(Node * root) const
         {
-            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_hypercube_includes_foreach, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_hypercube_includes_foreach, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1305,14 +1394,14 @@ class KHPTree {
         coherency_hypercube_disjoint_for(Node * node, void * args) const
         {
             Node * root = (Node *) args;
-            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_hypercube_disjoint_compare, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_hypercube_disjoint_compare, this, _1, _2);
             foreach_node(root, f, node);
         }
 
         void
         coherency_hypercube_disjoint(Node * root) const
         {
-            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_hypercube_disjoint_for, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_hypercube_disjoint_for, this, _1, _2);
             foreach_node(root, f, root);
         }
 
@@ -1339,8 +1428,10 @@ class KHPTree {
         coherency_black_height_k(Node * node, int k) const
         {
             // when cut is enabled, black_height is not guaranteed
-            if (CUT)
+            // TODO: is this a problem ?
+            # if KHP_TREE_CUT_ON_INSERT
                 return 1;
+            # endif /* KHP_TREE_CUT_ON_INSERT */
 
             if (node == nullptr)
                 return 1;
@@ -1369,34 +1460,35 @@ class KHPTree {
         coherency_balance(void) const
         {
             int height    = this->height();
-            int nelements = this->size();
-            int ideal_height = khp_log2(nelements + 1);
-            if constexpr(CUT)
-                tassert(height <  2 * K * ideal_height || height < 8);
-            else
-                tassert(height <= 2 * K * ideal_height);
+            int size = this->size();
+            int ideal_height = khp_log2(size + 1);
+            # if KHP_TREE_CUT_ON_INSERT
+            tassert(height <  2 * K * ideal_height || height < 8);
+            # else
+            tassert(height <= 2 * K * ideal_height);
+            # endif /* KHP_TREE_CUT_ON_INSERT */
         }
 
         void
-        coherency_nelements(Node * node) const
+        coherency_size(Node * node) const
         {
-            int nelements[K];
+            int size[K];
             for (int k = 0 ; k < K ; ++k)
-                nelements[k] = 0;
-            nelements[node->k] = 1;
+                size[k] = 0;
+            size[node->k] = 1;
 
             for (int k = node->k ; k < K ; ++k)
             {
                 for (int kk = 0 ; kk < K ; ++kk)
                 {
-                    int nl = node->st[kk].left  ? node->st[kk].left->includes.nelements[k]  : 0;
-                    int nr = node->st[kk].right ? node->st[kk].right->includes.nelements[k] : 0;
-                    nelements[k] += nr + nl;
+                    int nl = node->st[kk].left  ? node->st[kk].left->size(k)  : 0;
+                    int nr = node->st[kk].right ? node->st[kk].right->size(k) : 0;
+                    size[k] += nr + nl;
                 }
             }
 
             for (int k = 0 ; k < K ; ++k)
-                tassert(nelements[k] == node->includes.nelements[k]);
+                tassert(size[k] == node->size(k));
         }
 
         void
@@ -1415,8 +1507,8 @@ class KHPTree {
         void
         coherency_from(Node * root) const
         {
-            /* 2. check per-node nelements */
-            coherency_nelements(root);
+            /* 2. check per-node size */
+            coherency_size(root);
 
             /* 3. If a node is red, then both its children are black */
             coherency_color(root);
@@ -1453,7 +1545,7 @@ class KHPTree {
         void
         coherency_hypercube_represented(Hypercube cube)
         {
-            auto f = std::bind(&KHPTree<K, T, CUT>::coherency_hypercube_represented_check, this, _1, _2);
+            auto f = std::bind(&KHPTree<K, T>::coherency_hypercube_represented_check, this, _1, _2);
             foreach_node(this->root, f, &cube);
         }
 
@@ -1470,7 +1562,7 @@ class KHPTree {
                 this->coherency_from(this->root);
 
                 /* ensure the cube is represented in the tree */
-                this->coherency_hypercube_represented(cube);
+                this->coherency_hypercube_represented(h);
 
                 /* 7. check balance */
                 this->coherency_balance();
@@ -1507,10 +1599,12 @@ class KHPTree {
             const Node * inherit
         ) const = 0;
 
+        # if KHP_TREE_CUT_ON_INSERT
         /* called when the node being inserting includes all the descendent tree
          * return true if the subtree should be cut, false otherwise (in such
          * case, the insertion is propagated to all the subtree */
         virtual bool should_cut(T & t, Hypercube & h, Node * parent, int k) const = 0;
+        # endif /* KHP_TREE_CUT_ON_INSERT */
 
         /* called whenever this node is added to the tree */
         virtual void on_insert(Node * node, T & t) = 0;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 20:52:38 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 21:45:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,9 +14,13 @@
 #ifndef __DEPENDENCY_TREE_HPP__
 # define __DEPENDENCY_TREE_HPP__
 
+# define KHP_TREE_REBALANCE         0
+# define KHP_TREE_CUT_ON_INSERT     0
+# define KHP_TREE_MAINTAIN_SIZE     0
+# define KHP_TREE_MAINTAIN_HEIGHT   0
+# include <xkrt/memory/khp-tree.hpp>
 # include <xkrt/task/dependency-domain.hpp>
 # include <xkrt/task/task.hpp>
-# include <xkrt/memory/khp-tree.hpp>
 
 # include <vector>
 # include <unordered_map>
@@ -64,12 +68,10 @@ class KDependencyTreeSearch
 
 } /* class KDependencyTreeSearch */;
 
-# define CUT false
-
 template <int K>
-class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node {
+class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 
-    using Base      = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
+    using Base      = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
     using Node      = KDependencyTreeNode<K>;
     using Hypercube = KHypercube<K>;
     using Search    = KDependencyTreeSearch<K>;
@@ -136,21 +138,21 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
         inline void
         update_includes(void)
         {
-            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::update_includes();
+            KHPTree<K, KDependencyTreeSearch<K>>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
         }
 
         void
         dump_hypercube_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node::dump_hypercube_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_hypercube_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -162,14 +164,14 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>, CUT>::No
 };
 
 template<int K>
-class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public DependencyDomain
+class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public DependencyDomain
 {
-    using Base      = KHPTree<K, KDependencyTreeSearch<K>, CUT>;
+    using Base      = KHPTree<K, KDependencyTreeSearch<K>>;
     using Hypercube = KHypercube<K>;
 
     public:
     using Node     = KDependencyTreeNode<K>;
-    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>, CUT>::Node;
+    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
 
         using Search = KDependencyTreeSearch<K>;
 
@@ -252,19 +254,6 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>, CUT>, public
         ) const {
             (void) search;
             return new Node(h, k, color, reinterpret_cast<const Node *>(inherit));
-        }
-
-        inline bool
-        should_cut(
-            Search & search,
-            Hypercube & h,
-            NodeBase * parent,
-            int k
-        ) const {
-            (void) h;
-            (void) parent;
-            (void) k;
-            return search.access->mode & ACCESS_MODE_W;
         }
 
         //////////////////
