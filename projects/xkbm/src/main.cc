@@ -30,15 +30,16 @@ void  xkrt_benchmark_push(benchmark_node_t *);
 
 backend_t backends[] = {
  // {"AML",     0                 , aml_benchmark_push  , aml_benchmark_init,  aml_benchmark_deinit     },
-    {"XKRT",    1                 , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
+//    {"XKRT",    1                 , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
   //{"CUDA",    XKRT_SUPPORT_CUDA ,  cuda_benchmark_push, NULL               , NULL                     },
-  //  {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
+    {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
   //{"HWLOC",   1,                , hwloc_benchmark_push, NULL               , NULL                     },
 };
 
 benchmark_node_t xkbm = {
     .name = "xkbm",
     .desc = "The XKBM benchmarks suite",
+    .parent = NULL,
     .children = { NULL },
     .nchildren = 0,
     .run = NULL,
@@ -140,12 +141,12 @@ load_conf(benchmark_node_t * bench)
 //////////
 
 int
-main(int argc, char ** argv)
+main(void)
 {
     LOGGER_INFO("----------------------------------");
     LOGGER_INFO("%9s | %9s", "Backend", "Enabled");
     LOGGER_INFO("----------------------------------");
-    for (int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
+    for (unsigned int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
     {
         backend_t * backend = backends + i;
         const int enabled = backend->enabled ? 1 : 0;
@@ -158,7 +159,7 @@ main(int argc, char ** argv)
     HWLOC_SAFE_CALL(hwloc_topology_load( TOPOLOGY));
 
     // init
-    for (int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
+    for (unsigned int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
     {
         backend_t * backend = backends + i;
         backend->benchmark_push(&xkbm);
@@ -173,7 +174,7 @@ main(int argc, char ** argv)
     benchmark_run(&xkbm);
 
     // deinit
-    for (int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
+    for (unsigned int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
     {
         backend_t * backend = backends + i;
         if (backend->enabled && backend->deinit)

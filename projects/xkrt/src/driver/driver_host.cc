@@ -33,6 +33,7 @@
 static int
 XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
 {
+    (void) ndevices;
     return 0;
 }
 
@@ -42,6 +43,8 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(
     char * buffer,
     size_t size
 ) {
+    (void) device_driver_id;
+
     // Initialize and load topology
     hwloc_topology_t topology;
     hwloc_topology_init(&topology);
@@ -78,6 +81,7 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
 {
+    (void) topology;
     assert(device_driver_id == 0);
     pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), schedset);
     return 0;
@@ -86,6 +90,7 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
 static xkrt_device_t *
 XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_id)
 {
+    (void) driver;
     assert(device_driver_id == 0);
     static xkrt_device_t device;
     return &device;
@@ -94,11 +99,13 @@ XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_
 static void
 XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
 {
+    (void) device_driver_id;
 }
 
 static int
 XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 {
+    (void) device_driver_id;
     return 0;
 }
 
@@ -106,6 +113,8 @@ XKRT_DRIVER_ENTRYPOINT(device_destroy)(int device_driver_id)
 static int
 XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id, xkrt_device_global_id_bitfield_t * affinity)
 {
+    (void) device_driver_id;
+    (void) affinity;
     return 0;
 }
 
@@ -113,70 +122,99 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(int device_driver_id, xkrt_device_global_i
 // STREAM //
 ////////////
 
+# if 0
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
     xkrt_stream_t * istream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
 ) {
+    (void) istream;
+    (void) instr;
+    (void) idx;
     return 0;
 }
+# endif
 
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
     int device_driver_id,
     xkrt_stream_type_t stype
 ) {
+    (void) stype;
     assert(device_driver_id == 0);
     return 0;
 }
 
+# if 0
 static int
 XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
     xkrt_stream_t * istream,
     xkrt_stream_instruction_t * instr,
     xkrt_stream_instruction_counter_t idx
-
 ) {
+    (void)istream;
+    (void)instr;
+    (void)idx;
     assert(0);
     return EINPROGRESS;
 }
+# endif
 
+# if 0
 static xkrt_stream_t *
 XKRT_DRIVER_ENTRYPOINT(stream_create)(
     xkrt_device_t * idevice,
     xkrt_stream_type_t type,
     xkrt_stream_instruction_counter_t capacity
 ) {
+    (void)idevice;
+    (void)type;
+    (void)capacity;
     assert(0);
     return NULL;
 }
+# endif
 
+# if 0
 static void
 XKRT_DRIVER_ENTRYPOINT(stream_delete)(
     xkrt_stream_t * istream
 ) {
+    (void)istream;
     assert(0);
 }
+# endif
 
 ////////////
 // MEMORY //
 ////////////
 
+# if 0
 static void *
 XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size, int area_idx)
 {
+    (void)device_driver_id;
+    (void)size;
+    (void)area_idx;
     return NULL;
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
+    (void)device_driver_id;
+    (void)ptr;
+    (void)size;
+    (void)area_idx;
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories)
 {
+    (void)device_driver_id;
+    (void)info;
+    (void)nmemories;
 }
 
 static void *
@@ -184,6 +222,8 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
     int device_driver_id,
     uint64_t size
 ) {
+    (void)device_driver_id;
+    (void)size;
     return NULL;
 }
 
@@ -193,6 +233,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_deallocate)(
     void * mem,
     uint64_t size
 ) {
+    (void)device_driver_id;
+    (void)mem;
+    (void)size;
 }
 
 xkrt_driver_module_t
@@ -202,6 +245,10 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
     size_t binsize,
     xkrt_driver_module_format_t format
 ) {
+    (void)device_driver_id;
+    (void)bin;
+    (void)binsize;
+    (void)format;
     return NULL;
 }
 
@@ -209,6 +256,7 @@ void
 XKRT_DRIVER_ENTRYPOINT(module_unload)(
     xkrt_driver_module_t module
 ) {
+    (void)module;
 }
 
 xkrt_driver_module_fn_t
@@ -216,8 +264,11 @@ XKRT_DRIVER_ENTRYPOINT(module_get_fn)(
     xkrt_driver_module_t module,
     const char * name
 ) {
+    (void)module;
+    (void)name;
     return NULL;
 }
+# endif
 
 //////////////////////////
 // Routine registration //

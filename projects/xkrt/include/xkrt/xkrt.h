@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:35:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/01 21:47:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -65,7 +65,6 @@ extern "C" {
         size_t m, size_t n,
         size_t sizeof_type
     );
-
 
     ////////////////
     // DISTRIBUTE //

@@ -338,7 +338,7 @@ xkrt_device_t::offloader_stream_instructions_launch(
             int r = stream->launch_ready_instructions();
             stream->unlock();
 
-            switch (err)
+            switch (r)
             {
                 case (0):
                     break ;

@@ -52,7 +52,7 @@ static xkrt_device_ze_t *
 device_ze_get(int device_driver_id)
 {
     assert(device_driver_id >= 0);
-    assert(device_driver_id < ze_n_devices);
+    assert((uint32_t) device_driver_id < ze_n_devices);
     return DEVICES + device_driver_id;
 }
 
@@ -133,7 +133,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 
         // sycl interop
         # if XKRT_SUPPORT_SYCL
-        sycl::platform platform = sycl::ext::oneapi::level_zero::make_platform((pi_native_handle) ze_driver);
+        sycl::platform platform = sycl::make_platform<sycl::backend::ext_oneapi_level_zero>(ze_driver);
         # endif /* XKRT_SUPPORT_SYCL */
 
         for (unsigned int i = 0 ; i < ndevices ; ++i)
@@ -156,11 +156,11 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 
             # if XKRT_SUPPORT_SYCL
             // sycl interop
-            device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
+            device->sycl.device = sycl::ext::oneapi::level_zero::detail::make_device(platform, (ur_native_handle_t) ze_device);
 
             std::vector<sycl::device> sycl_devices(1);
             sycl_devices[0] = device->sycl.device;
-            device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
+            device->sycl.context = sycl::make_context<sycl::backend::ext_oneapi_level_zero>(sycl_devices, device->ze.context, 1);
             # endif /* XKRT_SUPPORT_SYCL */
 
             # if XKRT_SUPPORT_ZES
@@ -254,6 +254,7 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
 static xkrt_device_t *
 XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_id)
 {
+    (void) driver;
     assert(device_driver_id >= 0 && device_driver_id < XKRT_DEVICES_MAX);
 
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
@@ -437,6 +438,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_suggest)(
     int device_driver_id,
     xkrt_stream_type_t stype
 ) {
+    (void) device_driver_id;
+
     switch (stype)
     {
         case (XKRT_STREAM_TYPE_KERN):
@@ -482,7 +485,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
             {
                 res = zeEventQueryStatus(stream->ze.events.list[idx]);
                 if (res == ZE_RESULT_NOT_READY)
-                    sched_yield();
+                {
+                //    sched_yield();
+                }
                 else if (res == ZE_RESULT_SUCCESS)
                     return 0;
                 else
@@ -670,10 +675,10 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 
     # if XKRT_SUPPORT_SYCL
     sycl::property_list props = {}; /* how to convert `ze_command_queue_desc` to `sycl::property_list` ? */
-    sycl::queue queue = sycl::ext::oneapi::level_zero::make_queue(
+    sycl::queue queue = sycl::make_queue<sycl::backend::ext_oneapi_level_zero>(
         device->sycl.context,
         device->sycl.device,
-        (pi_native_handle) stream->ze.command.list,
+        (ur_native_handle_t) stream->ze.command.list,
         true,   /* immediate */
         true,   /* keep ownership */
         props
@@ -814,6 +819,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
 {
+    (void) size;
+    (void) area_idx;
+
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
 }
@@ -827,7 +835,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     info->capacity = device->ze.device_properties.maxMemAllocSize;
     *nmemories = device->ze.memory.pcount;
-    for (int i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+    for (uint32_t i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
         info[i].capacity = device->ze.memory.properties[i].totalSize;
         strncpy(info[i].name, device->ze.memory.properties[i].name, MIN(sizeof(device->ze.memory.properties[i].name), sizeof(info[i].name)));

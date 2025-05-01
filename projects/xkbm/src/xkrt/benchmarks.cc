@@ -101,7 +101,7 @@ static xkrt_driver_module_fn_t XKBM_CU_KERNEL_EMPTY[XKRT_DEVICES_MAX];
 
 // an empty spirv kernel
 const uint8_t SPIRV_EMPTY_KERNEL[] = {
-#  include <xkbm/kernels/empty.spvbin>
+#  include <xkbm/kernels/empty.spv.bytes>
 };
 
 static xkrt_driver_module_fn_t XKBM_ZE_KERNEL_EMPTY[XKRT_DEVICES_MAX];

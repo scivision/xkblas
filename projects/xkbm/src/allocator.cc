@@ -42,6 +42,7 @@ xkbm_alloc_and_touch(const size_t size)
 void
 xkbm_free(void * ptr, size_t size)
 {
+    (void) size;
     # if USE_MMAP
     munmap(ptr, size);
     # else

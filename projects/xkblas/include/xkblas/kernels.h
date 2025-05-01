@@ -14,9 +14,9 @@
 #ifndef __KERNELS_H__
 # define __KERNELS_H__
 
-# include "skernels.h"
-# include "dkernels.h"
-# include "ckernels.h"
-# include "zkernels.h"
+# include <xkblas/skernels.h>
+# include <xkblas/dkernels.h>
+# include <xkblas/ckernels.h>
+# include <xkblas/zkernels.h>
 
 #endif /* __KERNELS_H__ */
