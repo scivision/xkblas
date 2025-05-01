@@ -1,2 +1,5 @@
 __kernel
-void empty_kernel(void) {}
+void
+empty_kernel(void)
+{
+}

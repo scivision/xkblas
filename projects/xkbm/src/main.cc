@@ -30,9 +30,9 @@ void  xkrt_benchmark_push(benchmark_node_t *);
 
 backend_t backends[] = {
  // {"AML",     0                 , aml_benchmark_push  , aml_benchmark_init,  aml_benchmark_deinit     },
-    {"XKRT",    1                 , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
+//    {"XKRT",    1                 , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
   //{"CUDA",    XKRT_SUPPORT_CUDA ,  cuda_benchmark_push, NULL               , NULL                     },
-  //  {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
+    {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
   //{"HWLOC",   1,                , hwloc_benchmark_push, NULL               , NULL                     },
 };
 

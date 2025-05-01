@@ -133,7 +133,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 
         // sycl interop
         # if XKRT_SUPPORT_SYCL
-        sycl::platform platform = sycl::ext::oneapi::level_zero::make_platform((pi_native_handle) ze_driver);
+        sycl::platform platform = sycl::make_platform<sycl::backend::ext_oneapi_level_zero>(ze_driver);
         # endif /* XKRT_SUPPORT_SYCL */
 
         for (unsigned int i = 0 ; i < ndevices ; ++i)
@@ -156,11 +156,11 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices_requested)
 
             # if XKRT_SUPPORT_SYCL
             // sycl interop
-            device->sycl.device = sycl::ext::oneapi::level_zero::make_device(platform, (pi_native_handle) ze_device);
+            device->sycl.device = sycl::ext::oneapi::level_zero::detail::make_device(platform, (ur_native_handle_t) ze_device);
 
             std::vector<sycl::device> sycl_devices(1);
             sycl_devices[0] = device->sycl.device;
-            device->sycl.context = sycl::ext::oneapi::level_zero::make_context(sycl_devices, (pi_native_handle)device->ze.context, 1);
+            device->sycl.context = sycl::make_context<sycl::backend::ext_oneapi_level_zero>(sycl_devices, device->ze.context, 1);
             # endif /* XKRT_SUPPORT_SYCL */
 
             # if XKRT_SUPPORT_ZES
@@ -482,7 +482,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
             {
                 res = zeEventQueryStatus(stream->ze.events.list[idx]);
                 if (res == ZE_RESULT_NOT_READY)
-                    sched_yield();
+                {
+                //    sched_yield();
+                }
                 else if (res == ZE_RESULT_SUCCESS)
                     return 0;
                 else
@@ -670,10 +672,10 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
 
     # if XKRT_SUPPORT_SYCL
     sycl::property_list props = {}; /* how to convert `ze_command_queue_desc` to `sycl::property_list` ? */
-    sycl::queue queue = sycl::ext::oneapi::level_zero::make_queue(
+    sycl::queue queue = sycl::make_queue<sycl::backend::ext_oneapi_level_zero>(
         device->sycl.context,
         device->sycl.device,
-        (pi_native_handle) stream->ze.command.list,
+        (ur_native_handle_t) stream->ze.command.list,
         true,   /* immediate */
         true,   /* keep ownership */
         props
