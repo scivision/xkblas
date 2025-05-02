@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/07 16:23:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 14:41:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,8 +31,10 @@
 # include <functional>
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
-{
+XKRT_DRIVER_ENTRYPOINT(init)(
+    unsigned int ndevices,
+    bool use_p2p
+) {
     (void) ndevices;
     return 0;
 }

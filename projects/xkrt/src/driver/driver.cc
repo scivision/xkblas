@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:51:13 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 14:43:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,6 +43,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     unsigned int ndevices_requested  = runtime->conf.device.ngpus + 1;                      // host device + ngpus
     int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
     int drivers_mask        = runtime->conf.drivers_mask | (1 << XKRT_DRIVER_TYPE_HOST);    // always force host driver
+    bool use_p2p            = runtime->conf.device.use_p2p;
     assert(ndevices_requested < XKRT_DEVICES_MAX);
 
     // SET MEMBERS
@@ -122,7 +123,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
             LOGGER_INFO("Loading driver `%s`", driver_name);
 
             driver->ndevices_commited = 0;
-            if (driver->f_init == NULL || driver->f_init(ndevices_requested - ndevices))
+            if (driver->f_init == NULL || driver->f_init(ndevices_requested - ndevices, use_p2p))
             {
                 LOGGER_WARN("Failed to load");
                 return ;

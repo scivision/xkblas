@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:29:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 14:42:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -64,7 +64,7 @@ typedef struct  xkrt_driver_t
     ///////////////////////
     //  DRIVER LIFECYCLE //
     ///////////////////////
-    int (*f_init)(unsigned int ndevices);
+    int (*f_init)(unsigned int ndevices, bool use_p2p);
     void (*f_finalize)(void);
 
     /////////////////////////////////

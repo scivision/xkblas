@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:58:19 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 14:27:50 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,6 +45,7 @@ typedef struct  xkrt_conf_device_t
 {
     float gpu_mem_percent;              /* % of gpu memory to allocate initially */
     int ngpus;                          /* number of GPU for this node */
+    bool use_p2p;                       /* enable/disable p2p */
     xkrt_conf_offloader_t offloader;    /* offloader conf */
 }               xkrt_conf_device_t;
 

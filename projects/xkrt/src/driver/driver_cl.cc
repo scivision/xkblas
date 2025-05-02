@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:53:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 14:41:33 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -134,8 +134,12 @@ static void xkrt_cl_pfn_notify(
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
-{
+XKRT_DRIVER_ENTRYPOINT(init)(
+    unsigned int ndevices,
+    bool use_p2p
+) {
+    (void) use_p2p;
+
     assert(0 < ndevices);
     assert(ndevices <= XKRT_DEVICES_MAX);
 

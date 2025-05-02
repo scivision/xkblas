@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:53:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 15:26:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -85,10 +85,13 @@ static int        cu_device_count   = 0;
 static int *      cu_perf_topo      = NULL;
 static int        cu_count_perfrank = 0;
 static uint64_t * cu_perf_device    = NULL;
+static bool       cu_use_p2p        = false;
 
 static void
-get_gpu_topo(int ndevices)
-{
+get_gpu_topo(
+    unsigned int ndevices,
+    bool use_p2p
+) {
     cu_device_count = ndevices;
 
     int min_perf = 0;
@@ -97,50 +100,53 @@ get_gpu_topo(int ndevices)
     cu_perf_topo = (int *) malloc(sizeof(int) * cu_device_count * cu_device_count);
     assert(cu_perf_topo);
 
+    for (int i = 0; i < cu_device_count; ++i)
     // Enumerates Device <-> Device links and store perf_rank
     for (int i = 0; i < cu_device_count; ++i)
     {
         xkrt_device_cu_t * device_i = device_cu_get(i);
         for (int j = 0; j < cu_device_count; ++j)
         {
+            const int idx = i*cu_device_count+j;
             if (i == j)
             {
-                cu_perf_topo[i*cu_device_count+j] = 0;
+                // device to same device = highest perf
+                cu_perf_topo[idx] = 0;
             }
             else
             {
-                xkrt_device_cu_t * device_j = device_cu_get(j);
-                int perf_rank = 0;
-                int access_supported = 0;
+                cu_perf_topo[i*cu_device_count+j] = INT_MAX;
 
-                CU_SAFE_CALL(
-                    cuDeviceGetP2PAttribute(
-                       &access_supported,
-                        CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED,
-                        device_i->cu.device,
-                        device_j->cu.device
-                    )
-                );
-
-                if (access_supported)
+                if (use_p2p)
                 {
+                    xkrt_device_cu_t * device_j = device_cu_get(j);
+                    int perf_rank = 0;
+                    int access_supported = 0;
+
                     CU_SAFE_CALL(
-                        cuDeviceGetP2PAttribute(
-                           &perf_rank,
-                            CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK,
-                            device_i->cu.device,
-                            device_j->cu.device
-                        )
-                    );
+                            cuDeviceGetP2PAttribute(
+                                &access_supported,
+                                CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED,
+                                device_i->cu.device,
+                                device_j->cu.device
+                                )
+                            );
 
-                    cu_perf_topo[i*cu_device_count+j] = 1 + perf_rank;
-                    max_perf = MAX(perf_rank, max_perf);
-                    min_perf = MIN(perf_rank, min_perf);
-                }
-                else
-                {
-                    /* should be higher than previous value: computed after */
-                    cu_perf_topo[i*cu_device_count+j] = -1;
+                    if (access_supported)
+                    {
+                        CU_SAFE_CALL(
+                                cuDeviceGetP2PAttribute(
+                                    &perf_rank,
+                                    CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK,
+                                    device_i->cu.device,
+                                    device_j->cu.device
+                                    )
+                                );
+
+                        cu_perf_topo[i*cu_device_count+j] = 1 + perf_rank;
+                        max_perf = MAX(perf_rank, max_perf);
+                        min_perf = MIN(perf_rank, min_perf);
+                    }
                 }
             }
         }
@@ -150,7 +156,7 @@ get_gpu_topo(int ndevices)
     ++min_perf;
     for (int i = 0 ; i < cu_device_count*cu_device_count ; ++i)
     {
-        if (cu_perf_topo[i] == -1)
+        if (cu_perf_topo[i] == INT_MAX)
             cu_perf_topo[i] = min_perf + 1;
     }
 
@@ -178,8 +184,10 @@ get_gpu_topo(int ndevices)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
-{
+XKRT_DRIVER_ENTRYPOINT(init)(
+    unsigned int ndevices,
+    bool use_p2p
+) {
     CUresult err = cuInit(0);
     if (err != CUDA_SUCCESS)
     {
@@ -187,13 +195,15 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
             LOGGER_WARN("Tried to load Cuda driver with a stub library...");
         return 1;
     }
-    // TODO : move that to device init
+    cu_use_p2p = use_p2p;
+
     int ndevices_max;
     err = cuDeviceGetCount(&ndevices_max);
     if (err)
         return 1;
     ndevices = MIN((int)ndevices, ndevices_max);
 
+    // TODO : move that to device init
     assert(ndevices <= XKRT_DEVICES_MAX);
     for (unsigned int i = 0 ; i < ndevices ; ++i)
     {
@@ -203,7 +213,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(unsigned int ndevices)
         CU_SAFE_CALL(cuCtxCreate(&device->cu.context, 0, device->cu.device));
     }
 
-    get_gpu_topo(ndevices);
+    get_gpu_topo(ndevices, use_p2p);
 
     # if XKRT_SUPPORT_NVML
     NVML_SAFE_CALL(nvmlInit());
@@ -372,31 +382,38 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(
         }
         else
         {
-            int access;
-            CU_SAFE_CALL(cuDeviceCanAccessPeer(&access, device->cu.device, other_device->cu.device));
-
-            if (access)
+            if (cu_use_p2p)
             {
-                CUresult res = cuCtxEnablePeerAccess(other_device->cu.context, 0);
-                if ((res == CUDA_SUCCESS) || (res == CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED))
+                int access;
+                CU_SAFE_CALL(cuDeviceCanAccessPeer(&access, device->cu.device, other_device->cu.device));
+
+                if (access)
                 {
-                    int rank = cu_perf_topo[device_driver_id*cu_device_count+other_device_driver_id];
-                    assert(rank);
-                    if (cu_perf_device[device_driver_id*cu_count_perfrank+rank] & (1UL << other_device_driver_id))
+                    CUresult res = cuCtxEnablePeerAccess(other_device->cu.context, 0);
+                    if ((res == CUDA_SUCCESS) || (res == CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED))
                     {
-                        affinity[rank - 1] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device_driver_id);
+                        int rank = cu_perf_topo[device_driver_id*cu_device_count+other_device_driver_id];
+                        assert(rank);
+                        if (cu_perf_device[device_driver_id*cu_count_perfrank+rank] & (1UL << other_device_driver_id))
+                        {
+                            affinity[rank - 1] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device_driver_id);
+                        }
+                    }
+                    else
+                    {
+                        LOGGER_WARN("Could not enable peer from %d to %d",
+                                device->inherited.global_id, other_device->inherited.global_id);
                     }
                 }
                 else
                 {
-                    LOGGER_WARN("Could not enable peer from %d to %d",
+                    LOGGER_WARN("GPU peer from %d to %d is not possible",
                             device->inherited.global_id, other_device->inherited.global_id);
                 }
             }
             else
             {
-                LOGGER_WARN("GPU peer from %d to %d is not possible",
-                        device->inherited.global_id, other_device->inherited.global_id);
+                LOGGER_WARN("GPU Peer disabled");
             }
         }
     }
