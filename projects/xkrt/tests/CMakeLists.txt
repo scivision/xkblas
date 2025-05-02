@@ -16,6 +16,7 @@ set(TEST_SOURCES
     task-format.cc
     task-gpu-empty.cc
     team-cpus.cc
+    team-cpus-parallel-for.cc
     team-device.cc
 )
 

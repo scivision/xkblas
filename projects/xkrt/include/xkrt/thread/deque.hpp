@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/17 19:58:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 18:36:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -15,20 +15,12 @@
 #  define __XKRT_DEQUE_H__
 
 #  include <xkrt/consts.h>
+#  include <xkrt/memory/alignas.h>
 #  include <xkrt/sync/spinlock.h>
 
 #  include <pthread.h>
 #  include <atomic>
 #  include <new>
-
-#ifdef __cpp_lib_hardware_interference_size
-    using std::hardware_constructive_interference_size;
-    using std::hardware_destructive_interference_size;
-#else
-    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
-    constexpr std::size_t hardware_constructive_interference_size = 64;
-    constexpr std::size_t hardware_destructive_interference_size = 64;
-#endif
 
 /* a deque (THE protocol) */
 template<typename T, int C>

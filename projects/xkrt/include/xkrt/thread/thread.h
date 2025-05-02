@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 22:21:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 20:44:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -19,11 +19,20 @@
 #  include <xkrt/task/dependency-tree.hpp>
 #  include <xkrt/task/task.hpp>
 
+#  include <xkrt/memory/alignas.h>
 #  include <xkrt/thread/deque.hpp>
 #  include <xkrt/thread/naive-queue.hpp>
 
 #  include <pthread.h>
 #  include <atomic>
+
+#  include <linux/futex.h>      /* Definition of FUTEX_* constants */
+#  include <sys/syscall.h>      /* Definition of SYS_* constants */
+#  include <unistd.h>
+
+/////////////
+// THREADS //
+/////////////
 
 /* thread states */
 typedef enum    xkrt_thread_state_t
@@ -157,6 +166,13 @@ typedef struct  xkrt_thread_t
             volatile bool   sleeping;
         } sleep;
 
+    public:
+
+        struct {
+            /* next function index in the team functions */
+            uint32_t index;
+
+        } parallel_for;
 
     public:
 
@@ -178,7 +194,8 @@ typedef struct  xkrt_thread_t
             device_global_id(device_global_id),
             deque(),
             memory_stack_bottom(NULL),
-            memory_stack_capacity(THREAD_MAX_MEMORY)
+            memory_stack_capacity(THREAD_MAX_MEMORY),
+            parallel_for{.index = 0}
         {
             // set current task
             this->current_task = &this->implicit_task;
@@ -322,6 +339,10 @@ typedef struct  xkrt_thread_t
 
 }               xkrt_thread_t;
 
+//////////
+// TEAM //
+//////////
+
 /* a node in the topology graph */
 typedef struct  xkrt_team_node_t
 {
@@ -383,12 +404,13 @@ typedef struct  xkrt_team_t
 
     struct {
 
+        ////////////////////////////////////////////////////////
+
         // threads
         xkrt_thread_t * threads;
         int nthreads;
 
-        // barrier
-     // pthread_barrier_t barrier;
+        // custom barrier for workstealing
         struct {
             std::atomic<int> n;     /* for spawned threads to sync */
             volatile int version;
@@ -401,8 +423,25 @@ typedef struct  xkrt_team_t
             pthread_mutex_t mtx;
         } critical;
 
+        ////////////////////////////////////////////////////////////
+
+        // if the routine is parallel for, then this is the stack of lambdas to execute
+        # define XKRT_TEAM_PARALLEL_FOR_MAX_FUNC 1
+        alignas(hardware_destructive_interference_size)
+        struct {
+            uint32_t index;
+            std::function<void(xkrt_team_t * team, xkrt_thread_t * thread)> f[XKRT_TEAM_PARALLEL_FOR_MAX_FUNC];
+            uint32_t completed;
+            std::atomic<uint32_t> pending;
+        } parallel_for;
+
+
     } priv;
 
 }               xkrt_team_t;
+
+typedef std::function<void(xkrt_team_t * team, xkrt_thread_t * thread)> xkrt_team_parallel_for_func_t;
+void * xkrt_team_parallel_for_main(xkrt_team_t * team, xkrt_thread_t * thread);
+# define XKRT_TEAM_ROUTINE_PARALLEL_FOR xkrt_team_parallel_for_main
 
 # endif /* __XKRT_THREAD_H__ */

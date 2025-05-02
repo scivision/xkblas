@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:27:40 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 17:42:39 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -163,6 +163,9 @@ typedef struct  xkrt_runtime_t
 
     /* end a critical section */
     void team_critical_end(xkrt_team_t * team);
+
+    /* blocking parallel_for region */
+    void team_parallel_for(xkrt_team_t * team, xkrt_team_parallel_for_func_t func);
 
     ////////////
     // ENERGY //

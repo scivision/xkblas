@@ -1,21 +1,26 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   alignedas.h                                                              */
+/*   alignas.h                                                                */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 18:36:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 18:36:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __ALIGNEDAS_H__
-# define __ALIGNEDAS_H__
+#ifndef __ALIGNAS_H__
+# define __ALIGNAS_H__
 
-// Return the lowest integer 'X' so that 'X % B == 0' and 'S <= X'
-# define alignedas(S, B) (((S) % (B) == 0) ? (S) : ((S) + (B) - ((S) % (B))))
-# define is_alignedas(S, B) (((S) % (B)) == 0)
+#ifdef __cpp_lib_hardware_interference_size
+using std::hardware_constructive_interference_size;
+using std::hardware_destructive_interference_size;
+#else
+// 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+constexpr std::size_t hardware_constructive_interference_size = 64;
+constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
 
-#endif /* __ALIGNEDAS_H__ */
+#endif /* __ALIGNAS_H__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:55:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/02 21:30:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -171,16 +171,16 @@ team_create_get_place(
 
                 case (XKRT_TEAM_BINDING_PLACES_CORE):
                 {
-                    hwloc_obj_t pu = hwloc_get_pu_obj_by_os_index(runtime->topology, tid);
-                    HWLOC_SAFE_CALL(
-                        hwloc_cpuset_to_glibc_sched_affinity(
-                            runtime->topology,
-                            pu->cpuset,
-                            place,
-                            sizeof(*place)
-                        )
-                    );
+                    // this is a host thread
                     *device_global_id = HOST_DEVICE_GLOBAL_ID;
+
+                    // get linux cpuset
+                    int logical_index = tid;
+                    hwloc_obj_t pu = hwloc_get_obj_by_type(runtime->topology, HWLOC_OBJ_PU, logical_index);
+                    int os_cpu = pu->os_index;
+                    CPU_ZERO(place);
+                    CPU_SET(os_cpu, place);
+
                     return ;
                 }
 
@@ -253,22 +253,19 @@ team_create_recursive_fork(
     int to
 ) {
     assert(to >= from);
+    const int tid = from;
 
     // save calling thread cpu set
     cpu_set_t save_set;
     xkrt_runtime_t::thread_getaffinity(save_set);
 
     // retrieve cpuset and the global device id
-    const int tid = from;
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-
     xkrt_device_global_id_t device_global_id;
     xkrt_thread_place_t place;
     team_create_get_place(runtime, team, tid, &device_global_id, &place);
 
     // move thread before allocating future thread-private memory
-    xkrt_runtime_t::thread_setaffinity(cpuset);
+    xkrt_runtime_t::thread_setaffinity(place);
 
     team_recursive_args_t * args = (team_recursive_args_t *) malloc(sizeof(team_recursive_args_t));
     args->runtime = runtime;
@@ -299,6 +296,9 @@ xkrt_runtime_t::team_create(xkrt_team_t * team)
 
     // set all to zero
     memset(&team->priv, 0, sizeof(team->priv));
+
+    // init parallel for
+    team->priv.parallel_for.index = 0;
 
     // allocate thread array
     const int nthreads = team->desc.nthreads;
@@ -451,17 +451,19 @@ xkrt_runtime_t::task_wait(void)
             backoff = (backoff << 1);
         WAIT64 ;
     }
+
+    # undef WAIT
+
     # endif
 }
 
+// TODO : reimplement this using team's topology
 template<bool worksteal>
 void
 xkrt_runtime_t::team_barrier(
     xkrt_team_t * team,
     xkrt_thread_t * thread)
 {
-    // TODO : reimplement this using team's topology
-
     this->task_wait();
 
     if (team->priv.nthreads == 1)
@@ -492,9 +494,112 @@ xkrt_runtime_t::team_barrier(
 template void xkrt_runtime_t::team_barrier<true>(xkrt_team_t * team, xkrt_thread_t * thread);
 template void xkrt_runtime_t::team_barrier<false>(xkrt_team_t * team, xkrt_thread_t * thread);
 
+// TODO : memory ordering is so fucked, idk what to do with current Linux futex interfaces
+void
+xkrt_runtime_t::team_parallel_for(
+    xkrt_team_t * team,
+    xkrt_team_parallel_for_func_t f
+) {
+    // register the function to run on each thread
+    uint32_t index = team->priv.parallel_for.index;
+    team->priv.parallel_for.f[index % XKRT_TEAM_PARALLEL_FOR_MAX_FUNC] = f;
+    ++team->priv.parallel_for.index;
+
+    // the master thread must wait until all threads completed
+    team->priv.parallel_for.completed = 0;
+    team->priv.parallel_for.pending.store(team->priv.nthreads, std::memory_order_seq_cst);
+
+    // wakeup all waiting threads
+    syscall(
+        SYS_futex,
+        &team->priv.parallel_for.index,     // uint32_t *uaddr
+        FUTEX_WAKE,                         // int futex_op
+        INT_MAX,                            // uint32_t val
+        NULL,                               // const struct timespec *timeout | uint32_t val2
+        NULL,                               // uint32_t *uaddr2
+        NULL                                // uint32_t val3
+    );
+
+    if (f)
+    {
+        // wait until they executed
+        syscall(
+            SYS_futex,
+            &team->priv.parallel_for.completed, // uint32_t *uaddr
+            FUTEX_WAIT,                         // int futex_op
+            0,                                  // uint32_t val
+            NULL,                               // const struct timespec *timeout | uint32_t val2
+            NULL,                               // uint32_t *uaddr2
+            NULL                                // uint32_t val3
+        );
+    }
+}
+
+void *
+xkrt_team_parallel_for_main(
+    xkrt_team_t * team,
+    xkrt_thread_t * thread
+) {
+    while (1)
+    {
+        // keep executing functions until all got executed
+        while (thread->parallel_for.index < (volatile uint32_t) team->priv.parallel_for.index)
+        {
+parallel_for_run:
+            xkrt_team_parallel_for_func_t f = team->priv.parallel_for.f[thread->parallel_for.index % XKRT_TEAM_PARALLEL_FOR_MAX_FUNC];
+            if (f == nullptr)
+                return NULL;
+            ++thread->parallel_for.index;
+            f(team, thread);
+
+            // last thread to complete wakes up the master
+            if (team->priv.parallel_for.pending.fetch_sub(1, std::memory_order_seq_cst) - 1 == 0)
+            {
+                // wakeup the master thread
+                team->priv.parallel_for.completed = 1;
+                syscall(
+                    SYS_futex,
+                    &team->priv.parallel_for.completed, // uint32_t *uaddr
+                    FUTEX_WAKE,                         // int futex_op
+                    1,                                  // uint32_t val
+                    NULL,                               // const struct timespec *timeout | uint32_t val2
+                    NULL,                               // uint32_t *uaddr2
+                    NULL                                // uint32_t val3
+                );
+            }
+        }
+
+        // some polling before sleeping for real
+        for (int i = 0 ; i < 100 ; ++i)
+            if (thread->parallel_for.index < (volatile uint32_t) team->priv.parallel_for.index)
+                goto parallel_for_run;
+
+        // keep sleeping until there is functions to execute, or until the master is joining
+        while (thread->parallel_for.index >= (volatile uint32_t) team->priv.parallel_for.index)
+        {
+            // sleep that thread
+            syscall(
+                SYS_futex,
+                &team->priv.parallel_for.index,     // uint32_t *uaddr
+                FUTEX_WAIT,                         // int futex_op
+                thread->parallel_for.index,         // uint32_t val
+                NULL,                               // const struct timespec *timeout | uint32_t val2
+                NULL,                               // uint32_t *uaddr2
+                NULL                                // uint32_t val3
+            );
+        }
+    }
+
+    assert(0);
+    return NULL;
+}
+
 void
 xkrt_runtime_t::team_join(xkrt_team_t * team)
 {
+    if (team->desc.routine == XKRT_TEAM_ROUTINE_PARALLEL_FOR)
+        this->team_parallel_for(team, nullptr);
+
     // TODO : reimpl this using team's topology
     for (int i = 0 ; i < team->priv.nthreads ; ++i)
     {
@@ -520,5 +625,3 @@ xkrt_runtime_t::team_critical_end(xkrt_team_t * team)
 {
     pthread_mutex_unlock(&team->priv.critical.mtx);
 }
-
-
