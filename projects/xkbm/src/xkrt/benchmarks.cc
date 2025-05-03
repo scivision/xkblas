@@ -756,8 +756,8 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
             for (int j = 0 ; j < dst_device->nmemories ; ++j)
             {
-                if (src_device == dst_device)
-                    continue ;
+                // if (src_device == dst_device)
+                //     continue ;
 
                 xkrt_area_chunk_t * src_chunk = tls->areas[src_device_global_id][dst_device_global_id][i][1];
                 assert(src_chunk);
@@ -771,6 +771,20 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                     {
                         for (int c = 0 ; c < nchunks ; ++c)
                         {
+                            # if 0
+                            xkrt_callback_t callback;
+                            callback.func = NULL;
+
+                            runtime.copy(
+                                src_device_global_id,
+                                chunk_size,
+                                dst_device_global_id,
+                                (uintptr_t)dst_chunk->ptr + c * chunk_size,
+                                src_device_global_id,
+                                (uintptr_t)src_chunk->ptr + c * chunk_size,
+                                callback
+                            );
+                            # else
                             xkrt_memory_copy_async(
                                &runtime,
                                 src_device_global_id,
@@ -780,6 +794,7 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
                                 (uintptr_t)src_chunk->ptr + c * chunk_size,
                                 chunk_size
                             );
+                            # endif
                         }
                         xkrt_sync(&runtime);
                     }

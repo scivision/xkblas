@@ -26,8 +26,9 @@
 # include <xkrt/logger/metric.h>
 
 static ze_driver_handle_t driver;
-static ze_device_handle_t device;
 static ze_context_handle_t context;
+static ze_device_handle_t device;
+static ze_device_handle_t device2;
 static uint32_t n_queue_prop;
 static ze_command_queue_group_properties_t * queue_prop;
 static int ordinal_copy;
@@ -89,7 +90,8 @@ typedef enum    test_mode_t
 {
     KERNEL,
     H2D,
-    D2H
+    D2H,
+    D2D
 }               test_mode_t;
 
 typedef enum concurrency_mode_t : uint8_t
@@ -148,7 +150,11 @@ cmdlist_run(benchmark_node_t * node)
         LOGGER_FATAL("error");
 
     // timing
+    //  if immediate, only need to measure one
+    //  if non-immediate, measure (1, 2, 4, ..., 128) batched in a cmdlist given to a cmdqueue
+    //  do 100 iterations
     constexpr int n = immediate == IMMEDIATE ? 1 : 8;
+    constexpr int warmup = 10;
     time_array_t time(n, 100);
 
     // event pool
@@ -180,23 +186,37 @@ cmdlist_run(benchmark_node_t * node)
     ze_event_handle_t * wait_events = nullptr;
     ze_group_count_t launch = { 1, 1, 1 };
 
-    // allocate memory for latency test
+    // allocate memory
     const size_t size = 1 << n;
-    unsigned char * hostptr = (unsigned char *) calloc(1, size);
     const size_t alignment = 4 * sizeof(double);
-    unsigned char * deviceptr = NULL;
     const ze_device_mem_alloc_desc_t device_desc = {
         .stype = ZE_STRUCTURE_TYPE_DEVICE_MEMORY_PROPERTIES,
         .pNext = NULL,
         .flags = 0,
         .ordinal = 0
     };
+
+    // device ptr
+    unsigned char * deviceptr = NULL;
     ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device, (void **) &deviceptr));
     assert(deviceptr);
     ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device, deviceptr, size));
 
-    unsigned char * src = (mode == H2D) ? hostptr   : (mode == D2H) ? deviceptr : NULL;
-    unsigned char * dst = (mode == H2D) ? deviceptr : (mode == D2H) ? hostptr   : NULL;
+    // other ptr (host or device)
+    unsigned char * otherptr;
+    if (mode == D2H || mode == H2D)
+    {
+        otherptr = (unsigned char *) calloc(1, size);
+    }
+    else if (mode == D2D)
+    {
+        ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device2, (void **) &otherptr));
+        assert(otherptr);
+        ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device2, otherptr, size));
+    }
+
+    unsigned char * src = (mode == H2D) ? otherptr  : (mode == D2H) ? deviceptr : (mode == D2D) ? deviceptr : NULL;
+    unsigned char * dst = (mode == H2D) ? deviceptr : (mode == D2H) ? otherptr  : (mode == D2D) ? otherptr  : NULL;
 
     const uint32_t n_list = 1;
     ze_fence_handle_t fence = NULL;
@@ -207,7 +227,7 @@ cmdlist_run(benchmark_node_t * node)
 
         if (mode == KERNEL)
         {
-            for (int iter = -10 ; iter < time.niters ; ++iter)
+            for (int iter = -warmup ; iter < time.niters ; ++iter)
             {
                 uint64_t t0 = xkrt_get_nanotime();
                 ZE_SAFE_CALL(zeCommandListAppendLaunchKernel(list, modules[KERNEL_EMPTY].kernel, &launch, event, n_wait_events, wait_events));
@@ -218,10 +238,10 @@ cmdlist_run(benchmark_node_t * node)
                 ZE_SAFE_CALL(zeEventHostReset(event));
             }
         }
-        else if (mode == H2D || mode == D2H)
+        else if (mode == H2D || mode == D2H || mode == D2D)
         {
             // run the test
-            for (int iter = -10 ; iter < time.niters ; ++iter)
+            for (int iter = -warmup ; iter < time.niters ; ++iter)
             {
                 uint64_t t0 = xkrt_get_nanotime();
                 ZE_SAFE_CALL(zeCommandListAppendMemoryCopy(list, dst, src, size, event, n_wait_events, wait_events));
@@ -242,7 +262,7 @@ cmdlist_run(benchmark_node_t * node)
             for (int i = 0 ; i < n ; ++i)
             {
                 const int n_op = 1 << i;
-                for (int iter = -10 ; iter < time.niters ; ++iter)
+                for (int iter = -warmup ; iter < time.niters ; ++iter)
                 {
                     uint64_t t0 = xkrt_get_nanotime();
                     for (int j = 0 ; j < n_op ; ++j)
@@ -264,7 +284,7 @@ cmdlist_run(benchmark_node_t * node)
             for (int i = 0 ; i < n ; ++i)
             {
                 const int n_op = 1 << i;
-                for (int iter = -10 ; iter < time.niters ; ++iter)
+                for (int iter = -warmup ; iter < time.niters ; ++iter)
                 {
                     uint64_t t0 = xkrt_get_nanotime();
                     for (int j = 0 ; j < n_op ; ++j)
@@ -281,12 +301,19 @@ cmdlist_run(benchmark_node_t * node)
                 }
             }
         }
+        else
+        {
+            LOGGER_FATAL("error");
+        }
     }
     else
         LOGGER_FATAL("error");
 
     // release memory
-    free(hostptr);
+    if (mode == D2H || mode == H2D)
+        free(otherptr);
+    else if (mode == D2D)
+        ZE_SAFE_CALL(zeMemFree(context, otherptr));
     ZE_SAFE_CALL(zeMemFree(context, deviceptr));
 
     // report
@@ -553,6 +580,16 @@ static benchmark_node_t immediate_d2h = {
     .enabled = 0
 };
 
+static benchmark_node_t immediate_d2d = {
+    .name = "d2d",
+    .desc = "Latency of a D2D copy to an immediate command list",
+    .parent = NULL,
+    .children = { NULL },
+    .nchildren = 0,
+    .run = cmdlist_run<IMMEDIATE, D2D>,
+    .enabled = 0
+};
+
 static benchmark_node_t immediate = {
     .name = "immediate",
     .desc = "Cost of immediate command list",
@@ -598,6 +635,7 @@ ze_benchmark_push(benchmark_node_t * parent)
     LINK(cmdlist,   immediate);
     LINK(immediate, immediate_h2d);
     LINK(immediate, immediate_d2h);
+    LINK(immediate, immediate_d2d);
     LINK(immediate, immediate_kernel);
 
     LINK(cmdlist,       non_immediate);
@@ -618,8 +656,16 @@ ze_benchmark_init(void)
     ZE_SAFE_CALL(zeDriverGet(&driverCount, &driver));
 
     // device
-    uint32_t deviceCount = 1;
-    ZE_SAFE_CALL(zeDeviceGet(driver, &deviceCount, &device));
+    ze_device_handle_t devices[2];
+    uint32_t deviceCount = 2;
+    ZE_SAFE_CALL(zeDeviceGet(driver, &deviceCount, devices));
+    assert(deviceCount == 2);
+    device  = devices[0];
+    device2 = devices[1];
+
+    ze_bool_t can_access = 0;
+    ZE_SAFE_CALL(zeDeviceCanAccessPeer(device, device2, &can_access));
+    assert(can_access);
 
     // context
     ze_context_desc_t contextDesc = {
