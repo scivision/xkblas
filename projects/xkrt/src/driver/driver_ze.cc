@@ -913,6 +913,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
     }
 }
 
+// TODO: WARNING
+//  If built with `XKRT_SUPPORT_ZES` - then 2 memory areas will be reported (the HBM of each tile) - whatever the `ZE_FLAT_DEVICE_HIERARCHY`
+//  Otherwise, it will report 1 memory of 128GB virtualizing the 2 HBM with `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` - or 1 memory of 64GB if `ZE_FLAT_DEVICE_HIERARCHY=FLAT` that is the stack HBM
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
     int device_driver_id,
