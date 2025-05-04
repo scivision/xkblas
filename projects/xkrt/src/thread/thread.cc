@@ -18,6 +18,7 @@
 # include <cstring>
 # include <cerrno>
 
+# include <stdatomic.h>
 # include <hwloc.h>
 # include <sched.h>
 # include <hwloc/glibc-sched.h>
@@ -494,7 +495,6 @@ xkrt_runtime_t::team_barrier(
 template void xkrt_runtime_t::team_barrier<true>(xkrt_team_t * team, xkrt_thread_t * thread);
 template void xkrt_runtime_t::team_barrier<false>(xkrt_team_t * team, xkrt_thread_t * thread);
 
-// TODO : memory ordering is so fucked, idk what to do with current Linux futex interfaces
 void
 xkrt_runtime_t::team_parallel_for(
     xkrt_team_t * team,
@@ -503,13 +503,15 @@ xkrt_runtime_t::team_parallel_for(
     // register the function to run on each thread
     uint32_t index = team->priv.parallel_for.index;
     team->priv.parallel_for.f[index % XKRT_TEAM_PARALLEL_FOR_MAX_FUNC] = f;
-    ++team->priv.parallel_for.index;
 
     // the master thread must wait until all threads completed
     team->priv.parallel_for.completed = 0;
     team->priv.parallel_for.pending.store(team->priv.nthreads, std::memory_order_seq_cst);
 
-    // wakeup all waiting threads
+    // wake up threads
+    mem_barrier();
+    ++team->priv.parallel_for.index;
+
     syscall(
         SYS_futex,
         &team->priv.parallel_for.index,     // uint32_t *uaddr
@@ -522,16 +524,24 @@ xkrt_runtime_t::team_parallel_for(
 
     if (f)
     {
+        // busy waiting a bit before sleeping
+        for (int i = 0 ; i < 16 ; ++i)
+            if ((volatile uint32_t) team->priv.parallel_for.completed == 1)
+                return ;
+
         // wait until they executed
-        syscall(
-            SYS_futex,
-            &team->priv.parallel_for.completed, // uint32_t *uaddr
-            FUTEX_WAIT,                         // int futex_op
-            0,                                  // uint32_t val
-            NULL,                               // const struct timespec *timeout | uint32_t val2
-            NULL,                               // uint32_t *uaddr2
-            NULL                                // uint32_t val3
-        );
+        while ((volatile uint32_t) team->priv.parallel_for.completed == 0)
+        {
+            syscall(
+                SYS_futex,
+                &team->priv.parallel_for.completed, // uint32_t *uaddr
+                FUTEX_WAIT,                         // int futex_op
+                0,                                  // uint32_t val
+                NULL,                               // const struct timespec *timeout | uint32_t val2
+                NULL,                               // uint32_t *uaddr2
+                NULL                                // uint32_t val3
+            );
+        }
     }
 }
 
@@ -561,7 +571,7 @@ parallel_for_run:
                     SYS_futex,
                     &team->priv.parallel_for.completed, // uint32_t *uaddr
                     FUTEX_WAKE,                         // int futex_op
-                    1,                                  // uint32_t val
+                    INT_MAX,                            // uint32_t val
                     NULL,                               // const struct timespec *timeout | uint32_t val2
                     NULL,                               // uint32_t *uaddr2
                     NULL                                // uint32_t val3
@@ -570,7 +580,7 @@ parallel_for_run:
         }
 
         // some polling before sleeping for real
-        for (int i = 0 ; i < 100 ; ++i)
+        for (int i = 0 ; i < 16 ; ++i)
             if (thread->parallel_for.index < (volatile uint32_t) team->priv.parallel_for.index)
                 goto parallel_for_run;
 

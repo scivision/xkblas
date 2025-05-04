@@ -16,6 +16,12 @@
 # endif
 # include <sched.h>
 
+#ifdef NDEBUG
+# define XKRT_ASSERT(...) if (__VA_ARGS__) {}
+#else
+# define XKRT_ASSERT(...) assert(__VA_ARGS__)
+#endif
+
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
@@ -25,8 +31,6 @@ static xkrt_runtime_t runtime;
 static int
 get_ncpus(void)
 {
-    return 20;
-
     // Try to get the number of CPU cores from topology
     int depth = hwloc_get_type_depth(runtime.topology, HWLOC_OBJ_CORE);
     int r = hwloc_get_nbobjs_by_depth(runtime.topology, depth);
@@ -36,7 +40,7 @@ get_ncpus(void)
 int
 main(void)
 {
-    assert(xkrt_init(&runtime) == 0);
+    XKRT_ASSERT(xkrt_init(&runtime) == 0);
 
     // team on all cpus
     int ncpus = get_ncpus();
@@ -52,6 +56,7 @@ main(void)
             }
         }
     };
+    LOGGER_INFO("Team of %d threads", ncpus);
 
     // TEST 1
     // create and destroy the team without working
@@ -59,7 +64,7 @@ main(void)
         std::atomic<int> counter(0);
         runtime.team_create(&team);
         runtime.team_join(&team);
-        assert(counter == 0);
+        XKRT_ASSERT(counter == 0);
     }
 
     // TEST 2
@@ -73,7 +78,7 @@ main(void)
             }
         );
         runtime.team_join(&team);
-        assert(counter == ncpus);
+        XKRT_ASSERT(counter == ncpus);
     }
 
     // TEST 3
@@ -85,17 +90,13 @@ main(void)
 
         uint64_t t0 = xkrt_get_nanotime();
         for (int i = 0 ; i < n ; ++i)
-        {
-            runtime.team_parallel_for(&team, [&counter] (xkrt_team_t * team, xkrt_thread_t * thread) {
-                }
-            );
-        }
+            runtime.team_parallel_for(&team, [] (xkrt_team_t * team, xkrt_thread_t * thread) { });
         uint64_t tf = xkrt_get_nanotime();
         LOGGER_INFO("`%d` empty parallel on `%d` threads for took %lf s - that is %luns/task\n", n, ncpus, (tf-t0)/1e9, (tf-t0)/(n*ncpus));
 
         runtime.team_join(&team);
     }
-    assert(xkrt_deinit(&runtime) == 0);
+    XKRT_ASSERT(xkrt_deinit(&runtime) == 0);
 
     return 0;
 }
