@@ -37,8 +37,14 @@ typedef struct  xkrt_device_ze_t
         // handles
         ze_driver_handle_t      driver;
         ze_context_handle_t     context;
-        ze_device_handle_t      device;
-        ze_device_properties_t  device_properties;
+        ze_device_handle_t      handle;
+        ze_device_properties_t  properties;
+
+        // indexes
+        struct {
+            unsigned int driver;    // ze driver index
+            unsigned int device;    // ze device index
+        } index;
 
         // number of command queue group
         uint32_t ncommandqueuegroups;
@@ -51,7 +57,7 @@ typedef struct  xkrt_device_ze_t
 
         // memory properties
         struct {
-            uint32_t pcount;
+            uint32_t count;
             ze_device_memory_properties_t properties[XKRT_DEVICE_MEMORIES_MAX];
         } memory;
 
@@ -67,6 +73,25 @@ typedef struct  xkrt_device_ze_t
 
     # if XKRT_SUPPORT_ZES
     struct {
+
+       // handles
+        zes_device_handle_t device; // zes device
+
+        // indexes
+        struct {
+            unsigned int driver;    // ze driver index
+            unsigned int device;    // ze device index
+            ze_bool_t on_subdevice; // if this is a subdevice
+            uint32_t subdevice_id;  // subdevice id, if it is a subdevice
+        } index;
+
+        // memory
+        struct {
+            uint32_t count;
+            zes_mem_handle_t handles[XKRT_DEVICE_MEMORIES_MAX];
+        } memory;
+
+        // pwr
         struct {
             zes_pwr_handle_t handle;
         } pwr;

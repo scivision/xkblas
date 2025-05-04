@@ -42,19 +42,100 @@
 // them as global variable for now, there should only be 1 instances of a
 // driver right now
 
-static ze_driver_handle_t   ze_drivers[XKRT_DEVICES_MAX];
-static ze_context_handle_t  ze_contextes[XKRT_DEVICES_MAX];
-
+// xkrt
 static xkrt_device_ze_t * DEVICES;
-static uint32_t ze_n_devices = 0;
+static uint32_t n_devices = 0;
 
 static xkrt_device_ze_t *
 device_ze_get(int device_driver_id)
 {
     assert(device_driver_id >= 0);
-    assert((uint32_t) device_driver_id < ze_n_devices);
+    assert((uint32_t) device_driver_id < n_devices);
     return DEVICES + device_driver_id;
 }
+
+// ze core
+# define XKRT_ZE_MAX_DRIVERS 4
+static ze_driver_handle_t   ze_drivers[XKRT_ZE_MAX_DRIVERS];
+static uint32_t             ze_n_drivers;
+static ze_context_handle_t  ze_contextes[XKRT_ZE_MAX_DRIVERS];
+static ze_device_handle_t   ze_devices[XKRT_ZE_MAX_DRIVERS][XKRT_DEVICES_MAX];
+static uint32_t             ze_n_devices[XKRT_ZE_MAX_DRIVERS];
+
+# if XKRT_SUPPORT_ZES
+// ze sysman
+static uint32_t                 zes_n_drivers;
+static zes_driver_handle_t      zes_drivers[XKRT_ZE_MAX_DRIVERS];
+static uint32_t                 zes_n_devices[XKRT_ZE_MAX_DRIVERS];
+static zes_device_handle_t      zes_devices[XKRT_ZE_MAX_DRIVERS][XKRT_DEVICES_MAX];
+
+// zes indexing is different than ze, this convert
+static
+void convert_zes_device_to_ze_device(void)
+{
+    // for each xkrt devices
+    for (unsigned int device_driver_id = 0 ; device_driver_id < n_devices ; ++device_driver_id)
+    {
+        // figure out the mapping ze to zes
+        xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+        uint32_t ze_device_id = device->ze.index.device;
+
+        zes_uuid_t uuid = {};
+        memcpy(uuid.id, device->ze.properties.uuid.id, ZE_MAX_DEVICE_UUID_SIZE);
+
+        for (unsigned int zes_driver_id = 0; zes_driver_id < zes_n_drivers; ++zes_driver_id)
+        {
+            device->zes.device = nullptr;
+
+            zes_device_handle_t zes_device = nullptr;
+            ze_bool_t on_subdevice = false;
+            uint32_t subdevice_id = -1;
+            ZE_SAFE_CALL(zesDriverGetDeviceByUuidExp(zes_drivers[zes_driver_id], uuid, &zes_device, &on_subdevice, &subdevice_id));
+
+            if (zes_device)
+            {
+                for (unsigned int zes_device_id = 0 ; zes_device_id < zes_n_devices[zes_driver_id] ; ++zes_device_id)
+                {
+                    if (zes_device == zes_devices[zes_driver_id][zes_device_id])
+                    {
+                        if (on_subdevice)
+                            LOGGER_INFO("ZE device %2u is ZES device %u.%u", ze_device_id, zes_device_id, subdevice_id);
+                        else
+                            LOGGER_INFO("ZE device %2u is ZES device %2u", ze_device_id, zes_device_id);
+
+                        device->zes.index.device = zes_device_id;
+                        device->zes.index.driver = zes_driver_id;
+                        device->zes.index.on_subdevice = on_subdevice;
+                        device->zes.index.subdevice_id = subdevice_id;
+
+                        device->zes.device = zes_devices[zes_driver_id][zes_device_id];
+
+                        // memory
+                        ZE_SAFE_CALL(zesDeviceEnumMemoryModules(zes_device, &device->zes.memory.count, nullptr));
+                        assert(device->zes.memory.count <= XKRT_DEVICE_MEMORIES_MAX);    // if this fails, increase `XKRT_DEVICE_MEMORIES_MAX`
+                        device->zes.memory.count = MIN(device->zes.memory.count, XKRT_DEVICE_MEMORIES_MAX);
+                        ZE_SAFE_CALL(zesDeviceEnumMemoryModules(zes_device, &device->zes.memory.count, device->zes.memory.handles));
+
+                        // power
+                        # if 0
+                        uint32_t zes_pwr_handle_count;
+                        ZE_SAFE_CALL(zesDeviceEnumPowerDomains(device->zes.device, &zes_pwr_handle_count, NULL));
+
+                        assert(zes_pwr_handle_count == 3);
+                        ZE_SAFE_CALL(zesDeviceEnumPowerDomains(device->zes.device, &zes_pwr_handle_count, &device->zes.pwr.handle));
+                        # endif
+
+                        break ;
+                    }
+                }
+                if (device->zes.device == nullptr)
+                    LOGGER_FATAL("Could not map ZE device to ZES device");
+            }
+        }
+    }
+}
+
+# endif /* XKRT_SUPPORT_ZES */
 
 // see `ZE_FLAT_DEVICE_HIERARCHY` env variable
 static int
@@ -88,7 +169,6 @@ XKRT_DRIVER_ENTRYPOINT(init)(
         return 1;
 
     // get all drivers
-    uint32_t ze_n_drivers = 0;
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, NULL));
     assert(ze_n_drivers < sizeof(ze_drivers) / sizeof(*ze_drivers));
     ZE_SAFE_CALL(zeDriverGet(&ze_n_drivers, ze_drivers));
@@ -97,16 +177,14 @@ XKRT_DRIVER_ENTRYPOINT(init)(
     zes_init_flags_t zes_flags = ZES_INIT_FLAG_PLACEHOLDER;
     ZE_SAFE_CALL(zesInit(zes_flags));
 
-    uint32_t zes_n_drivers;
     ZE_SAFE_CALL(zesDriverGet(&zes_n_drivers, NULL));
     assert(ze_n_drivers == zes_n_drivers);
 
-    zes_driver_handle_t zes_drivers[XKRT_DEVICES_MAX];
     ZE_SAFE_CALL(zesDriverGet(&zes_n_drivers, zes_drivers));
     # endif /* XKRT_SUPPORT_ZES */
 
     // get all device handles per driver
-    for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && ze_n_devices < ndevices_requested ; ++ze_driver_id)
+    for (unsigned int ze_driver_id = 0 ; ze_driver_id < ze_n_drivers && n_devices < ndevices_requested ; ++ze_driver_id)
     {
         // get the driver
         ze_driver_handle_t ze_driver = ze_drivers[ze_driver_id];
@@ -120,19 +198,17 @@ XKRT_DRIVER_ENTRYPOINT(init)(
         ZE_SAFE_CALL(zeContextCreate(ze_driver, &ze_context_desc, ze_contextes + ze_driver_id));
 
         // get devices handles
-        uint32_t ndevices = ndevices_requested - ze_n_devices;
-        ze_device_handle_t ze_devices[XKRT_DEVICES_MAX];
-        ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ndevices, ze_devices));
+        ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ze_n_devices[ze_driver_id], NULL));
+        ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ze_n_devices[ze_driver_id], ze_devices[ze_driver_id]));
 
-        # if XKRT_SUPPORT_ZES
-        zes_driver_handle_t zes_driver = zes_drivers[ze_driver_id];
+        # if XKRT_SUPPORT_ZE
+        // TODO: assuming that ze driver id == zes driver id, which is probably wrong, but fuck off honestly
+        unsigned int zes_driver_id = ze_driver_id;
+        zes_driver_handle_t zes_driver = zes_drivers[zes_driver_id];
 
-        uint32_t zes_n_devices;
-        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices, NULL));
-        assert(ze_n_devices == zes_n_devices);
-
-        zes_device_handle_t zes_devices[XKRT_DEVICES_MAX];
-        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices, zes_devices));
+        // no choice but to get all zes device handle, as mapping differs...
+        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices[zes_driver_id], NULL));
+        ZE_SAFE_CALL(zesDeviceGet(zes_driver, &zes_n_devices[zes_driver_id], zes_devices[zes_driver_id]));
         # endif /* XKRT_SUPPORT_ZES */
 
         // sycl interop
@@ -140,23 +216,29 @@ XKRT_DRIVER_ENTRYPOINT(init)(
         sycl::platform platform = sycl::make_platform<sycl::backend::ext_oneapi_level_zero>(ze_driver);
         # endif /* XKRT_SUPPORT_SYCL */
 
-        for (unsigned int i = 0 ; i < ndevices ; ++i)
+        // create xkrt devices
+        uint32_t n = MIN(ndevices_requested - n_devices, ze_n_devices[ze_driver_id]);
+        for (unsigned int ze_device_id = 0 ; ze_device_id < n ; ++ze_device_id)
         {
-            ze_device_handle_t ze_device = ze_devices[i];
+            ze_device_handle_t ze_device = ze_devices[ze_driver_id][ze_device_id];
 
             // save handles
-            xkrt_device_ze_t * device = DEVICES + ze_n_devices;
+            xkrt_device_ze_t * device = DEVICES + n_devices++;
             device->ze.context = ze_contextes[ze_driver_id];
             device->ze.driver  = ze_drivers[ze_driver_id];
-            device->ze.device  = ze_device;
+            device->ze.handle  = ze_device;
+            device->ze.index.device = ze_device_id;
+            device->ze.index.driver = ze_driver_id;
 
             // get subdevice properties
-            device->ze.device_properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
-            ZE_SAFE_CALL(zeDeviceGetProperties(device->ze.device, &device->ze.device_properties));
+            device->ze.properties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
+            ZE_SAFE_CALL(zeDeviceGetProperties(device->ze.handle, &device->ze.properties));
 
             // get memory properties
-            device->ze.memory.pcount = XKRT_DEVICE_MEMORIES_MAX;
-            ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.device, &device->ze.memory.pcount, device->ze.memory.properties));
+            ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.handle, &device->ze.memory.count, nullptr));
+            assert(device->ze.memory.count <= XKRT_DEVICE_MEMORIES_MAX);    // if this fails, increase `XKRT_DEVICE_MEMORIES_MAX`
+            device->ze.memory.count = MIN(device->ze.memory.count, XKRT_DEVICE_MEMORIES_MAX);
+            ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.handle, &device->ze.memory.count, device->ze.memory.properties));
 
             # if XKRT_SUPPORT_SYCL
             // sycl interop
@@ -167,18 +249,14 @@ XKRT_DRIVER_ENTRYPOINT(init)(
             device->sycl.context = sycl::make_context<sycl::backend::ext_oneapi_level_zero>(sycl_devices, device->ze.context, 1);
             # endif /* XKRT_SUPPORT_SYCL */
 
-            # if XKRT_SUPPORT_ZES
-            zes_device_handle_t zes_device = zes_devices[i];
-            uint32_t zes_pwr_handle_count;
-            ZE_SAFE_CALL(zesDeviceEnumPowerDomains(zes_device, &zes_pwr_handle_count, NULL));
-            assert(zes_pwr_handle_count == 1);
-            ZE_SAFE_CALL(zesDeviceEnumPowerDomains(zes_device, &zes_pwr_handle_count, &device->zes.pwr.handle));
-            # endif /* XKRT_SUPPORT_ZES */
-
-            if (++ze_n_devices == ndevices_requested)
+            if (n_devices == ndevices_requested)
                 break ;
         }
     }
+
+    # if XKRT_SUPPORT_ZES
+    convert_zes_device_to_ze_device();
+    # endif /* XKRT_SUPPORT_ZES */
 
     return 0;
 }
@@ -195,7 +273,7 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(
     size_t pos = 0;
     pos += snprintf(uuid + pos, sizeof(uuid) - pos, "0x");
     for (int i = 0 ; i < ZE_MAX_DEVICE_UUID_SIZE ; ++i)
-        pos += snprintf(uuid + pos, sizeof(uuid) - pos, "%X", device->ze.device_properties.uuid.id[i]);
+        pos += snprintf(uuid + pos, sizeof(uuid) - pos, "%X", device->ze.properties.uuid.id[i]);
 
     snprintf(
         buffer,
@@ -204,15 +282,15 @@ XKRT_DRIVER_ENTRYPOINT(device_info)(
         "%d threads - %.2lfGB maximum alloc - core clock rate of %.2lfGHz - "
         "timer resolution of %luns - deviceId(pci)=%d - uuid=%s",
         device_driver_id,
-        device->ze.device_properties.name,
-        device->ze.device_properties.numSlices,
-        device->ze.device_properties.numSubslicesPerSlice,
-        device->ze.device_properties.numEUsPerSubslice,
-        device->ze.device_properties.numThreadsPerEU,
-        device->ze.device_properties.maxMemAllocSize / 1e9,
-        device->ze.device_properties.coreClockRate / 1e3,
-        device->ze.device_properties.timerResolution,
-        device->ze.device_properties.deviceId,
+        device->ze.properties.name,
+        device->ze.properties.numSlices,
+        device->ze.properties.numSubslicesPerSlice,
+        device->ze.properties.numEUsPerSubslice,
+        device->ze.properties.numThreadsPerEU,
+        device->ze.properties.maxMemAllocSize / 1e9,
+        device->ze.properties.coreClockRate / 1e3,
+        device->ze.properties.timerResolution,
+        device->ze.properties.deviceId,
         uuid
     );
 }
@@ -238,7 +316,7 @@ XKRT_DRIVER_ENTRYPOINT(get_name)(void)
 static unsigned int
 XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 {
-    return ze_n_devices;
+    return n_devices;
 }
 
 static int
@@ -247,7 +325,7 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * sch
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
     hwloc_cpuset_t cpuset = hwloc_bitmap_alloc();
-    HWLOC_SAFE_CALL(hwloc_levelzero_get_device_cpuset(topology, device->ze.device, cpuset));
+    HWLOC_SAFE_CALL(hwloc_levelzero_get_device_cpuset(topology, device->ze.handle, cpuset));
     CPU_ZERO(schedset);
     HWLOC_SAFE_CALL(hwloc_cpuset_to_glibc_sched_affinity(topology, cpuset, schedset, sizeof(cpu_set_t)));
 
@@ -265,13 +343,13 @@ XKRT_DRIVER_ENTRYPOINT(device_create)(xkrt_driver_t * driver, int device_driver_
     assert(device->inherited.state == XKRT_DEVICE_STATE_DEALLOCATED);
 
     // query number of command queue groups
-    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.device, &device->ze.ncommandqueuegroups, NULL));
+    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.handle, &device->ze.ncommandqueuegroups, NULL));
     assert(device->ze.ncommandqueuegroups);
 
     // query each group
     device->ze.command_queue_group_properties = (ze_command_queue_group_properties_t *) malloc(sizeof(ze_command_queue_group_properties_t) * device->ze.ncommandqueuegroups);
     assert(device->ze.command_queue_group_properties);
-    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.device, &device->ze.ncommandqueuegroups, device->ze.command_queue_group_properties));
+    ZE_SAFE_CALL(zeDeviceGetCommandQueueGroupProperties(device->ze.handle, &device->ze.ncommandqueuegroups, device->ze.command_queue_group_properties));
 
     device->ze.command_queue_group_used = new std::atomic<uint32_t>[device->ze.ncommandqueuegroups];
     assert(device->ze.command_queue_group_used);
@@ -654,7 +732,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     ZE_SAFE_CALL(
         zeCommandQueueCreate(
             device->ze.context,
-            device->ze.device,
+            device->ze.handle,
            &ze_command_queue_desc,
            &stream->ze.command.queue
         )
@@ -671,7 +749,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
     ZE_SAFE_CALL(
         zeCommandListCreateImmediate(
             device->ze.context,
-            device->ze.device,
+            device->ze.handle,
            &ze_command_queue_desc,
            &stream->ze.command.list
         )
@@ -700,7 +778,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         .count  = capacity
     };
     const uint32_t ndevices = 1;
-    ZE_SAFE_CALL(zeEventPoolCreate(device->ze.context, &ze_event_pool_desc, ndevices, &device->ze.device, &stream->ze.events.pool));
+    ZE_SAFE_CALL(zeEventPoolCreate(device->ze.context, &ze_event_pool_desc, ndevices, &device->ze.handle, &stream->ze.events.pool));
 
     stream->ze.events.list = (ze_event_handle_t *) malloc(sizeof(ze_event_handle_t) * capacity);
     assert(stream->ze.events.list);
@@ -736,6 +814,9 @@ XKRT_DRIVER_ENTRYPOINT(stream_delete)(
 static void *
 XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size, int area_idx)
 {
+    if (size == 0)
+        return NULL;
+
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
     # if 1
@@ -747,7 +828,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     };
     const size_t alignment = 4 * sizeof(double);
     void * device_ptr = NULL;
-    ze_result_t res = zeMemAllocDevice(device->ze.context, &device_desc, size, alignment, device->ze.device, &device_ptr);
+    ze_result_t res = zeMemAllocDevice(device->ze.context, &device_desc, size, alignment, device->ze.handle, &device_ptr);
     # else
 
     // TODO : cannot select memory ordinal with virtual/physical memory API
@@ -757,7 +838,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     ZE_SAFE_CALL(
         zeVirtualMemQueryPageSize(
             device->ze.context,
-            device->ze.device,
+            device->ze.handle,
             size,
            &pagesize
         )
@@ -787,7 +868,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
     ZE_SAFE_CALL(
         zePhysicalMemCreate(
             device->ze.context,
-            device->ze.device,
+            device->ze.handle,
            &ze_physical_mem_desc,
            &ze_physical_mem_handle
         )
@@ -810,7 +891,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_
 
     if (res == ZE_RESULT_SUCCESS)
     {
-        res = zeContextMakeMemoryResident(device->ze.context, device->ze.device, device_ptr, size);
+        res = zeContextMakeMemoryResident(device->ze.context, device->ze.handle, device_ptr, size);
         if (res == ZE_RESULT_SUCCESS)
             return device_ptr;
 
@@ -825,25 +906,51 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
 {
     (void) size;
     (void) area_idx;
-
-    xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
+    if (ptr)
+    {
+        xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+        ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
+    }
 }
 
 static void
 XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
     int device_driver_id,
-    xkrt_device_memory_info_t info[XKRT_DEVICES_MAX],
+    xkrt_device_memory_info_t info[XKRT_DEVICE_MEMORIES_MAX],
     int * nmemories
 ) {
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
-    info->capacity = device->ze.device_properties.maxMemAllocSize;
-    *nmemories = device->ze.memory.pcount;
-    for (uint32_t i = 0 ; i < device->ze.memory.pcount && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+
+    # if XKRT_SUPPORT_ZES
+    *nmemories = device->zes.memory.count;
+    for (uint32_t i = 0 ; i < *nmemories && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
-        info[i].capacity = device->ze.memory.properties[i].totalSize;
-        strncpy(info[i].name, device->ze.memory.properties[i].name, MIN(sizeof(device->ze.memory.properties[i].name), sizeof(info[i].name)));
+        // TODO: how to get memory name with zes ? because most likely ze memory mapping is different from zes memory mapping...
+        strncpy(info[i].name, "(null)", sizeof(info[i].name));
+        zes_mem_handle_t memory = device->zes.memory.handles[i];
+        zes_mem_state_t state = {
+            .stype = ZES_STRUCTURE_TYPE_MEM_STATE,
+            .pNext = NULL,
+            .health = ZES_MEM_HEALTH_UNKNOWN,
+            .free = 0,
+            .size = 0,
+        };
+        ZE_SAFE_CALL(zesMemoryGetState(memory, &state));
+        info[i].used = state.size - state.free;
+        info[i].capacity = state.size;
     }
+
+    # else
+
+    *nmemories = device->ze.memory.count;
+    for (uint32_t i = 0 ; i < *nmemories && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
+    {
+        strncpy(info[i].name, device->ze.memory.properties[i].name, MIN(sizeof(device->ze.memory.properties[i].name), sizeof(info[i].name)));
+        info[i].used = SIZE_MAX;
+        info[i].capacity = device->ze.memory.properties[i].totalSize;
+    }
+
+# endif /* XKRT_SUPPORT_ZES */
 }
 
 static void *
@@ -913,7 +1020,7 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
 
     // TODO : build log
     xkrt_driver_module_t module = NULL;
-    ZE_SAFE_CALL(zeModuleCreate(device->ze.context, device->ze.device, &desc, (ze_module_handle_t *) &module, NULL));
+    ZE_SAFE_CALL(zeModuleCreate(device->ze.context, device->ze.handle, &desc, (ze_module_handle_t *) &module, NULL));
     assert(module);
 
     return module;
@@ -924,6 +1031,9 @@ XKRT_DRIVER_ENTRYPOINT(module_load)(
 void
 XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_power_t * pwr)
 {
+    // problem is, there is multiple power handle for a ze device: which one to use ?
+    LOGGER_FATAL("Not implemented");
+
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
     assert(pwr);
@@ -939,6 +1049,9 @@ XKRT_DRIVER_ENTRYPOINT(power_start)(int device_driver_id, xkrt_power_t * pwr)
 void
 XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_power_t * pwr)
 {
+    // problem is, there is multiple power handle for a ze device: which one to use ?
+    LOGGER_FATAL("Not implemented");
+
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
     assert(device);
 

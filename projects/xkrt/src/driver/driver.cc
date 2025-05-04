@@ -204,14 +204,17 @@ xkrt_drivers_deinit(xkrt_runtime_t * runtime)
             device->threads[i]->wakeup();
     }
 
-    // wait for threads stream deletion
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    if (runtime->drivers.devices.n)
+    {
+        // wait for threads stream deletion
+        pthread_barrier_wait(&runtime->drivers.devices.barrier);
 
-    // wait for main thread driver deinitialization
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+        // wait for main thread driver deinitialization
+        pthread_barrier_wait(&runtime->drivers.devices.barrier);
 
-    // can destroy the barrier now
-    pthread_barrier_destroy(&runtime->drivers.devices.barrier);
+        // can destroy the barrier now
+        pthread_barrier_destroy(&runtime->drivers.devices.barrier);
+    }
 
     // join threads
     runtime->team_join(&runtime->drivers.devices.team);

@@ -1,0 +1,6 @@
+#ifndef __XKSMI_VERSION_H__
+# define __XKSMI_VERSION_H__
+
+# define XKSMI_VERSION_GITHASH "£GIT_HASH"
+
+#endif /* __XKSMI_VERSION_H__ */

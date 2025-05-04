@@ -1,0 +1,6 @@
+*.ar.bytes
+*.bc
+*.ll
+*.spv
+*.spv.bytes
+*.ar

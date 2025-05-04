@@ -91,7 +91,7 @@ typedef struct  xkrt_driver_t
     ////////////////////////////////
 
     /* retrieve memory infos */
-    void   (*f_memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICES_MAX], int * nmemories);
+    void   (*f_memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICE_MEMORIES_MAX], int * nmemories);
 
     /* allocate device memory */
     void * (*f_memory_device_allocate)(int device_driver_id, const size_t size, int area_idx);

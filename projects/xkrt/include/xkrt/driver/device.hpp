@@ -44,6 +44,9 @@ typedef struct  xkrt_device_memory_info_t
     /* memory capacity */
     size_t capacity;
 
+    /* memory used */
+    size_t used;
+
     /* memory name */
     char name[32];
 
