@@ -146,6 +146,44 @@ xkrt_runtime_t::task_submit(
     xkrt_device_task_execute(this, device, task);
 }
 
+/* spawn an independent host task */
+constexpr task_flag_bitfield_t host_capture_task_flags  = TASK_FLAG_ZERO;
+constexpr size_t host_capture_task_size                 = task_compute_size(host_capture_task_flags, 0);
+void
+xkrt_runtime_t::task_spawn(const std::function<void(task_t *)> & f)
+{
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
+
+    const task_format_id_t fmtid = this->formats.host_capture;
+    task_t * task = thread->allocate_task(host_capture_task_size + sizeof(f));
+    new (task) task_t(fmtid, host_capture_task_flags);
+
+    std::function<void(task_t *)> * fcpy = (std::function<void(task_t *)> *) TASK_ARGS(task, host_capture_task_size);
+    new (fcpy) std::function<void(task_t *)>(f);
+
+    thread->commit(task, xkrt_team_thread_task_enqueue, this, thread->team, thread);
+}
+
+static void
+body_host_capture(task_t * task)
+{
+    assert(task);
+
+    std::function<void(task_t *)> * f = (std::function<void(task_t *)> *) TASK_ARGS(task, host_capture_task_size);
+    (*f)(task);
+}
+
+void
+xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime)
+{
+    task_format_t format;
+    memset(format.f, 0, sizeof(format.f));
+    format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_host_capture;
+    snprintf(format.label, sizeof(format.label), "host_capture");
+    runtime->formats.host_capture = task_format_create(&(runtime->formats.list), &format);
+}
+
 /* submit a task to the given device */
 void
 xkrt_device_task_submit(

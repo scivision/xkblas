@@ -28,10 +28,6 @@ static const int fib_values[] = {
 };
 
 static xkrt_runtime_t runtime;
-static task_format_id_t fmtid;
-
-constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
-constexpr size_t task_size = task_compute_size(flags, 0);
 
 static inline int
 fib(int n, int depth = 0)
@@ -47,44 +43,21 @@ fib(int n, int depth = 0)
     }
     else
     {
-        xkrt_thread_t * thread = xkrt_thread_t::get_tls();
-        assert(thread);
+        runtime.task_spawn(
+            [&n, &fn1, depth] (task_t * task) {
+                fn1 = fib(n - 1, depth + 1);
+            }
+        );
 
-        // shared(fn1) firstprivate(n, depth)
-        task_t * t1 = thread->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
-        new(t1) task_t(fmtid, flags);
-        int ** shared1        = (int **) ((char*)t1 + sizeof(task_t));
-        int *  firstprivate11 = (int *)  ((char*)t1 + sizeof(task_t) + sizeof(int *));
-        int *  firstprivate12 = (int *)  ((char*)t1 + sizeof(task_t) + sizeof(int *) + sizeof(int));
-        *shared1        = &fn1;
-        *firstprivate11 = n - 1;
-        *firstprivate12 = depth+1;
-        thread->commit(t1, xkrt_team_thread_task_enqueue, &runtime, thread->team, thread);
-
-        // shared(fn2) firstprivate(n, depth)
-        task_t * t2 = thread->allocate_task(task_size + sizeof(int *) + 2 * sizeof(int));
-        new(t2) task_t(fmtid, flags);
-        int ** shared2        = (int **) ((char*)t2 + sizeof(task_t));
-        int *  firstprivate21 = (int *)  ((char*)t2 + sizeof(task_t) + sizeof(int *));
-        int *  firstprivate22 = (int *)  ((char*)t2 + sizeof(task_t) + sizeof(int *) + sizeof(int));
-        *shared2        = &fn2;
-        *firstprivate21 = n - 2;
-        *firstprivate22 = depth+1;
-        thread->commit(t2, xkrt_team_thread_task_enqueue, &runtime, thread->team, thread);
+        runtime.task_spawn(
+            [&n, &fn2, depth] (task_t * task) {
+                fn2 = fib(n - 2, depth + 1);
+            }
+        );
 
         runtime.task_wait();
     }
     return fn1 + fn2;
-}
-
-static void
-body_host(task_t * task)
-{
-          int ** fn     = (      int **) ((char*)task + sizeof(task_t));
-    const int *  n      = (const int *)  ((char*)task + sizeof(task_t) + sizeof(int *));
-    const int *  depth  = (const int *)  ((char*)task + sizeof(task_t) + sizeof(int *) + sizeof(int));
-
-    *fn[0] = fib(*n, *depth);
 }
 
 static void *
@@ -145,13 +118,6 @@ main(int argc, char ** argv)
     assert(N < sizeof(fib_values) / sizeof(int));
 
     assert(xkrt_init(&runtime) == 0);
-
-    // register task format
-    task_format_t format;
-    memset(format.f, 0, sizeof(format.f));
-    format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_host;
-    snprintf(format.label, sizeof(format.label), "fib");
-    fmtid = task_format_create(&(runtime.formats.list), &format);
 
     xkrt_team_t team = {
         .desc = {

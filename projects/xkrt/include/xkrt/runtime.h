@@ -43,6 +43,7 @@ typedef struct  xkrt_runtime_t
     struct {
         task_formats_t list;
         task_format_id_t copy_async;
+        task_format_id_t host_capture;
     } formats;
 
     /* user conf */
@@ -141,6 +142,9 @@ typedef struct  xkrt_runtime_t
     /* schedule a ready task, and return 1 if one task was found, 0 otherwise */
     int task_schedule(void);
 
+    /* spawn a host task that executes the passed function */
+    void task_spawn(const std::function<void(task_t*)> & f);
+
     ///////////////
     // THREADING //
     ///////////////
@@ -213,6 +217,9 @@ void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
 void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
+
+/* host capture task format */
+void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void * xkrt_device_thread_main(xkrt_team_t * team, xkrt_thread_t * thread);

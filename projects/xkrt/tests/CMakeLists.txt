@@ -8,7 +8,8 @@ project(tests)
 # list of tests
 set(TEST_SOURCES
     deinit.cc
-    fib.cc
+    fib-task-format.cc
+    fib-task-capture.cc
     init.cc
     sync.cc
     task-dependency.cc
