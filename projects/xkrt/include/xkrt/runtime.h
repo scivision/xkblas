@@ -91,7 +91,10 @@ typedef struct  xkrt_runtime_t
     // MEMORY //
     ////////////
 
-    /* allocate memory onto the given device */
+    /* allocate the chunk0 on the device if not allocated already */
+    void memory_device_preallocate_ensure(const xkrt_device_global_id_t device_global_id, const int memory_id);
+
+    /* allocate memory onto chunk0 of the given device */
     xkrt_area_chunk_t * memory_device_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
 
     /* deallocate the given chunk */

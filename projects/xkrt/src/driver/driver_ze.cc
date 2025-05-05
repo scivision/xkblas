@@ -913,7 +913,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
     }
 }
 
-// TODO: WARNING
+// TODO
+//
+// WARNING 1
 //  If built with `XKRT_SUPPORT_ZES` - then 2 memory areas will be reported (the HBM of each tile) - whatever the `ZE_FLAT_DEVICE_HIERARCHY`
 //  Otherwise, it will report 1 memory of 128GB virtualizing the 2 HBM with `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` - or 1 memory of 64GB if `ZE_FLAT_DEVICE_HIERARCHY=FLAT` that is the stack HBM
 static void
@@ -925,12 +927,32 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
     xkrt_device_ze_t * device = device_ze_get(device_driver_id);
 
     # if XKRT_SUPPORT_ZES
-    *nmemories = device->zes.memory.count;
+
+    // TODO: how to get memory mapping to subdevice ? we currently cannot, so
+    // hardcode 1 memory per device and assume sysman reports in subdevice
+    // index order...
+    unsigned int zes_memory_offset;
+    if (device->zes.index.on_subdevice)
+    {
+        *nmemories = 1;
+        zes_memory_offset = device->zes.index.subdevice_id;
+        // *nmemories = device->zes.memory.count;
+        // zes_memory_offset = 0;
+    }
+    else
+    {
+        *nmemories = device->zes.memory.count;
+        zes_memory_offset = 0;
+    }
+
     for (uint32_t i = 0 ; i < *nmemories && i < XKRT_DEVICE_MEMORIES_MAX ; ++i)
     {
-        // TODO: how to get memory name with zes ? because most likely ze memory mapping is different from zes memory mapping...
+        // TODO: how to get memory name with zes ? because most likely ze
+        // memory mapping is different from zes memory mapping...
         strncpy(info[i].name, "(null)", sizeof(info[i].name));
-        zes_mem_handle_t memory = device->zes.memory.handles[i];
+
+        assert(i + zes_memory_offset < device->zes.memory.count);
+        zes_mem_handle_t memory = device->zes.memory.handles[i + zes_memory_offset];
         zes_mem_state_t state = {
             .stype = ZES_STRUCTURE_TYPE_MEM_STATE,
             .pNext = NULL,
@@ -953,7 +975,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
         info[i].capacity = device->ze.memory.properties[i].totalSize;
     }
 
-# endif /* XKRT_SUPPORT_ZES */
+    # endif /* XKRT_SUPPORT_ZES */
 }
 
 static void *

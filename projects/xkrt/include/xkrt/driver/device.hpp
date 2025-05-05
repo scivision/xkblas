@@ -41,6 +41,10 @@ typedef enum    xkrt_device_state_t : uint8_t
 /* Memory info of a device */
 typedef struct  xkrt_device_memory_info_t
 {
+    ///////////////////////////////////////
+    //  TO BE FILL BY THE DRIVER ON INIT //
+    ///////////////////////////////////////
+
     /* memory capacity */
     size_t capacity;
 
@@ -49,6 +53,13 @@ typedef struct  xkrt_device_memory_info_t
 
     /* memory name */
     char name[32];
+
+    ////////////////////////////////
+    //  TO BE FILL BY THE RUNTIME //
+    ////////////////////////////////
+
+    /* whether this area was already allocated+mapped to the device */
+    int allocated;
 
     /* the area of that memory */
     xkrt_area_t area;

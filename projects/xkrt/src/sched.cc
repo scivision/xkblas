@@ -190,13 +190,8 @@ xkrt_device_thread_main(
             {
                 xkrt_device_memory_info_t * info = device->memories + i;
                 LOGGER_INFO("Found memory `%s` of capacity %zuGB", info->name, info->capacity/(size_t)1e9);
-
+                info->allocated = 0;
                 XKRT_MUTEX_INIT(info->area.lock);
-                const size_t size = (size_t) ((double)info->capacity * (double)(runtime->conf.device.gpu_mem_percent / 100.0));
-
-                assert(driver->f_memory_device_allocate);
-                const void * device_ptr = driver->f_memory_device_allocate(device->driver_id, size, i);
-                device->memory_set_chunk0((uintptr_t) device_ptr, size, i);
             }
         }
 
@@ -281,8 +276,11 @@ xkrt_device_thread_main(
         {
             for (int j = 0 ; j < device->nmemories ; ++j)
             {
-                xkrt_area_t * area = &(device->memories[j].area);
-                driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.ptr, area->chunk0.size, j);
+                if (device->memories[j].allocated)
+                {
+                    xkrt_area_t * area = &(device->memories[j].area);
+                    driver->f_memory_device_deallocate(device->driver_id, (void *) area->chunk0.ptr, area->chunk0.size, j);
+                }
             }
         }
         else

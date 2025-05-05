@@ -45,3 +45,6 @@ install(TARGETS ${XKSMI} DESTINATION bin)
 find_package(XKRT REQUIRED)
 include_directories("${XKRT_INCLUDE_DIRS}")
 target_link_libraries(${XKSMI} PRIVATE ${XKRT_LIBRARIES})
+
+# ncurses
+target_link_libraries(${XKSMI} PRIVATE ncurses)

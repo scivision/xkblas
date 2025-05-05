@@ -341,6 +341,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_mem
     size_t free, total;
     CU_SAFE_CALL(cuMemGetInfo(&free, &total));
     info[0].capacity = total;
+    info[0].used     = total - free;
     strncpy(info[0].name, "(null)", sizeof(info[0].name));
     *nmemories = 1;
 }

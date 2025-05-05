@@ -698,6 +698,7 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_mem
     cl_ulong max_mem_alloc_size;
     CL_SAFE_CALL(clGetDeviceInfo(device->cl.id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_mem_alloc_size, NULL));
     info[0].capacity = (size_t) max_mem_alloc_size;
+    info[0].used     = SIZE_MAX;
     strncpy(info[0].name, "(null)", sizeof(info[0].name));
     *nmemories = 1;
 }

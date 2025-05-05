@@ -23,6 +23,7 @@
 
 # include <hwloc.h>
 # include <hwloc/glibc-sched.h>
+# include <sys/sysinfo.h>
 
 # include <cassert>
 # include <cstdio>
@@ -210,15 +211,34 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
     (void)size;
     (void)area_idx;
 }
+# endif
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_info)(int device_driver_id, xkrt_device_memory_info_t info[XKRT_DEVICE_MEMORIES_MAX], int * nmemories)
-{
+XKRT_DRIVER_ENTRYPOINT(memory_device_info)(
+    int device_driver_id,
+    xkrt_device_memory_info_t info[XKRT_DEVICE_MEMORIES_MAX],
+    int * nmemories
+) {
     (void)device_driver_id;
-    (void)info;
-    (void)nmemories;
+    assert(device_driver_id == 0);
+
+    struct sysinfo sinfo;
+
+    if (sysinfo(&sinfo) == 0)
+    {
+        const int i = 0;
+        strncpy(info[i].name, "RAM", sizeof(info[i].name));
+        info[i].used     = sinfo.totalram - sinfo.freeram;
+        info[i].capacity = sinfo.totalram;
+        *nmemories = 1;
+    }
+    else
+    {
+        *nmemories = 0;
+    }
 }
 
+# if 0
 static void *
 XKRT_DRIVER_ENTRYPOINT(memory_host_allocate)(
     int device_driver_id,
@@ -296,7 +316,7 @@ XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 
     REGISTER(device_info);
 
- // REGISTER(memory_device_info);
+    REGISTER(memory_device_info);
  // REGISTER(memory_device_allocate);
  // REGISTER(memory_device_deallocate);
  // REGISTER(memory_host_allocate);
