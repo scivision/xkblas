@@ -111,6 +111,15 @@ else()
 endif()
 
 #--- PAPI
+if (KAAPI_USE_TRACE)
+  if (KAAPI_USE_PERFCTR)
+    # nothing to add
+  else()
+    set(KAAPI_USE_PERFCTR ON)
+    message(WARNING "KAAPI_USE_TRACE need KAAPI_USE_PERFCTR=ON. Force it to ON")
+  endif()
+endif()
+
 if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
   find_package(PAPI)
 endif()
