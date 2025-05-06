@@ -48,9 +48,7 @@
 #include "kaapi_offload.h"
 #include "kaapi_memory.h"
 
-
 #define LOGDEBUG(x)
-
 
 /* Used to compute the global_max cpu delay time 
 */
@@ -500,17 +498,6 @@ static int kaapi_offload_device_prepare_execute_task(
   kaapi_assert_debug(device == kaapi_offload_self_device());
   kaapi_assert_debug(KAAPI_ATOMIC_READ(&task->wc) ==0);
 
-#if KAAPI_USE_PREFETCH
-  int prefetch_taskcnt = 0;
-  kaapi_task_t* prefetch_tasklist[KAAPI_MAX_PREFETCH_WINDOW];
-#endif
-
-  /* take 'pseudo' lock to avoid activation of the task when data is received.
-     Wait until all  parameters have been processed.
-  */
-  KAAPI_ATOMIC_INCR(&task->wc);
-  KAAPI_ATOMIC_INCR(&device->cnt_pending);
-
 #if KAAPI_PIPELINE_GPUTASK
   /* Insert the task into the pipeline: no lock, only device thread may insert
      increment p_write after wc value is computed.
@@ -519,6 +506,19 @@ static int kaapi_offload_device_prepare_execute_task(
   device->pipeline[index % device->pipe_size] = task;
 #else
   uint64_t index = 0;
+#endif
+
+  /* take 'pseudo' lock to avoid activation of the task when data is received.
+     Wait until all  parameters have been processed.
+  */
+  KAAPI_ATOMIC_INCR(&task->wc);
+  KAAPI_ATOMIC_INCR(&device->cnt_pending);
+
+  if (device->use_unified == 0)
+  {
+#if KAAPI_USE_PREFETCH
+  int prefetch_taskcnt = 0;
+  kaapi_task_t* prefetch_tasklist[KAAPI_MAX_PREFETCH_WINDOW];
 #endif
 
   unsigned int ith;
@@ -564,12 +564,12 @@ static int kaapi_offload_device_prepare_execute_task(
         &view
     );
 
-    if (device->use_unified == 0)
-    {
       do {
         /* findaccess has already allocated the replica for asid with the right view.
             error code ENOMEM should be processed inside the dsm_acuire data that
             should only return iff memory has been allocated and transfer done.
+           On return to kaapi_dsm_acquire_data, the task->wc has been increment if the
+           data is not already located on the device. 
         */
         kaapi_assert_debug(device == kaapi_offload_self_device());
         err = kaapi_dsm_acquire_data( &kaapi_the_dsm, device->memdev.asid,
@@ -617,16 +617,16 @@ static int kaapi_offload_device_prepare_execute_task(
         kaapi_task_getargs(task),
         &mdi->replicas[lid]->view
       );
-    } //end device->use_unified==0
-  }
+    }
 
 #if KAAPI_USE_PREFETCH
-  /* prefetch data before launching kernel */
-  if (prefetch_taskcnt>0)
-  {
-    kaapi_do_prefetch_data( device, prefetch_taskcnt, prefetch_tasklist );
-  }
+    /* prefetch data before launching kernel */
+    if (prefetch_taskcnt>0)
+    {
+      kaapi_do_prefetch_data( device, prefetch_taskcnt, prefetch_tasklist );
+    }
 #endif
+  } //end device->use_unified==0
   
 #if KAAPI_PIPELINE_GPUTASK
   /* if the current task is the leading ready task then insert it
@@ -660,7 +660,7 @@ static int kaapi_offload_device_prepare_execute_task(
       KAAPI_CTXT_PERFREG_INCR(device->ctxt,KAAPI_PERF_ID_REORDER_HIT);
 #endif
 //#if KAAPI_PIPELINE_GPUTASK==0
-    kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
+    //kaapi_offload_stream_process_instruction( &device->stream, KAAPI_IO_STREAM_KERN );
 //#endif
 
 #if KAAPI_PIPELINE_GPUTASK
@@ -1169,6 +1169,7 @@ prepare_execute:
           kaapi_task_get_priority(task),
           ctxt->queue);
       )
+      kaapi_offload_device_prepare_execute_task(device, task );
       
 #if 0
 #if KAAPI_USE_STREAM_D2D
@@ -1192,7 +1193,6 @@ prepare_execute:
          kaapi_offload_poll_device( device );
       }
 
-      kaapi_offload_device_prepare_execute_task(device, task );
     }
     //kaapi_offload_poll_device( device );
   } while (f_fini && !f_fini(arg));
