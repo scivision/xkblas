@@ -114,7 +114,8 @@ kaapi_atomic32_t kaapi_dsm_asid_lid = {0}; /* 0 is the host memory */
 /* fwd decl */
 static int _kaapi_dsm_deallocate_replica(
     kaapi_dsm_t* dsm,
-    kaapi_metadata_info_t* mdi
+    kaapi_metadata_info_t* mdi,
+    uint16_t lid
 );
 
 /*
@@ -1582,7 +1583,7 @@ static void kaapi_memory_freehashmap( kaapi_hashmap_t* ht, kaapi_address_space_i
 //#warning "How it possible that mdi ==0 here ?"
         if (mdi !=0)
         {
-          _kaapi_dsm_deallocate_replica(&kaapi_the_dsm, mdi);
+          _kaapi_dsm_deallocate_replica(&kaapi_the_dsm, mdi, lid);
           free(mdi);
           KAAPI_HASHENTRIES_SET(entry, 0, kaapi_metadata_info_t*);
         }
@@ -2221,26 +2222,28 @@ static int _kaapi_dsm_allocate_replica(
 */
 static int _kaapi_dsm_deallocate_replica(
     kaapi_dsm_t* dsm,
-    kaapi_metadata_info_t* mdi
+    kaapi_metadata_info_t* mdi,
+    uint16_t lid
 )
 {
   /* dispatch over all caches / memory devices */
-  for (uint16_t lid=0; lid<KAAPI_MEMORY_MAX_NODES; ++lid)
+  //TG: comment, only free memory on lid. for (uint16_t lid=0; lid<KAAPI_MEMORY_MAX_NODES; ++lid)
   {
     kaapi_data_replica_t* kdr = mdi->replicas[lid];
-    if (kdr ==0) continue;
+    if (kdr ==0) return 0; // TG: continue;
     kaapi_atomic_lock(&kdr->lock);
     mdi->replicas[lid] = 0;
     if (kaapi_memory_replica_is_allocated(mdi, lid ))
     {
-      kaapi_memory_replica_unset_allocated(mdi, lid);
-      //kaapi_memory_device_t* device = kaapi_memory_device_get(kdr->ptr.asid);
+      kaapi_memory_device_t* device = kaapi_memory_device_get(kdr->ptr.asid);
       //if (device ==0) break;
       if (lid !=0)
       {
         size_t size_view = kaapi_memory_view_size( &kdr->view );
         kaapi_memory_free(kdr->ptr, size_view );
       }
+      kaapi_memory_replica_unset_allocated(mdi, lid);
+
       kdr->ptr = kaapi_make_nullpointer(0);
       kdr->cachelist = 0;
       kaapi_cache_entry_t* entry = (kaapi_cache_entry_t*)kdr->cacheentry;
