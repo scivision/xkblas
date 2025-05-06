@@ -293,7 +293,7 @@ static void _kaapi_get_gpu_topo(void)
   hipError_t res;
   uint64_t min_perf= UINT64_MAX; /* min_perf <= max_perf */
   uint64_t max_perf= 0;
-  int device_count = 0;
+  uint32_t device_count = 0;
   rsmi_status_t err;
 
   err = rsmi_init(0);
@@ -972,7 +972,7 @@ void* kaapi_hip_register_thread(void* dummy )
             //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
             if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
             {
-              printf("***[%s]: hipHostRegister error: %i. Ptr:%X, size:%lu\n", __func__, err, req.ptr, req.size);
+              printf("***[%s]: hipHostRegister error: %i. Ptr:%X, size:%lu\n", __func__, err, (uint64_t)req.ptr, req.size);
               req.err = EALREADY;
             }
           }
@@ -1919,7 +1919,7 @@ struct _kaapi_known_arch {
 static struct _kaapi_known_arch kaapi_known_devicebyname[] = {
   {"AMD Instinct MI250X", KAAPI_ARCH_MI250, 0},
   {"AMD Instinct MI250",  KAAPI_ARCH_MI250, 0},
-  {"AMD Instinct MI300A", KAAPI_ARCH_MI300A, 0},
+  {"AMD Instinct MI300A", KAAPI_ARCH_MI300A, 1},
   { 0, KAAPI_ARCH_UNKNOWN, 0}
 };
 #define KAAPI_KNOWN_DEVICE 3
@@ -1970,8 +1970,7 @@ KAAPI_PLUGIN_ENTRYPOINT(get_devices_info)(int* arch, int* has_unified)
       size_t len = strlen(kaapi_known_devicebyname[j].name);
       if (strncmp(prop.name, kaapi_known_devicebyname[j].name, len)==0)
       {
-printf("Driver HIP: device %i is %s::  Unified value:%i \n", j, prop.name, prop.name, kaapi_known_devicebyname[j].has_unified);
-        if (kaapi_known_devicebyname[j].has_unified) *has_unified |= 0x2;
+        if (kaapi_known_devicebyname[j].has_unified) *has_unified |= 0x3;
         else *has_unified &= ~0x2;
         if (*arch == KAAPI_ARCH_UNDEF) *arch = kaapi_known_devicebyname[j].arch;
         else if (*arch != kaapi_known_devicebyname[j].arch) *arch = KAAPI_ARCH_UNKNOWN;
@@ -1986,8 +1985,6 @@ printf("Driver HIP: device %i is %s::  Unified value:%i \n", j, prop.name, prop.
      the hardware performance capability to 0
   */
   if ((*has_unified & 0x1) ==0) *has_unified = 0;
-
-printf("Driver HIP: devices has uvm value: %i\n", *has_unified);
 
   return 0;
 }
