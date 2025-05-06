@@ -58,6 +58,8 @@
 
 #include "internal_register.h"
 
+
+
 /* 2^KAAPI_SIZE_DSM_MAP is the size of the hash map */
 #define KAAPI_SIZE_DSM_MAP 20
 
@@ -1800,7 +1802,6 @@ printf("%p:: handle: %p, sync: %p\n", pthread_self(), curr, curr->sync);
 
 //#undef KAAPI_DEBUG
 //#define KAAPI_DEBUG 0
-
   /* also do sync */
   kaapi_end_dfg( xk_ctxt->kthread );
   kaapi_assert( xk_ctxt == xkblas_context_get() );
@@ -1953,6 +1954,8 @@ int xkblas_memory_coherent_async(
   void* A, size_t LD, size_t eltsize
 )
 {
+  if (kaapi_default_param.use_unified == 1) return 0;
+
   xkblas_matrix_descr_t* Ah = xkblas_find(A);
   if (!xkblas_matrix_descr_isinit(Ah)) /* unknown matrix, return except if debug mode because it is strange to call this
   function with unknown matrix */
