@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:28:21 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 00:11:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,9 +21,9 @@
 # include <xkrt/support.h>
 
 # include <ze_api.h>
-# if XKRT_SUPPORT_SYCL
+# if XKRT_SUPPORT_ZE_SYCL_INTEROP
 #  include <sycl/sycl.hpp>
-# endif /* XKRT_SUPPORT_SYCL */
+# endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 # if XKRT_SUPPORT_ZES
 #  include <zes_api.h>
 # endif
@@ -63,13 +63,13 @@ typedef struct  xkrt_device_ze_t
 
     } ze;
 
-    # if XKRT_SUPPORT_SYCL
+    # if XKRT_SUPPORT_ZE_SYCL_INTEROP
     // sycl interop
     struct {
         sycl::device device;
         sycl::context context;
     } sycl;
-    # endif /* XKRT_SUPPORT_SYCL */
+    # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
     # if XKRT_SUPPORT_ZES
     struct {
@@ -120,11 +120,11 @@ typedef struct  xkrt_stream_ze_t
 
     } ze;
 
-    # if XKRT_SUPPORT_SYCL
+    # if XKRT_SUPPORT_ZE_SYCL_INTEROP
     struct {
         sycl::queue queue;
     } sycl;
-    # endif /* XKRT_SUPPORT_SYCL */
+    # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
 }               xkrt_stream_ze_t;
 

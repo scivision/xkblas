@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:43:12 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 03:54:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -82,13 +82,10 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     creators[XKRT_DRIVER_TYPE_HIP] = XKRT_DRIVER_TYPE_HIP_create_driver;
 # endif /* XKRT_SUPPORT_HIP */
 
-    # if 0
-    typedef struct  xkrt_thread_device_args_t
-    {
-        xkrt_driver_type_t driver_type;
-        int driver_device_id;
-    }               xkrt_thread_device_args_t;
-    # endif
+# if XKRT_SUPPORT_SYCL
+    extern xkrt_driver_t * XKRT_DRIVER_TYPE_SYCL_create_driver(void);
+    creators[XKRT_DRIVER_TYPE_SYCL] = XKRT_DRIVER_TYPE_SYCL_create_driver;
+# endif /* XKRT_SUPPORT_SYCL */
 
     // number of devices
     uint8_t ndevices = 0;
@@ -132,6 +129,8 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
             assert(driver->f_get_ndevices_max);
             unsigned int ndevices_max = driver->f_get_ndevices_max();
             LOGGER_DEBUG("Driver has up to %u devices", ndevices_max);
+            if (ndevices_max == 0)
+                continue ;
 
             unsigned int ndevices_for_driver = MIN(ndevices_requested - ndevices, ndevices_max);
             assert(ndevices_for_driver);

@@ -6,8 +6,8 @@ import sys
 print(sys.argv)
 print(len(sys.argv))
 
-if len(sys.argv) != 13:
-    print("usage: {} [DST-DIR] [DST-FILE] [USE_CUDA] [USE_ZE] [USE_SYCL] [USE_CL] [USE_STATS] [USE_CAIRO] [USE_NVML] [USE_ZES] [USE_RSMI] [ENABLE_HEAVY_DEBUG]".format(sys.argv[0]))
+if len(sys.argv) != 14:
+    print("usage: {} [DST-DIR] [DST-FILE] [USE_CUDA] [USE_ZE] [USE_SYCL] [USE_CL] [USE_STATS] [USE_CAIRO] [USE_NVML] [USE_ZES] [USE_RSMI] [ENABLE_HEAVY_DEBUG] [USE_ZE_SYCL_INTEROP]".format(sys.argv[0]))
     sys.exit(0)
 
 dstdir=sys.argv[1]
@@ -33,7 +33,9 @@ use_nvml=cmake_option_convert(sys.argv[9])
 use_zes=cmake_option_convert(sys.argv[10])
 use_rsmi=cmake_option_convert(sys.argv[11])
 enable_heavy_debug=cmake_option_convert(sys.argv[12])
-cmd('sed -e "s/__XKRT_SUPPORT_CUDA_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZE_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_SYCL_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CL_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_STATS_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CAIRO_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_NVML_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZES_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_RSMI_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_HEAVY_DEBUG_VALUE__/{}/g" {}/{}.template > {}/{}-tmp.h'.format(use_cuda, use_ze, use_sycl, use_opencl, use_stats, use_cairo, use_nvml, use_zes, use_rsmi, enable_heavy_debug, dstdir, dstfile, dstdir, dstfile))
+use_ze_sycl_interop=cmake_option_convert(sys.argv[13])
+
+cmd('sed -e "s/__XKRT_SUPPORT_CUDA_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZE_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_SYCL_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CL_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_STATS_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_CAIRO_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_NVML_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZES_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_RSMI_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_HEAVY_DEBUG_VALUE__/{}/g" -e "s/__XKRT_SUPPORT_ZE_SYCL_INTEROP_VALUE__/{}/g" {}/{}.template > {}/{}-tmp.h'.format(use_cuda, use_ze, use_sycl, use_opencl, use_stats, use_cairo, use_nvml, use_zes, use_rsmi, enable_heavy_debug, use_ze_sycl_interop, dstdir, dstfile, dstdir, dstfile))
 
 if cmd("test -f {}/{}.h".format(dstdir, dstfile)) or cmd("diff {}/{}.h {}/{}-tmp.h".format(dstdir, dstfile, dstdir, dstfile)):
     cmd("cp {}/{}-tmp.h {}/{}.h".format(dstdir, dstfile, dstdir, dstfile))

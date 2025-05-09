@@ -21,6 +21,9 @@
 # define XKRT_SUPPORT_ZE    __XKRT_SUPPORT_ZE_VALUE__
 
 /* If the runtime was compiled with SYCL support (for Level Zero interop and mkl) */
+# define XKRT_SUPPORT_ZE_SYCL_INTEROP __XKRT_SUPPORT_ZE_SYCL_INTEROP_VALUE__
+
+/* If the runtime was compiled with SYCL support */
 # define XKRT_SUPPORT_SYCL  __XKRT_SUPPORT_SYCL_VALUE__
 
 /* If the kernel was compiled with OpenCL support */

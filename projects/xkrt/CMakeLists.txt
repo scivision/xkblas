@@ -24,7 +24,8 @@ option(USE_STATS "Whether to compile the built-in stat system." OFF)
 option(USE_CUDA "Whether to build the CUDA driver." OFF)
 option(USE_HIP "Whether to build the HIP driver." OFF)
 option(USE_ZE "Whether to build the Level Zero driver." OFF)
-option(USE_SYCL "Enable the compilation of SYCL and set its interop with Level Zero driver" OFF)
+option(USE_ZE_SYCL_INTEROP "Enable the compilation of SYCL interop with Level Zero driver" OFF)
+option(USE_SYCL "Whether to build the SYCL driver." OFF)
 option(USE_CL "Whether to build the OpenCL driver." OFF)
 option(USE_CAIRO "Use Cairo to generate images (memory-tree debugging purposes mostly)." OFF)
 option(USE_NVML "Use Nvidia's NVML management library." OFF)
@@ -36,7 +37,7 @@ option(STRICT "Enable strict compilation mode" ON)
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG} ${USE_ZE_SYCL_INTEROP}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
@@ -147,18 +148,28 @@ if (USE_ZE)
 
     add_library(${XKRT}_driver_ze SHARED src/driver/driver_ze.cc)
     add_dependencies(${XKRT}_driver_ze always_generate_files)
-    target_compile_options(${XKRT}_driver_ze PRIVATE -fsycl)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_ze)
     install(TARGETS ${XKRT}_driver_ze LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
 endif()
 
-# SYCL
-if (USE_SYCL)
+# SYCL / ZE_SYCL_INTEROP
+if (USE_SYCL OR USE_ZE_SYCL_INTEROP)
     find_package(SYCL REQUIRED)
     include_directories(${SYCL_INCLUDE_DIRS})
-    target_link_libraries(${XKRT} PRIVATE ${SYCL_LIBRARIES} -fsycl)
-    target_link_libraries(${XKRT}_driver_ze PRIVATE -fsycl)
+endif()
+
+if (USE_SYCL)
+    add_library(${XKRT}_driver_sycl SHARED src/driver/driver_sycl.cc)
+    target_link_libraries( ${XKRT}_driver_sycl PRIVATE ${SYCL_LIBRARIES} -fsycl)
+    target_compile_options(${XKRT}_driver_sycl PRIVATE -fsycl)
+    add_dependencies(      ${XKRT}_driver_sycl always_generate_files)
+    target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_sycl)
+endif()
+
+if (USE_ZE_SYCL_INTEROP)
+    target_link_libraries( ${XKRT}_driver_ze PRIVATE ${SYCL_LIBRARIES} -fsycl)
+    target_compile_options(${XKRT}_driver_ze PRIVATE -fsycl)
 endif()
 
 # OpenCL
