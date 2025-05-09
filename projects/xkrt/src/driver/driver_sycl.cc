@@ -335,7 +335,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             void * src = (void *) instr->copy.D1.src_device_addr;
             void * dst = (void *) instr->copy.D1.dst_device_addr;
-            *e = q.memcpy(dst, src, count);
+            sycl::event evt = q.memcpy(dst, src, count);
+            new (e) sycl::event(evt);
             return EINPROGRESS;
         }
 
@@ -357,7 +358,8 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             assert(height > 0);
 
             const std::vector<sycl::event> dependencies = {};
-            *e = q.ext_oneapi_memcpy2d(dst, dpitch, src, spitch, width, height, dependencies);
+            sycl::event evt = q.ext_oneapi_memcpy2d(dst, dpitch, src, spitch, width, height, dependencies);
+            new (e) sycl::event(evt);
 
             # else
 
@@ -417,7 +419,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_instructions_progress)(
             {
                 auto status = e->get_info<sycl::info::event::command_execution_status>();
                 if (status == sycl::info::event_command_status::complete)
+                {
+                    // TODO : i think we need to do that
+                    e->~event();
                     return 0;
+                }
                 else
                     sched_yield();
             }

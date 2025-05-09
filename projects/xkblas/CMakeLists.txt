@@ -151,7 +151,6 @@ endif()
 
 option(USE_SYCL "Use Sycl" OFF)
 if (USE_SYCL)
-    include_directories("${ZE_INCLUDE_DIRS}")
     target_link_libraries( ${XKBLAS_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
     target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)
 endif()
