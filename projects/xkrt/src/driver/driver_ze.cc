@@ -201,7 +201,7 @@ XKRT_DRIVER_ENTRYPOINT(init)(
         ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ze_n_devices[ze_driver_id], NULL));
         ZE_SAFE_CALL(zeDeviceGet(ze_driver, &ze_n_devices[ze_driver_id], ze_devices[ze_driver_id]));
 
-        # if XKRT_SUPPORT_ZE
+        # if XKRT_SUPPORT_ZES
         // TODO: assuming that ze driver id == zes driver id, which is probably wrong, but fuck off honestly
         unsigned int zes_driver_id = ze_driver_id;
         zes_driver_handle_t zes_driver = zes_drivers[zes_driver_id];
@@ -212,9 +212,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(
         # endif /* XKRT_SUPPORT_ZES */
 
         // sycl interop
-        # if XKRT_SUPPORT_SYCL
+        # if XKRT_SUPPORT_ZE_SYCL_INTEROP
         sycl::platform platform = sycl::make_platform<sycl::backend::ext_oneapi_level_zero>(ze_driver);
-        # endif /* XKRT_SUPPORT_SYCL */
+        # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
         // create xkrt devices
         uint32_t n = MIN(ndevices_requested - n_devices, ze_n_devices[ze_driver_id]);
@@ -240,14 +240,14 @@ XKRT_DRIVER_ENTRYPOINT(init)(
             device->ze.memory.count = MIN(device->ze.memory.count, XKRT_DEVICE_MEMORIES_MAX);
             ZE_SAFE_CALL(zeDeviceGetMemoryProperties(device->ze.handle, &device->ze.memory.count, device->ze.memory.properties));
 
-            # if XKRT_SUPPORT_SYCL
+            # if XKRT_SUPPORT_ZE_SYCL_INTEROP
             // sycl interop
             device->sycl.device = sycl::ext::oneapi::level_zero::detail::make_device(platform, (ur_native_handle_t) ze_device);
 
             std::vector<sycl::device> sycl_devices(1);
             sycl_devices[0] = device->sycl.device;
             device->sycl.context = sycl::make_context<sycl::backend::ext_oneapi_level_zero>(sycl_devices, device->ze.context, 1);
-            # endif /* XKRT_SUPPORT_SYCL */
+            # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
             if (n_devices == ndevices_requested)
                 break ;
@@ -389,7 +389,7 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(
     int rank = 0;
     affinity[rank++] = (1 << device_global_id);
 
-# if 0
+# if 1
     xkrt_device_global_id_t subdevice_global_id = (device_global_id % 2 == 0) ? (device_global_id + 1) : (device_global_id - 1);
     affinity[rank++] =  (1 << subdevice_global_id);
     affinity[rank++] = (~affinity[0]) & (~affinity[1]);
@@ -759,7 +759,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         )
     );
 
-    # if XKRT_SUPPORT_SYCL
+    # if XKRT_SUPPORT_ZE_SYCL_INTEROP
     sycl::property_list props = {}; /* how to convert `ze_command_queue_desc` to `sycl::property_list` ? */
     sycl::queue queue = sycl::make_queue<sycl::backend::ext_oneapi_level_zero>(
         device->sycl.context,
@@ -770,7 +770,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_create)(
         props
     );
     new (&stream->sycl.queue) sycl::queue(queue);
-    # endif /* XKRT_SUPPORT_SYCL */
+    # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
     # endif
 

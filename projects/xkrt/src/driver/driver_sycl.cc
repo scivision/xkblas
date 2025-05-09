@@ -28,6 +28,18 @@
 // # include <hwloc/cuda.h>
 # include <hwloc/glibc-sched.h>
 
+//  this flag skips sycl/ur and jumps straight to ZE on interfaces that have
+//  poor implementations
+# if XKRT_SUPPORT_ZE
+#  define BYPASS_SYCL 0
+#  if BYPASS_SYCL
+#   include <ze_api.h>
+#   include <xkrt/logger/logger-ze.h>
+#  endif /* BYPASS_SYCL */
+# else
+#  define BYPASS_SYCL 0
+# endif /* XKRT_SUPPORT_ZE */
+
 # include <cassert>
 # include <cstdio>
 # include <cstdint>
@@ -133,7 +145,8 @@ XKRT_DRIVER_ENTRYPOINT(device_cpuset)(
     hwloc_bitmap_free(cpuset);
     # else
     CPU_ZERO(schedset);
-    CPU_XOR(schedset, schedset, schedset);
+    for (int i = device_driver_id * 4 ; i < (device_driver_id + 1) * 4 ; ++i)
+        CPU_SET(i, schedset);
     # endif
 
 
@@ -245,6 +258,10 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(
     LOGGER_IMPL("Set actual affinity, hardcoded for now");
     int rank = 0;
     affinity[rank++] = (1 << device_global_id);
+    # if 1 // Aurora specific - set high affinity between the two stacks for the gpu
+    xkrt_device_global_id_t stack_id = (device_global_id % 2 == 0) ? (device_global_id + 1) : (device_global_id - 1);
+    affinity[rank++] =  (1 << stack_id);
+    # endif
     affinity[rank++] = ~affinity[0];
 
     return 0;
@@ -344,21 +361,77 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_2D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
-            # if SYCL_EXT_ONEAPI_MEMCPY2D == 1
+                  void * dst    = (      void *) instr->copy.D2.dst_device_view.addr;
+            const void * src    = (const void *) instr->copy.D2.src_device_view.addr;
 
-            void * src = (void *) instr->copy.D2.src_device_view.addr;
-            void * dst = (void *) instr->copy.D2.dst_device_view.addr;
-
-            const size_t dpitch = instr->copy.D2.dst_device_view.ld * instr->copy.D2.sizeof_type;
-            const size_t spitch = instr->copy.D2.src_device_view.ld * instr->copy.D2.sizeof_type;
+            const size_t dst_pitch = instr->copy.D2.dst_device_view.ld * instr->copy.D2.sizeof_type;
+            const size_t src_pitch = instr->copy.D2.src_device_view.ld * instr->copy.D2.sizeof_type;
 
             const size_t width  = instr->copy.D2.m * instr->copy.D2.sizeof_type;
             const size_t height = instr->copy.D2.n;
-            assert(width > 0);
-            assert(height > 0);
+
+            # if BYPASS_SYCL
+
+            // get ze list
+            ze_command_list_handle_t list;
+            auto queue_type = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(q);
+            if (auto * ptr_queue_handle = std::get_if<ze_command_list_handle_t>(&queue_type))
+            {
+                list = *ptr_queue_handle;
+            }
+            else if (auto * ptr_queue_handle = std::get_if<ze_command_queue_handle_t>(&queue_type))
+            {
+                LOGGER_FATAL("QUEUE IS NON-IMMEDIATE, fuck that");
+            }
+
+            // create a ze event
+            new (e) sycl::event();
+            ze_event_handle_t event = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(*e);
+
+            const uint32_t dst_slice_pitch = 0;
+            const ze_copy_region_t dst_region = {
+                .originX = 0,
+                .originY = 0,
+                .originZ = 0,
+                .width   = (uint32_t) width,
+                .height  = (uint32_t) height,
+                .depth   = 1
+            };
+
+            const uint32_t src_slice_pitch = 0;
+            const ze_copy_region_t src_region = {
+                .originX = 0,
+                .originY = 0,
+                .originZ = 0,
+                .width   = (uint32_t) width,
+                .height  = (uint32_t) height,
+                .depth   = 1
+            };
+
+            const uint32_t num_wait_events = 0;
+            ze_event_handle_t * wait_events = NULL;
+
+            ZE_SAFE_CALL(
+                zeCommandListAppendMemoryCopyRegion(
+                    list,
+                    dst,
+                   &dst_region,
+                    dst_pitch,
+                    dst_slice_pitch,
+                    src,
+                   &src_region,
+                    src_pitch,
+                    src_slice_pitch,
+                    event,
+                    num_wait_events,
+                    wait_events
+                )
+            );
+
+            # elif SYCL_EXT_ONEAPI_MEMCPY2D == 1
 
             const std::vector<sycl::event> dependencies = {};
-            sycl::event evt = q.ext_oneapi_memcpy2d(dst, dpitch, src, spitch, width, height, dependencies);
+            sycl::event evt = q.ext_oneapi_memcpy2d(dst, dst_pitch, src, src_pitch, width, height, dependencies);
             new (e) sycl::event(evt);
 
             # else
@@ -578,7 +651,7 @@ XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_power_t * pwr)
 xkrt_driver_t *
 XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    xkrt_driver_sycl_t * driver = (xkrt_driver_sycl_t *) malloc(sizeof(xkrt_driver_sycl_t));
+    xkrt_driver_sycl_t * driver = (xkrt_driver_sycl_t *) calloc(1, sizeof(xkrt_driver_sycl_t));
     assert(driver);
 
     # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)

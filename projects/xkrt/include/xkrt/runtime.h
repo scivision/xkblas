@@ -194,6 +194,9 @@ typedef struct  xkrt_runtime_t
     /* get device */
     xkrt_device_t * device_get(const xkrt_device_global_id_t device_global_id);
 
+    /* get number of commited devices */
+    unsigned int get_ndevices(void);
+
     //////////////////////////////////////
     // linked list for freeing on crash //
     //////////////////////////////////////

@@ -841,7 +841,7 @@ XKRT_DRIVER_ENTRYPOINT(power_stop)(int device_driver_id, xkrt_power_t * pwr)
 xkrt_driver_t *
 XKRT_DRIVER_ENTRYPOINT(create_driver)(void)
 {
-    xkrt_driver_cu_t * driver = (xkrt_driver_cu_t *) malloc(sizeof(xkrt_driver_cu_t));
+    xkrt_driver_cu_t * driver = (xkrt_driver_cu_t *) calloc(1, sizeof(xkrt_driver_cu_t));
     assert(driver);
 
     # define REGISTER(func) driver->super.f_##func = XKRT_DRIVER_ENTRYPOINT(func)

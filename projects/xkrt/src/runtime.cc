@@ -131,3 +131,9 @@ xkrt_get_ndevices_max(xkrt_runtime_t * runtime, int * count)
     }
     return 0;
 }
+
+unsigned int
+xkrt_runtime_t::get_ndevices(void)
+{
+    return this->drivers.devices.n;
+}

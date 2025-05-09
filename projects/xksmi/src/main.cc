@@ -36,7 +36,7 @@ print_driver(xkrt_runtime_t * runtime, xkrt_driver_type_t driver_type)
 {
     xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t)driver_type);
     if (driver == NULL)
-        continue ;
+        return ;
 
     printsep_hash();
 
