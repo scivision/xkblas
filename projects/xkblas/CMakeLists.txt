@@ -7,8 +7,8 @@ SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})
 
 SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
-SET(XKBLAS_KERNELS_PRECISIONS s c d z)
-#SET(XKBLAS_KERNELS_PRECISIONS s d)
+#SET(XKBLAS_KERNELS_PRECISIONS s c d z)
+SET(XKBLAS_KERNELS_PRECISIONS s d)
 
 # custom kernels
 SET(XKBLAS_CUDA_KERNELS copyscale)
@@ -144,21 +144,16 @@ if(USE_CLBLAST)
 endif()
 
 option(USE_ZE "Use Level Zero" OFF)
-if (USE_SYCL)
+if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 
-option(USE_SYCL "Enable the compilation of Intel's BLAS via SYCL" OFF)
+option(USE_SYCL "Use Sycl" OFF)
 if (USE_SYCL)
-
-    # set sources
-    add_compile_definitions(XKBLAS_SUPPORT_SYCL=1)
-
-    # current impl relies on sycl ... no "zeBlas" equivalent to "cuBlas" :-(
+    include_directories("${ZE_INCLUDE_DIRS}")
+    target_link_libraries( ${XKBLAS_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
     target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)
-    # target_link_libraries(${XKBLAS_NAME} PRIVATE sycl)
-
 endif()
 
 ################

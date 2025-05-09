@@ -165,6 +165,7 @@ if (USE_SYCL)
     target_compile_options(${XKRT}_driver_sycl PRIVATE -fsycl)
     add_dependencies(      ${XKRT}_driver_sycl always_generate_files)
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_sycl)
+    install(TARGETS ${XKRT}_driver_sycl LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 endif()
 
 if (USE_ZE_SYCL_INTEROP)

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 04:31:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 05:34:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -344,6 +344,7 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_2D):
         {
             # if SYCL_EXT_ONEAPI_MEMCPY2D == 1
+
             void * src = (void *) instr->copy.D2.src_device_view.addr;
             void * dst = (void *) instr->copy.D2.dst_device_view.addr;
 
@@ -355,9 +356,13 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
             assert(width > 0);
             assert(height > 0);
 
-            *e = q.ext_oneapi_memcpy2d(dst, dpitch, src, spitch, width, height);
+            const std::vector<sycl::event> dependencies = {};
+            *e = q.ext_oneapi_memcpy2d(dst, dpitch, src, spitch, width, height, dependencies);
+
             # else
+
             LOGGER_FATAL("SYCL does not support memcpy2D");
+
             # endif
 
             return EINPROGRESS;

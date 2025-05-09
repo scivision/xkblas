@@ -5,18 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/19 23:00:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 05:02:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include <xkrt/support.h>
-
-# if XKRT_SUPPORT_ZE
-#  include <xkrt/driver/driver-ze.h>
-#  include <xkrt/logger/logger-ze.h>
-# endif /* XKRT_SUPPORT_ZE */
 
 # include "auto-tile.h"
 # include "context.h"
@@ -30,17 +25,17 @@
 
 # include <cassert>
 
-# include "xkblas/kernel-type.h"
-# include "xkblas/xkblas-experimental.h"
-
-# if XKBLAS_SUPPORT_SYCL
+# if XKRT_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 #  include <oneapi/mkl.hpp>
 #  include <sycl/ext/oneapi/backend/level_zero.hpp>
 #  include <xkblas/oneapi-mkl-helper.h>
-# else
-#  include "xkblas/cblas.h"
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
 # endif
+
+# include "xkblas/kernel-type.h"
+# include "xkblas/xkblas-experimental.h"
+# include "xkblas/cblas.h"
 
 typedef struct  args_t
 {
@@ -404,6 +399,9 @@ body_cuda(
 
 # if XKRT_SUPPORT_ZE
 
+#  include <xkrt/driver/driver-ze.h>
+#  include <xkrt/logger/logger-ze.h>
+
 static void
 body_ze(
     xkrt_stream_ze_t * stream,
@@ -421,7 +419,7 @@ body_ze(
 
     args_t * args = (args_t *) TASK_ARGS(task);
 
-    # if XKBLAS_SUPPORT_SYCL
+    # if XKRT_SUPPORT_ZE_SYCL_INTEROP
 
     sycl::queue & queue = stream->sycl.queue;
     oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
@@ -454,9 +452,9 @@ body_ze(
     );
     stream->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
 
-    # else /* XKBLAS_SUPPORT_SYCL */
+    # else /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
     LOGGER_FATAL("no blas impl for ze");
-    # endif /* XKBLAS_SUPPORT_SYCL */
+    # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
 
     # if 0
 
@@ -484,6 +482,60 @@ body_ze(
 }
 
 # endif
+
+# if XKRT_SUPPORT_SYCL
+
+#  include <xkrt/driver/driver-sycl.h>
+
+static void
+body_sycl(
+    xkrt_stream_sycl_t * stream,
+    xkrt_stream_instruction_t * instr,
+    xkrt_stream_instruction_counter_t idx
+) {
+    // unpack arguments
+    task_t * task = (task_t *) instr->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
+
+    args_t * args = (args_t *) TASK_ARGS(task);
+
+    sycl::queue & queue = stream->sycl.queue;
+    oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
+    oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
+    std::int64_t m = args->m;
+    std::int64_t n = args->n;
+    std::int64_t k = args->k;
+    oneapi::mkl::value_or_pointer<TYPE> alpha = args->alpha;
+    oneapi::mkl::value_or_pointer<TYPE> beta = args->beta;
+    const TYPE * a   = (const TYPE *) A->device_view.addr;
+    const TYPE * b   = (const TYPE *) B->device_view.addr;
+          TYPE * c   = (      TYPE *) C->device_view.addr;
+    std::int64_t lda = (std::int64_t) A->device_view.ld;
+    std::int64_t ldb = (std::int64_t) B->device_view.ld;
+    std::int64_t ldc = (std::int64_t) C->device_view.ld;
+    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
+    const std::vector<sycl::event> dependencies = {};
+
+    stream->sycl.events.buffer[idx] = oneapi::mkl::blas::column_major::gemm(
+        queue,
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc,
+        mode,
+        dependencies
+    );
+}
+
+# endif /* XKRT_SUPPORT_SYCL */
 
 # if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
 
@@ -574,6 +626,10 @@ register_£gemm_format(void)
     # if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
     format.f[XKRT_DRIVER_TYPE_CL] = (task_format_func_t) body_cl;
     # endif /* XKRT_SUPPORT_CL */
+
+    # if XKRT_SUPPORT_SYCL
+    format.f[XKRT_DRIVER_TYPE_SYCL] = (task_format_func_t) body_sycl;
+    # endif /* XKRT_SUPPORT_SYCL */
 
     snprintf(format.label, sizeof(format.label), "£gemm");
     format_id = xkblas_task_format_create(&format);

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 03:54:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 04:50:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,7 +51,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     memset(runtime->drivers.devices.list, 0, sizeof(runtime->drivers.devices.list));
     runtime->drivers.devices.next_id = 1;                                                   // host device is always 0
     runtime->drivers.devices.n = 0;
-    runtime->drivers.devices.round_robin_device_global_id = 0;
+    runtime->drivers.devices.round_robin_device_global_id = 0;                              // for task scheduling
 
     // LOAD DRIVERS
     xkrt_driver_t * (*creators[XKRT_DRIVER_TYPE_MAX])(void);

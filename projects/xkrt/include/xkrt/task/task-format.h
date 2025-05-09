@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 03:48:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/09 04:52:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,6 +51,7 @@ typedef enum    task_format_target_t : uint8_t
     TASK_FORMAT_TARGET_HIP   = 4,
     TASK_FORMAT_TARGET_SYCL  = 5,
     TASK_FORMAT_TARGET_MAX   = 6
+
 }               task_format_target_t;
 
 typedef void (*task_format_func_t)();
