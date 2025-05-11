@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 22:52:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:22:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -685,10 +685,7 @@ main_mumps(char ** args)
                 uint64_t t0 = get_nanotime();
 
                 # if USE_PREALLOCATE
-                impl.preallocate(D, n, n, ld);
-                impl.preallocate(L, m, n, ld);
-                impl.preallocate(U, n, m, ld);
-                impl.preallocate(G, m, m, ld);
+                impl.preallocate(D, m+n, m+n, ld);
                 # endif /* USE_PREALLOCATE */
 
                 impl.set_tile(ts[i][0]);

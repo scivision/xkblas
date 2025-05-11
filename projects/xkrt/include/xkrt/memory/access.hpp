@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 20:47:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:12:08 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -267,15 +267,11 @@ class access_t
             /* clear preallocated empty successors */
             successors.clear();
 
-            /* virtual access, no need to compute the region */
-            if (mode == ACCESS_MODE_V)
-                return ;
-
             /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
             assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
 
             /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
-            assert(mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
 
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
