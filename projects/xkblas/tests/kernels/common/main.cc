@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 22:38:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 22:52:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -482,7 +482,7 @@ main_mumps(char ** args)
     # define USE_WRITE_BACK     1
     # define USE_ARGS_MATRIX    0
     # define USE_TS_TUNER       1
-    # define USE_PREALLOCATE    0
+    # define USE_PREALLOCATE    1
     # define NMATRICES          1
 
     TYPE alpha, beta;
@@ -673,8 +673,6 @@ main_mumps(char ** args)
         const int ntiles = sizeof(ts) / (3 * sizeof(int));
         for (int i = 0 ; i < ntiles ; ++i)
         {
-            printf("Running with ts = {%d, %d, %d} (%d/%u)\n", ts[i][0], ts[i][1], ts[i][2], i, ntiles);
-
             for (int j = 0 ; j < Ix ; ++j)
             {
                 # if REPLICATE
@@ -713,7 +711,7 @@ main_mumps(char ** args)
                 uint64_t tt = get_nanotime();
                 impl.wait();
                 uint64_t tf = get_nanotime();
-                printf("Compute took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+                printf("(%d/%u) Compute took %lf s. (graph construction took %lf s.) - with ts = {%d, %d, %d}\n", i, ntiles, (tf-t0)/1e9, (tt-t0)/1e9, ts[i][0], ts[i][1], ts[i][2]);
 
                 impl.reset();
 
