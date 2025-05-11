@@ -237,7 +237,7 @@ xkblas_£gemm_async(
     const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
     /* distribute C in a cyclic-block manner */
-    const int ngpus = context->runtime.drivers.devices.n - 1;
+    const int ngpus = context->runtime.get_ndevices() - 1;
     xkrt_distribution_t d;
     xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
 

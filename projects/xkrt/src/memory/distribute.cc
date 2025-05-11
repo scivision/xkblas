@@ -30,6 +30,8 @@ xkrt_distribution_init(
     size_t m, size_t n,
     size_t mb, size_t nb
 ) {
+    assert(count);
+
     d->type  = type;
     d->count = count;
     d->m     = m;
