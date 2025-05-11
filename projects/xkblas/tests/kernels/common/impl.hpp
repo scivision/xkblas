@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/18 13:47:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 21:36:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,7 +44,7 @@ class impl_t
                   TYPE * C, int ldc
         );
 
-	void gemmt(
+	    void gemmt(
             int uplo, int transa, int transb,
             int m, int k,
             const TYPE * alpha,
@@ -52,7 +52,7 @@ class impl_t
             const TYPE * B, int ldb,
             const TYPE * beta,
                   TYPE * C, int ldc
-	);
+	    );
 
         void
         trsm(
@@ -92,6 +92,13 @@ class impl_t
 
         void
         replicate(
+            TYPE * M,
+            int m, int n,
+            int ld
+        );
+
+        void
+        preallocate(
             TYPE * M,
             int m, int n,
             int ld

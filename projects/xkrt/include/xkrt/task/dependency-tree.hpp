@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:45:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 22:17:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -283,8 +283,14 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         static inline void
         precedence(access_t * pred, access_t * succ)
         {
-            // succ must be a dependent task and have a wc != 0 at that point
-            assert((succ->task->flags & TASK_FLAG_DEPENDENT) && TASK_DEP_INFO(succ->task)->wc > 0);
+            // succ must be a dependent task
+            assert(succ->task->flags & TASK_FLAG_DEPENDENT);
+
+            // succ must have a wc>0 at this point: we are still processing dependencies, it cannot be scheduled yet
+            assert(TASK_DEP_INFO(succ->task)->wc > 0);
+
+            // succ has reached the maximum number of dependencies
+            assert(TASK_DEP_INFO(succ->task)->wc < (1 << (8 * sizeof(task_wait_counter_type_t)) - 1));
 
             // avoid redundant edges
             if (pred->successors.size() && pred->successors.back()->task == succ->task)
