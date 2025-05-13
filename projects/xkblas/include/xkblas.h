@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:58:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 21:41:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,6 +16,8 @@
 
 # include <stddef.h>
 # include <stdint.h>
+
+# define XKBLAS_2_0 1
 
 /* XKBLAS LEGACY INTERFACES */
 
@@ -39,8 +41,11 @@ extern "C" {
      * Restriction: concurrent 'xkblas_memory_coherent_async' on overlaping address spaces has an undefined behavior */
     void xkblas_memory_coherent_async(int uplo, int memflag, int m, int n, void * ptr, int ld, unsigned int sizeof_type);
 
-    /* create one task per device to replicate fully the passed matrix */
-    void xkblas_replicate_async(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
+    /* create one task to create a coherent replicate of the matrix on each device */
+    void xkblas_memory_replicate_async(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
+
+    /* allocate an incoherent replicate of the matrix on each device */
+    void xkblas_memory_preallocate(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
 
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);

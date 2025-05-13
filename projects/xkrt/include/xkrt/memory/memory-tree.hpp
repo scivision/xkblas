@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:45:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 21:30:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1645,6 +1645,7 @@ next_view:
                 fetch_list_launch_ith(task, list, i);
         }
 
+        template <bool only_allocates = false>
         inline fetch_list_t *
         fetch_list_to_device(
             task_t * task,
@@ -1688,18 +1689,22 @@ next_view:
                 /* step (4) set the access view on the device (that will be used by the kernel) */
                 this->fetch_access_setup_replicates(access, device_global_id, search);
 
-                /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
-                this->fetch_access_setup_copies(task, access, device_global_id, search.partition);
+                if (!only_allocates)
+                {
+                    /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
+                    this->fetch_access_setup_copies(task, access, device_global_id, search.partition);
 
-                /* step (6) if write access, make all other replicates incoherent */
-                this->fetch_access_set_coherent(access, device_global_id, search.partition);
+                    /* step (6) if write access, make all other replicates incoherent */
+                    this->fetch_access_set_coherent(access, device_global_id, search.partition);
+                }
 
             } /* this->lock(); */
             this->unlock();
 
             /* step (7) - convert a partition to the minimum number of fetches to run */
-            if (access->mode & ACCESS_MODE_R)
-                list = this->fetch_list_from_partition(search.partition);
+            if (!only_allocates)
+                if (access->mode & ACCESS_MODE_R)
+                    list = this->fetch_list_from_partition(search.partition);
 
             return list;
         }
@@ -1744,6 +1749,18 @@ next_view:
                 __task_fetching(list->pending, task);
                 this->fetch_list_launch(task, list);
             }
+        }
+
+        ////////////////////////
+        // ALLOCATE TO DEVICE //
+        ////////////////////////
+        void
+        allocate_to_device(
+            access_t * access,
+            xkrt_device_global_id_t device_global_id
+        ) {
+            assert(device_global_id != HOST_DEVICE_GLOBAL_ID);
+            this->fetch_list_to_device<true>(NULL, access, device_global_id);
         }
 
         //////////////////

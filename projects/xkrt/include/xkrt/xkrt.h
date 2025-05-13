@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:47:41 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 21:43:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,7 +48,7 @@ extern "C" {
     /* Make all device memory non-coherent */
     void xkrt_coherency_reset(xkrt_runtime_t * runtime);
 
-    /* Submit 1 task per device to replicate the data */
+    /* Submit 1 task per device to create a coherent replicate */
     void xkrt_coherency_replicate_2D_async(
         xkrt_runtime_t * runtime,
         matrix_order_t order,
@@ -62,6 +62,16 @@ extern "C" {
         xkrt_runtime_t * runtime,
         matrix_order_t order,
         void * addr, size_t ld,
+        size_t m, size_t n,
+        size_t sizeof_type
+    );
+
+    /* Allocate incoherent memory replicates onto the passed device */
+    void xkrt_coherency_allocate_2D(
+        xkrt_runtime_t * runtime,
+        xkrt_device_global_id_t device_global_id,
+        matrix_order_t order,
+        void * ptr, size_t ld,
         size_t m, size_t n,
         size_t sizeof_type
     );
