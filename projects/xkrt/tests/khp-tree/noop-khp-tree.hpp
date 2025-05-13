@@ -1,59 +1,99 @@
-# include <xkrt/memory/khp-tree.hpp>
+# define KHP_TREE_REBALANCE         0
+# define KHP_TREE_CUT_ON_INSERT     0
+# define KHP_TREE_MAINTAIN_SIZE     1
+# define KHP_TREE_MAINTAIN_HEIGHT   1
 
+# include <xkrt/memory/khp-tree.hpp>
 # define unused_type_t  int
-# define CUT            true
+
+static int next_id = 0;
+
+template <int K>
+class NoopKHPTreeNode : public KHPTree<K, unused_type_t>::Node
+{
+    public:
+        using Base = typename KHPTree<K, unused_type_t>::Node;
+
+    public:
+        int id;
+
+    public:
+        NoopKHPTreeNode(
+            const Hypercube & r,
+            const int k,
+            const Color color
+        ) :
+            Base(r, k, color),
+            id(next_id++)
+        {}
+
+        void
+        dump_str(FILE * f) const
+        {
+            fprintf(f, "%d", this->id);
+        }
+
+        void
+        dump_hypercube_str(FILE * f) const
+        {
+            fprintf(f, "%d", this->id);
+        }
+
+};
 
 template<int K>
-class NoopKHPTree : public KHPTree<K, unused_type_t, CUT>
+class NoopKHPTree : public KHPTree<K, unused_type_t>
 {
-    using Cube = KCube<K>;
-    using Node = typename KHPTree<K, unused_type_t, CUT>::Node;
+    public:
+        using Hypercube = KHypercube<K>;
+        using Node      = NoopKHPTreeNode<K>;
+        using NodeBase  = typename Node::Base;
 
     Node *
     new_node(
     unused_type_t & t,
-        const Cube & cube,
+        const Hypercube & h,
         const int k,
         const Color color
     ) const {
-        return new Node(cube, k, color);
+        return new Node(h, k, color);
     }
 
     Node *
     new_node(
         unused_type_t & t,
-        const Cube & cube,
+        const Hypercube & h,
         const int k,
         const Color color,
-        const Node * inherit
+        const NodeBase * inherit
     ) const {
-        return new Node(cube, k, color);
+        return new Node(h, k, color);
     }
 
     bool
-    should_cut(unused_type_t & t, Cube & cube, Node * parent, int k) const
+    should_cut(unused_type_t & t, Hypercube & h, NodeBase * parent, int k) const
     {
         return false;
     }
 
     void
-    on_insert(Node * node, unused_type_t & t)
+    on_insert(NodeBase * node, unused_type_t & t)
     {
     }
 
     void
-    on_shrink(Node * node, const Interval & interval, int k)
+    on_shrink(NodeBase * node, const Interval & interval, int k)
     {
     }
 
     bool
-    intersect_stop_test(Node * node, unused_type_t & t, const Cube & cube) const
+    intersect_stop_test(NodeBase * node, unused_type_t & t, const Hypercube & h) const
     {
         return false;
     }
 
     void
-    on_intersect(Node * node, unused_type_t & t, const Cube & cube) const
+    on_intersect(NodeBase * node, unused_type_t & t, const Hypercube & h) const
     {
     }
 };

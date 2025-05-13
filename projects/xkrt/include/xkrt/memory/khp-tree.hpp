@@ -187,7 +187,7 @@ class KHPTree {
                     # endif /* KHP_TREE_MAINTAIN_SIZE */
                     # if KHP_TREE_MAINTAIN_HEIGHT
                     int height[K];          // subtree height
-                    # endif /* KHP_TREE_MAINTAIN_SIZE */
+                    # endif /* KHP_TREE_MAINTAIN_HEIGHT */
                 } includes;
 
                 #if KHP_TREE_ENABLE_COHERENCY_CHECKS
@@ -380,33 +380,48 @@ class KHPTree {
                 void
                 dump(FILE * f) const
                 {
-                    {
-                        const char * COLORS[] = {
-                            "#000000",
-                            "#EE3333",
-                            "#3333EE",
-                            "#33EE33",
-                            "#FFFF00",
-                            "#FF00FF",
-                            "#00FFFF",
-                        };
-                        const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
+                    // dump the node
+                    const char * COLORS[] = {
+                        "#000000",
+                        "#EE3333",
+                        "#3333EE",
+                        "#33EE33",
+                        "#FFFF00",
+                        "#FF00FF",
+                        "#00FFFF",
+                    };
+                    const char * color = COLORS[this->colors[this->k] == BLACK ? 0 : this->k+1];
 
-                        // fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\n", this);
-                        // this->dump_str(f);
-                        // fprintf(f, "\", style=filled, fillcolor=\"%s\"] ;\n", color);
+                    // fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"--- node ---\\n", this);
+                    // this->dump_str(f);
+                    // fprintf(f, "\", style=filled, fillcolor=\"%s\"] ;\n", color);
 
-                        fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"", this);
-                        this->dump_str(f);
+                    fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\"", this);
+                    this->dump_str(f);
                         fprintf(f, "\", shape=square, style=filled, fillcolor=\"%s\"] ;\n", color);
-                    }
 
-                    FOREACH_CHILD_BEGIN(this, child, k, dir)
+                    // dump each child
+                    for (int k = 0 ; k < K ; ++k)
                     {
-                        child->dump(f);
-                        fprintf(f, "    N%p->N%p ; \n", this, child);
+                        for (int d = 0 ; d < DIRECTION_MAX ; ++d)
+                        {
+                            Node * child = reinterpret_cast<Node *>(this->st[k].children[d]);
+                            if (child)
+                            {
+                                child->dump(f);
+                                fprintf(f, "    N%p->N%p ; \n", this, child);
+                            }
+                            # if 0
+                            else
+                            {
+                                int idx = 2 * k + d;
+                                void * nullnode = ((char *) this) + idx + 1;
+                                fprintf(f, "    N%p[fontcolor=\"#ffffff\", label=\".\", shape=square, style=filled, fillcolor=\"%s\"] ;\n", nullnode, COLORS[0]);
+                                fprintf(f, "    N%p->N%p ; \n", this, nullnode);
+                            }
+                            # endif
+                        }
                     }
-                    FOREACH_CHILD_END(this, child, k, dir);
                 }
 
                 virtual void
@@ -444,7 +459,7 @@ class KHPTree {
                     }
                     else if (K == 2)
                     {
-                        fprintf(f, "    \\draw (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") rectangle (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") node[midway] {",
+                        fprintf(f, "    \\draw [line width=2mm] (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") rectangle (" INTERVAL_TYPE_MODIFIER ",-" INTERVAL_TYPE_MODIFIER ") node[midway,scale=10] {",
                             this->hypercube[1].a, this->hypercube[0].a,
                             this->hypercube[1].b, this->hypercube[0].b
                         );
@@ -623,7 +638,7 @@ class KHPTree {
             fclose(file);
 
             snprintf(filename, sizeof(filename),
-                    "dot -Tpdf %s-tree.dot > %s-tree.pdf",
+                    "dot -Tpdf -Gdpi=600 %s-tree.dot > %s-tree.pdf",
                     label, label
             );
             int r = system(filename);

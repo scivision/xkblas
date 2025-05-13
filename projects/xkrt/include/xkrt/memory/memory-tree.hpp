@@ -594,13 +594,13 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
+            Base::dump_str(f);
         }
 
         void
         dump_hypercube_str(FILE * f) const
         {
-            // KHPTree<K, DeviceInvalidHyperhypercubes>::Node::dump_hypercube_str(f);
+            // Base::dump_hypercube_str(f);
 
             for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
             {

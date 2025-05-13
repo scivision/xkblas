@@ -23,10 +23,16 @@ insert(
     NoopKHPTree<K> & tree,
     Interval intervals[K]
 ) {
-    KCube<K> cube(intervals);
+    KHypercube<K> h(intervals);
     unused_type_t t;
-    tree.insert(t, cube);
+    tree.insert(t, h);
     ++ninsert;
+
+    std::cout << "Exporting pdf..." << std::endl;
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "random-k-%d-%d", K, ninsert);
+    tree.export_pdf(buffer);
+
 }
 
 //Generate 'n' disjoint hyperplans
@@ -56,7 +62,7 @@ disjoint_hyperplans(NoopKHPTree<K> & tree, int n)
     }
 }
 
-//Generate 'n' hypercubes that includes all dimensions but one
+//Generate 'n' hyperhs that includes all dimensions but one
 template<int K>
 void
 pyramid(NoopKHPTree<K> & tree, int n)
@@ -81,7 +87,7 @@ pyramid(NoopKHPTree<K> & tree, int n)
     }
 }
 
-//Generate 'n' hypercubes that are included on all dimensions but one
+//Generate 'n' hyperhs that are included on all dimensions but one
 template<int K>
 void
 pyramid_inverted(NoopKHPTree<K> & tree, int n)
@@ -106,7 +112,7 @@ pyramid_inverted(NoopKHPTree<K> & tree, int n)
     }
 }
 
-// Generate 'n' hypercubes that are successively included into previous ones
+// Generate 'n' hyperhs that are successively included into previous ones
 template<int K>
 static void
 squares_included(NoopKHPTree<K> & tree, int n)
@@ -171,8 +177,12 @@ static void launch_tests(NoopKHPTree<K> & tree)
 
     uint64_t t0 = get_nanotime();
     {
+        # if 1
 
-        # if 0
+        matrix_tiles<K, 15>(tree, 2);
+        matrix_tiles<K, 10>(tree, 3);
+
+        # elif 0
         for (int i = 0 ; i < N ; ++i)
         {
             Interval interval[K] = {
@@ -232,8 +242,8 @@ static void launch_tests(NoopKHPTree<K> & tree)
     double dt = (tf - t0) / 1e9;
     int nelements = tree.size();
     printf("  Took %lf s.\n", dt);
-    printf("    Inserted %d cube and %d elements\n", ninsert, nelements);
-    printf("    Cube/s. = %.2lf\n", ninsert / dt);
+    printf("    Inserted %d h and %d elements\n", ninsert, nelements);
+    printf("    Hypercube/s. = %.2lf\n", ninsert / dt);
     printf("    Elements/s. = %.2lf\n", nelements / dt);
     printf("\n");
 }
@@ -245,10 +255,12 @@ static void run(void)
     NoopKHPTree<K> tree;
     launch_tests(tree);
 
+    # if 0
     std::cout << "Exporting pdf..." << std::endl;
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "random-k-%d", K);
     tree.export_pdf(buffer);
+    # endif
 }
 
 int
@@ -259,10 +271,10 @@ main(int argc, char ** argv)
 
     printf("Testing with N=%d, you can change running `%s [N]`\n\n", N, argv[0]);
 
-    run<1>();
+//    run<1>();
     run<2>();
-    run<3>();
-    run<4>();
+//    run<3>();
+//    run<4>();
 //    run<5>();
 //    run<6>();
 
