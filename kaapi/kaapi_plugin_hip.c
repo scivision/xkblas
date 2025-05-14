@@ -46,6 +46,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
+
 #define KAAPI_USE_PERSTREAM_BLASHANDLE  1
 
 #if (KAAPI_USE_HIP==0)
@@ -1203,6 +1204,11 @@ pthread_mutex_lock(&access_lock);
 pthread_mutex_unlock(&access_lock);
 }
 #endif
+          if (res != hipSuccess)
+          {
+           printf("***error while: %s: instr '%s' 1D data, src: %p, dest:%p; size: %li\n", __FUNCTION__, name_io[instr->type], src, dest, size);
+          }
+ 
           kaapi_hip_CheckError(res);
         } break;
 

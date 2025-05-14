@@ -49,20 +49,17 @@ struct kaapi_io_stream;
 struct kaapi_io_instruction;
 struct kaapi_device;
 
-//#define _PLUGIN_DEBUG   1
+#ifndef _PLUGIN_DEBUG 
+#define _PLUGIN_DEBUG 0
+#endif
 
 #if _PLUGIN_DEBUG
-#if 1
-#  define KAAPI_PLUGIN_TRACE_IN
-#  define KAAPI_PLUGIN_TRACE_OUT
-#else
 #  define KAAPI_PLUGIN_TRACE_IN \
     fprintf(stdout, "IN %s/%s\n", _PLUGIN_NAME, __FUNCTION__);\
     fflush(stdout);
 #  define KAAPI_PLUGIN_TRACE_OUT \
     fprintf(stdout, "OUT %s/%s\n", _PLUGIN_NAME, __FUNCTION__);\
     fflush(stdout);
-#endif
 #  define KAAPI_PLUGIN_TRACE_MSG(...) \
     fprintf(stdout, __VA_ARGS__);\
     fflush(stdout);
