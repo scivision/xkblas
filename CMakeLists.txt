@@ -282,9 +282,9 @@ if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
 endif()
 
 if (KAAPI_USE_SLEEP)
-  add_compile_options("-DDKAAPI_USE_SLEEP=1")
+  add_compile_options("-DKAAPI_USE_SLEEP=1")
 else()
-  add_compile_options("-DDKAAPI_USE_SLEEP=0")
+  add_compile_options("-DKAAPI_USE_SLEEP=0")
 endif()
 
 if (KAAPI_USE_HWLOC)
