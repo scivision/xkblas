@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:57:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/13 02:07:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,10 +14,18 @@
 # include <xkrt/logger/todo.h>
 # include <xkrt/runtime.h>
 
+//  General idea of these interfaces
+//      - Nvidia GPUs serializes memory pinning anyway
+//      - We have a single thread dedicated to pinning memory to any device
+//      - it schedule 'pinning tasks' that are tasks with read/write access on the memory
+
+
 //  Some ideas:
 //      - can we pin memory independently of CUDA / HIP / ... via 'mlock' and
 //      notify the driver that the memory is pinned ? Would be better in case
 //      of server with different GPU vendors...
+
+
 
 # pragma message(TODO "The current implementation is synchronous")
 
