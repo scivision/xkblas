@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 18:31:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:46:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,6 +29,9 @@ typedef enum    xkrt_driver_type_t : uint8_t
 
 extern "C"
 const char * xkrt_driver_name(xkrt_driver_type_t driver_type);
+
+extern "C"
+xkrt_driver_type_t xkrt_driver_type_from_name(const char * name);
 
 extern "C"
 int xkrt_support_driver(xkrt_driver_type_t driver_type);

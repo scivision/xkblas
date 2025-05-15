@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 18:49:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:47:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -246,6 +246,18 @@ xkrt_driver_name(xkrt_driver_type_t driver_type)
         case (XKRT_DRIVER_TYPE_SYCL):   return "sycl";
         default:                        return "(null)";
     }
+}
+
+extern "C"
+xkrt_driver_type_t xkrt_driver_type_from_name(const char * name)
+{
+    for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+    {
+        xkrt_driver_type_t driver_type = (xkrt_driver_type_t) i;
+        if (strcmp(name, xkrt_driver_name(driver_type)) == 0)
+            return driver_type;
+    }
+    return XKRT_DRIVER_TYPE_MAX;
 }
 
 extern "C"
