@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/13 02:07:57 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:21:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -27,7 +27,7 @@
 
 
 
-# pragma message(TODO "The current implementation is synchronous")
+# pragma message(TODO "The current implementation spawn independent tasks. Maybe make it dependent to a specific type of access")
 
 extern "C"
 int
@@ -70,21 +70,50 @@ extern "C"
 size_t
 xkrt_memory_register_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
-    return xkrt_memory_register(runtime, ptr, size); // not async for now
+    xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
+    assert(driver);
+
+    xkrt_team_t * team = &driver->team;
+
+    // TODO : could be optimized using a custom format for register tasks
+    runtime->team_task_spawn(
+        team,
+        [runtime, ptr, size] (task_t * task) {
+            LOGGER_DEBUG("register memory...");
+            xkrt_memory_register(runtime, ptr, size);
+        }
+    );
+
+    return 0;
 }
 
 extern "C"
 int
 xkrt_memory_unregister_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
 {
-    return xkrt_memory_unregister(runtime, ptr, size); // not async for now
+    xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
+    assert(driver);
+
+    xkrt_team_t * team = &driver->team;
+
+    // TODO : could be optimized using a custom format for unregister tasks
+    runtime->team_task_spawn(
+        team,
+        [runtime, ptr, size] (task_t * task) {
+            LOGGER_DEBUG("unregistering memory...");
+            xkrt_memory_unregister(runtime, ptr, size);
+        }
+    );
+    return 0;
 }
 
 extern "C"
 int
 xkrt_memory_register_waitall(xkrt_runtime_t * runtime)
 {
-    // nothing to do, as we are synchronous
-    (void) runtime;
+    // atm, waits for all children tasks
+    // instead, we probably want to wait only on register tasks
+
+    runtime->task_wait();
     return 0;
 }

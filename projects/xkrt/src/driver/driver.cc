@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 04:50:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 18:49:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,7 +32,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
 
     // PARAMETERS
     unsigned int ndevices_requested  = runtime->conf.device.ngpus + 1;                      // host device + ngpus
-    int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
     bool use_p2p            = runtime->conf.device.use_p2p;
     assert(ndevices_requested < XKRT_DEVICES_MAX);
 
@@ -80,17 +79,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     // number of devices
     uint8_t ndevices = 0;
 
-    // ALLOCATE DEVICE THREAD PLACES
-    xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_requested);
-    assert(places);
-
-    // ARGS PASSED TO FORKED THREADS
-    xkrt_device_team_args_t args = {
-        .runtime = runtime,
-        .devices = {},
-        .ndevices = 0
-    };
-
     // FOR EACH DRIVER
     for (uint8_t driver_type = 0 ;
             driver_type < XKRT_DRIVER_TYPE_MAX && ndevices < ndevices_requested ;
@@ -99,7 +87,7 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
         // if the driver is enabled
         xkrt_driver_t * (*creator)(void) = creators[driver_type];
         xkrt_conf_driver_t * driver_conf = runtime->conf.drivers.list + driver_type;
-        if (driver_conf->used & (1 << driver_type) && creator)
+        if (driver_conf->used && creator)
         {
             // create it
             xkrt_driver_t * driver = creator();
@@ -132,34 +120,45 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
             unsigned int ndevices_for_driver = MIN(ndevices_requested - ndevices, ndevices_max);
             assert(ndevices_for_driver);
 
+            // allocate driver thread places
+            xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_for_driver);
+            assert(places);
+
+            // ARGS PASSED TO FORKED THREADS
+            xkrt_device_team_args_t args = {
+                .runtime = runtime,
+                .devices = {},
+                .ndevices = 0
+            };
+
             // get cpuset for the device
             for (uint8_t i = 0; i < ndevices_for_driver ; ++i)
             {
                 assert(driver->f_device_cpuset);
-                int err = driver->f_device_cpuset(runtime->topology, &places[ndevices], i);
+                int err = driver->f_device_cpuset(runtime->topology, places + i, i);
                 if (err)
                     LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
                 else
                 {
-                    args.devices[ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
-                    args.devices[ndevices].device_driver_id = i;
+                    args.devices[args.ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
+                    args.devices[args.ndevices].device_driver_id = i;
                     ++ndevices;
+                    ++args.ndevices;
                 }
             }
 
             // create the team
             driver->team.desc.routine             = xkrt_device_thread_main;
             driver->team.desc.args                = &args;
-            driver->team.desc.nthreads            = ndevices_for_driver * nthreads_per_device;
+            driver->team.desc.nthreads            = args.ndevices * nthreads_per_device;
             driver->team.desc.binding.mode        = XKRT_TEAM_BINDING_MODE_COMPACT;
             driver->team.desc.binding.places      = XKRT_TEAM_BINDING_PLACES_EXPLICIT;
             driver->team.desc.binding.places_list = places;
-            driver->team.desc.binding.nplaces     = ndevices;
+            driver->team.desc.binding.nplaces     = args.ndevices;
             driver->team.desc.binding.flags       = XKRT_TEAM_BINDING_FLAG_NONE;
 
             // prepare the barrier for the devices team
             pthread_barrier_t * barrier = &driver->barrier;
-            args.ndevices = ndevices;
             if (pthread_barrier_init(barrier, NULL, driver->team.desc.nthreads + 1))
                 LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
 
@@ -234,7 +233,7 @@ xkrt_drivers_deinit(xkrt_runtime_t * runtime)
 }
 
 extern "C"
-const char * const
+const char *
 xkrt_driver_name(xkrt_driver_type_t driver_type)
 {
     switch (driver_type)

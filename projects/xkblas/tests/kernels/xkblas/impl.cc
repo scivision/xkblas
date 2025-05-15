@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:41:05 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:43:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,7 +41,7 @@ impl_t::deinit(void)
     xkblas_finalize();
 }
 
-/* allocate host memory */
+/* allocate and pin host memory */
 uintptr_t
 impl_t::alloc(size_t size)
 {
@@ -56,6 +56,20 @@ impl_t::alloc(size_t size)
     LOGGER_FATAL("Wtf");
     # endif
     # endif
+}
+
+/* spawn a register task */
+void
+impl_t::pin_async(void * ptr, size_t size)
+{
+    xkblas_register_memory_async(ptr, size);
+}
+
+/* wait previous pin tasks */
+void
+impl_t::pin_wait(void)
+{
+    xkblas_register_memory_waitall();
 }
 
 /* wait for kernels completion */

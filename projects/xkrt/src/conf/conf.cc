@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:29:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 18:44:51 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -117,6 +117,10 @@ static void
 __parse_nthreads_per_device(xkrt_conf_t * conf, char const * value)
 {
     if (value)
+        LOGGER_FATAL("deprecated, use `XKRT_DRIVERS`");
+
+    # if 0
+    if (value)
         conf->device.offloader.nthreads_per_device = (uint8_t) atoi(value);
 
     if (conf->device.offloader.nthreads_per_device < 1)
@@ -130,6 +134,7 @@ __parse_nthreads_per_device(xkrt_conf_t * conf, char const * value)
         conf->device.offloader.nthreads_per_device = XKRT_MAX_THREADS_PER_DEVICE;
         LOGGER_WARN("Requested too many threads per device, increase `XKRT_MAX_THREADS_PER_DEVICE` and recompile if you want more threads per device");
     }
+    # endif
 }
 
 static void
@@ -227,7 +232,6 @@ xkrt_init_conf(xkrt_conf_t * conf)
     //  KERNEL CONF //
     //////////////////
     conf->device.offloader.capacity = 512;
-    conf->device.offloader.nthreads_per_device = 1;
 
     // set to -1 so the driver's stream-suggest API fills these values if not
     // set by an env variable
