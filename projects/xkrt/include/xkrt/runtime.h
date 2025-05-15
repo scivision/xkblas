@@ -39,6 +39,10 @@ typedef struct  xkrt_runtime_t
     /* driver list */
     xkrt_drivers_t drivers;
 
+    /* the team of thread that register memory (only 1 thread, nvidia driver
+     * serializes register requests anyway... */
+    xkrt_team_t register_team;
+
     /* task formats */
     struct {
         task_formats_t list;

@@ -23,8 +23,11 @@
 
 extern "C"
 int
-xkrt_memory_register(xkrt_runtime_t * runtime, void * ptr, size_t size)
-{
+xkrt_memory_register(
+    xkrt_runtime_t * runtime,
+    void * ptr,
+    size_t size
+) {
     for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
     {
         xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) driver_id);
