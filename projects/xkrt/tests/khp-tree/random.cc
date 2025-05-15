@@ -28,10 +28,12 @@ insert(
     tree.insert(t, h);
     ++ninsert;
 
+    # if 0
     std::cout << "Exporting pdf..." << std::endl;
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "random-k-%d-%d", K, ninsert);
     tree.export_pdf(buffer);
+    # endif
 
 }
 
@@ -179,8 +181,8 @@ static void launch_tests(NoopKHPTree<K> & tree)
     {
         # if 1
 
-        matrix_tiles<K, 15>(tree, 2);
-        matrix_tiles<K, 10>(tree, 3);
+        matrix_tiles<K, 15>(tree, 2*8);
+        matrix_tiles<K, 10>(tree, 3*8);
 
         # elif 0
         for (int i = 0 ; i < N ; ++i)
@@ -240,9 +242,10 @@ static void launch_tests(NoopKHPTree<K> & tree)
 
     // finish
     double dt = (tf - t0) / 1e9;
+    int height    = tree.height();
     int nelements = tree.size();
     printf("  Took %lf s.\n", dt);
-    printf("    Inserted %d h and %d elements\n", ninsert, nelements);
+    printf("    Inserted %d h and %d elements - height is %d\n", ninsert, nelements, height);
     printf("    Hypercube/s. = %.2lf\n", ninsert / dt);
     printf("    Elements/s. = %.2lf\n", nelements / dt);
     printf("\n");
@@ -255,7 +258,7 @@ static void run(void)
     NoopKHPTree<K> tree;
     launch_tests(tree);
 
-    # if 0
+    # if 1
     std::cout << "Exporting pdf..." << std::endl;
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "random-k-%d", K);

@@ -148,7 +148,9 @@ __parse_p2p(xkrt_conf_t * conf, char const * value)
 static void
 __parse_drivers(xkrt_conf_t * conf, char const * value)
 {
-    conf->drivers_mask = value ? atoi(value) : ~0;
+    if (value)
+    {
+    }
 }
 
 void __parse_help(xkrt_conf_t * conf, char const * value);
@@ -183,7 +185,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
     {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
-    {"XKRT_DRIVERS",              __parse_drivers,             "A bitmask to set enabled drivers"},
+    {"XKRT_DRIVERS",              __parse_drivers,             "Exemple: 'cuda,4;hip,2;host,3' - will enable drivers cuda, hip and host respectively with 4, 2, and 3 threads per device."},
     {"XKRT_USE_P2P",              __parse_p2p,                 "Boolean to enable/disable the use of p2p transfers"},
     {NULL,                       NULL,                         NULL}
 };
@@ -209,6 +211,17 @@ xkrt_init_conf(xkrt_conf_t * conf)
     conf->device.gpu_mem_percent    = (float) 90.0;
     conf->device.use_p2p            = true;
     conf->merge_transfers           = false;
+
+    //////////////////
+    // drivers conf //
+    //////////////////
+
+    for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+    {
+        conf->drivers.list[i].nthreads_per_device = 1;
+        conf->drivers.list[i].used = 1;
+    }
+    conf->drivers.list[XKRT_DRIVER_TYPE_HOST].nthreads_per_device = 4;
 
     //////////////////
     //  KERNEL CONF //

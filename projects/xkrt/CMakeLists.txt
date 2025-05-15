@@ -37,7 +37,7 @@ option(STRICT "Enable strict compilation mode" ON)
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG} ${USE_ZE_SYCL_INTEROP}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG} ${USE_ZE_SYCL_INTEROP} ${USE_HIP}
     COMMENT "Always generate version/support file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)

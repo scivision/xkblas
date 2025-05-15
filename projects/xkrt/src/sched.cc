@@ -200,7 +200,7 @@ xkrt_device_thread_main(
     }
 
     // wait for all devices to be in the 'init' state and for all threads to join
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    pthread_barrier_wait(&driver->barrier);
 
     // register the device thread
     xkrt_device_t * device = driver->devices[device_driver_id];
@@ -246,13 +246,13 @@ xkrt_device_thread_main(
     }
 
     // wait for all devices to be in the 'commit' state with the offloader init
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    pthread_barrier_wait(&driver->barrier);
 
-    // initialize offloader thread
+    // initialize offloader thread to initialize streams
     device->offloader_init_thread(device_tid, driver->f_stream_create);
 
     // wait for all threads to have streams initialized
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    pthread_barrier_wait(&driver->barrier);
     // cannot use 'args->barrier' after this point
 
     /* infinite loop with the device context */
@@ -266,7 +266,7 @@ xkrt_device_thread_main(
                 driver->f_stream_delete(device->streams[device_tid][j][k]);
 
     // wait for all thread to delete their streams
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    pthread_barrier_wait(&driver->barrier);
 
     /* deinitialize driver */
     if (is_device_main_thread)
@@ -294,7 +294,7 @@ xkrt_device_thread_main(
     }
 
     /* wait for all the main thread to deinit */
-    pthread_barrier_wait(&runtime->drivers.devices.barrier);
+    pthread_barrier_wait(&driver->barrier);
 
     return NULL;
 }

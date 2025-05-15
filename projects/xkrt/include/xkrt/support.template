@@ -14,8 +14,11 @@
 #ifndef __XKRT_SUPPORT_H__
 # define __XKRT_SUPPORT_H__
 
-/* If the runtime was compiled with Mvidia's CUDA support */
+/* If the runtime was compiled with Nvidia's CUDA support */
 # define XKRT_SUPPORT_CUDA  __XKRT_SUPPORT_CUDA_VALUE__
+
+/* If the runtime was compiled with HIP support */
+# define XKRT_SUPPORT_HIP   __XKRT_SUPPORT_HIP_VALUE__
 
 /* If the runtime was compiled with Intel's Level Zero support */
 # define XKRT_SUPPORT_ZE    __XKRT_SUPPORT_ZE_VALUE__

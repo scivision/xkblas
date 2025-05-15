@@ -28,6 +28,9 @@ typedef enum    xkrt_driver_type_t : uint8_t
 }               xkrt_driver_type_t;
 
 extern "C"
+const char * const xkrt_driver_name(xkrt_driver_type_t driver_type);
+
+extern "C"
 int xkrt_support_driver(xkrt_driver_type_t driver_type);
 
 #endif /* __DRIVER_TYPE_H__ */

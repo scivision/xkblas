@@ -276,6 +276,9 @@ class KHPTree {
                 inline int
                 height(void) const
                 {
+                    // this is wrong
+                    assert(0);
+
                     int height = 0;
                     for (int k = 0 ; k < K ; ++k)
                         height = MAX(height, this->height(k));
