@@ -981,17 +981,22 @@ void* kaapi_hip_register_thread(void* dummy )
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
 #if defined(KAAPI_UNIFIED) 
+          if (kaapi_default_param.use_unified)
+	  {
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetPreferredLocation, 0); // Data should migrate on GPU sooner
 					err = hipMemAdvise(req.ptr, req.size, hipMemAdviseUnsetAccessedBy, 0);        // Data should migrate on GPU sooner
 					// No need to go back to fine-grain cache coherency policy
-#else
-					err = hipHostUnregister(req.ptr);
-          if (!( (hipSuccess == err) || (hipErrorHostMemoryNotRegistered == err)))
-          {
-            printf("***[%s]: hipHostUnregister error: %i\n", __func__, err);
-            req.err = EALREADY;
-          }
+	  }
+	  else
 #endif // defined(KAAPI_UNIFIED)
+	  {
+		err = hipHostUnregister(req.ptr);
+		if (!( (hipSuccess == err) || (hipErrorHostMemoryNotRegistered == err)))
+		{
+		  printf("***[%s]: hipHostUnregister error: %i\n", __func__, err);
+		  req.err = EALREADY;
+		}
+	  }
         }
       }
 #if KAAPI_USE_PERFCOUNTER
