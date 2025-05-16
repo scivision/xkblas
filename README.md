@@ -1,18 +1,21 @@
-# XKBlas v0.5
+# XKBlas v0.6 beta RC
 
 XKBlas is a drop in replacement of blas library for multi-GPUs servers similar
 to CUBLASXt but with higher performances especially when matrix dimensions 
 becomes smaller.
 
 XKBlas was only developped and tested on Linux plateform with CUDA >= 8.0 on machine with up to 8 GPUs (DGX-1).
-
-It was ported on AMD GPU with HIP/ROCM enviroment = 4.5, 5.X. Note:
+It was ported on AMD GPU with HIP/ROCM enviroment = 4.5, 5.X., 6.X Note:
  * ROCM version 4.5.0 has a [buggy TRSM.](https://github.com/ROCmSoftwarePlatform/rocBLAS/blob/develop/CHANGELOG.md?plain=1)
- * XKBlas was successfully port on top of MI50, MI100 GPU and MI250x GPU. Other AMD GPUs were not tested. 
+
+
+XKBlas was successfully port on top of :
+* P100, V100, A100, H100 and GraceHopper. Other NVIDIA GPUs where not tested.
+* MI50, MI100 GPU and MI250x GPU, MI300A. Other AMD GPUs were not tested. 
 
 XKBlas is built from 2 components:
 *  the multi-GPU module of the XKaapi[1,2] runtime that has low overhead in task management.
-*  tile algorithms come from PLASMA [3] or CHAMELEON [4] libraries.
+*  tile algorithms come from PLASMA [6] or CHAMELEON [7] libraries.
 
 This current version of XKBlas only contains BLAS level 3 algorithms, including XGEMMT:
 - XGEMM
@@ -34,7 +37,7 @@ You can clone the projet or get the tarball [here](https://gitlab.inria.fr/xkbla
 # Installation
 
 XKBlas needs: a CPU blas library (*e.g.* MKL or OpenBLAS or CrayBLAS) and an a CUDA toolkit; or ROCM environment (runtime + hipBLAS/rocBlas).
-XKBlas was successfully port on CUDA from version 8 until 11 and on HIP/ROCM 4.5.0 to HIP/ROCM 5.0.X
+XKBlas was successfully port on CUDA from version 8 until 11 and on HIP/ROCM 4.5.0 to HIP/ROCM 6.2.X
 
 Previous version of XKBlas where based on updating make.inc to local installation. 
 Since version 0.4, XKBlas switches to use CMake in order to simplify configuration.
@@ -51,6 +54,13 @@ Exclusive choices are:
 * -DKAAPI_USE_MKL=ON
 * -DKAAPI_USE_OPENBLAS=ON
 * -DKAAPI_USE_CRAYBLAS=ON. Used to link agains libSCI available with Cray PE. 
+
+## Selection of using Unified Memory
+Port on GraceHopper or MI300A let XKBlas/XKaapi to run using "native" unified memory. Preliminary experiments show that on other architectures, the performances are best using internal explicit memory copy.
+
+To enable unified memory support the flags -DENABLE_KAAPI_UNIFIED=ON should be set on the CMake command line option.
+
+Once compiled, at runtime and conservatively, the XKaapi execution runtime continues to exploit memory copy in place of true unified memory except if the environnement variable XKBLAS_UNIFIED is set to 1.
 
 ## Add support for generating execution trace
 In case the user want to access to execution trace of its applications; XKBlas is able to generate Gantt chart with BLAS calls.
@@ -140,10 +150,11 @@ Please contact us or fill an [issue here](https://gitlab.inria.fr/xkblas/version
 
 # References
 * [1] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020, 
-* [2] João V. F. Lima, Thierry Gautier, Vincent Danjean, Bruno Raffin, Nicolas Maillard. Design and analysis of scheduling strategies for multi-CPU and multi-GPU architectures. Parallel Computing 44: 37-52 (2015)
-* [3] Thierry Gautier, Joao Vicente Ferreira Lima, Nicolas Maillard, Bruno Raffin. XKaapi: A Runtime System for Data-Flow Task Programming on Heterogeneous Architectures. In Proc. of the 27-th IEEE International Parallel and Distributed Processing Symposium (IPDPS), Boston, USA, jun 2013.
-* [4] João V. F. Lima, Thierry Gautier, Nicolas Maillard, Vincent Danjean. Exploiting Concurrent GPU Operations for Efficient Work Stealing on Multi-GPUs. 24rd International Symposium on Computer Architecture and High Performance Computing (SBAC-PAD), Columbia University, New York, USA, oct 2012.
-* [5] http://icl.cs.utk.edu/plasma/software/
-* [6] https://solverstack.gitlabpages.inria.fr/chameleon/doxygen/index.html
+* [2] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020, 
+* [3] João V. F. Lima, Thierry Gautier, Vincent Danjean, Bruno Raffin, Nicolas Maillard. Design and analysis of scheduling strategies for multi-CPU and multi-GPU architectures. Parallel Computing 44: 37-52 (2015)
+* [4] Thierry Gautier, Joao Vicente Ferreira Lima, Nicolas Maillard, Bruno Raffin. XKaapi: A Runtime System for Data-Flow Task Programming on Heterogeneous Architectures. In Proc. of the 27-th IEEE International Parallel and Distributed Processing Symposium (IPDPS), Boston, USA, jun 2013.
+* [5] João V. F. Lima, Thierry Gautier, Nicolas Maillard, Vincent Danjean. Exploiting Concurrent GPU Operations for Efficient Work Stealing on Multi-GPUs. 24rd International Symposium on Computer Architecture and High Performance Computing (SBAC-PAD), Columbia University, New York, USA, oct 2012.
+* [6] http://icl.cs.utk.edu/plasma/software/
+* [7] https://solverstack.gitlabpages.inria.fr/chameleon/doxygen/index.html
 
 
