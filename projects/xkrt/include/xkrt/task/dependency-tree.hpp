@@ -18,7 +18,7 @@
 # define KHP_TREE_CUT_ON_INSERT     0
 # define KHP_TREE_MAINTAIN_SIZE     0
 # define KHP_TREE_MAINTAIN_HEIGHT   0
-# include <xkrt/memory/khp-tree.hpp>
+# include <xkrt/memory/access/common/khp-tree.hpp>
 # include <xkrt/task/dependency-domain.hpp>
 # include <xkrt/task/task.hpp>
 
@@ -170,10 +170,9 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
     using Hypercube = KHypercube<K>;
 
     public:
-    using Node     = KDependencyTreeNode<K>;
-    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
-
-        using Search = KDependencyTreeSearch<K>;
+        using Node      = KDependencyTreeNode<K>;
+        using NodeBase  = Base::Node;
+        using Search    = KDependencyTreeSearch<K>;
 
         /* alignment is ld.sizeof_type */
         KDependencyTree(const size_t ld, const size_t sizeof_type) :

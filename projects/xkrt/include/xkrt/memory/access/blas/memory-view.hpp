@@ -14,7 +14,7 @@
 #ifndef __MEMORY_VIEW_HPP__
 # define __MEMORY_VIEW_HPP__
 
-# include <xkrt/memory/matrix-tile.h>
+# include <xkrt/memory/access/blas/matrix.h>
 
 # include <vector>
 

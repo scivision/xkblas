@@ -16,7 +16,7 @@
 
 # include <xkrt/callback.h>
 # include <xkrt/consts.h>
-# include <xkrt/memory/memory-view.hpp>
+# include <xkrt/memory/access/blas/memory-view.hpp>
 # include <xkrt/driver/stream-instruction-type.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/cache-line-size.hpp>

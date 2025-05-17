@@ -110,9 +110,8 @@ khp_twopow(int n)
     return (1 << n);
 }
 
-# include <xkrt/min-max.h>
-# include <xkrt/memory/cube.hpp>
-# include <xkrt/sync/color.h>
+# include <xkrt/utils/min-max.h>
+# include <xkrt/memory/access/common/hypercube.hpp>
 # include <xkrt/sync/direction.h>
 
 # define FOREACH_K_CHILD_BEGIN(N, C, I, D)                              \
@@ -487,6 +486,14 @@ class KHPTree {
                 }
 
         }; /* class Node */
+
+
+    public:
+        typedef enum    Color
+        {
+            BLACK   = 0,
+            RED     = 1
+        }               Color;
 
     /* class tree */
     public:

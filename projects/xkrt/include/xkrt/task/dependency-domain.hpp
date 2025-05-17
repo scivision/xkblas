@@ -14,7 +14,7 @@
 #ifndef __DEPENDENCY_DOMAIN_HPP__
 # define __DEPENDENCY_DOMAIN_HPP__
 
-# include <xkrt/memory/access.hpp>
+# include <xkrt/memory/access/access.hpp>
 
 class DependencyDomain
 {

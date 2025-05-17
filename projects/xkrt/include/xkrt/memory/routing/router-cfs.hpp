@@ -1,13 +1,13 @@
 /**
  *  Idea is to use a dijkstra algorithm with weights being BW, but ignoring the link if there is already a pending transfer
- *  Problem is it may add significant latency, so its probably a relevant approach
+ *  Problem is it may add significant latency
  */
 
 # ifndef __ROUTER_CFS_HPP__
 #  define __ROUTER_CFS_HPP__
 
 # include <xkrt/consts.h>
-# include <xkrt/memory/router.hpp>
+# include <xkrt/memory/routing/router.hpp>
 # include <xkrt/sync/bits.h>
 
 # include <stdint.h>

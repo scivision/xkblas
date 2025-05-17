@@ -2,7 +2,7 @@
 #  define __ROUTER_AFFINITY_HPP__
 
 # include <xkrt/consts.h>
-# include <xkrt/memory/router.hpp>
+# include <xkrt/memory/routing/router.hpp>
 # include <xkrt/sync/bits.h>
 
 /** The higher the rank, the lower the performance */

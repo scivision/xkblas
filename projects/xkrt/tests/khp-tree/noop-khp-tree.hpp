@@ -3,7 +3,7 @@
 # define KHP_TREE_MAINTAIN_SIZE     1
 # define KHP_TREE_MAINTAIN_HEIGHT   1
 
-# include <xkrt/memory/khp-tree.hpp>
+# include <xkrt/memory/access/common/khp-tree.hpp>
 # define unused_type_t  int
 
 static int next_id = 0;

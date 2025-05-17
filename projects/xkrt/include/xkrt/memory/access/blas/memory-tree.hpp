@@ -18,7 +18,7 @@
 # define KHP_TREE_CUT_ON_INSERT     0
 # define KHP_TREE_MAINTAIN_SIZE     0
 # define KHP_TREE_MAINTAIN_HEIGHT   0
-# include <xkrt/memory/khp-tree.hpp>
+# include <xkrt/memory/access/common/khp-tree.hpp>
 
 //  TODO : the design of this is terrible with a cyclic ownership with 'xkrt_runtime_t'
 //  Redesign me !! This should be fully independent with callbacks that can be parametrized, raised with global device ids

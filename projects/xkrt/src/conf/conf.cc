@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/min-max.h>
+# include <xkrt/utils/min-max.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
 

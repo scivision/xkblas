@@ -14,9 +14,9 @@
 #ifndef __ACCESS_HPP__
 # define __ACCESS_HPP__
 
-# include <xkrt/memory/access-mode.h>
-# include <xkrt/memory/cube.hpp>
-# include <xkrt/memory/memory-view.hpp>
+# include <xkrt/memory/access/access-mode.h>
+# include <xkrt/memory/access/common/hypercube.hpp>
+# include <xkrt/memory/access/blas/memory-view.hpp>
 
 # include <vector>
 

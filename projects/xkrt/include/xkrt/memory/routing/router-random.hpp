@@ -1,7 +1,7 @@
 # ifndef __ROUTER_RANDOM_HPP__
 #  define __ROUTER_RANDOM_HPP__
 
-# include <xkrt/memory/router.hpp>
+# include <xkrt/memory/routing/router.hpp>
 # include <xkrt/sync/bits.h>
 
 /** The higher the rank, the lower the performance */

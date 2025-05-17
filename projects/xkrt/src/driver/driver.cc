@@ -15,7 +15,7 @@
 # include <xkrt/runtime.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/logger/logger.h>
-# include <xkrt/min-max.h>
+# include <xkrt/utils/min-max.h>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/thread/thread.h>
 

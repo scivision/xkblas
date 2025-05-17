@@ -20,6 +20,4 @@ typedef enum    Color
     RED     = 1
 }               Color;
 
-extern const char * COLORS[];
-
 #endif /* __COLOR_H__ */

@@ -15,7 +15,7 @@
 # define __COHERENCY_CONTROLLER_HPP__
 
 # include <xkrt/consts.h>
-# include <xkrt/memory/access.hpp>
+# include <xkrt/memory/access/access.hpp>
 # if 0
 # include <xkrt/task/task.hpp>          // this should gtfo
 # endif
