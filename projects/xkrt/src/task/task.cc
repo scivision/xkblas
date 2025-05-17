@@ -12,7 +12,7 @@
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory/memory-tree.hpp>
+# include <xkrt/memory/access/blas/region/memory-tree.hpp>
 
 /**
  * Retrieve or (insert and return) the memory controller of the passed task for the given access

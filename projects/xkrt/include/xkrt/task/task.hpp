@@ -23,13 +23,13 @@
 # include <stdint.h>
 
 # include <xkrt/consts.h>
-# include <xkrt/task/dependency-domain.hpp>
+# include <xkrt/memory/access/dependency-domain.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/access/access.hpp>
 # include <xkrt/memory/cache-line-size.hpp>
-# include <xkrt/memory/coherency-controller.hpp>
+# include <xkrt/memory/access/coherency-controller.hpp>
 # include <xkrt/sync/spinlock.h>
 
 /* task states */

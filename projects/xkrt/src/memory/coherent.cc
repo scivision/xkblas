@@ -13,8 +13,8 @@
 
 # include <xkrt/runtime.h>
 # include <xkrt/memory/alignedas.h>
-# include <xkrt/memory/memory-tree.hpp>
-# include <xkrt/task/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/region/memory-tree.hpp>
+# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;

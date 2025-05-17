@@ -25,7 +25,7 @@
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
-# include <xkrt/memory/coherency-controller.hpp>
+# include <xkrt/memory/access/coherency-controller.hpp>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/lockable.hpp>
 

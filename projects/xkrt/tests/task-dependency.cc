@@ -1,5 +1,5 @@
 # include <xkrt/xkrt.h>
-# include <xkrt/task/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/task/task.hpp>
 

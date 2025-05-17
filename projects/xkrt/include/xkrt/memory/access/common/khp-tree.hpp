@@ -138,6 +138,14 @@ do {                                                                    \
     }                                                                   \
 } while (0)
 
+
+typedef enum    Color
+{
+    BLACK   = 0,
+    RED     = 1
+}               Color;
+
+
 /**
  *  K is the number of dimensions
  *  T is search type
@@ -486,14 +494,6 @@ class KHPTree {
                 }
 
         }; /* class Node */
-
-
-    public:
-        typedef enum    Color
-        {
-            BLACK   = 0,
-            RED     = 1
-        }               Color;
 
     /* class tree */
     public:

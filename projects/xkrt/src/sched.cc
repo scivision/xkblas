@@ -11,7 +11,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/memory/memory-tree.hpp>
+# include <xkrt/memory/access/blas/region/memory-tree.hpp>
 # include <xkrt/xkrt.h>
 # include <xkrt/runtime.h>
 # include <xkrt/driver/device.hpp>

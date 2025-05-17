@@ -16,7 +16,7 @@
 # if XKRT_SUPPORT_CAIRO
 #  include <cairo/cairo.h>
 #  include <cairo/cairo-svg.h>
-#  include <xkrt/memory/memory-tree.hpp>
+#  include <xkrt/memory/access/blas/region/memory-tree.hpp>
 void
 xkrt_cairo_memory_trees(
     xkrt_runtime_t * runtime

@@ -16,7 +16,7 @@
 
 # include <xkrt/memory/access/access-mode.h>
 # include <xkrt/memory/access/common/hypercube.hpp>
-# include <xkrt/memory/access/blas/memory-view.hpp>
+# include <xkrt/memory/view.hpp>
 
 # include <vector>
 
