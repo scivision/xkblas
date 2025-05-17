@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 23:12:08 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/17 05:24:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 #ifndef __ACCESS_HPP__
 # define __ACCESS_HPP__
 
-# include <xkrt/memory/access/access-mode.h>
+# include <xkrt/memory/access/mode.h>
 # include <xkrt/memory/access/common/hypercube.hpp>
 # include <xkrt/memory/view.hpp>
 
