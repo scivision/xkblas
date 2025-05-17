@@ -910,7 +910,7 @@ mem_transfer_run(xkrt_team_t * team, xkrt_thread_t * thread)
         constexpr size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) 1 * 512 * 1024 * 1024 : 0;
         static_assert(size);
         constexpr size_t chunk_size = size / nchunks;
-        const xkrt_area_chunk_t * chunk = device->memory_allocate_on(size, i);
+        const xkrt_area_chunk_t * chunk = runtime.memory_device_allocate(device_global_id, size);
         if (chunk == NULL)
             LOGGER_FATAL("Out of device memory");
 

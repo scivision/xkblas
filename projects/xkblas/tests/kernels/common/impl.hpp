@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:36:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:42:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,6 +32,8 @@ class impl_t
         void deinit(void);
 
         uintptr_t alloc(size_t size);
+        void pin_async(void * ptr, size_t size);
+        void pin_wait(void);
 
         /* kernels (async) */
         void gemm(

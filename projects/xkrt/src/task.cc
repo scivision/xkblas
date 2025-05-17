@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 04:32:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:13:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -148,23 +148,66 @@ xkrt_runtime_t::task_submit(
     xkrt_device_task_execute(this, device, task);
 }
 
-/* spawn an independent host task */
-constexpr task_flag_bitfield_t host_capture_task_flags  = TASK_FLAG_ZERO;
-constexpr size_t host_capture_task_size                 = task_compute_size(host_capture_task_flags, 0);
-void
-xkrt_runtime_t::task_spawn(const std::function<void(task_t *)> & f)
-{
-    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+// spawn an independent task
+constexpr task_flag_bitfield_t host_capture_task_flags = TASK_FLAG_ZERO;
+constexpr size_t host_capture_task_size                = task_compute_size(host_capture_task_flags, 0);
+
+inline
+static void
+xkrt_team_task_spawn(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    xkrt_thread_t * thread,
+    const std::function<void(task_t *)> & f
+) {
     assert(thread);
 
-    const task_format_id_t fmtid = this->formats.host_capture;
-    task_t * task = thread->allocate_task(host_capture_task_size + sizeof(f));
-    new (task) task_t(fmtid, host_capture_task_flags);
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+    task_t * task = tls->allocate_task(host_capture_task_size + sizeof(f));
+    new (task) task_t(runtime->formats.host_capture, host_capture_task_flags);
 
     std::function<void(task_t *)> * fcpy = (std::function<void(task_t *)> *) TASK_ARGS(task, host_capture_task_size);
     new (fcpy) std::function<void(task_t *)>(f);
 
-    thread->commit(task, xkrt_team_thread_task_enqueue, this, thread->team, thread);
+    tls->commit(task, xkrt_team_thread_task_enqueue, runtime, team, thread);
+}
+
+// spawn on some thread of the team
+void
+xkrt_runtime_t::team_task_spawn(
+    xkrt_team_t * team,
+    const std::function<void(task_t *)> & f
+) {
+    # pragma message(TODO "Currently always spawning to the first thread, trusting workstealing to dispatch tasks: we could round-robin, random or whatever")
+    assert(team->priv.threads);
+    assert(team->priv.nthreads);
+
+    # if 0
+    // first, try to spawn in a sleeping thread
+    for (int i = 0 ; i < team->priv.nthreads ; ++i)
+    {
+        xkrt_thread_t * thread = team->priv.threads + i;
+        if (thread->sleep.sleeping)
+        {
+            xkrt_team_task_spawn(this, team, thread, f);
+            pthread_cond_signal(thread->sleep.cond);
+            return ;
+        }
+    }
+    # else
+    xkrt_team_task_spawn(this, team, team->priv.threads + 0, f);
+    # endif
+}
+
+// spawn on currently executing thread
+void
+xkrt_runtime_t::task_spawn(
+    const std::function<void(task_t *)> & f
+) {
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
+
+    xkrt_team_task_spawn(this, thread->team, thread, f);
 }
 
 static void

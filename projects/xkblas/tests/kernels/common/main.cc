@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 23:22:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:41:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -70,7 +70,14 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
     const size_t s = sizeof(TYPE);
     const uintptr_t alignon = s * ld;
     const uintptr_t memsize = n * (alignon + alignon/2 + s * ld * ld);
+
+    # if 0
     const uintptr_t mem     = impl.alloc(memsize);
+    # else
+    const uintptr_t mem     = (const uintptr_t) malloc(memsize);
+    impl.pin_async((void *) mem, memsize);
+    impl.pin_wait();
+    # endif
 
     for (int i = 0 ; i < n ; ++i)
     {

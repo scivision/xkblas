@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:55:19 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:11:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -308,5 +308,7 @@ xkrt_team_thread_task_enqueue(
 ) {
     (void) runtime;
     (void) team;
+    // TODO : thread should be woke up here, no ?
     thread->deque.push(task);
+    thread->wakeup();
 }

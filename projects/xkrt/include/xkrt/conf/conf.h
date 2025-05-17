@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:27:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 18:42:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -38,7 +38,6 @@ typedef struct  xkrt_conf_offloader_t
 {
     xkrt_conf_stream_t streams[XKRT_STREAM_TYPE_ALL];
     uint16_t capacity;
-    uint8_t nthreads_per_device;
 
 }               xkrt_conf_offloader_t;
 
