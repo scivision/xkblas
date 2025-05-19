@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 12:00:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/19 00:25:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -34,7 +34,7 @@ __random_set_bit(xkrt_device_global_id_bitfield_t bitfield)
     for (int i = 0; i <= k; ++i)
     {
         idx = static_cast<xkrt_device_global_id_t>(__builtin_ffs(static_cast<int>(bitfield)));
-        bitfield &= ~(1 << (idx - 1));
+        bitfield &= ~(1u << (idx - 1));
     }
 
     return idx;
