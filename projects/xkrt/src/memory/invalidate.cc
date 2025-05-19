@@ -53,9 +53,9 @@ xkrt_coherency_reset(xkrt_runtime_t * runtime)
     assert(dom);
 
     // delete memory controllers
-    for (auto mem : dom->mems)
-        delete mem;
-    dom->mems.clear();
+    for (auto mcc : dom->mccs)
+        delete mcc;
+    dom->mccs.clear();
 
     // delete deps domain
     for (auto dep : dom->deps)

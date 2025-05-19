@@ -93,9 +93,10 @@ xkrt_coherency_host_async(
 
     /* create an access, and retrieve all dependency tree nodes that are in conflict */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
-    DependencyTree * deptree = (DependencyTree *) task_get_dependency_domain(thread->current_task, &access);
+    DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
+
     std::vector<void *> conflicts;
-    deptree->conflicting(&conflicts, &access);
+    ((DependencyTree *) domain)->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
@@ -146,7 +147,7 @@ xkrt_coherency_host_async(
             if (!h.is_empty())
             {
                 new (accesses + 0) access_t(task, MATRIX_COLMAJOR, h, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
-                deptree->precedence(write, accesses + 0);
+                __access_precedes(write, accesses + 0);
                 found = true;
                 break ;
             }
@@ -155,7 +156,7 @@ xkrt_coherency_host_async(
         assert(found);
 
         // insert for future tasks dependencies
-        deptree->insert<AC>(accesses);
+        domain->put<AC>(accesses);
 
         // commit the task
         runtime->task_commit(task);

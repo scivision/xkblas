@@ -192,12 +192,12 @@ typedef struct  task_dom_info_t
     std::vector<DependencyDomain *> deps;
 
     /* memory controller for coherency - all threads may try to access this list */
-    std::vector<MemoryCoherencyController *> mems;
-    spinlock_t mems_lock;
+    std::vector<MemoryCoherencyController *> mccs;
+    spinlock_t mccs_lock;
 
-    task_dom_info_t() : deps(1), mems(1), mems_lock() {
+    task_dom_info_t() : deps(1), mccs(1), mccs_lock() {
         deps.clear();
-        mems.clear();
+        mccs.clear();
     }
 
 }               task_dom_info_t;
@@ -403,6 +403,32 @@ __task_precedes(
         }
         SPINLOCK_UNLOCK(pred->state.lock);
     }
+}
+
+static inline void
+__access_link(access_t * pred, access_t * succ)
+{
+    pred->successors.push_back(succ);
+}
+
+inline void
+__access_precedes(access_t * pred, access_t * succ)
+{
+    // succ must be a dependent task
+    assert(succ->task->flags & TASK_FLAG_DEPENDENT);
+
+    // succ must have a wc>0 at this point: we are still processing dependencies, it cannot be scheduled yet
+    assert(TASK_DEP_INFO(succ->task)->wc > 0);
+
+    // succ has reached the maximum number of dependencies
+    assert(TASK_DEP_INFO(succ->task)->wc < ((1 << (8 * sizeof(task_wait_counter_type_t))) - 1));
+
+    // avoid redundant edges
+    if (pred->successors.size() && pred->successors.back()->task == succ->task)
+        return ;
+
+    // set edge
+    __task_precedes(pred->task, succ->task, __access_link, pred, succ);
 }
 
 ////////////////////////////////////

@@ -49,6 +49,7 @@ class KDependencyTreeSearch
         ~KDependencyTreeSearch() {}
 
     public:
+
         void
         prepare_resolve(access_t * access)
         {
@@ -171,7 +172,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
 
     public:
         using Node      = KDependencyTreeNode<K>;
-        using NodeBase  = Base::Node;
+        using NodeBase  = typename Base::Node;
         using Search    = KDependencyTreeSearch<K>;
 
         /* alignment is ld.sizeof_type */
@@ -273,32 +274,6 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
             return (search.access->mode == ACCESS_MODE_R) && (node->nwrites == 0);
         }
 
-        static inline void
-        __access_precedes(access_t * pred, access_t * succ)
-        {
-            pred->successors.push_back(succ);
-        }
-
-        static inline void
-        precedence(access_t * pred, access_t * succ)
-        {
-            // succ must be a dependent task
-            assert(succ->task->flags & TASK_FLAG_DEPENDENT);
-
-            // succ must have a wc>0 at this point: we are still processing dependencies, it cannot be scheduled yet
-            assert(TASK_DEP_INFO(succ->task)->wc > 0);
-
-            // succ has reached the maximum number of dependencies
-            assert(TASK_DEP_INFO(succ->task)->wc < (1 << (8 * sizeof(task_wait_counter_type_t)) - 1));
-
-            // avoid redundant edges
-            if (pred->successors.size() && pred->successors.back()->task == succ->task)
-                return ;
-
-            // set edge
-            __task_precedes(pred->task, succ->task, __access_precedes, pred, succ);
-        }
-
         inline void
         on_intersect(
             NodeBase * nodebase,
@@ -317,9 +292,9 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
                 {
                     if ((search.access->mode & ACCESS_MODE_W) && node->last_reads.size())
                         for (access_t * pred : node->last_reads)
-                            precedence(pred, search.access);
+                            __access_precedes(pred, search.access);
                     else if (node->last_write)
-                        precedence(node->last_write, search.access);
+                        __access_precedes(node->last_write, search.access);
 
                     break ;
                 }
@@ -343,52 +318,26 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
             }
         }
 
-        template<int AC>
-        inline void
-        intersect(access_t * accesses)
+        void
+        link(access_t * access)
         {
+            assert(this->can_resolve(access));
+
             Search search;
-            for (int i = 0 ; i < AC ; ++i)
-            {
-                access_t * access = accesses + i;
-                assert(this->can_resolve(access));
-
-                search.prepare_resolve(access);
-                Base::intersect(search, access->hypercubes[0]);
-                Base::intersect(search, access->hypercubes[1]);
-            }
-        }
-
-        template<int AC>
-        inline void
-        insert(access_t * accesses)
-        {
-            Search search;
-            for (int i = 0 ; i < AC ; ++i)
-            {
-                access_t * access = accesses + i;
-
-                search.prepare_resolve(access);
-                Base::insert(search, access->hypercubes[0]);
-                Base::insert(search, access->hypercubes[1]);
-            }
-        }
-
-        template<int AC>
-        inline void
-        resolve(access_t * accesses)
-        {
-            # pragma message(TODO "If we semantically force a accesses region to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
-            this->intersect<AC>(accesses);
-            this->insert<AC>(accesses);
+            search.prepare_resolve(access);
+            Base::intersect(search, access->hypercubes[0]);
+            Base::intersect(search, access->hypercubes[1]);
         }
 
         void
-        resolve(access_t * access, int naccesses)
+        put(access_t * access)
         {
-            (void) access;
-            (void) naccesses;
-            LOGGER_FATAL("not implemented");
+            assert(this->can_resolve(access));
+
+            Search search;
+            search.prepare_resolve(access);
+            Base::insert(search, access->hypercubes[0]);
+            Base::insert(search, access->hypercubes[1]);
         }
 
         bool

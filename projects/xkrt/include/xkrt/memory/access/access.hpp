@@ -37,7 +37,7 @@ struct task_t;
 
 template<int K>
 static inline void
-memory_view_from_cube(
+memory_view_from_hypercube(
     memory_view_t & view,
     const KHypercube<K> & h,
     const size_t ld,
@@ -184,6 +184,13 @@ memory_view_to_hypercubes(
     }
 }
 
+/* access types */
+typedef enum    access_type_t
+{
+    ACCESS_TYPE_POINT,
+    ACCESS_TYPE_BLAS_MATRIX,
+}               access_type_t;
+
 class access_t
 {
     public:
@@ -198,21 +205,46 @@ class access_t
         /* the mode (READ, WRITE) */
         access_mode_t mode;
 
-        /* the concurrency (SEQUENTIAL, COMMUTATIVE, CONCURRENT)*/
+        /* the concurrency (SEQUENTIAL, COMMUTATIVE, CONCURRENT) */
         access_concurrency_t concurrency;
 
         /* the scope (UNIFIED or NONUNIFIED) */
         access_scope_t scope;
 
-        ////////////////
-        // the region //
-        ////////////////
+        /* access type */
+        access_type_t type;
 
-        /* Currently always 2 hypercubes that represents a matrix in an XKTree
-         * (1 cube if access is aligned on ld x sizeof_type, else 2 hypercubes) */
-        Hypercube hypercubes[2];
+        /////////////////////////////////////////////////
+        // logical region - depends on the access type //
+        /////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////
+        union {
+
+            ///////////////////
+            // BLAS MATRICES //
+            ///////////////////
+
+            struct {
+                /* Currently always 2 hypercubes that represents a matrix in an
+                 * XKTree (1 cube if access is aligned on ld x sizeof_type,
+                 * else 2 hypercubes) */
+                Hypercube hypercubes[2];
+            };
+
+            ///////////
+            // POINT //
+            ///////////
+
+            struct {
+                const void * point;
+            };
+
+            // none
+        };
+
+        //////////
+        // data //
+        //////////
 
         /* As opposed to kaapi/v1, we have no data handle to attach a sync access onto.
          * How to remove that vector and have a similar 'sync access' logic instead ?
@@ -234,12 +266,9 @@ class access_t
 
     public:
 
-        // Welcome traveller \o/ I am glad you found me
-        //
-        // Here is all the super-dirty pile of shit on which relies the world
-        // Hopefully you are only here by curiosity, and not trying to fix something.
-        //
-        // Well ... you have a wonderful day :-)
+        //////////////////////////////////////////////////////////////////////
+        // BLAS MATRIX ACCESSES CONSTRUCTORS                                //
+        //////////////////////////////////////////////////////////////////////
 
         access_t(
             task_t * task,
@@ -258,6 +287,7 @@ class access_t
             mode(mode),
             concurrency(concurrency),
             scope(scope),
+            type(ACCESS_TYPE_BLAS_MATRIX),
             hypercubes(),
             successors(8),
             task(task),
@@ -306,6 +336,7 @@ class access_t
             mode(mode),
             concurrency(concurrency),
             scope(scope),
+            type(ACCESS_TYPE_BLAS_MATRIX),
             hypercubes(),
             successors(8),
             task(task),
@@ -319,7 +350,7 @@ class access_t
             assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
             assert(!h.is_empty());
 
-            memory_view_from_cube(this->host_view, h, ld, s);
+            memory_view_from_hypercube(this->host_view, h, ld, s);
             new (this->hypercubes + 0) Hypercube(h);
         }
 
@@ -344,7 +375,41 @@ class access_t
             )
         {}
 
+        //////////////////////////////////////////////////////////////////////
+        // POINT ACCESSES CONSTRUCTORS                                      //
+        //////////////////////////////////////////////////////////////////////
+
+        access_t(
+            task_t * task,
+            const void * addr,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) :
+            mode(mode),
+            concurrency(concurrency),
+            scope(scope),
+            type(ACCESS_TYPE_POINT),
+            point(addr),
+            successors(8),
+            task(task),
+            host_view(MATRIX_COLMAJOR, addr, 1, 0, 0, 1, 1, 1),
+            device_view()
+        {
+            /* clear preallocated empty successors */
+            successors.clear();
+
+            /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
+            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
+
+            /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
+            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+        }
+
+        //////////////////////////////////////////////////////////////////////
+
         ~access_t() {}
+
 };
 
 #endif /* __ACCESS_HPP__ */

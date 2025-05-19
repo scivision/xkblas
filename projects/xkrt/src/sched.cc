@@ -71,9 +71,10 @@ xkrt_device_prepare_task(
                 if (access->mode == ACCESS_MODE_V)
                     continue ;
 
-                MemoryTree * memtree = (MemoryTree *) task_get_memory_controller(runtime, task->parent, access);
-                assert(memtree);
-                memtree->fetch(task, access, device_global_id);
+                assert(task == access->task);
+                MemoryCoherencyController * mcc = task_get_memory_controller(runtime, task->parent, access);
+                if (mcc)
+                    mcc->fetch(access, device_global_id);
             }
 
             /* decrease the task 'fetching' counter to detect early-fetch completion */
