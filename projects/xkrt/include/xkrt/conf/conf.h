@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:27:50 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 18:42:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,6 +17,7 @@
 # include <stdint.h>
 
 # include <xkrt/logger/todo.h>
+# include <xkrt/driver/driver-type.h>
 # include <xkrt/driver/stream.h>
 
 //////////////////
@@ -37,7 +38,6 @@ typedef struct  xkrt_conf_offloader_t
 {
     xkrt_conf_stream_t streams[XKRT_STREAM_TYPE_ALL];
     uint16_t capacity;
-    uint8_t nthreads_per_device;
 
 }               xkrt_conf_offloader_t;
 
@@ -49,14 +49,26 @@ typedef struct  xkrt_conf_device_t
     xkrt_conf_offloader_t offloader;    /* offloader conf */
 }               xkrt_conf_device_t;
 
+typedef struct  xkrt_conf_driver_t
+{
+    int nthreads_per_device;
+    int used;
+}               xkrt_conf_driver_t;
+
+typedef struct  xkrt_conf_drivers_t
+{
+    xkrt_conf_driver_t list[XKRT_DRIVER_TYPE_MAX];
+
+}               xkrt_conf_drivers_t;
+
 //////////////////////////////////////////////////////////////////
 
 typedef struct  xkrt_conf_s
 {
     xkrt_conf_device_t device;      /* device conf */
+    xkrt_conf_drivers_t drivers;    /* driver conf */
     bool merge_transfers;           /* attempt to merge continuous memory to a single transfer */
     bool report_stats_on_deinit;    /* report stats on deinit */
-    int drivers_mask;               /* bitmask to enable/disable drivers */
 }               xkrt_conf_t;
 
 void xkrt_init_conf(xkrt_conf_t * conf);

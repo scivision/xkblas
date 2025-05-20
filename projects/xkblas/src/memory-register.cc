@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/24 22:20:30 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:14:07 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,7 +14,7 @@
 # include <xkrt/logger/todo.h>
 # pragma message(TODO "Replace uint64_t with size_t")
 
-# include <xkblas/xkblas.h>
+# include <xkblas.h>
 
 # include <assert.h>
 # include <stddef.h>

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 04:50:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:47:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,7 +15,7 @@
 # include <xkrt/runtime.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/logger/logger.h>
-# include <xkrt/min-max.h>
+# include <xkrt/utils/min-max.h>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/thread/thread.h>
 
@@ -23,15 +23,6 @@
 # include <cstring>
 # include <cerrno>
 # include <climits>
-
-typedef struct  xkrt_driver_device_thread_arg_t
-{
-    xkrt_thread_t thread;
-    xkrt_driver_type_t driver_type;
-    uint8_t device_driver_id;
-    void (*routine)(void * vargs, xkrt_thread_t * thread, xkrt_driver_type_t driver_type, uint8_t device_driver_id);
-    void * vargs;
-}               xkrt_driver_device_thread_arg_t;
 
 /* initialize drivers and create 1 thread per gpu starting on the passed routine */
 void
@@ -41,8 +32,6 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
 
     // PARAMETERS
     unsigned int ndevices_requested  = runtime->conf.device.ngpus + 1;                      // host device + ngpus
-    int nthreads_per_device = runtime->conf.device.offloader.nthreads_per_device;
-    int drivers_mask        = runtime->conf.drivers_mask | (1 << XKRT_DRIVER_TYPE_HOST);    // always force host driver
     bool use_p2p            = runtime->conf.device.use_p2p;
     assert(ndevices_requested < XKRT_DEVICES_MAX);
 
@@ -90,23 +79,15 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
     // number of devices
     uint8_t ndevices = 0;
 
-    // ALLOCATE DEVICE THREAD PLACES
-    xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_requested);
-    assert(places);
-
-    // ARGS PASSED TO FORKED THREADS
-    xkrt_device_team_args_t args = {
-        .runtime = runtime,
-        .devices = {},
-        .ndevices = 0
-    };
-
     // FOR EACH DRIVER
-    for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX && ndevices < ndevices_requested ; ++driver_type)
+    for (uint8_t driver_type = 0 ;
+            driver_type < XKRT_DRIVER_TYPE_MAX && ndevices < ndevices_requested ;
+            ++driver_type)
     {
         // if the driver is enabled
         xkrt_driver_t * (*creator)(void) = creators[driver_type];
-        if (drivers_mask & (1 << driver_type) && creator)
+        xkrt_conf_driver_t * driver_conf = runtime->conf.drivers.list + driver_type;
+        if (driver_conf->used && creator)
         {
             // create it
             xkrt_driver_t * driver = creator();
@@ -114,6 +95,10 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
             if (driver == NULL)
                 continue ;
             driver->type = (xkrt_driver_type_t) driver_type;
+
+            // number of threads per device of that driver
+            int nthreads_per_device = driver_conf->nthreads_per_device;
+            assert(nthreads_per_device > 0);
 
             // load devices
             const char * driver_name = driver->f_get_name ? driver->f_get_name() : "(null)";
@@ -135,20 +120,55 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
             unsigned int ndevices_for_driver = MIN(ndevices_requested - ndevices, ndevices_max);
             assert(ndevices_for_driver);
 
+            // allocate driver thread places
+            xkrt_thread_place_t * places = (xkrt_thread_place_t *) malloc(sizeof(xkrt_thread_place_t) * ndevices_for_driver);
+            assert(places);
+
+            // ARGS PASSED TO FORKED THREADS
+            xkrt_device_team_args_t args = {
+                .runtime = runtime,
+                .devices = {},
+                .ndevices = 0
+            };
+
             // get cpuset for the device
-            for (uint8_t i = 0; i < ndevices_for_driver && ndevices < ndevices_requested; ++i)
+            for (uint8_t i = 0; i < ndevices_for_driver ; ++i)
             {
                 assert(driver->f_device_cpuset);
-                int err = driver->f_device_cpuset(runtime->topology, &places[ndevices], i);
+                int err = driver->f_device_cpuset(runtime->topology, places + i, i);
                 if (err)
                     LOGGER_WARN("Invalid cpuset returned for device %d - using default cpuset", i);
                 else
                 {
-                    args.devices[ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
-                    args.devices[ndevices].device_driver_id = i;
+                    args.devices[args.ndevices].driver_type      = (xkrt_driver_type_t) driver_type;
+                    args.devices[args.ndevices].device_driver_id = i;
                     ++ndevices;
+                    ++args.ndevices;
                 }
             }
+
+            // create the team
+            driver->team.desc.routine             = xkrt_device_thread_main;
+            driver->team.desc.args                = &args;
+            driver->team.desc.nthreads            = args.ndevices * nthreads_per_device;
+            driver->team.desc.binding.mode        = XKRT_TEAM_BINDING_MODE_COMPACT;
+            driver->team.desc.binding.places      = XKRT_TEAM_BINDING_PLACES_EXPLICIT;
+            driver->team.desc.binding.places_list = places;
+            driver->team.desc.binding.nplaces     = args.ndevices;
+            driver->team.desc.binding.flags       = XKRT_TEAM_BINDING_FLAG_NONE;
+
+            // prepare the barrier for the devices team
+            pthread_barrier_t * barrier = &driver->barrier;
+            if (pthread_barrier_init(barrier, NULL, driver->team.desc.nthreads + 1))
+                LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
+
+            // create a team of thread
+            runtime->team_create(&driver->team);
+
+            // wait for all devices to be created
+            pthread_barrier_wait(barrier);    // init
+            pthread_barrier_wait(barrier);    // commit
+            pthread_barrier_wait(barrier);    // offloader streams
         }
         // driver disabled or couldnt init
         else
@@ -163,36 +183,15 @@ xkrt_drivers_init(xkrt_runtime_t * runtime)
         return ;
     }
     LOGGER_INFO("Found %d devices (with %d requested)", ndevices, ndevices_requested);
-
-    runtime->drivers.devices.team.desc.routine              = xkrt_device_thread_main;
-    runtime->drivers.devices.team.desc.args                 = &args;
-    runtime->drivers.devices.team.desc.nthreads             = ndevices * nthreads_per_device;
-    runtime->drivers.devices.team.desc.binding.mode         = XKRT_TEAM_BINDING_MODE_COMPACT;
-    runtime->drivers.devices.team.desc.binding.places       = XKRT_TEAM_BINDING_PLACES_EXPLICIT;
-    runtime->drivers.devices.team.desc.binding.places_list  = places;
-    runtime->drivers.devices.team.desc.binding.nplaces      = ndevices;
-    runtime->drivers.devices.team.desc.binding.flags        = XKRT_TEAM_BINDING_FLAG_NONE;
-
-    // prepare the barrier for the devices team
-    pthread_barrier_t * barrier = &runtime->drivers.devices.barrier;
-    args.ndevices = ndevices;
-    if (pthread_barrier_init(barrier, NULL, runtime->drivers.devices.team.desc.nthreads + 1))
-        LOGGER_FATAL("Couldnt initialized pthread_barrier_t");
-
-    // create a team of thread
-    runtime->team_create(&runtime->drivers.devices.team);
-
-    // wait for all devices to be created
-    pthread_barrier_wait(barrier);    // init
-    pthread_barrier_wait(barrier);    // commit
-    pthread_barrier_wait(barrier);    // offloader streams
 }
 
 void
 xkrt_drivers_deinit(xkrt_runtime_t * runtime)
 {
     // notify each thread to stop
-    for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
+    for (xkrt_device_global_id_t device_global_id = 0 ;
+            device_global_id < runtime->drivers.devices.n ;
+            ++device_global_id)
     {
         xkrt_device_t * device = runtime->drivers.devices.list[device_global_id];
         assert(device);
@@ -203,34 +202,62 @@ xkrt_drivers_deinit(xkrt_runtime_t * runtime)
             device->threads[i]->wakeup();
     }
 
-    if (runtime->drivers.devices.n)
-    {
-        // wait for threads stream deletion
-        pthread_barrier_wait(&runtime->drivers.devices.barrier);
-
-        // wait for main thread driver deinitialization
-        pthread_barrier_wait(&runtime->drivers.devices.barrier);
-
-        // can destroy the barrier now
-        pthread_barrier_destroy(&runtime->drivers.devices.barrier);
-    }
-
-    // join threads
-    runtime->team_join(&runtime->drivers.devices.team);
-    free(runtime->drivers.devices.team.desc.binding.places_list);
-
     // finalize each driver
     for (uint8_t driver_type = 0 ; driver_type < XKRT_DRIVER_TYPE_MAX ; ++driver_type)
     {
         xkrt_driver_t * driver = runtime->drivers.list[driver_type];
         if (driver)
         {
+            if (driver->ndevices_commited.load())
+            {
+                // wait for threads stream deletion
+                pthread_barrier_wait(&driver->barrier);
+
+                // wait for main thread driver deinitialization
+                pthread_barrier_wait(&driver->barrier);
+
+                // can destroy the barrier now
+                pthread_barrier_destroy(&driver->barrier);
+            }
+
+            // join threads
+            runtime->team_join(&driver->team);
+            free(driver->team.desc.binding.places_list);
+
             if (driver->f_finalize)
                 driver->f_finalize();
             else
                 LOGGER_WARN("Driver `%u` is missing `f_finalize`", driver_type);
         }
     }
+}
+
+extern "C"
+const char *
+xkrt_driver_name(xkrt_driver_type_t driver_type)
+{
+    switch (driver_type)
+    {
+        case (XKRT_DRIVER_TYPE_HOST):   return "host";
+        case (XKRT_DRIVER_TYPE_CUDA):   return "cuda";
+        case (XKRT_DRIVER_TYPE_HIP):    return "hip";
+        case (XKRT_DRIVER_TYPE_ZE):     return "ze";
+        case (XKRT_DRIVER_TYPE_CL):     return "cl";
+        case (XKRT_DRIVER_TYPE_SYCL):   return "sycl";
+        default:                        return "(null)";
+    }
+}
+
+extern "C"
+xkrt_driver_type_t xkrt_driver_type_from_name(const char * name)
+{
+    for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+    {
+        xkrt_driver_type_t driver_type = (xkrt_driver_type_t) i;
+        if (strcmp(name, xkrt_driver_name(driver_type)) == 0)
+            return driver_type;
+    }
+    return XKRT_DRIVER_TYPE_MAX;
 }
 
 extern "C"
@@ -241,8 +268,10 @@ xkrt_support_driver(xkrt_driver_type_t driver_type)
     {
         case (XKRT_DRIVER_TYPE_HOST):   return 1;
         case (XKRT_DRIVER_TYPE_CUDA):   return XKRT_SUPPORT_CUDA;
+        case (XKRT_DRIVER_TYPE_HIP):    return XKRT_SUPPORT_HIP;
         case (XKRT_DRIVER_TYPE_ZE):     return XKRT_SUPPORT_ZE;
         case (XKRT_DRIVER_TYPE_CL):     return XKRT_SUPPORT_CL;
+        case (XKRT_DRIVER_TYPE_SYCL):   return XKRT_SUPPORT_SYCL;
         default:                        return 0;
     }
 }

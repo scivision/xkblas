@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 20:53:27 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:41:57 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -70,7 +70,14 @@ prepare_n_matrices(uintptr_t * matrices, size_t n, size_t ld)
     const size_t s = sizeof(TYPE);
     const uintptr_t alignon = s * ld;
     const uintptr_t memsize = n * (alignon + alignon/2 + s * ld * ld);
+
+    # if 0
     const uintptr_t mem     = impl.alloc(memsize);
+    # else
+    const uintptr_t mem     = (const uintptr_t) malloc(memsize);
+    impl.pin_async((void *) mem, memsize);
+    impl.pin_wait();
+    # endif
 
     for (int i = 0 ; i < n ; ++i)
     {
@@ -481,7 +488,9 @@ main_mumps(char ** args)
 
     # define USE_WRITE_BACK     1
     # define USE_ARGS_MATRIX    0
-    # define USE_TS_TUNER       0
+    # define USE_TS_TUNER       1
+    # define USE_PREALLOCATE    1
+    # define NMATRICES          1
 
     TYPE alpha, beta;
     FILL(&alpha, 1);
@@ -501,11 +510,11 @@ main_mumps(char ** args)
     };
     # else
     srand(2025);
-    int mn[50][2];
+    int mn[NMATRICES][2];
     for (int k = 0; k < sizeof(mn) / (2 * sizeof(int)); ++k)
     {
         mn[k][0] = 1024 + rand() % (16384 - 1024 + 1);
-        mn[k][1] =  512 + rand() % ( 4096 -  512 + 1);
+        mn[k][1] =  512 + rand() % ( 6144 -  512 + 1);
     }
     # endif /*USE_ARGS_MATRIX */
 
@@ -561,6 +570,9 @@ main_mumps(char ** args)
         {ts1, ts2, ts3}
     };
     # else
+    int m = mn[0][0];
+    int n = mn[0][1];
+
     int ts[][3] = {
         {512, 512, 512},
         {1024, 1024, 1024},
@@ -571,9 +583,7 @@ main_mumps(char ** args)
         {m/1, m/2, m/4},
         {n/1, n/2, n/4},
         {m/8, m/16, 2048},
-        {n/8, 4096, 8192},
         {1024, m/2, n/4},
-        {n/1, 512, m/2},
         {1024, m/4, 2048},
         {m/1, 1024, 4096},
         {n/2, m/2, 8192},
@@ -592,7 +602,6 @@ main_mumps(char ** args)
         {8192, n/4, m/4},
         {n/1, 1024, m/2},
         {m/4, 1024, n/4},
-        {n/16, m/16, 2048},
         {n/8, 512, m/8},
         {512, 512, 512},
         {2048, 2048, 2048},
@@ -600,8 +609,6 @@ main_mumps(char ** args)
         {n/2, n/1, 4096},
         {m/16, m/8, m/4},
         {n/16, n/8, 512},
-        {512, m/1, m/16},
-        {n/4, 8192, 4096},
         {m/2, 2048, 8192},
         {4096, m/1, 2048},
         {n/2, 1024, 1024},
@@ -624,11 +631,9 @@ main_mumps(char ** args)
         {n/1, 8192, m/16},
         {m/2, 2048, 512},
         {m/4, n/2, 1024},
-        {n/8, 1024, 8192},
         {512, m/8, 2048},
         {n/2, 4096, 512},
         {m/4, m/8, 4096},
-        {n/16, 2048, 1024},
         {8192, n/1, m/2},
         {1024, 4096, n/4},
         {m/8, 2048, n/4},
@@ -637,14 +642,12 @@ main_mumps(char ** args)
         {m/1, 8192, 1024},
         {n/4, 2048, m/4},
         {m/2, 1024, 512},
-        {n/8, 8192, 2048},
         {m/4, 512, n/2},
         {1024, m/16, n/8},
         {2048, 4096, 512},
         {8192, m/1, n/16},
         {n/2, 1024, 512},
         {m/4, 4096, 512},
-        {n/8, m/8, m/16},
         {m/16, 1024, n/4},
         {m/8, 8192, 2048},
         {1024, 512, n/2},
@@ -652,17 +655,9 @@ main_mumps(char ** args)
         {n/1, 1024, m/8},
         {2048, n/2, m/16},
         {m/1, n/2, n/4},
-        {n/16, 8192, 512},
         {m/2, 8192, 1024},
         {m/4, n/1, 4096},
         {n/4, 1024, 2048},
-        {m/1, m/2, m/8},
-        {n/1, n/2, n/8},
-        {2048, m/4, m/16},
-        {512, n/4, n/16},
-        {1024, m/8, n/2},
-        {n/16, m/8, 4096},
-        {8192, m/16, n/2},
         {m/2, 2048, n/1}
     };
     # endif
@@ -682,10 +677,9 @@ main_mumps(char ** args)
 
         uint64_t tmin = UINT64_MAX;
         int imin = 0;
-        for (int i = 0 ; i < sizeof(ts) / (3 * sizeof(int)) ; ++i)
+        const int ntiles = sizeof(ts) / (3 * sizeof(int));
+        for (int i = 0 ; i < ntiles ; ++i)
         {
-            printf("Running with ts = {%d, %d, %d}\n", ts[i][0], ts[i][1], ts[i][2]);
-
             for (int j = 0 ; j < Ix ; ++j)
             {
                 # if REPLICATE
@@ -696,6 +690,10 @@ main_mumps(char ** args)
                 // if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
                 //     continue ;
                 uint64_t t0 = get_nanotime();
+
+                # if USE_PREALLOCATE
+                impl.preallocate(D, m+n, m+n, ld);
+                # endif /* USE_PREALLOCATE */
 
                 impl.set_tile(ts[i][0]);
                 impl.trsm(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
@@ -717,7 +715,7 @@ main_mumps(char ** args)
                 uint64_t tt = get_nanotime();
                 impl.wait();
                 uint64_t tf = get_nanotime();
-                printf("Compute took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+                printf("(%d/%u) Compute took %lf s. (graph construction took %lf s.) - with ts = {%d, %d, %d}\n", i, ntiles, (tf-t0)/1e9, (tt-t0)/1e9, ts[i][0], ts[i][1], ts[i][2]);
 
                 impl.reset();
 

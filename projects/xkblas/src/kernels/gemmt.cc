@@ -23,8 +23,8 @@
 # include <xkrt/support.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
-# include <xkrt/min-max.h>
-# include <xkrt/memory/access.hpp>
+# include <xkrt/utils/min-max.h>
+# include <xkrt/memory/access/access.hpp>
 # include <xkrt/memory/cache-line-size.hpp>
 
 typedef struct args_t

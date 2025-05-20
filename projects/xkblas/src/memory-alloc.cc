@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 00:44:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:35:55 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,9 +16,6 @@
 
 # include <xkrt/xkrt.h>
 # include <xkrt/support.h>
-# if XKRT_SUPPORT_CUDA
-#  include <cuda_runtime.h>
-# endif /* XKRT_SUPPORT_CUDA */
 # include <xkrt/logger/logger.h>
 
 # include <assert.h>
@@ -54,16 +51,18 @@ extern "C"
 void *
 xkblas_unified_alloc(size_t size)
 {
+    // TODO
     xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
-    return runtime->memory_unified_allocate(0, size);
+    return runtime->memory_unified_allocate(1, size);
 }
 
 extern "C"
 void
 xkblas_unified_free(void * ptr, size_t size)
 {
+    // TODO
     xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
-    return runtime->memory_unified_deallocate(0, ptr, size);
+    return runtime->memory_unified_deallocate(1, ptr, size);
 }
 
 extern "C"

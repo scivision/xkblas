@@ -1,5 +1,5 @@
 # include <xkrt/xkrt.h>
-# include <xkrt/task/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 # include <xkrt/task/task-format.h>
 # include <xkrt/task/task.hpp>
 
@@ -35,7 +35,7 @@ main(void)
 
     // Create a task
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT | TASK_FLAG_DEVICE;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
     constexpr size_t task_size = task_compute_size(flags, AC);
 
     task_t * task = thread->allocate_task(task_size);
@@ -43,9 +43,6 @@ main(void)
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    new (dev) task_dev_info_t(UNSPECIFIED_DEVICE_GLOBAL_ID, UNSPECIFIED_TASK_ACCESS);
 
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "dependent-task-test");
@@ -64,7 +61,7 @@ main(void)
             for (int j = 0 ; j < m ; ++j)
                 mem[i*ld+j] = 42;
 
-        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_RW);
+        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_R);
 
         thread->resolve<AC>(task, accesses);
 

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 21:30:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:12:19 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -80,6 +80,8 @@ xkrt_thread_t::warmup(void)
 task_t *
 xkrt_thread_t::allocate_task(const size_t size)
 {
+    assert(xkrt_thread_t::get_tls() == this);
+
     # if 1
     if (this->memory_stack_ptr >= this->memory_stack_bottom + THREAD_MAX_MEMORY)
         LOGGER_FATAL("Stack overflow ! Increase `THREAD_MAX_MEMORY` and recompile");
@@ -451,6 +453,8 @@ xkrt_runtime_t::task_wait(void)
         if (backoff < max_backoff)
             backoff = (backoff << 1);
         WAIT64 ;
+
+        // TODO : maybe block in a pthread_cond
     }
 
     # undef WAIT

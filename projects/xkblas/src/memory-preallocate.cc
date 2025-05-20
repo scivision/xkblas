@@ -1,28 +1,28 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   dependency-domain.hpp                                                    */
+/*   memory-preallocate.cc                                                    */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:54:35 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:08:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __DEPENDENCY_DOMAIN_HPP__
-# define __DEPENDENCY_DOMAIN_HPP__
+# include <xkrt/xkrt.h>
+# include "context.h"
 
-# include <xkrt/memory/access.hpp>
-
-class DependencyDomain
-{
-    # if 0
-    public:
-        virtual void resolve(access_t * access, int naccesses) = 0;
-        virtual bool can_resolve(const access_t * access) const = 0;
-    # endif
-};
-
-#endif /* __DEPENDENCY_DOMAIN_HPP__ */
+extern "C"
+void
+xkblas_memory_preallocate(
+    void * ptr, int ld,
+    int m, int n,
+    unsigned int sizeof_type
+) {
+    xkrt_runtime_t * runtime = xkblas_xkrt_runtime_get();
+    for (xkrt_device_global_id_t device_global_id = 0; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
+        if (device_global_id != HOST_DEVICE_GLOBAL_ID)
+            xkrt_coherency_allocate_2D(runtime, device_global_id, MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);
+}

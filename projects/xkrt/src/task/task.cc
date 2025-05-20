@@ -12,7 +12,9 @@
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory/memory-tree.hpp>
+# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/region/memory-tree.hpp>
+# include <xkrt/memory/access/point/dependency-map.hpp>
 
 /**
  * Retrieve or (insert and return) the memory controller of the passed task for the given access
@@ -29,30 +31,59 @@ task_get_memory_controller(
     task_dom_info_t * dom = TASK_DOM_INFO(task);
     assert(dom);
 
-    SPINLOCK_LOCK(dom->mems_lock);
+    SPINLOCK_LOCK(dom->mccs_lock);
 
-    /* find previous memtree for that ld */
-    for (MemoryCoherencyController * mem : dom->mems)
+    /* find previous mcc for that ld */
+    for (MemoryCoherencyController * mcc : dom->mccs)
     {
-        MemoryTree * tree = (MemoryTree *) mem;
-        if (tree->can_resolve(access))
+        if (mcc->can_resolve(access))
         {
-            SPINLOCK_UNLOCK(dom->mems_lock);
-            return mem;
+            SPINLOCK_UNLOCK(dom->mccs_lock);
+            return mcc;
         }
     }
 
     LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
             access->host_view.ld, access->host_view.sizeof_type, runtime->conf.merge_transfers ? "true" : "false");
 
-    /* if not found, create a new memtree */
-    MemoryCoherencyController * mem = new MemoryTree(runtime, access->host_view.ld, access->host_view.sizeof_type, runtime->conf.merge_transfers);
-    assert(mem);
-    dom->mems.push_back(mem);
+    /* if not found, create a new memory coherency controller dependending on
+     * the access type */
+    MemoryCoherencyController * mcc;
+    switch (access->type)
+    {
+        case (ACCESS_TYPE_BLAS_MATRIX):
+        {
+            mcc = new MemoryTree(
+                runtime,
+                access->host_view.ld,
+                access->host_view.sizeof_type,
+                runtime->conf.merge_transfers
+            );
+            break ;
+        }
 
-    SPINLOCK_UNLOCK(dom->mems_lock);
+        case (ACCESS_TYPE_POINT):
+        {
+            mcc = NULL;
+            break ;
+        }
 
-    return mem;
+        default:
+        {
+            LOGGER_FATAL("Tried to run coherency controller on an unsupported access");
+            break ;
+        }
+    }
+
+    if (mcc)
+    {
+        assert(mcc->can_resolve(access));
+        dom->mccs.push_back(mcc);
+    }
+
+    SPINLOCK_UNLOCK(dom->mccs_lock);
+
+    return mcc;
 }
 
 /**
@@ -74,14 +105,30 @@ task_get_dependency_domain(
 
     /* find previous deptree for that ld */
     for (DependencyDomain * domain : dom->deps)
-    {
-        DependencyTree * tree = (DependencyTree *) domain;
-        if (tree->can_resolve(access))
+        if (domain->can_resolve(access))
             return domain;
-    }
 
     /* create a new domain */
-    DependencyDomain * domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+    DependencyDomain * domain;
+    switch (access->type)
+    {
+        case (ACCESS_TYPE_BLAS_MATRIX):
+        {
+            domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+            break ;
+        }
+
+        case (ACCESS_TYPE_POINT):
+        {
+            domain = new DependencyMap();
+            break ;
+        }
+
+        default:
+        {
+            LOGGER_FATAL("Tried to run a dependency domain on an unsupported access");
+        }
+    }
     dom->deps.push_back(domain);
 
     return domain;

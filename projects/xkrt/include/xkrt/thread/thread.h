@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 20:44:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 19:13:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -16,7 +16,7 @@
 
 #  include <xkrt/consts.h>
 #  include <xkrt/sync/spinlock.h>
-#  include <xkrt/task/dependency-tree.hpp>
+#  include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 #  include <xkrt/task/task.hpp>
 
 #  include <xkrt/memory/alignas.h>
@@ -277,12 +277,12 @@ typedef struct  xkrt_thread_t
             assert(task->flags & TASK_FLAG_DEPENDENT);
             assert(AC > 0);
 
-            DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
-            tree->insert<AC>(accesses);
+            DependencyDomain * dom = task_get_dependency_domain(this->current_task, accesses + 0);
+            dom->put<AC>(accesses);
         }
 
         # define __Thread_task_execute(T, t, F, ...)                                                \
-        do {                                                                                    \
+        do {                                                                                        \
                 assert(T && t);                                                                     \
                 task_format_t * format = runtime->formats.list.list + t->fmtid;                     \
                 assert(format->f[TASK_FORMAT_TARGET_HOST]);                                         \

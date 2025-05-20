@@ -13,6 +13,7 @@ set(TEST_SOURCES
     init.cc
     sync.cc
     task-dependency.cc
+    task-dependency-point.cc
     task-format-host.cc
     task-format.cc
     task-gpu-empty.cc

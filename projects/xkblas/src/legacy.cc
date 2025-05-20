@@ -5,14 +5,14 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 01:09:28 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:13:41 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
 # include "context.h"
-# include "xkblas/xkblas.h"
+# include "xkblas.h"
 # include "xkblas/kernel-type.h"
 
 # include <xkrt/xkrt.h>

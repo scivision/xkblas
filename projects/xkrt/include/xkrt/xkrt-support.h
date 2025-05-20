@@ -14,43 +14,22 @@
 #ifndef __XKRT_SUPPORT_H__
 # define __XKRT_SUPPORT_H__
 
-/* If the runtime was compiled with Nvidia's CUDA support */
-# define XKRT_SUPPORT_CUDA  __XKRT_SUPPORT_CUDA_VALUE__
-
-/* If the runtime was compiled with HIP support */
-# define XKRT_SUPPORT_HIP   __XKRT_SUPPORT_HIP_VALUE__
+/* If the runtime was compiled with Mvidia's CUDA support */
+# define XKRT_SUPPORT_CUDA  1
 
 /* If the runtime was compiled with Intel's Level Zero support */
-# define XKRT_SUPPORT_ZE    __XKRT_SUPPORT_ZE_VALUE__
+# define XKRT_SUPPORT_ZE    0
 
 /* If the runtime was compiled with SYCL support (for Level Zero interop and mkl) */
-# define XKRT_SUPPORT_ZE_SYCL_INTEROP __XKRT_SUPPORT_ZE_SYCL_INTEROP_VALUE__
-
-/* If the runtime was compiled with SYCL support */
-# define XKRT_SUPPORT_SYCL  __XKRT_SUPPORT_SYCL_VALUE__
+# define XKRT_SUPPORT_SYCL  0
 
 /* If the kernel was compiled with OpenCL support */
-# define XKRT_SUPPORT_CL __XKRT_SUPPORT_CL_VALUE__
+# define XKRT_SUPPORT_CL 0
 
 /* If the kernel was compiled with run-time statistics enabled */
-# define XKRT_SUPPORT_STATS __XKRT_SUPPORT_STATS_VALUE__
+# define XKRT_SUPPORT_STATS 1
 
 /* If runtime was compiled with cairo support */
-# define XKRT_SUPPORT_CAIRO __XKRT_SUPPORT_CAIRO_VALUE__
-
-/* If runtime was compiled with nvml support */
-# define XKRT_SUPPORT_NVML __XKRT_SUPPORT_NVML_VALUE__
-
-/* If the runtime was compiled with Intel's zes support */
-# define XKRT_SUPPORT_ZES __XKRT_SUPPORT_ZES_VALUE__
-
-/* If the runtime was compiled with AMD's rsmi support */
-# define XKRT_SUPPORT_RSMI __XKRT_SUPPORT_RSMI_VALUE__
-
-/* If the runtime should use heavy debug tests, that may significantly slowdown the execution */
-# define XKRT_SUPPORT_HEAVY_DEBUG __XKRT_SUPPORT_HEAVY_DEBUG_VALUE__
-# if XKRT_SUPPORT_HEAVY_DEBUG
-#  define KHP_TREE_ENABLE_COHERENCY_CHECKS 1
-# endif
+# define XKRT_SUPPORT_CAIRO 0
 
 #endif /* __XKRT_SUPPORT_H__ */

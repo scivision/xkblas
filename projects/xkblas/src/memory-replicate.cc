@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 16:55:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 23:07:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,7 +16,7 @@
 
 extern "C"
 void
-xkblas_replicate_async(
+xkblas_memory_replicate_async(
     void * ptr, int ld,
     int m, int n,
     unsigned int sizeof_type

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:45:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/20 14:36:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,14 +18,14 @@
 # define KHP_TREE_CUT_ON_INSERT     0
 # define KHP_TREE_MAINTAIN_SIZE     0
 # define KHP_TREE_MAINTAIN_HEIGHT   0
-# include <xkrt/memory/khp-tree.hpp>
+# include <xkrt/memory/access/common/khp-tree.hpp>
 
 //  TODO : the design of this is terrible with a cyclic ownership with 'xkrt_runtime_t'
 //  Redesign me !! This should be fully independent with callbacks that can be parametrized, raised with global device ids
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
-# include <xkrt/memory/coherency-controller.hpp>
+# include <xkrt/memory/access/coherency-controller.hpp>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/lockable.hpp>
 
@@ -76,8 +76,8 @@ class KMemoryForward {
 
     public:
 
-        /* the task that requested the forward */
-        task_t * task;
+        /* the access that requested the forward */
+        access_t * access;
 
         /* dst chunk */
         xkrt_area_chunk_t * chunk;
@@ -94,13 +94,13 @@ class KMemoryForward {
     public:
 
         KMemoryForward(
-            task_t * task,
+            access_t * access,
             xkrt_area_chunk_t * chunk,
             const Hypercube & dst_hypercube,
             xkrt_device_global_id_t device_global_id,
             memory_replicate_view_t & device_view
         ) :
-            task(task),
+            access(access),
             chunk(chunk),
             dst_hypercube(dst_hypercube),
             device_global_id(device_global_id),
@@ -129,7 +129,7 @@ class KMemoryReplicateAllocationView {
         struct {
 
             /* tasks awaiting on that view to be transfered */
-            std::vector<task_t *> tasks;
+            std::vector<access_t *> accesses;
 
             /* must forward this view to other views using D2D transfer */
             std::vector<MemoryForward> forwards;
@@ -154,7 +154,7 @@ class KMemoryReplicateAllocationView {
 
 }; /* MemoryReplicateAllocationView */
 
-// if this assertion, many bitwise operation in the runtime will be wrong as
+// if this assertion fails, many bitwise operation in the runtime will be wrong as
 // they are implicitly done on int32 : (1 << device_global_id) will be an int -
 // should update the runtime with (1UL << device_global_id) - maybe use a macro
 // for 'one' depending on that size
@@ -478,7 +478,7 @@ class KMemoryTreeNodeSearch {
         ///////////////////////////////////////////
         xkrt_area_chunk_t * chunk;
         struct {
-            std::vector<task_t *> tasks;
+            std::vector<access_t *> accesses;
             std::vector<MemoryForward> forwards;
         } awaiting;
 
@@ -594,13 +594,13 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KMemoryTreeNodeSearch<K>>::Node::dump_str(f);
+            Base::dump_str(f);
         }
 
         void
         dump_hypercube_str(FILE * f) const
         {
-            // KHPTree<K, DeviceInvalidHyperhypercubes>::Node::dump_hypercube_str(f);
+            // Base::dump_hypercube_str(f);
 
             for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
             {
@@ -933,8 +933,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 tree->unlock();
 
                 /* callback to release awaiting tasks */
-                for (task_t * & task : search.awaiting.tasks)
-                    fetch_callback_task(runtime, fetch, task);
+                for (access_t * & access : search.awaiting.accesses)
+                    fetch_callback_task(runtime, fetch, access->task);
 
                 /* callback to forward the data to other devices */
                 task_wait_counter_type_t nforwards = (task_wait_counter_type_t) search.awaiting.forwards.size();
@@ -947,7 +947,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                     {
                         MemoryForward & forward = search.awaiting.forwards[i];
 
-                        assert(forward.task);
+                        assert(forward.access);
                         assert(forward.chunk);
 
                         fetch_t * forward_fetch = forward_list->prepare_next_fetch();
@@ -956,7 +956,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                         forward_list->fetching();
 
                         // upcoming copy only needs m, n, sizeof_type
-                        memory_view_from_cube(forward_fetch->host_view, forward.dst_hypercube, tree->ld, tree->sizeof_type);
+                        memory_view_from_hypercube(forward_fetch->host_view, forward.dst_hypercube, tree->ld, tree->sizeof_type);
 
                         // the chunk to use
                         forward_fetch->dst_chunk = forward.chunk;
@@ -985,7 +985,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                         new (&forward_fetch->src_view) memory_replicate_view_t(fetch->dst_view.addr + offset, fetch->dst_view.ld);
 
                         // can launch the forward already
-                        tree->fetch_list_launch_ith(forward.task, forward_list, i);
+                        tree->fetch_list_launch_ith(forward.access, forward_list, i);
 
                         // no need to reduce the list, we already have only 1 copy per dst device
                     }
@@ -1022,7 +1022,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
                 /* set the views */
                 memory_view_t host_view;
-                memory_view_from_cube(host_view, partite.hypercube, this->ld, this->sizeof_type);
+                memory_view_from_hypercube(host_view, partite.hypercube, this->ld, this->sizeof_type);
                 const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
                 const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
                 const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
@@ -1046,7 +1046,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         fetch_list_to_host_setup_partition(Partition & partition)
         {
             assert(this->is_locked());
-            const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << HOST_DEVICE_GLOBAL_ID);
+            const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << HOST_DEVICE_GLOBAL_ID);
 
             /* launch fetch on each device */
             for (Partite & partite : partition.partites)
@@ -1167,7 +1167,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
                 MemoryBlock & block = node->block;
 
-                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
+                const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << device_global_id);
 
                 const bool coherent_on_any_device        = block.coherency != 0;
                 const bool coherent_on_device            = block.coherency &  devbit;
@@ -1204,7 +1204,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                     replicate.coherency     = 0;
                     assert(replicate.fetching == 0);
 
-                    block.coherency &= (memory_allocation_view_id_bitfield_t) ~devbit;
+                    block.coherency &= (xkrt_device_global_id_bitfield_t) ~devbit;
 
                     stop = freed >= 16*size;
                     // stop = false;
@@ -1288,7 +1288,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 const uintptr_t begin_addr = chunk->ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
-                const uint8_t allocation_view_id = replicate.nallocations++;
+                const memory_allocation_view_id_t allocation_view_id = replicate.nallocations++;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     LOGGER_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile");
 
@@ -1307,7 +1307,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         ) {
             assert(this->is_locked());
 
-            uint8_t j = 0;
+            memory_allocation_view_id_t j = 0;
             int nallocations = partition.partites[0].block->replicates[device_global_id].nallocations;
             size_t nblocks = partition.partites.size();
 
@@ -1322,7 +1322,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 {
                     /* for each allocation of other blocks */
                     int nallocations = partition.partites[i].block->replicates[device_global_id].nallocations;
-                    for (uint8_t k = 0 ; k < nallocations ; ++k)
+                    for (memory_allocation_view_id_t k = 0 ; k < nallocations ; ++k)
                     {
                         /* this block has a view with the same allocation, check next block */
                         MemoryReplicateAllocationView * rk = partition.partites[i].block->replicates[device_global_id].allocations[k];
@@ -1398,12 +1398,12 @@ next_view:
 
         inline void
         fetch_access_setup_copies(
-            task_t * task,
             access_t * access,
             xkrt_device_global_id_t device_global_id,
             Partition & partition
         ) {
             assert(this->is_locked());
+            assert(access->task);
 
             // if read mode is set
             if (access->mode & ACCESS_MODE_R)
@@ -1436,7 +1436,7 @@ next_view:
                     /* increment task fetch counter */
                     LOGGER_DEBUG(
                         "task `%s` fetching by `%s` on `%p`",
-                        task->label,
+                        access->task->label,
                         (dst_replicate.fetching & dst_allocbit) ? "awaiting" : (partite.block->fetching) ? "forwarding" : "launching",
                         (void *) dst_allocation_view->view.addr
                     );
@@ -1448,8 +1448,8 @@ next_view:
                         LOGGER_DEBUG("Skipping fetch of a block already being fetched (concurrent read)");
 
                         /* register a task awaiting on the fetch completion */
-                        dst_allocation_view->awaiting.tasks.push_back(task);
-                        __task_fetching(1, task);
+                        __task_fetching(1, access->task);
+                        dst_allocation_view->awaiting.accesses.push_back(access);
 
                         continue ;
                     }
@@ -1519,11 +1519,11 @@ next_view:
                         MemoryReplicateAllocationView * fetching_allocation_view = fetching_replicate.allocations[fetching_allocation_view_id];
                         assert(fetching_allocation_view);
 
-                        LOGGER_DEBUG("registered a forward for task `%s`", task->label);
+                        LOGGER_DEBUG("registered a forward for task `%s`", access->task->label);
 
-                        const MemoryForward forward(task, partition.chunk, partite.hypercube, device_global_id, dst_allocation_view->view);
+                        const MemoryForward forward(access, partition.chunk, partite.hypercube, device_global_id, dst_allocation_view->view);
                         fetching_allocation_view->awaiting.forwards.push_back(forward);
-                        __task_fetching(1, task);
+                        __task_fetching(1, access->task);
                     }
                     # endif /* USE_D2D_FORWARDING */
                     else
@@ -1569,7 +1569,7 @@ next_view:
             /* if access has a write mode, make all copies incoherent */
             if (access->mode & ACCESS_MODE_W)
             {
-                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
+                const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << device_global_id);
                 for (Partite & partite : partition.partites)
                 {
                     const memory_allocation_view_id_bitfield_t allocbit = (memory_allocation_view_id_bitfield_t) (1 << partite.dst_allocation_view_id);
@@ -1597,11 +1597,12 @@ next_view:
         /* launch a single fetch */
         inline void
         fetch_list_launch_ith(
-            task_t * task,
+            access_t * access,
             fetch_list_t * list,
             size_t i
         ) {
-            assert(task);
+            assert(access);
+            assert(access->task);
             assert(i >= 0);
             assert(i < list->n);
             assert(i < list->capacity);
@@ -1616,7 +1617,7 @@ next_view:
             xkrt_callback_t callback;
             callback.func = fetch_callback;
             callback.args[0] = this->runtime;
-            callback.args[1] = task;
+            callback.args[1] = access->task;
             callback.args[2] = list;
             callback.args[3] = (void *) i;
 
@@ -1638,16 +1639,16 @@ next_view:
 
         inline void
         fetch_list_launch(
-            task_t * task,
+            access_t * access,
             fetch_list_t * list
         ) {
             for (size_t i = 0 ; i < list->n ; ++i)
-                fetch_list_launch_ith(task, list, i);
+                fetch_list_launch_ith(access, list, i);
         }
 
+        template <bool only_allocates = false>
         inline fetch_list_t *
         fetch_list_to_device(
-            task_t * task,
             access_t * access,
             xkrt_device_global_id_t device_global_id
         ) {
@@ -1688,18 +1689,22 @@ next_view:
                 /* step (4) set the access view on the device (that will be used by the kernel) */
                 this->fetch_access_setup_replicates(access, device_global_id, search);
 
-                /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
-                this->fetch_access_setup_copies(task, access, device_global_id, search.partition);
+                if (!only_allocates)
+                {
+                    /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
+                    this->fetch_access_setup_copies(access, device_global_id, search.partition);
 
-                /* step (6) if write access, make all other replicates incoherent */
-                this->fetch_access_set_coherent(access, device_global_id, search.partition);
+                    /* step (6) if write access, make all other replicates incoherent */
+                    this->fetch_access_set_coherent(access, device_global_id, search.partition);
+                }
 
             } /* this->lock(); */
             this->unlock();
 
             /* step (7) - convert a partition to the minimum number of fetches to run */
-            if (access->mode & ACCESS_MODE_R)
-                list = this->fetch_list_from_partition(search.partition);
+            if (!only_allocates)
+                if (access->mode & ACCESS_MODE_R)
+                    list = this->fetch_list_from_partition(search.partition);
 
             return list;
         }
@@ -1707,7 +1712,6 @@ next_view:
         /** Fetch the access on the given device */
         void
         fetch(
-            task_t * task,
             access_t * access,
             xkrt_device_global_id_t device_global_id
         ) {
@@ -1730,7 +1734,7 @@ next_view:
             // long-path if targetting a device
             else
             {
-                list = this->fetch_list_to_device(task, access, device_global_id);
+                list = this->fetch_list_to_device(access, device_global_id);
             }
 
             // if there is fetch to perform, launch them
@@ -1741,9 +1745,22 @@ next_view:
                     this->fetch_list_reduce(list);
 
                 // increase task wait counter
-                __task_fetching(list->pending, task);
-                this->fetch_list_launch(task, list);
+                __task_fetching(list->pending, access->task);
+                this->fetch_list_launch(access, list);
             }
+        }
+
+        ////////////////////////
+        // ALLOCATE TO DEVICE //
+        ////////////////////////
+        void
+        allocate_to_device(
+            access_t * access,
+            xkrt_device_global_id_t device_global_id
+        ) {
+            assert(access->task == NULL);
+            assert(device_global_id != HOST_DEVICE_GLOBAL_ID);
+            this->fetch_list_to_device<true>(access, device_global_id);
         }
 
         //////////////////
@@ -1925,8 +1942,12 @@ next_view:
                         if (allocation_view->chunk == search.chunk)
                         {
                             /* move the awaiting tasks */
-                            search.awaiting.tasks.insert(search.awaiting.tasks.end(), allocation_view->awaiting.tasks.begin(), allocation_view->awaiting.tasks.end());
-                            allocation_view->awaiting.tasks.clear();
+                            search.awaiting.accesses.insert(
+                                search.awaiting.accesses.end(),
+                                allocation_view->awaiting.accesses.begin(),
+                                allocation_view->awaiting.accesses.end()
+                            );
+                            allocation_view->awaiting.accesses.clear();
 
                             /* move awaiting forwards */
                             search.awaiting.forwards.insert(

@@ -1,6 +1,6 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   cube.hpp                                                                 */
+/*   hypercube.hpp                                                            */
 /*                                                                   .-*-.    */
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
@@ -11,11 +11,11 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef __CUBE_HPP__
-# define __CUBE_HPP__
+#ifndef __HYPERCUBE_HPP__
+# define __HYPERCUBE_HPP__
 
-# include <xkrt/min-max.h>
-# include <xkrt/memory/interval.hpp>
+# include <xkrt/utils/min-max.h>
+# include <xkrt/memory/access/common/interval.hpp>
 
 # include <cassert>
 # include <cstdlib>
@@ -190,4 +190,4 @@ class KHypercube {
 
 using Hypercube = KHypercube<2>;
 
-#endif /* __CUBE_HPP__ */
+#endif /* __HYPERCUBE_HPP__ */

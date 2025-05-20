@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:00:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 21:43:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,8 +13,8 @@
 
 # include <xkrt/runtime.h>
 # include <xkrt/memory/alignedas.h>
-# include <xkrt/memory/memory-tree.hpp>
-# include <xkrt/task/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/region/memory-tree.hpp>
+# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 
 using fetch_list_t = KMemoryTree<2>::fetch_list_t;
 using fetch_t      = KMemoryTree<2>::fetch_t;
@@ -93,9 +93,10 @@ xkrt_coherency_host_async(
 
     /* create an access, and retrieve all dependency tree nodes that are in conflict */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_R);
-    DependencyTree * deptree = (DependencyTree *) task_get_dependency_domain(thread->current_task, &access);
+    DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
+
     std::vector<void *> conflicts;
-    deptree->conflicting(&conflicts, &access);
+    ((DependencyTree *) domain)->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
@@ -146,7 +147,7 @@ xkrt_coherency_host_async(
             if (!h.is_empty())
             {
                 new (accesses + 0) access_t(task, MATRIX_COLMAJOR, h, access.host_view.ld, access.host_view.sizeof_type, ACCESS_MODE_R);
-                deptree->precedence(write, accesses + 0);
+                __access_precedes(write, accesses + 0);
                 found = true;
                 break ;
             }
@@ -155,7 +156,7 @@ xkrt_coherency_host_async(
         assert(found);
 
         // insert for future tasks dependencies
-        deptree->insert<AC>(accesses);
+        domain->put<AC>(accesses);
 
         // commit the task
         runtime->task_commit(task);
@@ -164,5 +165,27 @@ xkrt_coherency_host_async(
     # undef AC
 
     # endif /* single copy vs one per partite */
+}
 
+/* Allocate incoherent memory replicates onto the passed device */
+extern "C"
+void
+xkrt_coherency_allocate_2D(
+    xkrt_runtime_t * runtime,
+    xkrt_device_global_id_t device_global_id,
+    matrix_order_t order,
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    LOGGER_DEBUG("`xkrt_memory_map_alloc` to device %u", device_global_id);
+
+    xkrt_thread_t * thread = xkrt_thread_t::get_tls();
+    assert(thread);
+    assert(thread->current_task);
+
+    /* create an access to insert in the memory tree */
+    access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_V);
+    MemoryTree * memtree = (MemoryTree *) task_get_memory_controller(runtime, thread->current_task, &access);
+    memtree->allocate_to_device(&access, device_global_id);
 }

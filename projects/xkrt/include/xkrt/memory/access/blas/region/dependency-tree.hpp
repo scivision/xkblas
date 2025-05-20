@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/01 21:45:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/11 22:17:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,8 +18,8 @@
 # define KHP_TREE_CUT_ON_INSERT     0
 # define KHP_TREE_MAINTAIN_SIZE     0
 # define KHP_TREE_MAINTAIN_HEIGHT   0
-# include <xkrt/memory/khp-tree.hpp>
-# include <xkrt/task/dependency-domain.hpp>
+# include <xkrt/memory/access/common/khp-tree.hpp>
+# include <xkrt/memory/access/dependency-domain.hpp>
 # include <xkrt/task/task.hpp>
 
 # include <vector>
@@ -49,6 +49,7 @@ class KDependencyTreeSearch
         ~KDependencyTreeSearch() {}
 
     public:
+
         void
         prepare_resolve(access_t * access)
         {
@@ -170,10 +171,9 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
     using Hypercube = KHypercube<K>;
 
     public:
-    using Node     = KDependencyTreeNode<K>;
-    using NodeBase = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
-
-        using Search = KDependencyTreeSearch<K>;
+        using Node      = KDependencyTreeNode<K>;
+        using NodeBase  = typename Base::Node;
+        using Search    = KDependencyTreeSearch<K>;
 
         /* alignment is ld.sizeof_type */
         KDependencyTree(const size_t ld, const size_t sizeof_type) :
@@ -274,26 +274,6 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
             return (search.access->mode == ACCESS_MODE_R) && (node->nwrites == 0);
         }
 
-        static inline void
-        __access_precedes(access_t * pred, access_t * succ)
-        {
-            pred->successors.push_back(succ);
-        }
-
-        static inline void
-        precedence(access_t * pred, access_t * succ)
-        {
-            // succ must be a dependent task and have a wc != 0 at that point
-            assert((succ->task->flags & TASK_FLAG_DEPENDENT) && TASK_DEP_INFO(succ->task)->wc > 0);
-
-            // avoid redundant edges
-            if (pred->successors.size() && pred->successors.back()->task == succ->task)
-                return ;
-
-            // set edge
-            __task_precedes(pred->task, succ->task, __access_precedes, pred, succ);
-        }
-
         inline void
         on_intersect(
             NodeBase * nodebase,
@@ -312,9 +292,9 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
                 {
                     if ((search.access->mode & ACCESS_MODE_W) && node->last_reads.size())
                         for (access_t * pred : node->last_reads)
-                            precedence(pred, search.access);
+                            __access_precedes(pred, search.access);
                     else if (node->last_write)
-                        precedence(node->last_write, search.access);
+                        __access_precedes(node->last_write, search.access);
 
                     break ;
                 }
@@ -338,52 +318,26 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
             }
         }
 
-        template<int AC>
-        inline void
-        intersect(access_t * accesses)
+        void
+        link(access_t * access)
         {
+            assert(this->can_resolve(access));
+
             Search search;
-            for (int i = 0 ; i < AC ; ++i)
-            {
-                access_t * access = accesses + i;
-                assert(this->can_resolve(access));
-
-                search.prepare_resolve(access);
-                Base::intersect(search, access->hypercubes[0]);
-                Base::intersect(search, access->hypercubes[1]);
-            }
-        }
-
-        template<int AC>
-        inline void
-        insert(access_t * accesses)
-        {
-            Search search;
-            for (int i = 0 ; i < AC ; ++i)
-            {
-                access_t * access = accesses + i;
-
-                search.prepare_resolve(access);
-                Base::insert(search, access->hypercubes[0]);
-                Base::insert(search, access->hypercubes[1]);
-            }
-        }
-
-        template<int AC>
-        inline void
-        resolve(access_t * accesses)
-        {
-            # pragma message(TODO "If we semantically force a accesses region to be disjointed, then these 2 loops can be merged with no risks of dependency cycle")
-            this->intersect<AC>(accesses);
-            this->insert<AC>(accesses);
+            search.prepare_resolve(access);
+            Base::intersect(search, access->hypercubes[0]);
+            Base::intersect(search, access->hypercubes[1]);
         }
 
         void
-        resolve(access_t * access, int naccesses)
+        put(access_t * access)
         {
-            (void) access;
-            (void) naccesses;
-            LOGGER_FATAL("not implemented");
+            assert(this->can_resolve(access));
+
+            Search search;
+            search.prepare_resolve(access);
+            Base::insert(search, access->hypercubes[0]);
+            Base::insert(search, access->hypercubes[1]);
         }
 
         bool

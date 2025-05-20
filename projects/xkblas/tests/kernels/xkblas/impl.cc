@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:57:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:43:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,7 +41,7 @@ impl_t::deinit(void)
     xkblas_finalize();
 }
 
-/* allocate host memory */
+/* allocate and pin host memory */
 uintptr_t
 impl_t::alloc(size_t size)
 {
@@ -56,6 +56,20 @@ impl_t::alloc(size_t size)
     LOGGER_FATAL("Wtf");
     # endif
     # endif
+}
+
+/* spawn a register task */
+void
+impl_t::pin_async(void * ptr, size_t size)
+{
+    xkblas_register_memory_async(ptr, size);
+}
+
+/* wait previous pin tasks */
+void
+impl_t::pin_wait(void)
+{
+    xkblas_register_memory_waitall();
 }
 
 /* wait for kernels completion */
@@ -200,7 +214,20 @@ impl_t::replicate(
     int m, int n,
     int ld
 ) {
-    // xkblas_replicate_async(M, ld, m, n, sizeof(TYPE));
+    # if XKBLAS_2_0
+    xkblas_memory_replicate_async(M, ld, m, n, sizeof(TYPE));
+    # endif /* XKBLAS_2_0 */
+}
+
+void
+impl_t::preallocate(
+    TYPE * M,
+    int m, int n,
+    int ld
+) {
+    # if XKBLAS_2_0
+    xkblas_memory_preallocate(M, ld, m, n, sizeof(TYPE));
+    # endif /* XKBLAS_2_0 */
 }
 
 void

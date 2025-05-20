@@ -45,6 +45,12 @@ typedef struct  xkrt_driver_t
     /* type */
     xkrt_driver_type_t type;
 
+    /* driver team */
+    xkrt_team_t team;
+
+    /* a barrier to synchronize all threads of the team and the main thread */
+    pthread_barrier_t barrier;
+
     /* devices */
     xkrt_device_t * devices[XKRT_DEVICES_MAX];
 
@@ -166,12 +172,6 @@ typedef struct  xkrt_drivers_t
     xkrt_driver_t * list[XKRT_DRIVER_TYPE_MAX];
 
     struct {
-
-        /* devices team */
-        xkrt_team_t team;
-
-        /* a barrier to synchronize all threads of the team and the main thread */
-        pthread_barrier_t barrier;
 
         /* list of devices */
         xkrt_device_t * list[XKRT_DEVICES_MAX];

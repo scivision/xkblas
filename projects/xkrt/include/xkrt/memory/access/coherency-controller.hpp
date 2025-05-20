@@ -15,17 +15,13 @@
 # define __COHERENCY_CONTROLLER_HPP__
 
 # include <xkrt/consts.h>
-# include <xkrt/memory/access.hpp>
-# if 0
-# include <xkrt/task/task.hpp>          // this should gtfo
-# endif
+# include <xkrt/memory/access/access.hpp>
 
-template<int K>
-class KMemoryCoherencyController {
+class MemoryCoherencyController {
 
     public:
 
-        virtual ~KMemoryCoherencyController() {}
+        virtual ~MemoryCoherencyController() {}
 
         /* returns a bitfield of devices that owns the most bytes of the given access */
         virtual xkrt_device_global_id_bitfield_t who_owns(access_t * access) = 0;
@@ -33,12 +29,11 @@ class KMemoryCoherencyController {
         /** all replicates must be invalidated */
         virtual void invalidate(void) = 0;
 
-    # if 0
         /* fetch the given access on the given device */
-        virtual void fetch(task_t * task, access_t * access, xkrt_device_global_id_t device_global_id) = 0;
-    # endif
-};
+        virtual void fetch(access_t * access, xkrt_device_global_id_t device_global_id) = 0;
 
-using MemoryCoherencyController = KMemoryCoherencyController<2>;
+        /* return true if that memory coherency controller can resolve that access */
+        virtual bool can_resolve(const access_t * access) const = 0;
+};
 
 #endif /* __MEMORY_TREE_HPP__ */

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 17:42:39 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:51:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,8 +17,8 @@
 # include <xkrt/conf/conf.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/thread/thread.h>
-# include <xkrt/memory/coherency-controller.hpp>
-# include <xkrt/memory/router-affinity.hpp>
+# include <xkrt/memory/access/coherency-controller.hpp>
+# include <xkrt/memory/routing/router-affinity.hpp>
 # include <xkrt/stats/stats.h>
 # include <xkrt/sync/spinlock.h>
 # include <xkrt/task/task.hpp>
@@ -38,6 +38,10 @@ typedef struct  xkrt_runtime_t
 
     /* driver list */
     xkrt_drivers_t drivers;
+
+    /* the team of thread that register memory (only 1 thread, nvidia driver
+     * serializes register requests anyway... */
+    xkrt_team_t register_team;
 
     /* task formats */
     struct {
@@ -142,7 +146,7 @@ typedef struct  xkrt_runtime_t
     /* schedule a ready task, and return 1 if one task was found, 0 otherwise */
     int task_schedule(void);
 
-    /* spawn a host task that executes the passed function */
+    /* spawn a task in the currently executing thread team */
     void task_spawn(const std::function<void(task_t*)> & f);
 
     ///////////////
@@ -173,6 +177,9 @@ typedef struct  xkrt_runtime_t
 
     /* blocking parallel_for region */
     void team_parallel_for(xkrt_team_t * team, xkrt_team_parallel_for_func_t func);
+
+    /* spawn a task in the passed team */
+    void team_task_spawn(xkrt_team_t * team, const std::function<void(task_t*)> & f);
 
     ////////////
     // ENERGY //

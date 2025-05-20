@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 15:26:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 20:48:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -427,7 +427,17 @@ XKRT_DRIVER_ENTRYPOINT(memory_host_register)(
     void * ptr,
     uint64_t size
 ) {
+    // if no context is set, set context '0'
+    CUcontext ctx;
+    CU_SAFE_CALL(cuCtxGetCurrent(&ctx));
+    if (ctx == NULL)
+        cu_set_context(0);
+
+    // even though we are using `CU_MEMHOSTREGISTER_PORTABLE` - which should
+    // pin across all contextes, it seems Cuda Driver requires the current
+    // thread to be bound to some context
     CU_SAFE_CALL(cuMemHostRegister(ptr, size, CU_MEMHOSTREGISTER_PORTABLE));
+
     return 0;
 }
 

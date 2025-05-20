@@ -5,13 +5,13 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:29:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/15 21:49:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/min-max.h>
+# include <xkrt/utils/min-max.h>
 # include <xkrt/conf/conf.h>
 # include <xkrt/logger/logger.h>
 
@@ -117,6 +117,10 @@ static void
 __parse_nthreads_per_device(xkrt_conf_t * conf, char const * value)
 {
     if (value)
+        LOGGER_FATAL("deprecated, use `XKRT_DRIVERS`");
+
+    # if 0
+    if (value)
         conf->device.offloader.nthreads_per_device = (uint8_t) atoi(value);
 
     if (conf->device.offloader.nthreads_per_device < 1)
@@ -130,6 +134,7 @@ __parse_nthreads_per_device(xkrt_conf_t * conf, char const * value)
         conf->device.offloader.nthreads_per_device = XKRT_MAX_THREADS_PER_DEVICE;
         LOGGER_WARN("Requested too many threads per device, increase `XKRT_MAX_THREADS_PER_DEVICE` and recompile if you want more threads per device");
     }
+    # endif
 }
 
 static void
@@ -148,7 +153,32 @@ __parse_p2p(xkrt_conf_t * conf, char const * value)
 static void
 __parse_drivers(xkrt_conf_t * conf, char const * value)
 {
-    conf->drivers_mask = value ? atoi(value) : ~0;
+    if (value)
+    {
+        char * driver_list = strdup(value);             // make a modifiable copy
+        char * driver_save;
+        char * driver = strtok_r(driver_list, ";", &driver_save);
+        while (driver)
+        {
+            char * driver_name_save;
+            char * driver_name  = strtok_r(driver, ",", &driver_name_save);
+            assert(driver_name);
+
+            char * nthreads_str = strtok_r(NULL, ",", &driver_name_save);
+            assert(nthreads_str);
+
+            int nthreads = atoi(nthreads_str);
+            assert(nthreads);
+
+            xkrt_driver_type_t driver_type = xkrt_driver_type_from_name(driver_name);
+            if (driver_type == XKRT_DRIVER_TYPE_MAX)
+                LOGGER_FATAL("Invalid `XKRT_DRIVERS`");
+            conf->drivers.list[driver_type].nthreads_per_device = nthreads;
+
+            driver = strtok_r(NULL, ";", &driver_save);
+        }
+        free(driver_list);
+    }
 }
 
 void __parse_help(xkrt_conf_t * conf, char const * value);
@@ -183,7 +213,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
     {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
-    {"XKRT_DRIVERS",              __parse_drivers,             "A bitmask to set enabled drivers"},
+    {"XKRT_DRIVERS",              __parse_drivers,             "Exemple: 'cuda,4;hip,2;host,3' - will enable drivers cuda, hip and host respectively with 4, 2, and 3 threads per device."},
     {"XKRT_USE_P2P",              __parse_p2p,                 "Boolean to enable/disable the use of p2p transfers"},
     {NULL,                       NULL,                         NULL}
 };
@@ -211,10 +241,20 @@ xkrt_init_conf(xkrt_conf_t * conf)
     conf->merge_transfers           = false;
 
     //////////////////
+    // drivers conf //
+    //////////////////
+
+    for (int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+    {
+        conf->drivers.list[i].nthreads_per_device = 1;
+        conf->drivers.list[i].used = 1;
+    }
+    conf->drivers.list[XKRT_DRIVER_TYPE_HOST].nthreads_per_device = 4;
+
+    //////////////////
     //  KERNEL CONF //
     //////////////////
     conf->device.offloader.capacity = 512;
-    conf->device.offloader.nthreads_per_device = 1;
 
     // set to -1 so the driver's stream-suggest API fills these values if not
     // set by an env variable
