@@ -382,7 +382,7 @@ alloc_device_run_fragmented(xkrt_team_t * team, xkrt_thread_t * thread)
         if constexpr(mode == RUNTIME)
             ptr = device->memory_allocate_on(size, memory_index);
         else if constexpr(mode == DRIVER)
-            ptr = driver->f_memory_device_allocate(device_global_id, size, memory_index);
+            ptr = driver->f_memory_device_allocate(device->driver_id, size, memory_index);
         uint64_t tf = xkrt_get_nanotime();
         time_alloc += (tf - t0);
         if (ptr == NULL)
@@ -401,7 +401,7 @@ alloc_device_run_fragmented(xkrt_team_t * team, xkrt_thread_t * thread)
             if constexpr(mode == RUNTIME)
                 device->memory_deallocate_on((xkrt_area_chunk_t *) ptr, memory_index);
             else if constexpr(mode == DRIVER)
-                driver->f_memory_device_deallocate(device_global_id, chunk.ptr, chunk.size, memory_index);
+                driver->f_memory_device_deallocate(device->driver_id, chunk.ptr, chunk.size, memory_index);
             uint64_t tf = xkrt_get_nanotime();
             time_free += (tf - t0);
             ++nfree;
@@ -411,7 +411,7 @@ alloc_device_run_fragmented(xkrt_team_t * team, xkrt_thread_t * thread)
 
     if constexpr(mode == DRIVER)
         for (auto & chunk : chunks)
-            driver->f_memory_device_deallocate(device_global_id, chunk.ptr, chunk.size, memory_index);
+            driver->f_memory_device_deallocate(device->driver_id, chunk.ptr, chunk.size, memory_index);
     device->memory_reset_on(memory_index);
 
     char b1[32], b2[32], b3[32], b4[32];
@@ -435,8 +435,8 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
-    time_array_t time_alloc(30, 5);
-    time_array_t time_dealloc(30, 5);
+    time_array_t time_alloc(30, 1000);
+    time_array_t time_dealloc(30, 1000);
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
@@ -461,7 +461,7 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
                     if constexpr(mode == RUNTIME)
                         ptr = runtime.memory_device_allocate(device_global_id, size);
                     else if constexpr(mode == DRIVER)
-                        ptr = driver->f_memory_device_allocate(device_global_id, size, memory_index);
+                        ptr = driver->f_memory_device_allocate(device->driver_id, size, memory_index);
 
                     if (ptr == NULL)
                         break ;
@@ -479,7 +479,7 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
                     if constexpr(mode == RUNTIME)
                         runtime.memory_device_deallocate(device_global_id, (xkrt_area_chunk_t *) ptr);
                     else if constexpr(mode == DRIVER)
-                        driver->f_memory_device_deallocate(device_global_id, ptr, size, memory_index);
+                        driver->f_memory_device_deallocate(device->driver_id, ptr, size, memory_index);
                 }
                 uint64_t tf = xkrt_get_nanotime();
                 time_dealloc.set(i, iter, tf - t0);
@@ -539,8 +539,8 @@ alloc_host_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
-    time_array_t time_alloc(34, 5);
-    time_array_t time_dealloc(34, 5);
+    time_array_t time_alloc(34, 1000);
+    time_array_t time_dealloc(34, 1000);
 
     runtime.team_critical_begin(team);
     for (int iter = 0 ; iter < time_alloc.niters ; ++iter)
@@ -628,7 +628,7 @@ static void *
 alloc_parallel_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = thread->device_global_id;
-    time_array_t time_alloc(34, 5);
+    time_array_t time_alloc(34, 100);
 
     uint64_t t0, tf;
 
