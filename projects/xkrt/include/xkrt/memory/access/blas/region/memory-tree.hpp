@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:30:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/20 14:36:46 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -154,7 +154,7 @@ class KMemoryReplicateAllocationView {
 
 }; /* MemoryReplicateAllocationView */
 
-// if this assertion, many bitwise operation in the runtime will be wrong as
+// if this assertion fails, many bitwise operation in the runtime will be wrong as
 // they are implicitly done on int32 : (1 << device_global_id) will be an int -
 // should update the runtime with (1UL << device_global_id) - maybe use a macro
 // for 'one' depending on that size
@@ -1046,7 +1046,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         fetch_list_to_host_setup_partition(Partition & partition)
         {
             assert(this->is_locked());
-            const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << HOST_DEVICE_GLOBAL_ID);
+            const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << HOST_DEVICE_GLOBAL_ID);
 
             /* launch fetch on each device */
             for (Partite & partite : partition.partites)
@@ -1167,7 +1167,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
                 MemoryBlock & block = node->block;
 
-                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
+                const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << device_global_id);
 
                 const bool coherent_on_any_device        = block.coherency != 0;
                 const bool coherent_on_device            = block.coherency &  devbit;
@@ -1204,7 +1204,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                     replicate.coherency     = 0;
                     assert(replicate.fetching == 0);
 
-                    block.coherency &= (memory_allocation_view_id_bitfield_t) ~devbit;
+                    block.coherency &= (xkrt_device_global_id_bitfield_t) ~devbit;
 
                     stop = freed >= 16*size;
                     // stop = false;
@@ -1288,7 +1288,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 const uintptr_t begin_addr = chunk->ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
-                const uint8_t allocation_view_id = replicate.nallocations++;
+                const memory_allocation_view_id_t allocation_view_id = replicate.nallocations++;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     LOGGER_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile");
 
@@ -1307,7 +1307,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         ) {
             assert(this->is_locked());
 
-            uint8_t j = 0;
+            memory_allocation_view_id_t j = 0;
             int nallocations = partition.partites[0].block->replicates[device_global_id].nallocations;
             size_t nblocks = partition.partites.size();
 
@@ -1322,7 +1322,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 {
                     /* for each allocation of other blocks */
                     int nallocations = partition.partites[i].block->replicates[device_global_id].nallocations;
-                    for (uint8_t k = 0 ; k < nallocations ; ++k)
+                    for (memory_allocation_view_id_t k = 0 ; k < nallocations ; ++k)
                     {
                         /* this block has a view with the same allocation, check next block */
                         MemoryReplicateAllocationView * rk = partition.partites[i].block->replicates[device_global_id].allocations[k];
@@ -1569,7 +1569,7 @@ next_view:
             /* if access has a write mode, make all copies incoherent */
             if (access->mode & ACCESS_MODE_W)
             {
-                const memory_allocation_view_id_bitfield_t devbit = (memory_allocation_view_id_bitfield_t) (1 << device_global_id);
+                const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << device_global_id);
                 for (Partite & partite : partition.partites)
                 {
                     const memory_allocation_view_id_bitfield_t allocbit = (memory_allocation_view_id_bitfield_t) (1 << partite.dst_allocation_view_id);
