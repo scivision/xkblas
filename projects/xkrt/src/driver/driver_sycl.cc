@@ -347,13 +347,14 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2H_1D):
         case (XKRT_STREAM_INSTR_TYPE_COPY_D2D_1D):
         {
+            void * src = (void *) instr->copy.D1.src_device_addr;
+            void * dst = (void *) instr->copy.D1.dst_device_addr;
             const size_t count  = instr->copy.D1.size;
             assert(count > 0);
 
-            void * src = (void *) instr->copy.D1.src_device_addr;
-            void * dst = (void *) instr->copy.D1.dst_device_addr;
             sycl::event evt = q.memcpy(dst, src, count);
             new (e) sycl::event(evt);
+
             return EINPROGRESS;
         }
 
@@ -384,10 +385,6 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
                 LOGGER_FATAL("QUEUE IS NON-IMMEDIATE, fuck that");
             }
 
-            // create a ze event
-            new (e) sycl::event();
-            ze_event_handle_t event = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(*e);
-
             const uint32_t dst_slice_pitch = 0;
             const ze_copy_region_t dst_region = {
                 .originX = 0,
@@ -410,6 +407,11 @@ XKRT_DRIVER_ENTRYPOINT(stream_instruction_launch)(
 
             const uint32_t num_wait_events = 0;
             ze_event_handle_t * wait_events = NULL;
+
+            // create a ze event
+            new (e) sycl::event();
+            ze_event_handle_t event = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(*e);
+            ZE_SAFE_CALL(zeEventHostReset(event));
 
             ZE_SAFE_CALL(
                 zeCommandListAppendMemoryCopyRegion(
