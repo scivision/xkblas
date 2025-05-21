@@ -913,6 +913,9 @@ XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * pt
     if (ptr)
     {
         xkrt_device_ze_t * device = device_ze_get(device_driver_id);
+
+        // from level zero spec:
+        //  The application may free the memory without evicting; the memory is implicitly evicted when freed.
         ZE_SAFE_CALL(zeMemFree(device->ze.context, ptr));
     }
 }

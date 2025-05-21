@@ -155,7 +155,7 @@ cmdlist_run(benchmark_node_t * node)
     //  do 100 iterations
     constexpr int n = immediate == IMMEDIATE ? 1 : 8;
     constexpr int warmup = 10;
-    time_array_t time(n, 100);
+    time_array_t time(n, 1000);
 
     // event pool
    const ze_event_pool_desc_t pool_desc = {
