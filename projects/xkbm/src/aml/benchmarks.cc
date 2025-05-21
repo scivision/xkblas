@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 20:35:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 03:39:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/21 19:35:10 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -13,7 +13,6 @@
 
 # include <xkbm/allocator.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/topology.h>
 # include <xkbm/time.h>
 # include <xkbm/combinator.h>
 # include <xkbm/pp.h>

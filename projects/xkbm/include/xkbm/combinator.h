@@ -1,6 +1,7 @@
 # ifndef __COMBINATOR_H__
 #  define __COMBINATOR_H__
 
+# include <assert.h>
 # include <initializer_list>
 # include <algorithm>
 # include <vector>

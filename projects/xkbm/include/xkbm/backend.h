@@ -12,6 +12,4 @@ typedef struct  backend_s
     void (*deinit)(void);
 }               backend_t;
 
-extern backend_t backends[];
-
 # endif /* __BACKEND_H__ */

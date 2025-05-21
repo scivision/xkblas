@@ -1,0 +1,16 @@
+#ifndef __XKBM_SUPPORT_H__
+# define __XKBM_SUPPORT_H__
+
+/* If the runtime was compiled with AML support */
+# define XKBM_SUPPORT_AML   @USE_AML@
+
+/* If the runtime was compiled with Nvidia's CUDA support */
+# define XKBM_SUPPORT_CUDA  @USE_CUDA@
+
+/* If the runtime was compiled with XKRT support */
+# define XKBM_SUPPORT_XKRT  @USE_XKRT@
+
+/* If the runtime was compiled with Intel's Level Zero support */
+# define XKBM_SUPPORT_ZE    @USE_ZE@
+
+#endif /* __XKBM_SUPPORT_H__ */

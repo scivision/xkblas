@@ -20,25 +20,44 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ###########
 
 option(ENABLE_HEAVY_DEBUG "Heavy assertion tests in the khp-tree structure, setting this variable to 'ON' will considerably slowdown task insertion, but can help debugging the khp-trees" OFF)
-option(USE_STATS "Whether to compile the built-in stat system." OFF)
-option(USE_CUDA "Whether to build the CUDA driver." OFF)
-option(USE_HIP "Whether to build the HIP driver." OFF)
-option(USE_ZE "Whether to build the Level Zero driver." OFF)
+option(STRICT       "Enable strict compilation mode" ON)
+option(USE_CAIRO    "Use Cairo to generate images (memory-tree debugging purposes mostly)." OFF)
+option(USE_CL       "Whether to build the OpenCL driver." OFF)
+option(USE_CUDA     "Whether to build the CUDA driver." OFF)
+option(USE_HIP      "Whether to build the HIP driver." OFF)
+option(USE_NVML     "Use Nvidia's NVML management library." OFF)
+option(USE_RSMI     "Use AMD's RSMI management library." OFF)
+option(USE_STATS    "Whether to compile the built-in stat system." OFF)
+option(USE_SYCL     "Whether to build the SYCL driver." OFF)
+option(USE_ZE       "Whether to build the Level Zero driver." OFF)
+option(USE_ZES      "Use Intel's ZES management library." OFF)
 option(USE_ZE_SYCL_INTEROP "Enable the compilation of SYCL interop with Level Zero driver" OFF)
-option(USE_SYCL "Whether to build the SYCL driver." OFF)
-option(USE_CL "Whether to build the OpenCL driver." OFF)
-option(USE_CAIRO "Use Cairo to generate images (memory-tree debugging purposes mostly)." OFF)
-option(USE_NVML "Use Nvidia's NVML management library." OFF)
-option(USE_ZES "Use Intel's ZES management library." OFF)
-option(USE_RSMI "Use AMD's RSMI management library." OFF)
-option(STRICT "Enable strict compilation mode" ON)
+
+include(BooleanUtils)
+convert_bool(ENABLE_HEAVY_DEBUG)
+convert_bool(STRICT)
+convert_bool(USE_CAIRO)
+convert_bool(USE_CL)
+convert_bool(USE_CUDA)
+convert_bool(USE_HIP)
+convert_bool(USE_NVML)
+convert_bool(USE_RSMI)
+convert_bool(USE_STATS)
+convert_bool(USE_SYCL)
+convert_bool(USE_ZE)
+convert_bool(USE_ZES)
+convert_bool(USE_ZE_SYCL_INTEROP)
+
+configure_file(
+    ${CMAKE_SOURCE_DIR}/include/xkrt/support.h.in
+    ${CMAKE_SOURCE_DIR}/include/xkrt/support.h
+)
 
 # XKRT version and supports
 add_custom_command(
     OUTPUT  always-run
     COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/version.py ${CMAKE_SOURCE_DIR}/include/xkrt version
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/../utils/support.py ${CMAKE_SOURCE_DIR}/include/xkrt support ${USE_CUDA} ${USE_ZE} ${USE_SYCL} ${USE_CL} ${USE_STATS} ${USE_CAIRO} ${USE_NVML} ${USE_ZES} ${USE_RSMI} ${ENABLE_HEAVY_DEBUG} ${USE_ZE_SYCL_INTEROP} ${USE_HIP}
-    COMMENT "Always generate version/support file before building the project"
+    COMMENT "Always generate version file before building the project"
 )
 add_custom_target(always_generate_files ALL DEPENDS always-run)
 

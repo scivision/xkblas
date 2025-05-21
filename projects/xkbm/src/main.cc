@@ -1,10 +1,8 @@
 # include <xkbm/backend.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/topology.h>
+# include <xkbm/support.h>
 
 # include <xkrt/logger/logger.h>
-
-hwloc_topology_t TOPOLOGY;
 
 ////////////////
 // BENCHMARKS //
@@ -13,8 +11,6 @@ hwloc_topology_t TOPOLOGY;
 void  cuda_benchmark_init(void);
 void  cuda_benchmark_deinit(void);
 void  cuda_benchmark_push(benchmark_node_t *);
-
-void hwloc_benchmark_push(benchmark_node_t *);
 
 void   aml_benchmark_init(void);
 void   aml_benchmark_deinit(void);
@@ -28,12 +24,23 @@ void  xkrt_benchmark_init(void);
 void  xkrt_benchmark_deinit(void);
 void  xkrt_benchmark_push(benchmark_node_t *);
 
-backend_t backends[] = {
- // {"AML",     0                 , aml_benchmark_push  , aml_benchmark_init,  aml_benchmark_deinit     },
+static backend_t backends[] =
+{
+    # if XKBM_SUPPORT_AML
+    {"AML",     1                 , aml_benchmark_push  , aml_benchmark_init,  aml_benchmark_deinit     },
+    # endif /* XKBM_SUPPORT_AML */
+
+    # if XKBM_SUPPORT_XKRT
     {"XKRT",    1                 , xkrt_benchmark_push , xkrt_benchmark_init, xkrt_benchmark_deinit    },
-  //{"CUDA",    XKRT_SUPPORT_CUDA ,  cuda_benchmark_push, NULL               , NULL                     },
-  //  {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
-  //{"HWLOC",   1,                , hwloc_benchmark_push, NULL               , NULL                     },
+    # endif /* XKBM_SUPPORT_XKRT */
+
+    # if XKBM_SUPPORT_CUDA
+    {"CUDA",    XKRT_SUPPORT_CUDA ,  cuda_benchmark_push, NULL               , NULL                     },
+    # endif /* XKBM_SUPPORT_CUDA */
+
+    # if XKBM_SUPPORT_ZE
+    {"ZE",      1                 , ze_benchmark_push   , ze_benchmark_init  , ze_benchmark_deinit      },
+    # endif /* XKBM_SUPPORT_ZE */
 };
 
 benchmark_node_t xkbm = {
@@ -155,9 +162,6 @@ main(void)
     }
     LOGGER_INFO("----------------------------------");
 
-    HWLOC_SAFE_CALL(hwloc_topology_init(&TOPOLOGY));
-    HWLOC_SAFE_CALL(hwloc_topology_load( TOPOLOGY));
-
     // init
     for (unsigned int i = 0 ; i < sizeof(backends) / sizeof(backend_t) ; ++i)
     {
@@ -180,8 +184,6 @@ main(void)
         if (backend->enabled && backend->deinit)
             backend->deinit();
     }
-
-    hwloc_topology_destroy(TOPOLOGY);
 
     return 0;
 }

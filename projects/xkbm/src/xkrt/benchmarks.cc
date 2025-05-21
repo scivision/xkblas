@@ -2,7 +2,6 @@
 
 # include <xkbm/allocator.h>
 # include <xkbm/benchmark.h>
-# include <xkbm/topology.h>
 # include <xkbm/time.h>
 # include <xkbm/pp.h>
 
@@ -75,7 +74,7 @@ foreach_core(benchmark_node_t * bench)
 // kernel launch latency //
 ///////////////////////////
 
-# if XKRT_SUPPORT_CUDA
+# if XKRT_SUPPORT_CUDA && XKBM_SUPPORT_CUDA
 #  include <cuda.h>
 #  include <xkrt/logger/logger-cu.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -95,7 +94,7 @@ static xkrt_driver_module_fn_t XKBM_CU_KERNEL_EMPTY[XKRT_DEVICES_MAX];
 
 # endif
 
-# if XKRT_SUPPORT_ZE
+# if XKRT_SUPPORT_ZE && XKBM_SUPPORT_ZE
 #  include <xkrt/logger/logger-ze.h>
 #  include <xkrt/driver/driver-ze.h>
 
@@ -146,7 +145,7 @@ launch(
 
     switch (device->driver_type)
     {
-        # if XKRT_SUPPORT_CUDA
+        # if XKRT_SUPPORT_CUDA && XKBM_SUPPORT_CUDA
         case (XKRT_DRIVER_TYPE_CUDA):
         {
             xkrt_stream_cu_t * stream = (xkrt_stream_cu_t *) istream;
@@ -173,7 +172,7 @@ launch(
         }
         # endif
 
-        # if XKRT_SUPPORT_ZE
+        # if XKRT_SUPPORT_ZE && XKBM_SUPPORT_ZE
         case (XKRT_DRIVER_TYPE_ZE):
         {
             xkrt_stream_ze_t * stream = (xkrt_stream_ze_t *) istream;
@@ -275,7 +274,18 @@ kernel_launch_latency_init(void)
 
                 switch (driver_type)
                 {
-                    # if XKRT_SUPPORT_ZE
+                    # if XKRT_SUPPORT_CUDA && XKBM_SUPPORT_CUDA
+                    case (XKRT_DRIVER_TYPE_CUDA):
+                    {
+                        bin  = (uint8_t *) PTX_EMPTY_KERNEL;
+                        size = sizeof(PTX_EMPTY_KERNEL);
+                        dst  = XKBM_CU_KERNEL_EMPTY + device_driver_id;
+                        format = XKRT_DRIVER_MODULE_FORMAT_NATIVE;
+                        break ;
+                    }
+                    # endif /* XKRT_SUPPORT_CUDA */
+
+                    # if XKRT_SUPPORT_ZE && XKBM_SUPPORT_ZE
                     case (XKRT_DRIVER_TYPE_ZE):
                     {
                         # if 0
@@ -291,17 +301,6 @@ kernel_launch_latency_init(void)
                         break ;
                     }
                     # endif /* XKRT_SUPPORT_ZE */
-
-                    # if XKRT_SUPPORT_CUDA
-                    case (XKRT_DRIVER_TYPE_CUDA):
-                    {
-                        bin  = (uint8_t *) PTX_EMPTY_KERNEL;
-                        size = sizeof(PTX_EMPTY_KERNEL);
-                        dst  = XKBM_CU_KERNEL_EMPTY + device_driver_id;
-                        format = XKRT_DRIVER_MODULE_FORMAT_NATIVE;
-                        break ;
-                    }
-                    # endif /* XKRT_SUPPORT_CUDA */
 
                     default:
                     {
