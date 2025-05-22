@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 20:48:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 02:21:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -295,25 +295,91 @@ XKRT_DRIVER_ENTRYPOINT(device_init)(int device_driver_id)
     CU_SAFE_CALL(cuDeviceTotalMem(&device->cu.prop.mem_total, device->cu.device));
 }
 
+# define USE_MMAP_EXPLICITLY 0
+
+# if USE_MMAP_EXPLICITLY
+static inline void
+get_prop_and_size(
+    int device_driver_id,
+    const size_t size,
+    CUmemAllocationProp * prop,
+    size_t * actualsize
+) {
+    prop->type = CU_MEM_ALLOCATION_TYPE_PINNED;
+    prop->requestedHandleTypes = CU_MEM_HANDLE_TYPE_NONE;
+    prop->location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    prop->location.id = device_driver_id;
+    prop->win32HandleMetaData = NULL;
+    prop->allocFlags.compressionType = CU_MEM_ACCESS_FLAGS_PROT_NONE;
+    prop->allocFlags.gpuDirectRDMACapable = 0;
+    prop->allocFlags.usage = 0;
+    prop->allocFlags.reserved[0] = 0;
+    prop->allocFlags.reserved[1] = 0;
+    prop->allocFlags.reserved[2] = 0;
+    prop->allocFlags.reserved[3] = 0;
+
+    size_t granularity;
+    CU_SAFE_CALL(cuMemGetAllocationGranularity(
+                &granularity, prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM));
+    *actualsize = (size + granularity - 1) & ~(granularity - 1);
+}
+# endif /* USE_MMAP_EXPLICITLY */
+
 static void *
-XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(int device_driver_id, const size_t size, int area_idx)
-{
+XKRT_DRIVER_ENTRYPOINT(memory_device_allocate)(
+    int device_driver_id,
+    const size_t size,
+    int area_idx
+) {
     assert(area_idx == 0);
 
-    cu_set_context(device_driver_id);
+    # if USE_MMAP_EXPLICITLY
+    CUmemAllocationProp prop;
+    size_t actualsize;
+    get_prop_and_size(device_driver_id, size, &prop, &actualsize);
 
+    CUdeviceptr addr = 0;
+    CU_SAFE_CALL(cuMemAddressReserve(&addr, actualsize, 0, 0, 0));  // reserve VA space
+
+    CUmemGenericAllocationHandle handle;
+    CU_SAFE_CALL(cuMemCreate(&handle, actualsize, &prop, 0));       // allocate physical memory
+    CU_SAFE_CALL(cuMemMap(addr, actualsize, 0, handle, 0));         // map it
+    CU_SAFE_CALL(cuMemRelease(handle));                             // (optional) release handle
+
+    CUmemAccessDesc desc = {};
+    desc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    desc.location.id = device_driver_id;
+    desc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    CU_SAFE_CALL(cuMemSetAccess(addr, actualsize, &desc, 1));
+
+    return (void *) addr;
+    # else
+    cu_set_context(device_driver_id);
     CUdeviceptr device_ptr = (CUdeviceptr) NULL;
     cuMemAlloc(&device_ptr, size);
     return (void *) device_ptr;
+    # endif
 }
 
 static void
-XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(int device_driver_id, void * ptr, const size_t size, int area_idx)
-{
-    (void) size;
+XKRT_DRIVER_ENTRYPOINT(memory_device_deallocate)(
+    int device_driver_id,
+    void * ptr,
+    const size_t size,
+    int area_idx
+) {
     assert(area_idx == 0);
+    # if USE_MMAP_EXPLICITLY
+    CUmemAllocationProp prop;
+    size_t actualsize;
+    get_prop_and_size(device_driver_id, size, &prop, &actualsize);
+    CU_SAFE_CALL(cuMemUnmap((CUdeviceptr) ptr, actualsize));
+    CU_SAFE_CALL(cuMemAddressFree((CUdeviceptr) ptr, actualsize));
+    # else
+    (void) size;
     cu_set_context(device_driver_id);
     CU_SAFE_CALL(cuMemFree((CUdeviceptr) ptr));
+    # endif
 }
 
 static void *

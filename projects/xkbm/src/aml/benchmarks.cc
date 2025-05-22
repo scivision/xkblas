@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 20:35:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/21 19:35:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 01:23:23 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -26,11 +26,11 @@
 # include <aml.h>
 # include <aml/utils/features.h>
 
-# if 0
 /////////
 // H2D //
 /////////
 
+# if 0
 typedef struct  aml_h2d_t
 {
     struct aml_area dst;
@@ -42,10 +42,11 @@ static const aml_h2d_t AML_H2D[] = {
     # endif /* AML_HAVE_BACKEND_CUDA */
 };
 
+
 static void
 bench_h2d(benchmark_node_t * node)
 {
-    const size_t size = 1 * 1024 * 1024 * 1024; // 1GB
+    constexpr size_t size = 1 * 1024 * 1024 * 1024; // 1GB
     void * srcbuf = xkbm_alloc_and_touch(size);
         !! TODO
     struct aml_dma           dma;
@@ -72,13 +73,13 @@ static benchmark_node_t h2d = {
     .run = bench_h2d,
     .enabled = 1
 };
-# endif
+    # endif
 
 ////////////////////
 // AML BENCHMARKS //
 ////////////////////
 
-static benchmark_node_t aml_benchmarks = {
+static benchmark_node_t aml = {
     .name = "aml",
     .desc = "Metrics through AML",
     .parent = NULL,
@@ -91,10 +92,10 @@ static benchmark_node_t aml_benchmarks = {
 void
 aml_benchmark_push(benchmark_node_t * parent)
 {
-    # define LINK(X, Y) benchmark_push_children(&(X), &(Y))
+    benchmark_push_children(parent, &aml);
 
-    LINK(*parent, aml_benchmarks);
-//    LINK(&aml_benchmarks, &h2d);
+    # define LINK(X, Y) benchmark_push_children(&(X), &(Y))
+//    LINK(aml, &h2d);
 }
 
 void

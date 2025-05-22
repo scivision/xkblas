@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/26 00:40:42 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/04 03:36:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/21 22:12:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -86,28 +86,28 @@ typedef enum    immediate_t
     NON_IMMEDIATE
 }               immediate_t;
 
-typedef enum    test_mode_t
+typedef enum    direction_t
 {
     KERNEL,
     H2D,
     D2H,
     D2D
-}               test_mode_t;
+}               direction_t;
 
-typedef enum concurrency_mode_t : uint8_t
+typedef enum concurrency_t : uint8_t
 {
     SERIAL=0,
     CONCURRENT=1
-}           concurrency_mode_t;
+}           concurrency_t;
 
-template<immediate_t immediate, test_mode_t mode>
+template<immediate_t immediate, direction_t dir>
 static void
 cmdlist_run(benchmark_node_t * node)
 {
     (void) node;
 
     // command list
-    const uint32_t ordinal = (mode == KERNEL) ? ordinal_compute : ordinal_copy;
+    const uint32_t ordinal = (dir == KERNEL) ? ordinal_compute : ordinal_copy;
     const uint32_t index   = 0;
     const ze_command_queue_desc_t queue_desc = {
         .stype      = ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
@@ -204,19 +204,19 @@ cmdlist_run(benchmark_node_t * node)
 
     // other ptr (host or device)
     unsigned char * otherptr;
-    if (mode == D2H || mode == H2D)
+    if (dir == D2H || dir == H2D)
     {
         otherptr = (unsigned char *) calloc(1, size);
     }
-    else if (mode == D2D)
+    else if (dir == D2D)
     {
         ZE_SAFE_CALL(zeMemAllocDevice(context, &device_desc, size, alignment, device2, (void **) &otherptr));
         assert(otherptr);
         ZE_SAFE_CALL(zeContextMakeMemoryResident(context, device2, otherptr, size));
     }
 
-    unsigned char * src = (mode == H2D) ? otherptr  : (mode == D2H) ? deviceptr : (mode == D2D) ? deviceptr : NULL;
-    unsigned char * dst = (mode == H2D) ? deviceptr : (mode == D2H) ? otherptr  : (mode == D2D) ? otherptr  : NULL;
+    unsigned char * src = (dir == H2D) ? otherptr  : (dir == D2H) ? deviceptr : (dir == D2D) ? deviceptr : NULL;
+    unsigned char * dst = (dir == H2D) ? deviceptr : (dir == D2H) ? otherptr  : (dir == D2D) ? otherptr  : NULL;
 
     const uint32_t n_list = 1;
     ze_fence_handle_t fence = NULL;
@@ -225,7 +225,7 @@ cmdlist_run(benchmark_node_t * node)
     {
         ze_event_handle_t event = events[0];
 
-        if (mode == KERNEL)
+        if (dir == KERNEL)
         {
             for (int iter = -warmup ; iter < time.niters ; ++iter)
             {
@@ -238,7 +238,7 @@ cmdlist_run(benchmark_node_t * node)
                 ZE_SAFE_CALL(zeEventHostReset(event));
             }
         }
-        else if (mode == H2D || mode == D2H || mode == D2D)
+        else if (dir == H2D || dir == D2H || dir == D2D)
         {
             // run the test
             for (int iter = -warmup ; iter < time.niters ; ++iter)
@@ -257,7 +257,7 @@ cmdlist_run(benchmark_node_t * node)
     }
     else if (immediate == NON_IMMEDIATE)
     {
-        if (mode == KERNEL)
+        if (dir == KERNEL)
         {
             for (int i = 0 ; i < n ; ++i)
             {
@@ -279,7 +279,7 @@ cmdlist_run(benchmark_node_t * node)
                 }
             }
         }
-        else if (mode == H2D || mode == D2H)
+        else if (dir == H2D || dir == D2H)
         {
             for (int i = 0 ; i < n ; ++i)
             {
@@ -310,15 +310,15 @@ cmdlist_run(benchmark_node_t * node)
         LOGGER_FATAL("error");
 
     // release memory
-    if (mode == D2H || mode == H2D)
+    if (dir == D2H || dir == H2D)
         free(otherptr);
-    else if (mode == D2D)
+    else if (dir == D2D)
         ZE_SAFE_CALL(zeMemFree(context, otherptr));
     ZE_SAFE_CALL(zeMemFree(context, deviceptr));
 
     // report
     auto convert = [] (char * buffer, size_t buffer_size, int i) { snprintf(buffer, buffer_size, "%d", 1<<i); };
-    time.report<METRIC_TIME>(mode == KERNEL ? "Launch Kernel" : mode == H2D ? "Launch H2D" : "Unknown", convert);
+    time.report<METRIC_TIME>(dir == KERNEL ? "Launch Kernel" : dir == H2D ? "Launch H2D" : "Unknown", convert);
 
     // release stuff
     ZE_SAFE_CALL(zeEventPoolDestroy(pool));

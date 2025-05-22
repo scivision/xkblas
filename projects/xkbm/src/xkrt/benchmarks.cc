@@ -434,8 +434,8 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
-    time_array_t time_alloc(30, 1000);
-    time_array_t time_dealloc(30, 1000);
+    time_array_t time_alloc(32, 20);
+    time_array_t time_dealloc(32, 20);
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
