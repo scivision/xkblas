@@ -434,8 +434,8 @@ alloc_device_run(xkrt_team_t * team, xkrt_thread_t * thread)
 {
     xkrt_device_global_id_t device_global_id = thread->device_global_id;
 
-    time_array_t time_alloc(32, 20);
-    time_array_t time_dealloc(32, 20);
+    time_array_t time_alloc(34, 1000);
+    time_array_t time_dealloc(34, 1000);
 
     xkrt_device_t * device = runtime.device_get(device_global_id);
     xkrt_driver_t * driver = runtime.driver_get(device->driver_type);
@@ -725,13 +725,15 @@ mem_transfer_run_d2d(xkrt_team_t * team, xkrt_thread_t * thread)
 
     // size of memory to transfer
     // const size_t size = (size_t) 1 * 1024 * 1024 * 1024;
-    const size_t size = (transfer_mode == LATENCY) ? 1 : (transfer_mode == BANDWIDTH) ? (size_t) src_device->memories[0].capacity / (runtime.drivers.devices.n.load() - 1) / 64 : 0;
+    const size_t size = (transfer_mode == LATENCY)   ? 1 :
+                        (transfer_mode == BANDWIDTH) ? (size_t) src_device->memories[0].capacity / (runtime.drivers.devices.n.load() - 1) / 64 :
+                        0;
     assert(size);
     const size_t chunk_size = size / nchunks;
     for (xkrt_device_global_id_t device_global_id = 1 ; device_global_id < runtime.drivers.devices.n ; ++device_global_id)
         for (int i = 0 ; i < src_device->nmemories ; ++i)
             for (int j = 0 ; j < 2 ; ++j)
-                if ((tls->areas[src_device_global_id][device_global_id][i][j] = src_device->memory_allocate_on(size, i)) == NULL)
+                if ((tls->areas[src_device_global_id][device_global_id][i][j] = runtime.memory_device_allocate_on(src_device_global_id, size, i)) == NULL)
                     LOGGER_FATAL("oom");
     runtime.team_barrier(team);
 

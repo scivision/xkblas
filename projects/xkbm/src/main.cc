@@ -3,6 +3,7 @@
 # include <xkbm/support.h>
 
 # include <xkrt/logger/logger.h>
+# include <xkrt/support.h>
 
 ////////////////
 // BENCHMARKS //

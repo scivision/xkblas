@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:41:33 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 20:18:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,6 +25,7 @@
 
 # include <xkrt/driver/driver-cl.h>
 # include <xkrt/logger/logger-cl.h>
+# include <xkrt/logger/logger-hwloc.h>
 
 # include <CL/cl.h>
 # include <hwloc/opencl.h>

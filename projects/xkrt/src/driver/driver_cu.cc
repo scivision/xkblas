@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/22 02:21:31 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 22:06:38 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,6 +24,7 @@
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/logger-cu.h>
 # include <xkrt/logger/logger-cublas.h>
+# include <xkrt/logger/logger-hwloc.h>
 # include <xkrt/logger/metric.h>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/mutex.h>
@@ -77,15 +78,14 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 
 /* cu_perf_topo[i,j] returns the perf_rank of the communication link between
    device.
-   cu_perf_device[d][i] for i=0,..,cu_count_perfrank-1 is the mask of device
+   cu_perf_device[d][i] for i=0,..,XKRT_DEVICES_PERF_RANK_MAX-1 is the mask of device
    for which the device d has link with performance i.
 */
 
-static int        cu_device_count   = 0;
-static int *      cu_perf_topo      = NULL;
-static int        cu_count_perfrank = 0;
-static uint64_t * cu_perf_device    = NULL;
-static bool       cu_use_p2p        = false;
+static int                                  cu_device_count   = 0;
+static int *                                cu_perf_topo      = NULL;
+static xkrt_device_global_id_bitfield_t *   cu_perf_device    = NULL;
+static bool                                 cu_use_p2p        = false;
 
 static void
 get_gpu_topo(
@@ -94,13 +94,13 @@ get_gpu_topo(
 ) {
     cu_device_count = ndevices;
 
-    int min_perf = 0;
-    int max_perf = 0;
-
     cu_perf_topo = (int *) malloc(sizeof(int) * cu_device_count * cu_device_count);
     assert(cu_perf_topo);
 
-    for (int i = 0; i < cu_device_count; ++i)
+    int rank_used[64];
+    memset(rank_used, 0, sizeof(rank_used));
+    rank_used[0] = 1;
+
     // Enumerates Device <-> Device links and store perf_rank
     for (int i = 0; i < cu_device_count; ++i)
     {
@@ -115,7 +115,7 @@ get_gpu_topo(
             }
             else
             {
-                cu_perf_topo[i*cu_device_count+j] = INT_MAX;
+                cu_perf_topo[idx] = INT_MAX;
 
                 if (use_p2p)
                 {
@@ -124,49 +124,71 @@ get_gpu_topo(
                     int access_supported = 0;
 
                     CU_SAFE_CALL(
-                            cuDeviceGetP2PAttribute(
-                                &access_supported,
-                                CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED,
-                                device_i->cu.device,
-                                device_j->cu.device
-                                )
-                            );
+                        cuDeviceGetP2PAttribute(
+                            &access_supported,
+                            CU_DEVICE_P2P_ATTRIBUTE_ACCESS_SUPPORTED,
+                            device_i->cu.device,
+                            device_j->cu.device
+                         )
+                    );
 
                     if (access_supported)
                     {
                         CU_SAFE_CALL(
-                                cuDeviceGetP2PAttribute(
-                                    &perf_rank,
-                                    CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK,
-                                    device_i->cu.device,
-                                    device_j->cu.device
-                                    )
-                                );
+                            cuDeviceGetP2PAttribute(
+                                &perf_rank,
+                                CU_DEVICE_P2P_ATTRIBUTE_PERFORMANCE_RANK,
+                                device_i->cu.device,
+                                device_j->cu.device
+                            )
+                        );
+                        cu_perf_topo[idx] = 1 + perf_rank;
 
-                        cu_perf_topo[i*cu_device_count+j] = 1 + perf_rank;
-                        max_perf = MAX(perf_rank, max_perf);
-                        min_perf = MIN(perf_rank, min_perf);
+                        if (1 + perf_rank >= sizeof(rank_used) / sizeof(*rank_used))
+                            LOGGER_FATAL("P2P perf_rank too high");
+                        rank_used[1 + perf_rank] = 1;
+                        LOGGER_DEBUG("PERF FROM %d to %d is %d", i, j, perf_rank + 1);
+                    }
+                    else
+                    {
+                        LOGGER_WARN("GPU access from %d to %d is not supported", i, j);
                     }
                 }
             }
         }
     }
 
-    /* if there is no link, set to the minmum perf */
-    ++min_perf;
+    /* shrink perf ranks, on MI300A it starts at 4 somehow */
     for (int i = 0 ; i < cu_device_count*cu_device_count ; ++i)
     {
         if (cu_perf_topo[i] == INT_MAX)
-            cu_perf_topo[i] = min_perf + 1;
+            cu_perf_topo[i] = XKRT_DEVICES_PERF_RANK_MAX - 1;
+        else
+        {
+            const int perf_rank = cu_perf_topo[i];
+            int rank = perf_rank;
+            while (rank - 1 > 0 && rank_used[rank - 1] == 0)
+                --rank;
+
+            if (rank != perf_rank)
+            {
+                LOGGER_DEBUG("SHRINKING PERF FROM RANK %d", perf_rank);
+                for (int j = i ; j < cu_device_count*cu_device_count ; ++j)
+                    if (cu_perf_topo[j] == perf_rank)
+                        cu_perf_topo[j] = rank;
+
+                rank_used[rank]      = 1;
+                rank_used[perf_rank] = 0;
+            }
+        }
+
+        if (cu_perf_topo[i] >= XKRT_DEVICES_PERF_RANK_MAX)
+            LOGGER_FATAL("Too many perf ranks. Recompile increasing `XKRT_DEVICES_PERF_RANK_MAX` to at least %d", XKRT_DEVICES_PERF_RANK_MAX);
     }
 
-    cu_count_perfrank = min_perf - max_perf + 2;
-    assert(cu_count_perfrank < XKRT_DEVICES_PERF_RANK_MAX);
-    if (cu_count_perfrank >= XKRT_DEVICES_PERF_RANK_MAX)
-        LOGGER_FATAL("Too many perf ranks. Recompile increasing `XKRT_DEVICES_PERF_RANK_MAX` to at least %d", cu_count_perfrank);
-
-    size_t size = cu_device_count * cu_count_perfrank * sizeof(uint64_t);
-    cu_perf_device = (uint64_t *) malloc(size);
+    // get number of ranks
+    size_t size = cu_device_count * XKRT_DEVICES_PERF_RANK_MAX * sizeof(xkrt_device_global_id_bitfield_t);
+    cu_perf_device = (xkrt_device_global_id_bitfield_t *) malloc(size);
     assert(cu_perf_device);
     memset(cu_perf_device, 0, size);
 
@@ -176,9 +198,9 @@ get_gpu_topo(
         {
             int rank = cu_perf_topo[device_cu_id*cu_device_count+other_device_cu_id];
             assert(0 <= device_cu_id * cu_device_count   + rank);
-            assert(     device_cu_id * cu_count_perfrank + rank <= cu_device_count * cu_count_perfrank);
+            assert(     device_cu_id * XKRT_DEVICES_PERF_RANK_MAX + rank <= cu_device_count * XKRT_DEVICES_PERF_RANK_MAX);
 
-            cu_perf_device[device_cu_id * cu_count_perfrank + rank] |= (1UL << other_device_cu_id);
+            cu_perf_device[device_cu_id * XKRT_DEVICES_PERF_RANK_MAX + rank] |= (1 << other_device_cu_id);
         }
     }
 }
@@ -461,9 +483,9 @@ XKRT_DRIVER_ENTRYPOINT(device_commit)(
                     {
                         int rank = cu_perf_topo[device_driver_id*cu_device_count+other_device_driver_id];
                         assert(rank);
-                        if (cu_perf_device[device_driver_id*cu_count_perfrank+rank] & (1UL << other_device_driver_id))
+                        if (cu_perf_device[device_driver_id*XKRT_DEVICES_PERF_RANK_MAX+rank] & (1UL << other_device_driver_id))
                         {
-                            affinity[rank - 1] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device_driver_id);
+                            affinity[rank] |= (xkrt_device_global_id_bitfield_t) (1UL << other_device->inherited.global_id);
                         }
                     }
                     else

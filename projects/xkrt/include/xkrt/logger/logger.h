@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 16:04:18 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 20:16:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -109,12 +109,5 @@ extern volatile uint64_t LOGGER_LAST_TIME;
 #  define LOGGER_DEBUG(...)
 # endif
 # define LOGGER_FATAL(...) LOGGER_PRINT(LOGGER_PRINT_FATAL_ID, __VA_ARGS__)
-
-# define HWLOC_SAFE_CALL(X)                                 \
-    do {                                                    \
-        int r = X;                                          \
-        if (r)                                              \
-            LOGGER_FATAL("`%s` failed with err=%d", #X, r); \
-    } while (0)
 
 #endif /* __LOGGER_H__*/

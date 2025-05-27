@@ -86,6 +86,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory/invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory/register.cc
     ${CMAKE_SOURCE_DIR}/src/memory/replicate.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/touch.cc
     ${CMAKE_SOURCE_DIR}/src/stats/stats.cc
     ${CMAKE_SOURCE_DIR}/src/task/task.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc
@@ -148,12 +149,13 @@ if (USE_HIP)
     find_package(HIP REQUIRED)
     include_directories("${HIP_INCLUDE_DIRS}")
 
-    # find_package(CUBLAS REQUIRED)
-    # include_directories("${CUBLAS_INCLUDE_DIRS}")
+    find_package(HIPBLAS REQUIRED)
+    include_directories("${HIPBLAS_INCLUDE_DIRS}")
 
     add_library(${XKRT}_driver_hip SHARED src/driver/driver_hip.cc)
     add_dependencies(${XKRT}_driver_hip always_generate_files)
     target_link_libraries(${XKRT}_driver_hip PRIVATE ${HWLOC_LIBRARIES} ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+    message(STATUS "LIB IS ${HIP_LIBRARIES}")
     target_link_libraries(${XKRT} PRIVATE ${XKRT}_driver_hip)
     install(TARGETS ${XKRT}_driver_hip LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 

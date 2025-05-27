@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/09 04:07:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 20:18:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,6 +21,7 @@
 # include <xkrt/driver/driver-ze.h>
 # include <xkrt/driver/driver.h>
 # include <xkrt/driver/stream.h>
+# include <xkrt/logger/logger-hwloc.h>
 # include <xkrt/logger/logger-ze.h>
 # include <xkrt/logger/metric.h>
 # include <xkrt/sync/bits.h>

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/20 14:36:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 21:22:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1408,7 +1408,7 @@ next_view:
             // if read mode is set
             if (access->mode & ACCESS_MODE_R)
             {
-                const xkrt_device_global_id_bitfield_t dst_devbit = (1 << device_global_id);
+                const xkrt_device_global_id_bitfield_t dst_devbit = (xkrt_device_global_id_bitfield_t) (1 << device_global_id);
 
                 // for each block of that access
                 for (Partite & partite : partition.partites)

@@ -20,6 +20,7 @@ set(TEST_SOURCES
     team-cpus.cc
     team-cpus-parallel-for.cc
     team-device.cc
+    touch-async.cc
 )
 
 # Loop over each test source file

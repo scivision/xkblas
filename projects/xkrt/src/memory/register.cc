@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 21:21:06 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/23 16:22:20 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -13,6 +13,10 @@
 
 # include <xkrt/logger/todo.h>
 # include <xkrt/runtime.h>
+
+///////////////////////////////////
+//  ORIGINAL KAAPI 1.0 INTERFACE //
+///////////////////////////////////
 
 //  General idea of these interfaces
 //      - Nvidia GPUs serializes memory pinning anyway
@@ -24,7 +28,6 @@
 //      - can we pin memory independently of CUDA / HIP / ... via 'mlock' and
 //      notify the driver that the memory is pinned ? Would be better in case
 //      of server with different GPU vendors...
-
 
 
 # pragma message(TODO "The current implementation spawn independent tasks. Maybe make it dependent to a specific type of access")
@@ -117,3 +120,9 @@ xkrt_memory_register_waitall(xkrt_runtime_t * runtime)
     runtime->task_wait();
     return 0;
 }
+
+//////////////////////////
+//  KAAPI 2.0 INTERFACE //
+//////////////////////////
+
+

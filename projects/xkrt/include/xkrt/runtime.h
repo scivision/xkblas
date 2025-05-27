@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 20:51:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/23 15:13:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,6 +48,7 @@ typedef struct  xkrt_runtime_t
         task_formats_t list;
         task_format_id_t copy_async;
         task_format_id_t host_capture;
+        task_format_id_t memory_touch_async;
     } formats;
 
     /* user conf */
@@ -99,6 +100,9 @@ typedef struct  xkrt_runtime_t
     /* allocate the chunk0 on the device if not allocated already */
     void memory_device_preallocate_ensure(const xkrt_device_global_id_t device_global_id, const int memory_id);
 
+    /* allocate memory onto chunk0 of the given device memory index */
+    xkrt_area_chunk_t * memory_device_allocate_on(const xkrt_device_global_id_t device_global_id, const size_t size, const int memory_id);
+
     /* allocate memory onto chunk0 of the given device */
     xkrt_area_chunk_t * memory_device_allocate(const xkrt_device_global_id_t device_global_id, const size_t size);
 
@@ -119,6 +123,23 @@ typedef struct  xkrt_runtime_t
 
     /* deallocate unified memory using the driver of the given device */
     void memory_unified_deallocate(const xkrt_device_global_id_t device_global_id, void * mem, const size_t size);
+
+    /////////////////////////
+    // MEMORY REGISTRATION //
+    /////////////////////////
+
+    /** Notify that the pointed memory had been touched, cancelling touching tasks */
+    int memory_notify_touched(void * ptr, const size_t size);
+
+    /**
+     *  Create 'nchunks' tasks so that each task i in [0..nchunks-1] touches
+     *  memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
+     *  Tasks will be cancelled if the memory is touched through `notify_touched()`
+     */
+    int memory_touch_async(void * ptr, const size_t chunk_size, int nchunks);
+
+    int register_async(void * ptr, const size_t chunk_size, int nchunks);
+    int unregister_async(void * ptr, const size_t chunk_size, int nchunks);
 
     /////////////////////
     // SYNCHRONIZATION //

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 20:59:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/22 21:44:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -49,14 +49,22 @@ xkrt_runtime_t::memory_device_preallocate_ensure(
 }
 
 xkrt_area_chunk_t *
+xkrt_runtime_t::memory_device_allocate_on(
+    const xkrt_device_global_id_t device_global_id,
+    const size_t size,
+    const int memory_id
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    this->memory_device_preallocate_ensure(device_global_id, memory_id);
+    return device->memory_allocate_on(size, memory_id);
+}
+
+xkrt_area_chunk_t *
 xkrt_runtime_t::memory_device_allocate(
     const xkrt_device_global_id_t device_global_id,
     const size_t size
 ) {
-    const int memory_id = 0;
-    xkrt_device_t * device = this->device_get(device_global_id);
-    this->memory_device_preallocate_ensure(device_global_id, memory_id);
-    return device->memory_allocate_on(size, memory_id);
+    return this->memory_device_allocate_on(device_global_id, size, 0);
 }
 
 void

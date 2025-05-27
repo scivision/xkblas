@@ -22,11 +22,22 @@ find_path(HIP_PREFIX
     HINTS $ENV{HIP_PATH}
 )
 
-find_library(HIP_LIBRARIES
-    # Pick the static library first for easier run-time linking.
-    NAMES libamdhip64.so librocm_smi64.so libamd_smi.so librocm_smi.so
-    HINTS ${HIP_PREFIX}/lib ${HILTIDEPS}/lib
+set(HIP_LIBRARIES "")
+foreach(libname
+    amdhip64
+    rocm_smi64
+    amd_smi
+    rocm_smi
 )
+    unset(_FOUND_LIB CACHE)
+    find_library(_FOUND_LIB
+        NAMES ${libname}
+        HINTS ${HIP_PREFIX}/lib ${HILTIDEPS}/lib
+    )
+    if(_FOUND_LIB)
+        list(APPEND HIP_LIBRARIES ${_FOUND_LIB})
+    endif()
+endforeach()
 
 find_path(HIP_INCLUDE_DIRS
     NAMES hip/hip_runtime.h

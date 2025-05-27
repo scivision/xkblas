@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 21:12:19 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/23 16:03:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -516,6 +516,10 @@ xkrt_runtime_t::team_parallel_for(
     mem_barrier();
     ++team->priv.parallel_for.index;
 
+    // TODO : within the kernel, this lead to a O(n) with 'n' the number of thread sleeping.
+    // This may be an issue if people wanna to large team of threads.
+    // Instead, use something hierarchical, with several futexes on small
+    // groups of thread to reduce syscall overhead
     syscall(
         SYS_futex,
         &team->priv.parallel_for.index,     // uint32_t *uaddr
