@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:43:23 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 16:28:06 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -141,7 +141,7 @@ xkrt_coherency_host_async(
         bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
-            Hypercube h;
+            access_t::Hypercube h;
             access_t::Hypercube::intersection(&h, access.hypercubes[i], node->hypercube);
 
             if (!h.is_empty())

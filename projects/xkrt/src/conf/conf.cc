@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 21:49:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 17:12:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -155,6 +155,14 @@ __parse_drivers(xkrt_conf_t * conf, char const * value)
 {
     if (value)
     {
+        // disable all drivers
+        for (unsigned int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+        {
+            conf->drivers.list[i].nthreads_per_device   = 0;
+            conf->drivers.list[i].used                  = 0;
+        }
+
+        // parse driver list
         char * driver_list = strdup(value);             // make a modifiable copy
         char * driver_save;
         char * driver = strtok_r(driver_list, ";", &driver_save);
@@ -174,6 +182,7 @@ __parse_drivers(xkrt_conf_t * conf, char const * value)
             if (driver_type == XKRT_DRIVER_TYPE_MAX)
                 LOGGER_FATAL("Invalid `XKRT_DRIVERS`");
             conf->drivers.list[driver_type].nthreads_per_device = nthreads;
+            conf->drivers.list[driver_type].used                = nthreads > 0;
 
             driver = strtok_r(NULL, ";", &driver_save);
         }

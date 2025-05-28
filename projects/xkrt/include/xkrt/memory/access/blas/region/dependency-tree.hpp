@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 22:17:10 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 16:55:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -167,10 +167,9 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 template<int K>
 class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public DependencyDomain
 {
-    using Base      = KHPTree<K, KDependencyTreeSearch<K>>;
-    using Hypercube = KHypercube<K>;
-
     public:
+        using Base      = KHPTree<K, KDependencyTreeSearch<K>>;
+        using Hypercube = KHypercube<K>;
         using Node      = KDependencyTreeNode<K>;
         using NodeBase  = typename Base::Node;
         using Search    = KDependencyTreeSearch<K>;

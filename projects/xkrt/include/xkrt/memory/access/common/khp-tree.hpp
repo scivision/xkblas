@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 06:22:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 16:55:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1130,6 +1130,7 @@ class KHPTree {
 
             while (k < K)
             {
+                # if 0
                 // quick-way out, if the cube includes all subcube with an
                 // 'out' access, we can discard all children
                 if constexpr (CUT_ON_INSERT)
@@ -1147,6 +1148,7 @@ class KHPTree {
                         }
                     }
                 }
+                # endif
 
                 // case (1)    J << I
                 if (h[k].b <= parent->hypercube[k].a)
@@ -1636,10 +1638,12 @@ class KHPTree {
             const Node * inherit
         ) const = 0;
 
+        # if 0
         /* called when the node being inserting includes all the descendent tree
          * return true if the subtree should be cut, false otherwise (in such
          * case, the insertion is propagated to all the subtree */
         virtual bool should_cut(T & t, Hypercube & h, Node * parent, int k) const = 0;
+        # endif
 
         /* called whenever this node is added to the tree */
         virtual void on_insert(Node * node, T & t) = 0;

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 06:36:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 16:51:52 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -37,6 +37,14 @@
 # include <functional>
 # include <numeric> // std::iota
 
+# define K                 1
+# define REBALANCE         0
+# define CUT_ON_INSERT     0
+# define MAINTAIN_SIZE     0
+# define MAINTAIN_HEIGHT   0
+
+class MemoryRegisterBlock;
+
 /* storage passed when searching in the tree */
 class MemoryRegisterTreeNodeSearch {
 
@@ -54,60 +62,19 @@ class MemoryRegisterTreeNodeSearch {
         }               Type;
 
     public:
-       MemoryRegisterTreeNodeSearch(const Type & t) : type(t) {}
+       MemoryRegisterTreeNodeSearch(const Type & t, std::vector<MemoryRegisterBlock> * b) : type(t), blocks(b) {}
        virtual ~MemoryRegisterTreeNodeSearch() {}
 
    public:
        Type type;
+       std::vector<MemoryRegisterBlock> * blocks;
 
 }; /* MemoryRegisterTreeNodeSearch */
 
-class MemoryRegisterBlock
+
+
+class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>::Node
 {
-    public:
-        MemoryRegisterBlock() : interval(), state{} {}
-        MemoryRegisterBlock(const Interval & i) : interval(i), state{} {}
-        ~MemoryRegisterBlock() {}
-
-    public:
-
-        /* the memory region represented */
-        Interval interval;
-
-        /* block state */
-        struct {
-
-            /* the block is pinned */
-            bool pinned     : 1;
-
-            /* the block is being pinned */
-            bool pinning    : 1;
-
-            /* the block had been touched */
-            bool touched    : 1;
-
-            /* the block is being touched */
-            bool touching   : 1;
-
-        } state;
-
-    public:
-
-        bool
-        operator<(const MemoryRegisterBlock & other) const
-        {
-            return this->interval < other.interval;
-        }
-};
-
-# define K                 1
-# define REBALANCE         0
-# define CUT_ON_INSERT     0
-# define MAINTAIN_SIZE     0
-# define MAINTAIN_HEIGHT   0
-
-class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>::Node{
-
     public:
         using Node = MemoryRegisterTreeNode;
         using Search = MemoryRegisterTreeNodeSearch;
@@ -188,6 +155,57 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
 
 }; /* MemoryRegisterTreeNode */
 
+class MemoryRegisterBlock
+{
+    public:
+        MemoryRegisterBlock() : interval(), state{} {}
+
+        MemoryRegisterBlock(
+            const Interval & i,
+            MemoryRegisterTreeNode::state_t & s
+        ) :
+            interval(i),
+            state{
+                .pinned   = s.pinned,
+                .pinning  = s.pinning,
+                .touched  = s.touched,
+                .touching = s.touching
+            }
+        {}
+
+        ~MemoryRegisterBlock() {}
+
+    public:
+
+        /* the memory region represented */
+        Interval interval;
+
+        /* block state */
+        struct {
+
+            /* the block is pinned */
+            bool pinned     : 1;
+
+            /* the block is being pinned */
+            bool pinning    : 1;
+
+            /* the block had been touched */
+            bool touched    : 1;
+
+            /* the block is being touched */
+            bool touching   : 1;
+
+        } state;
+
+    public:
+
+        bool
+        operator<(const MemoryRegisterBlock & other) const
+        {
+            return this->interval < other.interval;
+        }
+};
+
 class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>
 {
     public:
@@ -227,11 +245,14 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
 
         // Ensure the interval exists in the tree
         void
-        ensure(Hypercube & h)
+        ensure(const Interval & interval)
         {
+            const Interval intervals[1] = { interval };
+            Hypercube h(intervals);
+            Search search(Op::INSERTING, NULL);
+
             pthread_rwlock_wrlock(&this->rwlock);
             {
-                Search search(Op::INSERTING);
                 this->insert(search, h);
             }
             pthread_rwlock_unlock(&this->rwlock);
@@ -240,27 +261,33 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         // Retrieve a list of intervals to prepare the operation 'op' that is:
         // TODO: what if only a small portion is ready for 'op' ?
         int
-        run(const Hypercube & h, std::vector<MemoryRegisterBlock> & blocks, const Op & op)
-        {
+        run(
+            const Interval & interval,
+            std::vector<MemoryRegisterBlock> * blocks,
+            const Op & op
+        ) {
+            const Interval intervals[1] = { interval };
+            const Hypercube h(intervals);
+
             // run the operation to swap the bits
             pthread_rwlock_rdlock(&this->rwlock);
             {
-                Search search(op);
+                Search search(op, blocks);
                 this->intersect(search, h);
             }
             pthread_rwlock_rdlock(&this->rwlock);
 
             // intersects run in-order, so the blocks list is sorted by now
             // reduce the list with continuous intervals only
-            assert(std::is_sorted(blocks.begin(), blocks.end()));
+            assert(std::is_sorted(blocks->begin(), blocks->end()));
 
             // Index to write the next merged interval
             size_t write = 1;
 
-            for (size_t i = 1; i < blocks.size(); ++i)
+            for (size_t i = 1; i < blocks->size(); ++i)
             {
-                MemoryRegisterBlock &    last = blocks[write - 1];
-                MemoryRegisterBlock & current = blocks[i];
+                MemoryRegisterBlock &    last = (*blocks)[write - 1];
+                MemoryRegisterBlock & current = (*blocks)[i];
 
                 if (last.interval.b == current.interval.a)
                 {
@@ -270,12 +297,12 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                 else
                 {
                     // Move current to the next write position
-                    blocks[write++] = current;
+                    (*blocks)[write++] = current;
                 }
             }
 
             // Remove the unused tail
-            blocks.resize(write);
+            blocks->resize(write);
 
             return 0;
         }
@@ -345,8 +372,14 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                 case (Op::TOUCHING):
                 {
                     if (!node->state.touched.load())
-                        if (node->state.touching.compare_exchange_strong(false, true))
-                            search.partites.push_back(MemoryRegisterBlock(node->hypercube, node->state));
+                    {
+                              bool expected = false;
+                        const bool newvalue = true;
+                        if (node->state.touching.compare_exchange_strong(expected, newvalue))
+                            search.blocks->push_back(
+                                MemoryRegisterBlock(node->hypercube[0], node->state)
+                            );
+                    }
                     break ;
                 }
 
@@ -373,7 +406,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             const Color color
         ) const {
             assert(search.type == Op::INSERTING);
-            return new Node(search.access, h, k, color);
+            return new Node(h, k, color);
         }
 
         Node *
@@ -387,7 +420,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             (void) search;
             assert(search.type == Op::INSERTING);
             assert(!h.intersects(inherit->hypercube));
-            return new Node(h, k, color, reinterpret_cast<const Node *>(inherit), this->sizeof_type);
+            return new Node(h, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };
 

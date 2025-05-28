@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 06:21:22 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 17:04:14 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -40,9 +40,8 @@ typedef struct  xkrt_runtime_t
     /* driver list */
     xkrt_drivers_t drivers;
 
-    /* the team of thread that register memory (only 1 thread, nvidia driver
-     * serializes register requests anyway... */
-    xkrt_team_t register_team;
+    /* the memory register tree to keep track of pinned / touched memory */
+    MemoryRegisterTree memory_register_tree;
 
     /* task formats */
     struct {
