@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/29 19:53:20 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 05:22:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -60,6 +60,20 @@ class Interval {
         operator!=(const Interval & lhs, const Interval & rhs)
         {
             return lhs.a != rhs.a || lhs.b != rhs.b;
+        }
+
+        inline bool
+        intersects(const Interval & other) const
+        {
+            return this->a <= other.b && other.a <= this->b;
+        }
+
+        bool
+        operator<(const Interval & other) const
+        {
+            // this class should only be used to represent disjoint intervals
+            assert(!this->intersects(other));
+            return this->b <= other.a;
         }
 
 };

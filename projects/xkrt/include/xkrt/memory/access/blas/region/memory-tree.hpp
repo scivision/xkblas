@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/22 21:22:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 05:38:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -14,20 +14,19 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
-# define KHP_TREE_REBALANCE         0
-# define KHP_TREE_CUT_ON_INSERT     0
-# define KHP_TREE_MAINTAIN_SIZE     0
-# define KHP_TREE_MAINTAIN_HEIGHT   0
 # include <xkrt/memory/access/common/khp-tree.hpp>
 
-//  TODO : the design of this is terrible with a cyclic ownership with 'xkrt_runtime_t'
-//  Redesign me !! This should be fully independent with callbacks that can be parametrized, raised with global device ids
+//  TODO : the design of this is terrible with a cyclic ownership with
+//  'xkrt_runtime_t' Redesign me !! This should be fully independent with
+//  callbacks that can be parametrized, raised with global device ids
 
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/todo.h>
 # include <xkrt/memory/access/coherency-controller.hpp>
 # include <xkrt/sync/bits.h>
 # include <xkrt/sync/lockable.hpp>
+
+# pragma message(TODO "Replace the lock with a rwlock + atomic operations on block states. The global lock on the entire structure may be limiting scalability on multiple gpus")
 
 # include <xkrt/runtime.h>              // this should gtfo
 # include <xkrt/memory/area.h>          // this should gtfo

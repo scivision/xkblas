@@ -1,11 +1,18 @@
-# CMake Minimum version
-cmake_minimum_required(VERSION 3.7)
+# C++20 support starts in CMake 3.12+
+cmake_minimum_required(VERSION 3.12)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 SET(XKRT xkrt)
 
 # Project name
 project(${XKRT})
+
+###############
+# C++ version #
+###############
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
 
 #########
 # RPATH #

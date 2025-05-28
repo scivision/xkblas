@@ -9,6 +9,9 @@ cd build-debug
 cmake -DCMAKE_INSTALL_PREFIX=$HOME/install/xkrt/debug -DCMAKE_BUILD_TYPE=Debug -DSTRICT=on -DUSE_STATS=on -DUSE_CUDA=on -DUSE_ZE=off -DUSE_SYCL=off -DUSE_CL=off -DUSE_HIP=off -DUSE_CAIRO=off -DENABLE_HEAVY_DEBUG=off ..
 ```
 
+# Notes
+There is no well-defined ABI and a lot of routines are from inlined C++ headers code: updating xkrt most likely imply rebuilding the entire application.
+
 # To improve
 - If OCR is set on a successor task, when the predecessor writter completes
   - the successor device is known: set it already

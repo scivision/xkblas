@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/23 15:53:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 05:35:27 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -16,9 +16,17 @@
 typedef struct  memory_touch_async_args_t
 {
     xkrt_runtime_t * runtime;
-    void * ptr;
-    size_t chunk_size;
-    int i;
+    const unsigned char * start;
+    const unsigned char *   end;
+
+    memory_touch_async_args_t(
+        xkrt_runtime_t * r,
+        const unsigned char * s,
+        const unsigned char * e
+    ) : runtime(r), start(s), end(e) {}
+
+    ~memory_touch_async_args_t() {}
+
 }               memory_touch_async_args_t;
 
 static void
@@ -27,13 +35,28 @@ body_memory_touch_async(task_t * task)
     assert(task);
 
     memory_touch_async_args_t * args = (memory_touch_async_args_t *) TASK_ARGS(task);
-    size_t pagesize = (size_t) getpagesize();
+    assert(args->runtime);
 
-    // volatile to trick the compiler and avoid optimization of *p = *p
-    volatile unsigned char *   p = ((volatile unsigned char *) args->ptr) + (args->i+0) * args->chunk_size;
-             unsigned char * end = (         (unsigned char *) args->ptr) + (args->i+1) * args->chunk_size;
-    for ( ; p < end ; p += pagesize)
-        *p = *p;
+    const Interval intervals[1] = { Interval((uintptr_t) args->start, (uintptr_t) args->end) };
+    const Hypercube h(intervals);
+
+    args->runtime->memory_register_tree.run(h, blocks, MemoryRegisterTree::Op::TOUCHING);
+    if (blocks.size())
+    {
+        const size_t pagesize = (size_t) getpagesize();
+        for (MemoryBlock & block : blocks)
+        {
+            // maybe test residency with `mincore`
+            // https://man7.org/linux/man-pages/man2/mincore.2.html
+
+            // volatile to trick the compiler and avoid optimization of *p = *p
+            volatile unsigned char * a = (volatile unsigned char *) block.h[0].a;
+               const unsigned char * b = (   const unsigned char *) block.h[0].b;
+            for ( ; a < b ; a += pagesize)
+                *a = *a;
+        }
+        args->runtime->memory_register_tree.run(h, blocks, MemoryRegisterTree::Op::TOUCHED);
+    }
 }
 
 int
@@ -45,6 +68,14 @@ xkrt_runtime_t::memory_touch_async(
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     for (int i = 0 ; i < nchunks ; ++i)
     {
+        // inserts the interval in the tree to ensure they exist
+        const unsigned char * start = ((const unsigned char *) ptr) + (i+0) * chunk_size;
+        const unsigned char *   end = ((const unsigned char *) ptr) + (i+1) * chunk_size;
+        const Interval intervals[1] = { Interval((uintptr_t) start, (uintptr_t) end) };
+        const Hypercube h(intervals);
+        runtime->memory_register_tree.ensure(h);
+
+        // create a task that will touch the memory
         constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
         constexpr size_t task_size = task_compute_size(flags, 0);
         constexpr size_t args_size = sizeof(memory_touch_async_args_t);
@@ -53,10 +84,7 @@ xkrt_runtime_t::memory_touch_async(
         new(task) task_t(this->formats.memory_touch_async, flags);
 
         memory_touch_async_args_t * args = (memory_touch_async_args_t *) TASK_ARGS(task, task_size);
-        args->runtime    = this;
-        args->ptr        = ptr;
-        args->chunk_size = chunk_size;
-        args->i          = i;
+        new (args) memory_touch_async_args_t(runtime, start, end);
 
         thread->commit(task, xkrt_team_thread_task_enqueue, this, thread->team, thread);
     }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/23 15:13:47 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/28 06:21:22 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,7 @@
 # include <xkrt/driver/driver.h>
 # include <xkrt/thread/thread.h>
 # include <xkrt/memory/access/coherency-controller.hpp>
+# include <xkrt/memory/register/memory-register-tree.hpp>
 # include <xkrt/memory/routing/router-affinity.hpp>
 # include <xkrt/stats/stats.h>
 # include <xkrt/sync/spinlock.h>
@@ -128,9 +129,6 @@ typedef struct  xkrt_runtime_t
     // MEMORY REGISTRATION //
     /////////////////////////
 
-    /** Notify that the pointed memory had been touched, cancelling touching tasks */
-    int memory_notify_touched(void * ptr, const size_t size);
-
     /**
      *  Create 'nchunks' tasks so that each task i in [0..nchunks-1] touches
      *  memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
@@ -138,8 +136,8 @@ typedef struct  xkrt_runtime_t
      */
     int memory_touch_async(void * ptr, const size_t chunk_size, int nchunks);
 
-    int register_async(void * ptr, const size_t chunk_size, int nchunks);
-    int unregister_async(void * ptr, const size_t chunk_size, int nchunks);
+    int memory_register_async(void * ptr, const size_t chunk_size, int nchunks);
+    int memory_unregister_async(void * ptr, const size_t chunk_size, int nchunks);
 
     /////////////////////
     // SYNCHRONIZATION //

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 01:59:15 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/27 15:37:35 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -121,4 +121,47 @@ xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime)
     format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_copy;
     snprintf(format.label, sizeof(format.label), "memory_copy");
     runtime->formats.copy_async = task_format_create(&(runtime->formats.list), &format);
+}
+
+void
+xkrt_runtime_t::copy(
+    const xkrt_device_global_id_t   device_global_id,
+    const memory_view_t           & host_view,
+    const xkrt_device_global_id_t   dst_device_global_id,
+    const memory_replicate_view_t & dst_device_view,
+    const xkrt_device_global_id_t   src_device_global_id,
+    const memory_replicate_view_t & src_device_view,
+    const xkrt_callback_t         & callback
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    device->offloader_stream_instruction_submit_copy<memory_view_t, memory_replicate_view_t>(
+        host_view,
+        dst_device_global_id,
+        dst_device_view,
+        src_device_global_id,
+        src_device_view,
+        callback
+    );
+}
+
+void
+xkrt_runtime_t::copy(
+    const xkrt_device_global_id_t   device_global_id,
+    const size_t                    size,
+    const xkrt_device_global_id_t   dst_device_global_id,
+    const uintptr_t                 dst_device_addr,
+    const xkrt_device_global_id_t   src_device_global_id,
+    const uintptr_t                 src_device_addr,
+    const xkrt_callback_t         & callback
+) {
+    xkrt_device_t * device = this->device_get(device_global_id);
+    // TODO: create 1x instruction per pinned segment, and callback
+    device->offloader_stream_instruction_submit_copy<size_t, uintptr_t>(
+        size,
+        dst_device_global_id,
+        dst_device_addr,
+        src_device_global_id,
+        src_device_addr,
+        callback
+    );
 }
