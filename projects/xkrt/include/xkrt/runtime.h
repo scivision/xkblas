@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 17:04:14 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:00:32 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -248,6 +248,9 @@ void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 
 /* host capture task format */
 void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);
+
+/* touch format */
+void xkrt_memory_touch_async_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void * xkrt_device_thread_main(xkrt_team_t * team, xkrt_thread_t * thread);

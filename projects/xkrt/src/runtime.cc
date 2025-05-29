@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 20:49:46 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:00:02 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -35,6 +35,7 @@ task_format_register(xkrt_runtime_t * runtime)
     task_formats_init(&(runtime->formats.list));
     xkrt_memory_copy_async_register_format(runtime);
     xkrt_task_host_capture_register_format(runtime);
+    xkrt_memory_touch_async_register_format(runtime);
 }
 
 extern "C"

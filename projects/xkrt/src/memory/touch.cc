@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 17:17:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:51:13 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -47,6 +47,11 @@ body_memory_touch_async(task_t * task)
         const size_t pagesize = (size_t) getpagesize();
         for (MemoryRegisterBlock & block : blocks)
         {
+            assert( block.state.touching);
+            assert(!block.state.touched);
+            assert(!block.state.pinning);
+            assert(!block.state.pinned);
+
             // maybe test residency with `mincore`
             // https://man7.org/linux/man-pages/man2/mincore.2.html
 
@@ -58,6 +63,10 @@ body_memory_touch_async(task_t * task)
         }
         args->runtime->memory_register_tree.run(interval, &blocks, MemoryRegisterTree::Op::TOUCHED);
     }
+
+    // no need to requeue ever, because if a page couldnt be touched, it means
+    // it is being pinned or copied-to, so its being touched by someone else
+    // anyway
 }
 
 int

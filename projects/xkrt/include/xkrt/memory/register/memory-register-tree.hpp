@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 16:51:52 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:48:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -275,7 +275,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                 Search search(op, blocks);
                 this->intersect(search, h);
             }
-            pthread_rwlock_rdlock(&this->rwlock);
+            pthread_rwlock_unlock(&this->rwlock);
 
             // intersects run in-order, so the blocks list is sorted by now
             // reduce the list with continuous intervals only
@@ -371,14 +371,24 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             {
                 case (Op::TOUCHING):
                 {
-                    if (!node->state.touched.load())
+                    // try to take the lock on the interval by setting the touching bit
+                          bool expected = false;
+                    const bool newvalue = true;
+                    if (node->state.touching.compare_exchange_strong(expected, newvalue))
                     {
-                              bool expected = false;
-                        const bool newvalue = true;
-                        if (node->state.touching.compare_exchange_strong(expected, newvalue))
+                        // if the segment was already touched, release the touching bit lock
+                        if (node->state.touched.load())
+                        {
+                            assert(node->state.touching.load() == true);
+                            node->state.touching.store(false);
+                        }
+                        // else, it must be touched
+                        else
+                        {
                             search.blocks->push_back(
                                 MemoryRegisterBlock(node->hypercube[0], node->state)
                             );
+                        }
                     }
                     break ;
                 }

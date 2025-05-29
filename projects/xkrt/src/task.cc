@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 21:13:44 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:54:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -59,8 +59,7 @@ xkrt_device_task_execute(
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
-    task_t * current = thread->current_task;
-    thread->current_task = task;
+    task_format_t * format;
 
     /* running an empty task */
     if (task->fmtid == TASK_FORMAT_NULL)
@@ -70,7 +69,7 @@ xkrt_device_task_execute(
     else if (device)
     {
         /* retrieve task format */
-        task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
+        format = task_format_get(&(runtime->formats.list), task->fmtid);
         assert(format);
 
         // convert device driver type to task format target
@@ -97,13 +96,12 @@ xkrt_device_task_execute(
             targetfmt = TASK_FORMAT_TARGET_HOST;
 
         if (format->f[targetfmt] == NULL)
-            LOGGER_FATAL("task_t got scheduled but its format has no valid function");
+            LOGGER_FATAL("task got scheduled but its format has no valid function");
 
         /* running a host task */
         if (targetfmt == TASK_FORMAT_TARGET_HOST)
         {
-            ((void (*)(task_t *)) format->f[targetfmt])(task);
-            __task_executed(task, xkrt_runtime_submit_task, runtime);
+            goto run_host_task;
         }
         /* running a device task */
         else
@@ -126,16 +124,27 @@ xkrt_device_task_execute(
     else
     {
         /* retrieve task format */
-        task_format_t * format = task_format_get(&(runtime->formats.list), task->fmtid);
+        format = task_format_get(&(runtime->formats.list), task->fmtid);
         if (format)
         {
+run_host_task:
             assert(format->f[TASK_FORMAT_TARGET_HOST]);
+            task_t * current = thread->current_task;
+            thread->current_task = task;
             ((void (*)(task_t *)) format->f[TASK_FORMAT_TARGET_HOST])(task);
+            thread->current_task = current;
         }
-        __task_executed(task, xkrt_runtime_submit_task, runtime);
-    }
 
-    thread->current_task = current;
+        /* if the task yielded, requeue it */
+        if (task->flags & TASK_FLAG_REQUEUE)
+        {
+            task->flags = task->flags & ~(TASK_FLAG_REQUEUE);
+            xkrt_team_thread_task_enqueue(runtime, thread->team, thread, task);
+        }
+        /* else, it executed entirely */
+        else
+            __task_executed(task, xkrt_runtime_submit_task, runtime);
+    }
 }
 
 void

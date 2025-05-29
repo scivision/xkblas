@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 22:28:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/05/29 15:41:58 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -86,12 +86,13 @@ typedef enum    task_flags_t
     TASK_FLAG_DETACHABLE    = (1 << 1), // the task completion is associated with the completion of user-defined external events
     TASK_FLAG_DEVICE        = (1 << 2), // task task may execute on a device
     TASK_FLAG_DOMAIN        = (1 << 3), // if this task may have dependent children tasks - in such case, it will have a dependency and a memory domain
+    TASK_FLAG_REQUEUE       = (1 << 4), // if this flag is set, the task will be re-queued after returning from its body
 
     // support me in the future
-  // TASK_FLAG_UNDEFERED     = (1 << 1), // suspend the current task execution until that task completed
-  // TASK_FLAG_PERSISTENT    = (1 << 5), // persistence
+  // TASK_FLAG_UNDEFERED     = (1 << X), // suspend the current task execution until that task completed
+  // TASK_FLAG_PERSISTENT    = (1 << Y), // persistence
 
-    TASK_FLAG_MAX           = (1 << 4)
+    TASK_FLAG_MAX           = (1 << 5)
 }               task_flags_t;
 
 // if test fails increase size of 'task_flag_bitfield_t'
@@ -226,37 +227,37 @@ task_get_extra_size(const task_flag_bitfield_t flags)
             return                            0 +                            0 +                            0 +                            0;  // 0.0.0.0
 
         case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
-            return                            0 +                            0 +                            0 + sizeof(task_dep_info_t);  // 0.0.0.1
+            return                            0 +                            0 +                            0 +      sizeof(task_dep_info_t);  // 0.0.0.1
 
         case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
-            return                            0 +                            0 + sizeof(task_det_info_t) +                            0;  // 0.0.1.0
+            return                            0 +                            0 +      sizeof(task_det_info_t) +                            0;  // 0.0.1.0
 
         case (                   TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
-            return                            0 +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 0.0.1.1 - dep and det shared 'wc'
+            return                            0 +                            0 +                          0x0 +      sizeof(task_dep_info_t);  // 0.0.1.1 - dep and det shared 'wc'
 
         case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |               TASK_FLAG_ZERO |              TASK_FLAG_ZERO):
-            return                            0 + sizeof(task_dev_info_t) +                            0 +                            0;  // 0.1.0.0
+            return                            0 +      sizeof(task_dev_info_t) +                            0 +                            0;  // 0.1.0.0
 
         case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
-            return                            0 + sizeof(task_dev_info_t) +                            0 + sizeof(task_dep_info_t);  // 0.1.0.1
+            return                            0 +      sizeof(task_dev_info_t) +                            0 +      sizeof(task_dep_info_t);  // 0.1.0.1
 
         case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
-            return                            0 + sizeof(task_dev_info_t) + sizeof(task_det_info_t) +                            0;  // 0.1.1.0
+            return                            0 +      sizeof(task_dev_info_t) +      sizeof(task_det_info_t) +                            0;  // 0.1.1.0
 
         case (                   TASK_FLAG_ZERO |             TASK_FLAG_DEVICE |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
-            return                            0 + sizeof(task_dev_info_t) +                          0x0 + sizeof(task_dep_info_t);  // 0.1.1.1 - dep and det shared 'wc'
+            return                            0 +      sizeof(task_dev_info_t) +                          0x0 +      sizeof(task_dep_info_t);  // 0.1.1.1 - dep and det shared 'wc'
 
         case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |              TASK_FLAG_ZERO):
-            return sizeof(task_dom_info_t) +                            0 +                            0 +                            0;  // 1.0.0.0
+            return      sizeof(task_dom_info_t) +                            0 +                            0 +                            0;  // 1.0.0.0
 
         case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |               TASK_FLAG_ZERO |         TASK_FLAG_DEPENDENT):
-            return sizeof(task_dom_info_t) +                            0 +                            0 + sizeof(task_dep_info_t);  // 1.0.0.1
+            return      sizeof(task_dom_info_t) +                            0 +                            0 +      sizeof(task_dep_info_t);  // 1.0.0.1
 
         case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |              TASK_FLAG_ZERO):
-            return sizeof(task_dom_info_t) +                            0 + sizeof(task_det_info_t) +                            0;  // 1.0.1.0
+            return      sizeof(task_dom_info_t) +                            0 +      sizeof(task_det_info_t) +                            0;  // 1.0.1.0
 
         case (                 TASK_FLAG_DOMAIN |               TASK_FLAG_ZERO |         TASK_FLAG_DETACHABLE |         TASK_FLAG_DEPENDENT):
-            return sizeof(task_dom_info_t) +                            0 +                          0x0 + sizeof(task_dep_info_t);  // 1.0.1.1 - dep and det shared 'wc'
+            return      sizeof(task_dom_info_t) +                            0 +                          0x0 +      sizeof(task_dep_info_t);  // 1.0.1.1 - dep and det shared 'wc'
 
         // this is a constexpr, if we reach this default case, then the compiler will fail
         default:
@@ -326,6 +327,12 @@ TASK_DOM_INFO(const task_t * task)
     else
         return (task_dom_info_t *) (task + 1);
 }
+
+// tells the runtime to requeue this task after returning from its main
+# define TASK_MUST_REQUEUE(T)           \
+    do {                                \
+        T->flags |= TASK_FLAG_REQUEUE;  \
+    } while (0)
 
 static constexpr size_t
 TASK_ACCESSES_OFFSET(const task_flag_bitfield_t flags)
