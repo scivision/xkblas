@@ -2,127 +2,177 @@
 /*                                                                            */
 /*   register.cc                                                              */
 /*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
+/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 17:16:38 by Romain PEREIRA            \_)     (_/    */
+/*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
+/*   Updated: 2025/06/01 04:27:09 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
-/*   License: CeCILL-C                                                        */
+/*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
-# include <xkrt/logger/todo.h>
 # include <xkrt/runtime.h>
 
-///////////////////////////////////
-//  ORIGINAL KAAPI 1.0 INTERFACE //
-///////////////////////////////////
+using Hypercube = KHypercube<1>;
 
-//  General idea of these interfaces
-//      - Nvidia GPUs serializes memory pinning anyway
-//      - We have a single thread dedicated to pinning memory to any device
-//      - it schedule 'pinning tasks' that are tasks with read/write access on the memory
+typedef struct  memory_async_args_t
+{
+    xkrt_runtime_t * runtime;
+    const unsigned char * start;
+    const unsigned char *   end;
 
+    memory_async_args_t(
+        xkrt_runtime_t * r,
+        const unsigned char * s,
+        const unsigned char * e
+    ) : runtime(r), start(s), end(e) {}
 
-//  Some ideas:
-//      - can we pin memory independently of CUDA / HIP / ... via 'mlock' and
-//      notify the driver that the memory is pinned ? Would be better in case
-//      of server with different GPU vendors...
+    ~memory_async_args_t() {}
 
+}               memory_async_args_t;
 
-# pragma message(TODO "The current implementation spawn independent tasks. Maybe make it dependent to a specific type of access")
+template<MemoryRegisterTree::Op op1, MemoryRegisterTree::Op op2>
+static void
+body_memory_async(task_t * task)
+{
+    assert(task);
 
-extern "C"
-int
-xkrt_memory_register(
+    memory_async_args_t * args = (memory_async_args_t *) TASK_ARGS(task);
+    assert(args->runtime);
+
+    const Interval interval((uintptr_t) args->start, (uintptr_t) args->end);
+    std::vector<MemoryRegisterBlock> blocks;    // TODO: cache this to avoid dynamic alloc
+    args->runtime->memory_register_tree.run(interval, &blocks, op1);
+    if (blocks.size())
+    {
+        for (MemoryRegisterBlock & block : blocks)
+        {
+            switch (op1)
+            {
+                case (MemoryRegisterTree::Op::TOUCHING):
+                {
+                    assert( block.state.touching);
+                    assert(!block.state.touched);
+                    assert(!block.state.pinning);
+                    assert(!block.state.pinned);
+
+                    // maybe test residency with `mincore`
+                    // https://man7.org/linux/man-pages/man2/mincore.2.html
+
+                    // volatile to trick the compiler and avoid optimization of *p = *p
+                    volatile unsigned char * a = (volatile unsigned char *) block.interval.a;
+                       const unsigned char * b = (   const unsigned char *) block.interval.b;
+                       const size_t pagesize = (size_t) getpagesize();
+                    for ( ; a < b ; a += pagesize)
+                        *a = *a;
+
+                    // no need to requeue ever, because if a page couldnt be
+                    // touched, it means it is being pinned or copied-to, so
+                    // its being touched by someone else anyway
+                    break ;
+                }
+
+                case (MemoryRegisterTree::Op::PINNING):
+                {
+                }
+
+                default:
+                    LOGGER_FATAL("Not implemented");
+            } /* switch op */
+            args->runtime->memory_register_tree.run(block.interval, NULL, op2);
+        } /* foreach block */
+    }
+}
+
+static inline int
+__memory_async(
     xkrt_runtime_t * runtime,
     void * ptr,
-    size_t size
+    const size_t chunk_size,
+    int n,
+    task_format_id_t format
 ) {
-    for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
-    {
-        xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) driver_id);
-        if (!driver)
-            continue ;
-        if (!driver->f_memory_host_register)
-            LOGGER_WARN("Driver `%u` does not implement memory register", driver_id);
-        else if (driver->f_memory_host_register(ptr, size))
-            LOGGER_ERROR("Could not register memory for driver `%s`", driver->f_get_name());
-    }
-    return 0;
-}
-
-extern "C"
-int
-xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, size_t size)
-{
-    for (uint8_t driver_id = 0 ; driver_id < XKRT_DRIVER_TYPE_MAX; ++driver_id)
-    {
-        xkrt_driver_t * driver = runtime->driver_get((xkrt_driver_type_t) driver_id);
-        if (!driver)
-            continue ;
-        if (!driver->f_memory_host_unregister)
-            LOGGER_WARN("Driver `%u` does not implement memory unregister", driver_id);
-        else if (driver->f_memory_host_unregister(ptr, size))
-            LOGGER_ERROR("Could not unregister memory for driver `%s`", driver->f_get_name());
-    }
-    return 0;
-}
-
-extern "C"
-size_t
-xkrt_memory_register_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
-{
     xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
     assert(driver);
 
     xkrt_team_t * team = &driver->team;
 
-    // TODO : could be optimized using a custom format for register tasks
-    runtime->team_task_spawn(
-        team,
-        [runtime, ptr, size] (task_t * task) {
-            LOGGER_DEBUG("register memory...");
-            xkrt_memory_register(runtime, ptr, size);
-        }
-    );
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
 
+    for (int i = 0 ; i < n ; ++i)
+    {
+        // inserts the interval in the tree to ensure they exist
+        const unsigned char * start = ((const unsigned char *) ptr) + (i+0) * chunk_size;
+        const unsigned char *   end = ((const unsigned char *) ptr) + (i+1) * chunk_size;
+        const Interval interval((uintptr_t) start, (uintptr_t) end);
+        runtime->memory_register_tree.ensure(interval);
+
+        // create a task that will touch the memory
+        constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
+        constexpr size_t task_size = task_compute_size(flags, 0);
+        constexpr size_t args_size = sizeof(memory_async_args_t);
+
+        task_t * task = tls->allocate_task(task_size + args_size);
+        new(task) task_t(format, flags);
+
+        memory_async_args_t * args = (memory_async_args_t *) TASK_ARGS(task, task_size);
+        new (args) memory_async_args_t(runtime, start, end);
+
+        tls->commit(task, xkrt_team_thread_task_enqueue, runtime, team, team->priv.threads + 0);
+    }
     return 0;
 }
 
-extern "C"
 int
-xkrt_memory_unregister_async(xkrt_runtime_t * runtime, void * ptr, size_t size)
-{
-    xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
-    assert(driver);
-
-    xkrt_team_t * team = &driver->team;
-
-    // TODO : could be optimized using a custom format for unregister tasks
-    runtime->team_task_spawn(
-        team,
-        [runtime, ptr, size] (task_t * task) {
-            LOGGER_DEBUG("unregistering memory...");
-            xkrt_memory_unregister(runtime, ptr, size);
-        }
-    );
-    return 0;
+xkrt_runtime_t::memory_touch_async(
+    void * ptr,
+    const size_t chunk_size,
+    int n
+) {
+    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_touch_async);
 }
 
-extern "C"
 int
-xkrt_memory_register_waitall(xkrt_runtime_t * runtime)
-{
-    // atm, waits for all children tasks
-    // instead, we probably want to wait only on register tasks
-
-    runtime->task_wait();
-    return 0;
+xkrt_runtime_t::memory_register_async(
+    void * ptr,
+    const size_t chunk_size,
+    int n
+) {
+    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_pin_async);
 }
 
-//////////////////////////
-//  KAAPI 2.0 INTERFACE //
-//////////////////////////
+int
+xkrt_runtime_t::memory_unregister_async(
+    void * ptr,
+    const size_t chunk_size,
+    int n
+) {
+    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_unpin_async);
+}
 
+template<MemoryRegisterTree::Op op1, MemoryRegisterTree::Op op2>
+static void
+__memory_async_register_format(
+    xkrt_runtime_t * runtime,
+    task_format_id_t * format_id,
+    const char * label
+) {
+    task_format_t format;
+    memset(format.f, 0, sizeof(format.f));
+    format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_async<op1, op2>;
+    snprintf(format.label, sizeof(format.label), label);
+    *format_id = task_format_create(&(runtime->formats.list), &format);
+}
 
+void
+xkrt_memory_async_register_format(xkrt_runtime_t * runtime)
+{
+    __memory_async_register_format<MemoryRegisterTree::Op::TOUCHING, MemoryRegisterTree::Op::TOUCHED>(
+            runtime, &runtime->formats.memory_touch_async, "memory_touch_async");
+
+    __memory_async_register_format<MemoryRegisterTree::Op::PINNING, MemoryRegisterTree::Op::PINNED>(
+            runtime, &runtime->formats.memory_pin_async, "memory_pin_async");
+
+    __memory_async_register_format<MemoryRegisterTree::Op::UNPINNING, MemoryRegisterTree::Op::UNPINNED>(
+            runtime, &runtime->formats.memory_unpin_async, "memory_unpin_async");
+}

@@ -20,6 +20,8 @@ set(TEST_SOURCES
     team-cpus.cc
     team-cpus-parallel-for.cc
     team-device.cc
+    register-async.cc
+    register-async-legacy.cc
     touch-async.cc
 )
 

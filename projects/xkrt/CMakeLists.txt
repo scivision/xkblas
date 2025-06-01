@@ -92,8 +92,8 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory/distribute.cc
     ${CMAKE_SOURCE_DIR}/src/memory/invalidate.cc
     ${CMAKE_SOURCE_DIR}/src/memory/register.cc
+    ${CMAKE_SOURCE_DIR}/src/memory/register-legacy.cc
     ${CMAKE_SOURCE_DIR}/src/memory/replicate.cc
-    ${CMAKE_SOURCE_DIR}/src/memory/touch.cc
     ${CMAKE_SOURCE_DIR}/src/stats/stats.cc
     ${CMAKE_SOURCE_DIR}/src/task/task.cc
     ${CMAKE_SOURCE_DIR}/src/task/task-format.cc

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/29 15:48:43 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/01 04:37:16 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -54,11 +54,12 @@ class MemoryRegisterTreeNodeSearch {
             INSERTING,
             TOUCHING,
             TOUCHED,
-            TRANSFERING,
-            TRANSFERED,
             PINNING,
-            PINNED
-
+            PINNED,
+            UNPINNING,
+            UNPINNED,
+            TRANSFERING,
+            TRANSFERED
         }               Type;
 
     public:
@@ -277,32 +278,36 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             }
             pthread_rwlock_unlock(&this->rwlock);
 
-            // intersects run in-order, so the blocks list is sorted by now
-            // reduce the list with continuous intervals only
-            assert(std::is_sorted(blocks->begin(), blocks->end()));
-
-            // Index to write the next merged interval
-            size_t write = 1;
-
-            for (size_t i = 1; i < blocks->size(); ++i)
+            LOGGER_FATAL("we may want to merge differently depending on the op");
+            if (blocks)
             {
-                MemoryRegisterBlock &    last = (*blocks)[write - 1];
-                MemoryRegisterBlock & current = (*blocks)[i];
+                // intersects run in-order, so the blocks list is sorted by now
+                // reduce the list with continuous intervals only
+                assert(std::is_sorted(blocks->begin(), blocks->end()));
 
-                if (last.interval.b == current.interval.a)
+                // Index to write the next merged interval
+                size_t write = 1;
+
+                for (size_t i = 1; i < blocks->size(); ++i)
                 {
-                    // Merge into last interval
-                    last.interval.b = current.interval.b;
+                    MemoryRegisterBlock &    last = (*blocks)[write - 1];
+                    MemoryRegisterBlock & current = (*blocks)[i];
+
+                    if (last.interval.b == current.interval.a)
+                    {
+                        // Merge into last interval
+                        last.interval.b = current.interval.b;
+                    }
+                    else
+                    {
+                        // Move current to the next write position
+                        (*blocks)[write++] = current;
+                    }
                 }
-                else
-                {
-                    // Move current to the next write position
-                    (*blocks)[write++] = current;
-                }
+
+                // Remove the unused tail
+                blocks->resize(write);
             }
-
-            // Remove the unused tail
-            blocks->resize(write);
 
             return 0;
         }
@@ -397,6 +402,37 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                 {
                     assert(!node->state.touched.load());
                     node->state.touched.store(true);
+                    break ;
+                }
+
+                case (Op::PINNING):
+                {
+                    // try to take the lock on the interval by setting the pinned bit
+                          bool expected = false;
+                    const bool newvalue = true;
+                    if (node->state.pinning.compare_exchange_strong(expected, newvalue))
+                    {
+                        // if the segment was already pinned, release the pinning bit lock
+                        if (node->state.pinned.load())
+                        {
+                            assert(node->state.pinned.load() == true);
+                            node->state.pinning.store(false);
+                        }
+                        // else, it must be pinned
+                        else
+                        {
+                            search.blocks->push_back(
+                                MemoryRegisterBlock(node->hypercube[0], node->state)
+                            );
+                        }
+                    }
+                    break ;
+                }
+
+                case (Search::Type::PINNED):
+                {
+                    assert(!node->state.pinned.load());
+                    node->state.pinned.store(true);
                     break ;
                 }
 

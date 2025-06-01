@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/29 15:00:32 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/01 04:25:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -49,6 +49,8 @@ typedef struct  xkrt_runtime_t
         task_format_id_t copy_async;
         task_format_id_t host_capture;
         task_format_id_t memory_touch_async;
+        task_format_id_t memory_pin_async;
+        task_format_id_t memory_unpin_async;
     } formats;
 
     /* user conf */
@@ -129,14 +131,19 @@ typedef struct  xkrt_runtime_t
     /////////////////////////
 
     /**
-     *  Create 'nchunks' tasks so that each task i in [0..nchunks-1] touches
+     *  Create 'n' tasks so that each task i in [0..n-1] touches
      *  memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
      *  Tasks will be cancelled if the memory is touched through `notify_touched()`
      */
-    int memory_touch_async(void * ptr, const size_t chunk_size, int nchunks);
+    int memory_touch_async(void * ptr, const size_t chunk_size, int n);
 
-    int memory_register_async(void * ptr, const size_t chunk_size, int nchunks);
-    int memory_unregister_async(void * ptr, const size_t chunk_size, int nchunks);
+    /**
+     *  Create 'n' tasks so that each task i in [0..n-1] pins memory in
+     *  [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
+     *  Each task may run 'cuMemRegister' several time on a single chunk
+     */
+    int memory_register_async(void * ptr, const size_t chunk_size, int n);
+    int memory_unregister_async(void * ptr, const size_t chunk_size, int n);
 
     /////////////////////
     // SYNCHRONIZATION //
@@ -249,8 +256,8 @@ void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 /* host capture task format */
 void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);
 
-/* touch format */
-void xkrt_memory_touch_async_register_format(xkrt_runtime_t * runtime);
+/* register v2 format */
+void xkrt_memory_async_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void * xkrt_device_thread_main(xkrt_team_t * team, xkrt_thread_t * thread);
