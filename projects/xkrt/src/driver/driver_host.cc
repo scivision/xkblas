@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 14:41:51 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:16:43 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -82,8 +82,11 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
-{
+XKRT_DRIVER_ENTRYPOINT(device_cpuset)(
+    hwloc_topology_t topology,
+    cpu_set_t * schedset,
+    int device_driver_id
+) {
     (void) topology;
     assert(device_driver_id == 0);
     pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), schedset);

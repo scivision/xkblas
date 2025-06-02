@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 17:12:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 19:30:54 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -177,6 +177,9 @@ __parse_drivers(xkrt_conf_t * conf, char const * value)
 
             int nthreads = atoi(nthreads_str);
             assert(nthreads);
+
+            if (nthreads > XKRT_MAX_THREADS_PER_DEVICE)
+                LOGGER_FATAL("Requested too many threads for driver `%s`. Reduce the number of thread, or increase `XKRT_MAX_THREADS_PER_DEVICE` and recompile", driver_name, XKRT_MAX_THREADS_PER_DEVICE);
 
             xkrt_driver_type_t driver_type = xkrt_driver_type_from_name(driver_name);
             if (driver_type == XKRT_DRIVER_TYPE_MAX)

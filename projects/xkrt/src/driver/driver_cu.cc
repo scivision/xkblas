@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/22 22:06:38 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:02:26 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -210,7 +210,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(
     unsigned int ndevices,
     bool use_p2p
 ) {
+    LOGGER_INFO("Calling cuInit(0) ...");
     CUresult err = cuInit(0);
+    LOGGER_INFO("Returned from cuInit(0)");
     if (err != CUDA_SUCCESS)
     {
         if (err == CUDA_ERROR_STUB_LIBRARY)

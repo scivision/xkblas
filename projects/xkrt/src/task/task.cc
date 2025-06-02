@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/04/20 03:00:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/20 03:50:56 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 19:48:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -43,9 +43,6 @@ task_get_memory_controller(
         }
     }
 
-    LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
-            access->host_view.ld, access->host_view.sizeof_type, runtime->conf.merge_transfers ? "true" : "false");
-
     /* if not found, create a new memory coherency controller dependending on
      * the access type */
     MemoryCoherencyController * mcc;
@@ -59,6 +56,9 @@ task_get_memory_controller(
                 access->host_view.sizeof_type,
                 runtime->conf.merge_transfers
             );
+
+            LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
+                    access->host_view.ld, access->host_view.sizeof_type, runtime->conf.merge_transfers ? "true" : "false");
             break ;
         }
 

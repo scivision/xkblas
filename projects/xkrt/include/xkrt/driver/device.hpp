@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/11 00:11:03 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 19:31:44 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -380,6 +380,7 @@ typedef struct  xkrt_device_t
     /* push a task to a thread of the device */
     void push(task_t * const & task)
     {
+        assert(this->nthreads <= XKRT_MAX_THREADS_PER_DEVICE);
         uint8_t tid = this->thread_next.fetch_add(1, std::memory_order_relaxed) % this->nthreads;
         xkrt_thread_t * thread = this->threads[tid];
         thread->deque.push(task);

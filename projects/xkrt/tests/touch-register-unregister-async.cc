@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 20:49:42 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:11:29 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -20,12 +20,12 @@
 static xkrt_runtime_t runtime;
 
 static void *       ptr         = NULL;
-static const size_t size        = (size_t) (0.5 * 1024 * 1024 * 1024);
-static const int    nchunks     = 4;
+static const size_t size        = (size_t) 2 * 1024 * 1024 * 1024;
+static const size_t nchunks     = 64;
 static const size_t chunk_size  = size / nchunks;
 
 int
-main(void)
+main(int argc, char ** argv)
 {
     if (xkrt_init(&runtime))
         LOGGER_FATAL("ERROR INIT");
@@ -40,6 +40,14 @@ main(void)
 
     std::mt19937 rng(std::random_device{}());
     int done[3] = {0, 0, 0};
+
+    if (argc == 2)
+    {
+        done[0] = 1;
+        done[1] = 1;
+        done[2] = 1;
+        done[atoi(argv[1])] = 0;
+    }
 
     while (done[0] + done[1] + done[2] < 3)
     {

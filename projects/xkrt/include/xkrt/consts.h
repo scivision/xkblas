@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/22 21:45:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 19:30:34 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -41,7 +41,7 @@ static_assert(XKRT_DEVICES_MAX <= sizeof(xkrt_device_global_id_bitfield_t)*8);
 # define XKRT_DEVICES_MASK_ALL (~((xkrt_device_global_id_bitfield_t)0))
 
 /* maximum number of threads per device */
-# define XKRT_MAX_THREADS_PER_DEVICE (4)
+# define XKRT_MAX_THREADS_PER_DEVICE (16)
 
 /* maximum number of memory per thread */
 # define THREAD_MAX_MEMORY ((size_t)2*1024*1024*1024)
