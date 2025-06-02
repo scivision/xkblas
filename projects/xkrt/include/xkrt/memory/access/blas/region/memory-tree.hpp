@@ -74,7 +74,7 @@ template <int K>
 class KMemoryForward {
 
     public:
-        using Hypercube = KHypercube<2>;
+        using Hyperrect = KHyperrect<2>;
 
     public:
 
@@ -84,8 +84,8 @@ class KMemoryForward {
         /* dst chunk */
         xkrt_area_chunk_t * chunk;
 
-        /* the dst cube */
-        Hypercube dst_hypercube;
+        /* the dst rect */
+        Hyperrect dst_hyperrect;
 
         /* the dst device */
         xkrt_device_global_id_t device_global_id;
@@ -98,13 +98,13 @@ class KMemoryForward {
         KMemoryForward(
             access_t * access,
             xkrt_area_chunk_t * chunk,
-            const Hypercube & dst_hypercube,
+            const Hyperrect & dst_hyperrect,
             xkrt_device_global_id_t device_global_id,
             memory_replicate_view_t & device_view
         ) :
             access(access),
             chunk(chunk),
-            dst_hypercube(dst_hypercube),
+            dst_hyperrect(dst_hyperrect),
             device_global_id(device_global_id),
             device_view(device_view)
         {}
@@ -221,7 +221,7 @@ class KMemoryReplicate
 template <int K>
 class KMemoryBlock {
 
-    using Hypercube = KHypercube<K>;
+    using Hyperrect = KHyperrect<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
 
@@ -247,16 +247,16 @@ class KMemoryBlock {
 
         void
         memory_block_init(
-            const Hypercube & block_cube,
+            const Hyperrect & block_rect,
             const KMemoryBlock & inheriting_block,
-            const Hypercube & inheriting_cube,
+            const Hyperrect & inheriting_rect,
             const size_t sizeof_type
         ) {
             /////////////////////////////////
             //  HOST_VIEW HAS TO BE OFFSET //
             /////////////////////////////////
             INTERVAL_DIFF_TYPE_T d[K];
-            Hypercube::distance_manhattan(inheriting_cube, block_cube, d);
+            Hyperrect::distance_manhattan(inheriting_rect, block_rect, d);
 
             //////////////////////////////////
             //  DUPPLICATE REPLICATE INFOS  //
@@ -300,13 +300,13 @@ class KMemoryBlock {
 
         /* a block from splitting an existing one */
         KMemoryBlock(
-            const Hypercube & block_cube,
+            const Hyperrect & block_rect,
             const KMemoryBlock & inheriting_block,
-            const Hypercube & inheriting_cube,
+            const Hyperrect & inheriting_rect,
             const size_t sizeof_type
         ) {
             static_assert(K == 2);
-            this->memory_block_init(block_cube, inheriting_block, inheriting_cube, sizeof_type);
+            this->memory_block_init(block_rect, inheriting_block, inheriting_rect, sizeof_type);
         }
         ~KMemoryBlock() {}
 
@@ -316,7 +316,7 @@ class KMemoryBlock {
 template <int K>
 class KMemoryTreeNodeSearch {
 
-    using Hypercube = KHypercube<K>;
+    using Hyperrect = KHyperrect<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryForward = KMemoryForward<K>;
 
@@ -328,8 +328,8 @@ class KMemoryTreeNodeSearch {
                 /* memory block in the tree (WARNING : this is mutable outside a 'lock' section) */
                 MemoryBlock * block;
 
-                /* The hypercube of this block (intersection of the access with the tree node) */
-                const Hypercube hypercube;
+                /* The hyperrect of this block (intersection of the access with the tree node) */
+                const Hyperrect hyperrect;
 
                 /* dst device */
                 xkrt_device_global_id_t dst_device_global_id;
@@ -357,9 +357,9 @@ class KMemoryTreeNodeSearch {
 
             public:
 
-                Partite(MemoryBlock * b, const Hypercube & h) :
+                Partite(MemoryBlock * b, const Hyperrect & h) :
                     block(b),
-                    hypercube(h),
+                    hyperrect(h),
                     dst_device_global_id(HOST_DEVICE_GLOBAL_ID),
                     dst_allocation_view_id(MEMORY_REPLICATE_ALLOCATION_VIEW_NONE),
                     dst_view(),
@@ -374,8 +374,8 @@ class KMemoryTreeNodeSearch {
                 bool
                 operator<(const Partite & p) const
                 {
-                    const bool is_left  = this->hypercube[ACCESS_CUBE_COL_DIM].a < p.hypercube[ACCESS_CUBE_COL_DIM].a;
-                    const bool is_right = this->hypercube[ACCESS_CUBE_COL_DIM].a > p.hypercube[ACCESS_CUBE_COL_DIM].a;
+                    const bool is_left  = this->hyperrect[ACCESS_CUBE_COL_DIM].a < p.hyperrect[ACCESS_CUBE_COL_DIM].a;
+                    const bool is_right = this->hyperrect[ACCESS_CUBE_COL_DIM].a > p.hyperrect[ACCESS_CUBE_COL_DIM].a;
 
                     if (is_left)
                         return true;
@@ -384,10 +384,10 @@ class KMemoryTreeNodeSearch {
                         return false;
 
                     // vertically aligned
-                    assert(this->hypercube[ACCESS_CUBE_COL_DIM].a == p.hypercube[ACCESS_CUBE_COL_DIM].a);
+                    assert(this->hyperrect[ACCESS_CUBE_COL_DIM].a == p.hyperrect[ACCESS_CUBE_COL_DIM].a);
 
-                    const bool is_up    = this->hypercube[ACCESS_CUBE_ROW_DIM].a < p.hypercube[ACCESS_CUBE_ROW_DIM].a;
-                    const bool is_down  = this->hypercube[ACCESS_CUBE_ROW_DIM].a > p.hypercube[ACCESS_CUBE_ROW_DIM].a;
+                    const bool is_up    = this->hyperrect[ACCESS_CUBE_ROW_DIM].a < p.hyperrect[ACCESS_CUBE_ROW_DIM].a;
+                    const bool is_down  = this->hyperrect[ACCESS_CUBE_ROW_DIM].a > p.hyperrect[ACCESS_CUBE_ROW_DIM].a;
 
                     if (is_up)
                         return true;
@@ -471,7 +471,7 @@ class KMemoryTreeNodeSearch {
 
        /*
         * list of blocks for the current access.
-        * The set { b.cube / b in partition } is a partition of the space represented by access->hypercube
+        * The set { b.rect / b in partition } is a partition of the space represented by access->hyperrect
         */
         Partition partition;
 
@@ -540,7 +540,7 @@ template <int K>
 class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
 
     using Base = typename KHPTree<K, KMemoryTreeNodeSearch<K>>::Node;
-    using Hypercube = KHypercube<K>;
+    using Hyperrect = KHyperrect<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
@@ -555,10 +555,10 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
 
     public:
 
-        /* the cube was never accessed before, create a new node */
+        /* the rect was never accessed before, create a new node */
         KMemoryTreeNode<K>(
             const access_t * access,
-            const Hypercube & r,
+            const Hyperrect & r,
             const int k,
             const Color color
         ) :
@@ -571,24 +571,24 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
         /**
          * A new node is being created from a split, make it inherit its original node 'src'
          *  - access - the access
-         *  - r - the shrinked cube that this is inheriting from
+         *  - r - the shrinked rect that this is inheriting from
          *  - k - the dimension that got splitted
          *  - color - the node color
          *  - src - the node that got split
          *
          * We have:
-         *  U (src->hypercube, r) == the node cube before being shrinked
-         *  n (src->hypercube, r) = {} - empty intersection
+         *  U (src->hyperrect, r) == the node rect before being shrinked
+         *  n (src->hyperrect, r) = {} - empty intersection
          */
         KMemoryTreeNode<K>(
-            const Hypercube & r,
+            const Hyperrect & r,
             const int k,
             const Color color,
             const Node * src,
             const size_t sizeof_type
         ) :
             Base(r, k, color),
-            block(r, src->block, src->hypercube, sizeof_type)
+            block(r, src->block, src->hyperrect, sizeof_type)
         {}
 
     public:
@@ -600,9 +600,9 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
         }
 
         void
-        dump_hypercube_str(FILE * f) const
+        dump_hyperrect_str(FILE * f) const
         {
-            // Base::dump_hypercube_str(f);
+            // Base::dump_hyperrect_str(f);
 
             for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
             {
@@ -621,7 +621,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
     public:
         using Base = KHPTree<K, KMemoryTreeNodeSearch<K>>;
-        using Hypercube = KHypercube<K>;
+        using Hyperrect = KHyperrect<K>;
         using MemoryBlock = KMemoryBlock<K>;
         using MemoryForward = KMemoryForward<K>;
         using MemoryReplicate = KMemoryReplicate<K>;
@@ -668,8 +668,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
         typedef struct  fetch_t
         {
-            /* the logical hypercubes representing that fetch */
-            Hypercube hypercubes[2];
+            /* the logical hyperrects representing that fetch */
+            Hyperrect hyperrects[2];
 
             /* the host memory view */
             memory_view_t host_view;
@@ -844,19 +844,19 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                     const size_t dn = fj->host_view.n;
                     if (fi->host_view.ld == fj->host_view.ld && (fi->host_view.offset_addr(dm,  0) == fj->host_view.begin_addr() || fi->host_view.offset_addr( 0, dn) == fj->host_view.begin_addr()))
                     {
-                        assert(!fi->hypercubes[0].is_empty());
-                        assert(!fj->hypercubes[0].is_empty());
-                        assert( fi->hypercubes[1].is_empty());
-                        assert( fj->hypercubes[1].is_empty());
+                        assert(!fi->hyperrects[0].is_empty());
+                        assert(!fj->hyperrects[0].is_empty());
+                        assert( fi->hyperrects[1].is_empty());
+                        assert( fj->hyperrects[1].is_empty());
 
-                        memory_view_from_hypercubes<K>(
+                        memory_view_from_hyperrects<K>(
                             fi->host_view,
-                            fi->hypercubes[0], fj->hypercubes[0],
+                            fi->hyperrects[0], fj->hyperrects[0],
                             fi->host_view.ld,
                             fi->host_view.sizeof_type
                         );
 
-                        fi->hypercubes[1] = fj->hypercubes[0];
+                        fi->hyperrects[1] = fj->hyperrects[0];
 
                         fj->merged = true;
                         list->fetched();
@@ -929,8 +929,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 search.prepare_search_awaiting(fetch->dst_chunk);
                 tree->lock();
                 {
-                    tree->intersect(search, fetch->hypercubes[0]);
-                    tree->intersect(search, fetch->hypercubes[1]);
+                    tree->intersect(search, fetch->hyperrects[0]);
+                    tree->intersect(search, fetch->hyperrects[1]);
                 }
                 tree->unlock();
 
@@ -958,7 +958,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                         forward_list->fetching();
 
                         // upcoming copy only needs m, n, sizeof_type
-                        memory_view_from_hypercube(forward_fetch->host_view, forward.dst_hypercube, tree->ld, tree->sizeof_type);
+                        memory_view_from_hyperrect(forward_fetch->host_view, forward.dst_hyperrect, tree->ld, tree->sizeof_type);
 
                         // the chunk to use
                         forward_fetch->dst_chunk = forward.chunk;
@@ -969,8 +969,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                         // the forward dst view - memory region where to forward the data
                         forward_fetch->dst_view = forward.device_view;
 
-                        // only 1 cube representing the forward view
-                        forward_fetch->hypercubes[0] = forward.dst_hypercube;
+                        // only 1 rect representing the forward view
+                        forward_fetch->hyperrects[0] = forward.dst_hyperrect;
 
                         // the just-fetched 'dst' is the new 'src'
                         forward_fetch->src_device_global_id = fetch->dst_device_global_id;
@@ -1024,14 +1024,14 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
 
                 /* set the views */
                 memory_view_t host_view;
-                memory_view_from_hypercube(host_view, partite.hypercube, this->ld, this->sizeof_type);
+                memory_view_from_hyperrect(host_view, partite.hyperrect, this->ld, this->sizeof_type);
                 const memory_replicate_view_t host_replicate_view(host_view.begin_addr(), this->ld);
                 const memory_replicate_view_t dst_view = (partite.dst_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.dst_view;
                 const memory_replicate_view_t src_view = (partite.src_allocation_view_id == MEMORY_REPLICATE_ALLOCATION_VIEW_NONE) ? host_replicate_view : partite.src_view;
 
                 /* allocate fetch info for the callback argument */
                 fetch_t * fetch = list->prepare_next_fetch();
-                fetch->hypercubes[0]        = partite.hypercube;
+                fetch->hyperrects[0]        = partite.hyperrect;
                 fetch->host_view            = host_view;
                 fetch->src_device_global_id = partite.src_device_global_id;
                 fetch->src_view             = src_view;
@@ -1117,7 +1117,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             }
         }
 
-        /* create a list of fetch request to perform for the given hypercubes */
+        /* create a list of fetch request to perform for the given hyperrects */
         fetch_list_t *
         fetch_list_to_host(
             access_t * access
@@ -1127,13 +1127,13 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             {
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->hypercubes[0]);
-                this->insert(search, access->hypercubes[1]);
+                this->insert(search, access->hyperrects[0]);
+                this->insert(search, access->hyperrects[1]);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_partition();
-                this->intersect(search, access->hypercubes[0]);
-                this->intersect(search, access->hypercubes[1]);
+                this->intersect(search, access->hyperrects[0]);
+                this->intersect(search, access->hyperrects[1]);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
@@ -1277,7 +1277,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             {
                 /* compute distance from corner */
                 INTERVAL_DIFF_TYPE_T d[K];
-                Hypercube::distance_manhattan(corner.hypercube, partite.hypercube, d);
+                Hyperrect::distance_manhattan(corner.hyperrect, partite.hyperrect, d);
                 if (d[ACCESS_CUBE_ROW_DIM] < 0)
                 {
                     d[ACCESS_CUBE_ROW_DIM] += this->ld * this->sizeof_type;
@@ -1523,7 +1523,7 @@ next_view:
 
                         LOGGER_DEBUG("registered a forward for task `%s`", access->task->label);
 
-                        const MemoryForward forward(access, partition.chunk, partite.hypercube, device_global_id, dst_allocation_view->view);
+                        const MemoryForward forward(access, partition.chunk, partite.hyperrect, device_global_id, dst_allocation_view->view);
                         fetching_allocation_view->awaiting.forwards.push_back(forward);
                         __task_fetching(1, access->task);
                     }
@@ -1676,13 +1676,13 @@ next_view:
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->hypercubes[0]);
-                this->insert(search, access->hypercubes[1]);
+                this->insert(search, access->hyperrects[0]);
+                this->insert(search, access->hyperrects[1]);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_partition();
-                this->intersect(search, access->hypercubes[0]);
-                this->intersect(search, access->hypercubes[1]);
+                this->intersect(search, access->hyperrects[0]);
+                this->intersect(search, access->hyperrects[1]);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (3) find or allocate continuous memory for that access on that device */
@@ -1795,8 +1795,8 @@ next_view:
             this->lock();
             {
                 for (int i = 0 ; i < 2 ; ++i)
-                    if (!access->hypercubes[i].is_empty())
-                        this->intersect(search, access->hypercubes[i]);
+                    if (!access->hyperrects[i].is_empty())
+                        this->intersect(search, access->hyperrects[i]);
             }
             this->unlock();
 
@@ -1832,7 +1832,7 @@ next_view:
             assert(search.type == Search::Type::INSERTING_BLOCKS);
         }
 
-        /* shrinking on dimension 'k' from 'this->hypercube[k]' to 'interval' */
+        /* shrinking on dimension 'k' from 'this->hyperrect[k]' to 'interval' */
         void
         on_shrink(
             NodeBase * nodebase,
@@ -1843,21 +1843,21 @@ next_view:
             Node * node = reinterpret_cast<Node *>(nodebase);
 
             assert(k < K);
-            assert(node->hypercube[k].includes(interval));
+            assert(node->hyperrect[k].includes(interval));
 
             ///////////////////////
             //  SHRINK HOST VIEW //
             ///////////////////////
 
-            assert(node->hypercube[k].a <= interval.a);
-            const INTERVAL_DIFF_TYPE_T da = interval.a - node->hypercube[k].a;
+            assert(node->hyperrect[k].a <= interval.a);
+            const INTERVAL_DIFF_TYPE_T da = interval.a - node->hyperrect[k].a;
 
-            assert(node->hypercube[k].b >= interval.b);
+            assert(node->hyperrect[k].b >= interval.b);
 
             // must be aligned on sizeof(type)
             if (k == ACCESS_CUBE_ROW_DIM)
             {
-                const INTERVAL_DIFF_TYPE_T db = node->hypercube[k].b - interval.b;
+                const INTERVAL_DIFF_TYPE_T db = node->hyperrect[k].b - interval.b;
                 (void) db;
                 assert(da % this->sizeof_type == 0);
                 assert(db % this->sizeof_type == 0);
@@ -1887,7 +1887,7 @@ next_view:
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
 
             (void) nodebase;
@@ -1900,31 +1900,31 @@ next_view:
         }
 
         /**
-         * The passed cube is intersecting with 'this'
+         * The passed rect is intersecting with 'this'
          */
         inline void
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
 
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);
-            assert(h.intersects(node->hypercube));
+            assert(h.intersects(node->hyperrect));
 
             switch (search.type)
             {
                 case (Search::Type::SEARCH_FOR_PARTITION):
                 {
-                    /* intersecting against 'cube' that had been inserted
-                     * previously, so 'node' must be a sub-block of 'cube' */
-                    assert(h.includes(node->hypercube));
-                    search.partition.partites.push_back(Partite(&(node->block), node->hypercube));
+                    /* intersecting against 'rect' that had been inserted
+                     * previously, so 'node' must be a sub-block of 'rect' */
+                    assert(h.includes(node->hyperrect));
+                    search.partition.partites.push_back(Partite(&(node->block), node->hyperrect));
                     break ;
                 }
 
-                /* search for tasks awaiting on that cube for a given allocation */
+                /* search for tasks awaiting on that rect for a given allocation */
                 case (Search::Type::SEARCH_AWAITING):
                 {
                     const xkrt_device_global_id_bitfield_t devbit = (xkrt_device_global_id_bitfield_t) (1 << search.device_global_id);
@@ -1986,8 +1986,8 @@ next_view:
                 /* search for owners of the access */
                 case (Search::Type::SEARCH_OWNERS):
                 {
-                    Hypercube intersect;
-                    Hypercube::intersection(&intersect, h, node->hypercube);
+                    Hyperrect intersect;
+                    Hyperrect::intersection(&intersect, h, node->hyperrect);
                     const size_t bytes = intersect.size();
                     for (xkrt_device_global_id_t device_global_id = 0 ; device_global_id < XKRT_DEVICES_MAX ; ++device_global_id)
                         if (node->block.coherency & (1 << device_global_id))
@@ -2006,7 +2006,7 @@ next_view:
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color
         ) const {
@@ -2017,14 +2017,14 @@ next_view:
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color,
             const NodeBase * inherit
         ) const {
             (void) search;
             assert(search.type == Search::Type::INSERTING_BLOCKS);
-            assert(!h.intersects(inherit->hypercube));
+            assert(!h.intersects(inherit->hyperrect));
             return new Node(h, k, color, reinterpret_cast<const Node *>(inherit), this->sizeof_type);
         }
 };

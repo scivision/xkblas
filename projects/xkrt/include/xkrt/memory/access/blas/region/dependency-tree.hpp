@@ -74,7 +74,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 
     using Base      = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
     using Node      = KDependencyTreeNode<K>;
-    using Hypercube = KHypercube<K>;
+    using Hyperrect = KHyperrect<K>;
     using Search    = KDependencyTreeSearch<K>;
 
     public:
@@ -91,7 +91,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
     public:
 
         KDependencyTreeNode<K>(
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color
         ) :
@@ -104,7 +104,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 
         /* a new node from a split, inherit 'src' accesses */
         KDependencyTreeNode<K>(
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color,
             const Node * inherit
@@ -151,9 +151,9 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
         }
 
         void
-        dump_hypercube_str(FILE * f) const
+        dump_hyperrect_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_hypercube_str(f);
+            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_hyperrect_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -169,7 +169,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
 {
     public:
         using Base      = KHPTree<K, KDependencyTreeSearch<K>>;
-        using Hypercube = KHypercube<K>;
+        using Hyperrect = KHyperrect<K>;
         using Node      = KDependencyTreeNode<K>;
         using NodeBase  = typename Base::Node;
         using Search    = KDependencyTreeSearch<K>;
@@ -195,8 +195,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
 
             Search search;
             search.prepare_conflicting(conflicts, access);
-            Base::intersect(search, access->hypercubes[0]);
-            Base::intersect(search, access->hypercubes[1]);
+            Base::intersect(search, access->hyperrects[0]);
+            Base::intersect(search, access->hyperrects[1]);
         }
 
         //////////////
@@ -235,7 +235,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color
         ) const {
@@ -246,7 +246,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color,
             const NodeBase * inherit
@@ -262,7 +262,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
             (void) h;
 
@@ -277,7 +277,7 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
 
             (void) h;
@@ -324,8 +324,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
 
             Search search;
             search.prepare_resolve(access);
-            Base::intersect(search, access->hypercubes[0]);
-            Base::intersect(search, access->hypercubes[1]);
+            Base::intersect(search, access->hyperrects[0]);
+            Base::intersect(search, access->hyperrects[1]);
         }
 
         void
@@ -335,8 +335,8 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
 
             Search search;
             search.prepare_resolve(access);
-            Base::insert(search, access->hypercubes[0]);
-            Base::insert(search, access->hypercubes[1]);
+            Base::insert(search, access->hyperrects[0]);
+            Base::insert(search, access->hyperrects[1]);
         }
 
         bool

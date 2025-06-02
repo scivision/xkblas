@@ -15,7 +15,7 @@
 # define __ACCESS_HPP__
 
 # include <xkrt/memory/access/mode.h>
-# include <xkrt/memory/access/common/hypercube.hpp>
+# include <xkrt/memory/access/common/hyperrect.hpp>
 # include <xkrt/memory/view.hpp>
 
 # include <vector>
@@ -23,9 +23,9 @@
 /**
  *  We assume col major, dim 0 is for rows; dim 1 is for cols.
  *  These variables controls how a matrix (A, m, n, ld) is converted to an
- *  hypercube for the xktree.
+ *  hyperrect for the xktree.
  *
- *  e.g the matrix (0, 4, 8, 8) can whether be represented as the hypercube
+ *  e.g the matrix (0, 4, 8, 8) can whether be represented as the hyperrect
  *      (0:4, 0:8) - if ACCESS_CUBE_ROW_DIM == 0
  *   or (0:8, 0:4) - if ACCESS_CUBE_ROW_DIM == 1
  */
@@ -37,9 +37,9 @@ struct task_t;
 
 template<int K>
 static inline void
-memory_view_from_hypercube(
+memory_view_from_hyperrect(
     memory_view_t & view,
-    const KHypercube<K> & h,
+    const KHyperrect<K> & h,
     const size_t ld,
     const size_t sizeof_type
 ) {
@@ -65,10 +65,10 @@ memory_view_from_hypercube(
 
 template<int K>
 static inline void
-memory_view_from_hypercubes(
+memory_view_from_hyperrects(
     memory_view_t & view,
-    const KHypercube<K> & h0,
-    const KHypercube<K> & h1,
+    const KHyperrect<K> & h0,
+    const KHyperrect<K> & h1,
     const size_t ld,
     const size_t sizeof_type
 ) {
@@ -99,9 +99,9 @@ memory_view_from_hypercubes(
 
 template<int K>
 static inline void
-memory_view_to_hypercubes(
+memory_view_to_hyperrects(
     const memory_view_t & view,
-    KHypercube<K> (& hypercubes) [2]
+    KHyperrect<K> (& hyperrects) [2]
 ) {
     static_assert(K == 2);
 
@@ -115,7 +115,7 @@ memory_view_to_hypercubes(
     assert((A % (ld * s)) + (m * s) <= ld * s);
     # endif /* ACCESS_FORCE_ALIGNMENT */
 
-    // only 1 cube is needed
+    // only 1 rect is needed
     if ((A % (ld * s)) + m * s <= ld * s)
     {
         /**
@@ -136,13 +136,13 @@ memory_view_to_hypercubes(
             Interval list[2];
             list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
-            hypercubes[0].set_list(list);
-            assert(!hypercubes[0].is_empty());
+            hyperrects[0].set_list(list);
+            assert(!hyperrects[0].is_empty());
         }
 
-        assert(hypercubes[1].is_empty());
+        assert(hyperrects[1].is_empty());
     }
-    // 2 hypercubes are needed
+    // 2 hyperrects are needed
     else
     {
         /**
@@ -170,16 +170,16 @@ memory_view_to_hypercubes(
             list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
 
-            hypercubes[0].set_list(list0);
-            assert(!hypercubes[0].is_empty());
+            hyperrects[0].set_list(list0);
+            assert(!hyperrects[0].is_empty());
         }
 
         {
             Interval list1[2];
             list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
             list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
-            hypercubes[1].set_list(list1);
-            assert(!hypercubes[1].is_empty());
+            hyperrects[1].set_list(list1);
+            assert(!hyperrects[1].is_empty());
         }
     }
 }
@@ -194,7 +194,7 @@ typedef enum    access_type_t
 class access_t
 {
     public:
-        using Hypercube = KHypercube<2>;
+        using Hyperrect = KHyperrect<2>;
 
     public:
 
@@ -225,10 +225,10 @@ class access_t
             ///////////////////
 
             struct {
-                /* Currently always 2 hypercubes that represents a matrix in an
-                 * XKTree (1 cube if access is aligned on ld x sizeof_type,
-                 * else 2 hypercubes) */
-                Hypercube hypercubes[2];
+                /* Currently always 2 hyperrects that represents a matrix in an
+                 * XKTree (1 rect if access is aligned on ld x sizeof_type,
+                 * else 2 hyperrects) */
+                Hyperrect hyperrects[2];
             };
 
             ///////////
@@ -288,7 +288,7 @@ class access_t
             concurrency(concurrency),
             scope(scope),
             type(ACCESS_TYPE_BLAS_MATRIX),
-            hypercubes(),
+            hyperrects(),
             successors(8),
             task(task),
             host_view(order, addr, ld, offset_m, offset_n, m, n, s),
@@ -306,8 +306,8 @@ class access_t
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
 
-            // creates the two hypercubes of that memory view
-            memory_view_to_hypercubes(host_view, hypercubes);
+            // creates the two hyperrects of that memory view
+            memory_view_to_hyperrects(host_view, hyperrects);
         }
 
          access_t(
@@ -326,7 +326,7 @@ class access_t
         access_t(
             task_t * task,
             const matrix_order_t & order,
-            const Hypercube & h,
+            const Hyperrect & h,
             const size_t ld,
             const size_t s,
             access_mode_t mode,
@@ -337,7 +337,7 @@ class access_t
             concurrency(concurrency),
             scope(scope),
             type(ACCESS_TYPE_BLAS_MATRIX),
-            hypercubes(),
+            hyperrects(),
             successors(8),
             task(task),
             host_view(order, 0, ld, 0, 0, 0, 0, s),
@@ -350,8 +350,8 @@ class access_t
             assert(mode == ACCESS_MODE_R); // not a big deal, but right now only called from `coherent_async`
             assert(!h.is_empty());
 
-            memory_view_from_hypercube(this->host_view, h, ld, s);
-            new (this->hypercubes + 0) Hypercube(h);
+            memory_view_from_hyperrect(this->host_view, h, ld, s);
+            new (this->hyperrects + 0) Hyperrect(h);
         }
 
         access_t(

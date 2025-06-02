@@ -81,7 +81,7 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
         using Search = MemoryRegisterTreeNodeSearch;
         using BaseTree = KHPTree<K, MemoryRegisterTreeNodeSearch, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>;
         using Base = typename BaseTree::Node;
-        using Hypercube = KHypercube<K>;
+        using Hyperrect = KHyperrect<K>;
 
     public:
 
@@ -106,9 +106,9 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
 
     public:
 
-        /* the cube was never accessed before, create a new node */
+        /* the rect was never accessed before, create a new node */
         MemoryRegisterTreeNode(
-            const Hypercube & r,
+            const Hyperrect & r,
             const int k,
             const Color color
         ) :
@@ -118,17 +118,17 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
 
         /**
          * A new node is being created from a split, make it inherit its original node 'src'
-         *  - r - the shrinked cube that this is inheriting from
+         *  - r - the shrinked rect that this is inheriting from
          *  - k - the dimension that got splitted
          *  - color - the node color
          *  - src - the node that got split
          *
          * We have:
-         *  U (src->hypercube, r) == the node cube before being shrinked
-         *  n (src->hypercube, r) = {} - empty intersection
+         *  U (src->hyperrect, r) == the node rect before being shrinked
+         *  n (src->hyperrect, r) = {} - empty intersection
          */
         MemoryRegisterTreeNode(
-            const Hypercube & r,
+            const Hyperrect & r,
             const int k,
             const Color color,
             const Node * src
@@ -149,9 +149,9 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
         }
 
         void
-        dump_hypercube_str(FILE * f) const
+        dump_hyperrect_str(FILE * f) const
         {
-            Base::dump_hypercube_str(f);
+            Base::dump_hyperrect_str(f);
         }
 
 }; /* MemoryRegisterTreeNode */
@@ -211,7 +211,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
 {
     public:
         using Base = KHPTree<K, MemoryRegisterTreeNodeSearch, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>;
-        using Hypercube = KHypercube<K>;
+        using Hyperrect = KHyperrect<K>;
         using Node = MemoryRegisterTreeNode;
         using NodeBase = typename KHPTree<K, MemoryRegisterTreeNodeSearch>::Node;
         using Search = MemoryRegisterTreeNodeSearch;
@@ -249,7 +249,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         ensure(const Interval & interval)
         {
             const Interval intervals[1] = { interval };
-            Hypercube h(intervals);
+            Hyperrect h(intervals);
             Search search(Op::INSERTING, NULL);
 
             pthread_rwlock_wrlock(&this->rwlock);
@@ -268,7 +268,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             const Op & op
         ) {
             const Interval intervals[1] = { interval };
-            const Hypercube h(intervals);
+            const Hyperrect h(intervals);
 
             // run the operation to swap the bits
             pthread_rwlock_rdlock(&this->rwlock);
@@ -328,7 +328,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             assert(search.type == Search::Type::INSERTING);
         }
 
-        /* shrinking on dimension 'k' from 'this->hypercube[k]' to 'interval' */
+        /* shrinking on dimension 'k' from 'this->hyperrect[k]' to 'interval' */
         void
         on_shrink(
             NodeBase * nodebase,
@@ -348,7 +348,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         intersect_stop_test(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
 
             (void) nodebase;
@@ -359,18 +359,18 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         }
 
         /**
-         * The passed cube is intersecting with 'this'
+         * The passed rect is intersecting with 'this'
          */
         inline void
         on_intersect(
             NodeBase * nodebase,
             Search & search,
-            const Hypercube & h
+            const Hyperrect & h
         ) const {
 
             assert(nodebase);
             Node * node = reinterpret_cast<Node *>(nodebase);
-            assert(h.intersects(node->hypercube));
+            assert(h.intersects(node->hyperrect));
 
             switch (search.type)
             {
@@ -391,7 +391,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                         else
                         {
                             search.blocks->push_back(
-                                MemoryRegisterBlock(node->hypercube[0], node->state)
+                                MemoryRegisterBlock(node->hyperrect[0], node->state)
                             );
                         }
                     }
@@ -422,7 +422,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                         else
                         {
                             search.blocks->push_back(
-                                MemoryRegisterBlock(node->hypercube[0], node->state)
+                                MemoryRegisterBlock(node->hyperrect[0], node->state)
                             );
                         }
                     }
@@ -447,7 +447,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color
         ) const {
@@ -458,14 +458,14 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         Node *
         new_node(
             Search & search,
-            const Hypercube & h,
+            const Hyperrect & h,
             const int k,
             const Color color,
             const NodeBase * inherit
         ) const {
             (void) search;
             assert(search.type == Op::INSERTING);
-            assert(!h.intersects(inherit->hypercube));
+            assert(!h.intersects(inherit->hyperrect));
             return new Node(h, k, color, reinterpret_cast<const Node *>(inherit));
         }
 };

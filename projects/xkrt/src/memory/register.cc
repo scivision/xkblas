@@ -13,8 +13,6 @@
 
 # include <xkrt/runtime.h>
 
-using Hypercube = KHypercube<1>;
-
 typedef struct  memory_async_args_t
 {
     xkrt_runtime_t * runtime;

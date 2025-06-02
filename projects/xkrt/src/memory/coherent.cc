@@ -37,7 +37,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 //      - create one successor Yi task per conflicting tasks Xi - to be executed on the helper thread
 //      - when Xi complete, it makes Yi ready
 //      - When Yi executes,
-//          - it find all fetches to do (i.e. which cube on which device) - there should be only one cube on one device at that point
+//          - it find all fetches to do (i.e. which rect on which device) - there should be only one rect on one device at that point
 //          - it creates a task Zi pushed into the device's thread queue
 //      - Zi is scheduled on the device thread queue, and will launch the asynchronous fetch
 //          - Yi completion is deferred to Zi completion
@@ -137,12 +137,12 @@ xkrt_coherency_host_async(
         assert(accesses);
 
         /* as 'conflicts' are forming a partition of 'access', it must only
-         * intersects with a single cubes of 'access' : find which of the two */
+         * intersects with a single rects of 'access' : find which of the two */
         bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
-            access_t::Hypercube h;
-            access_t::Hypercube::intersection(&h, access.hypercubes[i], node->hypercube);
+            access_t::Hyperrect h;
+            access_t::Hyperrect::intersection(&h, access.hyperrects[i], node->hyperrect);
 
             if (!h.is_empty())
             {
@@ -152,7 +152,7 @@ xkrt_coherency_host_async(
                 break ;
             }
         }
-        /* assert to check that we did find a cube from 'access' that intersects with the node */
+        /* assert to check that we did find a rect from 'access' that intersects with the node */
         assert(found);
 
         // insert for future tasks dependencies
