@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/28 16:55:54 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 12:37:49 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -211,6 +211,7 @@ class KHPTree {
                 struct includes_t<false, true> {
                     Hyperrect hyperrect;
                     int height[K];
+                    int total_height;
                 };
 
                 template<>
@@ -258,6 +259,7 @@ class KHPTree {
                         memset(this->includes.height, 0, sizeof(this->includes.height));
                         for (int i = k ; i < K ; ++i)
                             this->includes.height[i] = 1;
+                        this->includes.total_height = 1;
                     }
 
                     this->colors[k] = color;
@@ -337,9 +339,35 @@ class KHPTree {
                 {
                     for (int k = 0 ; k < K ; ++k)
                     {
-                        int hleft  = this->st[k].left  ? this->st[k].left->includes.height[k]   : 0;
-                        int hright = this->st[k].right ? this->st[k].right->includes.height[k]  : 0;
-                        this->includes.height[k] = 1 + MAX(hleft, hright);
+                        // get left height
+                        int hleft, thleft;
+                        if (this->st[k].left)
+                        {
+                            hleft  = this->st[k].left->includes.height[k];
+                            thleft = this->st[k].left->includes.total_height;
+                        }
+                        else
+                        {
+                            hleft  = 0;
+                            thleft = 0;
+                        }
+
+                        // get right height
+                        int hright, thright;
+                        if (this->st[k].right)
+                        {
+                            hright  = this->st[k].right->includes.height[k];
+                            thright = this->st[k].right->includes.total_height;
+                        }
+                        else
+                        {
+                            hright  = 0;
+                            thright = 0;
+                        }
+
+                        // get max height
+                        this->includes.height[k]    = 1 + MAX(hleft, hright);
+                        this->includes.total_height = 1 + MAX(thleft, thright);
                     }
                 }
 
@@ -361,13 +389,16 @@ class KHPTree {
                 inline int
                 height(void) const
                 {
-                    // this is wrong
-                    assert(0);
-
-                    int height = 0;
-                    for (int k = 0 ; k < K ; ++k)
-                        height = MAX(height, this->height(k));
-                    return height;
+                    if constexpr(MAINTAIN_HEIGHT)
+                    {
+                        return this->includes.total_height;
+                    }
+                    else
+                    {
+                        int thleft  = this->st[k].left  ? this->st[k].left->height()  : 0;
+                        int thright = this->st[k].right ? this->st[k].right->height() : 0;
+                        return 1 + MAX(thleft, thright);
+                    }
                 }
 
                 inline void

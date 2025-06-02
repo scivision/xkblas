@@ -5,12 +5,13 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/01 04:27:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 13:38:25 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <xkrt/xkrt.h>
 # include <xkrt/runtime.h>
 
 typedef struct  memory_async_args_t
@@ -29,7 +30,7 @@ typedef struct  memory_async_args_t
 
 }               memory_async_args_t;
 
-template<MemoryRegisterTree::Op op1, MemoryRegisterTree::Op op2>
+template<MemoryRegisterTree::Op op>
 static void
 body_memory_async(task_t * task)
 {
@@ -40,19 +41,19 @@ body_memory_async(task_t * task)
 
     const Interval interval((uintptr_t) args->start, (uintptr_t) args->end);
     std::vector<MemoryRegisterBlock> blocks;    // TODO: cache this to avoid dynamic alloc
-    args->runtime->memory_register_tree.run(interval, &blocks, op1);
+    args->runtime->memory_register_tree.run(interval, &blocks, op);
     if (blocks.size())
     {
-        for (MemoryRegisterBlock & block : blocks)
+        switch (op)
         {
-            switch (op1)
+            case (MemoryRegisterTree::Op::TOUCHING):
             {
-                case (MemoryRegisterTree::Op::TOUCHING):
+                for (MemoryRegisterBlock & block : blocks)
                 {
                     assert( block.state.touching);
-                    assert(!block.state.touched);
-                    assert(!block.state.pinning);
-                    assert(!block.state.pinned);
+                    // assert(!block.state.touched);
+                    // assert(!block.state.pinning);
+                    // assert(!block.state.pinned);
 
                     // maybe test residency with `mincore`
                     // https://man7.org/linux/man-pages/man2/mincore.2.html
@@ -67,18 +68,68 @@ body_memory_async(task_t * task)
                     // no need to requeue ever, because if a page couldnt be
                     // touched, it means it is being pinned or copied-to, so
                     // its being touched by someone else anyway
-                    break ;
-                }
 
-                case (MemoryRegisterTree::Op::PINNING):
+                    // mark touched
+                    args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::TOUCHED);
+                }
+                return ;
+            }
+
+            case (MemoryRegisterTree::Op::PINNING):
+            {
+                for (MemoryRegisterBlock & block : blocks)
                 {
-                }
+                    // assert( block.state.touching);
+                    // assert(!block.state.touched);
+                    assert( block.state.pinning);
+                    assert(!block.state.pinned);
 
-                default:
-                    LOGGER_FATAL("Not implemented");
-            } /* switch op */
-            args->runtime->memory_register_tree.run(block.interval, NULL, op2);
-        } /* foreach block */
+                    // get segment to pin
+                    void  * ptr = (void *) block.interval.a;
+                    size_t size = (size_t) (block.interval.b - block.interval.a);
+                    xkrt_memory_register(args->runtime, ptr, size);
+                    LOGGER_DEBUG("Registered %p of size %zu", ptr, size);
+
+                    // TODO : this will trigger another search, if thats a perf
+                    // bottleneck, then maybe cache the node in the
+                    // `MemoryRegisterBlock`
+
+                    // mark pinned
+                    args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::PINNED);
+                }
+                return ;
+            }
+
+            case (MemoryRegisterTree::Op::UNPINNING):
+            {
+                for (MemoryRegisterBlock & block : blocks)
+                {
+                    // assert( block.state.touching);
+                    // assert(!block.state.touched);
+                    assert(!block.state.pinning);
+                    assert( block.state.pinned);
+                    assert( block.state.unpinning);
+
+                    // get segment to pin
+                    void  * ptr = (void *) block.interval.a;
+                    size_t size = (size_t) (block.interval.b - block.interval.a);
+                    xkrt_memory_unregister(args->runtime, ptr, size);
+                    LOGGER_DEBUG("Unregistered %p of size %zu", ptr, size);
+
+                    // TODO : this will trigger another search, if thats a perf
+                    // bottleneck, then maybe cache the node in the
+                    // `MemoryRegisterBlock`
+
+                    // mark pinned
+                    args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::UNPINNED);
+                }
+                return ;
+            }
+
+            default:
+                LOGGER_FATAL("Not implemented");
+
+        } /* switch op */
     }
 }
 
@@ -148,7 +199,7 @@ xkrt_runtime_t::memory_unregister_async(
     return __memory_async(this, ptr, chunk_size, n, this->formats.memory_unpin_async);
 }
 
-template<MemoryRegisterTree::Op op1, MemoryRegisterTree::Op op2>
+template<MemoryRegisterTree::Op op>
 static void
 __memory_async_register_format(
     xkrt_runtime_t * runtime,
@@ -157,20 +208,20 @@ __memory_async_register_format(
 ) {
     task_format_t format;
     memset(format.f, 0, sizeof(format.f));
-    format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_async<op1, op2>;
-    snprintf(format.label, sizeof(format.label), label);
+    format.f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_memory_async<op>;
+    snprintf(format.label, sizeof(format.label), "%s", label);
     *format_id = task_format_create(&(runtime->formats.list), &format);
 }
 
 void
 xkrt_memory_async_register_format(xkrt_runtime_t * runtime)
 {
-    __memory_async_register_format<MemoryRegisterTree::Op::TOUCHING, MemoryRegisterTree::Op::TOUCHED>(
+    __memory_async_register_format<MemoryRegisterTree::Op::TOUCHING>(
             runtime, &runtime->formats.memory_touch_async, "memory_touch_async");
 
-    __memory_async_register_format<MemoryRegisterTree::Op::PINNING, MemoryRegisterTree::Op::PINNED>(
+    __memory_async_register_format<MemoryRegisterTree::Op::PINNING>(
             runtime, &runtime->formats.memory_pin_async, "memory_pin_async");
 
-    __memory_async_register_format<MemoryRegisterTree::Op::UNPINNING, MemoryRegisterTree::Op::UNPINNED>(
+    __memory_async_register_format<MemoryRegisterTree::Op::UNPINNING>(
             runtime, &runtime->formats.memory_unpin_async, "memory_unpin_async");
 }
