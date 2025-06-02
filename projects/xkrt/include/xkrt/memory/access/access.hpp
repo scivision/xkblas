@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/17 05:24:09 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 21:12:28 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -407,6 +407,12 @@ class access_t
         }
 
         //////////////////////////////////////////////////////////////////////
+
+        access_t(
+            task_t * task,
+            access_mode_t mode
+        ) : access_t(task, (const void *) NULL, mode) {}
+
 
         ~access_t() {}
 

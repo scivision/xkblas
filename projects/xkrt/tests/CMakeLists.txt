@@ -24,6 +24,7 @@ set(TEST_SOURCES
     unregister-async.cc
     register-async-legacy.cc
     touch-async.cc
+    touch-register-unregister-async.cc
 )
 
 # pthread deps

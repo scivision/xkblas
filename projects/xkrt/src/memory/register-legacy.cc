@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/01 04:02:26 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 16:08:59 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,7 +45,7 @@ xkrt_memory_register(
         if (!driver)
             continue ;
         if (!driver->f_memory_host_register)
-            LOGGER_WARN("Driver `%u` does not implement memory register", driver_id);
+            LOGGER_DEBUG("Driver `%u` does not implement memory register", driver_id);
         else if (driver->f_memory_host_register(ptr, size))
             LOGGER_ERROR("Could not register memory for driver `%s`", driver->f_get_name());
     }
@@ -62,7 +62,7 @@ xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, size_t size)
         if (!driver)
             continue ;
         if (!driver->f_memory_host_unregister)
-            LOGGER_WARN("Driver `%u` does not implement memory unregister", driver_id);
+            LOGGER_DEBUG("Driver `%u` does not implement memory unregister", driver_id);
         else if (driver->f_memory_host_unregister(ptr, size))
             LOGGER_ERROR("Could not unregister memory for driver `%s`", driver->f_get_name());
     }

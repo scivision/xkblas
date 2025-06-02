@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/01 04:25:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:31:45 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -277,6 +277,9 @@ void xkrt_device_task_execute(
 
 /* enqueue the task in the thread of the team */
 void xkrt_team_thread_task_enqueue(xkrt_runtime_t * runtime, xkrt_team_t * team, xkrt_thread_t * thread, task_t * task);
+
+/* enqueue the task to a random thread of the team */
+void xkrt_team_task_enqueue(xkrt_runtime_t * runtime, xkrt_team_t * team, task_t * task);
 
 /* submit a task to the given device */
 void xkrt_device_task_submit(

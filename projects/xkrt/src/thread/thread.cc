@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/23 16:03:59 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:32:12 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -334,7 +334,6 @@ run(
     task_t * task
 ) {
     assert(thread == xkrt_thread_t::get_tls());
-    // tls->execute(task, xkrt_team_thread_task_enqueue, runtime, team, thread);
     __Thread_task_execute(thread, task, xkrt_team_thread_task_enqueue, runtime, team, thread);
 }
 

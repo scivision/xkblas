@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov.fr>                  .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/29 15:41:58 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 21:01:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -287,6 +287,9 @@ task_compute_size(const task_flag_bitfield_t flags, const uint8_t ac)
  *
  * if some flags are removed, builing blocks are removed
  */
+
+// TODO : implement DEP_INFO, DET_INFO, ... with a `flags` argument to
+// compute the offset at compile-time
 
 static inline task_dep_info_t *
 TASK_DEP_INFO(const task_t * task)

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 13:38:25 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 21:13:48 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -50,7 +50,7 @@ body_memory_async(task_t * task)
             {
                 for (MemoryRegisterBlock & block : blocks)
                 {
-                    assert( block.state.touching);
+                    // assert( block.state.touching);
                     // assert(!block.state.touched);
                     // assert(!block.state.pinning);
                     // assert(!block.state.pinned);
@@ -133,13 +133,13 @@ body_memory_async(task_t * task)
     }
 }
 
+template<MemoryRegisterTree::Op op>
 static inline int
 __memory_async(
     xkrt_runtime_t * runtime,
     void * ptr,
     const size_t chunk_size,
-    int n,
-    task_format_id_t format
+    int n
 ) {
     xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
     assert(driver);
@@ -147,6 +147,19 @@ __memory_async(
     xkrt_team_t * team = &driver->team;
 
     xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+
+    // if pinning/unpinning, create a fake dependency to serialize, as the cuda
+    // driver serializes anyway, to avoid blocking team's threads unnecessarily
+    const task_format_id_t format = (op == MemoryRegisterTree::Op::TOUCHING)  ? runtime->formats.memory_touch_async :
+                                    (op == MemoryRegisterTree::Op::PINNING)   ? runtime->formats.memory_pin_async   :
+                                    (op == MemoryRegisterTree::Op::UNPINNING) ? runtime->formats.memory_unpin_async :
+                                    0;
+    assert(format);
+
+    constexpr int                         ac = (op == MemoryRegisterTree::Op::TOUCHING) ?              0 :                   1;
+    constexpr task_flag_bitfield_t     flags = (op == MemoryRegisterTree::Op::TOUCHING) ? TASK_FLAG_ZERO : TASK_FLAG_DEPENDENT;
+    constexpr               size_t task_size = task_compute_size(flags, ac);
+    constexpr               size_t args_size = sizeof(memory_async_args_t);
 
     for (int i = 0 ; i < n ; ++i)
     {
@@ -156,18 +169,28 @@ __memory_async(
         const Interval interval((uintptr_t) start, (uintptr_t) end);
         runtime->memory_register_tree.ensure(interval);
 
-        // create a task that will touch the memory
-        constexpr task_flag_bitfield_t flags = TASK_FLAG_ZERO;
-        constexpr size_t task_size = task_compute_size(flags, 0);
-        constexpr size_t args_size = sizeof(memory_async_args_t);
-
+        // create a task that will touch/pin/unpin the memory
         task_t * task = tls->allocate_task(task_size + args_size);
         new(task) task_t(format, flags);
+
+        if constexpr (ac == 1)
+        {
+            task_dep_info_t * dep = TASK_DEP_INFO(task);
+            new (dep) task_dep_info_t(ac);
+
+            access_t * accesses = TASK_ACCESSES(task, flags);
+            new(accesses + 0) access_t(task, ACCESS_MODE_W);
+
+            if (tls->last_register_memory_access)
+                __access_precedes(tls->last_register_memory_access, accesses);
+
+            tls->last_register_memory_access = accesses;
+        }
 
         memory_async_args_t * args = (memory_async_args_t *) TASK_ARGS(task, task_size);
         new (args) memory_async_args_t(runtime, start, end);
 
-        tls->commit(task, xkrt_team_thread_task_enqueue, runtime, team, team->priv.threads + 0);
+        tls->commit(task, xkrt_team_task_enqueue, runtime, team);
     }
     return 0;
 }
@@ -178,7 +201,7 @@ xkrt_runtime_t::memory_touch_async(
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_touch_async);
+    return __memory_async<MemoryRegisterTree::Op::TOUCHING>(this, ptr, chunk_size, n);
 }
 
 int
@@ -187,7 +210,7 @@ xkrt_runtime_t::memory_register_async(
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_pin_async);
+    return __memory_async<MemoryRegisterTree::Op::PINNING>(this, ptr, chunk_size, n);
 }
 
 int
@@ -196,7 +219,7 @@ xkrt_runtime_t::memory_unregister_async(
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async(this, ptr, chunk_size, n, this->formats.memory_unpin_async);
+    return __memory_async<MemoryRegisterTree::Op::UNPINNING>(this, ptr, chunk_size, n);
 }
 
 template<MemoryRegisterTree::Op op>

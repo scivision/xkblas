@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 19:13:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 21:14:47 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL 2.1                                                      */
 /*                                                                            */
@@ -25,6 +25,7 @@
 
 #  include <pthread.h>
 #  include <atomic>
+#  include <random>
 
 #  include <linux/futex.h>      /* Definition of FUTEX_* constants */
 #  include <sys/syscall.h>      /* Definition of SYS_* constants */
@@ -157,7 +158,11 @@ typedef struct  xkrt_thread_t
         /* memory capacity */
         size_t memory_stack_capacity;
 
-    private:
+        /* random number generator */
+        std::minstd_rand rng;
+
+        /* last task submitted that register memory, to serialize */
+        access_t * last_register_memory_access;
 
         /* lock and condition to sleep the mutex */
         struct {
@@ -165,8 +170,6 @@ typedef struct  xkrt_thread_t
             pthread_cond_t  cond;
             volatile bool   sleeping;
         } sleep;
-
-    public:
 
         struct {
             /* next function index in the team functions */
@@ -195,6 +198,8 @@ typedef struct  xkrt_thread_t
             deque(),
             memory_stack_bottom(NULL),
             memory_stack_capacity(THREAD_MAX_MEMORY),
+            rng(),
+            last_register_memory_access(NULL),
             parallel_for{.index = 0}
         {
             // set current task

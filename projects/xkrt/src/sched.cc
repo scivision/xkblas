@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/15 21:11:55 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 20:23:15 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -309,7 +309,38 @@ xkrt_team_thread_task_enqueue(
 ) {
     (void) runtime;
     (void) team;
-    // TODO : thread should be woke up here, no ?
+    thread->deque.push(task);
+    thread->wakeup();
+}
+
+void
+xkrt_team_task_enqueue(
+    xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
+    task_t * task
+) {
+    (void) runtime;
+
+    // start at a random thread
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+    int start = tls->rng() % team->priv.nthreads;
+
+    // find one that is not already working
+    for (int i = 0 ; i < team->priv.nthreads ; ++i)
+    {
+        xkrt_thread_t * thread = team->priv.threads + ((start + i) % team->priv.nthreads);
+        bool busy = !thread->sleep.sleeping;
+        if (busy)
+            continue ;
+
+        // assign it the task
+        thread->deque.push(task);
+        thread->wakeup();
+        return ;
+    }
+
+    // all threads are working, assigning on the first random one
+    xkrt_thread_t * thread = team->priv.threads + start;
     thread->deque.push(task);
     thread->wakeup();
 }
