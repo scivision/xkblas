@@ -21,6 +21,7 @@ set(TEST_SOURCES
     team-cpus-parallel-for.cc
     team-device.cc
     register-async.cc
+    unregister-async.cc
     register-async-legacy.cc
     touch-async.cc
 )

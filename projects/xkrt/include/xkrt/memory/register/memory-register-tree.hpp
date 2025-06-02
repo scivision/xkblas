@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/01 04:37:16 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/02 13:37:01 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -63,12 +63,18 @@ class MemoryRegisterTreeNodeSearch {
         }               Type;
 
     public:
-       MemoryRegisterTreeNodeSearch(const Type & t, std::vector<MemoryRegisterBlock> * b) : type(t), blocks(b) {}
+       MemoryRegisterTreeNodeSearch(
+           const Type & t,
+           std::vector<MemoryRegisterBlock> * b,
+           int pid
+       ) : type(t), blocks(b), pinning_id(pid) {}
+
        virtual ~MemoryRegisterTreeNodeSearch() {}
 
    public:
        Type type;
        std::vector<MemoryRegisterBlock> * blocks;
+        int pinning_id;
 
 }; /* MemoryRegisterTreeNodeSearch */
 
@@ -93,6 +99,9 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
             /* the block is being pinned */
             std::atomic<bool> pinning;
 
+            /* the block is being pinned */
+            std::atomic<bool> unpinning;
+
             /* the block had been touched */
             std::atomic<bool> touched;
 
@@ -103,6 +112,9 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
 
         /* the block state */
         state_t state;
+
+        /* node pinning id */
+        int pinning_id;
 
     public:
 
@@ -163,15 +175,19 @@ class MemoryRegisterBlock
 
         MemoryRegisterBlock(
             const Interval & i,
-            MemoryRegisterTreeNode::state_t & s
+            MemoryRegisterTreeNode::state_t & s,
+            int pid
         ) :
             interval(i),
             state{
-                .pinned   = s.pinned,
-                .pinning  = s.pinning,
-                .touched  = s.touched,
-                .touching = s.touching
-            }
+                .pinned    = s.pinned,
+                .pinning   = s.pinning,
+                .unpinning = s.unpinning,
+                .touched   = s.touched,
+                .touching  = s.touching,
+                .padding   = 0
+            },
+            pinning_id(pid)
         {}
 
         ~MemoryRegisterBlock() {}
@@ -182,21 +198,34 @@ class MemoryRegisterBlock
         Interval interval;
 
         /* block state */
-        struct {
+        union {
+            struct {
 
-            /* the block is pinned */
-            bool pinned     : 1;
+                /* the block is pinned */
+                bool pinned     : 1;
 
-            /* the block is being pinned */
-            bool pinning    : 1;
+                /* the block is being pinned */
+                bool pinning    : 1;
 
-            /* the block had been touched */
-            bool touched    : 1;
+                /* the block is being unpinned */
+                bool unpinning  : 1;
 
-            /* the block is being touched */
-            bool touching   : 1;
+                /* the block had been touched */
+                bool touched    : 1;
 
-        } state;
+                /* the block is being touched */
+                bool touching   : 1;
+
+                /* padding for char */
+                bool padding    : 4;
+
+            } state;
+
+            unsigned char state_char;
+        };
+
+        /* block pinning id, for merging unpinning requests */
+        int pinning_id;
 
     public:
 
@@ -221,7 +250,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
 
     public:
 
-        MemoryRegisterTree(void) : Base()
+        MemoryRegisterTree(void) : Base(), pinning_ids()
         {
             pthread_rwlock_init(&rwlock, NULL);
         }
@@ -240,6 +269,11 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
          */
         pthread_rwlock_t rwlock;
 
+        /**
+         *  an identifier for pinning requests
+         */
+        std::atomic<int> pinning_ids;
+
         ////////////////////////////////////////////////////////
         // PUBLIC INTERFACES TO INTERACT WITH THE MEMORY TREE //
         ////////////////////////////////////////////////////////
@@ -250,7 +284,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
         {
             const Interval intervals[1] = { interval };
             Hyperrect h(intervals);
-            Search search(Op::INSERTING, NULL);
+            Search search(Op::INSERTING, NULL, 0);
 
             pthread_rwlock_wrlock(&this->rwlock);
             {
@@ -270,15 +304,17 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
             const Interval intervals[1] = { interval };
             const Hyperrect h(intervals);
 
+            // search
+            int pinning_id = op == Op::PINNED ? 1 + this->pinning_ids.fetch_add(1, std::memory_order_relaxed) : 0;
+            Search search(op, blocks, pinning_id);
+
             // run the operation to swap the bits
             pthread_rwlock_rdlock(&this->rwlock);
             {
-                Search search(op, blocks);
                 this->intersect(search, h);
             }
             pthread_rwlock_unlock(&this->rwlock);
 
-            LOGGER_FATAL("we may want to merge differently depending on the op");
             if (blocks)
             {
                 // intersects run in-order, so the blocks list is sorted by now
@@ -293,7 +329,8 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                     MemoryRegisterBlock &    last = (*blocks)[write - 1];
                     MemoryRegisterBlock & current = (*blocks)[i];
 
-                    if (last.interval.b == current.interval.a)
+                    // merge if in same state, with same pinning id, and continuous
+                    if (last.state_char == current.state_char && last.pinning_id == current.pinning_id && last.interval.b == current.interval.a)
                     {
                         // Merge into last interval
                         last.interval.b = current.interval.b;
@@ -391,7 +428,7 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                         else
                         {
                             search.blocks->push_back(
-                                MemoryRegisterBlock(node->hyperrect[0], node->state)
+                                MemoryRegisterBlock(node->hyperrect[0], node->state, 0)
                             );
                         }
                     }
@@ -400,39 +437,74 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
 
                 case (Search::Type::TOUCHED):
                 {
+                    assert( node->state.touching.load());
                     assert(!node->state.touched.load());
+                    node->state.touching.store(false);
                     node->state.touched.store(true);
                     break ;
                 }
 
                 case (Op::PINNING):
                 {
-                    // try to take the lock on the interval by setting the pinned bit
+                    assert(node->state.pinned.load() == false);
+
                           bool expected = false;
                     const bool newvalue = true;
                     if (node->state.pinning.compare_exchange_strong(expected, newvalue))
                     {
-                        // if the segment was already pinned, release the pinning bit lock
-                        if (node->state.pinned.load())
-                        {
-                            assert(node->state.pinned.load() == true);
-                            node->state.pinning.store(false);
-                        }
-                        // else, it must be pinned
-                        else
-                        {
-                            search.blocks->push_back(
-                                MemoryRegisterBlock(node->hyperrect[0], node->state)
-                            );
-                        }
+                        node->state.touching.store(true);
+                        search.blocks->push_back(
+                            MemoryRegisterBlock(node->hyperrect[0], node->state, 0)
+                        );
+                    }
+                    else
+                    {
+                        LOGGER_FATAL("Tried to pin the same memory twice");
                     }
                     break ;
                 }
 
                 case (Search::Type::PINNED):
                 {
+                    assert( node->state.pinning.load());
                     assert(!node->state.pinned.load());
+                    node->pinning_id = search.pinning_id;
+                    node->state.pinning.store(false);
+                    node->state.touched.store(true);
                     node->state.pinned.store(true);
+                    break ;
+                }
+
+                case (Op::UNPINNING):
+                {
+                    assert(node->state.pinned.load());
+                    assert(node->pinning_id > 0);
+
+                          bool expected = false;
+                    const bool newvalue = true;
+                    if (node->state.unpinning.compare_exchange_strong(expected, newvalue))
+                    {
+                        node->state.unpinning.store(true);
+                        search.blocks->push_back(
+                            MemoryRegisterBlock(node->hyperrect[0], node->state, node->pinning_id)
+                        );
+                    }
+                    else
+                    {
+                        LOGGER_FATAL("Tried to unpin the same memory segment twice");
+                    }
+                    break ;
+                }
+
+                case (Search::Type::UNPINNED):
+                {
+                    assert(!node->state.pinning.load());
+                    assert( node->state.pinned.load());
+                    assert( node->state.unpinning.load());
+                    assert( node->pinning_id > 0);
+                    node->pinning_id = 0;
+                    node->state.pinned.store(false);
+                    node->state.unpinning.store(false);
                     break ;
                 }
 
