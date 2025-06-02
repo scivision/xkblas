@@ -119,6 +119,10 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 # DEPENDENCES #
 ###############
 
+# PTHREAD
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(${XKRT} PRIVATE Threads::Threads)
 # HWLOC
 find_package(HWLOC REQUIRED)
 include_directories(${HWLOC_INCLUDE_DIRS})
