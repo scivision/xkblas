@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   logger-cl.h                                                  .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/14 01:16:35 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:01:14 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __LOGGER_CL_H__
 #  define __LOGGER_CL_H__
 

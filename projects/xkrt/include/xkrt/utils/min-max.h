@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   min-max.h                                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:49 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:49 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   min-max.h                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/10 17:00:08 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:07:08 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

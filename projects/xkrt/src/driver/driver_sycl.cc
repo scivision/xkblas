@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver_sycl.cc                                                           */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/22 20:18:37 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   driver_sycl.cc                                               .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/05/09 04:32:49 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 17:56:18 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

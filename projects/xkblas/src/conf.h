@@ -1,13 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   conf.h                                                                   */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:18:51 by                           \_)     (_/    */
-/*                                                                            */
+/*   conf.h                                                       .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/10/04 17:03:17 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:23:03 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Pierre-Etienne POLET <pierre-etienne.polet@inria.fr>             */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

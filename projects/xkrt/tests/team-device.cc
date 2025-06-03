@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   team-device.cc                                               .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/04 05:42:49 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:13:59 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include <xkrt/xkrt.h>
 # include <assert.h>
 

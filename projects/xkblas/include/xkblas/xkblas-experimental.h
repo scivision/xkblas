@@ -1,13 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkblas-experimental.h                                                    */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/03/02 17:03:46 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/17 05:23:49 by Romain PEREIRA            \_)     (_/    */
+/*   xkblas-experimental.h                                        .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/26 19:40:36 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:27:09 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: ???                                                             */
+/*   Author: Pierre-Etienne POLET <pierre-etienne.polet@inria.fr>             */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

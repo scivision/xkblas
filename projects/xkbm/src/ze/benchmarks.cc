@@ -1,13 +1,15 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   benchmarks.cc                                                            */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/02/26 00:40:42 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/21 22:12:45 by Romain PEREIRA            \_)     (_/    */
+/*   benchmarks.cc                                                .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/18 22:56:54 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:39:58 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: ???                                                             */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -1,13 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   auto-tile.cc                                                             */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 00:08:15 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   auto-tile.cc                                                 .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/09/11 16:58:39 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:22:52 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Pierre-Etienne POLET <pierre-etienne.polet@inria.fr>             */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

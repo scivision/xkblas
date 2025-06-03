@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   task-gpu-empty.cc                                            .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/12/20 15:07:55 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:13:49 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include <xkrt/xkrt.h>
 # include <xkrt/memory/access/blas/region/dependency-tree.hpp>
 # include <xkrt/task/task-format.h>

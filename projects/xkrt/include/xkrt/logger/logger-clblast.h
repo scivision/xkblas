@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   logger-clblast.h                                                         */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/17 13:03:44 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   logger-clblast.h                                             .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/15 00:45:32 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:01:11 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

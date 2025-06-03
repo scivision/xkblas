@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   logger-ze.h                                                  .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/13 01:27:12 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:02:00 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __LOGGER_ZE_H__
 #  define __LOGGER_ZE_H__
 

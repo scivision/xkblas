@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   stream.cc                                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/21 21:55:04 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   stream.cc                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/30 14:08:45 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 17:56:31 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   alignedas.h                                                              */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 18:36:12 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   alignedas.h                                                  .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:04:08 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver-ze-blas.h                                                         */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2024/12/19 11:48:24 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   driver-ze-blas.h                                             .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/08/06 13:12:59 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:00:19 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

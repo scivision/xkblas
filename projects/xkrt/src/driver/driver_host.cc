@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   driver_host.cc                                                           */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 20:16:43 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   driver_host.cc                                               .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/10 17:00:08 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 19:14:53 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

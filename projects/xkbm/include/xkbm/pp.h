@@ -1,3 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   pp.h                                                         .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/09/05 16:28:42 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:37:30 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __XKBM_PP__
 #  define __XKBM_PP__
 

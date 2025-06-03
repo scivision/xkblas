@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   router-cfs.hpp                                               .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/31 08:26:12/05:00 by Romain PEREI      __/_*_*(_        */
+/*   Updated: 2025/06/03 18:04:37 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 /**
  *  Idea is to use a dijkstra algorithm with weights being BW, but ignoring the link if there is already a pending transfer
  *  Problem is it may add significant latency

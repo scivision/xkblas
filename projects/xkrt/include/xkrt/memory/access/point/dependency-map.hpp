@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   dependency-tree.hpp                                                      */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 22:17:10 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   dependency-map.hpp                                           .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/05/19 00:09:44 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:03:59 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

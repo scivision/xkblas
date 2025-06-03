@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   team-cpus-parallel-for.cc                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/03/03 01:28:08 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 21:33:00 by Romain PEREIRA            \_)     (_/    */
+/*   team-cpus-parallel-for.cc                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/05 05:19:56 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:13:56 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: ???                                                             */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

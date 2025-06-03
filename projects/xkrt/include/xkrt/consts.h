@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   consts.h                                                                 */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 19:30:34 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   consts.h                                                     .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/08/01 12:09:49 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 19:13:45 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 
