@@ -2,6 +2,13 @@
 cmake_minimum_required(VERSION 3.7)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+###############
+# C++ version #
+###############
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
+
 # Project name
 SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})

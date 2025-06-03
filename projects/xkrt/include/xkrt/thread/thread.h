@@ -3,7 +3,7 @@
 /*   thread.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/19 20:55:39 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:25:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 20:39:40 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -145,6 +145,9 @@ typedef struct  xkrt_thread_t
         /* the pthread */
         pthread_t pthread;
 
+        /* global thread tid */
+        int gtid;
+
         /* the tid in the team */
         int tid;
 
@@ -199,6 +202,7 @@ typedef struct  xkrt_thread_t
             implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
             state(XKRT_THREAD_INITIALIZED),
             pthread(pthread),
+            gtid(gettid()),
             tid(tid),
             device_global_id(device_global_id),
             deque(),

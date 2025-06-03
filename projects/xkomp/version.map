@@ -1,0 +1,10 @@
+VERSION {
+    global:
+        __kmpc_global_thread_num;
+        __kmpc_omp_task_alloc;
+        __kmpc_omp_task;
+        __kmpc_omp_taskwait;
+        __kmpc_fork_call;
+    local:
+        *;
+};

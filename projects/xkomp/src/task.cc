@@ -1,5 +1,7 @@
-# include <xkrt/logger/logger.h>
+# include <xkomp/xkomp.h>
 # include <xkomp/kmp.h>
+
+# include <xkrt/logger/logger.h>
 
 # include <assert.h>
 
@@ -19,4 +21,25 @@ __kmpc_omp_task_alloc(
     assert(task);
 
     return task;
+}
+
+extern "C"
+kmp_int32
+__kmpc_omp_task(
+    ident_t * loc_ref,
+    kmp_int32 gtid,
+    kmp_task_t * new_task)
+{
+    LOGGER_NOT_IMPLEMENTED();
+    return 0;
+}
+
+extern "C"
+kmp_int32
+__kmpc_omp_taskwait(
+    ident_t * loc_ref,
+    kmp_int32 gtid
+) {
+    runtime->task_wait();
+    return 0;
 }

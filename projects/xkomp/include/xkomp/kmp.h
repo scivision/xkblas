@@ -111,4 +111,6 @@ typedef struct kmp_task { /* GEH: Shouldn't this be aligned somehow? */
     /*  private vars  */
 } kmp_task_t;
 
+typedef void (*kmpc_micro)(kmp_int32 *global_tid, kmp_int32 *bound_tid, ...);
+
 #endif /* __KMP_H__ */

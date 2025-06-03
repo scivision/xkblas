@@ -1,5 +1,4 @@
 # include <xkrt/logger/logger.h>
-# include <omptarget.h>
 
 extern "C"
 void
