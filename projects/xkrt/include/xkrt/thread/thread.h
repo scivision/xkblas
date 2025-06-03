@@ -3,7 +3,7 @@
 /*   thread.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/19 20:55:39 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:40 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:25:04 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -33,6 +33,9 @@
 #  include <linux/futex.h>      /* Definition of FUTEX_* constants */
 #  include <sys/syscall.h>      /* Definition of SYS_* constants */
 #  include <unistd.h>
+
+/* represent a pointer to the current team */
+# define XKRT_TEAM_CURRENT (xkrt_thread_t::get_tls()->team)
 
 /////////////
 // THREADS //

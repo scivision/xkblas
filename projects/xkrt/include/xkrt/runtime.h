@@ -3,7 +3,7 @@
 /*   runtime.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:32 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:34:57 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -140,18 +140,19 @@ typedef struct  xkrt_runtime_t
      *  memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
      *  Tasks will be cancelled if the memory is touched through `notify_touched()`
      */
-    int memory_touch_async(void * ptr, const size_t chunk_size, int n);
+    int memory_touch_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
 
     /**
      *  Create 'n' tasks so that each task i in [0..n-1] pins memory in
      *  [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
      *  Each task may run 'cuMemRegister' several time on a single chunk
      */
-    int memory_register_async(void * ptr, const size_t chunk_size, int n);
-    int memory_unregister_async(void * ptr, const size_t chunk_size, int n);
+    int memory_register_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
+    int memory_unregister_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
 
     /* Submit a copy instruction to a stream of the device */
     int memory_transfer_async(
+        xkrt_team_t                   * team,
         const xkrt_device_global_id_t   device_global_id,
         const size_t                    size,
         const xkrt_device_global_id_t   dst_device_global_id,
@@ -221,6 +222,12 @@ typedef struct  xkrt_runtime_t
 
     /* spawn a task in the passed team */
     void team_task_spawn(xkrt_team_t * team, const std::function<void(task_t*)> & f);
+
+    /* retrieve the team of thread of the specific driver */
+    xkrt_team_t * team_get(const xkrt_driver_type_t type);
+
+    /* retrieve the first non-null driver' team from the passed bitfield */
+    xkrt_team_t * team_get_any(const xkrt_driver_type_bitfield_t types);
 
     ////////////
     // ENERGY //

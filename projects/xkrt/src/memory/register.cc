@@ -3,7 +3,7 @@
 /*   register.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:15:13 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 20:00:46 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -168,24 +168,20 @@ template<MemoryRegisterTree::Op op>
 static inline int
 __memory_async(
     xkrt_runtime_t * runtime,
+    xkrt_team_t * team,
     void * ptr,
     const size_t chunk_size,
     int n
 ) {
-    xkrt_driver_t * driver = runtime->driver_get(XKRT_DRIVER_TYPE_HOST);
-    assert(driver);
-
-    xkrt_team_t * team = &driver->team;
-
     xkrt_thread_t * tls = xkrt_thread_t::get_tls();
 
     // if pinning/unpinning, create a fake dependency to serialize, as the cuda
     // driver serializes anyway, to avoid blocking team's threads unnecessarily
-    const task_format_id_t format = (op == MemoryRegisterTree::Op::TOUCHING)  ? runtime->formats.memory_touch_async :
+    const task_format_id_t fmtid  = (op == MemoryRegisterTree::Op::TOUCHING)  ? runtime->formats.memory_touch_async :
                                     (op == MemoryRegisterTree::Op::PINNING)   ? runtime->formats.memory_pin_async   :
                                     (op == MemoryRegisterTree::Op::UNPINNING) ? runtime->formats.memory_unpin_async :
                                      0;
-    assert(format);
+    assert(fmtid);
 
     constexpr int                         ac = (op == MemoryRegisterTree::Op::TOUCHING) ?              0 :                   1;
     constexpr task_flag_bitfield_t     flags = (op == MemoryRegisterTree::Op::TOUCHING) ? TASK_FLAG_ZERO : TASK_FLAG_DEPENDENT;
@@ -202,7 +198,12 @@ __memory_async(
 
         // create a task that will touch/pin/unpin the memory
         task_t * task = tls->allocate_task(task_size + args_size);
-        new(task) task_t(format, flags);
+        new(task) task_t(fmtid, flags);
+
+        #ifndef NDEBUG
+        task_format_t * format = task_format_get(&runtime->formats.list, fmtid);
+        snprintf(task->label, sizeof(task->label), "%s", format->label);
+        #endif
 
         if constexpr (ac == 1)
         {
@@ -229,33 +230,37 @@ __memory_async(
 
 int
 xkrt_runtime_t::memory_touch_async(
+    xkrt_team_t * team,
     void * ptr,
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async<MemoryRegisterTree::Op::TOUCHING>(this, ptr, chunk_size, n);
+    return __memory_async<MemoryRegisterTree::Op::TOUCHING>(this, team, ptr, chunk_size, n);
 }
 
 int
 xkrt_runtime_t::memory_register_async(
+    xkrt_team_t * team,
     void * ptr,
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async<MemoryRegisterTree::Op::PINNING>(this, ptr, chunk_size, n);
+    return __memory_async<MemoryRegisterTree::Op::PINNING>(this, team, ptr, chunk_size, n);
 }
 
 int
 xkrt_runtime_t::memory_unregister_async(
+    xkrt_team_t * team,
     void * ptr,
     const size_t chunk_size,
     int n
 ) {
-    return __memory_async<MemoryRegisterTree::Op::UNPINNING>(this, ptr, chunk_size, n);
+    return __memory_async<MemoryRegisterTree::Op::UNPINNING>(this, team, ptr, chunk_size, n);
 }
 
 int
 xkrt_runtime_t::memory_transfer_async(
+    xkrt_team_t * team,
     const xkrt_device_global_id_t   device_global_id,
     const size_t                    size,
     const xkrt_device_global_id_t   dst_device_global_id,

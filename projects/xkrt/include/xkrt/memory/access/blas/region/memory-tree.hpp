@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:56:55 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1293,7 +1293,8 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
                 const uintptr_t begin_addr = chunk->ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
-                const memory_allocation_view_id_t allocation_view_id = replicate.nallocations++;
+                const memory_allocation_view_id_t allocation_view_id = replicate.nallocations;
+                replicate.nallocations += 1;
                 if (allocation_view_id >= MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX)
                     LOGGER_FATAL("Too many allocations of the same data on the same device... Increase `MEMORY_REPLICATE_ALLOCATION_VIEWS_MAX` and recompile");
 

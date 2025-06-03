@@ -11,18 +11,13 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+# include <random>
+
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
 
-# include <random>
-
 static xkrt_runtime_t runtime;
-
-static void *       ptr         = NULL;
-static const size_t size        = (size_t) 2 * 1024 * 1024 * 1024;
-static const size_t nchunks     = 64;
-static const size_t chunk_size  = size / nchunks;
 
 int
 main(int argc, char ** argv)
@@ -32,11 +27,6 @@ main(int argc, char ** argv)
 
     xkrt_driver_t * driver = runtime.driver_get(XKRT_DRIVER_TYPE_HOST);
     assert(driver);
-
-    int nthreads = driver->team.priv.nthreads;
-
-    LOGGER_INFO("Size is %.1f GB in %d chunks using %u threads",
-            size/1e9, nchunks, nthreads);
 
     std::mt19937 rng(std::random_device{}());
     int done[3] = {0, 0, 0};
@@ -49,6 +39,8 @@ main(int argc, char ** argv)
         done[atoi(argv[1])] = 0;
     }
 
+    int dumped = 0;
+
     while (done[0] + done[1] + done[2] < 3)
     {
         int i;
@@ -57,8 +49,15 @@ main(int argc, char ** argv)
 
         LOGGER_INFO("------------------------------");
 
+        # include "register-async.conf.cc"
+        if (dumped == 0)
+        {
+            LOGGER_INFO("Size is %.1f GB in %zu chunks using %u threads",
+                size/1e9, nchunks, team->priv.nthreads);
+            dumped = 1;
+        }
+
         uint64_t t0 = xkrt_get_nanotime();
-        ptr = malloc(chunk_size * nchunks);
 
         if (i == 0 || i == 1)
         {
@@ -67,7 +66,7 @@ main(int argc, char ** argv)
                 LOGGER_INFO("Running with pre-touch");
 
                 uint64_t t0 = xkrt_get_nanotime();
-                runtime.memory_touch_async(ptr, chunk_size, nchunks);
+                runtime.memory_touch_async(team, ptr, chunk_size, nchunks);
                 runtime.task_wait();
                 uint64_t tf = xkrt_get_nanotime();
                 LOGGER_INFO("      Touch took %lf s.", (tf - t0) / 1e9);
@@ -79,7 +78,7 @@ main(int argc, char ** argv)
 
             {
                 uint64_t t0 = xkrt_get_nanotime();
-                runtime.memory_register_async(ptr, chunk_size, nchunks);
+                runtime.memory_register_async(team, ptr, chunk_size, nchunks);
                 runtime.task_wait();
                 uint64_t tf = xkrt_get_nanotime();
                 LOGGER_INFO("    Pinning took %lf s.", (tf - t0) / 1e9);
@@ -89,8 +88,8 @@ main(int argc, char ** argv)
         {
             LOGGER_INFO("Running with concurrent touch");
             uint64_t t0 = xkrt_get_nanotime();
-            runtime.memory_register_async(ptr, chunk_size, nchunks);
-            runtime.memory_touch_async(ptr, chunk_size, nchunks);
+            runtime.memory_register_async(team, ptr, chunk_size, nchunks);
+            runtime.memory_touch_async(team, ptr, chunk_size, nchunks);
             runtime.task_wait();
             uint64_t tf = xkrt_get_nanotime();
             LOGGER_INFO("  Touch+Pin took %lf s.", (tf - t0) / 1e9);
@@ -98,7 +97,7 @@ main(int argc, char ** argv)
 
         {
             uint64_t t0 = xkrt_get_nanotime();
-            runtime.memory_unregister_async(ptr, chunk_size, nchunks);
+            runtime.memory_unregister_async(team, ptr, chunk_size, nchunks);
             runtime.task_wait();
             uint64_t tf = xkrt_get_nanotime();
             LOGGER_INFO("  Unpinning took %lf s.", (tf - t0) / 1e9);

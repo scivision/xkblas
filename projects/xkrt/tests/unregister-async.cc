@@ -17,20 +17,17 @@
 
 static xkrt_runtime_t runtime;
 
-static void *       ptr         = NULL;
-static const size_t chunk_size  = 4096 * 64 + 123;
-static const int    nchunks     = 16;
-
 int
 main(void)
 {
     assert(xkrt_init(&runtime) == 0);
 
-    ptr = malloc(chunk_size * nchunks);
-    runtime.memory_register_async(ptr, chunk_size, nchunks);
+    # include "register-async.conf.cc"
+
+    runtime.memory_register_async(team, ptr, chunk_size, nchunks);
     runtime.task_wait();
 
-    runtime.memory_unregister_async(ptr, chunk_size, nchunks);
+    runtime.memory_unregister_async(team, ptr, chunk_size, nchunks);
     runtime.task_wait();
 
     assert(xkrt_deinit(&runtime) == 0);

@@ -18,15 +18,14 @@
 static xkrt_runtime_t runtime;
 
 static void *       ptr         = NULL;
-static const size_t chunk_size  = 4096 * 64 + 123;
-static const int    nchunks     = 16;
+static const size_t size        = 4096 * 64 + 123;
 
 int
 main(void)
 {
     assert(xkrt_init(&runtime) == 0);
-    ptr = malloc(chunk_size * nchunks);
-    runtime.memory_register_async(ptr, chunk_size, nchunks);
+    ptr = malloc(size);
+    xkrt_memory_register_async(&runtime, ptr, size);
     assert(xkrt_deinit(&runtime) == 0);
 
     return 0;
