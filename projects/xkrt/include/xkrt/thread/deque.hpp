@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   deque.hpp                                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/02/19 19:23:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 18:36:54 by Romain PEREIRA            \_)     (_/    */
+/*   deque.hpp                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/06 15:05:42 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:06:50 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: CeCILL 2.1                                                      */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

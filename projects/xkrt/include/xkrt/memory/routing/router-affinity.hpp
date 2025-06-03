@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   router-affinity.hpp                                          .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/11 14:59:33 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:04:34 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __ROUTER_AFFINITY_HPP__
 #  define __ROUTER_AFFINITY_HPP__
 

@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   invalidate.cc                                                            */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:58:09 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   invalidate.cc                                                .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 17:57:22 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

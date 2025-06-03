@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   alignas.h                                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/02 18:36:25 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   alignas.h                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/09/05 16:28:42 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:04:04 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   runtime.h                                                                */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/23 15:13:47 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   runtime.h                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:05:04 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

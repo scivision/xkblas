@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   access.hpp                                                               */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/17 05:24:09 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   access.hpp                                                   .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/03 11:51:31 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:02:21 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

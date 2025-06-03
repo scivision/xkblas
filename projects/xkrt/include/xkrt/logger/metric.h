@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   metric.h                                                                 */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/02/18 15:08:36 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/14 20:29:37 by Romain PEREIRA            \_)     (_/    */
+/*   metric.h                                                     .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/18 22:56:54 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:02:05 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: CeCILL 2.1                                                      */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -1,3 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   backend.h                                                    .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/02/18 22:56:54 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:37:19 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __BACKEND_H__
 #  define __BACKEND_H__
 

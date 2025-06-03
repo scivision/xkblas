@@ -1,3 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   main.cc                                                      .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/05/04 19:06:57 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:41:29 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include <xkrt/xkrt.h>
 # include <xkrt/logger/metric.h>
 

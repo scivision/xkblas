@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   xkrt.h                                                                   */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/18 15:05:11 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 21:43:09 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   xkrt.h                                                       .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/08/06 13:12:59 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:08:02 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

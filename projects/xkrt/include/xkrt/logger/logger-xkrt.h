@@ -1,3 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*   logger-xkrt.h                                                .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/01 02:28:06 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:01:56 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
+/*                                                                            */
+/* ************************************************************************** */
+
 # ifndef __LOGGER_XKRT_H__
 #  define __LOGGER_XKRT_H__
 

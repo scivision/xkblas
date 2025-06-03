@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   deque.cc                                                                 */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:44 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/20 00:17:10 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   deque.cc                                                     .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/06 15:05:42 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 17:58:33 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

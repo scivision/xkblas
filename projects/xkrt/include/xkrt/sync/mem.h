@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   mem.h                                                                    */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/03 20:42:52 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   mem.h                                                        .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/07/11 15:12:55 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:06:23 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

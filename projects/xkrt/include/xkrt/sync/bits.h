@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   bits.h                                                                   */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:48 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/19 00:25:43 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   bits.h                                                       .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/10/11 15:29:11 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:06:03 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

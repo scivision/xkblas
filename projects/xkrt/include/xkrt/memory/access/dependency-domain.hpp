@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   dependency-domain.hpp                                                    */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/04/03 04:54:35 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   dependency-domain.hpp                                        .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:03:41 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

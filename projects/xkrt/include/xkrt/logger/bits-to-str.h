@@ -1,13 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   bits-to-str.h                                                            */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2025/02/18 15:08:36 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/03/07 17:07:51 by Romain PEREIRA            \_)     (_/    */
+/*   bits-to-str.h                                                .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2024/09/05 16:28:42 by Romain Pereira          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:01:01 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
+/*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   License: CeCILL 2.1                                                      */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

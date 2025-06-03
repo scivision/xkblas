@@ -1,13 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   memory-register.cc                                                       */
-/*                                                                   .-*-.    */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
-/*                                                              __/_*_*(_     */
-/*   Created: 2024/12/17 13:03:47 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/05/11 23:14:07 by Romain PEREIRA            \_)     (_/    */
-/*                                                                            */
+/*   memory-register.cc                                           .-*-.       */
+/*                                                              .'* *.'       */
+/*   Created: 2025/03/24 22:25:39 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/03 18:24:22 by Romain PEREIRA         / _______ \       */
+/*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
+/*                                                                            */
+/*   Author: Pierre-Etienne POLET <pierre-etienne.polet@inria.fr>             */
+/*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
+/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*                                                                            */
+/*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
 /* ************************************************************************** */
 

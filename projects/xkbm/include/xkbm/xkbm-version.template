@@ -1,3 +1,18 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*    xkbm-version.template                                        .-*-.      */
+/*                                                               .'* *.'      */
+/*    Created: 2025/02/18 22:56:54 by Romain PEREIRA          __/_*_*(_       */
+/*    Updated: 2025/06/03 18:38:40 by Romain PEREIRA         / _______ \      */
+/*                                                           \_)     (_/      */
+/*    License: CeCILL-C                                                       */
+/*                                                                            */
+/*    Author: Romain PEREIRA <romain.pereira@outlook.com>                     */
+/*                                                                            */
+/*    Copyright: see AUTHORS                                                  */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef __XKBM_VERSION_H__
 # define __XKBM_VERSION_H__
 
