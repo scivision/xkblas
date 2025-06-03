@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:43 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 20:31:45 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/03 02:18:18 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,6 +51,7 @@ typedef struct  xkrt_runtime_t
         task_format_id_t memory_touch_async;
         task_format_id_t memory_pin_async;
         task_format_id_t memory_unpin_async;
+        task_format_id_t memory_transfer_async;
     } formats;
 
     /* user conf */
@@ -74,6 +75,7 @@ typedef struct  xkrt_runtime_t
     ////////////////////
 
     /* Submit a copy instruction to a stream of the device */
+    [[deprecated("Use `runtime.memory_transfer_async` instead")]]
     void copy(
         const xkrt_device_global_id_t   device_global_id,
         const size_t                    size,
@@ -144,6 +146,17 @@ typedef struct  xkrt_runtime_t
      */
     int memory_register_async(void * ptr, const size_t chunk_size, int n);
     int memory_unregister_async(void * ptr, const size_t chunk_size, int n);
+
+    /* Submit a copy instruction to a stream of the device */
+    int memory_transfer_async(
+        const xkrt_device_global_id_t   device_global_id,
+        const size_t                    size,
+        const xkrt_device_global_id_t   dst_device_global_id,
+        const uintptr_t                 dst_device_addr,
+        const xkrt_device_global_id_t   src_device_global_id,
+        const uintptr_t                 src_device_addr,
+        const xkrt_callback_t         & callback
+    );
 
     /////////////////////
     // SYNCHRONIZATION //
@@ -251,7 +264,7 @@ typedef struct  xkrt_runtime_t
 void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
-void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_transfer_async_register_format(xkrt_runtime_t * runtime);
 
 /* host capture task format */
 void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);

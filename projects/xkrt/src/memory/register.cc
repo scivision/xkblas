@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <rpereira@anl.gov>                     .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2025/05/23 14:58:24 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 21:13:48 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/03 02:45:11 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: ???                                                             */
 /*                                                                            */
@@ -50,11 +50,6 @@ body_memory_async(task_t * task)
             {
                 for (MemoryRegisterBlock & block : blocks)
                 {
-                    // assert( block.state.touching);
-                    // assert(!block.state.touched);
-                    // assert(!block.state.pinning);
-                    // assert(!block.state.pinned);
-
                     // maybe test residency with `mincore`
                     // https://man7.org/linux/man-pages/man2/mincore.2.html
 
@@ -79,8 +74,6 @@ body_memory_async(task_t * task)
             {
                 for (MemoryRegisterBlock & block : blocks)
                 {
-                    // assert( block.state.touching);
-                    // assert(!block.state.touched);
                     assert( block.state.pinning);
                     assert(!block.state.pinned);
 
@@ -104,8 +97,6 @@ body_memory_async(task_t * task)
             {
                 for (MemoryRegisterBlock & block : blocks)
                 {
-                    // assert( block.state.touching);
-                    // assert(!block.state.touched);
                     assert(!block.state.pinning);
                     assert( block.state.pinned);
                     assert( block.state.unpinning);
@@ -122,6 +113,40 @@ body_memory_async(task_t * task)
 
                     // mark pinned
                     args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::UNPINNED);
+                }
+                return ;
+            }
+
+            case (MemoryRegisterTree::Op::TRANSFERING):
+            {
+                xkrt_device_t * device = this->device_get(device_global_id);
+                assert(device);
+
+                for (MemoryRegisterBlock & block : blocks)
+                {
+                    assert(!block.state.pinning);
+                    assert(!block.state.touching);
+                    assert( block.state.transfering);
+
+                    // get segment to pin
+                    void  * ptr = (void *) block.interval.a;
+                    size_t size = (size_t) (block.interval.b - block.interval.a);
+                    device->offloader_stream_instruction_submit_copy<size_t, uintptr_t>(
+                        size,
+                        dst_device_global_id,
+                        dst_device_addr,
+                        src_device_global_id,
+                        src_device_addr,
+                        callback
+                    );
+                    LOGGER_DEBUG("Transfering %p of size %zu", ptr, size);
+
+                    // TODO : this will trigger another search, if thats a perf
+                    // bottleneck, then maybe cache the node in the
+                    // `MemoryRegisterBlock`
+
+                    // mark pinned
+                    args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::TRANSFERED);
                 }
                 return ;
             }
@@ -153,7 +178,7 @@ __memory_async(
     const task_format_id_t format = (op == MemoryRegisterTree::Op::TOUCHING)  ? runtime->formats.memory_touch_async :
                                     (op == MemoryRegisterTree::Op::PINNING)   ? runtime->formats.memory_pin_async   :
                                     (op == MemoryRegisterTree::Op::UNPINNING) ? runtime->formats.memory_unpin_async :
-                                    0;
+                                     0;
     assert(format);
 
     constexpr int                         ac = (op == MemoryRegisterTree::Op::TOUCHING) ?              0 :                   1;
@@ -192,6 +217,7 @@ __memory_async(
 
         tls->commit(task, xkrt_team_task_enqueue, runtime, team);
     }
+
     return 0;
 }
 
@@ -222,6 +248,20 @@ xkrt_runtime_t::memory_unregister_async(
     return __memory_async<MemoryRegisterTree::Op::UNPINNING>(this, ptr, chunk_size, n);
 }
 
+int
+xkrt_runtime_t::memory_transfer_async(
+    const xkrt_device_global_id_t   device_global_id,
+    const size_t                    size,
+    const xkrt_device_global_id_t   dst_device_global_id,
+    const uintptr_t                 dst_device_addr,
+    const xkrt_device_global_id_t   src_device_global_id,
+    const uintptr_t                 src_device_addr,
+    const xkrt_callback_t         & callback
+) {
+    LOGGER_FATAL("TODO");
+    return 0;
+}
+
 template<MemoryRegisterTree::Op op>
 static void
 __memory_async_register_format(
@@ -247,4 +287,7 @@ xkrt_memory_async_register_format(xkrt_runtime_t * runtime)
 
     __memory_async_register_format<MemoryRegisterTree::Op::UNPINNING>(
             runtime, &runtime->formats.memory_unpin_async, "memory_unpin_async");
+
+    __memory_async_register_format<MemoryRegisterTree::Op::TRANSFERING>(
+            runtime, &runtime->formats.memory_transfer_async, "memory_transfer_async");
 }

@@ -5,7 +5,7 @@
 /*   Author: Romain PEREIRA <romain.pereira@inria.fr>              .'* *.'    */
 /*                                                              __/_*_*(_     */
 /*   Created: 2024/12/17 13:03:45 by Romain PEREIRA            / _______ \    */
-/*   Updated: 2025/06/02 13:37:01 by Romain PEREIRA            \_)     (_/    */
+/*   Updated: 2025/06/03 02:55:31 by Romain PEREIRA            \_)     (_/    */
 /*                                                                            */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -108,6 +108,9 @@ class MemoryRegisterTreeNode : public KHPTree<K, MemoryRegisterTreeNodeSearch, R
             /* the block is being touched */
             std::atomic<bool> touching;
 
+            /* the block is being transfered */
+            std::atomic<bool> transfering;
+
         }               state_t;
 
         /* the block state */
@@ -180,12 +183,13 @@ class MemoryRegisterBlock
         ) :
             interval(i),
             state{
-                .pinned    = s.pinned,
-                .pinning   = s.pinning,
-                .unpinning = s.unpinning,
-                .touched   = s.touched,
-                .touching  = s.touching,
-                .padding   = 0
+                .pinned      = s.pinned,
+                .pinning     = s.pinning,
+                .unpinning   = s.unpinning,
+                .touched     = s.touched,
+                .touching    = s.touching,
+                .transfering = s.transfering,
+                .padding     = 0
             },
             pinning_id(pid)
         {}
@@ -202,22 +206,25 @@ class MemoryRegisterBlock
             struct {
 
                 /* the block is pinned */
-                bool pinned     : 1;
+                bool pinned      : 1;
 
                 /* the block is being pinned */
-                bool pinning    : 1;
+                bool pinning     : 1;
 
                 /* the block is being unpinned */
-                bool unpinning  : 1;
+                bool unpinning   : 1;
 
                 /* the block had been touched */
-                bool touched    : 1;
+                bool touched     : 1;
 
                 /* the block is being touched */
-                bool touching   : 1;
+                bool touching    : 1;
+
+                /* the block is being transfered */
+                bool transfering : 1;
 
                 /* padding for char */
-                bool padding    : 4;
+                bool padding     : 2;
 
             } state;
 
@@ -505,6 +512,25 @@ class MemoryRegisterTree : public KHPTree<K, MemoryRegisterTreeNodeSearch, REBAL
                     node->pinning_id = 0;
                     node->state.pinned.store(false);
                     node->state.unpinning.store(false);
+                    break ;
+                }
+
+                case (Search::Type::TRANSFERING):
+                {
+                    // TODO : append blocks to list if not being pinned/touched/unpinned
+                    // otherwise, add a completion callback that will launch the transfer
+                    LOGGER_FATAL("TODO");
+                    break ;
+                }
+
+                case (Search::Type::TRANSFERED):
+                {
+                    assert(!node->state.pinning.load());
+                    assert(!node->state.unpinning.load());
+                    assert(!node->state.touching.load());
+                    assert( node->state.transfering.load());
+                    node->state.touched.store(true);
+                    node->state.transfering.store(false);
                     break ;
                 }
 
