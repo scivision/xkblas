@@ -1,9 +1,9 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   register-async.cc                                            .-*-.       */
+/*   memory-register-async.cc                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/11 14:59:33 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:42:44 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 21:20:22 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,7 +25,7 @@ main(void)
 {
     assert(xkrt_init(&runtime) == 0);
 
-    # include "register-async.conf.cc"
+    # include "memory-register-async.conf.cc"
 
     runtime.memory_register_async(team, ptr, chunk_size, nchunks);
     runtime.task_wait();

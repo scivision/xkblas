@@ -49,7 +49,7 @@ main(int argc, char ** argv)
 
         LOGGER_INFO("------------------------------");
 
-        # include "register-async.conf.cc"
+        # include "memory-register-async.conf.cc"
         if (dumped == 0)
         {
             LOGGER_INFO("Size is %.1f GB in %zu chunks using %u threads",

@@ -22,7 +22,7 @@ main(void)
 {
     assert(xkrt_init(&runtime) == 0);
 
-    # include "register-async.conf.cc"
+    # include "memory-register-async.conf.cc"
 
     runtime.memory_register_async(team, ptr, chunk_size, nchunks);
     runtime.task_wait();

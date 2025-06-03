@@ -8,23 +8,24 @@ project(tests)
 # list of tests
 set(TEST_SOURCES
     deinit.cc
-    fib-task-format.cc
     fib-task-capture.cc
+    fib-task-format.cc
     init.cc
+    memory-register-async-legacy.cc
+    memory-register-async.cc
+    memory-touch-async.cc
+    memory-touch-register-unregister-async.cc
+    memory-transfer-async.cc
+    memory-unregister-async.cc
     sync.cc
-    task-dependency.cc
     task-dependency-point.cc
+    task-dependency.cc
     task-format-host.cc
     task-format.cc
     task-gpu-empty.cc
-    team-cpus.cc
     team-cpus-parallel-for.cc
+    team-cpus.cc
     team-device.cc
-    register-async.cc
-    unregister-async.cc
-    register-async-legacy.cc
-    touch-async.cc
-    touch-register-unregister-async.cc
 )
 
 # pthread deps

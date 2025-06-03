@@ -1,9 +1,9 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   touch-async.cc                                               .-*-.       */
+/*   memory-transfer-async.cc                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/03/05 05:19:56 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:41:56 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 22:24:56 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -25,9 +25,24 @@ main(void)
 {
     assert(xkrt_init(&runtime) == 0);
 
-    # include "register-async.conf.cc"
+    # include "memory-register-async.conf.cc"
 
-    runtime.memory_touch_async(team, ptr, chunk_size, nchunks);
+    const xkrt_device_global_id_t device_global_id = 1; // to the first device
+    const int       device_memory_id = 0;               // to the first device's memory
+    const uintptr_t device_addr      = (const uintptr_t) runtime.memory_device_allocate_on(device_global_id, size, device_memory_id);
+    assert(device_addr);
+
+    const uintptr_t host_addr = (const uintptr_t) ptr;
+
+    const bool h2d = true;
+
+    runtime.memory_transfer_async(
+        device_global_id,
+        device_addr,
+        host_addr,
+        size,
+        h2d
+    );
     runtime.task_wait();
 
     assert(xkrt_deinit(&runtime) == 0);

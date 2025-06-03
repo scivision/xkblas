@@ -3,7 +3,7 @@
 /*   register.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 20:00:46 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 22:55:18 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -120,43 +120,6 @@ body_memory_async(task_t * task)
                 return ;
             }
 
-            case (MemoryRegisterTree::Op::TRANSFERING):
-            {
-                # if 0
-                xkrt_device_t * device = args->runtime->device_get(device_global_id);
-                assert(device);
-
-                for (MemoryRegisterBlock & block : blocks)
-                {
-                    assert(!block.state.pinning);
-                    assert(!block.state.touching);
-                    assert( block.state.transfering);
-
-                    // get segment to pin
-                    void  * ptr = (void *) block.interval.a;
-                    size_t size = (size_t) (block.interval.b - block.interval.a);
-                    device->offloader_stream_instruction_submit_copy<size_t, uintptr_t>(
-                        size,
-                        dst_device_global_id,
-                        dst_device_addr,
-                        src_device_global_id,
-                        src_device_addr,
-                        callback
-                    );
-                    LOGGER_DEBUG("Transfering %p of size %zu", ptr, size);
-
-                    // TODO : this will trigger another search, if thats a perf
-                    // bottleneck, then maybe cache the node in the
-                    // `MemoryRegisterBlock`
-
-                    // mark pinned
-                    args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::TRANSFERED);
-                }
-                return ;
-                    # endif
-                LOGGER_FATAL("TODO");
-            }
-
             default:
                 LOGGER_FATAL("Not implemented");
 
@@ -164,6 +127,7 @@ body_memory_async(task_t * task)
     }
 }
 
+// TODO: that code is super ugly, split for each op to improve readability
 template<MemoryRegisterTree::Op op>
 static inline int
 __memory_async(
@@ -210,6 +174,7 @@ __memory_async(
             task_dep_info_t * dep = TASK_DEP_INFO(task);
             new (dep) task_dep_info_t(ac);
 
+            // TODO : make it commutative, and favor the one with transfering tasks successors
             access_t * accesses = TASK_ACCESSES(task, flags);
             new(accesses + 0) access_t(task, ACCESS_MODE_W);
 
@@ -258,18 +223,102 @@ xkrt_runtime_t::memory_unregister_async(
     return __memory_async<MemoryRegisterTree::Op::UNPINNING>(this, team, ptr, chunk_size, n);
 }
 
+typedef struct  memory_transfer_async_args_t
+{
+    xkrt_runtime_t                * runtime;
+    const xkrt_device_global_id_t   device_global_id;
+    const uintptr_t                 device_addr;
+    const uintptr_t                 host_addr;
+    const size_t                    size;
+    const bool                      h2d;
+    std::atomic<int>                ref;
+
+    memory_transfer_async_args_t(
+        xkrt_runtime_t                * runtime,
+        const xkrt_device_global_id_t   device_global_id,
+        const uintptr_t                 device_addr,
+        const uintptr_t                 host_addr,
+        const size_t                    size,
+        const bool                      h2d
+    ) :
+        runtime(runtime),
+        device_global_id(device_global_id),
+        device_addr(device_addr),
+        host_addr(host_addr),
+        size(size),
+        h2d(h2d),
+        ref(0)
+    {}
+
+}               memory_transfer_async_args_t;
+
+// TODO:
+//  - create a task that write on the segment
+//  - update touching/registering/unregistering so that it creates tasks that read on the segment
+//  - implement commutative accesses so register tasks are prioritize depending on the transfers to come
+
+static inline void
+__memory_transfer_async_block(
+    memory_transfer_async_args_t * args,
+    MemoryRegisterBlock          & block
+) {
+    // get host segment
+    const Interval & interval = block.interval;
+    uintptr_t segment_ptr  = (uintptr_t) interval.a;
+       size_t segment_size = (size_t) (interval.b - interval.a);
+    assert(args->host_addr <= segment_ptr);
+    assert(segment_ptr <= args->host_addr + args->size);
+    assert(segment_ptr + segment_size < args->host_addr + args->size);
+
+    LOGGER_DEBUG("Transfering %lu of size %zu", segment_ptr, segment_size);
+
+    const uintptr_t offset = segment_ptr - args->host_addr;
+
+    // get src/dst
+    const xkrt_device_global_id_t dst_device_global_id = args->h2d ? args->device_global_id     : HOST_DEVICE_GLOBAL_ID;
+    const uintptr_t               dst_device_mem       = args->h2d ? args->device_addr + offset : segment_ptr;
+    const xkrt_device_global_id_t src_device_global_id = args->h2d ? HOST_DEVICE_GLOBAL_ID      : args->device_global_id;
+    const uintptr_t               src_device_mem       = args->h2d ? segment_ptr                : args->device_addr + offset;
+
+    # if 0
+    // spawn the task - that eventually depend on if currently pinning etc...
+    xkrt_memory_copy_async(
+        args->runtime,
+        args->device_global_id,
+              dst_device_global_id,
+              dst_device_mem,
+              src_device_global_id,
+              src_device_mem,
+              segment_size
+    );
+    # endif
+
+    // TODO : this will trigger another search, if thats a perf
+    // bottleneck, then maybe cache the node in the
+    // `MemoryRegisterBlock`
+
+    // mark pinned in the callback
+    args->runtime->memory_register_tree.run(interval, NULL, MemoryRegisterTree::Op::TRANSFERED);
+}
+
 int
 xkrt_runtime_t::memory_transfer_async(
-    xkrt_team_t * team,
     const xkrt_device_global_id_t   device_global_id,
+    const uintptr_t                 device_addr,
+    const uintptr_t                 host_addr,
     const size_t                    size,
-    const xkrt_device_global_id_t   dst_device_global_id,
-    const uintptr_t                 dst_device_addr,
-    const xkrt_device_global_id_t   src_device_global_id,
-    const uintptr_t                 src_device_addr,
-    const xkrt_callback_t         & callback
+    const bool                      h2d
 ) {
-    LOGGER_FATAL("TODO");
+    const Interval interval(host_addr, host_addr + size);
+    memory_transfer_async_args_t * args = (memory_transfer_async_args_t *) malloc(sizeof(memory_transfer_async_args_t));
+    assert(args);
+    new (args) memory_transfer_async_args_t(this, device_global_id, device_addr, host_addr, size, h2d);
+
+    this->memory_register_tree.transfer(interval, __memory_transfer_async_block, args);
+
+    if (args->ref.fetch_sub(1, std::memory_order_relaxed) == 1)
+        free(args);
+
     return 0;
 }
 

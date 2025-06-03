@@ -3,7 +3,7 @@
 /*   runtime.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:34:57 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 22:19:12 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -78,7 +78,6 @@ typedef struct  xkrt_runtime_t
     ////////////////////
 
     /* Submit a copy instruction to a stream of the device */
-    [[deprecated("Use `runtime.memory_transfer_async` instead")]]
     void copy(
         const xkrt_device_global_id_t   device_global_id,
         const size_t                    size,
@@ -150,16 +149,58 @@ typedef struct  xkrt_runtime_t
     int memory_register_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
     int memory_unregister_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
 
-    /* Submit a copy instruction to a stream of the device */
+    /**
+     *  Create tasks to copy memory from/to the host.
+     *  The number of tasks spawned depend on the number and the state of segment previously submitted.
+     *
+     *  This routine supports concurrency with `memory_touch_async` `memory_register_async` `memory_unregister_async` :
+     *      if there is a task currently touching/registering/unregistering a
+     *      sub-segment, then a dependent transfer task will spawn for that sub-segment
+     *
+     *      Similarly, if there is an un-going transfer on a segment,
+     *      future registering/unregistering tasks will depend on it, and
+     *      touching tasks will not touch the sub-segment, as the copy already touched it
+     *
+     *  Said differently, these interfaces put in competition memory
+     *  touching/registering/unregistering/transfer with the heuristic that:
+     *      - better initiating transfer early on unregistered memory over waiting for registration
+     *
+     *  For instance,
+     *
+     *      Legend: R  = registered memory
+     *              U  = unregistered memory
+     *              R' = registering memory
+     *
+     * (1)
+     *      host_addr                               host_addr + size
+     *          [ R  R  R  R  R  R  R  R  R  R  R  R  R  R  R ]
+     *
+     *  Then a single transfer task is spawned and mark ready immediatly.
+     *
+     *
+     * (2)
+     *      host_addr            X           Y        host_addr + size
+     *          [ R  R  R  R  R  U  U  U  U  R  R  R  R  R  R ]
+     *
+     *  Then 3x transfer tasks spawns and are marked ready immediatly.
+     *      [host_addr..X[  ,  [X..Y[  , [Y..host_addr + size[
+     *
+     *
+     * (3)
+     *      host_addr            X           Y        host_addr + size
+     *          [ R  R  R  R  R  U  U  U  U  R' R' R' R' R' R']
+     *
+     *  Then 3x transfer tasks spawns,
+     *      [host_addr..X[  ,  [X..Y[  are marked ready immediatly.
+     *      [Y..host_addr + size[      is made dependent of the task currently registering the segment
+     *
+     */
     int memory_transfer_async(
-        xkrt_team_t                   * team,
-        const xkrt_device_global_id_t   device_global_id,
-        const size_t                    size,
-        const xkrt_device_global_id_t   dst_device_global_id,
-        const uintptr_t                 dst_device_addr,
-        const xkrt_device_global_id_t   src_device_global_id,
-        const uintptr_t                 src_device_addr,
-        const xkrt_callback_t         & callback
+        const xkrt_device_global_id_t device_global_id,
+        const uintptr_t               device_addr,
+        const uintptr_t               host_addr,
+        const size_t                  size,
+        const bool                    h2d
     );
 
     /////////////////////
