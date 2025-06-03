@@ -119,7 +119,8 @@ body_memory_async(task_t * task)
 
             case (MemoryRegisterTree::Op::TRANSFERING):
             {
-                xkrt_device_t * device = this->device_get(device_global_id);
+                # if 0
+                xkrt_device_t * device = args->runtime->device_get(device_global_id);
                 assert(device);
 
                 for (MemoryRegisterBlock & block : blocks)
@@ -149,6 +150,8 @@ body_memory_async(task_t * task)
                     args->runtime->memory_register_tree.run(block.interval, NULL, MemoryRegisterTree::Op::TRANSFERED);
                 }
                 return ;
+                    # endif
+                LOGGER_FATAL("TODO");
             }
 
             default:

@@ -264,7 +264,7 @@ typedef struct  xkrt_runtime_t
 void xkrt_runtime_submit_task(xkrt_runtime_t * runtime, task_t * task);
 
 /* memory async thread management */
-void xkrt_memory_transfer_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 
 /* host capture task format */
 void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);
