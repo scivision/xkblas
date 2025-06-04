@@ -317,7 +317,7 @@ class KMemoryBlock {
 
 /* storage passed when searchingi n the tree */
 template <int K>
-class KMemoryTreeNodeSearch {
+class KBLASMemoryTreeNodeSearch {
 
     using Hyperrect = KHyperrect<K>;
     using MemoryBlock = KMemoryBlock<K>;
@@ -493,9 +493,9 @@ class KMemoryTreeNodeSearch {
         size_t bytes_owned[XKRT_DEVICES_MAX];
 
    public:
-       KMemoryTreeNodeSearch() : KMemoryTreeNodeSearch(0) {}
+       KBLASMemoryTreeNodeSearch() : KBLASMemoryTreeNodeSearch(0) {}
 
-       KMemoryTreeNodeSearch(
+       KBLASMemoryTreeNodeSearch(
            xkrt_device_global_id_t devid
        ) :
            type(INSERTING_BLOCKS),
@@ -506,7 +506,7 @@ class KMemoryTreeNodeSearch {
            awaiting()
        {}
 
-       virtual ~KMemoryTreeNodeSearch() {}
+       virtual ~KBLASMemoryTreeNodeSearch() {}
 
        void
        prepare_insert(access_t * a)
@@ -537,19 +537,19 @@ class KMemoryTreeNodeSearch {
            this->type = SEARCH_OWNERS;
        }
 
-}; /* KMemoryTreeNodeSearch */
+}; /* KBLASMemoryTreeNodeSearch */
 
 template <int K>
-class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
+class KBLASMemoryTreeNode : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>::Node {
 
-    using Base = typename KHPTree<K, KMemoryTreeNodeSearch<K>>::Node;
+    using Base = typename KHPTree<K, KBLASMemoryTreeNodeSearch<K>>::Node;
     using Hyperrect = KHyperrect<K>;
     using MemoryBlock = KMemoryBlock<K>;
     using MemoryReplicate = KMemoryReplicate<K>;
     using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
-    using Node = KMemoryTreeNode<K>;
-    using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
-    using Search = KMemoryTreeNodeSearch<K>;
+    using Node = KBLASMemoryTreeNode<K>;
+    using Partite = typename KBLASMemoryTreeNodeSearch<K>::Partite;
+    using Search = KBLASMemoryTreeNodeSearch<K>;
 
     public:
 
@@ -559,7 +559,7 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
     public:
 
         /* the rect was never accessed before, create a new node */
-        KMemoryTreeNode<K>(
+        KBLASMemoryTreeNode<K>(
             const access_t * access,
             const Hyperrect & r,
             const int k,
@@ -583,7 +583,7 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
          *  U (src->hyperrect, r) == the node rect before being shrinked
          *  n (src->hyperrect, r) = {} - empty intersection
          */
-        KMemoryTreeNode<K>(
+        KBLASMemoryTreeNode<K>(
             const Hyperrect & r,
             const int k,
             const Color color,
@@ -617,27 +617,27 @@ class KMemoryTreeNode : public KHPTree<K, KMemoryTreeNodeSearch<K>>::Node {
             }
         }
 
-}; /* KMemoryTreeNode */
+}; /* KBLASMemoryTreeNode */
 
 template <int K>
-class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable, public MemoryCoherencyController {
+class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public Lockable, public MemoryCoherencyController {
 
     public:
-        using Base = KHPTree<K, KMemoryTreeNodeSearch<K>>;
+        using Base = KHPTree<K, KBLASMemoryTreeNodeSearch<K>>;
         using Hyperrect = KHyperrect<K>;
         using MemoryBlock = KMemoryBlock<K>;
         using MemoryForward = KMemoryForward<K>;
         using MemoryReplicate = KMemoryReplicate<K>;
         using MemoryReplicateAllocationView = KMemoryReplicateAllocationView<K>;
-        using Node = KMemoryTreeNode<K>;
-        using NodeBase = typename KHPTree<K, KMemoryTreeNodeSearch<K>>::Node;
-        using Partite = typename KMemoryTreeNodeSearch<K>::Partite;
-        using Partition = typename KMemoryTreeNodeSearch<K>::Partition;
-        using Search = KMemoryTreeNodeSearch<K>;
+        using Node = KBLASMemoryTreeNode<K>;
+        using NodeBase = typename KHPTree<K, KBLASMemoryTreeNodeSearch<K>>::Node;
+        using Partite = typename KBLASMemoryTreeNodeSearch<K>::Partite;
+        using Partition = typename KBLASMemoryTreeNodeSearch<K>::Partition;
+        using Search = KBLASMemoryTreeNodeSearch<K>;
 
     public:
 
-        KMemoryTree(
+        KBLASMemoryTree(
             xkrt_runtime_t * runtime,
             const size_t ld,
             const size_t sizeof_type,
@@ -650,7 +650,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             merge_transfers(merge_transfers)
         {}
 
-        ~KMemoryTree() {}
+        ~KBLASMemoryTree() {}
 
         /* the runtime so the tree can launch data movements */
         xkrt_runtime_t * runtime;
@@ -700,7 +700,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         typedef struct  fetch_list_t
         {
             /* the memory tree */
-            KMemoryTree * tree;
+            KBLASMemoryTree * tree;
 
             /* list of fetches to submit */
             fetch_t * fetches;
@@ -714,7 +714,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             /* number of pending fetches */
             volatile task_wait_counter_t pending;
 
-            fetch_list_t(KMemoryTree * tree, fetch_t * fetches, task_wait_counter_type_t capacity) : tree(tree), fetches(fetches), capacity(capacity), n(0), pending(0) {}
+            fetch_list_t(KBLASMemoryTree * tree, fetch_t * fetches, task_wait_counter_type_t capacity) : tree(tree), fetches(fetches), capacity(capacity), n(0), pending(0) {}
             ~fetch_list_t() {}
 
             fetch_t *
@@ -885,7 +885,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
         }
 
         static inline fetch_list_t *
-        fetch_list_new(KMemoryTree * tree, task_wait_counter_type_t capacity)
+        fetch_list_new(KBLASMemoryTree * tree, task_wait_counter_type_t capacity)
         {
             fetch_list_t * list = (fetch_list_t *) calloc(1, sizeof(fetch_list_t) + capacity * sizeof(fetch_t));
             assert(list);
@@ -907,7 +907,7 @@ class KMemoryTree : public KHPTree<K, KMemoryTreeNodeSearch<K>>, public Lockable
             fetch_list_t * list = (fetch_list_t *) args[2];
             assert(list);
 
-            KMemoryTree * tree = list->tree;
+            KBLASMemoryTree * tree = list->tree;
             assert(tree);
 
             size_t fetch_idx = (size_t) args[3];
@@ -2033,6 +2033,6 @@ next_view:
         }
 };
 
-using MemoryTree = KMemoryTree<2>;
+using BLASBLASMemoryTree = KBLASMemoryTree<2>;
 
 #endif /* __MEMORY_TREE_HPP__ */

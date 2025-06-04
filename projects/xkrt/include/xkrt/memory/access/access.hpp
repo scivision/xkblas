@@ -3,7 +3,7 @@
 /*   access.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/03 11:51:31 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:13:53 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 01:53:43 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -191,7 +191,9 @@ memory_view_to_hyperrects(
 typedef enum    access_type_t
 {
     ACCESS_TYPE_POINT,
+    ACCESS_TYPE_INTERVAL,
     ACCESS_TYPE_BLAS_MATRIX,
+    ACCESS_TYPE_NULL,
 }               access_type_t;
 
 class access_t
@@ -218,7 +220,7 @@ class access_t
         access_type_t type;
 
         /////////////////////////////////////////////////
-        // logical region - depends on the access type //
+        // region -         depends on the access type //
         /////////////////////////////////////////////////
 
         union {
@@ -232,6 +234,14 @@ class access_t
                  * XKTree (1 rect if access is aligned on ld x sizeof_type,
                  * else 2 hyperrects) */
                 Hyperrect hyperrects[2];
+            };
+
+            //////////////
+            // INTERVAL //
+            //////////////
+
+            struct {
+                const Interval interval;
             };
 
             ///////////
@@ -261,7 +271,7 @@ class access_t
         # define ACCESS_GET_TASK(A) (A->task)
         task_t * task;
 
-        /* host view of the access */
+        /* host view of the access = mapped memory from the region */
         memory_view_t host_view;
 
         /* device view of the access - set after fetching the data */
@@ -410,12 +420,67 @@ class access_t
         }
 
         //////////////////////////////////////////////////////////////////////
+        // INTERVAL ACCESSES CONSTRUCTORS                                   //
+        //////////////////////////////////////////////////////////////////////
 
         access_t(
             task_t * task,
-            access_mode_t mode
-        ) : access_t(task, (const void *) NULL, mode) {}
+            const Interval & interval,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) :
+            mode(mode),
+            concurrency(concurrency),
+            scope(scope),
+            type(ACCESS_TYPE_INTERVAL),
+            interval(interval),
+            successors(8),
+            task(task),
+            host_view(MATRIX_COLMAJOR, 0, 0, 0, 0, interval.a, interval.b - interval.a, 0),
+            device_view()
+        {
+            /* clear preallocated empty successors */
+            successors.clear();
 
+            /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
+            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
+
+            /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
+            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+        }
+
+        //////////////////////////////////////////////////////////////////////
+
+
+        //////////////////////////////////////////////////////////////////////
+        // NULL ACCESS                                                      //
+        //////////////////////////////////////////////////////////////////////
+
+        access_t(
+            task_t * task,
+            access_mode_t mode,
+            access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
+            access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
+        ) :
+            mode(mode),
+            concurrency(concurrency),
+            scope(scope),
+            type(ACCESS_TYPE_NULL),
+            successors(8),
+            task(task),
+            host_view(MATRIX_COLMAJOR, 0, 0, 0, 0, 0, 0, 0),
+            device_view()
+        {
+            /* clear preallocated empty successors */
+            successors.clear();
+
+            /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
+            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
+
+            /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
+            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+        }
 
         ~access_t() {}
 

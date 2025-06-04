@@ -29,7 +29,7 @@
 # include <unordered_map>
 
 template<int K>
-class KDependencyTreeSearch
+class KBLASDependencyTreeSearch
 {
     public:
         enum Type
@@ -48,8 +48,8 @@ class KDependencyTreeSearch
         std::vector<void *> * conflicts;
 
     public:
-        KDependencyTreeSearch() {}
-        ~KDependencyTreeSearch() {}
+        KBLASDependencyTreeSearch() {}
+        ~KBLASDependencyTreeSearch() {}
 
     public:
 
@@ -70,15 +70,15 @@ class KDependencyTreeSearch
             this->access = access;
         }
 
-} /* class KDependencyTreeSearch */;
+} /* class KBLASDependencyTreeSearch */;
 
 template <int K>
-class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
+class KBLASDependencyTreeNode : public KHPTree<K, KBLASDependencyTreeSearch<K>>::Node {
 
-    using Base      = typename KHPTree<K, KDependencyTreeSearch<K>>::Node;
-    using Node      = KDependencyTreeNode<K>;
+    using Base      = typename KHPTree<K, KBLASDependencyTreeSearch<K>>::Node;
+    using Node      = KBLASDependencyTreeNode<K>;
     using Hyperrect = KHyperrect<K>;
-    using Search    = KDependencyTreeSearch<K>;
+    using Search    = KBLASDependencyTreeSearch<K>;
 
     public:
 
@@ -93,7 +93,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 
     public:
 
-        KDependencyTreeNode<K>(
+        KBLASDependencyTreeNode<K>(
             const Hyperrect & h,
             const int k,
             const Color color
@@ -106,7 +106,7 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
         }
 
         /* a new node from a split, inherit 'src' accesses */
-        KDependencyTreeNode<K>(
+        KBLASDependencyTreeNode<K>(
             const Hyperrect & h,
             const int k,
             const Color color,
@@ -142,21 +142,21 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
         inline void
         update_includes(void)
         {
-            KHPTree<K, KDependencyTreeSearch<K>>::Node::update_includes();
+            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::update_includes();
             this->update_includes_nwrites();
         }
 
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_str(f);
+            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
         }
 
         void
         dump_hyperrect_str(FILE * f) const
         {
-            KHPTree<K, KDependencyTreeSearch<K>>::Node::dump_hyperrect_str(f);
+            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::dump_hyperrect_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -168,19 +168,19 @@ class KDependencyTreeNode : public KHPTree<K, KDependencyTreeSearch<K>>::Node {
 };
 
 template<int K>
-class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public DependencyDomain
+class KBLASDependencyTree : public KHPTree<K, KBLASDependencyTreeSearch<K>>, public DependencyDomain
 {
     public:
-        using Base      = KHPTree<K, KDependencyTreeSearch<K>>;
+        using Base      = KHPTree<K, KBLASDependencyTreeSearch<K>>;
         using Hyperrect = KHyperrect<K>;
-        using Node      = KDependencyTreeNode<K>;
+        using Node      = KBLASDependencyTreeNode<K>;
         using NodeBase  = typename Base::Node;
-        using Search    = KDependencyTreeSearch<K>;
+        using Search    = KBLASDependencyTreeSearch<K>;
 
         /* alignment is ld.sizeof_type */
-        KDependencyTree(const size_t ld, const size_t sizeof_type) :
+        KBLASDependencyTree(const size_t ld, const size_t sizeof_type) :
             Base(), ld(ld), sizeof_type(sizeof_type) {}
-        ~KDependencyTree() {}
+        ~KBLASDependencyTree() {}
 
         /* alignement for this dep tree */
         const size_t ld;
@@ -350,6 +350,6 @@ class KDependencyTree : public KHPTree<K, KDependencyTreeSearch<K>>, public Depe
         }
 };
 
-using DependencyTree = KDependencyTree<2>;
+using BLASBLASDependencyTree = KBLASDependencyTree<2>;
 
 #endif /* __DEPENDENCY_TREE_HPP__ */

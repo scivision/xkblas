@@ -19,14 +19,14 @@
 # if XKRT_SUPPORT_CAIRO
 #  include <cairo/cairo.h>
 #  include <cairo/cairo-svg.h>
-#  include <xkrt/memory/access/blas/region/memory-tree.hpp>
+#  include <xkrt/memory/access/blas/memory-tree.hpp>
 void
 xkrt_cairo_memory_trees(
     xkrt_runtime_t * runtime
 ) {
     for (MemoryCoherencyController * memcontroller : runtime->memcontrollers)
     {
-        MemoryTree * memtree = (MemoryTree *) memcontroller;
+        BLASBLASMemoryTree * memtree = (BLASBLASMemoryTree *) memcontroller;
         assert(memtree);
 
         if (memtree->root == NULL)
@@ -42,7 +42,7 @@ xkrt_cairo_memory_trees(
 
         // Step 2: Draw elements without knowing the final size
         double offset = (double) memtree->root->rect[1].a;
-        std::function<void(MemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](MemoryTree::NodeBase * node, void * args) {
+        std::function<void(BLASBLASMemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](BLASBLASMemoryTree::NodeBase * node, void * args) {
             double y1 = (double) node->rect[0].a;
             double y2 = (double) node->rect[0].b;
             double x2 = (double) offset - (double) node->rect[1].a;

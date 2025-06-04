@@ -1,9 +1,9 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   task-dependency.cc                                           .-*-.       */
+/*   task-dependency-interval.cc                                  .-*-.       */
 /*                                                              .'* *.'       */
-/*   Created: 2024/12/20 15:07:55 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:13:40 by Romain PEREIRA         / _______ \       */
+/*   Created: 2025/05/19 00:09:44 by Romain PEREIRA          __/_*_*(_        */
+/*   Updated: 2025/06/04 01:56:28 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,12 +22,19 @@
 # include <assert.h>
 # include <string.h>
 
-static int r = 0;
+static int x = 0;
+
+# define AC 1
+constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
+constexpr size_t task_size = task_compute_size(flags, AC);
+constexpr size_t args_size = sizeof(int);
 
 static void
 func(task_t * task)
 {
-    r = 1;
+    int * args = (int *) TASK_ARGS(task, task_size);
+    assert(*args == x);
+    ++x;
 }
 
 int
@@ -49,50 +56,58 @@ main(void)
     xkrt_thread_t * thread = xkrt_thread_t::get_tls();
     assert(thread);
 
-    // Create a task
-    # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEPENDENT;
-    constexpr size_t task_size = task_compute_size(flags, AC);
+    ////////////////////////////////
+    // Create the following graph //
+    //  T1 -> T2 -> T3            //
+    ////////////////////////////////
 
-    task_t * task = thread->allocate_task(task_size);
-    new(task) task_t(FORMAT, flags);
+    access_mode_t modes[] = {
+        ACCESS_MODE_W,
+        ACCESS_MODE_R,
+        ACCESS_MODE_RW
+    };
 
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
+    const Interval interval[] = {
+        Interval((INTERVAL_TYPE_T) (&x - 16), (INTERVAL_TYPE_T) (&x + 16)),
+        Interval((INTERVAL_TYPE_T) (&x -  0), (INTERVAL_TYPE_T) (&x + 19)),
+        Interval((INTERVAL_TYPE_T) (&x -  3), (INTERVAL_TYPE_T) (&x + 12))
+    };
 
-    # ifndef NDEBUG
-    snprintf(task->label, sizeof(task->label), "dependent-task-test");
-    # endif
+    constexpr int ntasks = sizeof(modes) / sizeof(access_mode_t);
+    assert(ntasks == sizeof(interval) / sizeof(Interval));
 
-    // set accesses
-    access_t * accesses = TASK_ACCESSES(task);
+    for (int t = 0 ; t < ntasks ; ++t)
     {
+        // Create a task
+        task_t * task = thread->allocate_task(task_size + args_size);
+        new(task) task_t(FORMAT, flags);
+
+        task_dep_info_t * dep = TASK_DEP_INFO(task);
+        new (dep) task_dep_info_t(AC);
+
+        int * args = (int *) TASK_ARGS(task, task_size);
+        *args = t;
+
+        # ifndef NDEBUG
+        snprintf(task->label, sizeof(task->label), "dependent-task-test-%d", t);
+        # endif
+
+        // set accesses
+        access_t * accesses = TASK_ACCESSES(task);
         static_assert(AC <= TASK_MAX_ACCESSES);
-
-        const int ld = 1;
-        int * mem = (int *) malloc(ld * ld * sizeof(int));
-        const int  m = ld;
-        const int  n = ld;
-        for (int i = 0 ; i < m ; ++i)
-            for (int j = 0 ; j < m ; ++j)
-                mem[i*ld+j] = 42;
-
-        new(accesses + 0) access_t(task, MATRIX_COLMAJOR, mem, ld, 0, 0, m, n, sizeof(int), ACCESS_MODE_R);
-
+        new(accesses + 0) access_t(task, interval[t], modes[t]);
         thread->resolve<AC>(task, accesses);
 
-        # undef AC
+        // submit it to the runtime
+        runtime.task_commit(task);
     }
-
-    // submit it to the runtime
-    runtime.task_commit(task);
 
     // wait
     assert(xkrt_sync(&runtime) == 0);
 
     // deinit has an implicit taskwait
     assert(xkrt_deinit(&runtime) == 0);
-    assert(r == 1);
+    assert(x == ntasks);
 
     return 0;
 }

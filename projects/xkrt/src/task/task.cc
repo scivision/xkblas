@@ -15,8 +15,8 @@
 /* ************************************************************************** */
 
 # include <xkrt/runtime.h>
-# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
-# include <xkrt/memory/access/blas/region/memory-tree.hpp>
+# include <xkrt/memory/access/blas/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/memory-tree.hpp>
 # include <xkrt/memory/access/point/dependency-map.hpp>
 
 /**
@@ -53,7 +53,7 @@ task_get_memory_controller(
     {
         case (ACCESS_TYPE_BLAS_MATRIX):
         {
-            mcc = new MemoryTree(
+            mcc = new BLASBLASMemoryTree(
                 runtime,
                 access->host_view.ld,
                 access->host_view.sizeof_type,
@@ -117,7 +117,7 @@ task_get_dependency_domain(
     {
         case (ACCESS_TYPE_BLAS_MATRIX):
         {
-            domain = new DependencyTree(access->host_view.ld, access->host_view.sizeof_type);
+            domain = new BLASBLASDependencyTree(access->host_view.ld, access->host_view.sizeof_type);
             break ;
         }
 

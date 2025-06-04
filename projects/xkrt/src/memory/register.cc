@@ -3,7 +3,7 @@
 /*   register.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 22:55:18 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 01:54:42 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -309,6 +309,7 @@ xkrt_runtime_t::memory_transfer_async(
     const size_t                    size,
     const bool                      h2d
 ) {
+    # if 0
     const Interval interval(host_addr, host_addr + size);
     memory_transfer_async_args_t * args = (memory_transfer_async_args_t *) malloc(sizeof(memory_transfer_async_args_t));
     assert(args);
@@ -318,7 +319,7 @@ xkrt_runtime_t::memory_transfer_async(
 
     if (args->ref.fetch_sub(1, std::memory_order_relaxed) == 1)
         free(args);
-
+    # endif
     return 0;
 }
 

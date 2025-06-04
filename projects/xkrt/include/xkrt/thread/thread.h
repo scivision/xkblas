@@ -19,7 +19,7 @@
 
 #  include <xkrt/consts.h>
 #  include <xkrt/sync/spinlock.h>
-#  include <xkrt/memory/access/blas/region/dependency-tree.hpp>
+#  include <xkrt/memory/access/blas/dependency-tree.hpp>
 #  include <xkrt/task/task.hpp>
 
 #  include <xkrt/memory/alignas.h>
@@ -276,8 +276,8 @@ typedef struct  xkrt_thread_t
             // 1) we assume that all accesses use that same dependency domain
             // 2) C++ pure virtual function cannot be templated. To still
             //    benefits from compile-time optimization, we force the casting to
-            //    a DependencyTree, as it is the only DependencyDomain implemented currently.
-            DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
+            //    a BLASBLASDependencyTree, as it is the only DependencyDomain implemented currently.
+            BLASBLASDependencyTree * tree = (BLASBLASDependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
             tree->resolve<AC>(accesses);
         }
 

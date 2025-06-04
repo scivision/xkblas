@@ -18,6 +18,7 @@ set(TEST_SOURCES
     memory-transfer-async.cc
     memory-unregister-async.cc
     sync.cc
+    task-dependency-interval.cc
     task-dependency-point.cc
     task-dependency.cc
     task-format-host.cc
