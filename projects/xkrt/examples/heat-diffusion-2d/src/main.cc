@@ -8,7 +8,7 @@
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
 /*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
-/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*   Author: Romain PEREIRA <rpereira@anl.gov>                                */
 /*                                                                            */
 /*   Copyright: see AUTHORS                                                   */
 /*                                                                            */

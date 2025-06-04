@@ -9,7 +9,7 @@
 /*                                                                            */
 /*   Author: Pierre-Etienne POLET <pierre-etienne.polet@inria.fr>             */
 /*   Author: Thierry GAUTIER <thierry.gautier@inrialpes.fr>                   */
-/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>                         */
 /*                                                                            */
 /*   Copyright: see AUTHORS                                                   */
 /*                                                                            */

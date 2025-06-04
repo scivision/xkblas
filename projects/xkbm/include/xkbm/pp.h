@@ -7,7 +7,7 @@
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
-/*   Author: Romain PEREIRA <romain.pereira@outlook.com>                      */
+/*   Author: Romain PEREIRA <romain.pereira@inria.fr>                         */
 /*                                                                            */
 /*   Copyright: see AUTHORS                                                   */
 /*                                                                            */
