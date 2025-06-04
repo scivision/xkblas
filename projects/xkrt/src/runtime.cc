@@ -3,7 +3,7 @@
 /*   runtime.cc                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:15:25 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 03:16:58 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,6 +75,9 @@ xkrt_init(xkrt_runtime_t * runtime)
     // the '+1' is to enforce the host device, always
     xkrt_drivers_init(runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
+
+    // register access
+    runtime->last_register_memory_access = NULL;
 
     return 0;
 }

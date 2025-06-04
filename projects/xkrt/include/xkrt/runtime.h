@@ -3,7 +3,7 @@
 /*   runtime.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 22:19:12 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 03:17:34 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -65,6 +65,10 @@ typedef struct  xkrt_runtime_t
 
     /* hwloc topology, read only, initialized at init */
     hwloc_topology_t topology;
+
+    /* an access that reprenset register/unregister tasks, to serialize them to
+     * avoid blocking threads, as the cuda driver serialize it anyway */
+    std::atomic<access_t *> last_register_memory_access;
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // UTILITIES FOR THE MEMORY COHERENCY TREE - THIS SHOULD GTFO AND BE ABSTRACTED IN THE TREE //
@@ -135,16 +139,18 @@ typedef struct  xkrt_runtime_t
     /////////////////////////
 
     /**
-     *  Create 'n' tasks so that each task i in [0..n-1] touches
-     *  memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
-     *  Tasks will be cancelled if the memory is touched through `notify_touched()`
+     *  Create 'n' tasks so that each task i in [0..n-1]:
+     *      - access - commutative write on [ptr + i*chunk_size,  ptr + (i+1)*chunk_size]
+     *      - routine - touches memory pages in [ptr + i*chunk_size,  ptr + (i+1)*chunk_size]
      */
     int memory_touch_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
 
     /**
-     *  Create 'n' tasks so that each task i in [0..n-1] pins memory in
-     *  [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
-     *  Each task may run 'cuMemRegister' several time on a single chunk
+     *  Create 'n' tasks so that each task i in [0..n-1]
+     *      - access - commutative write on [ptr + i*chunk_size,  ptr + (i+1)*chunk_size]
+     *      - routine - register a chunk of memory [ptr + i*chunk_size,  ptr + (i+1)*chunk_size].
+     *
+     *  Note: each task may run several 'cuMemRegister' several time on a single chunk
      */
     int memory_register_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
     int memory_unregister_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
@@ -152,6 +158,12 @@ typedef struct  xkrt_runtime_t
     /**
      *  Create tasks to copy memory from/to the host.
      *  The number of tasks spawned depend on the number and the state of segment previously submitted.
+     *  Each 'transfer' task
+     *      - access - a sequential write on a sub-segment
+     *      - routine - submit a copy instruction to the device stream
+     *      - is detachable - and is fulfilled once the copy completed
+     *
+     *  Discussions
      *
      *  This routine supports concurrency with `memory_touch_async` `memory_register_async` `memory_unregister_async` :
      *      if there is a task currently touching/registering/unregistering a
