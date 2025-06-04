@@ -3,7 +3,7 @@
 /*   thread.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/19 20:55:39 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:07:01 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 20:29:13 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -315,6 +315,25 @@ typedef struct  xkrt_thread_t
         dump_tasks(FILE * f, std::vector<task_t *> & tasks)
         {
             fprintf(f, "digraph G {\n");
+
+            // print all tasks and accesses
+            for (task_t * & task : tasks)
+            {
+                fprintf(f, "    \"%p\" [label=\"%.4s\"] ;\n", task, task->label);
+                if (task->flags & TASK_FLAG_DEPENDENT)
+                {
+                    task_dep_info_t * dep = TASK_DEP_INFO(task);
+                    access_t * accesses = TASK_ACCESSES(task);
+                    for (int i = 0 ; i < dep->ac ; ++i)
+                    {
+                        access_t * access = accesses + i;
+                        // fprintf(f, "    \"%p\" [label=\"AC%d\", shape=box] ;\n", access, i);
+                        // fprintf(f, "    \"%p\" -> \"%p\" [dir=both] ;\n", task, access);
+                    }
+                }
+            }
+
+            // print edges
             for (task_t * & task : tasks)
             {
                 if (task->flags & TASK_FLAG_DEPENDENT)
@@ -324,9 +343,11 @@ typedef struct  xkrt_thread_t
                     for (int i = 0 ; i < dep->ac ; ++i)
                     {
                         access_t * pred = accesses + i;
-                        fprintf(f, "    \"%p\" [label=\"%s - ac %d\"] ;\n", pred, task->label, i);
                         for (access_t * succ : pred->successors)
-                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
+                        {
+                            // fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred, succ);
+                            fprintf(f, "    \"%p\" -> \"%p\" ;\n", pred->task, succ->task);
+                        }
                     }
                 }
             }

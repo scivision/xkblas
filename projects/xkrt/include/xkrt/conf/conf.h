@@ -3,7 +3,7 @@
 /*   conf.h                                                       .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 18:31:21 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:59:12 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 19:56:10 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -72,6 +72,7 @@ typedef struct  xkrt_conf_s
     xkrt_conf_drivers_t drivers;    /* driver conf */
     bool merge_transfers;           /* attempt to merge continuous memory to a single transfer */
     bool report_stats_on_deinit;    /* report stats on deinit */
+    bool export_tdg_on_deinit;      /* export tdg on deinit */
 }               xkrt_conf_t;
 
 void xkrt_init_conf(xkrt_conf_t * conf);

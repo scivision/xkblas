@@ -3,7 +3,7 @@
 /*   runtime.cc                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:57:57 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 20:19:14 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -90,6 +90,27 @@ xkrt_deinit(xkrt_runtime_t * runtime)
     if (runtime->conf.report_stats_on_deinit)
         xkrt_runtime_stats_report(runtime);
     # endif /* XKRT_SUPPORT_STATS */
+
+    # ifndef NDEBUG
+    if (runtime->conf.export_tdg_on_deinit)
+    {
+        xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+        if (tls->tasks.size())
+        {
+            char filepath[128];
+            snprintf(filepath, sizeof(filepath), "tdg-%d-%zu.dot", tls->tid, xkrt_get_nanotime());
+            LOGGER_INFO("Exporting TDG to `%s`", filepath);
+            FILE * f = fopen(filepath, "w");
+            if (f)
+            {
+                tls->dump_tasks(f);
+                fclose(f);
+            }
+            else
+                LOGGER_ERROR("Error opening `%s`", filepath);
+        }
+    }
+    # endif /* NDEBUG */
 
     runtime->state = XKRT_RUNTIME_DEINITIALIZED;
     xkrt_drivers_deinit(runtime);

@@ -487,8 +487,8 @@ main_mumps(char ** args)
      */
 
     # define USE_WRITE_BACK     1
-    # define USE_ARGS_MATRIX    0
-    # define USE_TS_TUNER       1
+    # define USE_ARGS_MATRIX    1
+    # define USE_TS_TUNER       0
     # define USE_PREALLOCATE    1
     # define NMATRICES          1
 
@@ -534,7 +534,7 @@ main_mumps(char ** args)
         printf("allocating and filling matrices %d/%d with (m, n) = (%d, %d)\n", k+1, nmatrices, m, n);
 
         /* allocate matrices */
-        # if 1
+        # if 0
         uintptr_t matrices[1];
         prepare_n_matrices(matrices, 1, ld);
 

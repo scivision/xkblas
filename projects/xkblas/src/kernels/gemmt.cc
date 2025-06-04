@@ -3,7 +3,7 @@
 /*   gemmt.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/04 17:03:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:35:46 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 20:42:41 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -131,7 +131,7 @@ xkblas_£gemmt_tile_async(
 
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label),
-            "gemm(A=(%zu,%zu) ; B=(%zu,%zu) ; C=(%zu,%zu))",
+            "gemmt(A=(%zu,%zu) ; B=(%zu,%zu) ; C=(%zu,%zu))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* NDEBUG */
 

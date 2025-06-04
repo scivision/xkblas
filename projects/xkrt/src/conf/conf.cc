@@ -3,7 +3,7 @@
 /*   conf.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 10:59:00 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:54:31 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 19:56:51 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -147,6 +147,13 @@ __parse_stats(xkrt_conf_t * conf, char const * value)
 }
 
 static void
+__parse_export_tdg(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->export_tdg_on_deinit = value ? atoi(value) : 0;
+}
+
+static void
 __parse_p2p(xkrt_conf_t * conf, char const * value)
 {
     if (value)
@@ -216,6 +223,7 @@ static xkrt_conf_parse_t CONF_PARSE[] = {
     {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
     {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
+    {"XKRT_EXPORT_TDG",           __parse_export_tdg,          "Write the task dependency graph to a .dot file on each taskwait"},
     {"XKRT_DRIVERS",              __parse_drivers,             "Exemple: 'cuda,4;hip,2;host,3' - will enable drivers cuda, hip and host respectively with 4, 2, and 3 threads per device."},
     {"XKRT_USE_P2P",              __parse_p2p,                 "Boolean to enable/disable the use of p2p transfers"},
     {NULL,                       NULL,                         NULL}
@@ -238,6 +246,7 @@ xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
     conf->report_stats_on_deinit    = 0;
+    conf->export_tdg_on_deinit      = 0;
     conf->device.ngpus              = (uint8_t)-1;
     conf->device.gpu_mem_percent    = (float) 90.0;
     conf->device.use_p2p            = true;
