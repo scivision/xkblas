@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 02:23:00 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 17:00:11 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1734,7 +1734,6 @@ next_view:
             // short-path if targetting the host
             if (device_global_id == HOST_DEVICE_GLOBAL_ID)
             {
-                assert(access->mode == ACCESS_MODE_R);
                 list = this->fetch_list_to_host(access);
             }
             // long-path if targetting a device

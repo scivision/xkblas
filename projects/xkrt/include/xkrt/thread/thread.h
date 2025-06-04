@@ -3,7 +3,7 @@
 /*   thread.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/19 20:55:39 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/04 03:15:49 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 12:35:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -206,7 +206,6 @@ typedef struct  xkrt_thread_t
             memory_stack_bottom(NULL),
             memory_stack_capacity(THREAD_MAX_MEMORY),
             rng(),
-            last_register_memory_access(NULL),
             parallel_for{.index = 0}
         {
             // set current task

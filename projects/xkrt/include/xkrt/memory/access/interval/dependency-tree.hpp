@@ -3,7 +3,7 @@
 /*   dependency-tree.hpp                                          .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/05 18:10:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 02:43:21 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 15:54:03 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -174,7 +174,10 @@ class IntervalDependencyTree : public KHPTree<K, IntervalDependencyTreeSearch>, 
     public:
 
         /* alignment is ld.sizeof_type */
-        IntervalDependencyTree() : Base() {}
+        IntervalDependencyTree() : Base()
+        {
+            LOGGER_FATAL("IntervalDependencyTree shouldnt be used. Use BLAS matrix with ld=SIZE_MAX instead");
+        }
         ~IntervalDependencyTree() {}
 
     public:

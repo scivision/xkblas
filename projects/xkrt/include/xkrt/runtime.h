@@ -3,7 +3,7 @@
 /*   runtime.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 03:17:34 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 16:35:56 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -52,9 +52,6 @@ typedef struct  xkrt_runtime_t
         task_format_id_t copy_async;
         task_format_id_t host_capture;
         task_format_id_t memory_touch_async;
-        task_format_id_t memory_pin_async;
-        task_format_id_t memory_unpin_async;
-        task_format_id_t memory_transfer_async;
     } formats;
 
     /* user conf */
@@ -65,10 +62,6 @@ typedef struct  xkrt_runtime_t
 
     /* hwloc topology, read only, initialized at init */
     hwloc_topology_t topology;
-
-    /* an access that reprenset register/unregister tasks, to serialize them to
-     * avoid blocking threads, as the cuda driver serialize it anyway */
-    std::atomic<access_t *> last_register_memory_access;
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // UTILITIES FOR THE MEMORY COHERENCY TREE - THIS SHOULD GTFO AND BE ABSTRACTED IN THE TREE //
@@ -155,6 +148,10 @@ typedef struct  xkrt_runtime_t
     int memory_register_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
     int memory_unregister_async(xkrt_team_t * team, void * ptr, const size_t chunk_size, int n);
 
+    // TODO - this was a preliminary design. In the end, it got moved to the
+    // memory coherency controller when fetching data on a
+    // ACCESS_MODE_PIN/ACCESS_MODE_UNPIN
+    # if 0
     /**
      *  Create tasks to copy memory from/to the host.
      *  The number of tasks spawned depend on the number and the state of segment previously submitted.
@@ -214,6 +211,7 @@ typedef struct  xkrt_runtime_t
         const size_t                  size,
         const bool                    h2d
     );
+    # endif
 
     /////////////////////
     // SYNCHRONIZATION //
@@ -333,7 +331,10 @@ void xkrt_memory_copy_async_register_format(xkrt_runtime_t * runtime);
 void xkrt_task_host_capture_register_format(xkrt_runtime_t * runtime);
 
 /* register v2 format */
-void xkrt_memory_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_touch_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_register_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_unregister_async_register_format(xkrt_runtime_t * runtime);
+void xkrt_memory_transfer_async_register_format(xkrt_runtime_t * runtime);
 
 /* Main entry thread created per device */
 void * xkrt_device_thread_main(xkrt_team_t * team, xkrt_thread_t * thread);

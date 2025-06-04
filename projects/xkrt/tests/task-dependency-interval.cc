@@ -3,7 +3,7 @@
 /*   task-dependency-interval.cc                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/05/19 00:09:44 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/04 01:56:28 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 16:36:55 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -95,7 +95,7 @@ main(void)
         // set accesses
         access_t * accesses = TASK_ACCESSES(task);
         static_assert(AC <= TASK_MAX_ACCESSES);
-        new(accesses + 0) access_t(task, interval[t], modes[t]);
+        new(accesses + 0) access_t(task, interval[t].a, interval[t].b, modes[t]);
         thread->resolve<AC>(task, accesses);
 
         // submit it to the runtime

@@ -3,7 +3,7 @@
 /*   access.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/03 11:51:31 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 02:26:24 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 16:38:53 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -313,10 +313,13 @@ class access_t
             successors.clear();
 
             /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
-            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
+            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL ||
+                    concurrency == ACCESS_CONCURRENCY_COMMUTATIVE);
 
             /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
-            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R ||
+                    mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW ||
+                    mode == ACCESS_MODE_PIN || mode == ACCESS_MODE_UNPIN);
 
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
@@ -425,35 +428,33 @@ class access_t
         // INTERVAL ACCESSES CONSTRUCTORS                                   //
         //////////////////////////////////////////////////////////////////////
 
+        // TODO : convert it to a BLAS matrix for now, as the memory coherency
+        // tree is quite hard/heavy to implement and would require significant
+        // code refractoring to mutualize code with a 1D implementation
         access_t(
             task_t * task,
-            const Interval & interval,
+            const uintptr_t a,
+            const uintptr_t b,
             access_mode_t mode,
             access_concurrency_t concurrency = ACCESS_CONCURRENCY_SEQUENTIAL,
             access_scope_t scope = ACCESS_SCOPE_NONUNIFIED
         ) :
-            mode(mode),
-            concurrency(concurrency),
-            scope(scope),
-            type(ACCESS_TYPE_INTERVAL),
-            segment(interval),
-            successors(8),
-            task(task),
-            host_view(MATRIX_COLMAJOR, 0, 0, 0, 0, interval.a, interval.b - interval.a, 0),
-            device_view()
-        {
-            /* clear preallocated empty successors */
-            successors.clear();
-
-            /* Only ACCESS_CONCURRENCY_SEQUENTIAL is supported yet */
-            assert(concurrency == ACCESS_CONCURRENCY_SEQUENTIAL);
-
-            /* Only ACCESS_MODE_R|ACCESS_MODE_W supported yet */
-            assert(mode == ACCESS_MODE_V || mode == ACCESS_MODE_R || mode == ACCESS_MODE_W || mode == ACCESS_MODE_RW);
+            access_t(
+                task,
+                MATRIX_COLMAJOR,    // order
+                (const void *) a,   // addr
+                SIZE_MAX,           // ld
+                0,                  // offset_m
+                0,                  // offset_n
+                (size_t) (b - a),   // m
+                1,                  // n
+                1,                  // s
+                mode,
+                concurrency,
+                scope
+        ) {
+            assert(a < b);
         }
-
-        //////////////////////////////////////////////////////////////////////
-
 
         //////////////////////////////////////////////////////////////////////
         // NULL ACCESS                                                      //

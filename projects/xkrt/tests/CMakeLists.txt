@@ -15,7 +15,6 @@ set(TEST_SOURCES
     memory-register-async.cc
     memory-touch-async.cc
     memory-touch-register-unregister-async.cc
-    memory-transfer-async.cc
     memory-unregister-async.cc
     sync.cc
     task-dependency-interval.cc
