@@ -3,7 +3,7 @@
 /*   task.hpp                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 16:52:52 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:36 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:44:00 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -193,16 +193,21 @@ typedef struct  task_dev_info_t
 typedef struct  task_dom_info_t
 {
     /* dependency controller - only the thread currently executing the task may read this list */
-    std::vector<DependencyDomain *> deps;
+    struct {
+        std::vector<DependencyDomain *> blas;
+        DependencyDomain * interval;
+        DependencyDomain * point;
+    } deps;
 
     /* memory controller for coherency - all threads may try to access this list */
-    std::vector<MemoryCoherencyController *> mccs;
-    spinlock_t mccs_lock;
+    struct {
+        std::vector<MemoryCoherencyController *> blas;
+        // DependencyDomain * interval; - not implemented
+        // DependencyDomain * point; - not implemented
+        spinlock_t blas_lock;
+    } mccs;
 
-    task_dom_info_t() : deps(1), mccs(1), mccs_lock() {
-        deps.clear();
-        mccs.clear();
-    }
+    task_dom_info_t() : deps{}, mccs{} {}
 
 }               task_dom_info_t;
 

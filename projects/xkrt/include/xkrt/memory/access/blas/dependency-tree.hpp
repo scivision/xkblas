@@ -3,7 +3,7 @@
 /*   dependency-tree.hpp                                          .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/05 18:10:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:13:57 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:22:44 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,10 +17,6 @@
 #ifndef __DEPENDENCY_TREE_HPP__
 # define __DEPENDENCY_TREE_HPP__
 
-# define KHP_TREE_REBALANCE         0
-# define KHP_TREE_CUT_ON_INSERT     0
-# define KHP_TREE_MAINTAIN_SIZE     0
-# define KHP_TREE_MAINTAIN_HEIGHT   0
 # include <xkrt/memory/access/common/khp-tree.hpp>
 # include <xkrt/memory/access/dependency-domain.hpp>
 # include <xkrt/task/task.hpp>
@@ -142,21 +138,21 @@ class KBLASDependencyTreeNode : public KHPTree<K, KBLASDependencyTreeSearch<K>>:
         inline void
         update_includes(void)
         {
-            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::update_includes();
+            Base::update_includes();
             this->update_includes_nwrites();
         }
 
         void
         dump_str(FILE * f) const
         {
-            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::dump_str(f);
+            Base::dump_str(f);
             fprintf(f, "\\nreads=%zu\\nwrites=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
         }
 
         void
         dump_hyperrect_str(FILE * f) const
         {
-            KHPTree<K, KBLASDependencyTreeSearch<K>>::Node::dump_hyperrect_str(f);
+            Base::dump_hyperrect_str(f);
 
             fprintf(f, "\\\\ reads=%zu \\\\ writes=%d", this->last_reads.size(), this->last_write->task ? 1 : 0);
             fprintf(f, "\\\\ nwrites = %d ", this->nwrites);
@@ -198,8 +194,8 @@ class KBLASDependencyTree : public KHPTree<K, KBLASDependencyTreeSearch<K>>, pub
 
             Search search;
             search.prepare_conflicting(conflicts, access);
-            Base::intersect(search, access->hyperrects[0]);
-            Base::intersect(search, access->hyperrects[1]);
+            Base::intersect(search, access->rects[0]);
+            Base::intersect(search, access->rects[1]);
         }
 
         //////////////
@@ -323,33 +319,23 @@ class KBLASDependencyTree : public KHPTree<K, KBLASDependencyTreeSearch<K>>, pub
         void
         link(access_t * access)
         {
-            assert(this->can_resolve(access));
-
             Search search;
             search.prepare_resolve(access);
-            Base::intersect(search, access->hyperrects[0]);
-            Base::intersect(search, access->hyperrects[1]);
+            Base::intersect(search, access->rects[0]);
+            Base::intersect(search, access->rects[1]);
         }
 
         void
         put(access_t * access)
         {
-            assert(this->can_resolve(access));
-
             Search search;
             search.prepare_resolve(access);
-            Base::insert(search, access->hyperrects[0]);
-            Base::insert(search, access->hyperrects[1]);
+            Base::insert(search, access->rects[0]);
+            Base::insert(search, access->rects[1]);
         }
 
-        bool
-        can_resolve(const access_t * access) const
-        {
-            assert(access);
-            return (this->ld == access->host_view.ld) && (this->sizeof_type == access->host_view.sizeof_type);
-        }
 };
 
-using BLASBLASDependencyTree = KBLASDependencyTree<2>;
+using BLASDependencyTree = KBLASDependencyTree<2>;
 
 #endif /* __DEPENDENCY_TREE_HPP__ */

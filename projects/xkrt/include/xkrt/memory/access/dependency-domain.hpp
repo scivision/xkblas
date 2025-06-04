@@ -3,7 +3,7 @@
 /*   dependency-domain.hpp                                        .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:03:41 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:23:08 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -28,9 +28,6 @@ class DependencyDomain
         virtual ~DependencyDomain() {}
 
     public:
-
-        // return true if the dependency domain can resolve
-        virtual bool can_resolve(const access_t * access) const = 0;
 
         // set edges with previous accesses
         virtual void link(access_t * access) = 0;

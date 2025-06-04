@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/05/27 15:08:32 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:04:28 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:03:18 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -21,10 +21,6 @@
 #ifndef __REGISTER_MEMORY_TREE_HPP__
 # define __REGISTER_MEMORY_TREE_HPP__
 
-# define KHP_TREE_REBALANCE         0
-# define KHP_TREE_CUT_ON_INSERT     0
-# define KHP_TREE_MAINTAIN_SIZE     0
-# define KHP_TREE_MAINTAIN_HEIGHT   0
 # include <xkrt/memory/access/common/khp-tree.hpp>
 
 //  TODO : the design of this is terrible with a cyclic ownership with 'xkrt_runtime_t'

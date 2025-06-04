@@ -3,7 +3,7 @@
 /*   hyperrect.hpp                                                .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:12 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:13:01 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -37,6 +37,12 @@ class KHyperrect {
     public:
 
         KHyperrect() : list() {}
+
+        KHyperrect(const Interval & interval) requires (K == 1)
+        {
+            assert(K == 1);
+            this->set_list(&interval);
+        }
 
         KHyperrect(const Interval list[K])
         {

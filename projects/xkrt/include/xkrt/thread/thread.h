@@ -276,8 +276,8 @@ typedef struct  xkrt_thread_t
             // 1) we assume that all accesses use that same dependency domain
             // 2) C++ pure virtual function cannot be templated. To still
             //    benefits from compile-time optimization, we force the casting to
-            //    a BLASBLASDependencyTree, as it is the only DependencyDomain implemented currently.
-            BLASBLASDependencyTree * tree = (BLASBLASDependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
+            //    a BLASDependencyTree, as it is the only DependencyDomain implemented currently.
+            BLASDependencyTree * tree = (BLASDependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
             tree->resolve<AC>(accesses);
         }
 

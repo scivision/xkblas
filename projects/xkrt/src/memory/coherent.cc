@@ -3,7 +3,7 @@
 /*   coherent.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/07 22:00:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:15:02 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:16:07 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -99,7 +99,7 @@ xkrt_coherency_host_async(
     DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
 
     std::vector<void *> conflicts;
-    ((BLASBLASDependencyTree *) domain)->conflicting(&conflicts, &access);
+    ((BLASDependencyTree *) domain)->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
@@ -113,7 +113,7 @@ xkrt_coherency_host_async(
     for (void * & conflict : conflicts)
     {
         /* retrieve the node */
-        BLASBLASDependencyTree::Node * node = (BLASBLASDependencyTree::Node *) conflict;
+        BLASDependencyTree::Node * node = (BLASDependencyTree::Node *) conflict;
         access_t * write = node->last_write;
         assert(write);
         assert(access.host_view.ld          == write->host_view.ld);
@@ -144,8 +144,8 @@ xkrt_coherency_host_async(
         bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
-            access_t::Hyperrect h;
-            access_t::Hyperrect::intersection(&h, access.hyperrects[i], node->hyperrect);
+            access_t::Rect h;
+            access_t::Rect::intersection(&h, access.rects[i], node->hyperrect);
 
             if (!h.is_empty())
             {

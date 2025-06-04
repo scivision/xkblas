@@ -3,7 +3,7 @@
 /*   coherency-controller.hpp                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/08 00:21:00 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:02:47 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:23:05 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -35,8 +35,6 @@ class MemoryCoherencyController {
         /* fetch the given access on the given device */
         virtual void fetch(access_t * access, xkrt_device_global_id_t device_global_id) = 0;
 
-        /* return true if that memory coherency controller can resolve that access */
-        virtual bool can_resolve(const access_t * access) const = 0;
 };
 
 #endif /* __MEMORY_TREE_HPP__ */

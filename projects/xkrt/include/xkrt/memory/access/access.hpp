@@ -3,7 +3,7 @@
 /*   access.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/03 11:51:31 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 01:53:43 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:26:24 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -68,7 +68,7 @@ memory_view_from_hyperrect(
 
 template<int K>
 static inline void
-memory_view_from_hyperrects(
+memory_view_from_rects(
     memory_view_t & view,
     const KHyperrect<K> & h0,
     const KHyperrect<K> & h1,
@@ -102,9 +102,9 @@ memory_view_from_hyperrects(
 
 template<int K>
 static inline void
-memory_view_to_hyperrects(
+memory_view_to_rects(
     const memory_view_t & view,
-    KHyperrect<K> (& hyperrects) [2]
+    KHyperrect<K> (& rects) [2]
 ) {
     static_assert(K == 2);
 
@@ -139,13 +139,13 @@ memory_view_to_hyperrects(
             Interval list[2];
             list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
-            hyperrects[0].set_list(list);
-            assert(!hyperrects[0].is_empty());
+            rects[0].set_list(list);
+            assert(!rects[0].is_empty());
         }
 
-        assert(hyperrects[1].is_empty());
+        assert(rects[1].is_empty());
     }
-    // 2 hyperrects are needed
+    // 2 rects are needed
     else
     {
         /**
@@ -173,33 +173,35 @@ memory_view_to_hyperrects(
             list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
             list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
 
-            hyperrects[0].set_list(list0);
-            assert(!hyperrects[0].is_empty());
+            rects[0].set_list(list0);
+            assert(!rects[0].is_empty());
         }
 
         {
             Interval list1[2];
             list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
             list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
-            hyperrects[1].set_list(list1);
-            assert(!hyperrects[1].is_empty());
+            rects[1].set_list(list1);
+            assert(!rects[1].is_empty());
         }
     }
 }
 
 /* access types */
-typedef enum    access_type_t
+typedef enum    access_type_t : uint8_t
 {
-    ACCESS_TYPE_POINT,
-    ACCESS_TYPE_INTERVAL,
-    ACCESS_TYPE_BLAS_MATRIX,
-    ACCESS_TYPE_NULL,
+    ACCESS_TYPE_POINT       = 0,
+    ACCESS_TYPE_INTERVAL    = 1,
+    ACCESS_TYPE_BLAS_MATRIX = 2,
+    ACCESS_TYPE_NULL        = 3,
+    ACCESS_TYPE_MAX         = 4,
 }               access_type_t;
 
 class access_t
 {
     public:
-        using Hyperrect = KHyperrect<2>;
+        using Rect    = KHyperrect<2>;
+        using Segment = KHyperrect<1>;
 
     public:
 
@@ -230,10 +232,10 @@ class access_t
             ///////////////////
 
             struct {
-                /* Currently always 2 hyperrects that represents a matrix in an
+                /* Currently always 2 rects that represents a matrix in an
                  * XKTree (1 rect if access is aligned on ld x sizeof_type,
-                 * else 2 hyperrects) */
-                Hyperrect hyperrects[2];
+                 * else 2 rects) */
+                Rect rects[2];
             };
 
             //////////////
@@ -241,7 +243,7 @@ class access_t
             //////////////
 
             struct {
-                const Interval interval;
+                Segment segment;
             };
 
             ///////////
@@ -301,7 +303,7 @@ class access_t
             concurrency(concurrency),
             scope(scope),
             type(ACCESS_TYPE_BLAS_MATRIX),
-            hyperrects(),
+            rects(),
             successors(8),
             task(task),
             host_view(order, addr, ld, offset_m, offset_n, m, n, s),
@@ -319,8 +321,8 @@ class access_t
             // not sure about what to do if other ordering
             assert(host_view.order == MATRIX_COLMAJOR);
 
-            // creates the two hyperrects of that memory view
-            memory_view_to_hyperrects(host_view, hyperrects);
+            // creates the two rects of that memory view
+            memory_view_to_rects(host_view, rects);
         }
 
          access_t(
@@ -339,7 +341,7 @@ class access_t
         access_t(
             task_t * task,
             const matrix_order_t & order,
-            const Hyperrect & h,
+            const Rect & h,
             const size_t ld,
             const size_t s,
             access_mode_t mode,
@@ -350,7 +352,7 @@ class access_t
             concurrency(concurrency),
             scope(scope),
             type(ACCESS_TYPE_BLAS_MATRIX),
-            hyperrects(),
+            rects(),
             successors(8),
             task(task),
             host_view(order, 0, ld, 0, 0, 0, 0, s),
@@ -364,7 +366,7 @@ class access_t
             assert(!h.is_empty());
 
             memory_view_from_hyperrect(this->host_view, h, ld, s);
-            new (this->hyperrects + 0) Hyperrect(h);
+            new (this->rects + 0) Rect(h);
         }
 
         access_t(
@@ -434,7 +436,7 @@ class access_t
             concurrency(concurrency),
             scope(scope),
             type(ACCESS_TYPE_INTERVAL),
-            interval(interval),
+            segment(interval),
             successors(8),
             task(task),
             host_view(MATRIX_COLMAJOR, 0, 0, 0, 0, interval.a, interval.b - interval.a, 0),

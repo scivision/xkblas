@@ -3,7 +3,7 @@
 /*   dummy-coherency-controller.hpp                               .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/05/19 00:09:44 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:03:46 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:23:13 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,12 +48,6 @@ class DummyMemoryCoherencyController {
             LOGGER_FATAL("Tried to run coherency controller on an unsupported access");
         }
 
-        /* return true if that memory coherency controller can resolve that access */
-        bool
-        can_resolve(const access_t * access) const
-        {
-            LOGGER_FATAL("Tried to run coherency controller on an unsupported access");
-        }
 };
 
 #endif /* __DUMMY_COHERENCY_CONTROLLER_HPP__ */

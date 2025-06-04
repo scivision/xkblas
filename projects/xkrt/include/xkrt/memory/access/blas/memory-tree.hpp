@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:56:55 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:23:00 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -671,8 +671,8 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
 
         typedef struct  fetch_t
         {
-            /* the logical hyperrects representing that fetch */
-            Hyperrect hyperrects[2];
+            /* the logical rects representing that fetch */
+            Hyperrect rects[2];
 
             /* the host memory view */
             memory_view_t host_view;
@@ -847,19 +847,19 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
                     const size_t dn = fj->host_view.n;
                     if (fi->host_view.ld == fj->host_view.ld && (fi->host_view.offset_addr(dm,  0) == fj->host_view.begin_addr() || fi->host_view.offset_addr( 0, dn) == fj->host_view.begin_addr()))
                     {
-                        assert(!fi->hyperrects[0].is_empty());
-                        assert(!fj->hyperrects[0].is_empty());
-                        assert( fi->hyperrects[1].is_empty());
-                        assert( fj->hyperrects[1].is_empty());
+                        assert(!fi->rects[0].is_empty());
+                        assert(!fj->rects[0].is_empty());
+                        assert( fi->rects[1].is_empty());
+                        assert( fj->rects[1].is_empty());
 
-                        memory_view_from_hyperrects<K>(
+                        memory_view_from_rects<K>(
                             fi->host_view,
-                            fi->hyperrects[0], fj->hyperrects[0],
+                            fi->rects[0], fj->rects[0],
                             fi->host_view.ld,
                             fi->host_view.sizeof_type
                         );
 
-                        fi->hyperrects[1] = fj->hyperrects[0];
+                        fi->rects[1] = fj->rects[0];
 
                         fj->merged = true;
                         list->fetched();
@@ -932,8 +932,8 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
                 search.prepare_search_awaiting(fetch->dst_chunk);
                 tree->lock();
                 {
-                    tree->intersect(search, fetch->hyperrects[0]);
-                    tree->intersect(search, fetch->hyperrects[1]);
+                    tree->intersect(search, fetch->rects[0]);
+                    tree->intersect(search, fetch->rects[1]);
                 }
                 tree->unlock();
 
@@ -973,7 +973,7 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
                         forward_fetch->dst_view = forward.device_view;
 
                         // only 1 rect representing the forward view
-                        forward_fetch->hyperrects[0] = forward.dst_hyperrect;
+                        forward_fetch->rects[0] = forward.dst_hyperrect;
 
                         // the just-fetched 'dst' is the new 'src'
                         forward_fetch->src_device_global_id = fetch->dst_device_global_id;
@@ -1034,7 +1034,7 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
 
                 /* allocate fetch info for the callback argument */
                 fetch_t * fetch = list->prepare_next_fetch();
-                fetch->hyperrects[0]        = partite.hyperrect;
+                fetch->rects[0]        = partite.hyperrect;
                 fetch->host_view            = host_view;
                 fetch->src_device_global_id = partite.src_device_global_id;
                 fetch->src_view             = src_view;
@@ -1120,7 +1120,7 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
             }
         }
 
-        /* create a list of fetch request to perform for the given hyperrects */
+        /* create a list of fetch request to perform for the given rects */
         fetch_list_t *
         fetch_list_to_host(
             access_t * access
@@ -1130,13 +1130,13 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
             {
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->hyperrects[0]);
-                this->insert(search, access->hyperrects[1]);
+                this->insert(search, access->rects[0]);
+                this->insert(search, access->rects[1]);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_partition();
-                this->intersect(search, access->hyperrects[0]);
-                this->intersect(search, access->hyperrects[1]);
+                this->intersect(search, access->rects[0]);
+                this->intersect(search, access->rects[1]);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (5) if read access, find src/dst, and setup views to transfer on step (7) */
@@ -1680,13 +1680,13 @@ next_view:
 
                 /* step (1) ensure the access is represented in the tree as blocks */
                 search.prepare_insert(access);
-                this->insert(search, access->hyperrects[0]);
-                this->insert(search, access->hyperrects[1]);
+                this->insert(search, access->rects[0]);
+                this->insert(search, access->rects[1]);
 
                 /* step (2) find all blocks representing the access */
                 search.prepare_search_partition();
-                this->intersect(search, access->hyperrects[0]);
-                this->intersect(search, access->hyperrects[1]);
+                this->intersect(search, access->rects[0]);
+                this->intersect(search, access->rects[1]);
                 assert(search.partition.partites.size() >= 1);
 
                 /* step (3) find or allocate continuous memory for that access on that device */
@@ -1779,13 +1779,6 @@ next_view:
             this->clear();
         }
 
-        bool
-        can_resolve(const access_t * access) const
-        {
-            assert(access);
-            return (this->ld == access->host_view.ld) && (this->sizeof_type == access->host_view.sizeof_type);
-        }
-
         //////////////
         //  OCR     //
         //////////////
@@ -1799,8 +1792,8 @@ next_view:
             this->lock();
             {
                 for (int i = 0 ; i < 2 ; ++i)
-                    if (!access->hyperrects[i].is_empty())
-                        this->intersect(search, access->hyperrects[i]);
+                    if (!access->rects[i].is_empty())
+                        this->intersect(search, access->rects[i]);
             }
             this->unlock();
 
