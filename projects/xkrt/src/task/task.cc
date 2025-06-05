@@ -3,7 +3,7 @@
 /*   task.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/04/03 04:44:23 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/04 02:45:36 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 02:22:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,31 +47,34 @@ task_get_memory_controller(
             // is too many differnet matrices LD
 
             /* find previous mcc for that ld */
-            SPINLOCK_LOCK(dom->mccs.blas_lock);
             for (MemoryCoherencyController * mcc : dom->mccs.blas)
             {
-                BLASBLASMemoryTree * memtree = (BLASBLASMemoryTree *) mcc;
+                BLASMemoryTree * memtree = (BLASMemoryTree *) mcc;
                 if (memtree->ld == access->host_view.ld &&
                         memtree->sizeof_type == access->host_view.sizeof_type)
-                {
-                    SPINLOCK_UNLOCK(dom->mccs.blas_lock);
                     return mcc;
-                }
             }
 
             /* else insert a new one */
-            mcc = new BLASBLASMemoryTree(
+            mcc = new BLASMemoryTree(
                 runtime,
                 access->host_view.ld,
                 access->host_view.sizeof_type,
                 runtime->conf.merge_transfers
             );
-
             dom->mccs.blas.push_back(mcc);
+
+            /* insert regions that represents registered memory segment, to
+             * enforce the split in multiple copies */
+            # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+            if (runtime->conf.protect_registered_memory_overflow)
+                for (const auto & [ptr, size] : runtime->registered_memory)
+                    ((BLASMemoryTree *) mcc)->registered(ptr, size);
+            # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
 
             LOGGER_DEBUG("Created a new memory tree with (ld, sizeof(type), merge) = (%lu, %lu, %s)",
                     access->host_view.ld, access->host_view.sizeof_type, runtime->conf.merge_transfers ? "true" : "false");
-            SPINLOCK_UNLOCK(dom->mccs.blas_lock);
+
             break ;
         }
 

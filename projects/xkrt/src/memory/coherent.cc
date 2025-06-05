@@ -189,6 +189,6 @@ xkrt_coherency_allocate_2D(
 
     /* create an access to insert in the memory tree */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_V);
-    BLASBLASMemoryTree * memtree = (BLASBLASMemoryTree *) task_get_memory_controller(runtime, thread->current_task, &access);
+    BLASMemoryTree * memtree = (BLASMemoryTree *) task_get_memory_controller(runtime, thread->current_task, &access);
     memtree->allocate_to_device(&access, device_global_id);
 }

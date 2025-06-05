@@ -187,7 +187,7 @@ class KRegisterTree : public KHPTree<K, KRegisterTreeNodeSearch<K>>, public Lock
             assert(node->hypercube[k].b >= interval.b);
 
             // must be aligned on sizeof(type)
-            if (k == ACCESS_CUBE_ROW_DIM)
+            if (k == ACCESS_BLAS_ROW_DIM)
             {
                 const INTERVAL_DIFF_TYPE_T db = node->hypercube[k].b - interval.b;
                 (void) db;
@@ -204,7 +204,7 @@ class KRegisterTree : public KHPTree<K, KRegisterTreeNodeSearch<K>>, public Lock
                     for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
-                        const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_CUBE_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
+                        const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_BLAS_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
                         allocation_view->view.addr += offset;
                         assert(allocation_view->view.addr >= allocation_view->chunk->ptr);
                     }

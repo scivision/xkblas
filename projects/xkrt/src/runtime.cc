@@ -3,7 +3,7 @@
 /*   runtime.cc                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 16:31:07 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 01:43:21 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -75,6 +75,13 @@ xkrt_init(xkrt_runtime_t * runtime)
     // the '+1' is to enforce the host device, always
     xkrt_drivers_init(runtime);
     runtime->state = XKRT_RUNTIME_INITIALIZED;
+
+    # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+    // initialize the registered memory map
+    new (&runtime->registered_memory) std::map<uintptr_t, size_t>();
+    if (!runtime->conf.protect_registered_memory_overflow)
+        LOGGER_WARN("Compiled with `XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION` but `XKRT_MEMORY_REGISTER_PROTECT_OVERFLOW` environment variable is not set");
+    # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
 
     return 0;
 }

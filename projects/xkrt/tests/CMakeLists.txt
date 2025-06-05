@@ -12,6 +12,7 @@ set(TEST_SOURCES
     fib-task-format.cc
     init.cc
     memory-register-async-legacy.cc
+    memory-register-async-legacy-memcpy-split.cc
     memory-register-async.cc
     memory-touch-async.cc
     memory-touch-register-unregister-async.cc

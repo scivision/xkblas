@@ -49,6 +49,12 @@ xkrt_memory_register(
         else if (driver->f_memory_host_register(ptr, size))
             LOGGER_ERROR("Could not register memory for driver `%s`", driver->f_get_name());
     }
+
+    # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+    /* save in the registered map, for later accesses */
+    runtime->registered_memory[(uintptr_t)ptr] = size;
+    # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+
     return 0;
 }
 
@@ -66,6 +72,13 @@ xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, size_t size)
         else if (driver->f_memory_host_unregister(ptr, size))
             LOGGER_ERROR("Could not unregister memory for driver `%s`", driver->f_get_name());
     }
+
+
+    # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+    /* remove from the registered map */
+    runtime->registered_memory.erase((uintptr_t)ptr);
+    # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+
     return 0;
 }
 

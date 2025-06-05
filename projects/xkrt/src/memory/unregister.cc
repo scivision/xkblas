@@ -3,7 +3,7 @@
 /*   unregister.cc                                                .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 16:29:47 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 23:25:08 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,6 +29,8 @@ xkrt_runtime_t::memory_unregister_async(
     const size_t chunk_size,
     int n
 ) {
+    LOGGER_FATAL("Not implemented");
+
     xkrt_thread_t * tls = xkrt_thread_t::get_tls();
 
     // null format, the registration occurs during the fetching/fetched state

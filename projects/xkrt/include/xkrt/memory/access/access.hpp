@@ -29,11 +29,11 @@
  *  hyperrect for the xktree.
  *
  *  e.g the matrix (0, 4, 8, 8) can whether be represented as the hyperrect
- *      (0:4, 0:8) - if ACCESS_CUBE_ROW_DIM == 0
- *   or (0:8, 0:4) - if ACCESS_CUBE_ROW_DIM == 1
+ *      (0:4, 0:8) - if ACCESS_BLAS_ROW_DIM == 0
+ *   or (0:8, 0:4) - if ACCESS_BLAS_ROW_DIM == 1
  */
-# define ACCESS_CUBE_ROW_DIM 0
-# define ACCESS_CUBE_COL_DIM (1 - ACCESS_CUBE_ROW_DIM)
+# define ACCESS_BLAS_ROW_DIM 0
+# define ACCESS_BLAS_COL_DIM (1 - ACCESS_BLAS_ROW_DIM)
 
 // task and accesses depends to one another, breaking chicken/egg problem here
 struct task_t;
@@ -48,10 +48,10 @@ memory_view_from_hyperrect(
 ) {
     static_assert(K == 2);
 
-    const INTERVAL_TYPE_T       x = h[ACCESS_CUBE_ROW_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dx = h[ACCESS_CUBE_ROW_DIM].length();
-    const INTERVAL_TYPE_T       y = h[ACCESS_CUBE_COL_DIM].a;
-    const INTERVAL_DIFF_TYPE_T dy = h[ACCESS_CUBE_COL_DIM].length();
+    const INTERVAL_TYPE_T       x = h[ACCESS_BLAS_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dx = h[ACCESS_BLAS_ROW_DIM].length();
+    const INTERVAL_TYPE_T       y = h[ACCESS_BLAS_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T dy = h[ACCESS_BLAS_COL_DIM].length();
     assert(dx > 0);
     assert(dy > 0);
 
@@ -75,10 +75,10 @@ memory_view_from_rects(
     const size_t ld,
     const size_t sizeof_type
 ) {
-    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_CUBE_ROW_DIM].a;
-    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_CUBE_ROW_DIM].b;
-    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_CUBE_COL_DIM].a;
-    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_CUBE_COL_DIM].b;
+    const INTERVAL_DIFF_TYPE_T x0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_BLAS_ROW_DIM].a;
+    const INTERVAL_DIFF_TYPE_T xf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_BLAS_ROW_DIM].b;
+    const INTERVAL_DIFF_TYPE_T y0 = (INTERVAL_DIFF_TYPE_T) h0[ACCESS_BLAS_COL_DIM].a;
+    const INTERVAL_DIFF_TYPE_T yf = (INTERVAL_DIFF_TYPE_T) h1[ACCESS_BLAS_COL_DIM].b;
     assert(0 <= x0 && x0 <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
     assert(0 <= xf && xf <= (INTERVAL_DIFF_TYPE_T) (ld * sizeof_type));
     assert(y0 < yf);
@@ -137,8 +137,8 @@ memory_view_to_rects(
 
         {
             Interval list[2];
-            list[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
-            list[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
+            list[ACCESS_BLAS_ROW_DIM] = Interval(x0, x1);
+            list[ACCESS_BLAS_COL_DIM] = Interval(y0, y1);
             rects[0].set_list(list);
             assert(!rects[0].is_empty());
         }
@@ -170,8 +170,8 @@ memory_view_to_rects(
 
         {
             Interval list0[2];
-            list0[ACCESS_CUBE_ROW_DIM] = Interval(x0, x1);
-            list0[ACCESS_CUBE_COL_DIM] = Interval(y0, y1);
+            list0[ACCESS_BLAS_ROW_DIM] = Interval(x0, x1);
+            list0[ACCESS_BLAS_COL_DIM] = Interval(y0, y1);
 
             rects[0].set_list(list0);
             assert(!rects[0].is_empty());
@@ -179,8 +179,8 @@ memory_view_to_rects(
 
         {
             Interval list1[2];
-            list1[ACCESS_CUBE_ROW_DIM] = Interval(x2, x3);
-            list1[ACCESS_CUBE_COL_DIM] = Interval(y2, y3);
+            list1[ACCESS_BLAS_ROW_DIM] = Interval(x2, x3);
+            list1[ACCESS_BLAS_COL_DIM] = Interval(y2, y3);
             rects[1].set_list(list1);
             assert(!rects[1].is_empty());
         }

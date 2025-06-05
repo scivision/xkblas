@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 17:00:11 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 02:39:18 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -278,7 +278,7 @@ class KMemoryBlock {
                     const MemoryReplicateAllocationView * inheriting_allocation = inheriting_replicate->allocations[i];
 
                     // warning: 'ld' here depends on the allocation itself
-                    const INTERVAL_DIFF_TYPE_T offset   = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM] * inheriting_allocation->view.ld * sizeof_type;
+                    const INTERVAL_DIFF_TYPE_T offset   = d[ACCESS_BLAS_ROW_DIM] + d[ACCESS_BLAS_COL_DIM] * inheriting_allocation->view.ld * sizeof_type;
                     const uintptr_t begin_addr          = (uintptr_t) ((INTERVAL_DIFF_TYPE_T) inheriting_allocation->view.addr + offset);
                     assert(begin_addr >= inheriting_allocation->chunk->ptr);
 
@@ -377,8 +377,8 @@ class KBLASMemoryTreeNodeSearch {
                 bool
                 operator<(const Partite & p) const
                 {
-                    const bool is_left  = this->hyperrect[ACCESS_CUBE_COL_DIM].a < p.hyperrect[ACCESS_CUBE_COL_DIM].a;
-                    const bool is_right = this->hyperrect[ACCESS_CUBE_COL_DIM].a > p.hyperrect[ACCESS_CUBE_COL_DIM].a;
+                    const bool is_left  = this->hyperrect[ACCESS_BLAS_COL_DIM].a < p.hyperrect[ACCESS_BLAS_COL_DIM].a;
+                    const bool is_right = this->hyperrect[ACCESS_BLAS_COL_DIM].a > p.hyperrect[ACCESS_BLAS_COL_DIM].a;
 
                     if (is_left)
                         return true;
@@ -387,10 +387,10 @@ class KBLASMemoryTreeNodeSearch {
                         return false;
 
                     // vertically aligned
-                    assert(this->hyperrect[ACCESS_CUBE_COL_DIM].a == p.hyperrect[ACCESS_CUBE_COL_DIM].a);
+                    assert(this->hyperrect[ACCESS_BLAS_COL_DIM].a == p.hyperrect[ACCESS_BLAS_COL_DIM].a);
 
-                    const bool is_up    = this->hyperrect[ACCESS_CUBE_ROW_DIM].a < p.hyperrect[ACCESS_CUBE_ROW_DIM].a;
-                    const bool is_down  = this->hyperrect[ACCESS_CUBE_ROW_DIM].a > p.hyperrect[ACCESS_CUBE_ROW_DIM].a;
+                    const bool is_up    = this->hyperrect[ACCESS_BLAS_ROW_DIM].a < p.hyperrect[ACCESS_BLAS_ROW_DIM].a;
+                    const bool is_down  = this->hyperrect[ACCESS_BLAS_ROW_DIM].a > p.hyperrect[ACCESS_BLAS_ROW_DIM].a;
 
                     if (is_up)
                         return true;
@@ -1281,15 +1281,15 @@ class KBLASMemoryTree : public KHPTree<K, KBLASMemoryTreeNodeSearch<K>>, public 
                 /* compute distance from corner */
                 INTERVAL_DIFF_TYPE_T d[K];
                 Hyperrect::distance_manhattan(corner.hyperrect, partite.hyperrect, d);
-                if (d[ACCESS_CUBE_ROW_DIM] < 0)
+                if (d[ACCESS_BLAS_ROW_DIM] < 0)
                 {
-                    d[ACCESS_CUBE_ROW_DIM] += this->ld * this->sizeof_type;
-                    d[ACCESS_CUBE_COL_DIM] -= 1;
+                    d[ACCESS_BLAS_ROW_DIM] += this->ld * this->sizeof_type;
+                    d[ACCESS_BLAS_COL_DIM] -= 1;
                 }
-                assert(d[ACCESS_CUBE_ROW_DIM] >= 0);
-                assert(d[ACCESS_CUBE_COL_DIM] >= 0);
+                assert(d[ACCESS_BLAS_ROW_DIM] >= 0);
+                assert(d[ACCESS_BLAS_COL_DIM] >= 0);
 
-                const uintptr_t offset = d[ACCESS_CUBE_ROW_DIM] + d[ACCESS_CUBE_COL_DIM]*ld*sizeof_type;
+                const uintptr_t offset = d[ACCESS_BLAS_ROW_DIM] + d[ACCESS_BLAS_COL_DIM]*ld*sizeof_type;
                 const uintptr_t begin_addr = chunk->ptr + offset;
 
                 MemoryReplicate & replicate = partite.block->replicates[device_global_id];
@@ -1851,7 +1851,7 @@ next_view:
             assert(node->hyperrect[k].b >= interval.b);
 
             // must be aligned on sizeof(type)
-            if (k == ACCESS_CUBE_ROW_DIM)
+            if (k == ACCESS_BLAS_ROW_DIM)
             {
                 const INTERVAL_DIFF_TYPE_T db = node->hyperrect[k].b - interval.b;
                 (void) db;
@@ -1868,7 +1868,7 @@ next_view:
                     for (memory_allocation_view_id_t i = 0 ; i < replicate.nallocations ; ++i)
                     {
                         MemoryReplicateAllocationView * allocation_view = replicate.allocations[i];
-                        const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_CUBE_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
+                        const INTERVAL_DIFF_TYPE_T offset = (k == ACCESS_BLAS_ROW_DIM) ? da : (da * allocation_view->view.ld * this->sizeof_type);
                         allocation_view->view.addr += offset;
                         assert(allocation_view->view.addr >= allocation_view->chunk->ptr);
                     }
@@ -2023,8 +2023,91 @@ next_view:
             assert(!h.intersects(inherit->hyperrect));
             return new Node(h, k, color, reinterpret_cast<const Node *>(inherit), this->sizeof_type);
         }
+
+        //////////////////////////////////////////
+        // Memory registration / unregistration //
+        //////////////////////////////////////////
+
+        /* the given memory segment got registered */
+        void
+        registered(
+            uintptr_t ptr,
+            size_t size
+        ) {
+            static_assert(K == 2);
+            using Rect = Hyperrect;
+
+            /**
+             *  x = memory being registered
+             *      --------------------------------->
+             *      |      x  x  x
+             *      |      x  x  x
+             *      |      x  x  x
+             * LD.s |   x  x  x  x
+             *      |   x  x  x  x
+             *      |   x  x  x
+             *      v
+             *
+             *  generate 3 rects from it
+             *
+             *          y0 y1 y2 y3
+             *      --------------------------------->
+             *      |      1  1  2   x2
+             *      |      1  1  2
+             *      |      1  1  2
+             * x0   |   0  1  1  2
+             *      |   0  1  1  2   x3
+             * x1   |   0  1  1
+             *      v
+             */
+
+            const INTERVAL_TYPE_T LDs = this->ld * this->sizeof_type;
+
+            const INTERVAL_TYPE_T x0 = ptr % LDs;
+            const INTERVAL_TYPE_T x1 = MIN(x0 + size, LDs);
+            const INTERVAL_TYPE_T dx10 = x1 - x0;
+
+            const INTERVAL_TYPE_T x2 = 0;
+            const INTERVAL_TYPE_T x3 = (size - dx10) % LDs;
+            const INTERVAL_TYPE_T dx32 = x3 - x2;
+
+            assert((size - dx10 - dx32) % LDs == 0);
+
+            const INTERVAL_TYPE_T y0 = ptr / LDs;
+            const INTERVAL_TYPE_T y1 = y0 + 1;
+            const INTERVAL_TYPE_T y3 = y0 + ((size - dx10 - dx32) / LDs) + 2;
+            const INTERVAL_TYPE_T y2 = y3 - 1;
+
+            Interval intervals[3][2];
+            intervals[0][ACCESS_BLAS_ROW_DIM] = Interval(x0, x1);
+            intervals[0][ACCESS_BLAS_COL_DIM] = Interval(y0, y1);
+            intervals[1][ACCESS_BLAS_ROW_DIM] = Interval(0, LDs);
+            intervals[1][ACCESS_BLAS_COL_DIM] = Interval(y1, y2);
+            intervals[2][ACCESS_BLAS_ROW_DIM] = Interval(x2, x3);
+            intervals[2][ACCESS_BLAS_COL_DIM] = Interval(y2, y3);
+
+            Rect rects[3] = {
+                Rect(intervals[0]),
+                Rect(intervals[1]),
+                Rect(intervals[2])
+            };
+
+            /* insert blocks in the tree, they won't be merged by default when
+             * transfering. Maybe add a 'registered' bit on each rect, to
+             * manage merging in the future */
+            Search search(HOST_DEVICE_GLOBAL_ID);
+            search.prepare_insert(NULL);
+            this->lock();
+            {
+                this->insert(search, rects[0]);
+                this->insert(search, rects[1]);
+                this->insert(search, rects[2]);
+            }
+            this->unlock();
+        }
+
 };
 
-using BLASBLASMemoryTree = KBLASMemoryTree<2>;
+using BLASMemoryTree = KBLASMemoryTree<2>;
 
 #endif /* __MEMORY_TREE_HPP__ */

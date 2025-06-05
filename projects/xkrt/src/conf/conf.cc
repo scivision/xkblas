@@ -3,7 +3,7 @@
 /*   conf.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 10:59:00 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:44 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 23:11:55 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -97,6 +97,13 @@ static void
 __parse_ngpus(xkrt_conf_t * conf, char const * value)
 {
     conf->device.ngpus = value ? (uint8_t) atoi(value) : 1;
+}
+
+static void
+__parse_register_overflow(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->protect_registered_memory_overflow = atoi(value);
 }
 
 static void
@@ -209,27 +216,28 @@ typedef struct  xkrt_conf_parse_t
 
 // variables are parsed in-order
 static xkrt_conf_parse_t CONF_PARSE[] = {
-    {"XKRT_HELP",                 __parse_help,                "Show this helper"},
-    {"XKRT_VERBOSE",              __parse_verbose,             "Verbosity level (the higher the most)"},
-    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,     "Merge memory transfers over continuous virtual memory"},
-    {"XKRT_PRECISION",            NULL,                        NULL},
-    {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
-    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
-    {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
-    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of H2D streams per GPU"},
-    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of D2H streams per GPU"},
-    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of D2D streams per GPU"},
-    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of KERN streams per GPU"},
-    {"XKRT_KERN_PER_STREAM",      __parse_kern_per_stream,     "Number of concurrent kernels per KERN stream before throttling device-thread"},
-    {"XKRT_H2D_PER_STREAM",       __parse_h2d_per_stream,      "Number of concurrent copies per H2D stream before throttling device-thread"},
-    {"XKRT_D2H_PER_STREAM",       __parse_d2h_per_stream,      "Number of concurrent copies per D2H stream before throttling device-thread"},
-    {"XKRT_D2D_PER_STREAM",       __parse_d2d_per_stream,      "Number of concurrent copies per D2D stream before throttling device-thread"},
     {"XKRT_CACHE_LIMIT",          NULL,                        NULL},
-    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
+    {"XKRT_D2D_PER_STREAM",       __parse_d2d_per_stream,      "Number of concurrent copies per D2D stream before throttling device-thread"},
+    {"XKRT_D2H_PER_STREAM",       __parse_d2h_per_stream,      "Number of concurrent copies per D2H stream before throttling device-thread"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
-    {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
     {"XKRT_DRIVERS",              __parse_drivers,             "Exemple: 'cuda,4;hip,2;host,3' - will enable drivers cuda, hip and host respectively with 4, 2, and 3 threads per device."},
+    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
+    {"XKRT_H2D_PER_STREAM",       __parse_h2d_per_stream,      "Number of concurrent copies per H2D stream before throttling device-thread"},
+    {"XKRT_HELP",                 __parse_help,                "Show this helper"},
+    {"XKRT_KERN_PER_STREAM",      __parse_kern_per_stream,     "Number of concurrent kernels per KERN stream before throttling device-thread"},
+    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,     "Merge memory transfers over continuous virtual memory"},
+    {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
+    {"XKRT_MEMORY_REGISTER_PROTECT_OVERFLOW", __parse_register_overflow, "Split memory transfers to avoid overflow over registered/unregistered memory that causes cuda to crash"},
+    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of D2D streams per GPU"},
+    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of D2H streams per GPU"},
+    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of H2D streams per GPU"},
+    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of KERN streams per GPU"},
+    {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
+    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
+    {"XKRT_PRECISION",            NULL,                        NULL},
+    {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
     {"XKRT_USE_P2P",              __parse_p2p,                 "Boolean to enable/disable the use of p2p transfers"},
+    {"XKRT_VERBOSE",              __parse_verbose,             "Verbosity level (the higher the most)"},
     {NULL,                       NULL,                         NULL}
 };
 
@@ -249,11 +257,12 @@ void
 xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
-    conf->report_stats_on_deinit    = 0;
-    conf->device.ngpus              = (uint8_t)-1;
-    conf->device.gpu_mem_percent    = (float) 90.0;
-    conf->device.use_p2p            = true;
-    conf->merge_transfers           = false;
+    conf->report_stats_on_deinit                = 0;
+    conf->device.ngpus                          = (uint8_t)-1;
+    conf->device.gpu_mem_percent                = (float) 90.0;
+    conf->device.use_p2p                        = true;
+    conf->merge_transfers                       = false;
+    conf->protect_registered_memory_overflow    = false;
 
     //////////////////
     // drivers conf //

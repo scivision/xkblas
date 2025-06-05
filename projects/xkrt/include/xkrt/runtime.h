@@ -3,7 +3,7 @@
 /*   runtime.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 16:35:56 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 23:24:05 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -28,6 +28,8 @@
 # include <xkrt/task/task.hpp>
 
 # include <hwloc.h>
+
+# include <map>
 
 typedef enum    xkrt_runtime_state_t : uint8_t
 {
@@ -59,6 +61,11 @@ typedef struct  xkrt_runtime_t
 
     /* memory router */
     RouterAffinity router;
+
+    # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+    /* registered memory segments, map: addr -> size */
+    std::map<uintptr_t, size_t> registered_memory;
+    # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
 
     /* hwloc topology, read only, initialized at init */
     hwloc_topology_t topology;

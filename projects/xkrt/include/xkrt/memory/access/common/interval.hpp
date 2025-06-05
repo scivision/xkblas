@@ -3,7 +3,7 @@
 /*   interval.hpp                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 19:14:18 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 02:20:25 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -51,6 +51,14 @@ class Interval {
         includes(const Interval & interval) const
         {
             return (this->a <= interval.a && interval.b <= this->b);
+        }
+
+        Interval &
+        operator=(const Interval & other)
+        {
+            this->a = other.a;
+            this->b = other.b;
+            return *this;
         }
 
         friend bool

@@ -3,7 +3,7 @@
 /*   task.hpp                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 16:52:52 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 02:44:00 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 23:31:53 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -204,7 +204,6 @@ typedef struct  task_dom_info_t
         std::vector<MemoryCoherencyController *> blas;
         // DependencyDomain * interval; - not implemented
         // DependencyDomain * point; - not implemented
-        spinlock_t blas_lock;
     } mccs;
 
     task_dom_info_t() : deps{}, mccs{} {}

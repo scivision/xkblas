@@ -26,7 +26,7 @@ xkrt_cairo_memory_trees(
 ) {
     for (MemoryCoherencyController * memcontroller : runtime->memcontrollers)
     {
-        BLASBLASMemoryTree * memtree = (BLASBLASMemoryTree *) memcontroller;
+        BLASMemoryTree * memtree = (BLASMemoryTree *) memcontroller;
         assert(memtree);
 
         if (memtree->root == NULL)
@@ -42,7 +42,7 @@ xkrt_cairo_memory_trees(
 
         // Step 2: Draw elements without knowing the final size
         double offset = (double) memtree->root->rect[1].a;
-        std::function<void(BLASBLASMemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](BLASBLASMemoryTree::NodeBase * node, void * args) {
+        std::function<void(BLASMemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](BLASMemoryTree::NodeBase * node, void * args) {
             double y1 = (double) node->rect[0].a;
             double y2 = (double) node->rect[0].b;
             double x2 = (double) offset - (double) node->rect[1].a;
