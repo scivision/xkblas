@@ -73,7 +73,6 @@ xkrt_memory_unregister(xkrt_runtime_t * runtime, void * ptr, size_t size)
             LOGGER_ERROR("Could not unregister memory for driver `%s`", driver->f_get_name());
     }
 
-
     # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
     /* remove from the registered map */
     runtime->registered_memory.erase((uintptr_t)ptr);

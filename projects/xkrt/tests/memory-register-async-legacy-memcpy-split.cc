@@ -17,13 +17,11 @@
 
 static xkrt_runtime_t runtime;
 
-# define TYPE               unsigned char
+# define TYPE               double
 # define S                  (sizeof(TYPE))
-# define N                  (16)
-// # define REGISTER_OFFSET    (0)
-// # define REGISTER_SIZE      (N*S*N*S)
-# define REGISTER_OFFSET    (N*S/2)
-# define REGISTER_SIZE      (N*S*(N-1)*S)
+# define N                  (8192)
+# define REGISTER_OFFSET    (123)
+# define REGISTER_SIZE      (10000)
 
 static_assert(REGISTER_OFFSET + REGISTER_SIZE <= N*S*N*S);
 
@@ -33,6 +31,8 @@ main(void)
     assert(xkrt_init(&runtime) == 0);
 
     // allocate N x N bytes = a matrix of LD = N - forcing alignement on LD.s
+
+    # if 0 /* force memory alignment on ld.s */
     const size_t ld = N;
     const size_t s = sizeof(TYPE);
     const uintptr_t alignon = s * ld;
@@ -40,8 +40,10 @@ main(void)
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
     const uintptr_t p = mem + (alignon - (mem % alignon));
     assert(p % alignon == 0);
-
     TYPE * ptr = (TYPE *) p;
+    # else
+    TYPE * ptr = (TYPE *) malloc(N*N*S);
+    # endif
 
     // register a portion of it
     xkrt_memory_register_async(&runtime, ptr + REGISTER_OFFSET, REGISTER_SIZE);

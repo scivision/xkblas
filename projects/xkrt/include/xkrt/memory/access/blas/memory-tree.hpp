@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/05 02:39:18 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 03:00:57 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -17,6 +17,7 @@
 #ifndef __MEMORY_TREE_HPP__
 # define __MEMORY_TREE_HPP__
 
+# include <xkrt/support.h>
 # include <xkrt/memory/access/common/khp-tree.hpp>
 
 //  TODO : the design of this is terrible with a cyclic ownership with
@@ -239,6 +240,11 @@ class KMemoryBlock {
         /* fetching devices (i.e. devices with at least one fetching allocation) */
         volatile xkrt_device_global_id_bitfield_t fetching;
 
+        # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+        /* true/false whether the block is registered */
+        bool registered;
+        # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+
     public:
 
         /* a new memory block, assume it is coherent on the host */
@@ -246,9 +252,12 @@ class KMemoryBlock {
             replicates(),
             coherency(0),
             fetching(0)
+            # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+            , registered(false)
+            # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
         {}
 
-        void
+        inline void
         memory_block_init(
             const Hyperrect & block_rect,
             const KMemoryBlock & inheriting_block,
@@ -299,6 +308,9 @@ class KMemoryBlock {
 
             this->coherency = inheriting_block.coherency;
             this->fetching = inheriting_block.fetching;
+            # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+            this->registered = inheriting_block.registered;
+            # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
         }
 
         /* a block from splitting an existing one */
@@ -447,6 +459,10 @@ class KBLASMemoryTreeNodeSearch {
            SEARCH_FOR_PARTITION = 1,    // search for a partition
            SEARCH_AWAITING      = 2,    // search tasks awaiting on blocks (to be transfered onto a gpu, typically)
            SEARCH_OWNERS        = 3,    // search how many bytes owns each device
+            # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+            REGISTERED          = 4,    // mark memory block as registered
+            UNREGISTERED        = 5,    // mark memory block as unregistered
+            # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
        };
 
    public:
@@ -493,7 +509,7 @@ class KBLASMemoryTreeNodeSearch {
         size_t bytes_owned[XKRT_DEVICES_MAX];
 
    public:
-       KBLASMemoryTreeNodeSearch() : KBLASMemoryTreeNodeSearch(0) {}
+       KBLASMemoryTreeNodeSearch() : KBLASMemoryTreeNodeSearch(HOST_DEVICE_GLOBAL_ID) {}
 
        KBLASMemoryTreeNodeSearch(
            xkrt_device_global_id_t devid
@@ -535,6 +551,12 @@ class KBLASMemoryTreeNodeSearch {
        {
            memset(this->bytes_owned, 0, sizeof(this->bytes_owned));
            this->type = SEARCH_OWNERS;
+       }
+
+       void
+       prepare(Type t)
+       {
+           this->type = t;
        }
 
 }; /* KBLASMemoryTreeNodeSearch */
@@ -1825,7 +1847,33 @@ next_view:
         ) {
             (void) nodebase;
             (void) search;
-            assert(search.type == Search::Type::INSERTING_BLOCKS);
+            switch (search.type)
+            {
+                case (Search::Type::INSERTING_BLOCKS):
+                    break ;
+
+                # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+                case (Search::Type::REGISTERED):
+                {
+                    Node * node = reinterpret_cast<Node *>(nodebase);
+                    assert(!node->block.registered);
+                    node->block.registered = true;
+                    break ;
+                }
+
+                case (Search::Type::UNREGISTERED):
+                {
+                    Node * node = reinterpret_cast<Node *>(nodebase);
+                    assert(node->block.registered);
+                    node->block.registered = false;
+                    break ;
+                }
+
+                # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+
+                default:
+                    LOGGER_FATAL("Invalid search type for insert");
+            }
         }
 
         /* shrinking on dimension 'k' from 'this->hyperrect[k]' to 'interval' */
@@ -2006,7 +2054,12 @@ next_view:
             const int k,
             const Color color
         ) const {
-            assert(search.type == Search::Type::INSERTING_BLOCKS);
+            assert(
+                search.type == Search::Type::INSERTING_BLOCKS
+             # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+                || search.type == Search::Type::REGISTERED
+             # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+            );
             return new Node(search.access, h, k, color);
         }
 
@@ -2028,14 +2081,17 @@ next_view:
         // Memory registration / unregistration //
         //////////////////////////////////////////
 
-        /* the given memory segment got registered */
-        void
-        registered(
+        # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+
+        /* the given memory segment got (un)registered */
+        template<Search::Type T>
+        inline void
+        registered_update(
             uintptr_t ptr,
             size_t size
         ) {
-            static_assert(K == 2);
             using Rect = Hyperrect;
+            static_assert(K == 2);
 
             /**
              *  x = memory being registered
@@ -2092,11 +2148,9 @@ next_view:
                 Rect(intervals[2])
             };
 
-            /* insert blocks in the tree, they won't be merged by default when
-             * transfering. Maybe add a 'registered' bit on each rect, to
-             * manage merging in the future */
-            Search search(HOST_DEVICE_GLOBAL_ID);
-            search.prepare_insert(NULL);
+            /* insert blocks in the tree with the registered bit */
+            Search search;
+            search.prepare(T);
             this->lock();
             {
                 this->insert(search, rects[0]);
@@ -2106,6 +2160,23 @@ next_view:
             this->unlock();
         }
 
+        void
+        registered(
+            uintptr_t ptr,
+            size_t size
+        ) {
+            registered_update<Search::Type::REGISTERED>(ptr, size);
+        }
+
+        void
+        unregistered(
+            uintptr_t ptr,
+            size_t size
+        ) {
+            registered_update<Search::Type::UNREGISTERED>(ptr, size);
+        }
+
+        # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
 };
 
 using BLASMemoryTree = KBLASMemoryTree<2>;
