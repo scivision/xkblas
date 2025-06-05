@@ -3,7 +3,7 @@
 /*   memory-tree.hpp                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/16 16:15:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/05 03:00:57 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 03:56:20 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -1856,7 +1856,6 @@ next_view:
                 case (Search::Type::REGISTERED):
                 {
                     Node * node = reinterpret_cast<Node *>(nodebase);
-                    assert(!node->block.registered);
                     node->block.registered = true;
                     break ;
                 }
@@ -1864,7 +1863,6 @@ next_view:
                 case (Search::Type::UNREGISTERED):
                 {
                     Node * node = reinterpret_cast<Node *>(nodebase);
-                    assert(node->block.registered);
                     node->block.registered = false;
                     break ;
                 }
@@ -2072,7 +2070,12 @@ next_view:
             const NodeBase * inherit
         ) const {
             (void) search;
-            assert(search.type == Search::Type::INSERTING_BLOCKS);
+            assert(
+                search.type == Search::Type::INSERTING_BLOCKS
+             # if XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION
+                || search.type == Search::Type::REGISTERED
+             # endif /* XKRT_MEMORY_REGISTER_OVERFLOW_PROTECTION */
+            );
             assert(!h.intersects(inherit->hyperrect));
             return new Node(h, k, color, reinterpret_cast<const Node *>(inherit), this->sizeof_type);
         }

@@ -17,44 +17,72 @@
 
 static xkrt_runtime_t runtime;
 
-# define TYPE               double
-# define S                  (sizeof(TYPE))
-# define N                  (8192)
-# define REGISTER_OFFSET    (123)
-# define REGISTER_SIZE      (10000)
+# define TYPE unsigned char
+# define S    (sizeof(TYPE))
+# define N    (512)
 
-static_assert(REGISTER_OFFSET + REGISTER_SIZE <= N*S*N*S);
+# define REGISTER_OFFSET (pagesize*3)
+# define REGISTER_SIZE   (5*pagesize)
 
 int
 main(void)
 {
     assert(xkrt_init(&runtime) == 0);
 
-    // allocate N x N bytes = a matrix of LD = N - forcing alignement on LD.s
+    // retrieve page size
+    const size_t pagesize = getpagesize();
 
-    # if 0 /* force memory alignment on ld.s */
-    const size_t ld = N;
-    const size_t s = sizeof(TYPE);
-    const uintptr_t alignon = s * ld;
-    const uintptr_t memsize = (alignon + alignon/2 + s * ld * ld);
+    // allocate N x N bytes = a matrix of LD = N - forcing alignement on LD.s
+    const size_t size = N*N*S;
+    assert(REGISTER_OFFSET+REGISTER_SIZE < size);
+
+    # if 1
+    const uintptr_t alignon = N * S;
+    const uintptr_t memsize = (alignon + alignon/2 + size);
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
+    # if 0 /* force memory alignment on ld.s */
     const uintptr_t p = mem + (alignon - (mem % alignon));
     assert(p % alignon == 0);
-    TYPE * ptr = (TYPE *) p;
+    # else /* force not to be aligned */
+    const uintptr_t p = mem + (alignon - (mem % alignon)) + alignon / 2;
+    assert(p % alignon != 0);
+    # endif
     # else
-    TYPE * ptr = (TYPE *) malloc(N*N*S);
+    const uintptr_t p = (const uintptr_t) malloc(size);
     # endif
 
-    // register a portion of it
-    xkrt_memory_register_async(&runtime, ptr + REGISTER_OFFSET, REGISTER_SIZE);
+    // Randomly touch pages outside the registered range
+    std::vector<size_t> unregistered_pages;
+    for (size_t offset = 0; offset < size; offset += pagesize)
+        if (offset < REGISTER_OFFSET-pagesize || offset >= REGISTER_OFFSET+REGISTER_SIZE-pagesize)
+            unregistered_pages.push_back(offset);
 
-    // wait for registration
+    // Randomly shuffle the access pattern
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(unregistered_pages.begin(), unregistered_pages.end(), g);
+
+    for (size_t offset : unregistered_pages)
+        ((unsigned char *)p)[offset] = 42; // Touch to make it dirty / paged-in
+
+    // register a portion of it
+    xkrt_memory_register_async(
+        &runtime,
+        (void *) (p+REGISTER_OFFSET),
+        REGISTER_SIZE
+    );
     runtime.task_wait();
 
     // submit data to devices
-    xkrt_coherency_replicate_2D_async(&runtime, MATRIX_COLMAJOR, ptr, N, N, N, S);
+    xkrt_coherency_replicate_2D_async(&runtime, MATRIX_COLMAJOR, (void *) p, N, N, N, S);
+    runtime.task_wait();
 
-    // wait
+    // unregister a portion of it
+    xkrt_memory_unregister_async(
+        &runtime,
+        (void *) (p+REGISTER_OFFSET),
+        REGISTER_SIZE
+    );
     runtime.task_wait();
 
     // finalize
