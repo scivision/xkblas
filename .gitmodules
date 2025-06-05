@@ -1,0 +1,3 @@
+[submodule "projects/xkaapi"]
+	path = projects/xkaapi
+	url = https://gitlab.inria.fr/xkaapi/dev-v2
