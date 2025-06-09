@@ -8,6 +8,7 @@ VERSION {
         __kmpc_for_static_init_4;
         __kmpc_for_static_fini;
         __kmpc_barrier;
+        __kmpc_push_num_threads;
 
         omp_get_thread_num;
         omp_get_num_threads;

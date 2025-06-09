@@ -7,7 +7,6 @@
 xkomp_t  _xkomp;
 xkomp_t * xkomp;
 
-extern "C"
 xkomp_t *
 xkomp_get(void)
 {
@@ -15,6 +14,7 @@ xkomp_get(void)
     {
         xkomp = &_xkomp;
         xkrt_init(&xkomp->runtime);
+        xkomp_env_init(&xkomp->env);
     }
 
     return xkomp;
@@ -24,11 +24,17 @@ extern "C"
 kmp_int32
 __kmpc_global_thread_num(ident_t * loc)
 {
+    xkomp_get();
+
     xkrt_thread_t * tls = xkrt_thread_t::get_tls();
     assert(tls);
 
     return tls->gtid;
 }
+
+/////////////////////////
+// STANDARD OPENMP API //
+/////////////////////////
 
 extern "C"
 int

@@ -70,6 +70,20 @@ __kmpc_fork_call_wrapper(
     return NULL;
 }
 
+thread_local int pushed_num_threads;
+
+// # pragma omp [...] num_threads(X)
+extern "C"
+void
+__kmpc_push_num_threads(
+    ident_t * loc,
+    kmp_int32 global_tid,
+    kmp_int32 num_threads
+) {
+    pushed_num_threads = num_threads < 0 ? 0 : num_threads;
+}
+
+// # pragma omp parallel
 extern "C"
 void
 __kmpc_fork_call(
@@ -87,9 +101,13 @@ __kmpc_fork_call(
         args_copy[i] = va_arg(args, void *);
     va_end(args);
 
-    // parse number pf threads
-    LOGGER_NOT_IMPLEMENTED();
-    unsigned int nthreads = 4;
+    // parse number of threads - see Algorithm 12.1 Determine Number of Threads
+    // This is not standard, but whatever for now
+    xkomp_t * xkomp = xkomp_get();
+    unsigned int nthreads = pushed_num_threads ? pushed_num_threads :
+                            xkomp->env.OMP_NUM_THREADS ? xkomp->env.OMP_NUM_THREADS : 0;
+    if (nthreads > xkomp->env.OMP_THREAD_LIMIT)
+        nthreads = xkomp->env.OMP_THREAD_LIMIT;
 
     // create wrapper args
     wargs_t wargs = {
@@ -105,10 +123,12 @@ __kmpc_fork_call(
     team.desc.nthreads          = nthreads;
     team.desc.master_is_member  = true;
 
-    xkomp_t * xkomp = xkomp_get();
     xkomp->runtime.team_create(&team);
     xkomp->runtime.team_join(&team);
 
     // free args
     free(args_copy);
+
+    // reset pushed num threads
+    pushed_num_threads = 0;
 }
