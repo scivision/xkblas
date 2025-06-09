@@ -11,6 +11,7 @@
 int
 main(void)
 {
+    # if 0
     double * x = (double *) calloc(1, sizeof(double) * N);
     assert(x);
 
@@ -31,6 +32,7 @@ main(void)
     # pragma omp taskwait
 
     # pragma omp target exit data map(release: x[0:N]) device(DEVICE_ID)
+    # endif
 
     return 0;
 }

@@ -40,6 +40,7 @@ __kmpc_omp_taskwait(
     ident_t * loc_ref,
     kmp_int32 gtid
 ) {
-    runtime->task_wait();
+    xkomp_t * xkomp = xkomp_get();
+    xkomp->runtime.task_wait();
     return 0;
 }

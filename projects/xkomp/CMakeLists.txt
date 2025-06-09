@@ -23,6 +23,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
 
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/api.cc
+    ${CMAKE_SOURCE_DIR}/src/barrier.cc
+    ${CMAKE_SOURCE_DIR}/src/for.cc
     ${CMAKE_SOURCE_DIR}/src/fork.cc
     ${CMAKE_SOURCE_DIR}/src/task.cc
     ${CMAKE_SOURCE_DIR}/src/target.cc

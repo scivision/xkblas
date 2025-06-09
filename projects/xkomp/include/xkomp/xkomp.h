@@ -3,6 +3,14 @@
 
 # include <xkrt/xkrt.h>
 
-extern xkrt_runtime_t * runtime;
+typedef struct  xkomp_t
+{
+    xkrt_runtime_t runtime;
+}               xkomp_t;
+
+extern xkomp_t * xkomp;
+
+extern "C"
+xkomp_t * xkomp_get(void);
 
 # endif /* __XKOMP_H__ */
