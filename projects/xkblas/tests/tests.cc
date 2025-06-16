@@ -37,25 +37,32 @@ main(void)
 
     int transA = CblasNoTrans;
     int transB = CblasNoTrans;
-    int M = 4096;
-    //int M = 2048;
-    int N = M;
-    int K = M;
-    int LD = M;
+    size_t M = 16384;
+    size_t N = M;
+    size_t K = M;
+    size_t LD = M;
     TYPE alpha = 1.0;
     TYPE beta  = 1.0;
     xkblas_set_param(2048, 0);
 
     // host matrices
-    const size_t size = 3 * LD*LD*sizeof(TYPE);
+    const size_t alignon = LD * sizeof(TYPE);
+    const size_t size = 3 * LD*LD*sizeof(TYPE) + alignon;
+
+    # if 1
+    const uintptr_t memp = (const uintptr_t) malloc(size);
+    const uintptr_t  mem = memp + (alignon - memp % alignon);
+    assert(mem % alignon == 0);
+    # else
     const uintptr_t mem = (const uintptr_t) malloc(size);
+    # endif
     const TYPE * A = (const TYPE *) (mem + 0*LD*LD*sizeof(TYPE));
     const TYPE * B = (const TYPE *) (mem + 1*LD*LD*sizeof(TYPE));
           TYPE * C = (      TYPE *) (mem + 2*LD*LD*sizeof(TYPE));
     void * ptr = (void *) mem;
     memset(ptr, 0, size);
 
-    const int ntasks = 1;
+    const int ntasks = 8;
 
     uint64_t t0 = xkrt_get_nanotime();
     {
@@ -63,12 +70,13 @@ main(void)
         xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
         xkblas_memory_coherent_async(0, 0, M, N, C, LD, sizeof(TYPE));
         xkblas_memory_unregister_tiled_async(ptr, size, ntasks);
+        printf("Graph created in %.4lf s\n", (xkrt_get_nanotime() - t0)/1e9);
         xkblas_sync();
     }
     uint64_t tf = xkrt_get_nanotime();
     double dt = (tf-t0)/1e9;
     double FLOPS_S = FLOPS(M, N, K) / dt;
-    printf("%.2lf TFLOP/s\n", FLOPS_S/1e12);
+    printf("Graph execution took %.4lf s (%.2lf TFLOP/s)\n", dt, FLOPS_S/1e12);
 
     xkblas_deinit();
 
