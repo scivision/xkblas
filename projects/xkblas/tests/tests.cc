@@ -12,20 +12,22 @@
 /* ************************************************************************** */
 
 # include "xkblas.h"
+# include "xkblas/flops.h"
 # include "xkblas/cblas.h"
+
+# include <xkrt/logger/logger.h>
+# include <xkrt/logger/metric.h>
 
 # include <assert.h>
 # include <stdlib.h>
 # include <stdint.h>
+# include <string.h>
 
 # if 1
 # include "xkblas/skernels.h"
 # define TYPE               float
 # define xkblas_gemm_async  xkblas_sgemm_async
-# else
-# include "xkblas-bkernel.h"
-# define TYPE               char
-# define xkblas_gemm_async  xkblas_bgemm_async
+# define FLOPS(M, N, K)     FLOPS_SGEMM(M, N, K)
 # endif
 
 int
@@ -35,28 +37,38 @@ main(void)
 
     int transA = CblasNoTrans;
     int transB = CblasNoTrans;
-    int M = 16;
+    int M = 4096;
+    //int M = 2048;
     int N = M;
     int K = M;
-    int LD = K+M;
+    int LD = M;
     TYPE alpha = 1.0;
     TYPE beta  = 1.0;
+    xkblas_set_param(2048, 0);
 
-    uintptr_t mem = (uintptr_t) malloc(sizeof(TYPE) * (LD * LD + LD));
-    uintptr_t Ap  = mem + (LD - (mem % LD)) + 0 * sizeof(TYPE) * (LD * LD);
-    uintptr_t Bp  = mem + (LD - (mem % LD)) + 1 * sizeof(TYPE) * (LD * LD);
-    uintptr_t Cp  = mem + (LD - (mem % LD)) + 2 * sizeof(TYPE) * (LD * LD);
+    // host matrices
+    const size_t size = 3 * LD*LD*sizeof(TYPE);
+    const uintptr_t mem = (const uintptr_t) malloc(size);
+    const TYPE * A = (const TYPE *) (mem + 0*LD*LD*sizeof(TYPE));
+    const TYPE * B = (const TYPE *) (mem + 1*LD*LD*sizeof(TYPE));
+          TYPE * C = (      TYPE *) (mem + 2*LD*LD*sizeof(TYPE));
+    void * ptr = (void *) mem;
+    memset(ptr, 0, size);
 
-    assert(Ap % LD == 0);
-    assert(Bp % LD == 0);
-    assert(Cp % LD == 0);
+    const int ntasks = 1;
 
-    const TYPE * A = (const TYPE *) Ap;
-    const TYPE * B = (const TYPE *) Bp;
-          TYPE * C = (      TYPE *) Cp;
-
-    xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
-    xkblas_sync();
+    uint64_t t0 = xkrt_get_nanotime();
+    {
+        xkblas_memory_register_tiled_async(ptr, size, ntasks);
+        xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
+        xkblas_memory_coherent_async(0, 0, M, N, C, LD, sizeof(TYPE));
+        xkblas_memory_unregister_tiled_async(ptr, size, ntasks);
+        xkblas_sync();
+    }
+    uint64_t tf = xkrt_get_nanotime();
+    double dt = (tf-t0)/1e9;
+    double FLOPS_S = FLOPS(M, N, K) / dt;
+    printf("%.2lf TFLOP/s\n", FLOPS_S/1e12);
 
     xkblas_deinit();
 

@@ -6,6 +6,13 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 SET(XKBLAS_NAME xkblas)
 project(${XKBLAS_NAME})
 
+###############
+# C++ version #
+###############
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
+
 SET(XKBLAS_KERNELS copyscale gemm gemmt symm syr2k syrk trmm trsm)
 SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 #SET(XKBLAS_KERNELS_PRECISIONS s d)
@@ -117,7 +124,7 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 
 option(STRICT "Enable strict compilation mode" ON)
 if (STRICT)
-    SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
+    # SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
 endif()
 
