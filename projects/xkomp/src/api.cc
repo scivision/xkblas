@@ -55,3 +55,10 @@ omp_get_num_threads(void)
 
     return tls->team->priv.nthreads;
 }
+
+extern "C"
+int
+omp_get_max_threads(void)
+{
+    return 256;
+}

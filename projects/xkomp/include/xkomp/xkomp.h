@@ -6,10 +6,11 @@
 /* environment variables parsed at program starts */
 typedef struct  xkomp_env_t
 {
-    char OMP_DISPLAY_ENV;
-     int OMP_NUM_THREADS;
-     int OMP_THREAD_LIMIT;
-
+    char    OMP_DISPLAY_ENV;
+    int     OMP_NUM_THREADS;
+    int     OMP_THREAD_LIMIT;
+    char *  OMP_PLACES;
+    char *  OMP_PROC_BIND;
 }               xkomp_env_t;
 
 /** global variable that holds the entire openmp context */

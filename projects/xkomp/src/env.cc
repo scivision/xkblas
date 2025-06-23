@@ -2,30 +2,37 @@
 
 template <typename T>
 T
-xkomp_env_init_parse_convert(const char * value)
+xkomp_env_init_parse_convert(const char * const value)
 {
     static_assert(sizeof(T) == 0, "Unsupported type for xkomp_env_init_parse");
 }
 
 template <>
 int
-xkomp_env_init_parse_convert<int>(const char * value)
+xkomp_env_init_parse_convert<int>(const char * const value)
 {
     return atoi(value);
 }
 
 template <>
 char
-xkomp_env_init_parse_convert<char>(const char * value)
+xkomp_env_init_parse_convert<char>(const char * const value)
 {
     return *value;
+}
+
+template <>
+char *
+xkomp_env_init_parse_convert<char *>(const char * const value)
+{
+    return strdup(value);
 }
 
 template <typename T>
 void
 xkomp_env_init_parse(
     T * var,
-    const char * name,
+    const char * const name,
     const T default_value
 ) {
     const char * value = getenv(name);
@@ -46,9 +53,11 @@ xkomp_env_init(xkomp_env_t * env)
 {
     // parse env variables
     # define F(T, S, D) xkomp_env_init_parse<T>(&env->S, #S, D)
-    F(char, OMP_DISPLAY_ENV,    'f');       // true, false or verbose ('t', 'f' or 'v')
-    F( int, OMP_NUM_THREADS,     0);
-    F( int, OMP_THREAD_LIMIT,    INT_MAX);
+    F(char,     OMP_DISPLAY_ENV,    'f');   // true, false or verbose ('t', 'f' or 'v')
+    F(int,      OMP_NUM_THREADS,    0);
+    F(int,      OMP_THREAD_LIMIT,   INT_MAX);
+    F(char *,   OMP_PLACES,         "cores");
+    F(char *,   OMP_PROC_BIND,      "close");
     # undef F
 
     // maybe display
