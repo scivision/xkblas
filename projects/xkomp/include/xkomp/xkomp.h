@@ -19,6 +19,9 @@ typedef struct  xkomp_t
     /* underlaying XKaapi runtime */
     xkrt_runtime_t runtime;
 
+    /* omp task format */
+    task_format_id_t task_format;
+
     /* environment variables */
     xkomp_env_t env;
 
@@ -29,5 +32,8 @@ xkomp_t * xkomp_get(void);
 
 /** load env variables */
 void xkomp_env_init(xkomp_env_t * env);
+
+/* save task format */
+void xkomp_task_register_format(xkomp_t * xkomp);
 
 # endif /* __XKOMP_H__ */

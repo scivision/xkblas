@@ -9,6 +9,8 @@ VERSION {
         __kmpc_for_static_fini;
         __kmpc_barrier;
         __kmpc_push_num_threads;
+        __kmpc_single;
+        __kmpc_end_single;
 
         omp_get_thread_num;
         omp_get_num_threads;

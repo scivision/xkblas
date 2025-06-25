@@ -15,6 +15,7 @@ xkomp_get(void)
         xkomp = &_xkomp;
         xkrt_init(&xkomp->runtime);
         xkomp_env_init(&xkomp->env);
+        xkomp_task_register_format(xkomp);
     }
 
     return xkomp;

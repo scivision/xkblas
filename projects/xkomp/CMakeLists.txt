@@ -27,6 +27,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/env.cc
     ${CMAKE_SOURCE_DIR}/src/for.cc
     ${CMAKE_SOURCE_DIR}/src/fork.cc
+    ${CMAKE_SOURCE_DIR}/src/single.cc
     ${CMAKE_SOURCE_DIR}/src/task.cc
     ${CMAKE_SOURCE_DIR}/src/target.cc
 )

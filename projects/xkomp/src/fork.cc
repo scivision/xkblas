@@ -97,7 +97,7 @@ __kmpc_fork_call_wrapper(
     return NULL;
 }
 
-thread_local int pushed_num_threads;
+_Thread_local int pushed_num_threads;
 
 // # pragma omp [...] num_threads(X)
 extern "C"
