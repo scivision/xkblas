@@ -73,11 +73,16 @@ extern "C" {
     /* set the mode math for the next kernel */
     void xkblas_set_modemath(xkblas_mode_math_t mode);
 
-    /* ??? */
-    uint64_t xkblas_register_memory_async(void * ptr, uint64_t sz);
+    int xkblas_register_memory(void * ptr, uint64_t sz);
     int xkblas_unregister_memory(void * ptr, uint64_t sz);
-    int xkblas_register_memory_waitall(void);
 
+    /* create 'n' tasks that (un)register the memory block that write virtually to
+     * the memory segments */
+    int xkblas_memory_register_tiled_async(void * ptr, size_t sz, int n);
+    int xkblas_memory_unregister_tiled_async(void * ptr, size_t sz, int n);
+    int xkblas_memory_touch_tiled_async(void * ptr, size_t sz, int n);
+
+    /* get number of gpus */
     int xkblas_get_ngpus(void);
 
     //////////////////////////////////
@@ -101,6 +106,20 @@ extern "C" {
     /* invalidate device memory */
     [[deprecated("No replacement available yet (`caches` name may not be the most appropriate here)")]]
         void xkblas_memory_invalidate_caches(void);
+
+    /* spawn an independent tasks that register the passed memory */
+    [[deprecated("Use `xkblas_register_memory_tiled_async` instead")]]
+        uint64_t xkblas_register_memory_async(void * ptr, uint64_t sz);
+
+    /* spawn an independent tasks that unregister the passed memory */
+    [[deprecated("Use `xkblas_unregister_memory_tiled_async` instead")]]
+        int xkblas_unregister_memory_async(void * ptr, uint64_t sz);
+
+    /* see xkblas_sync() */
+    [[deprecated("Use `xkblas_sync` instead")]]
+        int xkblas_register_memory_waitall(void);
+
+
 
 #if defined(__STDC_NO_COMPLEX__)
 # error "Compiler support for complex number is required."
