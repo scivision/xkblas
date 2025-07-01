@@ -1,7 +1,7 @@
-# define KHP_TREE_REBALANCE         0
-# define KHP_TREE_CUT_ON_INSERT     0
-# define KHP_TREE_MAINTAIN_SIZE     1
-# define KHP_TREE_MAINTAIN_HEIGHT   1
+# define REBALANCE         0
+# define CUT_ON_INSERT     0
+# define MAINTAIN_SIZE     1
+# define MAINTAIN_HEIGHT   1
 
 # include <xkrt/memory/access/common/khp-tree.hpp>
 # define unused_type_t  int
@@ -9,7 +9,7 @@
 static int next_id = 0;
 
 template <int K>
-class NoopKHPTreeNode : public KHPTree<K, unused_type_t>::Node
+class NoopKHPTreeNode : public KHPTree<K, unused_type_t, REBALANCE, CUT_ON_INSERT, MAINTAIN_SIZE, MAINTAIN_HEIGHT>::Node
 {
     public:
         using Base = typename KHPTree<K, unused_type_t>::Node;

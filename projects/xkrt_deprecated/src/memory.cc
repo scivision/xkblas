@@ -3,7 +3,7 @@
 /*   memory.cc                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/04/21 21:22:03 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:56:59 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:14:57 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -149,46 +149,4 @@ xkrt_runtime_t::memory_unified_deallocate(
     {
         LOGGER_FATAL("Driver `%s` does not implement memory_dealloc_unified", driver->f_get_name());
     }
-}
-
-void
-xkrt_runtime_t::copy(
-    const xkrt_device_global_id_t   device_global_id,
-    const memory_view_t           & host_view,
-    const xkrt_device_global_id_t   dst_device_global_id,
-    const memory_replicate_view_t & dst_device_view,
-    const xkrt_device_global_id_t   src_device_global_id,
-    const memory_replicate_view_t & src_device_view,
-    const xkrt_callback_t         & callback
-) {
-    xkrt_device_t * device = this->device_get(device_global_id);
-    device->offloader_stream_instruction_submit_copy<memory_view_t, memory_replicate_view_t>(
-        host_view,
-        dst_device_global_id,
-        dst_device_view,
-        src_device_global_id,
-        src_device_view,
-        callback
-    );
-}
-
-void
-xkrt_runtime_t::copy(
-    const xkrt_device_global_id_t   device_global_id,
-    const size_t                    size,
-    const xkrt_device_global_id_t   dst_device_global_id,
-    const uintptr_t                 dst_device_addr,
-    const xkrt_device_global_id_t   src_device_global_id,
-    const uintptr_t                 src_device_addr,
-    const xkrt_callback_t         & callback
-) {
-    xkrt_device_t * device = this->device_get(device_global_id);
-    device->offloader_stream_instruction_submit_copy<size_t, uintptr_t>(
-        size,
-        dst_device_global_id,
-        dst_device_addr,
-        src_device_global_id,
-        src_device_addr,
-        callback
-    );
 }

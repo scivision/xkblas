@@ -19,9 +19,11 @@
 # include <xkbm/benchmark.h>
 # include <xkbm/time.h>
 # include <xkbm/pp.h>
+# include <xkbm/support.h>
 
 # include <xkrt/xkrt.h>
 # include <xkrt/runtime.h>
+# include <xkrt/support.h>
 # include <xkrt/logger/logger.h>
 # include <xkrt/logger/metric.h>
 

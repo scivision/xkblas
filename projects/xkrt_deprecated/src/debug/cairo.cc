@@ -19,14 +19,14 @@
 # if XKRT_SUPPORT_CAIRO
 #  include <cairo/cairo.h>
 #  include <cairo/cairo-svg.h>
-#  include <xkrt/memory/access/blas/region/memory-tree.hpp>
+#  include <xkrt/memory/access/blas/memory-tree.hpp>
 void
 xkrt_cairo_memory_trees(
     xkrt_runtime_t * runtime
 ) {
     for (MemoryCoherencyController * memcontroller : runtime->memcontrollers)
     {
-        MemoryTree * memtree = (MemoryTree *) memcontroller;
+        BLASMemoryTree * memtree = (BLASMemoryTree *) memcontroller;
         assert(memtree);
 
         if (memtree->root == NULL)
@@ -41,12 +41,12 @@ xkrt_cairo_memory_trees(
         cairo_set_source_rgb(rec_ctx, 0, 0, 0); // Black stroke
 
         // Step 2: Draw elements without knowing the final size
-        double offset = (double) memtree->root->cube[1].a;
-        std::function<void(MemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](MemoryTree::NodeBase * node, void * args) {
-            double y1 = (double) node->cube[0].a;
-            double y2 = (double) node->cube[0].b;
-            double x2 = (double) offset - (double) node->cube[1].a;
-            double x1 = (double) offset - (double) node->cube[1].b;
+        double offset = (double) memtree->root->rect[1].a;
+        std::function<void(BLASMemoryTree::NodeBase *, void *)> f = [offset, rec_ctx](BLASMemoryTree::NodeBase * node, void * args) {
+            double y1 = (double) node->rect[0].a;
+            double y2 = (double) node->rect[0].b;
+            double x2 = (double) offset - (double) node->rect[1].a;
+            double x1 = (double) offset - (double) node->rect[1].b;
             cairo_rectangle(rec_ctx, x1, y1, x2-x1, y2-y1);
             cairo_stroke(rec_ctx);
             LOGGER_WARN("Drawing %lf %lf %lf %lf", x1, y1, x2-x1, y2-y1);

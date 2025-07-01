@@ -3,7 +3,7 @@
 /*   driver-type.h                                                .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/06 13:12:59 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:00:15 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:31:10 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,6 +29,9 @@ typedef enum    xkrt_driver_type_t : uint8_t
     XKRT_DRIVER_TYPE_SYCL   = 5,  // sycl driver
     XKRT_DRIVER_TYPE_MAX    = 6
 }               xkrt_driver_type_t;
+
+typedef uint8_t xkrt_driver_type_bitfield_t;
+static_assert(XKRT_DRIVER_TYPE_MAX <= sizeof(xkrt_driver_type_bitfield_t)*8);
 
 extern "C"
 const char * xkrt_driver_name(xkrt_driver_type_t driver_type);

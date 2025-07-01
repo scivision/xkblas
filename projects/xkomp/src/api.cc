@@ -1,32 +1,65 @@
+# include <xkomp/xkomp.h>
+
 # include <xkrt/logger/logger.h>
 # include <kmp.h>
 # include <stdint.h>
+
+xkomp_t  _xkomp;
+xkomp_t * xkomp;
+
+xkomp_t *
+xkomp_get(void)
+{
+    if (xkomp == NULL)
+    {
+        xkomp = &_xkomp;
+        xkrt_init(&xkomp->runtime);
+        xkomp_env_init(&xkomp->env);
+        xkomp_task_register_format(xkomp);
+    }
+
+    return xkomp;
+}
 
 extern "C"
 kmp_int32
 __kmpc_global_thread_num(ident_t * loc)
 {
-    LOGGER_NOT_IMPLEMENTED();
-    return 0;
+    xkomp_get();
+
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+    assert(tls);
+
+    return tls->gtid;
 }
 
+/////////////////////////
+// STANDARD OPENMP API //
+/////////////////////////
+
 extern "C"
-kmp_int32
-__kmpc_omp_task(
-    ident_t * loc_ref,
-    kmp_int32 gtid,
-    kmp_task_t * new_task)
+int
+omp_get_thread_num(void)
 {
-    LOGGER_NOT_IMPLEMENTED();
-    return 0;
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+    assert(tls);
+
+    return tls->tid;
 }
 
 extern "C"
-kmp_int32
-__kmpc_omp_taskwait(
-    ident_t * loc_ref,
-    kmp_int32 gtid
-) {
-    LOGGER_NOT_IMPLEMENTED();
-    return 0;
+int
+omp_get_num_threads(void)
+{
+    xkrt_thread_t * tls = xkrt_thread_t::get_tls();
+    assert(tls);
+
+    return tls->team->priv.nthreads;
+}
+
+extern "C"
+int
+omp_get_max_threads(void)
+{
+    return 256;
 }

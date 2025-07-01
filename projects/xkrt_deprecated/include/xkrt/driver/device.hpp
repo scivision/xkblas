@@ -3,7 +3,7 @@
 /*   device.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/12 01:17:49 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:59:39 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:13:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -383,6 +383,7 @@ typedef struct  xkrt_device_t
     /* push a task to a thread of the device */
     void push(task_t * const & task)
     {
+        assert(this->nthreads <= XKRT_MAX_THREADS_PER_DEVICE);
         uint8_t tid = this->thread_next.fetch_add(1, std::memory_order_relaxed) % this->nthreads;
         xkrt_thread_t * thread = this->threads[tid];
         thread->deque.push(task);

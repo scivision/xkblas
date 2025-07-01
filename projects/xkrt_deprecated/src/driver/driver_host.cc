@@ -3,7 +3,7 @@
 /*   driver_host.cc                                               .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 17:00:08 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:55:54 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:14:53 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -85,8 +85,11 @@ XKRT_DRIVER_ENTRYPOINT(get_ndevices_max)(void)
 }
 
 static int
-XKRT_DRIVER_ENTRYPOINT(device_cpuset)(hwloc_topology_t topology, cpu_set_t * schedset, int device_driver_id)
-{
+XKRT_DRIVER_ENTRYPOINT(device_cpuset)(
+    hwloc_topology_t topology,
+    cpu_set_t * schedset,
+    int device_driver_id
+) {
     (void) topology;
     assert(device_driver_id == 0);
     pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), schedset);

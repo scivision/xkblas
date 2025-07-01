@@ -3,7 +3,7 @@
 /*   consts.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/01 12:09:49 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:59:19 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:13:45 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -44,7 +44,7 @@ static_assert(XKRT_DEVICES_MAX <= sizeof(xkrt_device_global_id_bitfield_t)*8);
 # define XKRT_DEVICES_MASK_ALL (~((xkrt_device_global_id_bitfield_t)0))
 
 /* maximum number of threads per device */
-# define XKRT_MAX_THREADS_PER_DEVICE (4)
+# define XKRT_MAX_THREADS_PER_DEVICE (16)
 
 /* maximum number of memory per thread */
 # define THREAD_MAX_MEMORY ((size_t)2*1024*1024*1024)

@@ -3,7 +3,7 @@
 /*   invalidate.cc                                                .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/07 14:28:00 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:57:22 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:43:03 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -56,14 +56,20 @@ xkrt_coherency_reset(xkrt_runtime_t * runtime)
     assert(dom);
 
     // delete memory controllers
-    for (auto mcc : dom->mccs)
+    for (auto mcc : dom->mccs.blas)
         delete mcc;
-    dom->mccs.clear();
+    dom->mccs.blas.clear();
 
     // delete deps domain
-    for (auto dep : dom->deps)
+    for (auto dep : dom->deps.blas)
         delete dep;
-    dom->deps.clear();
+    dom->deps.blas.clear();
+
+    if (dom->deps.interval)
+        delete dom->deps.interval;
+
+    if (dom->deps.point)
+        delete dom->deps.point;
 
     // deallocate all device memory
     xkrt_memory_deallocate_all(runtime);

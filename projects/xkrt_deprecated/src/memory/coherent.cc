@@ -3,7 +3,7 @@
 /*   coherent.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/07 22:00:23 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:57:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/04 02:16:07 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -16,11 +16,11 @@
 
 # include <xkrt/runtime.h>
 # include <xkrt/memory/alignedas.h>
-# include <xkrt/memory/access/blas/region/memory-tree.hpp>
-# include <xkrt/memory/access/blas/region/dependency-tree.hpp>
+# include <xkrt/memory/access/blas/memory-tree.hpp>
+# include <xkrt/memory/access/blas/dependency-tree.hpp>
 
-using fetch_list_t = KMemoryTree<2>::fetch_list_t;
-using fetch_t      = KMemoryTree<2>::fetch_t;
+using fetch_list_t = KBLASMemoryTree<2>::fetch_list_t;
+using fetch_t      = KBLASMemoryTree<2>::fetch_t;
 
 // args for 'runtime->coherent_async'
 typedef struct alignas(CACHE_LINE_SIZE) args_t
@@ -40,7 +40,7 @@ typedef struct alignas(CACHE_LINE_SIZE) args_t
 //      - create one successor Yi task per conflicting tasks Xi - to be executed on the helper thread
 //      - when Xi complete, it makes Yi ready
 //      - When Yi executes,
-//          - it find all fetches to do (i.e. which cube on which device) - there should be only one cube on one device at that point
+//          - it find all fetches to do (i.e. which rect on which device) - there should be only one rect on one device at that point
 //          - it creates a task Zi pushed into the device's thread queue
 //      - Zi is scheduled on the device thread queue, and will launch the asynchronous fetch
 //          - Yi completion is deferred to Zi completion
@@ -99,7 +99,7 @@ xkrt_coherency_host_async(
     DependencyDomain * domain = task_get_dependency_domain(thread->current_task, &access);
 
     std::vector<void *> conflicts;
-    ((DependencyTree *) domain)->conflicting(&conflicts, &access);
+    ((BLASDependencyTree *) domain)->conflicting(&conflicts, &access);
 
     LOGGER_DEBUG("`xkrt_memory_coherent_async` found %zu conflicts", conflicts.size());
 
@@ -113,7 +113,7 @@ xkrt_coherency_host_async(
     for (void * & conflict : conflicts)
     {
         /* retrieve the node */
-        DependencyTree::Node * node = (DependencyTree::Node *) conflict;
+        BLASDependencyTree::Node * node = (BLASDependencyTree::Node *) conflict;
         access_t * write = node->last_write;
         assert(write);
         assert(access.host_view.ld          == write->host_view.ld);
@@ -140,12 +140,12 @@ xkrt_coherency_host_async(
         assert(accesses);
 
         /* as 'conflicts' are forming a partition of 'access', it must only
-         * intersects with a single cubes of 'access' : find which of the two */
+         * intersects with a single rects of 'access' : find which of the two */
         bool found = false;
         for (int i = 0 ; i < 2 ; ++i)
         {
-            Hypercube h;
-            access_t::Hypercube::intersection(&h, access.hypercubes[i], node->hypercube);
+            access_t::Rect h;
+            access_t::Rect::intersection(&h, access.rects[i], node->hyperrect);
 
             if (!h.is_empty())
             {
@@ -155,7 +155,7 @@ xkrt_coherency_host_async(
                 break ;
             }
         }
-        /* assert to check that we did find a cube from 'access' that intersects with the node */
+        /* assert to check that we did find a rect from 'access' that intersects with the node */
         assert(found);
 
         // insert for future tasks dependencies
@@ -189,6 +189,6 @@ xkrt_coherency_allocate_2D(
 
     /* create an access to insert in the memory tree */
     access_t access(NULL, order, ptr, ld, m, n, sizeof_type, ACCESS_MODE_V);
-    MemoryTree * memtree = (MemoryTree *) task_get_memory_controller(runtime, thread->current_task, &access);
+    BLASMemoryTree * memtree = (BLASMemoryTree *) task_get_memory_controller(runtime, thread->current_task, &access);
     memtree->allocate_to_device(&access, device_global_id);
 }

@@ -3,7 +3,11 @@
 /*   conf.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 10:59:00 by Romain PEREIRA          __/_*_*(_        */
+<<<<<<< HEAD:projects/xkrt_deprecated/src/conf/conf.cc
 /*   Updated: 2025/06/04 19:56:51 by Romain PEREIRA         / _______ \       */
+=======
+/*   Updated: 2025/06/04 23:11:55 by Romain PEREIRA         / _______ \       */
+>>>>>>> fc356b3a952cec28a52dcc5dd79c6e5b7a5bea7b:projects/xkrt/src/conf/conf.cc
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -100,6 +104,13 @@ __parse_ngpus(xkrt_conf_t * conf, char const * value)
 }
 
 static void
+__parse_register_overflow(xkrt_conf_t * conf, char const * value)
+{
+    if (value)
+        conf->protect_registered_memory_overflow = atoi(value);
+}
+
+static void
 __parse_gpu_mem_percent(xkrt_conf_t * conf, char const * value)
 {
     if (value)
@@ -165,6 +176,14 @@ __parse_drivers(xkrt_conf_t * conf, char const * value)
 {
     if (value)
     {
+        // disable all drivers
+        for (unsigned int i = 0 ; i < XKRT_DRIVER_TYPE_MAX ; ++i)
+        {
+            conf->drivers.list[i].nthreads_per_device   = 0;
+            conf->drivers.list[i].used                  = 0;
+        }
+
+        // parse driver list
         char * driver_list = strdup(value);             // make a modifiable copy
         char * driver_save;
         char * driver = strtok_r(driver_list, ";", &driver_save);
@@ -180,10 +199,14 @@ __parse_drivers(xkrt_conf_t * conf, char const * value)
             int nthreads = atoi(nthreads_str);
             assert(nthreads);
 
+            if (nthreads > XKRT_MAX_THREADS_PER_DEVICE)
+                LOGGER_FATAL("Requested too many threads for driver `%s`. Reduce the number of thread, or increase `XKRT_MAX_THREADS_PER_DEVICE` and recompile", driver_name, XKRT_MAX_THREADS_PER_DEVICE);
+
             xkrt_driver_type_t driver_type = xkrt_driver_type_from_name(driver_name);
             if (driver_type == XKRT_DRIVER_TYPE_MAX)
                 LOGGER_FATAL("Invalid `XKRT_DRIVERS`");
             conf->drivers.list[driver_type].nthreads_per_device = nthreads;
+            conf->drivers.list[driver_type].used                = nthreads > 0;
 
             driver = strtok_r(NULL, ";", &driver_save);
         }
@@ -204,28 +227,33 @@ typedef struct  xkrt_conf_parse_t
 
 // variables are parsed in-order
 static xkrt_conf_parse_t CONF_PARSE[] = {
-    {"XKRT_HELP",                 __parse_help,                "Show this helper"},
-    {"XKRT_VERBOSE",              __parse_verbose,             "Verbosity level (the higher the most)"},
-    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,     "Merge memory transfers over continuous virtual memory"},
-    {"XKRT_PRECISION",            NULL,                        NULL},
-    {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
-    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
-    {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
-    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of H2D streams per GPU"},
-    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of D2H streams per GPU"},
-    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of D2D streams per GPU"},
-    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of KERN streams per GPU"},
-    {"XKRT_KERN_PER_STREAM",      __parse_kern_per_stream,     "Number of concurrent kernels per KERN stream before throttling device-thread"},
-    {"XKRT_H2D_PER_STREAM",       __parse_h2d_per_stream,      "Number of concurrent copies per H2D stream before throttling device-thread"},
-    {"XKRT_D2H_PER_STREAM",       __parse_d2h_per_stream,      "Number of concurrent copies per D2H stream before throttling device-thread"},
-    {"XKRT_D2D_PER_STREAM",       __parse_d2d_per_stream,      "Number of concurrent copies per D2D stream before throttling device-thread"},
     {"XKRT_CACHE_LIMIT",          NULL,                        NULL},
-    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
+    {"XKRT_D2D_PER_STREAM",       __parse_d2d_per_stream,      "Number of concurrent copies per D2D stream before throttling device-thread"},
+    {"XKRT_D2H_PER_STREAM",       __parse_d2h_per_stream,      "Number of concurrent copies per D2H stream before throttling device-thread"},
     {"XKRT_DEFAULT_MATH",         NULL,                        NULL},
+<<<<<<< HEAD:projects/xkrt_deprecated/src/conf/conf.cc
     {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
     {"XKRT_EXPORT_TDG",           __parse_export_tdg,          "Write the task dependency graph to a .dot file on each taskwait"},
+=======
+>>>>>>> fc356b3a952cec28a52dcc5dd79c6e5b7a5bea7b:projects/xkrt/src/conf/conf.cc
     {"XKRT_DRIVERS",              __parse_drivers,             "Exemple: 'cuda,4;hip,2;host,3' - will enable drivers cuda, hip and host respectively with 4, 2, and 3 threads per device."},
+    {"XKRT_GPU_MEM_PERCENT",      __parse_gpu_mem_percent,     "%% of total memory to allocate initially per GPU (in ]0..100["},
+    {"XKRT_H2D_PER_STREAM",       __parse_h2d_per_stream,      "Number of concurrent copies per H2D stream before throttling device-thread"},
+    {"XKRT_HELP",                 __parse_help,                "Show this helper"},
+    {"XKRT_KERN_PER_STREAM",      __parse_kern_per_stream,     "Number of concurrent kernels per KERN stream before throttling device-thread"},
+    {"XKRT_MERGE_TRANSFERS",      __parse_merge_transfers,     "Merge memory transfers over continuous virtual memory"},
+    {"XKRT_NGPUS",                __parse_ngpus,               "Number of gpus to use"},
+    {"XKRT_MEMORY_REGISTER_PROTECT_OVERFLOW", __parse_register_overflow, "Split memory transfers to avoid overflow over registered/unregistered memory that causes cuda to crash"},
+    {"XKRT_NSTREAMS_D2D",         __parse_nstreams_d2d,        "Number of D2D streams per GPU"},
+    {"XKRT_NSTREAMS_D2H",         __parse_nstreams_d2h,        "Number of D2H streams per GPU"},
+    {"XKRT_NSTREAMS_H2D",         __parse_nstreams_h2d,        "Number of H2D streams per GPU"},
+    {"XKRT_NSTREAMS_KERN",        __parse_nstreams_kern,       "Number of KERN streams per GPU"},
+    {"XKRT_NTHREADS_PER_DEVICE",  __parse_nthreads_per_device, "Number of threads per device to poll streams"},
+    {"XKRT_OFFLOADER_CAPACITY",   __parse_offloader_capacity,  "Maximum number of pending instructions per stream"},
+    {"XKRT_PRECISION",            NULL,                        NULL},
+    {"XKRT_STATS",                __parse_stats,               "Boolean to dump stats on deinit"},
     {"XKRT_USE_P2P",              __parse_p2p,                 "Boolean to enable/disable the use of p2p transfers"},
+    {"XKRT_VERBOSE",              __parse_verbose,             "Verbosity level (the higher the most)"},
     {NULL,                       NULL,                         NULL}
 };
 
@@ -245,12 +273,21 @@ void
 xkrt_init_conf(xkrt_conf_t * conf)
 {
     // set default conf
+<<<<<<< HEAD:projects/xkrt_deprecated/src/conf/conf.cc
     conf->report_stats_on_deinit    = 0;
     conf->export_tdg_on_deinit      = 0;
     conf->device.ngpus              = (uint8_t)-1;
     conf->device.gpu_mem_percent    = (float) 90.0;
     conf->device.use_p2p            = true;
     conf->merge_transfers           = false;
+=======
+    conf->report_stats_on_deinit                = 0;
+    conf->device.ngpus                          = (uint8_t)-1;
+    conf->device.gpu_mem_percent                = (float) 90.0;
+    conf->device.use_p2p                        = true;
+    conf->merge_transfers                       = false;
+    conf->protect_registered_memory_overflow    = false;
+>>>>>>> fc356b3a952cec28a52dcc5dd79c6e5b7a5bea7b:projects/xkrt/src/conf/conf.cc
 
     //////////////////
     // drivers conf //

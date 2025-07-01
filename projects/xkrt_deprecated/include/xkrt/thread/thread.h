@@ -3,7 +3,11 @@
 /*   thread.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/19 20:55:39 by Romain PEREIRA          __/_*_*(_        */
+<<<<<<< HEAD:projects/xkrt_deprecated/include/xkrt/thread/thread.h
 /*   Updated: 2025/06/04 20:29:13 by Romain PEREIRA         / _______ \       */
+=======
+/*   Updated: 2025/06/04 12:35:49 by Romain PEREIRA         / _______ \       */
+>>>>>>> fc356b3a952cec28a52dcc5dd79c6e5b7a5bea7b:projects/xkrt/include/xkrt/thread/thread.h
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -19,7 +23,7 @@
 
 #  include <xkrt/consts.h>
 #  include <xkrt/sync/spinlock.h>
-#  include <xkrt/memory/access/blas/region/dependency-tree.hpp>
+#  include <xkrt/memory/access/blas/dependency-tree.hpp>
 #  include <xkrt/task/task.hpp>
 
 #  include <xkrt/memory/alignas.h>
@@ -28,10 +32,14 @@
 
 #  include <pthread.h>
 #  include <atomic>
+#  include <random>
 
 #  include <linux/futex.h>      /* Definition of FUTEX_* constants */
 #  include <sys/syscall.h>      /* Definition of SYS_* constants */
 #  include <unistd.h>
+
+/* represent a pointer to the current team */
+# define XKRT_TEAM_CURRENT (xkrt_thread_t::get_tls()->team)
 
 /////////////
 // THREADS //
@@ -141,6 +149,9 @@ typedef struct  xkrt_thread_t
         /* the pthread */
         pthread_t pthread;
 
+        /* global thread tid */
+        int gtid;
+
         /* the tid in the team */
         int tid;
 
@@ -160,7 +171,8 @@ typedef struct  xkrt_thread_t
         /* memory capacity */
         size_t memory_stack_capacity;
 
-    private:
+        /* random number generator */
+        std::minstd_rand rng;
 
         /* lock and condition to sleep the mutex */
         struct {
@@ -168,8 +180,6 @@ typedef struct  xkrt_thread_t
             pthread_cond_t  cond;
             volatile bool   sleeping;
         } sleep;
-
-    public:
 
         struct {
             /* next function index in the team functions */
@@ -193,11 +203,13 @@ typedef struct  xkrt_thread_t
             implicit_task(TASK_FORMAT_NULL, TASK_FLAG_DOMAIN),
             state(XKRT_THREAD_INITIALIZED),
             pthread(pthread),
+            gtid(gettid()),
             tid(tid),
             device_global_id(device_global_id),
             deque(),
             memory_stack_bottom(NULL),
             memory_stack_capacity(THREAD_MAX_MEMORY),
+            rng(),
             parallel_for{.index = 0}
         {
             // set current task
@@ -264,8 +276,8 @@ typedef struct  xkrt_thread_t
             // 1) we assume that all accesses use that same dependency domain
             // 2) C++ pure virtual function cannot be templated. To still
             //    benefits from compile-time optimization, we force the casting to
-            //    a DependencyTree, as it is the only DependencyDomain implemented currently.
-            DependencyTree * tree = (DependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
+            //    a BLASDependencyTree, as it is the only DependencyDomain implemented currently.
+            BLASDependencyTree * tree = (BLASDependencyTree *) task_get_dependency_domain(this->current_task, accesses + 0);
             tree->resolve<AC>(accesses);
         }
 

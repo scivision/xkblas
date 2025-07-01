@@ -3,7 +3,7 @@
 /*   interval.hpp                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:03:28 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/05 02:20:25 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -53,6 +53,14 @@ class Interval {
             return (this->a <= interval.a && interval.b <= this->b);
         }
 
+        Interval &
+        operator=(const Interval & other)
+        {
+            this->a = other.a;
+            this->b = other.b;
+            return *this;
+        }
+
         friend bool
         operator==(const Interval & lhs, const Interval & rhs)
         {
@@ -63,6 +71,20 @@ class Interval {
         operator!=(const Interval & lhs, const Interval & rhs)
         {
             return lhs.a != rhs.a || lhs.b != rhs.b;
+        }
+
+        inline bool
+        intersects(const Interval & other) const
+        {
+            return this->a <= other.b && other.a <= this->b;
+        }
+
+        bool
+        operator<(const Interval & other) const
+        {
+            // this class should only be used to represent disjoint intervals
+            assert(!this->intersects(other));
+            return this->b <= other.a;
         }
 
 };

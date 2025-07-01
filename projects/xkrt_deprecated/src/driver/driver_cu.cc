@@ -3,7 +3,7 @@
 /*   driver_cu.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 17:00:08 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 17:55:35 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/06/03 19:14:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -213,7 +213,9 @@ XKRT_DRIVER_ENTRYPOINT(init)(
     unsigned int ndevices,
     bool use_p2p
 ) {
+    LOGGER_INFO("Calling cuInit(0) ...");
     CUresult err = cuInit(0);
+    LOGGER_INFO("Returned from cuInit(0)");
     if (err != CUDA_SUCCESS)
     {
         if (err == CUDA_ERROR_STUB_LIBRARY)
