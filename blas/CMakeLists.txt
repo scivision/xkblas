@@ -31,8 +31,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BL
 #message(STATUS "----------- INCLUDE DIR: HIPBLAS_INCLUDE_DIRS:" ${HIPBLAS_INCLUDE_DIRS})
 #message(STATUS "----------- INCLUDE DIR: HIP_INCLUDE_DIRS:" ${HIP_INCLUDE_DIRS})
 
-#${HIP_INCLUDE_DIRS} 
-
 # Bootstrap 
 set(BLAS_FUNCTION_LIST gemm gemmt trsm trmm syrk syr2k symm herk her2k hemm)
 if (XKBLAS_BUILD_COPYSCALE)
