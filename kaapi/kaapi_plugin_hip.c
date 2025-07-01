@@ -39,6 +39,7 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -973,7 +974,7 @@ void* kaapi_hip_register_thread(void* dummy )
             //printf("***[%s]: hipHostRegister called: (@%p,%llu)\n", __func__, req.ptr,req.size);
             if (!( (hipSuccess == err) || (hipErrorHostMemoryAlreadyRegistered == err)))
             {
-              printf("***[%s]: hipHostRegister error: %i. Ptr:%X, size:%lu\n", __func__, err, (uint64_t)req.ptr, req.size);
+              printf("***[%s]: hipHostRegister error: %i. Ptr:%" PRIX64 ", size:%lu\n", __func__, err, (uint64_t)req.ptr, req.size);
               req.err = EALREADY;
             }
           }
@@ -1787,7 +1788,7 @@ static int kaapi_set_cpuset(cpu_set_t* schedset, int device_id)
     return ENOTSUP;
   }
 
-  int device_count;
+  uint32_t device_count;
   rerr = rsmi_num_monitor_devices(&device_count);
   if (rerr != RSMI_STATUS_SUCCESS) goto return_rsmi_error;
 
