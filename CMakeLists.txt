@@ -45,6 +45,9 @@ option(ENABLE_KAAPI_NVTX "Enable NVTX profiling for the CPU threads" OFF)
 if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
 endif()
+if (NOT (KAAPI_USE_HIP OR KAAPI_USE_CUDA_RT))
+  message(FATAL_ERROR "You should provide a runtime implementation: use either -DKAAPI_USE_HIP=on or -DKAAPI_USE_CUDA_RT=on")
+endif()
 
 #--- OpenMP
 find_package(OpenMP)
