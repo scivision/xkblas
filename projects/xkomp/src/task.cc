@@ -5,12 +5,8 @@
 
 # include <assert.h>
 
-typedef struct  omp_task_args_t
-{
-    kmp_task_t kmp_task;
-}               omp_task_args_t;
-
-constexpr size_t
+// see llvm impl
+const size_t
 round_up_to_val(size_t size, size_t val)
 {
     if (size & (val - 1))
@@ -26,10 +22,7 @@ round_up_to_val(size_t size, size_t val)
 
 constexpr int AC = 0;
 constexpr task_flag_bitfield_t xkflags = TASK_FLAG_ZERO;
-constexpr size_t task_size = task_compute_size(xkflags, AC);
-constexpr size_t args_size = sizeof(omp_task_args_t);
-constexpr size_t total_size = round_up_to_val(task_size + args_size, sizeof(void *));
-constexpr size_t shareds_offset = total_size - task_size - args_size;
+constexpr size_t task_size      = task_compute_size(xkflags, AC);
 
 extern "C"
 kmp_task_t *
@@ -47,21 +40,28 @@ __kmpc_omp_task_alloc(
     xkomp_t * xkomp = xkomp_get();
     assert(xkomp);
 
-    task_t * task = thread->allocate_task(total_size + sizeof_shareds);
+    // see llvm impl
+    const size_t args_size      = sizeof_kmp_task_t;
+    const size_t total_size     = task_size + args_size;
+    const size_t shareds_offset = round_up_to_val(total_size, sizeof(void *));
+    assert(shareds_offset >= total_size);
+    assert(shareds_offset % sizeof(void *) == 0);
+
+    task_t * task = thread->allocate_task(shareds_offset + sizeof_shareds);
     new(task) task_t(xkomp->task_format, xkflags);
 
-    omp_task_args_t * args = (omp_task_args_t *) TASK_ARGS(task, task_size);
-    assert(args);
+    kmp_task_t * ktask = (kmp_task_t *) TASK_ARGS(task, task_size);
+    assert(ktask);
 
-    args->kmp_task.shareds = (sizeof_shareds > 0) ? ((char *) task) + total_size : NULL;
-    args->kmp_task.routine = task_entry;
-    args->kmp_task.part_id = 0;
+    ktask->shareds = (sizeof_shareds > 0) ? ((char *) task) + shareds_offset : NULL;
+    ktask->routine = task_entry;
+    ktask->part_id = 0;
 
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "omp-task");
     # endif /* NDEBUG */
 
-    return (kmp_task_t *) args;
+    return ktask;
 }
 
 extern "C"
@@ -69,15 +69,11 @@ kmp_int32
 __kmpc_omp_task(
     ident_t * loc_ref,
     kmp_int32 gtid,
-    kmp_task_t * new_task
+    kmp_task_t * ktask
 ) {
-    omp_task_args_t * args = (omp_task_args_t *) new_task;
-    assert(args);
-    assert(&args->kmp_task == new_task);
-
-    task_t * task = (task_t *) (((char *) args) - task_size);
+    task_t * task = (task_t *) (((char *) ktask) - task_size);
     assert(task);
-    assert(TASK_ARGS(task) == (void *) args);
+    assert(TASK_ARGS(task) == (void *) ktask);
 
     xkomp_t * xkomp = xkomp_get();
     assert(xkomp);
@@ -101,10 +97,10 @@ __kmpc_omp_taskwait(
 static void
 body_omp_task(task_t * task)
 {
-    omp_task_args_t * args = (omp_task_args_t *) TASK_ARGS(task);
-    assert(args);
+    kmp_task_t * ktask = (kmp_task_t *) TASK_ARGS(task);
+    assert(ktask);
 
-    args->kmp_task.routine(0, &args->kmp_task);
+    ktask->routine(0, ktask);
 }
 
 void

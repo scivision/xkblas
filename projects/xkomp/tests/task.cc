@@ -18,6 +18,13 @@ main(void)
                 assert(y == 43);
             }
 
+            # pragma omp task shared(x) firstprivate(y) untied
+            {
+                puts("Hello world");
+                assert(x == 42);
+                assert(y == 43);
+            }
+
             # pragma omp taskwait
         }
     }
