@@ -54,6 +54,10 @@ Exclusive choices are:
 * -DKAAPI_USE_MKL=ON
 * -DKAAPI_USE_OPENBLAS=ON
 * -DKAAPI_USE_CRAYBLAS=ON. Used to link agains libSCI available with Cray PE. 
+* -DKAAPI_USE_NVPL=ON
+* -DKAAPI_USE_AOCL=ON
+
+
 
 ## Selection of using Unified Memory
 Port on GraceHopper or MI300A let XKBlas/XKaapi to run using "native" unified memory. Preliminary experiments show that on other architectures, the performances are best using internal explicit memory copy.
