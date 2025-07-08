@@ -1,8 +1,7 @@
 # XKBlas v0.6 beta RC
 
-XKBlas is a drop in replacement of blas library for multi-GPUs servers similar
-to CUBLASXt but with higher performances especially when matrix dimensions 
-becomes smaller.
+XKBlas is a BLAS library for multi-GPUs servers similar to CUBLASXt but with 
+higher performances especially when matrix dimensions becomes smaller.
 
 XKBlas was only developped and tested on Linux plateform with CUDA >= 8.0 on machine with up to 8 GPUs (DGX-1).
 It was ported on AMD GPU with HIP/ROCM enviroment = 4.5, 5.X., 6.X Note:
@@ -118,14 +117,9 @@ The Failure/Passed status are reported to stdout while all output traces are
 added to a file called `log`.
 
 # Compilation of XKBlas program
-This step is optional if you want to use the drop-in replacement of the BLAS library,
-in the same way NVBLAS traps redirect BLAS calls to equivalent CUBLASXT, then you only need to
-run your program with preloading `libXKBlas_blaswrapper.so` (see below).
-
 The installation generates 3 libraries in  `<install directory>/lib`:
 * `libkaapi.so`: the low level XKaapi runtime
 * `libXKBlas.so`: the XKBlas library which is linked against libkaapi.so
-* `libXKBlas_blaswrapper.so`: the BLAS drop-in replacement library **NOT YET AVAILABLE IN V0.4-rc7**
 
 The XKBlas API is defined in `<install directory>/include` repository and the user that want to 
 compile XKBlas program with its API should includes `XKBlas.h`.
@@ -140,12 +134,6 @@ for instance XKBLAS_GPUSET=5 (=0b101) selects GPU id 0 and GPU id 2.
 * `XKBLAS_CACHE_LIMIT`, an integer (default 95) >0 and less or equal to 100 representing the percent of GPU memory that XKBlas may use for caching tiles.
 * `XKBLAS_NSTREAMS`, an integer (default 4) that gives the number of CUDA streams for launching kernel to GPU
 * `XKBLAS_NKERNELS`, an integer (default 2) that gives the maximum of CUDA kernels pending into each CUDA stream for launching kernel.
-
-
-For instance, if you want to run with XKBlas as a drop in replacement BLAS library:
-```
-> LD_PRELOAD=<install directory>/lib/libXKBlas_blaswrapper.so XKBLAS_NGPUS=2 ./prog arg
-```
 
 
 # Any support ?
