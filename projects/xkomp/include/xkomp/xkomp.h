@@ -25,6 +25,9 @@ typedef struct  xkomp_t
     /* environment variables */
     xkomp_env_t env;
 
+    /* the team of thread for parallel region */
+    xkrt_team_t team;
+
 }               xkomp_t;
 
 extern xkomp_t * xkomp;

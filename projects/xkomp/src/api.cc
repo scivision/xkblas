@@ -61,5 +61,6 @@ extern "C"
 int
 omp_get_max_threads(void)
 {
-    return 256;
+    xkomp_t * omp = xkomp_get();
+    return MIN(omp->env.OMP_NUM_THREADS, omp->env.OMP_THREAD_LIMIT);
 }

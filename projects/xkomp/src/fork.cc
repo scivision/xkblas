@@ -76,15 +76,17 @@ __kmp_invoke_microtask(
     return 1;
 }
 
+# define TEAM_MAX_ARGS (64)
+
 typedef struct  wargs_t
 {
     int argc;
-    void ** args;
+    void * args[TEAM_MAX_ARGS];
     kmpc_micro f;
 }               wargs_t;
 
 static void *
-__kmpc_fork_call_wrapper(
+fork_call_wrapper(
     xkrt_team_t * team,
     xkrt_thread_t * thread
 ) {
@@ -119,42 +121,50 @@ __kmpc_fork_call(
     kmpc_micro f,
     ...
 ) {
-    // copy parallel region routine arguments
-    va_list args;
-    void ** args_copy = (void **) malloc(sizeof(void *) * argc);
-    assert(args_copy);
-    va_start(args, f);
-    for (kmp_int32 i = 0; i < argc; ++i)
-        args_copy[i] = va_arg(args, void *);
-    va_end(args);
 
     // parse number of threads - see Algorithm 12.1 Determine Number of Threads
     // This is not standard, but whatever for now
-    xkomp_t * xkomp = xkomp_get();
+    xkomp_t * omp = xkomp_get();
     unsigned int nthreads = pushed_num_threads ? pushed_num_threads :
-                            xkomp->env.OMP_NUM_THREADS ? xkomp->env.OMP_NUM_THREADS : 0;
-    if (nthreads > xkomp->env.OMP_THREAD_LIMIT)
-        nthreads = xkomp->env.OMP_THREAD_LIMIT;
+                            omp->env.OMP_NUM_THREADS ? omp->env.OMP_NUM_THREADS : 0;
+    if (nthreads > omp->env.OMP_THREAD_LIMIT)
+        nthreads = omp->env.OMP_THREAD_LIMIT;
 
-    // create wrapper args
-    wargs_t wargs = {
-        .argc       = argc,
-        .args       = args_copy,
-        .f  = f
-    };
+    if (omp->team.priv.threads == NULL)
+    {
+        // create the team
+        omp->team.desc.binding.mode     = XKRT_TEAM_BINDING_MODE_COMPACT;
+        omp->team.desc.binding.places   = XKRT_TEAM_BINDING_PLACES_CORE;
+        omp->team.desc.binding.flags    = XKRT_TEAM_BINDING_FLAG_NONE;
+        omp->team.desc.routine          = XKRT_TEAM_ROUTINE_PARALLEL_FOR;
+        omp->team.desc.args             = malloc(sizeof(wargs_t));
+        omp->team.desc.nthreads         = nthreads;
+        omp->team.desc.master_is_member = false;
 
-    // create the team
-    xkrt_team_t team = XKRT_TEAM_STATIC_INITIALIZER;
-    team.desc.routine           = __kmpc_fork_call_wrapper;
-    team.desc.args              = &wargs;
-    team.desc.nthreads          = nthreads;
-    team.desc.master_is_member  = true;
+        omp->runtime.team_create(&omp->team);
+    }
+    assert(omp->team.priv.threads != NULL);
+    assert(omp->team.priv.nthreads == nthreads);
+    assert(omp->team.desc.args && argc <= TEAM_MAX_ARGS);
 
-    xkomp->runtime.team_create(&team);
-    xkomp->runtime.team_join(&team);
+    // copy parallel region routine arguments
+    va_list args;
+    va_start(args, f);
+    wargs_t * wargs = (wargs_t *) omp->team.desc.args;
+    wargs->argc = argc;
+    wargs->f = f;
+    for (kmp_int32 i = 0; i < argc; ++i)
+        wargs->args[i] = va_arg(args, void *);
+    va_end(args);
 
-    // free args
-    free(args_copy);
+    // run parallel for
+    omp->runtime.team_parallel_for(&omp->team, fork_call_wrapper);
+
+    # if 0
+    omp->runtime.team_join(&omp->team);
+    free(omp->team.desc.args);
+    omp->team.priv.threads = NULL;
+    # endif
 
     // reset pushed num threads
     pushed_num_threads = 0;
