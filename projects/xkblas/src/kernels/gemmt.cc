@@ -3,7 +3,7 @@
 /*   gemmt.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/04 17:03:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/04 20:42:41 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/07/01 15:42:50 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -123,7 +123,7 @@ xkblas_£gemmt_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 2;
-    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution2D_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -277,7 +277,7 @@ xkblas_£gemmt_async(
     /* distribute C in a cyclic-block manner */
     const int ngpus = context->runtime.drivers.devices.n - 1;
     xkrt_distribution_t d;
-    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
+    xkrt_distribution2D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Cm, Cn, Cmb, Cnb);
 
     const TYPE one = (TYPE) 1.0;
 

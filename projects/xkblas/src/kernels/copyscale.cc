@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:35:36 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/07/01 15:41:53 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -105,7 +105,7 @@ xkblas_£copyscale_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution_get(d, Ltm, Ltn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
+    xkrt_device_global_id_t device_global_id = d ? xkrt_distribution2D_get(d, Ltm, Ltn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -195,7 +195,7 @@ xkblas_£copyscale_async(
     /* distribute C in a cyclic-block manner */
     const int ngpus = context->runtime.drivers.devices.n - 1;
     xkrt_distribution_t d;
-    xkrt_distribution_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Lm, Ln, Lmb, Lnb);
+    xkrt_distribution2D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC2DBLOCK, ngpus, Lm, Ln, Lmb, Lnb);
 
     # define D(i, j) D, i*Dmb, j*Dnb
     # define L(i, j) L, i*Lmb, j*Lnb

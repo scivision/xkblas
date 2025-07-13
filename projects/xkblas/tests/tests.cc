@@ -66,10 +66,10 @@ main(void)
 
     uint64_t t0 = xkrt_get_nanotime();
     {
-        xkblas_memory_register_tiled_async(ptr, size, ntasks);
+        // xkblas_memory_register_tiled_async(ptr, size, ntasks);
         xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
         xkblas_memory_coherent_async(0, 0, M, N, C, LD, sizeof(TYPE));
-        xkblas_memory_unregister_tiled_async(ptr, size, ntasks);
+        // xkblas_memory_unregister_tiled_async(ptr, size, ntasks);
         printf("Graph created in %.4lf s\n", (xkrt_get_nanotime() - t0)/1e9);
         xkblas_sync();
     }

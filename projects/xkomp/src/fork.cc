@@ -112,6 +112,58 @@ __kmpc_push_num_threads(
     pushed_num_threads = num_threads < 0 ? 0 : num_threads;
 }
 
+static xkrt_team_binding_places_t
+parse_places(
+    const char * places
+) {
+    if (places == NULL)
+        return XKRT_TEAM_BINDING_PLACES_HYPERTHREAD;
+
+    struct mapping_struct_s {
+        const char * name;
+        xkrt_team_binding_places_t places;
+    };
+
+    constexpr struct mapping_struct_s mapping[] = {
+        {  "threads",   XKRT_TEAM_BINDING_PLACES_HYPERTHREAD},
+        {  "cores",     XKRT_TEAM_BINDING_PLACES_CORE       },
+        {  "L1s",       XKRT_TEAM_BINDING_PLACES_L1         },
+        {  "L2s",       XKRT_TEAM_BINDING_PLACES_L2         },
+        {  "L3s",       XKRT_TEAM_BINDING_PLACES_L3         },
+        {  "numas",     XKRT_TEAM_BINDING_PLACES_NUMA       },
+        {  "devices",   XKRT_TEAM_BINDING_PLACES_DEVICE     },
+        {  "sockets",   XKRT_TEAM_BINDING_PLACES_SOCKET     },
+        {  "machines",  XKRT_TEAM_BINDING_PLACES_MACHINE    }
+    };
+
+    constexpr unsigned int nmapping = sizeof(mapping) / sizeof(struct mapping_struct_s);
+
+    for (unsigned int i = 0 ; i < nmapping ; ++i)
+        if (strcmp(mapping[i].name, places) == 0)
+            return mapping[i].places;
+
+    constexpr char * values = "threads, cores, L1s, L2s, L3s, numas, devices, sockets, machines";
+    constexpr unsigned int fb = 1;
+    LOGGER_WARN("Unknown `OMP_PLACES=%s` - falling back to %s. Available values are %s",
+            places, mapping[fb].name, values);
+
+    return mapping[fb].places;
+}
+
+static xkrt_team_binding_mode_t
+parse_proc_bind(
+    const char * proc_bind
+) {
+    if (proc_bind)
+    {
+        if (strcmp(proc_bind, "close") == 0)
+            return XKRT_TEAM_BINDING_MODE_COMPACT;
+        if (strcmp(proc_bind, "spread") == 0)
+            return XKRT_TEAM_BINDING_MODE_SPREAD;
+    }
+    return XKRT_TEAM_BINDING_MODE_COMPACT;
+}
+
 // # pragma omp parallel
 extern "C"
 void
@@ -133,13 +185,13 @@ __kmpc_fork_call(
     if (omp->team.priv.threads == NULL)
     {
         // create the team
-        omp->team.desc.binding.mode     = XKRT_TEAM_BINDING_MODE_COMPACT;
-        omp->team.desc.binding.places   = XKRT_TEAM_BINDING_PLACES_CORE;
+        omp->team.desc.binding.mode     = parse_proc_bind(omp->env.OMP_PROC_BIND);
+        omp->team.desc.binding.places   = parse_places(omp->env.OMP_PLACES);
         omp->team.desc.binding.flags    = XKRT_TEAM_BINDING_FLAG_NONE;
         omp->team.desc.routine          = XKRT_TEAM_ROUTINE_PARALLEL_FOR;
         omp->team.desc.args             = malloc(sizeof(wargs_t));
         omp->team.desc.nthreads         = nthreads;
-        omp->team.desc.master_is_member = false;
+        omp->team.desc.master_is_member = true;
 
         omp->runtime.team_create(&omp->team);
     }
