@@ -39,7 +39,7 @@
  * support natively 2D memory view.
  */
 
-# include "context.h"
+# include "xkblas/v2.hpp"
 # include "auto-tile.h"
 # include "xkblas/kernel-type.h"
 # include "xkblas/cblas.h"
@@ -79,7 +79,7 @@ static task_format_id_t format_id;
  * Am, An, ..., Cn are index of the tile begining */
 inline int
 xkblas_£copyscale_tile_async(
-    xkblas_context_t * context,
+    xkblas_t * context,
     xkrt_distribution_t * d,
     size_t m, size_t n,
     int should_copy,
@@ -160,7 +160,7 @@ xkblas_£copyscale_async(
 
     // TODO check if something to do ... n_cols > 0
 
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
 
     size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_COPYSCALE].tile;

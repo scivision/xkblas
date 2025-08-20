@@ -15,7 +15,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "context.h"
+# include "xkblas/v2.hpp"
 # include "xkblas/kernel-type.h"
 
 # include <xkrt/logger/logger.h>
@@ -35,7 +35,7 @@ xkblas_kernel_auto_tile(
     int * args,
     size_t * ts
 ) {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
 
     const int ngpus        = context->runtime.drivers.devices.n;

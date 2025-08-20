@@ -3,7 +3,7 @@
 /*   conf.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/10 10:59:00 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:22:59 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/08/20 15:20:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -15,8 +15,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "conf.h"
-
+# include <xkblas/conf.h>
 # include <xkrt/logger/logger.h>
 
 # include <assert.h>

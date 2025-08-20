@@ -15,7 +15,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-# include "context.h"
+# include "xkblas/v2.hpp"
 
 # include <xkrt/xkrt.h>
 # include <xkrt/sync/spinlock.h>
@@ -29,10 +29,10 @@
 //////////////////////////////
 
 // singleton of runtime context
-xkblas_context_t *
-xkblas_context_get(void)
+xkblas_t *
+xkblas_get(void)
 {
-    static xkblas_context_t context = {
+    static xkblas_t context = {
         .state = {
             .spinlock = 0,
             .current = { XKBLAS_CONTEXT_DEINITIALIZED }
@@ -45,7 +45,7 @@ xkblas_context_get(void)
 xkrt_runtime_t *
 xkblas_xkrt_runtime_get(void)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     return &(context->runtime);
 }
 
@@ -55,7 +55,7 @@ extern "C"
 int
 xkblas_init(void)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
 
     if (context->state.current == XKBLAS_CONTEXT_DEINITIALIZED)
@@ -78,7 +78,7 @@ extern "C"
 void
 xkblas_deinit(void)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
 
     if (context->state.current == XKBLAS_CONTEXT_INITIALIZED)
@@ -103,7 +103,7 @@ extern "C"
 void
 xkblas_sync(void)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
 
     xkrt_sync(&(context->runtime));
@@ -115,7 +115,7 @@ xkblas_sync(void)
 task_format_id_t
 xkblas_task_format_create(task_format_t * format)
 {
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
     assert(context);
     return task_format_create(&(context->runtime.formats.list), format);
 }

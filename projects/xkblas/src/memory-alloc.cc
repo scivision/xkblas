@@ -26,7 +26,7 @@
 # include <stddef.h>
 # include <stdlib.h>
 
-# include "context.h"
+# include "xkblas/v2.hpp"
 
 extern "C"
 void *

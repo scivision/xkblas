@@ -86,7 +86,6 @@ list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/generate
 SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/auto-tile.cc
     ${CMAKE_SOURCE_DIR}/src/conf.cc
-    ${CMAKE_SOURCE_DIR}/src/context.cc
     ${CMAKE_SOURCE_DIR}/src/legacy.cc
     ${CMAKE_SOURCE_DIR}/src/memory-alloc.cc
     ${CMAKE_SOURCE_DIR}/src/memory-coherent.cc
@@ -94,6 +93,7 @@ SET(SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/memory-preallocate.cc
     ${CMAKE_SOURCE_DIR}/src/memory-register.cc
     ${CMAKE_SOURCE_DIR}/src/memory-replicate.cc
+    ${CMAKE_SOURCE_DIR}/src/xkblas.cc
     ${XKBLAS_KERNELS_SOURCE_FILES}
 )
 

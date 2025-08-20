@@ -16,7 +16,7 @@
 /* ************************************************************************** */
 
 # include <xkrt/xkrt.h>
-# include "context.h"
+# include "xkblas/v2.hpp"
 
 extern "C"
 void

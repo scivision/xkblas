@@ -42,7 +42,7 @@
 # include <cassert>
 
 # include "auto-tile.h"
-# include "context.h"
+# include "xkblas/v2.hpp"
 
 # include "xkblas/kernel-type.h"
 # include "xkblas/cblas.h"
@@ -89,7 +89,7 @@ static task_format_id_t format_id;
 
 int
 xkblas_£gemmt_tile_async(
-    xkblas_context_t * context,
+    xkblas_t * context,
     xkrt_distribution_t * d,
     int uplo,
     int transA, int transB,
@@ -158,7 +158,7 @@ xkblas_£gemmt_tile_async(
 
 int
 xkblas_£gemm_tile_async(
-    xkblas_context_t * context,
+    xkblas_t * context,
     xkrt_distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
@@ -250,7 +250,7 @@ xkblas_£gemmt_async(
         return -13;
     }
 
-    xkblas_context_t * context = xkblas_context_get();
+    xkblas_t * context = xkblas_get();
 
     size_t ts = context->conf.kernels[XKBLAS_KERNEL_TYPE_GEMM].tile;
     if (ts == 0)

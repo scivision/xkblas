@@ -24,7 +24,7 @@
 # include <stddef.h>
 # include <stdlib.h>
 
-# include "context.h"
+# include "xkblas/v2.hpp"
 
 static inline xkrt_team_t *
 __get_registering_team(xkrt_runtime_t * runtime)
