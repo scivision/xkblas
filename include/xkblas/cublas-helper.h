@@ -3,7 +3,7 @@
 /*   cublas-helper.h                                              .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/14 23:28:05 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/08/21 14:34:31 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/05 19:24:32 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,12 +32,20 @@
         XKBLAS_CUBLAS_CALL_POST();      \
     } while (0)
 
-# define XKBLAS_CUBLAS_DISPATCH_PRECISION(NAME)                                                                         \
-    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cublasS##NAME, float>(stream, instr, idx);             \
-    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cublasD##NAME, double>(stream, instr, idx);            \
-    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cublasC##NAME, cuComplex>(stream, instr, idx);         \
-    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cublasZ##NAME, cuDoubleComplex>(stream, instr, idx);
+# define XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
+    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, cublas##PX##NAME, T>(stream, instr, idx);
 
+# define XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(NAME)            \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, S, float)          \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, D, double)
+
+# define XKBLAS_CUBLAS_DISPATCH_PRECISION_COMPLEX(NAME)         \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, C, cuComplex)      \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, Z, cuDoubleComplex)
+
+# define XKBLAS_CUBLAS_DISPATCH_PRECISION(NAME)     \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(NAME)     \
+    XKBLAS_CUBLAS_DISPATCH_PRECISION_COMPLEX(NAME)
 
 # include "xkblas/cblas.h"
 

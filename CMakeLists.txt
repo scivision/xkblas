@@ -30,7 +30,10 @@ SET(XKBLAS_KERNELS
     copyscale
 
     # level 3
-    gemm gemmt symm syr2k syrk trmm trsm
+    gemm gemmt herk symm syr2k syrk trmm trsm
+
+    # lapacke
+    potrf
 )
 SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 
@@ -53,6 +56,11 @@ foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
 
     # for each kernel
     foreach(kernel IN LISTS XKBLAS_KERNELS)
+
+        # skip single and double precision for hermitian operators
+        if((precision STREQUAL "s" OR precision STREQUAL "d") AND kernel MATCHES "^h.*")
+            continue()
+        endif()
 
         # generate c bindings
         list(APPEND XKBLAS_KERNELS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/kernels/${kernel}.cc)

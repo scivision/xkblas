@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:05:48 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/05 20:07:11 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,8 +31,9 @@ typedef enum    xkblas_state_t : uint8_t
     XKBLAS_CONTEXT_INITIALIZED,
 }               xkblas_state_t;
 
-# define TYPE  xkblas_precision_type_t<P>
-# define TYPED template <xkblas_precision_t P>
+# define TYPED      template <xkblas_precision_t P>
+# define TYPE       xkblas_precision_type_t<P>
+# define TYPE_REAL  xkblas_precision_type_real_t<P>
 
 /* xkblas instance */
 typedef struct  xkblas_t
@@ -176,6 +177,17 @@ typedef struct  xkblas_t
     );
 
     TYPED
+    int
+    herk_async(
+        int uplo, int trans,
+        int n, int k,
+        const TYPE_REAL * alpha,
+        const TYPE * A, int lda,
+        const TYPE_REAL * beta,
+              TYPE * C, int ldc
+    );
+
+    TYPED
     int symm_async(
         int side, int uplo,
         int m, int n,
@@ -255,6 +267,18 @@ typedef struct  xkblas_t
     );
 
     TYPED
+    int herk_tile_async(
+        int uplo, int trans,
+        const size_t n, const size_t k,
+        const TYPE_REAL * alpha,
+        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+        const TYPE_REAL * beta,
+              TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+        xkrt::distribution_t * d
+    );
+
+
+    TYPED
     int syrk_tile_async(
         int uplo, int trans,
         const size_t n, const size_t k,
@@ -276,7 +300,7 @@ typedef struct  xkblas_t
         xkrt::distribution_t * d
     );
 
-    // LAPACK - TODO
+    // LAPACKE
     TYPED
     int geqrf_async();
 
@@ -284,7 +308,25 @@ typedef struct  xkblas_t
     int orgqr_async();
 
     TYPED
-    int ormqr();
+    int ormqr_async();
+
+    TYPED
+    int potrf_async(
+        int uplo,
+        int n,
+        TYPE * A,
+        int lda
+    );
+
+    // LAPACKE TILE
+
+    TYPED
+    int potrf_tile_async(
+        int uplo,
+        int n,
+        TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+        xkrt::distribution_t * d
+    );
 
 }               xkblas_t;
 

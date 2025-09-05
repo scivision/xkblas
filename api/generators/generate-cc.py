@@ -16,11 +16,12 @@ def cmd(s):
     print(s)
     os.system(s)
 
+#          TYPE                 TYPE_REAL    CU_TYPE
 modes={
-    "s": ("float",              "float"),
-    "c": ("float _Complex",     "cuComplex"),
-    "d": ("double",             "double"),
-    "z": ("double _Complex",    "cuDoubleComplex")
+    "s": ("float",              "float",    "float"),
+    "c": ("float _Complex",     "float",    "cuComplex"),
+    "d": ("double",             "double",   "double"),
+    "z": ("double _Complex",    "double",   "cuDoubleComplex")
 }
 
 assert(precision in modes)
@@ -29,10 +30,11 @@ mode = modes[precision]
 src="{}/{}.cc".format(src, kernel)
 dst="{}/{}{}.cc".format(dst, precision, kernel)
 cmd(
-    "cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}".format(
+    "cat {} | sed 's/££/{}/g' | sed 's/£/{}/g' | sed 's/\\bCU_TYPE\\b/{}/g' | sed 's/\\bTYPE_REAL\\b/{}/g' | sed 's/\\bTYPE\\b/{}/g' > {}".format(
         src,
         precision.upper(),
         precision,
+        mode[2],
         mode[1],
         mode[0],
         dst

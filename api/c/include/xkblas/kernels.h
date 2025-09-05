@@ -3,7 +3,7 @@
 /*   kernels.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/20 22:44:37 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/05 20:07:26 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -63,6 +63,28 @@ extern "C" {
     );
 
     int
+    xkblas_£gemmt_async(
+        int uplo,
+        int transA, int transB,
+        int n, int k,
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * B, int ldb,
+        const TYPE * beta,
+              TYPE * C, int ldc
+    );
+
+    int
+    xkblas_£herk_async(
+        int uplo, int transA,
+        int n, int k,
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * beta,
+              TYPE * C, int ldc
+    );
+
+    int
     xkblas_£syrk_async(
         int uplo, int trans,
         int n, int k,
@@ -80,18 +102,6 @@ extern "C" {
         const TYPE * alpha,
         const TYPE * A, int lda,
               TYPE * B, int ldb
-    );
-
-    int
-    xkblas_£gemmt_async(
-        int uplo,
-        int transA, int transB,
-        int n, int k,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * B, int ldb,
-        const TYPE * beta,
-              TYPE * C, int ldc
     );
 
     int
@@ -124,6 +134,14 @@ extern "C" {
         const TYPE * B, int ldb,
         const TYPE * beta,
               TYPE * C, int ldc
+    );
+
+    int
+    xkblas_£potrf_async(
+        int uplo,
+        int n,
+        TYPE * A,
+        int lda
     );
 
 # ifdef __cplusplus

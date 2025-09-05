@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:10:54 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/05 20:24:44 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -203,8 +203,8 @@ xkblas_t::trsm_async(
     const size_t Bmb = ts;
     const size_t Bnb = ts;
 
-    const size_t Amt = NUM_OF_TILES(Am, Amb);
-    const size_t Ant = NUM_OF_TILES(An, Anb);
+    // const size_t Amt = NUM_OF_TILES(Am, Amb);
+    // const size_t Ant = NUM_OF_TILES(An, Anb);
     const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
     const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
 
@@ -226,10 +226,10 @@ xkblas_t::trsm_async(
     if (side == CblasLeft) {
         if (uplo == CblasUpper) {
             if (transA == CblasNoTrans) {
-                for (int tk = 0; tk < Bmt; tk++) {
+                for (size_t tk = 0; tk < Bmt; tk++) {
                     size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
                     TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (int tn = 0; tn < Bnt; tn++) {
+                    for (size_t tn = 0; tn < Bnt; tn++) {
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -241,8 +241,8 @@ xkblas_t::trsm_async(
                             &d
                         );
                     }
-                    for (int tm = tk+1; tm < Bmt; ++tm) {
-                        for (int tn = 0; tn < Bnt; ++tn) {
+                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
+                        for (size_t tn = 0; tn < Bnt; ++tn) {
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
@@ -262,10 +262,10 @@ xkblas_t::trsm_async(
              *  CblasLeft / CblasUpper / CblasTrans
              */
             else {
-                for (int tk = 0; tk < Bmt; ++tk) {
+                for (size_t tk = 0; tk < Bmt; ++tk) {
                     size_t bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
                     TYPE lalpha = (tk == 0)     ? *alpha : one;
-                    for (int tn = 0; tn < Bnt; ++tn) {
+                    for (size_t tn = 0; tn < Bnt; ++tn) {
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -277,9 +277,9 @@ xkblas_t::trsm_async(
                             &d
                         );
                     }
-                    for (int tm = tk+1; tm < Bmt; tm++) {
+                    for (size_t tm = tk+1; tm < Bmt; tm++) {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (int tn = 0; tn < Bnt; ++tn) {
+                        for (size_t tn = 0; tn < Bnt; ++tn) {
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 transA, CblasNoTrans,
@@ -301,10 +301,10 @@ xkblas_t::trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (int tk = 0; tk < Bmt; ++tk) {
+                for (size_t tk = 0; tk < Bmt; ++tk) {
                     size_t bs_km  = (tk == Bmt-1) ? (Bm-tk*Bmb) : Bmb;
                     TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (int tn = 0; tn < Bnt; ++tn) {
+                    for (size_t tn = 0; tn < Bnt; ++tn) {
                         size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -316,9 +316,9 @@ xkblas_t::trsm_async(
                             &d
                         );
                     }
-                    for (int tm = tk+1; tm < Bmt; ++tm) {
+                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (int tn = 0; tn < Bnt; ++tn) {
+                        for (size_t tn = 0; tn < Bnt; ++tn) {
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
@@ -338,10 +338,10 @@ xkblas_t::trsm_async(
              *  CblasLeft / CblasLower / Cblas[Conj]Trans
              */
             else {
-                for (int tk = 0; tk < Bmt; ++tk) {
+                for (size_t tk = 0; tk < Bmt; ++tk) {
                     size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
                     TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (int tn = 0; tn < Bnt; ++tn) {
+                    for (size_t tn = 0; tn < Bnt; ++tn) {
                         size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                         this->trsm_tile_async<P>(
                             side, uplo, transA, diag,
@@ -352,8 +352,8 @@ xkblas_t::trsm_async(
                             &d
                         );
                     }
-                    for (int tm = tk+1; tm < Bmt; ++tm) {
-                        for (int tn = 0; tn < Bnt; ++tn) {
+                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
+                        for (size_t tn = 0; tn < Bnt; ++tn) {
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 transA, CblasNoTrans,
@@ -377,10 +377,10 @@ xkblas_t::trsm_async(
     else {
         if (uplo == CblasUpper) {
             if (transA == CblasNoTrans) {
-                for (int tk = 0; tk < Bnt; ++tk) {
+                for (size_t tk = 0; tk < Bnt; ++tk) {
                     size_t bs_kn = (tk == Bnt-1) ? (Bn-tk*Bnb) : Bnb;
                     TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (int tm = 0; tm < Bmt; ++tm) {
+                    for (size_t tm = 0; tm < Bmt; ++tm) {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         this->trsm_tile_async<P>(
                             side, uplo, transA, diag,
@@ -391,9 +391,9 @@ xkblas_t::trsm_async(
                             &d
                         );
                     }
-                    for (int tm = 0; tm < Bmt; ++tm) {
+                    for (size_t tm = 0; tm < Bmt; ++tm) {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
                             size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
@@ -413,9 +413,9 @@ xkblas_t::trsm_async(
              *  CblasRight / CblasUpper / CblasConjTrans
              */
             else {
-                for (int tk = 0; tk < Bnt; ++tk) {
+                for (size_t tk = 0; tk < Bnt; ++tk) {
                     size_t bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    for (int tm = 0; tm < Bmt; ++tm) {
+                    for (size_t tm = 0; tm < Bmt; ++tm) {
                         size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -427,7 +427,7 @@ xkblas_t::trsm_async(
                             &d
                         );
 
-                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, transA,
                                 bs_mm, Bnb, bs_kn,
@@ -448,10 +448,10 @@ xkblas_t::trsm_async(
          */
         else {
             if (transA == CblasNoTrans) {
-                for (int tk = 0; tk < Bnt; ++tk) {
+                for (size_t tk = 0; tk < Bnt; ++tk) {
                     size_t bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
                     TYPE lalpha = tk == 0 ? *alpha : one;
-                    for (int tm = 0; tm < Bmt; ++tm) {
+                    for (size_t tm = 0; tm < Bmt; ++tm) {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -463,7 +463,7 @@ xkblas_t::trsm_async(
                             &d
                         );
 
-                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
@@ -479,9 +479,9 @@ xkblas_t::trsm_async(
                 }
             }
             else {
-                for (int tk = 0; tk < Bnt; ++tk) {
+                for (size_t tk = 0; tk < Bnt; ++tk) {
                     size_t bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
-                    for (int tm = 0; tm < Bmt; ++tm) {
+                    for (size_t tm = 0; tm < Bmt; ++tm) {
                         size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
                         this->trsm_tile_async<P>(
                             side, uplo,
@@ -494,7 +494,7 @@ xkblas_t::trsm_async(
 
                         );
 
-                        for (int tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
                             size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, transA,

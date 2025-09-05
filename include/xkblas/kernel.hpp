@@ -40,6 +40,18 @@ template <> struct _xkblas_precision_type_t<Z>  { using type = double _Complex; 
 template <xkblas_precision_t P>
 using xkblas_precision_type_t = typename _xkblas_precision_type_t<P>::type;
 
+// Real part precision type
+template <xkblas_precision_t P>
+struct _xkblas_precision_type_real_t;
+
+template <> struct _xkblas_precision_type_real_t<S>  { using type = float;   };
+template <> struct _xkblas_precision_type_real_t<C>  { using type = float;   };
+template <> struct _xkblas_precision_type_real_t<D>  { using type = double;  };
+template <> struct _xkblas_precision_type_real_t<Z>  { using type = double;  };
+
+template <xkblas_precision_t P>
+using xkblas_precision_type_real_t = typename _xkblas_precision_type_real_t<P>::type;
+
 // Precision name
 template <xkblas_precision_t P>
 struct _xkblas_precision_name_t;
@@ -70,11 +82,15 @@ using xkblas_precision_name_t = typename _xkblas_precision_name_t<P>::value;
     /* LEVEL 3 */                \
     F(GEMM)                      \
     F(GEMMT)                     \
+    F(HERK)                      \
     F(SYMM)                      \
     F(SYR2K)                     \
     F(SYRK)                      \
     F(TRSM)                      \
-    F(TRMM)
+    F(TRMM)                      \
+                                 \
+    /* LAPACKE */                \
+    F(POTRF)
 
 // Now define the enum using the macro
 typedef enum    xkblas_kernel_t
@@ -138,6 +154,8 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(C,     GEMMT)                                 \
     F(D,     GEMMT)                                 \
     F(Z,     GEMMT)                                 \
+    F(C,     HERK)                                  \
+    F(Z,     HERK)                                  \
     F(S,     SYMM)                                  \
     F(C,     SYMM)                                  \
     F(D,     SYMM)                                  \
@@ -157,7 +175,11 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(S,     TRMM)                                  \
     F(C,     TRMM)                                  \
     F(D,     TRMM)                                  \
-    F(Z,     TRMM)
+    F(Z,     TRMM)                                  \
+                                                    \
+   /* LAPACKE */                                    \
+   F(C,      POTRF)                                 \
+   F(Z,      POTRF)
 
 
 # endif /* __KERNEL_H__ */

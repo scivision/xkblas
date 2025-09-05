@@ -52,6 +52,49 @@ rt.task_spawn<1>(
 xkblas_sync(); // or equivalently, rt.task_wait()
 ```
 
+## List of kernels supported
+Kernels are being added lazily: if you need a missing kernel for a specific hardware, add it yourself or open an issue and someone will add it on a best effort basis.
+
+Adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (~10min of coding) - while adding support for an unsupported kernel may involve more work (~3h of coding).
+
+### Level 1
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
+|-------------|-----|------|-----|-----------------|
+| axpby       | ✗   | ✗    | ✗   | ✗               |
+| axpy        | ✗   | ✓    | ✗   | ✗               |
+| copyscale   | ✓   | ✓    | ✗   | ✗               |
+| divcopy     | ✗   | ✗    | ✗   | ✗               |
+| dot         | ✗   | ✗    | ✗   | ✗               |
+| fill        | ✗   | ✗    | ✗   | ✗               |
+| nrm2        | ✗   | ✗    | ✗   | ✗               |
+| scalcopy    | ✗   | ✗    | ✗   | ✗               |
+| scale       | ✗   | ✗    | ✗   | ✗               |
+
+### Level 2
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
+|-------------|-----|------|-----|-----------------|
+| copyscale   | ✓   | ✓    | ✗   | ✗               |
+
+### Level 3
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
+|-------------|-----|------|-----|-----------------|
+| gemm        | ✓   | ✓    | ✓   | ✓               |
+| gemmt       | ✓   | ✓    | ✗   | ✗               |
+| herk        | ✓   | ✓    | ✗   | ✗               |
+| symm        | ✗   | ✗    | ✗   | ✗               |
+| syr2k       | ✗   | ✗    | ✗   | ✗               |
+| syrk        | ✓   | ✓    | ✗   | ✗               |
+| trmm        | ✗   | ✗    | ✗   | ✗               |
+| trsm        | ✓   | ✓    | ✗   | ✗               |
+
+### Lapacke
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
+|-------------|-----|------|-----|-----------------|
+| geqrf       | ✗   | ✗    | ✗   | ✗               |
+| orgqr       | ✗   | ✗    | ✗   | ✗               |
+| ormqr       | ✗   | ✗    | ✗   | ✗               |
+| potrf       | ✗   | ✗    | ✗   | ✗               |
+
 # Problems on Intel GPUs
 - memcpy2D is broken
 - Deadlock / pagefaults of what seems valid transfers
