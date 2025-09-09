@@ -58,11 +58,14 @@
 /* */
 void Usage(void)
 {
-  printf("XKBLAS_NGPUS:\n");
-  printf("XKBLAS_TILE_SIZE:\n");
-  printf("XKBLAS_THRESHOLD:\n");
-  printf("\n");
-  printf("KAAPI_CUDA_KERNEL_STREAM_NUMS:\n");
+  printf("libxkblas wrapper has the same environment variables as XKblas.\n");
+  printf("Nevertheless, either BLAS kernels may be executed to CPU or GPU,");
+  printf("The decision is to run on GPU is iff the arithmetic intensity is");
+  printf("greather than predefined threshold.");
+  printf("Each kernel PXYZ, for each precision 'P' has a env. var nammed XKBLAS_THRESHOLD_PXYZ\n");
+  printf("that allow to change its threshold.\n");
+  printf("E.g. kernel ZGEMM threshold may be changed by XKBLAS_THRESHOLD_ZGEMM.\n");
+  printf("The env. variable XKBLAS_THRESHOLD is used to defined a threshold to all kernels.\n");
   abort();
 }
 
@@ -111,24 +114,29 @@ __attribute__((constructor)) void toto_constructor(void)
 
   if (getenv("XKBLAS_HELP"))
     Usage();
-  if (getenv("XKBLAS_NGPUS"))
-    setenv("KAAPI_NUM_GPUS",getenv("XKBLAS_NGPUS"),1);
 
   if (0 != xkblas_init())
   {
-    printf(LIBNAME ": cannot initialize\n");
+    fprintf(stderr,LIBNAME ": cannot initialize\n");
     abort();
   }
   extern const char* get_kaapi_version(void);
-  printf(LIBNAME ": version :%s\n", get_kaapi_version());
-  printf(LIBNAME ": ngpus :%i\n", kaapi_default_param.ngpus);
+  if (kaapi_default_param.verbose)
+  {
+    printf(LIBNAME ": version :%s\n", get_kaapi_version());
+    printf(LIBNAME ": ngpus :%i\n", kaapi_default_param.ngpus);
+  }
 
   if ((kaapi_default_param.ngpus>0) && (getenv("XKBLAS_THRESHOLD")))
   {
     threshold=atol(getenv("XKBLAS_THRESHOLD"));
     if (threshold <0) threshold = 0;
   }
-  printf(LIBNAME ": threshold :%i\n", threshold);
+
+  if (kaapi_default_param.verbose)
+  {
+    printf(LIBNAME ": threshold :%i\n", threshold);
+  }
 
   /* Threshold per kernels */
   for (int i=0; i<LAST; ++i)
@@ -159,11 +167,16 @@ __attribute__((constructor)) void toto_constructor(void)
       {
         threshold_kern[i] = threshold;
       }
-      printf(LIBNAME ": %s =%li\n", name, (long)threshold_kern[i] );
+      if (kaapi_default_param.verbose)
+      {
+        printf(LIBNAME ": %s =%li\n", name, (long)threshold_kern[i] );
     }
   }
 
-  printf(LIBNAME ": library initialized.\n");
+  if (kaapi_default_param.verbose)
+  {
+    printf(LIBNAME ": library initialized.\n");
+  }
 }
 
 /*
