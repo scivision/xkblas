@@ -3,7 +3,7 @@
 /*   clblast-helper.h                                             .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/23 15:33:40 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/06/03 18:26:39 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/11 21:08:55 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,6 +22,22 @@
 
 # include "xkblas/cblas.h"
 # include <clblast.h>
+
+# define XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, PX, T) \
+    if constexpr (P == xkblas_precision_t::PX) body_cl_run<P, CLBlast##PX##NAME, T>(stream, instr, idx);
+
+# define XKBLAS_CLBLAST_DISPATCH_PRECISION_REAL(NAME)               \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, S, float)             \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, D, double)
+
+# define XKBLAS_CLBLAST_DISPATCH_PRECISION_COMPLEX(NAME)            \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, C, cl_float2)         \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, Z, cl_double2)
+
+# define XKBLAS_CLBLAST_DISPATCH_PRECISION(NAME)     \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_REAL(NAME)     \
+    XKBLAS_CLBLAST_DISPATCH_PRECISION_COMPLEX(NAME)
+
 
 static inline CLBlastTranspose
 cblas2clblast_op(int trans)

@@ -3,7 +3,7 @@
 /*   gemm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:10:15 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/11 21:18:43 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -215,7 +215,7 @@ xkblas_t::gemm_async(
     const size_t Am = (transA == CblasNoTrans) ? m : k;
     const size_t An = (transA == CblasNoTrans) ? k : m;
     const size_t Bm = (transB == CblasNoTrans) ? k : n;
-    const size_t Bn = (transB == CblasNoTrans) ? n : k;
+    // const size_t Bn = (transB == CblasNoTrans) ? n : k;
     const size_t Cm = m;
     const size_t Cn = n;
 
@@ -256,8 +256,8 @@ xkblas_t::gemm_async(
 
     const size_t Amt = NUM_OF_TILES(Am, Amb);
     const size_t Ant = NUM_OF_TILES(An, Anb);
-    const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
-    const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
+    // const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
+    // const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
     const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
     const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
 
@@ -574,9 +574,9 @@ body_sycl(
 #  include <xkrt/driver/driver-cl.h>
 #  include <xkblas/clblast-helper.h>
 
-TYPED
-static void
-body_cl(
+template <xkblas_precision_t P, auto FUNC, typename CL_TYPE>
+static inline void
+body_cl_run(
     stream_cl_t * stream,
     stream_instruction_t * instr,
     stream_instruction_counter_t idx
@@ -609,19 +609,29 @@ body_cl(
     const CLBlastLayout layout = CLBlastLayoutColMajor;
 
     CLBLAST_SAFE_CALL(
-        CLBlast££gemm(
+        FUNC(
             layout,
             cblas2clblast_op(args->transA), cblas2clblast_op(args->transB),
             args->m, args->n, args->k,
-            args->alpha,
+            *((const CL_TYPE *) &args->alpha),
             a_buffer, a_offset, A->device_view.ld,
             b_buffer, b_offset, B->device_view.ld,
-            args->beta,
+            *((const CL_TYPE *) &args->beta),
             c_buffer, c_offset, C->device_view.ld,
            &stream->cl.queue,
             stream->cl.events + idx
         )
     );
+}
+
+TYPED
+static void
+body_cl(
+    stream_cl_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    XKBLAS_CLBLAST_DISPATCH_PRECISION(gemm);
 }
 
 # endif /* XKRT_SUPPORT_CL */

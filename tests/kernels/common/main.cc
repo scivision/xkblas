@@ -79,8 +79,15 @@ preallocate(
     int m, int n,
     int ld
 ) {
-    LOGGER_FATAL("Not supproted");
-    // xkblas_memory_preallocate(M, ld, m, n, sizeof(TYPE));
+    for (xkrt::device_global_id_t device_global_id = 0 ; device_global_id < xkblas->runtime.get_ndevices() ; ++device_global_id)
+    {
+        if (device_global_id == HOST_DEVICE_GLOBAL_ID)
+            continue ;
+
+        xkblas->runtime.memory_replicate_noncoherent(
+            device_global_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
+        );
+    }
 }
 
 TYPED
@@ -600,7 +607,8 @@ main_mumps(char ** args)
     # define USE_ARGS_MATRIX    1
     # define USE_TS_TUNER       0
     # define USE_PREALLOCATE    1
-    # define NMATRICES          1
+    # define NMATRICES          10
+    # define DUMP_GRAPH         0
 
     TYPE alpha, beta;
     FILL(&alpha, 1);
@@ -619,12 +627,15 @@ main_mumps(char ** args)
         {atoi(args[1]), atoi(args[2])}
     };
     # else
-    srand(2025);
+    srand(0x270196);
     int mn[NMATRICES][2];
     for (int k = 0; k < sizeof(mn) / (2 * sizeof(int)); ++k)
     {
         mn[k][0] = 1024 + rand() % (16384 - 1024 + 1);
-        mn[k][1] =  512 + rand() % ( 6144 -  512 + 1);
+        mn[k][1] =  512 + rand() % ( 8192 -  512 + 1);
+        for (int i = 0 ; i < 2 ; ++i)
+            if (mn[k][i] % 2 == 1)
+                mn[k][i] += 1;
     }
     # endif /*USE_ARGS_MATRIX */
 
@@ -792,13 +803,10 @@ main_mumps(char ** args)
         {
             for (int j = 0 ; j < Ix ; ++j)
             {
-                # if REPLICATE
-                impl.replicate(D, ld, m+n, m+n);
-                xkblas_sync();
-                # endif /* ONLY_COMPUTE */
-
-                // if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
-                //     continue ;
+                if (ts[i][0] < 200 || ts[i][1] < 200 || ts[i][2] < 200)
+                    continue ;
+                if (ts[i][0] > n || ts[i][1] > n || ts[i][2] > n)
+                    continue ;
                 uint64_t t0 = get_nanotime();
 
                 # if USE_PREALLOCATE
@@ -810,13 +818,14 @@ main_mumps(char ** args)
 
                 set_tile_size(ts[i][1]);
                 xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+
                 # if USE_WRITE_BACK
-             // coherent_async<P>(D, m, m, ld);
+                // coherent_async<P>(D, m, m, ld);
                 coherent_async<P>(L, n, m, ld);
                 coherent_async<P>(U, m, n, ld);
                 # endif
                 set_tile_size(ts[i][2]);
-                xkblas->gemm_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+                xkblas->gemmt_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
 
                 # if USE_WRITE_BACK
                 coherent_async<P>(G, m, m, ld);
@@ -825,7 +834,18 @@ main_mumps(char ** args)
                 uint64_t tt = get_nanotime();
                 xkblas_sync();
                 uint64_t tf = get_nanotime();
-                printf("(%d/%u) Compute took %lf s. (graph construction took %lf s.) - with ts = {%d, %d, %d}\n", i, ntiles, (tf-t0)/1e9, (tt-t0)/1e9, ts[i][0], ts[i][1], ts[i][2]);
+                printf("(tiling %d/%u) (iter %d/%d) Compute took %lf s. (graph construction took %lf s.) - with ts = {%d, %d, %d}\n", i, ntiles, j, Ix, (tf-t0)/1e9, (tt-t0)/1e9, ts[i][0], ts[i][1], ts[i][2]);
+
+                # if DUMP_GRAPH
+                if (i == 0 && j == 0)
+                {
+                    xkrt::thread_t * thread = xkrt::thread_t::get_tls();
+                    FILE * f = fopen("graph.dot", "w");
+                    thread->dump_tasks(f);
+                    fclose(f);
+                    printf("Graph dumped\n");
+                }
+                # endif
 
                 xkblas_memory_invalidate_caches();
 
