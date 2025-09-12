@@ -34,6 +34,9 @@ SET(XKBLAS_KERNELS
 
     # lapacke
     potrf
+
+    # sparse
+    spmv
 )
 SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 

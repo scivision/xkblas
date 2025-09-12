@@ -28,13 +28,13 @@ dump_matrix(
     const BLAS_INT n,
     const BLAS_INT ld
 ) {
-    if (m <= 32 && n <= 32)
-    {
-        printf("---- %s ----\n", label);
-        for (int j = 0 ; j < m ; ++j)
-            for (int i = 0 ; i < n ; ++i)
-                printf("%4.0f%c", M[i*ld+j], (i == n-1) ? '\n' : ' ');
-    }
+    if (m > 64 || n > 64)
+        return ;
+
+    printf("---- %s ----\n", label);
+    for (int j = 0 ; j < m ; ++j)
+        for (int i = 0 ; i < n ; ++i)
+            printf("%4.4f%c", M[i*ld+j], (i == n-1) ? '\n' : ' ');
 }
 
 TYPED
@@ -47,12 +47,90 @@ dump_matrix_diff(
     const BLAS_INT n,
     const BLAS_INT ld
 ) {
-    if (m <= 64 && n <= 64)
+    if (m > 64 || n > 64)
+        return ;
+
+    printf("---- %s ----\n", label);
+    for (int j = 0 ; j < m ; ++j)
+        for (int i = 0 ; i < n ; ++i)
+            printf("%4.4f%c", A[i*ld+j] - B[i*ld+j], (i == n-1) ? '\n' : ' ');
+}
+
+TYPED
+static void
+dump_vector(
+    const char * label,
+    const TYPE * X,
+    const BLAS_INT n
+) {
+    if (n > 64)
+        return ;
+
+    printf("---- %s ----\n", label);
+    for (int i = 0 ; i < n ; ++i)
+        printf("%4.4f\n", X[i]);
+}
+
+TYPED
+static void
+dump_csr_matrix(
+    const char * label,
+    int m,
+    int n,
+    int * csr_row_offsets,
+    int * csr_col_indices,
+    TYPE * csr_values
+) {
+    if (m > 64 || n > 64)
+        return ;
+
+    printf("---- %s ----\n", label);
+    for (int i = 0; i < n; ++i)
     {
-        printf("---- %s ----\n", label);
-        for (int j = 0 ; j < m ; ++j)
-            for (int i = 0 ; i < n ; ++i)
-                printf("%4.0f%c", A[i*ld+j] - B[i*ld+j], (i == n-1) ? '\n' : ' ');
+        int start = csr_row_offsets[i];
+        int end = csr_row_offsets[i + 1];
+        int idx = start;
+
+        for (int j = 0; j < m; ++j)
+        {
+            if (idx < end && csr_col_indices[idx] == j)
+            {
+                printf("%4.4f ", csr_values[idx]);
+                ++idx;
+            }
+            else
+            {
+                printf("%4.4f ", 0.0);
+            }
+        }
+        printf("\n");
+    }
+}
+
+TYPED
+void
+spmv_cpu(
+    const TYPE * alpha,
+    /* matrix A (in) */
+    int transA,
+    const int nrows,
+    const int ncols,
+    const int nnz,
+    const int * row_ptr,
+    const int * col_idx,
+    const TYPE * values,
+    /* vector X (in) */
+    TYPE * x,
+    const TYPE * beta,
+    /* vector Y (inout) */
+    TYPE * y
+) {
+    for (int i = 0; i < nrows; i++) {
+        double sum = 0.0;
+        for (int jj = row_ptr[i]; jj < row_ptr[i+1]; jj++) {
+            sum += values[jj] * x[col_idx[jj]];
+        }
+        y[i] = *alpha * sum + *beta * y[i];
     }
 }
 

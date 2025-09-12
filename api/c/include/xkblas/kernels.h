@@ -3,7 +3,7 @@
 /*   kernels.h                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/05 20:07:26 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/12 20:17:48 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -142,6 +142,24 @@ extern "C" {
         int n,
         TYPE * A,
         int lda
+    );
+
+    int
+    xkblas_£spmv_async(
+        const TYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int * csr_row_offsets,
+        const int * csr_col_indices,
+        const TYPE * csr_values,
+        /* vector X (in) */
+        TYPE * X,
+        const TYPE * beta,
+        /* vector Y (inout) */
+        TYPE * Y
     );
 
 # ifdef __cplusplus

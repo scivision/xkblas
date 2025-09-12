@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/05 20:07:11 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/12 20:07:17 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -80,6 +80,9 @@ typedef struct  xkblas_t
     ////////////
 
     // TODO : coherent async etc
+
+    void host_coherent_async(void * ptr, size_t size);
+    void sync(void);
 
     /////////////
     // Kernels //
@@ -325,6 +328,50 @@ typedef struct  xkblas_t
         int uplo,
         int n,
         TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+        xkrt::distribution_t * d
+    );
+
+    // SPARSE
+
+    /* Y = alpha . op(A) . X + beta . Y
+     * spmv of a CSR matrix with dense vectors */
+    TYPED
+    int
+    spmv_async(
+        const TYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int * csr_row_offsets,
+        const int * csr_col_indices,
+        const TYPE * csr_values,
+        /* vector X (in) */
+        TYPE * X,
+        const TYPE * beta,
+        /* vector Y (inout) */
+        TYPE * Y
+    );
+
+    TYPED
+    int
+    spmv_tile_async(
+        const TYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int * csr_row_offsets,
+        const int * csr_col_indices,
+        const TYPE * csr_values,
+        /* vector X (in) */
+        TYPE * X,
+        const TYPE * beta,
+        /* vector Y (inout) */
+        TYPE * Y,
+        size_t tm,
         xkrt::distribution_t * d
     );
 

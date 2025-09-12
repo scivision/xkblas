@@ -40,6 +40,7 @@ static xkblas_t * xkblas;
 # include "common/check.cc"
 static bool SKIP_CHECK = 0;
 static bool ALIGN_MATRICES = 0;
+static bool REGISTER_MEMORY = 1;
 
 /////////////////////////
 //  PARAMETERS TO TEST //
@@ -118,6 +119,59 @@ coherent_async(
 
 TYPED
 static void
+prepare_csr_matrix(
+    double density,
+    int m,
+    int n,
+    int * nnz,
+    int ** csr_row_offsets,
+    int ** csr_col_indices,
+    TYPE ** csr_values
+) {
+    int max_nnz = (int)(m * n * density) + 1;
+    size_t csr_values_size = max_nnz * sizeof(TYPE);
+    size_t csr_col_indices_size = max_nnz * sizeof(int);
+    size_t csr_row_offsets_size = (m + 1) * sizeof(int);
+    size_t memsize = csr_values_size + csr_col_indices_size + csr_row_offsets_size;
+    const uintptr_t memory = (const uintptr_t) malloc(memsize);
+
+    if (REGISTER_MEMORY)
+    {
+        xkblas_register_memory_async((void *) memory, memsize);
+        xkblas_register_memory_waitall();
+    }
+
+    // Temporary storage for maximum nonzeros
+    *csr_values         = (TYPE *) (memory + 0);
+    *csr_col_indices    = (int *)  (memory + csr_values_size);
+    *csr_row_offsets    = (int *)  (memory + csr_values_size + csr_col_indices_size);
+
+    *nnz = 0; // total nonzeros
+    (*csr_row_offsets)[0] = 0;
+
+    for (int i = 0; i < m; ++i)
+    {
+        if (*nnz < max_nnz)
+        {
+            for (int j = 0; j < n; ++j)
+            {
+                if ((double)rand() / RAND_MAX < density)
+                {
+                    if (*nnz >= max_nnz)
+                        break ;
+
+                    (*csr_values)[*nnz]      = (rand() % 9) + 1; // random value 1–9
+                    (*csr_col_indices)[*nnz] = j;
+                    *nnz = *nnz + 1;
+                }
+            }
+        }
+        (*csr_row_offsets)[i+1] = *nnz;
+    }
+}
+
+TYPED
+static void
 prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
 {
     /* allocate matrices */
@@ -126,8 +180,13 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
     const uintptr_t memsize = nmats * (alignon + alignon/2 + s * ld * n);
 
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
-    xkblas_register_memory_async((void *) mem, memsize);
-    xkblas_register_memory_waitall();
+
+    if (REGISTER_MEMORY)
+    {
+        xkblas_register_memory_async((void *) mem, memsize);
+        xkblas_register_memory_waitall();
+    }
+    FILL((TYPE *)mem, memsize / sizeof(TYPE));
 
     for (int i = 0 ; i < nmats ; ++i)
     {
@@ -150,7 +209,6 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
         }
 
         matrices[i] = M;
-        FILL((TYPE *)M, ld*n);
         assert(M + ld*n <= mem + memsize);
     }
 }
@@ -178,8 +236,6 @@ main_axpy(char ** args)
     # define Y     ((TYPE *)vectors[1])
     # define Y2    ((TYPE *)vectors[2])
     prepare_n_vectors<P>(vectors, 3, n);
-
-    srand(2023);
 
     // for small vectors
     if (n <= 64)
@@ -211,10 +267,12 @@ main_axpy(char ** args)
             printf("%3f . [ %3f ] + [ %3f ] = [ %3f ]\n", alpha, X[i], Y2[i], Y[i]);
     }
 
+    # undef X
+    # undef Y
+    # undef Y2
+
     return 0;
 }
-
-
 
 // GEMM - GEMM //
 TYPED
@@ -322,8 +380,6 @@ main_gemm(char ** args)
     # define CRef  ((TYPE *)matrices[3])
     # define CImpl ((TYPE *)matrices[4])
     prepare_n_matrices<P>(matrices, 5, ld, ld);
-
-    srand(2023);
 
     // for small matrices
     if (m <= 64)
@@ -568,22 +624,6 @@ main_copyscale(char ** args)
     return 0;
 }
 
-# define SEED 0x123
-
-/* return a random integer in [a, b] */
-static inline int
-rand_int(double a, double b)
-{
-    static bool initialized = false;
-    if (!initialized)
-    {
-        srand(SEED);
-        initialized = true;
-    }
-    double f = rand() / (double) RAND_MAX;
-    return (int) (a + (b - a) * f);
-}
-
 TYPED
 static int
 main_mumps(char ** args)
@@ -627,7 +667,6 @@ main_mumps(char ** args)
         {atoi(args[1]), atoi(args[2])}
     };
     # else
-    srand(0x270196);
     int mn[NMATRICES][2];
     for (int k = 0; k < sizeof(mn) / (2 * sizeof(int)); ++k)
     {
@@ -938,6 +977,73 @@ main_trsm_copyscale_gemm(char ** args)
     return 0;
 }
 
+TYPED
+static int
+main_spmv(char ** args)
+{
+
+    /**
+     *         n
+     *      .-------.  .-.                 m
+     *      |       |  | |           _____________
+     *      |       |  |X| n    =   [______Y______]
+     *   m  |  A    |  | |
+     *      |       |  .-.
+     *      |       |
+     *      .-------.
+     */
+
+    TYPE alpha, beta;
+    alpha = (TYPE) atof(args[3]);
+    beta  = (TYPE) atof(args[4]);
+    // FILL(&alpha, 1);
+    // FILL(&beta, 1);
+    printf("alpha=%.4lf, beta=%.4lf\n", alpha, beta);
+
+    /* parse arguments */
+    int m  = atoi(args[0]);
+    int n  = atoi(args[1]);
+    int ts = atoi(args[2]);
+
+    /* generate matrix A */
+    int nnz;
+    int * csr_row_offsets, * csr_col_indices;
+    TYPE * csr_values;
+    const double density = (double) atof(args[5]);
+    prepare_csr_matrix<P>(density, m, n, &nnz, &csr_row_offsets, &csr_col_indices, &csr_values);
+    dump_csr_matrix<P>("A", m, n, csr_row_offsets, csr_col_indices, csr_values);
+
+    /* generate vectors X and Y */
+    /* allocate vectors */
+    uintptr_t ptr[3];
+    prepare_n_vectors<P>(ptr, 3, MAX(m, n));
+    # define X ((TYPE *)ptr[0])
+    # define Y ((TYPE *)ptr[1])
+    # define Y_check ((TYPE *)ptr[2])
+    dump_vector<P>("X", X, n);
+    dump_vector<P>("Y", Y, m);
+    memcpy(Y_check, Y, m * sizeof(TYPE));
+
+    /* run spmv */
+    set_tile_size(ts);
+    xkblas->spmv_async<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
+    xkblas->host_coherent_async(Y, m * sizeof(TYPE));
+    xkblas->sync();
+    dump_vector<P>("Y := alpha.A.X + beta.Y", Y, m);
+
+    if (!SKIP_CHECK)
+    {
+        /* run check */
+        spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check);
+        dump_vector<P>("CPU value of Y", Y_check, m);
+    }
+
+    # undef X
+    # undef Y
+
+    return 0;
+}
+
 typedef struct  func_t
 {
     const char * name;
@@ -1053,6 +1159,21 @@ static func_t funcs[] = {
                     "  - TS2 : tile size for copyscale\n"
                     "  - TS3 : tile size for gemm\n",
     },
+
+    {
+        .name = "SPMV",
+        .f = main_spmv<PRECISION>,
+        .nargs = 6,
+        .descr = "SPMV Y := alpha.A.X + beta.X",
+        .usage =    "M N TS alpha beta density\n"
+                    "  -       M : number of rows\n"
+                    "  -       N : number of columns\n"
+                    "  -      TS : tile size\n"
+                    "  -   alpha : alpha\n"
+                    "  -    beta : beta\n"
+                    "  - density : beta\n"
+    },
+
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
 
@@ -1080,10 +1201,14 @@ error_usage(const char * label, func_t * func)
 int
 main(int argc, char ** argv)
 {
-    SKIP_CHECK = getenv("SKIP_CHECK") ? atoi(getenv("SKIP_CHECK")) : false;
-    ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? atoi(getenv("ALIGN_MATRICES")) : false;
+    SKIP_CHECK = getenv("SKIP_CHECK") ? atoi(getenv("SKIP_CHECK")) : SKIP_CHECK;
+    ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? atoi(getenv("ALIGN_MATRICES")) : ALIGN_MATRICES;
+    REGISTER_MEMORY = getenv("REGISTER_MEMORY") ? atoi(getenv("REGISTER_MEMORY")) : REGISTER_MEMORY;
     printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
     printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
+    printf("Register memory (REGISTER_MEMORY) %s\n", REGISTER_MEMORY ? "enabled" : "disabled");
+
+    srand(0x16112003);
 
     if (argc >= 2)
     {
