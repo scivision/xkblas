@@ -108,7 +108,7 @@ dump_csr_matrix(
 }
 
 TYPED
-void
+int
 spmv_cpu(
     const TYPE * alpha,
     /* matrix A (in) */
@@ -123,15 +123,23 @@ spmv_cpu(
     TYPE * x,
     const TYPE * beta,
     /* vector Y (inout) */
-    TYPE * y
+    TYPE * y,
+    TYPE * y_gpu
 ) {
+    int r = 0;
+
     for (int i = 0; i < nrows; i++) {
         double sum = 0.0;
         for (int jj = row_ptr[i]; jj < row_ptr[i+1]; jj++) {
             sum += values[jj] * x[col_idx[jj]];
         }
         y[i] = *alpha * sum + *beta * y[i];
+
+        // 0.1% precision
+        if (100.0 * abs(y[i] - y_gpu[i]) / MAX(abs(y[i]), abs(y_gpu[i])) > 0.1)
+            r = 1;
     }
+    return r;
 }
 
 /**

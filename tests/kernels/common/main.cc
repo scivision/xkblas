@@ -1034,8 +1034,9 @@ main_spmv(char ** args)
     if (!SKIP_CHECK)
     {
         /* run check */
-        spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check);
+        int r = spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check, Y);
         dump_vector<P>("CPU value of Y", Y_check, m);
+        printf("Result is %12s\n", (r == 0) ? "CORRECT" : "INCORRECT");
     }
 
     # undef X
