@@ -3,7 +3,7 @@
 /*   xkblas.cc                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/02 19:52:01 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/12 15:08:47 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -80,6 +80,18 @@ xkblas_t::deinit(void)
     }
 }
 
+void
+xkblas_t::sync(void)
+{
+    this->runtime.task_wait();
+}
+
+void
+xkblas_t::host_coherent_async(void * ptr, size_t size)
+{
+    this->runtime.memory_host_coherent_async(ptr, size);
+}
+
 //////////////////////////////
 //  Runtime initialization  //
 //////////////////////////////
@@ -139,5 +151,5 @@ xkblas_sync(void)
     xkblas_t * context = xkblas_get();
     assert(context);
 
-    context->runtime.task_wait();
+    context->sync();
 }

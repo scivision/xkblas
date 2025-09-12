@@ -90,7 +90,10 @@ using xkblas_precision_name_t = typename _xkblas_precision_name_t<P>::value;
     F(TRMM)                      \
                                  \
     /* LAPACKE */                \
-    F(POTRF)
+    F(POTRF)                     \
+                                 \
+    /* SPARSE */                 \
+    F(SPMV)
 
 // Now define the enum using the macro
 typedef enum    xkblas_kernel_t
@@ -177,9 +180,16 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(D,     TRMM)                                  \
     F(Z,     TRMM)                                  \
                                                     \
-   /* LAPACKE */                                    \
+   /* lapacke */                                    \
    F(C,      POTRF)                                 \
-   F(Z,      POTRF)
+   F(Z,      POTRF)                                 \
+                                                    \
+   /* sparse */                                     \
+   F(S,      SPMV)                                  \
+   F(C,      SPMV)                                  \
+   F(D,      SPMV)                                  \
+   F(Z,      SPMV)
+
 
 
 # endif /* __KERNEL_H__ */

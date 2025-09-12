@@ -55,7 +55,7 @@ xkblas_sync(); // or equivalently, rt.task_wait()
 ## List of kernels supported
 Kernels are being added lazily: if you need a missing kernel for a specific hardware, add it yourself or open an issue and someone will add it on a best effort basis.
 
-Adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (~10min of coding) - while adding support for an unsupported kernel may involve more work (~3h of coding).
+Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (~10min of coding) - while adding support for an unsupported kernel may involve more work (~3h of coding).
 
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
@@ -95,10 +95,15 @@ Adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already s
 | ormqr       | ✗   | ✗    | ✗   | ✗               |
 | potrf       | ✗   | ✗    | ✗   | ✗               |
 
+### Sparse
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
+|-------------|-----|------|-----|-----------------|
+| spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
+
 # Problems on Intel GPUs
 - memcpy2D is broken
 - Deadlock / pagefaults of what seems valid transfers
-- It is unclear if that code is correct
+- It is unclear if that code is correct and what it does - currently using it in the gemm implementation
 ```
 440 void func(ze_event_handle_t * eventPtr)
 441 {
