@@ -137,7 +137,10 @@ spmv_cpu(
 
         // 0.1% precision
         if (100.0 * abs(y[i] - y_gpu[i]) / MAX(abs(y[i]), abs(y_gpu[i])) > 0.1)
-            r = 1;
+        {
+            printf("y_cpu[%d] = %lf vs y_gpu[%d] = %lf\n", i , y[i], i, y_gpu[i]);
+            return 1;
+        }
     }
     return r;
 }

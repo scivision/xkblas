@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:09:52 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 18:40:28 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -119,7 +119,7 @@ xkblas_t::copyscale_tile_async(
     new (accesses + 0) access_t(task, MATRIX_COLMAJOR, D, ldd, Dm, Dn, n, n, sizeof(TYPE), ACCESS_MODE_R , ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, MATRIX_COLMAJOR, L, ldl, Lm, Ln, n, m, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 2) access_t(task, MATRIX_COLMAJOR, U, ldu, Um, Un, m, n, sizeof(TYPE), ACCESS_MODE_W , ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve<AC>(task, accesses);
+    thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);

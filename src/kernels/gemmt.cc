@@ -3,7 +3,7 @@
 /*   gemmt.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/04 17:03:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:10:21 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 18:40:45 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -147,7 +147,7 @@ xkblas_t::gemmt_tile_async(
     new(accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new(accesses + 1) access_t(task, MATRIX_COLMAJOR, B, ldb, B_offset_m, B_offset_n, Bm, Bn, sizeof(TYPE), ACCESS_MODE_R, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new(accesses + 2) access_t(task, MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        , ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve<AC>(task, accesses);
+    thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);

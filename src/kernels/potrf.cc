@@ -3,7 +3,7 @@
 /*   potrf.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/05 20:52:07 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 18:40:59 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -126,7 +126,7 @@ xkblas_t::potrf_tile_async(
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
     new (accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve<AC>(task, accesses);
+    thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);

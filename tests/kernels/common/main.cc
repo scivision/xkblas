@@ -41,6 +41,7 @@ static xkblas_t * xkblas;
 static bool SKIP_CHECK = 0;
 static bool ALIGN_MATRICES = 0;
 static bool REGISTER_MEMORY = 1;
+static bool DUMP_GRAPH = 0;
 
 /////////////////////////
 //  PARAMETERS TO TEST //
@@ -85,7 +86,7 @@ preallocate(
         if (device_global_id == HOST_DEVICE_GLOBAL_ID)
             continue ;
 
-        xkblas->runtime.memory_replicate_noncoherent(
+        xkblas->runtime.memory_noncoherent_alloc(
             device_global_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
         );
     }
@@ -93,28 +94,21 @@ preallocate(
 
 TYPED
 static void
-coherent_async(
+premove(
     TYPE * M,
     int m, int n,
     int ld
 ) {
-    # if 1
-    xkblas->runtime.memory_host_coherent_async(
-            MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE));
-    # else
-    int memflag = 0;
-    int uplo = 0;
-    xkblas_memory_coherent_async(uplo, memflag, m, n, M, ld, sizeof(TYPE));
-    # endif
-}
+    for (xkrt::device_global_id_t device_global_id = 0 ; device_global_id < xkblas->runtime.get_ndevices() ; ++device_global_id)
+    {
+        if (device_global_id == HOST_DEVICE_GLOBAL_ID)
+            continue ;
 
-TYPED
-static void
-coherent_async(
-    TYPE * X,
-    int n
-) {
-    xkblas->runtime.memory_host_coherent_async(X, n * sizeof(TYPE));
+        xkblas->memory_coherent_async(
+            device_global_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
+        );
+    }
+    xkblas->sync();
 }
 
 TYPED
@@ -135,11 +129,13 @@ prepare_csr_matrix(
     size_t memsize = csr_values_size + csr_col_indices_size + csr_row_offsets_size;
     const uintptr_t memory = (const uintptr_t) malloc(memsize);
 
+    # if 0
     if (REGISTER_MEMORY)
     {
         xkblas_register_memory_async((void *) memory, memsize);
         xkblas_register_memory_waitall();
     }
+    # endif
 
     // Temporary storage for maximum nonzeros
     *csr_values         = (TYPE *) (memory + 0);
@@ -181,11 +177,13 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
 
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
 
+    # if 0
     if (REGISTER_MEMORY)
     {
         xkblas_register_memory_async((void *) mem, memsize);
         xkblas_register_memory_waitall();
     }
+    # endif
     FILL((TYPE *)mem, memsize / sizeof(TYPE));
 
     for (int i = 0 ; i < nmats ; ++i)
@@ -245,8 +243,8 @@ main_axpy(char ** args)
         memset(Y, 0, n * sizeof(TYPE));
         for (int i = 0 ; i < n ; ++i)
         {
-            X[i] = 1.0;
-            Y[i] = 0.25;
+            X[i] = (TYPE) 1.0;
+            Y[i] = (TYPE) 0.25;
         }
         memcpy(Y2, Y, n * sizeof(TYPE));
     }
@@ -254,7 +252,7 @@ main_axpy(char ** args)
     uint64_t t0 = get_nanotime();
     set_tile_size(ts);
     xkblas->axpy_async<P>(n, alpha, X, Y);
-    coherent_async<P>(Y, n);
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, n*sizeof(TYPE));
     uint64_t tt = get_nanotime();
     xkblas_sync();
     uint64_t tf = get_nanotime();
@@ -324,7 +322,7 @@ main_gemm_gemm(char ** args)
                 set_tile_size(ts2);
                 xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-                coherent_async<P>(CImpl, m, n, ld);
+                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
 
                 uint64_t tt = get_nanotime();
                 xkblas_sync();
@@ -414,7 +412,7 @@ main_gemm(char ** args)
             uint64_t t0 = get_nanotime();
             set_tile_size(ts);
             xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
-            coherent_async<P>(CImpl, m, n, ld);
+            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
             uint64_t tt = get_nanotime();
             xkblas_sync();
             uint64_t tf = get_nanotime();
@@ -482,7 +480,7 @@ main_syrk(char ** args)
         uint64_t t0 = get_nanotime();
         set_tile_size(ts);
         xkblas->syrk_async<P>(uplo, TRANS[t1], n, k, &alpha, A, ld, &beta, CImpl, ld);
-        coherent_async<P>(CImpl, n, n, ld);
+        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, n, n, sizeof(TYPE));
         uint64_t tt = get_nanotime();
         xkblas_sync();
         uint64_t tf = get_nanotime();
@@ -557,7 +555,7 @@ main_trsm(char ** args)
                     uint64_t t0 = get_nanotime();
                     set_tile_size(ts);
                     xkblas->trsm_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld);
-                    coherent_async<P>(BImpl, m, n, ld);
+                    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
                     xkblas_sync();
                     uint64_t tf = get_nanotime();
                     printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
@@ -608,8 +606,8 @@ main_copyscale(char ** args)
         int * IW = NULL;
         set_tile_size(ts);
         xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
-        coherent_async<P>(L, m, n, ld);
-        coherent_async<P>(U, n, m, ld);
+        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, m, n, sizeof(TYPE));
+        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, n, m, sizeof(TYPE));
         xkblas_sync();
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
@@ -648,7 +646,6 @@ main_mumps(char ** args)
     # define USE_TS_TUNER       0
     # define USE_PREALLOCATE    1
     # define NMATRICES          10
-    # define DUMP_GRAPH         0
 
     TYPE alpha, beta;
     FILL(&alpha, 1);
@@ -859,32 +856,21 @@ main_mumps(char ** args)
                 xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
 
                 # if USE_WRITE_BACK
-                // coherent_async<P>(D, m, m, ld);
-                coherent_async<P>(L, n, m, ld);
-                coherent_async<P>(U, m, n, ld);
+                // xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
+                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
+                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
                 # endif
                 set_tile_size(ts[i][2]);
                 xkblas->gemmt_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
 
                 # if USE_WRITE_BACK
-                coherent_async<P>(G, m, m, ld);
+                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
                 # endif
 
                 uint64_t tt = get_nanotime();
                 xkblas_sync();
                 uint64_t tf = get_nanotime();
                 printf("(tiling %d/%u) (iter %d/%d) Compute took %lf s. (graph construction took %lf s.) - with ts = {%d, %d, %d}\n", i, ntiles, j, Ix, (tf-t0)/1e9, (tt-t0)/1e9, ts[i][0], ts[i][1], ts[i][2]);
-
-                # if DUMP_GRAPH
-                if (i == 0 && j == 0)
-                {
-                    xkrt::thread_t * thread = xkrt::thread_t::get_tls();
-                    FILE * f = fopen("graph.dot", "w");
-                    thread->dump_tasks(f);
-                    fclose(f);
-                    printf("Graph dumped\n");
-                }
-                # endif
 
                 xkblas_memory_invalidate_caches();
 
@@ -958,10 +944,12 @@ main_trsm_copyscale_gemm(char ** args)
             xkblas->trsm_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, k, &alpha, D, ld, L, ld);
             xkblas->copyscale_async<P>(m, k, should_copy, IW, D, ld, L, ld, U, ld);
             xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, L, ld, U, ld, &beta, G, ld);
-            coherent_async<P>(D, k, k, ld);
-            coherent_async<P>(L, m, k, ld);
-            coherent_async<P>(U, k, n, ld);
-            coherent_async<P>(G, m, n, ld);
+
+            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, k, k, sizeof(TYPE));
+            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, m, k, sizeof(TYPE));
+            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, k, n, sizeof(TYPE));
+            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, n, sizeof(TYPE));
+
             uint64_t tt = get_nanotime();
             xkblas_sync();
             uint64_t tf = get_nanotime();
@@ -1024,12 +1012,16 @@ main_spmv(char ** args)
     dump_vector<P>("Y", Y, m);
     memcpy(Y_check, Y, m * sizeof(TYPE));
 
+    uint64_t t0 = get_nanotime();
+
     /* run spmv */
     set_tile_size(ts);
     xkblas->spmv_async<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
-    xkblas->host_coherent_async(Y, m * sizeof(TYPE));
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
     xkblas->sync();
+    uint64_t tf = get_nanotime();
     dump_vector<P>("Y := alpha.A.X + beta.Y", Y, m);
+
 
     if (!SKIP_CHECK)
     {
@@ -1039,8 +1031,92 @@ main_spmv(char ** args)
         printf("Result is %12s\n", (r == 0) ? "CORRECT" : "INCORRECT");
     }
 
+
+    printf("Took %lf s\n", (tf - t0) / 1.0e9);
+
     # undef X
     # undef Y
+
+    return 0;
+}
+
+// PIN-GEMM-UNPIN //
+TYPED
+static int
+main_pin_gemm_unpin(char ** args)
+{
+    /* parse arguments */
+    int n = atoi(args[0]);
+    int ts = atoi(args[1]);
+    int npin = atoi(args[2]);
+    int repeat = atoi(args[3]);
+    set_tile_size(ts);
+
+    TYPE alpha = (const TYPE) 1.0;
+    TYPE beta  = (const TYPE) 1.0;
+
+    /* currently only support this */
+    int ld = n;
+
+    /* allocate matrices */
+    uintptr_t matrices[3];
+    # define A ((TYPE *)matrices[0])
+    # define B ((TYPE *)matrices[1])
+    # define C ((TYPE *)matrices[2])
+    prepare_n_matrices<P>(matrices, 3, ld, ld);
+
+    # define SYNC 0
+
+    for (int i = 0 ; i < repeat ; ++i)
+    {
+        // assume A and B already on device 1
+        premove(A, n, n, ld);
+        premove(B, n, n, ld);
+
+        // pin C, run gemm, write back, unpin C
+        uint64_t t0 = get_nanotime();
+        xkblas->memory_register_async(C, n*n*sizeof(TYPE), npin);
+
+        # if SYNC
+        xkblas->sync();
+        uint64_t t1 = get_nanotime();
+        printf("Register took %lf s\n", (t1-t0)/1e9);
+        # endif
+
+        xkblas->gemm_async<P>(CblasNoTrans, CblasNoTrans, n, n, n, &alpha, A, ld, B, ld, &beta, C, ld);
+
+        # if SYNC
+        xkblas->sync();
+        uint64_t t2 = get_nanotime();
+        printf("Gemm took %lf s\n", (t2-t1)/1e9);
+        # endif
+
+        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ld, n, n, sizeof(TYPE));
+
+        # if SYNC
+        xkblas->sync();
+        uint64_t t3 = get_nanotime();
+        printf("Coherent took %lf s\n", (t3-t2)/1e9);
+        # endif
+
+        xkblas->memory_unregister_async(C, n*n*sizeof(TYPE), npin);
+
+        # if SYNC
+        xkblas->sync();
+        uint64_t t4 = get_nanotime();
+        printf("Unregister took %lf s\n", (t4-t3)/1e9);
+        # endif
+
+        uint64_t tt = get_nanotime();
+        xkblas_sync();
+        uint64_t tf = get_nanotime();
+
+        printf("Implementation took %lf s. (graph construction took %lf s.)\n", (tf-t0)/1e9, (tt-t0)/1e9);
+
+        xkblas_memory_invalidate_caches();
+    }
+
+    # undef C
 
     return 0;
 }
@@ -1175,6 +1251,18 @@ static func_t funcs[] = {
                     "  - density : beta\n"
     },
 
+    {
+        .name = "PIN-GEMM-UNPIN",
+        .f = main_pin_gemm_unpin<PRECISION>,
+        .nargs = 4,
+        .descr = "Pre-move A and B to the GPU, and do a gemm(A, B, C) with overlap between pining and operations on C",
+        .usage = "N TS NPIN REPEAT\n"
+                 "  -       N : number of rows and columns\n"
+                 "  -      TS : tile size\n"
+                 "  -    NPIN : number of segments to pin the matrix C\n"
+                 "  -  REPEAT : number of time to repeat the sequence\n"
+    }
+
 };
 # define N_FUNCS (sizeof(funcs) / sizeof(func_t))
 
@@ -1205,9 +1293,11 @@ main(int argc, char ** argv)
     SKIP_CHECK = getenv("SKIP_CHECK") ? atoi(getenv("SKIP_CHECK")) : SKIP_CHECK;
     ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? atoi(getenv("ALIGN_MATRICES")) : ALIGN_MATRICES;
     REGISTER_MEMORY = getenv("REGISTER_MEMORY") ? atoi(getenv("REGISTER_MEMORY")) : REGISTER_MEMORY;
+    DUMP_GRAPH = getenv("DUMP_GRAPH") ? atoi(getenv("DUMP_GRAPH")) : DUMP_GRAPH;
     printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
     printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
     printf("Register memory (REGISTER_MEMORY) %s\n", REGISTER_MEMORY ? "enabled" : "disabled");
+    printf("Dumping graph (DUMP_GRAPH) %s\n", DUMP_GRAPH ? "enabled" : "disabled");
 
     srand(0x16112003);
 
@@ -1229,6 +1319,16 @@ main(int argc, char ** argv)
                 xkblas_init();
                 xkblas = xkblas_get();
                 int r = func->f(args);
+
+                if (DUMP_GRAPH)
+                {
+                    xkrt::thread_t * thread = xkrt::thread_t::get_tls();
+                    FILE * f = fopen("graph.dot", "w");
+                    thread->dump_tasks(f);
+                    fclose(f);
+                    printf("Graph dumped\n");
+                }
+
                 xkblas_deinit();
                 return r;
             }

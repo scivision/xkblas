@@ -3,7 +3,7 @@
 /*   xkblas.cc                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/12 15:08:47 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 19:55:36 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -87,9 +87,49 @@ xkblas_t::sync(void)
 }
 
 void
-xkblas_t::host_coherent_async(void * ptr, size_t size)
-{
-    this->runtime.memory_host_coherent_async(ptr, size);
+xkblas_t::memory_coherent_async(
+    device_global_id_t device_global_id,
+    void * ptr,
+    size_t size
+) {
+    return this->runtime.memory_coherent_async(device_global_id, ptr, size);
+}
+
+void
+xkblas_t::memory_coherent_async(
+    device_global_id_t device_global_id,
+    matrix_storage_t storage,
+    void * ptr,
+    size_t ld,
+    size_t m,
+    size_t n,
+    size_t sizeof_type
+) {
+    return this->runtime.memory_coherent_async(device_global_id, storage, ptr, ld, m, n, sizeof_type);
+}
+
+int
+xkblas_t::memory_register_async(
+    void * ptr,
+    size_t size,
+    int n
+) {
+    xkrt::team_t * team = this->runtime.team_get(XKRT_DRIVER_TYPE_HOST);
+    assert(team);
+
+    return this->runtime.memory_register_async(team, ptr, size, n);
+}
+
+int
+xkblas_t::memory_unregister_async(
+    void * ptr,
+    size_t size,
+    int n
+) {
+    xkrt::team_t * team = this->runtime.team_get(XKRT_DRIVER_TYPE_HOST);
+    assert(team);
+
+    return this->runtime.memory_unregister_async(team, ptr, size, n);
 }
 
 //////////////////////////////

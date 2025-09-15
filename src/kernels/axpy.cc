@@ -3,7 +3,7 @@
 /*   axpy.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/01/30 00:16:18 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:09:43 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 18:40:20 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -74,7 +74,7 @@ xkblas_t::axpy_tile_async(
     access_t * accesses = TASK_ACCESSES(task, flags);
     new (accesses + 0) access_t(task, A, bs, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, B, bs, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve<AC>(task, accesses);
+    thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);

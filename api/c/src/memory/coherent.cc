@@ -3,7 +3,7 @@
 /*   coherent.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/06 13:12:59 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:20:18 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 19:42:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -31,5 +31,5 @@ xkblas_memory_coherent_async(
     (void) uplo;
     (void) memflag;
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    return runtime->memory_host_coherent_async(MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);
+    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);
 }

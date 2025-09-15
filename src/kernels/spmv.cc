@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/12 20:18:57 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 18:41:07 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -128,7 +128,7 @@ xkblas_t::spmv_tile_async(
     new (accesses + 2) access_t(task, csr_values,       nnz, sizeof(TYPE), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 3) access_t(task, X,                n,   sizeof(TYPE), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 4) access_t(task, Y,                m,   sizeof(TYPE), Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve<AC>(task, accesses);
+    thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);

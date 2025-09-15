@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/12 20:07:17 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/15 19:54:23 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -79,9 +79,23 @@ typedef struct  xkblas_t
     // Memory //
     ////////////
 
-    // TODO : coherent async etc
+    /* spawn tasks to make the replica coherent on the passed device */
+    void memory_coherent_async(xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
+    void memory_coherent_async(xkrt::device_global_id_t device_global_id, matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
 
-    void host_coherent_async(void * ptr, size_t size);
+    /**
+     * Memory registration async
+     *  ptr is base address
+     *  size is the number of total bytes
+     *  n is the number of continugous intervals to pin in separate tasks
+     */
+    int memory_register_async  (void * ptr, size_t size, int n);
+    int memory_unregister_async(void * ptr, size_t size, int n);
+
+    /////////////////////
+    // Synchronization //
+    /////////////////////
+
     void sync(void);
 
     /////////////
