@@ -56,11 +56,13 @@ SET(XKBLAS_KERNELS_PRECISIONS s c d z)
 
 # custom kernels
 SET(XKBLAS_CUDA_KERNELS copyscale)
+SET(XKBLAS_HIP_KERNELS  copyscale)
 
 # Generated C source files for bindings
 SET(XKBLAS_KERNELS_SOURCE_FILES)
 SET(XKBLAS_KERNELS_C_SOURCE_FILES)
 SET(XKBLAS_CUDA_KERNELS_SOURCE_FILES)
+SET(XKBLAS_HIP_KERNELS_SOURCE_FILES)
 
 # ensure C api directory exists
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/xkblas)
@@ -115,6 +117,20 @@ foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
                 ${CMAKE_SOURCE_DIR}/api/c/src/kernels/${kernel}.cu
         )
     endforeach()
+
+    # custom hip kernels
+    foreach(kernel IN LISTS XKBLAS_HIP_KERNELS)
+        list(APPEND XKBLAS_HIP_KERNELS_SOURCE_FILES ${CMAKE_BINARY_DIR}/api/c/src/kernels/${precision}${kernel}.hip.cpp)
+        add_custom_command(
+            OUTPUT
+                ${CMAKE_BINARY_DIR}/api/c/src/kernels/${precision}${kernel}.hip.cpp
+            COMMAND
+                python3 ${CMAKE_SOURCE_DIR}/api/generators/generate-hip.py ${CMAKE_SOURCE_DIR}/api/c/src/kernels ${CMAKE_BINARY_DIR}/api/c/src/kernels ${kernel} ${precision}
+            DEPENDS
+                ${CMAKE_SOURCE_DIR}/api/c/src/kernels/${kernel}.hip.cpp
+        )
+    endforeach()
+
 
 endforeach()
 
@@ -201,6 +217,16 @@ if (USE_HIPBLAS)
     find_package(HIPBLAS REQUIRED)
     include_directories("${HIP_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+endif()
+
+# HIP custom kernels
+if (USE_HIP)
+    enable_language(HIP)
+    set_source_files_properties(${XKBLAS_HIP_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE HIP)
+    add_library(${XKBLAS_NAME}_kernels_hip SHARED ${XKBLAS_HIP_KERNELS_SOURCE_FILES})
+    # set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
+    install(TARGETS ${XKBLAS_NAME}_kernels_hip LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_hip)
 endif()
 
 if (USE_CLBLAST)

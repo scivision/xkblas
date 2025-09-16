@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/16 15:29:30 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/16 16:32:10 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -176,19 +176,19 @@ xkblas_t::copyscale_async(
     const size_t Umb = ts;
     const size_t Unb = ts;
 
-    const size_t Dm  = n;
-    const size_t Dn  = n;
+//  const size_t Dm  = n;
+//  const size_t Dn  = n;
     const size_t Lm  = m;
     const size_t Ln  = n;
-    const size_t Um  = n;
-    const size_t Un  = m;
+//  const size_t Um  = n;
+//  const size_t Un  = m;
 
-    const size_t Dmt = NUM_OF_TILES(Dm, Dmb);
-    const size_t Dnt = NUM_OF_TILES(Dn, Dnb);
+ // const size_t Dmt = NUM_OF_TILES(Dm, Dmb);
+ // const size_t Dnt = NUM_OF_TILES(Dn, Dnb);
     const size_t Lmt = NUM_OF_TILES(Lm, Lmb);
     const size_t Lnt = NUM_OF_TILES(Ln, Lnb);
-    const size_t Umt = NUM_OF_TILES(Um, Umb);
-    const size_t Unt = NUM_OF_TILES(Un, Unb);
+//  const size_t Umt = NUM_OF_TILES(Um, Umb);
+//  const size_t Unt = NUM_OF_TILES(Un, Unb);
 
     /* distribute C in a cyclic-block manner */
     const int ngpus = context->runtime.drivers.devices.n - 1;
@@ -199,10 +199,10 @@ xkblas_t::copyscale_async(
     # define L(i, j) L, i*Lmb, j*Lnb
     # define U(i, j) U, i*Umb, j*Unb
 
-    for (int tm = 0; tm < Lmt ; ++tm)
+    for (size_t tm = 0; tm < Lmt ; ++tm)
     {
         const size_t bs_m = (tm == Lmt-1) ? (m-tm*Lnb) : Lnb;
-        for( int tn = 0; tn < Lnt ; ++tn )
+        for (size_t tn = 0; tn < Lnt ; ++tn)
         {
             const size_t bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
             this->copyscale_tile_async<P>(
@@ -289,6 +289,77 @@ body_cuda(
 
 # endif /* XKRT_SUPPORT_CUDA */
 
+
+
+# if XKRT_SUPPORT_HIP
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+extern "C" {
+    int hip_scopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
+    int hip_dcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
+    int hip_ccopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipblasComplex * D, int ldd, hipblasComplex * L, int ldl, hipblasComplex * U, int ldu);
+    int hip_zcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipblasDoubleComplex * D, int ldd, hipblasDoubleComplex * L, int ldl, hipblasDoubleComplex * U, int ldu);
+};
+
+template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
+static inline void
+body_hip_run(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    assert(stream);
+
+    hipStream_t hip_stream = stream->hip.handle.high;
+    assert(hip_stream);
+
+    task_t * task = (task_t *) instr->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * D = accesses + 0;
+    const access_t * L = accesses + 1;
+    const access_t * U = accesses + 2;
+
+    assert(D->device_view.addr % D->host_view.sizeof_type == 0);
+    assert(L->device_view.addr % L->host_view.sizeof_type == 0);
+    assert(U->device_view.addr % U->host_view.sizeof_type == 0);
+
+    args_t * args = (args_t *) TASK_ARGS(task);
+    assert(args);
+
+    FUNC(
+        hip_stream,
+        (int) args->m, (int) args->n,
+        args->should_copy, args->IW,
+        (const CU_TYPE *) D->device_view.addr, (int) D->device_view.ld,
+        (      CU_TYPE *) L->device_view.addr, (int) L->device_view.ld,
+        (      CU_TYPE *) U->device_view.addr, (int) U->device_view.ld
+    );
+
+    XKBLAS_HIPBLAS_CALL_POST();
+}
+
+TYPED
+static void
+body_hip(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(stream, instr, idx);
+}
+
+# endif /* XKRT_SUPPORT_HIP */
+
+
+
+
+
 # if XKRT_SUPPORT_HOST
 
 TYPED
@@ -319,7 +390,7 @@ xkblas_t::task_format_create_COPYSCALE(
     # endif /* XKRT_SUPPORT_CUDA */
 
     # if XKRT_SUPPORT_HIP
-    // format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
     # endif /* XKRT_SUPPORT_HIP */
 }
 
