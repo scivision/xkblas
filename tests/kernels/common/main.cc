@@ -1070,8 +1070,8 @@ main_pin_gemm_unpin(char ** args)
     for (int i = 0 ; i < repeat ; ++i)
     {
         // assume A and B already on device 1
-        premove(A, n, n, ld);
-        premove(B, n, n, ld);
+        premove<P>(A, n, n, ld);
+        premove<P>(B, n, n, ld);
 
         // pin C, run gemm, write back, unpin C
         uint64_t t0 = get_nanotime();

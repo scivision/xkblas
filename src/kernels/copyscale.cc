@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:40:28 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/16 15:29:30 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -317,6 +317,10 @@ xkblas_t::task_format_create_COPYSCALE(
     # if XKRT_SUPPORT_CUDA
     format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
+
+    # if XKRT_SUPPORT_HIP
+    // format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKRT_SUPPORT_HIP */
 }
 
 /* instanciate methods for each precision */

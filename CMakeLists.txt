@@ -1,6 +1,20 @@
 # CMake Minimum version
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.17)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
+###########
+# OPTIONS #
+###########
+
+option(STRICT "Enable strict compilation mode" ON)
+option(USE_CUBLAS "Enable cublas" OFF)
+option(USE_CUDA "Enable the compilation of custom cuda kernels" OFF)
+option(USE_HIPBLAS "Enable hipblas" OFF)
+option(USE_HIP "Enable hip" OFF)
+option(USE_CLBLAST "Enable clblast" ON)
+option(USE_ZE "Use Level Zero" OFF)
+option(USE_SYCL "Use Sycl" OFF)
+
 
 ###############
 # C++ version #
@@ -148,7 +162,6 @@ include_directories(${CMAKE_BINARY_DIR}/api/c/include/)
 install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
-option(STRICT "Enable strict compilation mode" ON)
 if (STRICT)
     # SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
     target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
@@ -166,7 +179,6 @@ target_link_libraries(${XKBLAS_NAME} PRIVATE XKRT::xkrt)
 # DEPENDENCIES #
 ################
 
-option(USE_CUBLAS "Enable cublas" ON)
 if (USE_CUBLAS)
     find_package(CUDA_DRIVER REQUIRED)
     find_package(CUBLAS REQUIRED)
@@ -174,8 +186,7 @@ if (USE_CUBLAS)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
 endif()
 
-# Cuda kernels
-option(USE_CUDA "Enable the compilation of custom cuda kernels" ON)
+# Cuda custom kernels
 if (USE_CUDA)
     enable_language(CUDA)
     set_source_files_properties(${XKBLAS_CUDA_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
@@ -185,21 +196,25 @@ if (USE_CUDA)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
 endif()
 
-option(USE_CLBLAST "Enable clblast" ON)
-if(USE_CLBLAST)
+if (USE_HIPBLAS)
+    find_package(HIP REQUIRED)
+    find_package(HIPBLAS REQUIRED)
+    include_directories("${HIP_INCLUDE_DIRS}")
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+endif()
+
+if (USE_CLBLAST)
     find_package(CLBLAST REQUIRED)
     add_compile_definitions(XKBLAS_SUPPORT_CLBLAST=1)
     include_directories("${CLBLAST_INCLUDE_DIRS}")
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${CLBLAST_LIBRARIES})
 endif()
 
-option(USE_ZE "Use Level Zero" OFF)
 if (USE_ZE)
     find_package(ZE REQUIRED)
     include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 
-option(USE_SYCL "Use Sycl" OFF)
 if (USE_SYCL)
     target_link_libraries( ${XKBLAS_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
     target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)

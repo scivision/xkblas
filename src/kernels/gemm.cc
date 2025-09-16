@@ -3,7 +3,7 @@
 /*   gemm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 19:05:37 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/16 15:48:08 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -220,19 +220,19 @@ xkblas_t::gemm_async(
     const size_t Cm = m;
     const size_t Cn = n;
 
-    if (lda < MAX(1, Am))
+    if ((size_t)lda < MAX(1, Am))
     {
         LOGGER_FATAL("illegal value of lda");
         return -8;
     }
 
-    if (ldb < MAX(1, Bm))
+    if ((size_t)ldb < MAX(1, Bm))
     {
         LOGGER_FATAL("illegal value of ldb");
         return -10;
     }
 
-    if (ldc < MAX(1, Cm))
+    if ((size_t)ldc < MAX(1, Cm))
     {
         LOGGER_FATAL("illegal value of ldc");
         return -13;
@@ -427,6 +427,62 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemm);
 }
 # endif /* XKRT_SUPPORT_CUDA */
+
+
+# if XKRT_SUPPORT_HIP
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
+static inline void
+body_hip_run(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    hipblasHandle_t handle = stream->hip.blas.handle;
+    assert(handle);
+
+    task_t * task = (task_t *) instr->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(B->device_view.addr % B->host_view.sizeof_type == 0);
+    assert(C->device_view.addr % C->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    XKBLAS_HIPBLAS_CALL(
+        FUNC(
+            handle,
+            cblas2hipblas_op(args->transA), cblas2hipblas_op(args->transB),
+            (int) args->m, (int) args->n, (int) args->k,
+            (const HIP_TYPE *) &args->alpha,
+            (const HIP_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+            (const HIP_TYPE *) B->device_view.addr, (int) B->device_view.ld,
+            (const HIP_TYPE *) &args->beta,
+            (      HIP_TYPE *) C->device_view.addr, (int) C->device_view.ld
+        )
+    );
+}
+
+TYPED
+static void
+body_hip(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    XKBLAS_HIPBLAS_DISPATCH_PRECISION(gemm);
+}
+# endif /* XKRT_SUPPORT_HIP */
+
 
 # if XKRT_SUPPORT_ZE
 
@@ -662,6 +718,10 @@ xkblas_t::task_format_create_GEMM(
     # if XKRT_SUPPORT_CUDA
     format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
+
+    # if XKRT_SUPPORT_HIP
+    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKRT_SUPPORT_HIP */
 
     # if XKRT_SUPPORT_ZE
     format->f[XKRT_DRIVER_TYPE_ZE] = (task_format_func_t) body_ze<P>;
