@@ -85,7 +85,7 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | syr2k       | ✗   | ✗    | ✗   | ✗               |
 | syrk        | ✓   | ✓    | ✗   | ✗               |
 | trmm        | ✗   | ✗    | ✗   | ✗               |
-| trsm        | ✓   | ✓    | ✗   | ✗               |
+| trsm        | ✓   | ✓    | ✓   | ✗               |
 
 ### Lapacke
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |

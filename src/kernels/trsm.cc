@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:53:00 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/16 15:53:45 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -573,6 +573,64 @@ body_cuda(
 
 # endif /* XKRT_SUPPORT_CUDA */
 
+
+# if XKRT_SUPPORT_HIP
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
+static void
+body_hip_run(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    assert(stream);
+
+    hipblasHandle_t handle = stream->hip.blas.handle;
+    assert(handle);
+
+    task_t * task = (task_t *) instr->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(B->device_view.addr % B->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    XKBLAS_HIPBLAS_CALL(
+        FUNC(
+            handle,
+            cblas2hipblas_side(args->side), cblas2hipblas_uplo(args->uplo),
+            cblas2hipblas_op(args->transA), cblas2hipblas_diag(args->diag),
+            (int) args->m, (int) args->n,
+            (const CU_TYPE *) &(args->alpha),
+            (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+                  (CU_TYPE *) B->device_view.addr, (int) B->device_view.ld
+        )
+    );
+}
+
+TYPED
+static void
+body_hip(
+    stream_hip_t * stream,
+    stream_instruction_t * instr,
+    stream_instruction_counter_t idx
+) {
+    XKBLAS_HIPBLAS_DISPATCH_PRECISION(trsm);
+}
+
+# endif /* XKRT_SUPPORT_HIP */
+
+
+
+
 # ifdef XKRT_SUPPORT_HOST
 static void
 body_cpu(void * args)
@@ -597,6 +655,10 @@ xkblas_t::task_format_create_TRSM(
     # if XKRT_SUPPORT_CUDA
     format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
+
+    # if XKRT_SUPPORT_HIP
+    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKRT_SUPPORT_HIP */
 }
 
 # define DEFINE(P)  \
