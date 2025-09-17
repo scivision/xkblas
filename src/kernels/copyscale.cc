@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/16 16:32:10 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/17 18:32:26 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -298,11 +298,11 @@ body_cuda(
 extern "C" {
     int hip_scopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
     int hip_dcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
-    int hip_ccopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipblasComplex * D, int ldd, hipblasComplex * L, int ldl, hipblasComplex * U, int ldu);
-    int hip_zcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipblasDoubleComplex * D, int ldd, hipblasDoubleComplex * L, int ldl, hipblasDoubleComplex * U, int ldu);
+    int hip_ccopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipFloatComplex * D, int ldd, hipFloatComplex * L, int ldl, hipFloatComplex * U, int ldu);
+    int hip_zcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipDoubleComplex * D, int ldd, hipDoubleComplex * L, int ldl, hipDoubleComplex * U, int ldu);
 };
 
-template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 body_hip_run(
     stream_hip_t * stream,
@@ -333,9 +333,9 @@ body_hip_run(
         hip_stream,
         (int) args->m, (int) args->n,
         args->should_copy, args->IW,
-        (const CU_TYPE *) D->device_view.addr, (int) D->device_view.ld,
-        (      CU_TYPE *) L->device_view.addr, (int) L->device_view.ld,
-        (      CU_TYPE *) U->device_view.addr, (int) U->device_view.ld
+        (const HIP_TYPE *) D->device_view.addr, (int) D->device_view.ld,
+        (      HIP_TYPE *) L->device_view.addr, (int) L->device_view.ld,
+        (      HIP_TYPE *) U->device_view.addr, (int) U->device_view.ld
     );
 
     XKBLAS_HIPBLAS_CALL_POST();

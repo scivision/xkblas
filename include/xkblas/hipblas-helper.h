@@ -3,7 +3,7 @@
 /*   hipblas-helper.h                                             .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/02/14 23:28:05 by Romain PEREIRA          __/_*_*(_        */
-/*   Updated: 2025/09/16 15:48:48 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/16 17:51:02 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */

@@ -196,10 +196,8 @@ target_link_libraries(${XKBLAS_NAME} PRIVATE XKRT::xkrt)
 ################
 
 if (USE_CUBLAS)
-    find_package(CUDA_DRIVER REQUIRED)
-    find_package(CUBLAS REQUIRED)
-    include_directories("${CUBLAS_INCLUDE_DIRS}")
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${CUBLAS_LIBRARIES})
+    find_package(CUDAToolkit REQUIRED)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cublas)
 endif()
 
 # Cuda custom kernels
