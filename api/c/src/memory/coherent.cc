@@ -3,7 +3,7 @@
 /*   coherent.cc                                                  .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/08/06 13:12:59 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 19:42:49 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/17 20:25:56 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,14 +22,20 @@ XKRT_NAMESPACE_USE;
 
 extern "C"
 void
-xkblas_memory_coherent_async(
-    int uplo, int memflag,
-    int m, int n,
-    void * ptr, int ld,
-    unsigned int sizeof_type
+xkblas_memory_segment_coherent_async(
+    void * ptr, size_t size
 ) {
-    (void) uplo;
-    (void) memflag;
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);
+    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, ptr, size);
+}
+
+extern "C"
+void
+xkblas_memory_matrix_coherent_async(
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
 }

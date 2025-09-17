@@ -3,7 +3,7 @@
 /*   xkblas.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/03 15:47:35 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/17 20:25:30 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -39,15 +39,14 @@ extern "C" {
     /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
 
-    /* Synchronize host memory with devices memory on the passed address space.
-     * Restriction: concurrent 'xkblas_memory_coherent_async' on overlaping address spaces has an undefined behavior */
-    void xkblas_memory_coherent_async(int uplo, int memflag, int m, int n, void * ptr, int ld, unsigned int sizeof_type);
+    /* make memory coherent on some physical memory */
+    void xkblas_memory_segment_coherent_async(void * ptr, size_t size);
 
-    /* create one task to create a coherent replicate of the matrix on each device */
-    void xkblas_memory_replicate_async(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
-
-    /* allocate an incoherent replicate of the matrix on each device */
-    void xkblas_memory_preallocate(void * ptr, int ld, int m, int n, unsigned int sizeof_type);
+    void xkblas_memory_matrix_coherent_async(
+        void * ptr, size_t ld,
+        size_t m, size_t n,
+        size_t sizeof_type
+    );
 
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);
@@ -124,9 +123,9 @@ extern "C" {
     # error "Compiler support for complex number is required."
     #else
     # include <complex.h>
-        typedef float _Complex Complex32_t;
-        typedef double _Complex Complex64_t;
-        typedef double CFloat64_t;
+    typedef float _Complex Complex32_t;
+    typedef double _Complex Complex64_t;
+    typedef double CFloat64_t;
     #endif
 
     #include <xkblas/skernels.h>

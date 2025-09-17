@@ -67,7 +67,7 @@ main(void)
     {
         xkblas_memory_register_tiled_async(ptr, size, nt);
         xkblas_gemm_async(transA, transB, M, N, K, &alpha, A, LD, B, LD, &beta, C, LD);
-        xkblas_memory_coherent_async(0, 0, M, N, C, LD, sizeof(TYPE));
+        xkblas_memory_matrix_coherent_async(C, LD, M, N, sizeof(TYPE));
         xkblas_memory_unregister_tiled_async(ptr, size, nt);
         printf("Graph created in %.4lf s\n", (xkblas_get_nanotime() - t0)/1e9);
         xkblas_sync();

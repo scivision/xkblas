@@ -42,16 +42,20 @@ function cgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ld
     @ccall libxkblas.xkblas_cgemm_async(transA::Cint, transB::Cint, m::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
+function cgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
+    @ccall libxkblas.xkblas_cgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
+function cherk_async(uplo, transA, n, k, alpha, A, lda, beta, C, ldc)
+    @ccall libxkblas.xkblas_cherk_async(uplo::Cint, transA::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
 function csyrk_async(uplo, trans, n, k, alpha, A, lda, beta, C, ldc)
     @ccall libxkblas.xkblas_csyrk_async(uplo::Cint, trans::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
 function ctrsm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
     @ccall libxkblas.xkblas_ctrsm_async(side::Cint, uplo::Cint, transA::Cint, diag::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint)::Cint
-end
-
-function cgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
-    @ccall libxkblas.xkblas_cgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
 function ctrmm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
@@ -64,6 +68,14 @@ end
 
 function csymm_async(side, uplo, m, n, alpha, A, lda, B, ldb, beta, C, ldc)
     @ccall libxkblas.xkblas_csymm_async(side::Cint, uplo::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
+function cpotrf_async(uplo, n, A, lda)
+    @ccall libxkblas.xkblas_cpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
+end
+
+function cspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 function daxpby_async(n, alpha, x, beta, y)
@@ -108,16 +120,20 @@ function dgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ld
     @ccall libxkblas.xkblas_dgemm_async(transA::Cint, transB::Cint, m::Cint, n::Cint, k::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, B::Ptr{Cdouble}, ldb::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
 end
 
+function dgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
+    @ccall libxkblas.xkblas_dgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, B::Ptr{Cdouble}, ldb::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
+end
+
+function dherk_async(uplo, transA, n, k, alpha, A, lda, beta, C, ldc)
+    @ccall libxkblas.xkblas_dherk_async(uplo::Cint, transA::Cint, n::Cint, k::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
+end
+
 function dsyrk_async(uplo, trans, n, k, alpha, A, lda, beta, C, ldc)
     @ccall libxkblas.xkblas_dsyrk_async(uplo::Cint, trans::Cint, n::Cint, k::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
 end
 
 function dtrsm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
     @ccall libxkblas.xkblas_dtrsm_async(side::Cint, uplo::Cint, transA::Cint, diag::Cint, m::Cint, n::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, B::Ptr{Cdouble}, ldb::Cint)::Cint
-end
-
-function dgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
-    @ccall libxkblas.xkblas_dgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, B::Ptr{Cdouble}, ldb::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
 end
 
 function dtrmm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
@@ -130,6 +146,14 @@ end
 
 function dsymm_async(side, uplo, m, n, alpha, A, lda, B, ldb, beta, C, ldc)
     @ccall libxkblas.xkblas_dsymm_async(side::Cint, uplo::Cint, m::Cint, n::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, B::Ptr{Cdouble}, ldb::Cint, beta::Ptr{Cdouble}, C::Ptr{Cdouble}, ldc::Cint)::Cint
+end
+
+function dpotrf_async(uplo, n, A, lda)
+    @ccall libxkblas.xkblas_dpotrf_async(uplo::Cint, n::Cint, A::Ptr{Cdouble}, lda::Cint)::Cint
+end
+
+function dspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
 end
 
 function saxpby_async(n, alpha, x, beta, y)
@@ -174,16 +198,20 @@ function sgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ld
     @ccall libxkblas.xkblas_sgemm_async(transA::Cint, transB::Cint, m::Cint, n::Cint, k::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, B::Ptr{Cfloat}, ldb::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
 end
 
+function sgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
+    @ccall libxkblas.xkblas_sgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, B::Ptr{Cfloat}, ldb::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
+end
+
+function sherk_async(uplo, transA, n, k, alpha, A, lda, beta, C, ldc)
+    @ccall libxkblas.xkblas_sherk_async(uplo::Cint, transA::Cint, n::Cint, k::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
+end
+
 function ssyrk_async(uplo, trans, n, k, alpha, A, lda, beta, C, ldc)
     @ccall libxkblas.xkblas_ssyrk_async(uplo::Cint, trans::Cint, n::Cint, k::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
 end
 
 function strsm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
     @ccall libxkblas.xkblas_strsm_async(side::Cint, uplo::Cint, transA::Cint, diag::Cint, m::Cint, n::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, B::Ptr{Cfloat}, ldb::Cint)::Cint
-end
-
-function sgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
-    @ccall libxkblas.xkblas_sgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, B::Ptr{Cfloat}, ldb::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
 end
 
 function strmm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
@@ -196,6 +224,14 @@ end
 
 function ssymm_async(side, uplo, m, n, alpha, A, lda, B, ldb, beta, C, ldc)
     @ccall libxkblas.xkblas_ssymm_async(side::Cint, uplo::Cint, m::Cint, n::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, B::Ptr{Cfloat}, ldb::Cint, beta::Ptr{Cfloat}, C::Ptr{Cfloat}, ldc::Cint)::Cint
+end
+
+function spotrf_async(uplo, n, A, lda)
+    @ccall libxkblas.xkblas_spotrf_async(uplo::Cint, n::Cint, A::Ptr{Cfloat}, lda::Cint)::Cint
+end
+
+function sspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
 end
 
 function init()
@@ -214,16 +250,12 @@ function deinit()
     @ccall libxkblas.xkblas_deinit()::Cvoid
 end
 
-function memory_coherent_async(uplo, memflag, m, n, ptr, ld, sizeof_type)
-    @ccall libxkblas.xkblas_memory_coherent_async(uplo::Cint, memflag::Cint, m::Cint, n::Cint, ptr::Ptr{Cvoid}, ld::Cint, sizeof_type::Cuint)::Cvoid
+function memory_segment_coherent_async(ptr, size)
+    @ccall libxkblas.xkblas_memory_segment_coherent_async(ptr::Ptr{Cvoid}, size::Csize_t)::Cvoid
 end
 
-function memory_replicate_async(ptr, ld, m, n, sizeof_type)
-    @ccall libxkblas.xkblas_memory_replicate_async(ptr::Ptr{Cvoid}, ld::Cint, m::Cint, n::Cint, sizeof_type::Cuint)::Cvoid
-end
-
-function memory_preallocate(ptr, ld, m, n, sizeof_type)
-    @ccall libxkblas.xkblas_memory_preallocate(ptr::Ptr{Cvoid}, ld::Cint, m::Cint, n::Cint, sizeof_type::Cuint)::Cvoid
+function memory_matrix_coherent_async(ptr, ld, m, n, sizeof_type)
+    @ccall libxkblas.xkblas_memory_matrix_coherent_async(ptr::Ptr{Cvoid}, ld::Csize_t, m::Csize_t, n::Csize_t, sizeof_type::Csize_t)::Cvoid
 end
 
 function unified_alloc(size)
@@ -974,16 +1006,20 @@ function zgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ld
     @ccall libxkblas.xkblas_zgemm_async(transA::Cint, transB::Cint, m::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
+function zgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
+    @ccall libxkblas.xkblas_zgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
+function zherk_async(uplo, transA, n, k, alpha, A, lda, beta, C, ldc)
+    @ccall libxkblas.xkblas_zherk_async(uplo::Cint, transA::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
 function zsyrk_async(uplo, trans, n, k, alpha, A, lda, beta, C, ldc)
     @ccall libxkblas.xkblas_zsyrk_async(uplo::Cint, trans::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
 function ztrsm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
     @ccall libxkblas.xkblas_ztrsm_async(side::Cint, uplo::Cint, transA::Cint, diag::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint)::Cint
-end
-
-function zgemmt_async(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
-    @ccall libxkblas.xkblas_zgemmt_async(uplo::Cint, transA::Cint, transB::Cint, n::Cint, k::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
 end
 
 function ztrmm_async(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb)
@@ -996,6 +1032,14 @@ end
 
 function zsymm_async(side, uplo, m, n, alpha, A, lda, B, ldb, beta, C, ldc)
     @ccall libxkblas.xkblas_zsymm_async(side::Cint, uplo::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, B::Ptr{ComplexF32}, ldb::Cint, beta::Ptr{ComplexF32}, C::Ptr{ComplexF32}, ldc::Cint)::Cint
+end
+
+function zpotrf_async(uplo, n, A, lda)
+    @ccall libxkblas.xkblas_zpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
+end
+
+function zspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_zspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 const CBLAS_INDEX = size_t
