@@ -62,7 +62,6 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 |-------------|-----|------|-----|-----------------|
 | axpby       | ✗   | ✗    | ✗   | ✗               |
 | axpy        | ✗   | ✓    | ✗   | ✗               |
-| copyscale   | ✓   | ✓    | ✗   | ✗               |
 | divcopy     | ✗   | ✗    | ✗   | ✗               |
 | dot         | ✗   | ✗    | ✗   | ✗               |
 | fill        | ✗   | ✗    | ✗   | ✗               |
@@ -73,13 +72,13 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 ### Level 2
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
-| copyscale   | ✓   | ✓    | ✗   | ✗               |
+| copyscale   | ✓   | ✓    | ✓   | ✗               |
 
 ### Level 3
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | gemm        | ✓   | ✓    | ✓   | ✓               |
-| gemmt       | ✓   | ✓    | ✗   | ✗               |
+| gemmt       | ✓   | ✓    | ✓   | ✗               |
 | herk        | ✓   | ✓    | ✗   | ✗               |
 | symm        | ✗   | ✗    | ✗   | ✗               |
 | syr2k       | ✗   | ✗    | ✗   | ✗               |
