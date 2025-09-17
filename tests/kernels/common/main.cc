@@ -42,6 +42,7 @@ static bool SKIP_CHECK = 0;
 static bool ALIGN_MATRICES = 0;
 static bool REGISTER_MEMORY = 1;
 static bool DUMP_GRAPH = 0;
+static int MUMPS_AUTOTUNE_FROM = 0;
 
 /////////////////////////
 //  PARAMETERS TO TEST //
@@ -129,13 +130,11 @@ prepare_csr_matrix(
     size_t memsize = csr_values_size + csr_col_indices_size + csr_row_offsets_size;
     const uintptr_t memory = (const uintptr_t) malloc(memsize);
 
-    # if 0
     if (REGISTER_MEMORY)
     {
         xkblas_register_memory_async((void *) memory, memsize);
         xkblas_register_memory_waitall();
     }
-    # endif
 
     // Temporary storage for maximum nonzeros
     *csr_values         = (TYPE *) (memory + 0);
@@ -177,13 +176,11 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
 
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
 
-    # if 0
     if (REGISTER_MEMORY)
     {
         xkblas_register_memory_async((void *) mem, memsize);
         xkblas_register_memory_waitall();
     }
-    # endif
     FILL((TYPE *)mem, memsize / sizeof(TYPE));
 
     for (int i = 0 ; i < nmats ; ++i)
@@ -643,7 +640,7 @@ main_mumps(char ** args)
 
     # define USE_WRITE_BACK     1
     # define USE_ARGS_MATRIX    1
-    # define USE_TS_TUNER       0
+    # define USE_TS_TUNER       1
     # define USE_PREALLOCATE    1
     # define NMATRICES          10
 
@@ -835,7 +832,7 @@ main_mumps(char ** args)
         uint64_t tmin = UINT64_MAX;
         int imin = 0;
         const int ntiles = sizeof(ts) / (3 * sizeof(int));
-        for (int i = 0 ; i < ntiles ; ++i)
+        for (int i = MUMPS_AUTOTUNE_FROM ; i < ntiles ; ++i)
         {
             for (int j = 0 ; j < Ix ; ++j)
             {
@@ -843,11 +840,15 @@ main_mumps(char ** args)
                     continue ;
                 if (ts[i][0] > n || ts[i][1] > n || ts[i][2] > n)
                     continue ;
-                uint64_t t0 = get_nanotime();
 
                 # if USE_PREALLOCATE
-                preallocate<P>(D, m+n, m+n, ld);
+                preallocate<P>(D, n, n, ld);
+                preallocate<P>(L, m, n, ld);
+                preallocate<P>(U, n, m, ld);
+                preallocate<P>(G, m, m, ld);
                 # endif /* USE_PREALLOCATE */
+
+                uint64_t t0 = get_nanotime();
 
                 set_tile_size(ts[i][0]);
                 xkblas->trsm_async<P>(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
@@ -1294,6 +1295,7 @@ main(int argc, char ** argv)
     ALIGN_MATRICES = getenv("ALIGN_MATRICES") ? atoi(getenv("ALIGN_MATRICES")) : ALIGN_MATRICES;
     REGISTER_MEMORY = getenv("REGISTER_MEMORY") ? atoi(getenv("REGISTER_MEMORY")) : REGISTER_MEMORY;
     DUMP_GRAPH = getenv("DUMP_GRAPH") ? atoi(getenv("DUMP_GRAPH")) : DUMP_GRAPH;
+    MUMPS_AUTOTUNE_FROM = getenv("MUMPS_AUTOTUNE_FROM") ? atoi(getenv("MUMPS_AUTOTUNE_FROM")) : MUMPS_AUTOTUNE_FROM;
     printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
     printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
     printf("Register memory (REGISTER_MEMORY) %s\n", REGISTER_MEMORY ? "enabled" : "disabled");
