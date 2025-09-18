@@ -3,7 +3,7 @@
 /*   xkblas.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/18 02:41:34 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/18 16:26:04 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -121,6 +121,14 @@ extern "C" {
     /* see xkblas_sync() */
     //DEPRECATED("Use `xkblas_sync` instead")
         int xkblas_register_memory_waitall(void);
+
+    /* see xkblas_sync() */
+    //DEPRECATED("Use `xkblas_memory_natrix_coherent_async` instead")
+        int xkblas_memory_coherent_async(
+            int uplo, int memflag,
+            size_t M, size_t N,
+            void* A, size_t LD, size_t eltsize
+        );
 
     #if defined(__STDC_NO_COMPLEX__)
     # error "Compiler support for complex number is required."

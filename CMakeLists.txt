@@ -68,6 +68,7 @@ SET(XKBLAS_HIP_KERNELS_SOURCE_FILES)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/xkblas)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/src/kernels)
 configure_file(${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/xkblas.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/api/c/include/xkblas/kernels.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/kernels.h COPYONLY)
 add_custom_target(link_target ALL COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas.h)
 
 # for each precision
@@ -100,9 +101,9 @@ foreach(precision IN LISTS XKBLAS_KERNELS_PRECISIONS)
         OUTPUT
             ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}kernels.h
         COMMAND
-            python3 ${CMAKE_SOURCE_DIR}/api/generators/generate-h.py ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/kernels.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}kernels.h ${precision}
+            python3 ${CMAKE_SOURCE_DIR}/api/generators/generate-h.py ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xkernels.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}kernels.h ${precision}
         DEPENDS
-            ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/kernels.h
+            ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xkernels.h
     )
 
     # custom cuda kernels
@@ -178,6 +179,7 @@ include_directories(${CMAKE_BINARY_DIR}/api/c/include/)
 # Installation
 install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
+install(DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
     # SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
