@@ -144,6 +144,7 @@ SET(SOURCE_FILES
 
 # C bindings to its own custom lib that link with xkblas-core
 SET(C_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/api/c/src/host-async.cc
     ${CMAKE_SOURCE_DIR}/api/c/src/legacy.cc
     ${CMAKE_SOURCE_DIR}/api/c/src/memory/alloc.cc
     ${CMAKE_SOURCE_DIR}/api/c/src/memory/coherent.cc

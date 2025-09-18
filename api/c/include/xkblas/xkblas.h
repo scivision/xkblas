@@ -3,7 +3,7 @@
 /*   xkblas.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/17 20:25:30 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/18 02:41:34 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,6 +47,9 @@ extern "C" {
         size_t m, size_t n,
         size_t sizeof_type
     );
+
+    /* run a host function in a task */
+    void xkblas_host_async(void (*func)(void *), void * args);
 
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);

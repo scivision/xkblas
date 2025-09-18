@@ -3,7 +3,7 @@
 /*   auto-tile.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/11 16:58:39 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:11:48 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/18 02:33:09 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -60,6 +60,15 @@ xkblas_kernel_auto_tile(
             const double f = 4.0;
             ts_auto = (size_t) ceil(sqrt((double)m*(double)n / (f * (double)(ngpus * nstream_kern))));
 
+            break ;
+        }
+
+        case (SPMV):
+        {
+            int m   = args[0];
+            int n   = args[1];
+            int nnz = args[2];
+            ts_auto = (size_t) m;
             break ;
         }
 

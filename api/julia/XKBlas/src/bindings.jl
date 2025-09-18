@@ -258,6 +258,10 @@ function memory_matrix_coherent_async(ptr, ld, m, n, sizeof_type)
     @ccall libxkblas.xkblas_memory_matrix_coherent_async(ptr::Ptr{Cvoid}, ld::Csize_t, m::Csize_t, n::Csize_t, sizeof_type::Csize_t)::Cvoid
 end
 
+function host_async(func, args)
+    @ccall libxkblas.xkblas_host_async(func::Ptr{Cvoid}, args::Ptr{Cvoid})::Cvoid
+end
+
 function unified_alloc(size)
     @ccall libxkblas.xkblas_unified_alloc(size::Csize_t)::Ptr{Cvoid}
 end
