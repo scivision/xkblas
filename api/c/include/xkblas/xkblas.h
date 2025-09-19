@@ -3,7 +3,7 @@
 /*   xkblas.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/18 16:26:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 02:43:41 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -73,6 +73,7 @@ extern "C" {
     /* set the mode math for the next kernel */
     void xkblas_set_modemath(xkblas_mode_math_t mode);
 
+    /* synchronous memory registration */
     int xkblas_register_memory(void * ptr, uint64_t sz);
     int xkblas_unregister_memory(void * ptr, uint64_t sz);
 

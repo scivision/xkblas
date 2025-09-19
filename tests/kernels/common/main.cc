@@ -507,7 +507,9 @@ main_trsm(char ** args)
     int m = atoi(args[0]);
     int n = atoi(args[1]);
     int ts = atoi(args[2]);
-    TYPE alpha = (const TYPE) 0.0;
+    set_tile_size(ts);
+    int m_threshold = atoi(args[3]);
+    TYPE alpha = (const TYPE) 1.0;
 
     /* currently only support this */
     int ld = MAX(m, n);
@@ -521,7 +523,7 @@ main_trsm(char ** args)
     # define BRef  ((TYPE *)matrices[2])
     # define BImpl ((TYPE *)matrices[3])
     prepare_n_matrices<P>(matrices, 4, ld, ld);
-    FILL(&alpha, 1);
+    // FILL(&alpha, 1);
 
     // diagonal dominante
     TYPE invmax = 1.0 / (TYPE) MAX(m,n);
@@ -530,38 +532,48 @@ main_trsm(char ** args)
     for(int i = 0 ; i < ld ; ++i)
         A[ld*i+i] = 1.0;
 
-    int s = 0;
-    int u = 0;
-    int t = 0;
-    int d = 0;
+    // we want to optimize this
+    int s = 0; // CblasLeft;
+    int u = 0; // CblasUpper;
+    int t = 0; // CblasNoTrans;
+    int d = 1; // CblasUnit;
 
-    for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
+    for (int iter = 0 ; iter < 1 ; ++iter)
     {
-        for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
+        //for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
         {
-            for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
+            //for (int u = 0 ; u < N_CBLAS_UPLO ; ++u)
             {
-                for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
+                //for (int t = 0 ; t < N_CBLAS_TRANSPOSE ; ++t)
                 {
-                    xkblas_memory_invalidate_caches();
-                    memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
-
-                    /* run on impl */
-                    printf("Running implementation with (%s, %s, %s, %s)\n",
-                            SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
-                    uint64_t t0 = get_nanotime();
-                    set_tile_size(ts);
-                    xkblas->trsm_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld);
-                    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
-                    xkblas_sync();
-                    uint64_t tf = get_nanotime();
-                    printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
-
-                    if (!SKIP_CHECK)
+                    //for (int d = 0 ; d < N_CBLAS_DIAG ; ++d)
                     {
-                        memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
-                        int r = trsm_cmp<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, alpha, A, ld, B, BRef, BImpl, ld);
-                        printf("Result is %12s with params (%s, %s, %s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
+                        xkblas_memory_invalidate_caches();
+                        memcpy(BImpl, B, sizeof(TYPE) * (ld * ld));
+
+                        /* run on impl */
+                        if (iter == 0)
+                        {
+                            printf("Running implementation with (%s, %s, %s, %s)\n",
+                                SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
+                        }
+                        uint64_t t0 = get_nanotime();
+                        xkblas->trsm_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld, m_threshold);
+                        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
+                        uint64_t t1 = get_nanotime();
+                        xkblas_sync();
+                        uint64_t tf = get_nanotime();
+                        printf("Implementation took %lf s. and creating graph %lf s.\n",
+                            (tf - t0) / (double)1e9,
+                            (t1 - t0) / (double)1e9
+                        );
+
+                        if (iter == 0 && !SKIP_CHECK)
+                        {
+                            memcpy(BRef,  B, sizeof(TYPE) * (ld * ld));
+                            int r = trsm_cmp<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, alpha, A, ld, B, BRef, BImpl, ld);
+                            printf("Result is %12s with params (%s, %s, %s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
+                        }
                     }
                 }
             }
@@ -728,7 +740,7 @@ main_mumps(char ** args)
     int n = mn[0][1];
 
     int ts[][3] = {
-        {512, 512, 512},
+        // {512, 512, 512},
         {1024, 1024, 1024},
         {2048, 2048, 2048},
         {512, 1024, 2048},
@@ -1190,12 +1202,13 @@ static func_t funcs[] = {
     {
         .name = "TRSM",
         .f = main_trsm<PRECISION>,
-        .nargs = 3,
+        .nargs = 4,
         .descr = "A.X = B",
-        .usage =    "M N TS\n"
-                    "  - M  : number of rows of matrices L\n"
-                    "  - N  : number of rows of matrices D, cols of matrices D and L\n"
-                    "  - TS : tile size\n"
+        .usage =    "M N TS THRESHOLD\n"
+                    "  -         M : number of rows of matrices L\n"
+                    "  -         N : number of rows of matrices D, cols of matrices D and L\n"
+                    "  -        TS : tile size\n"
+                    "  - THRESHOLD : minimum value of 'm' to recurse before running a tiled-TRSM\n"
     },
 
     {

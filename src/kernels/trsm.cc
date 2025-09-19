@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/16 15:53:45 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 02:57:35 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -178,13 +178,13 @@ xkblas_t::trsm_async(
     const size_t Bm = m;
     const size_t Bn = n;
 
-    if (lda < MAX(1, An))
+    if ((size_t) lda < MAX(1, An))
     {
         LOGGER_ERROR("illegal value of lda");
         return -8;
     }
 
-    if (ldb < MAX(1, Bn))
+    if ((size_t) ldb < MAX(1, Bn))
     {
         LOGGER_ERROR("illegal value of ldb");
         return -10;
@@ -216,8 +216,6 @@ xkblas_t::trsm_async(
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
-
-    # pragma message(TODO "Block sizes truncation are suspicious to me here, double check")
 
     # define A(I, J) A, (I), (J), Amb, Anb, lda
     # define B(I, J) B, (I), (J), Bmb, Bnb, ldb
@@ -519,6 +517,50 @@ xkblas_t::trsm_async(
     return 0;
 }
 
+// From algorithm 1 of
+// Adaptive triangular system solving
+// Jean-Guillaume Dumas, Clément Pernet, Jean-Louis Roch
+TYPED
+int
+xkblas_t::trsm_async(
+    int side, int uplo,
+    int transA, int diag,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+          TYPE * B, int ldb,
+    const int m_threshold
+) {
+    if (m <= m_threshold)
+        return this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
+
+    // compute sub matrices
+    const int m1 = m / 2;
+    const int m2 = m - m1;
+    const TYPE * A1 = A;
+    const TYPE * A2 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  0, m1);
+    const TYPE * A3 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
+          TYPE * B1 = B;
+          TYPE * B2 =       (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
+
+   // TODO: if alpha != 1.0 i guess bellow is wrong
+    assert(*alpha == (TYPE) 1.0);
+
+    // lower part
+    this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
+
+    // middle part
+    const int transB = CblasNoTrans;
+    const TYPE  one = (const TYPE) +1.0;
+    const TYPE mone = (const TYPE) -1.0;
+    this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A2, lda, B2, ldb, &one, B1, ldb);
+
+    // upper part
+    this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
+
+    return 0;
+}
+
 # if XKRT_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -664,6 +706,7 @@ xkblas_t::task_format_create_TRSM(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_TRSM<P>(task_format_t * format); \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
+    template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
     template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, distribution_t * d);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

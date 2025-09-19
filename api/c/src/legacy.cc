@@ -3,7 +3,7 @@
 /*   legacy.cc                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/04 15:55:36 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/08/27 16:14:00 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/18 21:30:26 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -64,6 +64,16 @@ xkblas_set_param(size_t nb, size_t p)
 
     for (int i = 0 ; i < XKBLAS_KERNEL_MAX ; ++i)
         context->conf.kernels[i].tile = nb;
+}
+
+extern "C"
+void
+xkblas_set_tile_parameter(xkblas_kernel_t kernel, size_t ts)
+{
+    xkblas_t * context = xkblas_get();
+    assert(context);
+
+    context->conf.kernels[kernel].tile = ts;
 }
 
 extern "C"

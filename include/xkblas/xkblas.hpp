@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 19:54:23 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 02:32:26 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -246,6 +246,22 @@ typedef struct  xkblas_t
               TYPE * B, int ldb
     );
 
+    /**
+     *
+     *  This perform a regular tiling using the TSRM tiling parameter
+     *  With sub-TSRM on the diagonal, and GEMM on the other blocks
+     *
+     *  .-------------------.
+     *  | \                 |
+     *  |___\               |
+     *  |    | \            |
+     *  |____|___\          |
+     *  |    |    | \       |
+     *  |____|____|___\     |
+     *  |    |    |    | \  |
+     *  |____|____|____|___\|
+     *
+     */
     TYPED
     int trsm_async(
         int side, int uplo,
@@ -254,6 +270,33 @@ typedef struct  xkblas_t
         const TYPE * alpha,
         const TYPE * A, int lda,
               TYPE * B, int ldb
+    );
+
+    /**
+     *
+     *  This perform a recursive tiling, recursing as long as m >= min_tile_size
+     *  GEMMs may also be re-subdivided from the GEMM tiling parameter
+     *
+     *  .-------------------.
+     *  | \                 |
+     *  |___\               |
+     *  |    | \            |
+     *  |____|___\          |
+     *  |         | \       |
+     *  |         |___\     |
+     *  |         |    | \  |
+     *  |____ ____|____|___\|
+     *
+     */
+    TYPED
+    int trsm_async(
+        int side, int uplo,
+        int transA, int diag,
+        int m, int n,
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+              TYPE * B, int ldb,
+        const int m_threshold
     );
 
     // LEVEL 3 TILE
