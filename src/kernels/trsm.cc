@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 02:57:35 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 16:05:10 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -517,9 +517,6 @@ xkblas_t::trsm_async(
     return 0;
 }
 
-// From algorithm 1 of
-// Adaptive triangular system solving
-// Jean-Guillaume Dumas, Clément Pernet, Jean-Louis Roch
 TYPED
 int
 xkblas_t::trsm_async(
@@ -534,29 +531,80 @@ xkblas_t::trsm_async(
     if (m <= m_threshold)
         return this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
 
-    // compute sub matrices
-    const int m1 = m / 2;
-    const int m2 = m - m1;
-    const TYPE * A1 = A;
-    const TYPE * A2 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  0, m1);
-    const TYPE * A3 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
-          TYPE * B1 = B;
-          TYPE * B2 =       (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
+    if (uplo == CblasUpper)
+    {
+        // From algorithm 1 of
+        // Adaptive triangular system solving
+        // Jean-Guillaume Dumas, Clément Pernet, Jean-Louis Roch
 
-   // TODO: if alpha != 1.0 i guess bellow is wrong
-    assert(*alpha == (TYPE) 1.0);
+        //
+        //     | A1  A2 |    | B1 |
+        //     |     A3 |    | B2 |
+        //
 
-    // lower part
-    this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
+        // compute sub matrices
+        const int m1 = m / 2;
+        const int m2 = m - m1;
+        const TYPE * A1 = A;
+        const TYPE * A2 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  0, m1);
+        const TYPE * A3 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
+              TYPE * B1 = B;
+              TYPE * B2 =       (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
 
-    // middle part
-    const int transB = CblasNoTrans;
-    const TYPE  one = (const TYPE) +1.0;
-    const TYPE mone = (const TYPE) -1.0;
-    this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A2, lda, B2, ldb, &one, B1, ldb);
+        // TODO: if alpha != 1.0 i guess bellow is wrong
+        assert(*alpha == (TYPE) 1.0);
 
-    // upper part
-    this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
+        // lower part
+        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
+
+        // middle part
+        const int transB = CblasNoTrans;
+        const TYPE  one = (const TYPE) +1.0;
+        const TYPE mone = (const TYPE) -1.0;
+        this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A2, lda, B2, ldb, &one, B1, ldb);
+
+        // upper part
+        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
+
+    }
+    else
+    {
+        assert(uplo == CblasLower);
+
+        // From Fig. 1 of
+        // Toward Portable GPU Performance: Julia Recursive Implementation of TRMM
+        // and TRSM
+
+        //
+        //     | A11      |    | B1 |
+        //     | A21  A22 |    | B2 |
+        //
+
+        // compute sub matrices
+        const int m1 = m / 2;
+        const int m2 = m - m1;
+        const TYPE * A11 = A;
+        const TYPE * A21 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  m1, 0);
+        const TYPE * A22 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
+              TYPE * B1 = B;
+              TYPE * B2 = (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
+
+        // TODO: if alpha != 1.0 i guess bellow is wrong
+        assert(*alpha == (TYPE) 1.0);
+
+        // upper part
+        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A11, lda, B1, ldb, m_threshold);
+
+        // middle part
+        const int transB = CblasNoTrans;
+        const TYPE  one = (const TYPE) +1.0;
+        const TYPE mone = (const TYPE) -1.0;
+        this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A21, lda, B1, ldb, &one, B2, ldb);
+
+        // lower part
+        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A22, lda, B2, ldb, m_threshold);
+
+    }
 
     return 0;
 }
@@ -677,9 +725,19 @@ body_hip(
 static void
 body_cpu(void * args)
 {
-    LOGGER_DEBUG("Executing a trsm on cpu");
+    LOGGER_FATAL("Executing a trsm on cpu");
 }
 # endif /* XKRT_SUPPORT_HOST */
+
+TYPED
+static task_format_target_t
+suggest_format(task_t * task)
+{
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    if (args->m < 128)
+        return TASK_FORMAT_TARGET_HOST;
+    return TASK_FORMAT_TARGET_NO_SUGGEST;
+}
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -691,16 +749,18 @@ xkblas_t::task_format_create_TRSM(
     task_format_t * format
 ) {
     # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
+    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
 
     # if XKRT_SUPPORT_HIP
-    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
     # endif /* XKRT_SUPPORT_HIP */
+
+    format->suggest = (task_format_suggest_t) suggest_format<P>;
 }
 
 # define DEFINE(P)  \

@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:41:07 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 15:02:37 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -420,11 +420,11 @@ xkblas_t::task_format_create_SPMV(
     task_format_t * format
 ) {
     # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
+    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
 }
 

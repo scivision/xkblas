@@ -3,7 +3,7 @@
 /*   gemmt.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/04 17:03:17 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/16 17:57:06 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 15:02:27 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -487,15 +487,15 @@ xkblas_t::task_format_create_GEMMT(
     task_format_t * format
 ) {
     # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
+    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKRT_SUPPORT_HOST */
 
     # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKRT_SUPPORT_CUDA */
 
     # if XKRT_SUPPORT_HIP
-    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
     # endif /* XKRT_SUPPORT_HIP */
 }
 

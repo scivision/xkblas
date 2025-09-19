@@ -534,11 +534,11 @@ main_trsm(char ** args)
 
     // we want to optimize this
     int s = 0; // CblasLeft;
-    int u = 0; // CblasUpper;
+    int u = 1; // 0 = CblasUpper; 1 = CblasLower
     int t = 0; // CblasNoTrans;
     int d = 1; // CblasUnit;
 
-    for (int iter = 0 ; iter < 1 ; ++iter)
+    for (int iter = 0 ; iter < 10 ; ++iter)
     {
         //for (int s = 0 ; s < N_CBLAS_SIDE ; ++s)
         {
