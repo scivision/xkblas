@@ -3,7 +3,7 @@
 /*   copyscale.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/28 19:46:21 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 15:02:16 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:12:38 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -224,7 +224,7 @@ xkblas_t::copyscale_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -287,11 +287,11 @@ body_cuda(
     if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(stream, instr, idx);
 }
 
-# endif /* XKRT_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 
 
-# if XKRT_SUPPORT_HIP
+# if XKBLAS_SUPPORT_HIP
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
 
@@ -354,23 +354,8 @@ body_hip(
     if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(stream, instr, idx);
 }
 
-# endif /* XKRT_SUPPORT_HIP */
+# endif /* XKBLAS_SUPPORT_HIP */
 
-
-
-
-
-# if XKRT_SUPPORT_HOST
-
-TYPED
-static void
-body_cpu(void * args)
-{
-    LOGGER_DEBUG("Executing a copyscale on cpu");
-    xkblas_zcopyscale_native(...);
-}
-
-# endif /* XKRT_SUPPORT_HOST */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -381,17 +366,13 @@ void
 xkblas_t::task_format_create_COPYSCALE(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUDA
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUDA */
 
-    # if XKRT_SUPPORT_HIP
+    # if XKBLAS_SUPPORT_HIP
     format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKRT_SUPPORT_HIP */
+    # endif /* XKBLAS_SUPPORT_HIP */
 }
 
 /* instanciate methods for each precision */

@@ -3,7 +3,7 @@
 /*   gemm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 15:02:25 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:12:49 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -54,7 +54,7 @@
 
 # include <cassert>
 
-# if XKRT_SUPPORT_SYCL
+# if XKBLAS_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 #  include <oneapi/mkl.hpp>
 #  include <sycl/ext/oneapi/backend/level_zero.hpp>
@@ -374,7 +374,7 @@ xkblas_t::gemm_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -426,10 +426,10 @@ body_cuda(
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemm);
 }
-# endif /* XKRT_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 
-# if XKRT_SUPPORT_HIP
+# if XKBLAS_SUPPORT_HIP
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
 
@@ -481,10 +481,10 @@ body_hip(
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(gemm);
 }
-# endif /* XKRT_SUPPORT_HIP */
+# endif /* XKBLAS_SUPPORT_HIP */
 
 
-# if XKRT_SUPPORT_ZE
+# if XKBLAS_SUPPORT_ZE
 
 #  include <xkrt/driver/driver-ze.h>
 #  include <xkrt/logger/logger-ze.h>
@@ -507,7 +507,7 @@ body_ze(
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
 
-    # if XKRT_SUPPORT_ZE_SYCL_INTEROP
+    # if XKBLAS_SUPPORT_ZE_SYCL_INTEROP
 
     sycl::queue & queue = stream->sycl.queue;
     oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
@@ -540,9 +540,9 @@ body_ze(
     );
     stream->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
 
-    # else /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
+    # else /* XKBLAS_SUPPORT_ZE_SYCL_INTEROP */
     LOGGER_FATAL("no blas impl for ze");
-    # endif /* XKRT_SUPPORT_ZE_SYCL_INTEROP */
+    # endif /* XKBLAS_SUPPORT_ZE_SYCL_INTEROP */
 
     # if 0
 
@@ -571,7 +571,7 @@ body_ze(
 
 # endif
 
-# if XKRT_SUPPORT_SYCL
+# if XKBLAS_SUPPORT_SYCL
 
 #  include <xkrt/driver/driver-sycl.h>
 
@@ -624,9 +624,9 @@ body_sycl(
     );
 }
 
-# endif /* XKRT_SUPPORT_SYCL */
+# endif /* XKBLAS_SUPPORT_SYCL */
 
-# if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
+# if XKBLAS_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
 
 #  include <xkrt/driver/driver-cl.h>
 #  include <xkblas/clblast-helper.h>
@@ -691,16 +691,7 @@ body_cl(
     XKBLAS_CLBLAST_DISPATCH_PRECISION(gemm);
 }
 
-# endif /* XKRT_SUPPORT_CL */
-
-# if XKRT_SUPPORT_HOST
-TYPED
-static void
-body_cpu(void * args)
-{
-    LOGGER_FATAL("Executing a gemm on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CL */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -711,29 +702,25 @@ void
 xkblas_t::task_format_create_GEMM(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUDA
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUDA */
 
-    # if XKRT_SUPPORT_HIP
+    # if XKBLAS_SUPPORT_HIP
     format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKRT_SUPPORT_HIP */
+    # endif /* XKBLAS_SUPPORT_HIP */
 
-    # if XKRT_SUPPORT_ZE
+    # if XKBLAS_SUPPORT_ZE
     format->f[TASK_FORMAT_TARGET_ZE] = (task_format_func_t) body_ze<P>;
-    # endif /* XKRT_SUPPORT_ZE */
+    # endif /* XKBLAS_SUPPORT_ZE */
 
-    # if XKRT_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
+    # if XKBLAS_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
     format->f[TASK_FORMAT_TARGET_CL] = (task_format_func_t) body_cl<P>;
-    # endif /* XKRT_SUPPORT_CL */
+    # endif /* XKBLAS_SUPPORT_CL */
 
-    # if XKRT_SUPPORT_SYCL
+    # if XKBLAS_SUPPORT_SYCL
     format->f[TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) body_sycl<P>;
-    # endif /* XKRT_SUPPORT_SYCL */
+    # endif /* XKBLAS_SUPPORT_SYCL */
 }
 
 /* instanciate methods for each precision */

@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 16:05:10 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/22 03:53:11 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -609,7 +609,7 @@ xkblas_t::trsm_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -661,10 +661,10 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(trsm);
 }
 
-# endif /* XKRT_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 
-# if XKRT_SUPPORT_HIP
+# if XKBLAS_SUPPORT_HIP
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
 
@@ -716,25 +716,70 @@ body_hip(
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(trsm);
 }
 
-# endif /* XKRT_SUPPORT_HIP */
+# endif /* XKBLAS_SUPPORT_HIP */
 
 
+# ifdef XKBLAS_SUPPORT_CBLAS
 
-
-# ifdef XKRT_SUPPORT_HOST
+template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu(void * args)
+body_cpu_run(task_t * task)
 {
-    LOGGER_FATAL("Executing a trsm on cpu");
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    if constexpr (P == xkblas_precision_t::S || P == xkblas_precision_t::D)
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_SIDE)      args->side,
+            (const enum CBLAS_UPLO)      args->uplo,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_DIAG)      args->diag,
+            (int) args->m, (int) args->n,
+            (const TYPE  ) args->alpha,
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+                  (TYPE *) B->host_view.addr, (int) B->host_view.ld
+        );
+    }
+    else
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_SIDE)      args->side,
+            (const enum CBLAS_UPLO)      args->uplo,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_DIAG)      args->diag,
+            (int) args->m, (int) args->n,
+            (const TYPE *) &(args->alpha),
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+                  (TYPE *) B->host_view.addr, (int) B->host_view.ld
+        );
+    }
 }
-# endif /* XKRT_SUPPORT_HOST */
+
+TYPED
+static void
+body_cpu(task_t * task)
+{
+    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_strsm>(task);
+    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dtrsm>(task);
+    if constexpr (P == xkblas_precision_t::C) body_cpu_run<P, cblas_ctrsm>(task);
+    if constexpr (P == xkblas_precision_t::Z) body_cpu_run<P, cblas_ztrsm>(task);
+}
+
+# endif /* XKBLAS_SUPPORT_CBLAS */
 
 TYPED
 static task_format_target_t
 suggest_format(task_t * task)
 {
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
-    if (args->m < 128)
+    if (args->m < 32)
         return TASK_FORMAT_TARGET_HOST;
     return TASK_FORMAT_TARGET_NO_SUGGEST;
 }
@@ -748,17 +793,17 @@ void
 xkblas_t::task_format_create_TRSM(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
+    # if XKBLAS_SUPPORT_CBLAS
     format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
+    # endif /* XKBLAS_SUPPORT_CBLAS */
 
-    # if XKRT_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUDA
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUDA */
 
-    # if XKRT_SUPPORT_HIP
+    # if XKBLAS_SUPPORT_HIP
     format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKRT_SUPPORT_HIP */
+    # endif /* XKBLAS_SUPPORT_HIP */
 
     format->suggest = (task_format_suggest_t) suggest_format<P>;
 }

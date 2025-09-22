@@ -3,7 +3,7 @@
 /*   syrk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/03 15:23:28 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 15:55:29 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:12:09 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -366,7 +366,7 @@ xkblas_t::syrk_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -418,15 +418,7 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(syrk);
 }
 
-# endif /* XKRT_SUPPORT_CUDA */
-
-# ifdef XKRT_SUPPORT_HOST
-static void
-body_cpu(void * args)
-{
-    LOGGER_DEBUG("Executing a syrk on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -437,13 +429,9 @@ void
 xkblas_t::task_format_create_SYRK(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUDA
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUDA */
 }
 
 # define DEFINE(P)  \

@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 02:32:26 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 21:48:59 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -18,6 +18,7 @@
 
 # include <xkblas/conf.h>
 # include <xkblas/kernel.hpp>
+# include <xkblas/support.h>
 
 # include <xkrt/runtime.h>
 # include <xkrt/sync/spinlock.h>
