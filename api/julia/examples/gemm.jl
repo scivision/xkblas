@@ -2,7 +2,7 @@ using LinearAlgebra, Random
 using XKBlas
 
 # Problem setup
-n = 2
+n = 3
 m, n, k = n, n, n
 A = [Float32(rand()) for _ in 1:(m*k)]
 B = [Float32(rand()) for _ in 1:(k*n)]

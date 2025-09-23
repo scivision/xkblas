@@ -1,4 +1,7 @@
-# CBlas constants
+###################
+# CBlas constants #
+###################
+
 export Order, Transpose, Uplo, Diag, Side
 
 module Order
