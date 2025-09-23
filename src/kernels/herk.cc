@@ -3,7 +3,7 @@
 /*   herk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:40:52 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:23:06 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -54,7 +54,7 @@
 
 # include <cassert>
 
-# if XKRT_SUPPORT_SYCL
+# if XKBLAS_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 #  include <oneapi/mkl.hpp>
 #  include <sycl/ext/oneapi/backend/level_zero.hpp>
@@ -198,13 +198,13 @@ xkblas_t::herk_async(
     const size_t Cm = n;
     const size_t Cn = n;
 
-    if (lda < MAX(1, Am))
+    if ((size_t) lda < MAX(1, Am))
     {
         LOGGER_FATAL("illegal value of lda");
         return -8;
     }
 
-    if (ldc < MAX(1, Cm))
+    if ((size_t) ldc < MAX(1, Cm))
     {
         LOGGER_FATAL("illegal value of ldc");
         return -13;
@@ -242,7 +242,7 @@ xkblas_t::herk_async(
     # define A(I, J) A, (I), (J), Amb, Anb, lda
     # define C(I, J) C, (I), (J), Cmb, Cnb, ldc
 
-    for (size_t tn = 0; tn < Cnt; ++n)
+    for (size_t tn = 0; tn < Cnt; ++tn)
     {
         size_t bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
 
@@ -257,7 +257,7 @@ xkblas_t::herk_async(
                     bs_nn, bs_kn,
                     alpha,
                     A(tn, tk),
-                    beta,
+                   &dbeta,
                     C(tn, tn),
                     &d
                 );
@@ -377,7 +377,7 @@ xkblas_t::herk_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -430,16 +430,7 @@ body_cuda(
     if constexpr (P == xkblas_precision_t::C)
         body_cuda_run<P, cublasZherk, double, cuDoubleComplex>(stream, instr, idx);
 }
-# endif /* XKRT_SUPPORT_CUDA */
-
-# if XKRT_SUPPORT_HOST
-TYPED
-static void
-body_cpu(void * args)
-{
-    LOGGER_FATAL("Executing a herk on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -450,13 +441,9 @@ void
 xkblas_t::task_format_create_HERK(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # if XKBLAS_SUPPORT_CUDA
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
+    # endif /* XKBLAS_SUPPORT_CUDA */
 }
 
 /* instanciate methods for each precision */

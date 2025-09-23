@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:41:07 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:13:29 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -30,7 +30,7 @@
 
 # include <cassert>
 
-# if XKRT_SUPPORT_SYCL
+# if XKBLAS_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
 #  include <oneapi/mkl.hpp>
 #  include <sycl/ext/oneapi/backend/level_zero.hpp>
@@ -226,7 +226,7 @@ xkblas_t::spmv_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cusparse-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -399,16 +399,7 @@ body_cuda(
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();
 }
-# endif /* XKRT_SUPPORT_CUDA */
-
-# if XKRT_SUPPORT_HOST
-TYPED
-static void
-body_cpu(void * args)
-{
-    LOGGER_FATAL("Executing a spmv on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -419,13 +410,9 @@ void
 xkblas_t::task_format_create_SPMV(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # if XKBLAS_SUPPORT_CUDA
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
+    # endif /* XKBLAS_SUPPORT_CUDA */
 }
 
 /* instanciate methods for each precision */

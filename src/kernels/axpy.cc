@@ -3,7 +3,7 @@
 /*   axpy.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2025/01/30 00:16:18 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:40:20 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:12:29 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -136,7 +136,7 @@ xkblas_t::axpy_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -182,16 +182,7 @@ body_cuda(
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(axpy);
 }
-# endif /* XKRT_SUPPORT_CUDA */
-
-# if XKRT_SUPPORT_HOST
-TYPED
-static void
-body_cpu(void * args)
-{
-    LOGGER_FATAL("Executing an axpy on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -202,13 +193,9 @@ void
 xkblas_t::task_format_create_AXPY(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # if XKBLAS_SUPPORT_CUDA
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
+    # endif /* XKBLAS_SUPPORT_CUDA */
 }
 
 # define DEFINE(P)  \

@@ -6,15 +6,24 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 # OPTIONS #
 ###########
 
-option(STRICT "Enable strict compilation mode" ON)
-option(USE_CUBLAS "Enable cublas" OFF)
-option(USE_CUDA "Enable the compilation of custom cuda kernels" OFF)
-option(USE_HIPBLAS "Enable hipblas" OFF)
-option(USE_HIP "Enable hip" OFF)
-option(USE_CLBLAST "Enable clblast" ON)
-option(USE_ZE "Use Level Zero" OFF)
-option(USE_SYCL "Use Sycl" OFF)
+option(STRICT       "Enable strict compilation mode" ON)
+option(USE_CBLAS    "Enable the use of CPU Blas library. See https://cmake.org/cmake/help/latest/module/FindBLAS.html" OFF)
+option(USE_CLBLAST  "Enable clblast" ON)
+option(USE_CUBLAS   "Enable cublas" OFF)
+option(USE_CUDA     "Enable the compilation of custom cuda kernels" OFF)
+option(USE_HIP      "Enable hip" OFF)
+option(USE_HIPBLAS  "Enable hipblas" OFF)
+option(USE_SYCL     "Use Sycl" OFF)
+option(USE_ZE       "Use Level Zero" OFF)
 
+include(BooleanUtils)
+convert_bool(USE_CBLAS)
+convert_bool(USE_CUBLAS)
+convert_bool(USE_CUDA)
+convert_bool(USE_HIP)
+convert_bool(USE_HIPBLAS)
+convert_bool(USE_SYCL)
+convert_bool(USE_ZE)
 
 ###############
 # C++ version #
@@ -174,9 +183,25 @@ add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES} ${C_SOURCE_FILES})
 # Include directory
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 include_directories(${CMAKE_SOURCE_DIR}/src/)
+include_directories(${CMAKE_BINARY_DIR}/include/)
 include_directories(${CMAKE_BINARY_DIR}/api/c/include/)
 
-# Installation
+# Support header file generated
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/include/xkblas")
+configure_file(
+    ${CMAKE_SOURCE_DIR}/include/xkblas/support.h.in
+    ${CMAKE_BINARY_DIR}/include/xkblas/support.h
+)
+
+################
+# INSTALLATION #
+################
+
+install(
+    FILES "${CMAKE_BINARY_DIR}/include/xkblas/support.h"
+    DESTINATION include/xkblas
+)
+
 install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 install(DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
@@ -245,6 +270,66 @@ endif()
 if (USE_SYCL)
     target_link_libraries( ${XKBLAS_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
     target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)
+endif()
+
+if (USE_CBLAS)
+    if (USE_MKL)
+        message(STATUS "MKLROOT=$ENV{MKLROOT}")
+        if(DEFINED ENV{MKLROOT})
+            message(STATUS "MKLROOT=[$ENV{MKLROOT}]")
+        else()
+            message(FATAL_ERROR "`USE_MKL` is set but `MKLROOT` is unset")
+        endif()
+        set(BLA_VENDOR Intel10_64lp_seq)
+        add_compile_options("-DUSE_MKL=1")
+        add_compile_options("-DMKL_ILP64")
+        add_compile_options("-m64")
+    endif()
+
+    if (USE_CRAYBLAS)
+        set(BLA_VENDOR Generic)
+        add_compile_options("-DUSE_CRAYBLAS=1")
+    endif()
+
+    if (USE_OPENBLAS)
+        set(BLA_VENDOR OpenBLAS)
+        add_compile_options("-DUSE_OPENBLAS=1")
+    endif()
+
+    if (USE_NVHPC)
+        set(BLA_VENDOR NVHPC)
+        add_compile_options("-DUSE_NVHPC=1")
+    endif()
+
+    if (NOT USE_MKL AND NOT USE_OPENBLAS AND NOT USE_CRAYBLAS)
+        message(FATAL_ERROR "XKblas tests requires you specify a BLAS Vendor library.")
+    endif()
+
+    find_package(BLAS)
+    if (${BLAS_FOUND})
+        message(STATUS "Found BLAS library.")
+    else()
+        add_compile_options("-DNO_CPU_BLAS=1")
+        message(STATUS "Testing correctness requires a BLAS library, and none were found.")
+        set(BLAS_INCLUDE_DIRS "")
+        set(BLAS_LIBRARIES_DIRS "")
+    endif()
+
+    if (USE_MKL)
+        find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h $ENV{MKLROOT}/include)
+    endif()
+
+    if (USE_CRAYBLAS)
+        find_path(BLAS_INCLUDE_DIRS lapacke.h ${CRAY_LIBSCI_PREFIX_DIR}/include)
+    endif()
+
+    if (USE_OPENBLAS)
+        find_path(BLAS_INCLUDE_DIRS lapacke.h)
+    endif()
+
+    include_directories(${BLAS_INCLUDE_DIRS})
+    target_link_libraries(${XKBLAS_NAME} PRIVATE ${BLAS_LIBRARIES})
+
 endif()
 
 ################

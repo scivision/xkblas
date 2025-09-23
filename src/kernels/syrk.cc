@@ -3,7 +3,7 @@
 /*   syrk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/03 15:23:28 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 18:41:16 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/19 22:12:09 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -191,7 +191,7 @@ xkblas_t::syrk_async(
     const size_t Am = (trans == CblasNoTrans) ? n : k;
     const size_t An = (trans == CblasNoTrans) ? k : n;
 
-    if (lda < MAX(1, Am))
+    if ((size_t)lda < MAX(1, Am))
     {
         LOGGER_FATAL("illegal value of lda");
         return -7;
@@ -234,12 +234,12 @@ xkblas_t::syrk_async(
     # define A(tm, tn) A, tm, tn, Amb, Anb
     # define C(tm, tn) C, tm, tn, Cmb, Cnb
 
-    for (int tn = 0; tn < Cnt; ++tn)
+    for (size_t tn = 0; tn < Cnt; ++tn)
     {
         const size_t bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
         if (trans == CblasNoTrans)
         {
-            for (int tk = 0; tk < Ant; ++tk)
+            for (size_t tk = 0; tk < Ant; ++tk)
             {
                 const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -254,10 +254,10 @@ xkblas_t::syrk_async(
 
             if (uplo == CblasLower)
             {
-                for (int tm = tn+1; tm < Cmt; ++tm)
+                for (size_t tm = tn+1; tm < Cmt; ++tm)
                 {
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
-                    for (int tk = 0; tk < Ant; ++tk)
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
                         const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -276,10 +276,10 @@ xkblas_t::syrk_async(
             }
             else
             {
-                for (int tm = tn+1; tm < Cmt; ++tm)
+                for (size_t tm = tn+1; tm < Cmt; ++tm)
                 {
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
-                    for (int tk = 0; tk < Ant; ++tk)
+                    for (size_t tk = 0; tk < Ant; ++tk)
                     {
                         const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -299,7 +299,7 @@ xkblas_t::syrk_async(
         }
         else
         {
-            for (int tk = 0; tk < Amt; ++tk)
+            for (size_t tk = 0; tk < Amt; ++tk)
             {
                 const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -317,10 +317,10 @@ xkblas_t::syrk_async(
 
             if (uplo == CblasLower)
             {
-                for (int tm = tn+1; tm < Cmt ; ++tm)
+                for (size_t tm = tn+1; tm < Cmt ; ++tm)
                 {
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
-                    for (int tk = 0; tk < Amt; ++tk)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -339,10 +339,10 @@ xkblas_t::syrk_async(
             }
             else
             {
-                for (int tm = tn+1; tm < Cmt; ++tm)
+                for (size_t tm = tn+1; tm < Cmt; ++tm)
                 {
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
-                    for (int tk = 0; tk < Amt; ++tk)
+                    for (size_t tk = 0; tk < Amt; ++tk)
                     {
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
@@ -366,7 +366,7 @@ xkblas_t::syrk_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -418,15 +418,7 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(syrk);
 }
 
-# endif /* XKRT_SUPPORT_CUDA */
-
-# ifdef XKRT_SUPPORT_HOST
-static void
-body_cpu(void * args)
-{
-    LOGGER_DEBUG("Executing a syrk on cpu");
-}
-# endif /* XKRT_SUPPORT_HOST */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -437,13 +429,9 @@ void
 xkblas_t::task_format_create_SYRK(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
-
-    # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # if XKBLAS_SUPPORT_CUDA
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
+    # endif /* XKBLAS_SUPPORT_CUDA */
 }
 
 # define DEFINE(P)  \

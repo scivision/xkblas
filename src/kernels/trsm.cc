@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/16 15:53:45 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/22 03:53:11 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -178,13 +178,13 @@ xkblas_t::trsm_async(
     const size_t Bm = m;
     const size_t Bn = n;
 
-    if (lda < MAX(1, An))
+    if ((size_t) lda < MAX(1, An))
     {
         LOGGER_ERROR("illegal value of lda");
         return -8;
     }
 
-    if (ldb < MAX(1, Bn))
+    if ((size_t) ldb < MAX(1, Bn))
     {
         LOGGER_ERROR("illegal value of ldb");
         return -10;
@@ -216,8 +216,6 @@ xkblas_t::trsm_async(
     TYPE one        = (TYPE) 1.0;
     TYPE mone       = (TYPE)-1.0;
     TYPE minvalpha  = (TYPE)-1.0 / *alpha;
-
-    # pragma message(TODO "Block sizes truncation are suspicious to me here, double check")
 
     # define A(I, J) A, (I), (J), Amb, Anb, lda
     # define B(I, J) B, (I), (J), Bmb, Bnb, ldb
@@ -519,7 +517,99 @@ xkblas_t::trsm_async(
     return 0;
 }
 
-# if XKRT_SUPPORT_CUDA
+TYPED
+int
+xkblas_t::trsm_async(
+    int side, int uplo,
+    int transA, int diag,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+          TYPE * B, int ldb,
+    const int m_threshold
+) {
+    if (m <= m_threshold)
+        return this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
+
+    if (uplo == CblasUpper)
+    {
+        // From algorithm 1 of
+        // Adaptive triangular system solving
+        // Jean-Guillaume Dumas, Clément Pernet, Jean-Louis Roch
+
+        //
+        //     | A1  A2 |    | B1 |
+        //     |     A3 |    | B2 |
+        //
+
+        // compute sub matrices
+        const int m1 = m / 2;
+        const int m2 = m - m1;
+        const TYPE * A1 = A;
+        const TYPE * A2 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  0, m1);
+        const TYPE * A3 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
+              TYPE * B1 = B;
+              TYPE * B2 =       (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
+
+        // TODO: if alpha != 1.0 i guess bellow is wrong
+        assert(*alpha == (TYPE) 1.0);
+
+        // lower part
+        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
+
+        // middle part
+        const int transB = CblasNoTrans;
+        const TYPE  one = (const TYPE) +1.0;
+        const TYPE mone = (const TYPE) -1.0;
+        this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A2, lda, B2, ldb, &one, B1, ldb);
+
+        // upper part
+        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
+
+    }
+    else
+    {
+        assert(uplo == CblasLower);
+
+        // From Fig. 1 of
+        // Toward Portable GPU Performance: Julia Recursive Implementation of TRMM
+        // and TRSM
+
+        //
+        //     | A11      |    | B1 |
+        //     | A21  A22 |    | B2 |
+        //
+
+        // compute sub matrices
+        const int m1 = m / 2;
+        const int m2 = m - m1;
+        const TYPE * A11 = A;
+        const TYPE * A21 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE),  m1, 0);
+        const TYPE * A22 = (const TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) A, lda, sizeof(TYPE), m1, m1);
+              TYPE * B1 = B;
+              TYPE * B2 = (TYPE *) matrix_tile_t::offset_addr(MATRIX_COLMAJOR, (const uintptr_t) B, ldb, sizeof(TYPE),  m1,  0);
+
+        // TODO: if alpha != 1.0 i guess bellow is wrong
+        assert(*alpha == (TYPE) 1.0);
+
+        // upper part
+        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A11, lda, B1, ldb, m_threshold);
+
+        // middle part
+        const int transB = CblasNoTrans;
+        const TYPE  one = (const TYPE) +1.0;
+        const TYPE mone = (const TYPE) -1.0;
+        this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A21, lda, B1, ldb, &one, B2, ldb);
+
+        // lower part
+        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A22, lda, B2, ldb, m_threshold);
+
+    }
+
+    return 0;
+}
+
+# if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -571,10 +661,10 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(trsm);
 }
 
-# endif /* XKRT_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUDA */
 
 
-# if XKRT_SUPPORT_HIP
+# if XKBLAS_SUPPORT_HIP
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
 
@@ -626,18 +716,73 @@ body_hip(
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(trsm);
 }
 
-# endif /* XKRT_SUPPORT_HIP */
+# endif /* XKBLAS_SUPPORT_HIP */
 
 
+# ifdef XKBLAS_SUPPORT_CBLAS
 
-
-# ifdef XKRT_SUPPORT_HOST
+template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu(void * args)
+body_cpu_run(task_t * task)
 {
-    LOGGER_DEBUG("Executing a trsm on cpu");
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    if constexpr (P == xkblas_precision_t::S || P == xkblas_precision_t::D)
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_SIDE)      args->side,
+            (const enum CBLAS_UPLO)      args->uplo,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_DIAG)      args->diag,
+            (int) args->m, (int) args->n,
+            (const TYPE  ) args->alpha,
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+                  (TYPE *) B->host_view.addr, (int) B->host_view.ld
+        );
+    }
+    else
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_SIDE)      args->side,
+            (const enum CBLAS_UPLO)      args->uplo,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_DIAG)      args->diag,
+            (int) args->m, (int) args->n,
+            (const TYPE *) &(args->alpha),
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+                  (TYPE *) B->host_view.addr, (int) B->host_view.ld
+        );
+    }
 }
-# endif /* XKRT_SUPPORT_HOST */
+
+TYPED
+static void
+body_cpu(task_t * task)
+{
+    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_strsm>(task);
+    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dtrsm>(task);
+    if constexpr (P == xkblas_precision_t::C) body_cpu_run<P, cblas_ctrsm>(task);
+    if constexpr (P == xkblas_precision_t::Z) body_cpu_run<P, cblas_ztrsm>(task);
+}
+
+# endif /* XKBLAS_SUPPORT_CBLAS */
+
+TYPED
+static task_format_target_t
+suggest_format(task_t * task)
+{
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    if (args->m < 32)
+        return TASK_FORMAT_TARGET_HOST;
+    return TASK_FORMAT_TARGET_NO_SUGGEST;
+}
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -648,22 +793,25 @@ void
 xkblas_t::task_format_create_TRSM(
     task_format_t * format
 ) {
-    # if XKRT_SUPPORT_HOST
-    format->f[XKRT_DRIVER_TYPE_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKRT_SUPPORT_HOST */
+    # if XKBLAS_SUPPORT_CBLAS
+    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
+    # endif /* XKBLAS_SUPPORT_CBLAS */
 
-    # if XKRT_SUPPORT_CUDA
-    format->f[XKRT_DRIVER_TYPE_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKRT_SUPPORT_CUDA */
+    # if XKBLAS_SUPPORT_CUDA
+    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
+    # endif /* XKBLAS_SUPPORT_CUDA */
 
-    # if XKRT_SUPPORT_HIP
-    format->f[XKRT_DRIVER_TYPE_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKRT_SUPPORT_HIP */
+    # if XKBLAS_SUPPORT_HIP
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKBLAS_SUPPORT_HIP */
+
+    format->suggest = (task_format_suggest_t) suggest_format<P>;
 }
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_TRSM<P>(task_format_t * format); \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
+    template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
     template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, distribution_t * d);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
