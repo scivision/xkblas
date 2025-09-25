@@ -13,7 +13,7 @@ beta_vec  = [Float32(0.0)]
 
 lda, ldb, ldc = m, k, m
 
-transA, transB = XKBlas.Transpose.N, XKBlas.Transpose.N
+transA, transB = XKBlas.CblasNoTrans, XKBlas.CblasNoTrans
 
 # Run an XKBlas sequence
 XKBlas.init()

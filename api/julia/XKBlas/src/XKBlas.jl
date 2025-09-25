@@ -1,7 +1,6 @@
 module XKBlas
 
 using Libdl
-using CEnum
 
 # --- Load the library handle ---
 libpath = Libdl.find_library(["libxkblas"], String[])
