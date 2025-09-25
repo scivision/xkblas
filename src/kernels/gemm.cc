@@ -3,7 +3,7 @@
 /*   gemm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 22:12:49 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/25 02:51:35 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -693,6 +693,63 @@ body_cl(
 
 # endif /* XKBLAS_SUPPORT_CL */
 
+# ifdef XKBLAS_SUPPORT_CBLAS
+
+template <xkblas_precision_t P, auto FUNC>
+static void
+body_cpu_run(task_t * task)
+{
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    if constexpr (P == xkblas_precision_t::S || P == xkblas_precision_t::D)
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_TRANSPOSE) args->transB,
+            (int) args->m, (int) args->n, (int) args->k,
+            (const TYPE  ) args->alpha,
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+            (const TYPE *) B->host_view.addr, (int) B->host_view.ld,
+            (const TYPE  ) args->beta,
+                  (TYPE *) C->host_view.addr, (int) C->host_view.ld
+        );
+    }
+    else
+    {
+        FUNC(
+            CblasColMajor,
+            (const enum CBLAS_TRANSPOSE) args->transA,
+            (const enum CBLAS_TRANSPOSE) args->transB,
+            (int) args->m, (int) args->n, (int) args->k,
+            (const TYPE *) &(args->alpha),
+            (const TYPE *) A->host_view.addr, (int) A->host_view.ld,
+            (const TYPE *) B->host_view.addr, (int) B->host_view.ld,
+            (const TYPE *) &(args->beta),
+                  (TYPE *) C->host_view.addr, (int) C->host_view.ld
+        );
+    }
+}
+
+TYPED
+static void
+body_cpu(task_t * task)
+{
+    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_sgemm>(task);
+    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dgemm>(task);
+    if constexpr (P == xkblas_precision_t::C) body_cpu_run<P, cblas_cgemm>(task);
+    if constexpr (P == xkblas_precision_t::Z) body_cpu_run<P, cblas_zgemm>(task);
+}
+
+# endif /* XKBLAS_SUPPORT_CBLAS */
+
+
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
@@ -702,6 +759,10 @@ void
 xkblas_t::task_format_create_GEMM(
     task_format_t * format
 ) {
+    # if XKBLAS_SUPPORT_CBLAS
+    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
+    # endif /* XKBLAS_SUPPORT_CBLAS */
+
     # if XKBLAS_SUPPORT_CUDA
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKBLAS_SUPPORT_CUDA */

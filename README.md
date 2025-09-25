@@ -78,11 +78,11 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | gemm        | ✓   | ✓    | ✓   | ✓               |
-| gemmt       | ✓   | ✓    | ✓   | ✗               |
-| herk        | ✓   | ✓    | ✗   | ✗               |
+| gemmt       | ✗   | ✓    | ✓   | ✗               |
+| herk        | ✗   | ✓    | ✗   | ✗               |
 | symm        | ✗   | ✗    | ✗   | ✗               |
 | syr2k       | ✗   | ✗    | ✗   | ✗               |
-| syrk        | ✓   | ✓    | ✗   | ✗               |
+| syrk        | ✗   | ✓    | ✗   | ✗               |
 | trmm        | ✗   | ✗    | ✗   | ✗               |
 | trsm        | ✓   | ✓    | ✓   | ✗               |
 
