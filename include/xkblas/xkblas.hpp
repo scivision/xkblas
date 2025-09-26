@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 21:48:59 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/25 18:53:48 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -107,9 +107,11 @@ typedef struct  xkblas_t
 
     // LEVEL 1 - TODO
 
+    /* y := a.x + b.y */
     TYPED
     int axpby_async(int n, const TYPE alpha, const TYPE * x, const TYPE beta, TYPE * y);
 
+    /* y := a.x + y */
     TYPED
     int axpy_async(int n, const TYPE alpha, const TYPE * x, TYPE * y);
 
@@ -156,6 +158,17 @@ typedef struct  xkblas_t
               TYPE * U, int ldu
     );
 
+    TYPED
+    int gemv_async(
+        int transA,
+        int m, int n,
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * x, int incx,
+        const TYPE * beta,
+              TYPE * y, int incy
+    );
+
     // LEVEL 2  - single tile
     TYPED
     int copyscale_tile_async(
@@ -166,6 +179,18 @@ typedef struct  xkblas_t
               TYPE * L, const size_t Lm, const size_t Ln, int ldl,
               TYPE * U, const size_t Um, const size_t Un, int ldu,
         const size_t Ltm, const size_t Ltn,
+        xkrt::distribution_t * d
+    );
+
+    TYPED
+    int gemv_tile_async(
+        int transA,
+        const size_t m, const size_t n,
+        const TYPE * alpha,
+        const TYPE * A, const size_t lda,
+        const TYPE * x, const size_t incx,
+        const TYPE * beta,
+              TYPE * y, const size_t tm, const size_t mb, const size_t incy,
         xkrt::distribution_t * d
     );
 

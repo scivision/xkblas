@@ -78,6 +78,7 @@ using xkblas_precision_name_t = typename _xkblas_precision_name_t<P>::value;
                                  \
     /* LEVEL 2 */                \
     F(COPYSCALE)                 \
+    F(GEMV)                      \
                                  \
     /* LEVEL 3 */                \
     F(GEMM)                      \
@@ -147,6 +148,10 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(C,     COPYSCALE)                             \
     F(D,     COPYSCALE)                             \
     F(Z,     COPYSCALE)                             \
+    F(S,     GEMV)                                  \
+    F(C,     GEMV)                                  \
+    F(D,     GEMV)                                  \
+    F(Z,     GEMV)                                  \
                                                     \
     /* LEVEL 3 */                                   \
     F(S,     GEMM)                                  \

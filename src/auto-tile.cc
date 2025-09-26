@@ -3,7 +3,7 @@
 /*   auto-tile.cc                                                 .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/11 16:58:39 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/18 02:33:09 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/25 18:56:56 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -45,6 +45,7 @@ xkblas_kernel_auto_tile(
     switch (kernel)
     {
         case (AXPY):
+        case (GEMV):
         {
             ts_auto = 2048;
             break ;
