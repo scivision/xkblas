@@ -359,7 +359,7 @@ xkblas_t::gemmt_async(
     return 0;
 }
 
-# if XKBLAS_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -427,7 +427,7 @@ body_cuda(
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemm);
 }
 
-# endif /* XKBLAS_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUBLAS */
 
 
 # if XKBLAS_SUPPORT_HIP
@@ -496,9 +496,9 @@ void
 xkblas_t::task_format_create_GEMMT(
     task_format_t * format
 ) {
-    # if XKBLAS_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUBLAS
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUBLAS */
 
     # if XKBLAS_SUPPORT_HIP
     format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;

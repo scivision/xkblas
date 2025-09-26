@@ -298,7 +298,7 @@ xkblas_t::spmv_async(
     return 0;
 }
 
-# if XKBLAS_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUSPARSE
 #  include <xkblas/cusparse-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -481,7 +481,7 @@ body_cuda(
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();
 }
-# endif /* XKBLAS_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUSPARSE */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -492,9 +492,9 @@ void
 xkblas_t::task_format_create_SPMV(
     task_format_t * format
 ) {
-    # if XKBLAS_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUSPARSE
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUSPARSE */
 }
 
 /* instanciate methods for each precision */
