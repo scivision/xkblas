@@ -15,20 +15,22 @@ function random_csr_arrays(m::Int, n::Int; density::Float64=0.2, rng=Random.defa
     colind = A_csr.colval      # Vector{Int} of column indices
     values = A_csr.nzval       # Vector{Float64} of nonzero values
 
-    println(rowptr)
-    println(colind)
+    if (n <= 64)
+        println(rowptr)
+        println(colind)
+    end
 
     return rowptr, colind, values, A_csr
 end
 
 # Example usage
-m = 2
-n = 2
-density=0.2
+m = 16384
+n = 16384
+density=0.1
 rows, cols, values, A = random_csr_arrays(m, n, density=density)
 nnz = length(values)
 index_base = 1
-index_type = sizeof(cols[1]) * 8
+index_type = sizeof(cols[1]) * 8    # 32 or 64
 
 X = rand(n)
 Y = 0.0 * rand(m)
@@ -37,13 +39,19 @@ beta  = [0.0]
 transA = XKBlas.CblasNoTrans
 
 XKBlas.init()
-XKBlas.dspmv_async(alpha, transA, index_base, index_type, m, n, nnz, rows, cols, values, X, beta, Y)
-XKBlas.memory_segment_coherent_async(Y, m * sizeof(Y[1]))
+
+@time begin
+    XKBlas.dspmv_async(alpha, transA, index_base, index_type, m, n, nnz, rows, cols, values, X, beta, Y)
+    XKBlas.memory_segment_coherent_async(Y, m * sizeof(Y[1]))
+    XKBlas.sync()
+end
+
 XKBlas.deinit()
 
-println("A =")
-display(Matrix(A))  # dense view for clarity
-println("X = ", X)
-
-println("XKBlas Y = ", Y)
-println(" Julia Y = ", A * X)
+if (n <= 64)
+    println("A =")
+    display(Matrix(A))  # dense view for clarity
+    println("X = ", X)
+    println("XKBlas Y = ", Y)
+    println(" Julia Y = ", A * X)
+end

@@ -22,7 +22,7 @@ extern "C" {
 
 // # include <xkblas/flops.h>
 
-# define KAAPI_NO_DEFAULT_BLAS_ENUM 1
+# define XKBLAS_NO_DEFAULT_BLAS_ENUM 1
 
 # include "common/blas.h"
 # include "common/blas-version.h"
@@ -34,6 +34,7 @@ extern "C" {
 //////////////////////////////
 
 # include <xkblas/xkblas.h>
+# include <xkblas/cblas.h>
 # include <xkblas/xkblas.hpp>
 static xkblas_t * xkblas;
 
@@ -1030,7 +1031,7 @@ main_spmv(char ** args)
     /* run spmv */
     set_tile_size(ts);
     const int index_base = 0;
-    xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
+    xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, CblasSparseCSR, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
     xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
     xkblas->sync();
     uint64_t tf = get_nanotime();

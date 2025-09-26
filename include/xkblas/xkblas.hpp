@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/25 18:53:48 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 15:28:27 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -430,9 +430,10 @@ typedef struct  xkblas_t
         const int nrows,
         const int ncols,
         const int nnz,
-        const INDEX * csr_row_offsets,
-        const INDEX * csr_col_indices,
-        const TYPE * csr_values,
+        const int format,
+        const INDEX * row,
+        const INDEX * col,
+        const TYPE * values,
         /* vector X (in) */
         TYPE * X,
         const TYPE * beta,
@@ -449,9 +450,10 @@ typedef struct  xkblas_t
         const int nrows,
         const int ncols,
         const int nnz,
-        const INDEX * csr_row_offsets,
-        const INDEX * csr_col_indices,
-        const TYPE * csr_values,
+        const int format,
+        const INDEX * row,
+        const INDEX * col,
+        const TYPE * values,
         TYPE * X,
         const TYPE * beta,
         TYPE * Y,

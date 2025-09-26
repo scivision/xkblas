@@ -3,7 +3,7 @@
 /*   xkernels.h                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/25 18:32:14 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 15:26:58 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -165,6 +165,7 @@ extern "C" {
         const int nrows,
         const int ncols,
         const int nnz,
+        const int format,
         const void * csr_row_offsets,
         const void * csr_col_indices,
         const TYPE * csr_values,

@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/25 23:32:33 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 15:27:36 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -30,9 +30,10 @@ xkblas_£spmv_async(
     const int nrows,
     const int ncols,
     const int nnz,
-    const void * csr_row_offsets,
-    const void * csr_col_indices,
-    const TYPE * csr_values,
+    const int format,
+    const void * row,
+    const void * col,
+    const TYPE * values,
     /* vector X (in) */
     TYPE * X,
     const TYPE * beta,
@@ -40,10 +41,10 @@ xkblas_£spmv_async(
     TYPE * Y
 ) {
     if (index_type == 32)
-        return xkblas_get()->spmv_async<xkblas_precision_t::££, I32>(alpha, transA, index_base, nrows, ncols, nnz, (int32_t *) csr_row_offsets, (int32_t *) csr_col_indices, csr_values, X, beta, Y);
+        return xkblas_get()->spmv_async<xkblas_precision_t::££, I32>(alpha, transA, index_base, nrows, ncols, nnz, format, (int32_t *) row, (int32_t *) col, values, X, beta, Y);
     else
     {
         assert(index_type == 64);
-        return xkblas_get()->spmv_async<xkblas_precision_t::££, I64>(alpha, transA, index_base, nrows, ncols, nnz, (int64_t *) csr_row_offsets, (int64_t *) csr_col_indices, csr_values, X, beta, Y);
+        return xkblas_get()->spmv_async<xkblas_precision_t::££, I64>(alpha, transA, index_base, nrows, ncols, nnz, format, (int64_t *) row, (int64_t *) col, values, X, beta, Y);
     }
 }
