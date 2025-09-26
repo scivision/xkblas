@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 ###########
 
 option(STRICT       "Enable strict compilation mode" ON)
+option(USE_TESTS    "Compile tests (require a CBLAS installation)" OFF)
 option(USE_CBLAS    "Enable the use of CPU Blas library. See https://cmake.org/cmake/help/latest/module/FindBLAS.html" OFF)
 option(USE_CLBLAST  "Enable clblast" ON)
 option(USE_CUBLAS   "Enable cublas" OFF)
@@ -335,4 +336,6 @@ endif()
 ################
 # Sub projects #
 ################
-add_subdirectory(tests/)
+if (USE_TESTS)
+    add_subdirectory(tests/)
+endif()
