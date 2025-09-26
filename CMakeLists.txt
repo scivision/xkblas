@@ -50,7 +50,7 @@ SET(XKBLAS_KERNELS
     axpby axpy divcopy dot fill nrm2 scalcopy scale
 
     # level 2
-    copyscale
+    copyscale gemv
 
     # level 3
     gemm gemmt herk symm syr2k syrk trmm trsm

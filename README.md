@@ -73,6 +73,7 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | copyscale   | ✓   | ✓    | ✓   | ✗               |
+| gemv        | ✓   | ✓    | ✗   | ✗               |
 
 ### Level 3
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |

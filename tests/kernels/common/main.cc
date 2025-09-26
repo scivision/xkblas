@@ -1053,6 +1053,58 @@ main_spmv(char ** args)
     return 0;
 }
 
+TYPED
+static int
+main_gemv(char ** args)
+{
+    TYPE alpha, beta;
+    alpha = (TYPE) atof(args[3]);
+    beta  = (TYPE) atof(args[4]);
+    // FILL(&alpha, 1);
+    // FILL(&beta, 1);
+    printf("alpha=%.4lf, beta=%.4lf\n", alpha, beta);
+
+    /* parse arguments */
+    int m  = atoi(args[0]);
+    int n  = atoi(args[1]);
+    int ts = atoi(args[2]);
+
+    /* generate matrix A */
+    /* allocate matrices */
+    uintptr_t matrices[1];
+    int ld = MAX(m, n);
+    # define A ((TYPE *)matrices[0])
+    prepare_n_matrices<P>(matrices, 1, ld, ld);
+    dump_matrix<P>("A", A, m, n, ld);
+
+    /* allocate vectors */
+    uintptr_t ptr[2];
+    prepare_n_vectors<P>(ptr, 2, MAX(m, n));
+    # define X ((TYPE *)ptr[0])
+    # define Y ((TYPE *)ptr[1])
+    dump_vector<P>("X", X, n);
+    dump_vector<P>("Y", Y, m);
+
+    uint64_t t0 = get_nanotime();
+
+    /* run spmv */
+    set_tile_size(ts);
+    xkblas->gemv_async<P>(CblasNoTrans, m, n, &alpha, A, ld, X, 1, &beta, Y, 1);
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
+    xkblas->sync();
+    uint64_t tf = get_nanotime();
+    dump_vector<P>("y := alpha.A.X + beta.y", Y, m);
+
+    printf("Took %lf s\n", (tf - t0) / 1.0e9);
+
+    # undef X
+    # undef Y
+    # undef A
+
+    return 0;
+}
+
+
 // PIN-GEMM-UNPIN //
 TYPED
 static int
@@ -1263,6 +1315,19 @@ static func_t funcs[] = {
                     "  -   alpha : alpha\n"
                     "  -    beta : beta\n"
                     "  - density : beta\n"
+    },
+
+    {
+        .name = "GEMV",
+        .f = main_gemv<PRECISION>,
+        .nargs = 5,
+        .descr = "y := alpha.A.x + beta.y",
+        .usage =    "m n ts alpha beta\n"
+                    "  -       m : number of rows\n"
+                    "  -       n : number of columns\n"
+                    "  -      ts : tile size\n"
+                    "  -   alpha : alpha\n"
+                    "  -    beta : beta\n"
     },
 
     {

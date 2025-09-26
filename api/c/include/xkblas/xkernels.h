@@ -1,9 +1,9 @@
 /* ************************************************************************** */
 /*                                                                            */
-/*   kernels.h                                                    .-*-.       */
+/*   xkernels.h                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/12 20:17:48 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/25 18:32:14 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,6 +48,17 @@ extern "C" {
         const TYPE * D, int ldd,
               TYPE * L, int ldl,
               TYPE * U, int ldu
+    );
+
+    int
+    xkblas_£gemv_async(
+        int transA,
+        int m, int n,
+        const TYPE * alpha,
+        const TYPE * A, int lda,
+        const TYPE * x, int incx,
+        const TYPE * beta,
+              TYPE * y, int incy
     );
 
     /* Level 3 */
