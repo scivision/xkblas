@@ -63,7 +63,7 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | axpby       | ✗   | ✗    | ✗   | ✗               |
 | axpy        | ✗   | ✓    | ✗   | ✗               |
 | divcopy     | ✗   | ✗    | ✗   | ✗               |
-| dot         | ✗   | ✗    | ✗   | ✗               |
+| dot         | ✓   | ✓    | ✗   | ✗               |
 | fill        | ✗   | ✗    | ✗   | ✗               |
 | nrm2        | ✗   | ✗    | ✗   | ✗               |
 | scalcopy    | ✗   | ✗    | ✗   | ✗               |
