@@ -2,11 +2,12 @@ using XKBlas
 
 XKBlas.init()
 
-f = function(args)
-    println("Hello from Julia!")
+x = 0
+f = () -> begin
+    global x = 42
 end
-cf = @cfunction(f, Cvoid, (Ptr{Cvoid},))
-XKBlas.host_async(cf, C_NULL)
-
+XKBlas.host_async(f)
 XKBlas.sync()
+println(string("X is ", x))
+
 XKBlas.deinit()

@@ -74,8 +74,8 @@ function cpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_cpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
 end
 
-function cspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
+function cspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 function daxpby_async(n, alpha, x, beta, y)
@@ -152,8 +152,8 @@ function dpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_dpotrf_async(uplo::Cint, n::Cint, A::Ptr{Cdouble}, lda::Cint)::Cint
 end
 
-function dspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
+function dspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
 end
 
 function saxpby_async(n, alpha, x, beta, y)
@@ -230,8 +230,8 @@ function spotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_spotrf_async(uplo::Cint, n::Cint, A::Ptr{Cfloat}, lda::Cint)::Cint
 end
 
-function sspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
+function sspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
 end
 
 function zaxpby_async(n, alpha, x, beta, y)
@@ -308,8 +308,8 @@ function zpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_zpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
 end
 
-function zspmv_async(alpha, transA, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_zspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cint}, csr_col_indices::Ptr{Cint}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
+function zspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_zspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 function init()

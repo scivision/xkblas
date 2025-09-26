@@ -32,9 +32,11 @@ typedef enum    xkblas_state_t : uint8_t
     XKBLAS_CONTEXT_INITIALIZED,
 }               xkblas_state_t;
 
-# define TYPED      template <xkblas_precision_t P>
-# define TYPE       xkblas_precision_type_t<P>
-# define TYPE_REAL  xkblas_precision_type_real_t<P>
+# define TYPED              template <xkblas_precision_t P>
+# define TYPED_WITH_INDEX   template <xkblas_precision_t P, xkblas_index_t T>
+# define TYPE               xkblas_precision_type_t<P>
+# define TYPE_REAL          xkblas_precision_type_real_t<P>
+# define INDEX              xkblas_index_type_t<T>
 
 /* xkblas instance */
 typedef struct  xkblas_t
@@ -418,17 +420,18 @@ typedef struct  xkblas_t
 
     /* Y = alpha . op(A) . X + beta . Y
      * spmv of a CSR matrix with dense vectors */
-    TYPED
+    TYPED_WITH_INDEX
     int
     spmv_async(
         const TYPE * alpha,
         /* matrix A (in) */
         int transA,
+        int index_base,     // 0 or 1
         const int nrows,
         const int ncols,
         const int nnz,
-        const int * csr_row_offsets,
-        const int * csr_col_indices,
+        const INDEX * csr_row_offsets,
+        const INDEX * csr_col_indices,
         const TYPE * csr_values,
         /* vector X (in) */
         TYPE * X,
@@ -437,22 +440,20 @@ typedef struct  xkblas_t
         TYPE * Y
     );
 
-    TYPED
+    TYPED_WITH_INDEX
     int
     spmv_tile_async(
         const TYPE * alpha,
-        /* matrix A (in) */
         int transA,
+        int index_base,
         const int nrows,
         const int ncols,
         const int nnz,
-        const int * csr_row_offsets,
-        const int * csr_col_indices,
+        const INDEX * csr_row_offsets,
+        const INDEX * csr_col_indices,
         const TYPE * csr_values,
-        /* vector X (in) */
         TYPE * X,
         const TYPE * beta,
-        /* vector Y (inout) */
         TYPE * Y,
         size_t tm,
         xkrt::distribution_t * d

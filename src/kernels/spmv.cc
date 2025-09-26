@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 22:13:29 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/25 23:51:00 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -46,6 +46,8 @@ struct args_t
     args_t(
         xkblas_t * xkblas,
         int transA,
+        int index_base,
+        xkblas_index_t index_type,
         int m,
         int n,
         int nnz,
@@ -54,6 +56,8 @@ struct args_t
     ) :
         xkblas(xkblas),
         transA(transA),
+        index_base(index_base),
+        index_type(index_type),
         m(m),
         n(n),
         nnz(nnz),
@@ -65,6 +69,8 @@ struct args_t
 
     xkblas_t * xkblas;
     const int transA;
+    const int index_base;
+    const xkblas_index_t index_type;
     const int m;
     const int n;
     const int nnz;
@@ -72,17 +78,18 @@ struct args_t
     const TYPE beta;
 };
 
-TYPED
+TYPED_WITH_INDEX
 int
 xkblas_t::spmv_tile_async(
     const TYPE * alpha,
     /* matrix A (in) */
     int transA,
+    int index_base,
     const int m,
     const int n,
     const int nnz,
-    const int * csr_row_offsets,
-    const int * csr_col_indices,
+    const INDEX * csr_row_offsets,
+    const INDEX * csr_col_indices,
     const TYPE * csr_values,
     /* vector X (in) */
     TYPE * X,
@@ -113,7 +120,7 @@ xkblas_t::spmv_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(this, transA, m, n, nnz, *alpha, *beta);
+    new (args) args_t<P>(this, transA, index_base, T, m, n, nnz, *alpha, *beta);
 
     # ifndef NDEBUG
     snprintf(task->label, sizeof(task->label), "spmv");
@@ -123,8 +130,8 @@ xkblas_t::spmv_tile_async(
     access_t * accesses = TASK_ACCESSES(task, flags);
     access_mode_t A_X_mode = (*alpha == (const TYPE) 0.0) ? ACCESS_MODE_V : ACCESS_MODE_R;
     access_mode_t Ymode    = (*beta  == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-    new (accesses + 0) access_t(task, csr_row_offsets,  m+1, sizeof(int),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 1) access_t(task, csr_col_indices,  nnz, sizeof(int),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 0) access_t(task, csr_row_offsets,  m+1, sizeof(INDEX),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 1) access_t(task, csr_col_indices,  nnz, sizeof(INDEX),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 2) access_t(task, csr_values,       nnz, sizeof(TYPE), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 3) access_t(task, X,                n,   sizeof(TYPE), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 4) access_t(task, Y,                m,   sizeof(TYPE), Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
@@ -136,17 +143,18 @@ xkblas_t::spmv_tile_async(
     return 0;
 }
 
-TYPED
+TYPED_WITH_INDEX
 int
 xkblas_t::spmv_async(
     const TYPE * alpha,
     /* matrix A (in) */
     int transA,
+    int index_base,
     const int m,
     const int n,
     const int nnz,
-    const int * csr_row_offsets,
-    const int * csr_col_indices,
+    const INDEX * csr_row_offsets,
+    const INDEX * csr_col_indices,
     const TYPE * csr_values,
     /* vector X (in) */
     TYPE * X,
@@ -156,6 +164,9 @@ xkblas_t::spmv_async(
 ) {
     assert(alpha);
     assert(beta);
+
+    if (index_base != 0 && index_base != 1)
+        LOGGER_FATAL("Invalid index_base");
 
     if (*alpha == (TYPE) 0 && *beta == (TYPE) 0)
         return 0;
@@ -176,7 +187,7 @@ xkblas_t::spmv_async(
     distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, m, ts);
 
     // replicate `csr_row_offsets` to avoid polluting user matrix
-    int * csr_row_offsets_dup = (int *) malloc(sizeof(int) * (m+1));
+    INDEX * csr_row_offsets_dup = (INDEX *) malloc(sizeof(INDEX) * (m+1));
     assert(csr_row_offsets_dup);
 
     // for each tile
@@ -188,7 +199,7 @@ xkblas_t::spmv_async(
         size_t bs = m1 - m0;
 
         // compute number of nnz for that tile, to offset values array
-        int tile_nnz = csr_row_offsets[m1] - csr_row_offsets[m0];
+        INDEX tile_nnz = csr_row_offsets[m1] - csr_row_offsets[m0];
 
         // no elements in that tile
         if (tile_nnz == 0)
@@ -203,18 +214,19 @@ xkblas_t::spmv_async(
         // adjust tile_row_ptr so first entry is 0
         if (tm != 0)
             for (size_t i = m0 ; i <= m1 ; ++i)
-                csr_row_offsets_dup[i] = csr_row_offsets[i] - csr_row_offsets[m0];
+                    csr_row_offsets_dup[i] = csr_row_offsets[i] - csr_row_offsets[m0] + (INDEX) index_base;
 
-        const int * csr_row_offsets_ptr = (tm == 0) ? csr_row_offsets : csr_row_offsets_dup;
+        const INDEX * csr_row_offsets_ptr = (tm == 0) ? csr_row_offsets : csr_row_offsets_dup;
 
         // tile spmv
-        this->spmv_tile_async<P>(
+        this->spmv_tile_async<P, T>(
             alpha,
             transA,
+            index_base,
             bs, n, tile_nnz,
             csr_row_offsets_ptr + m0,
-            csr_col_indices + csr_row_offsets[m0],
-            csr_values      + csr_row_offsets[m0],
+            csr_col_indices     + csr_row_offsets[m0] - index_base,
+            csr_values          + csr_row_offsets[m0] - index_base,
             X,
             beta,
             Y + m0,
@@ -222,6 +234,7 @@ xkblas_t::spmv_async(
            &d
         );
     }
+    LOGGER_WARN("`csr_row_offsets_dup` is leaking");
 
     return 0;
 }
@@ -267,17 +280,27 @@ body_cuda_run(
     const access_t * X_acc           = accesses + 3;
     const access_t * Y_acc           = accesses + 4;
 
-    assert(csr_row_offsets->device_view.addr % sizeof(int)     == 0);
-    assert(csr_col_indices->device_view.addr % sizeof(int)     == 0);
+    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    if (args->index_type == I32)
+    {
+        assert(csr_row_offsets->device_view.addr % sizeof(int32_t) == 0);
+        assert(csr_col_indices->device_view.addr % sizeof(int32_t) == 0);
+    }
+    else
+    {
+        assert(csr_row_offsets->device_view.addr % sizeof(int64_t) == 0);
+        assert(csr_col_indices->device_view.addr % sizeof(int64_t) == 0);
+    }
     assert(csr_values->device_view.addr      % sizeof(CU_TYPE) == 0);
     assert(X_acc->device_view.addr           % sizeof(CU_TYPE) == 0);
     assert(Y_acc->device_view.addr           % sizeof(CU_TYPE) == 0);
 
-    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
-    assert(args);
-
     // setup matrix desc
     cusparseSpMatDescr_t A;
+    cusparseIndexBase_t index_base = (args->index_base == 0) ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
+    cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I : CUSPARSE_INDEX_64I;
     CUSPARSE_SAFE_CALL(
         cusparseCreateCsr(
             &A,
@@ -287,9 +310,9 @@ body_cuda_run(
             (void *) csr_row_offsets->device_view.addr,
             (void *) csr_col_indices->device_view.addr,
             (void *) csr_values->device_view.addr,
-            CUSPARSE_INDEX_32I,
-            CUSPARSE_INDEX_32I,
-            CUSPARSE_INDEX_BASE_ZERO,
+            index_type,
+            index_type,
+            index_base,
             CUDA_DATA_TYPE
         )
     );
@@ -417,9 +440,13 @@ xkblas_t::task_format_create_SPMV(
 
 /* instanciate methods for each precision */
 
+# define DEFINE(P, T)  \
+    template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const xkblas_index_type_t<T> * csr_row_offsets, const  xkblas_index_type_t<T> * csr_col_indices, const xkblas_precision_type_t<P> * csr_values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const xkblas_index_type_t<T> * csr_row_offsets, const xkblas_index_type_t<T> * csr_col_indices, const xkblas_precision_type_t<P> * csr_values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, size_t tm, distribution_t * d);
+XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
+# undef DEFINE
+
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SPMV<P>(task_format_t * format); \
-    template int xkblas_t::spmv_async<P>(const xkblas_precision_type_t<P> * alpha, int transA, const int m, const int n, const int nnz, const int * csr_row_offsets, const int * csr_col_indices, const xkblas_precision_type_t<P> * csr_values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv_tile_async<P>(const xkblas_precision_type_t<P> * alpha, int transA, const int m, const int n, const int nnz, const int * csr_row_offsets, const int * csr_col_indices, const xkblas_precision_type_t<P> * csr_values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, size_t tm, distribution_t * d);
+    template void xkblas_t::task_format_create_SPMV<P>(task_format_t * format);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
