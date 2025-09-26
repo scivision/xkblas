@@ -1,3 +1,29 @@
+##########################
+# INDEPENDENT HOST ASYNC #
+##########################
+
+function _host_async_trampoline(fptr::Ptr{Cvoid})
+    fref = unsafe_pointer_to_objref(fptr)
+    fref[]()
+    return
+end
+
+function host_async(f::Function)
+    cf = @cfunction(_host_async_trampoline, Cvoid, (Ptr{Cvoid},))
+    fref = Ref(f)
+    host_async(cf, fref)
+end
+
+########################
+# DEPENDENT HOST ASYNC #
+########################
+
+function host_async(f; reads=[], writes=[])
+    println("host_async with read/write")
+    # TODO: pass to xkrt/xkblas
+    # f(reads..., writes...)
+end
+
 ###################
 # CBlas constants #
 ###################

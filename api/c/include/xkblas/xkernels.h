@@ -160,11 +160,13 @@ extern "C" {
         const TYPE * alpha,
         /* matrix A (in) */
         int transA,
+        int index_base,
+        int index_type,
         const int nrows,
         const int ncols,
         const int nnz,
-        const int * csr_row_offsets,
-        const int * csr_col_indices,
+        const void * csr_row_offsets,
+        const void * csr_col_indices,
         const TYPE * csr_values,
         /* vector X (in) */
         TYPE * X,
