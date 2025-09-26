@@ -65,7 +65,9 @@ xkblas_kernel_auto_tile(
     switch (kernel)
     {
         case (AXPY):
+        case (DOT):
         case (GEMV):
+        case (SCAL):
         {
             ts_auto = 2048;
             break ;

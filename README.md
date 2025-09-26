@@ -67,7 +67,7 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | fill        | ✗   | ✗    | ✗   | ✗               |
 | nrm2        | ✗   | ✗    | ✗   | ✗               |
 | scalcopy    | ✗   | ✗    | ✗   | ✗               |
-| scale       | ✗   | ✗    | ✗   | ✗               |
+| scal        | ✓   | ✓    | ✗   | ✗               |
 
 ### Level 2
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |

@@ -122,7 +122,7 @@ using xkblas_index_name_t = typename _xkblas_index_name_t<T>::value;
     F(FILL)                      \
     F(NRM2)                      \
     F(SCALCOPY)                  \
-    F(SCALE)                     \
+    F(SCAL)                      \
                                  \
     /* LEVEL 2 */                \
     F(COPYSCALE)                 \
@@ -176,10 +176,8 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(C,     NRM2)                                  \
     F(D,     NRM2)                                  \
     F(Z,     NRM2)                                  \
-    F(S,     SCALE)                                 \
-    F(C,     SCALE)                                 \
-    F(D,     SCALE)                                 \
-    F(Z,     SCALE)                                 \
+    F(S,     SCAL)                                  \
+    F(D,     SCAL)                                  \
     F(S,     AXPY)                                  \
     F(C,     AXPY)                                  \
     F(D,     AXPY)                                  \
@@ -251,10 +249,10 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(C,     NRM2)                                  \
     F(D,     NRM2)                                  \
     F(Z,     NRM2)                                  \
-    F(S,     SCALE)                                 \
-    F(C,     SCALE)                                 \
-    F(D,     SCALE)                                 \
-    F(Z,     SCALE)                                 \
+    F(S,     SCAL)                                  \
+    F(C,     SCAL)                                  \
+    F(D,     SCAL)                                  \
+    F(Z,     SCAL)                                  \
     F(S,     AXPY)                                  \
     F(C,     AXPY)                                  \
     F(D,     AXPY)                                  \

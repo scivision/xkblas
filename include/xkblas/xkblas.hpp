@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/26 17:49:17 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 18:38:35 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -133,7 +133,7 @@ typedef struct  xkblas_t
     int scalcopy_async();    // TODO
 
     TYPED
-    int scale_async(int n, const TYPE s, const TYPE * x);
+    int scal_async(int n, const TYPE * alpha, TYPE * x, int incx);
 
     // LEVEL 1 - single tile
 
@@ -164,6 +164,15 @@ typedef struct  xkblas_t
         const TYPE * y, int incy,
         const TYPE * temp_r,
               TYPE * r,
+        xkrt::device_global_id_t device_global_id
+    );
+
+    TYPED
+    int scal_tile_async(
+        int n,
+        const TYPE * alpha,
+        TYPE * x,
+        int incx,
         xkrt::device_global_id_t device_global_id
     );
 

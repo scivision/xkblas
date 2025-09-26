@@ -1175,6 +1175,39 @@ main_dot(char ** args)
     return 0;
 }
 
+TYPED
+static int
+main_scal(char ** args)
+{
+    int n  = atoi(args[0]);
+    int ts = atoi(args[1]);
+    TYPE alpha = (TYPE) atof(args[2]);
+    printf("alpha=%lf\n", alpha);
+
+    /* allocate vectors */
+    uintptr_t ptr[1];
+    prepare_n_vectors<P>(ptr, 1, n);
+    # define X ((TYPE *)ptr[0])
+    dump_vector<P>("X", X, n);
+
+    int incx = 1;
+    set_tile_size(ts);
+
+    uint64_t t0 = get_nanotime();
+    xkblas->scal_async<P>(n, &alpha, X, incx);
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, X, sizeof(TYPE) * n);
+    xkblas->sync();
+    uint64_t tf = get_nanotime();
+
+    dump_vector<P>("alpha.X", X, n);
+    printf("GPU Took %lf s\n", (tf - t0) / 1.0e9);
+
+    # undef X
+
+    return 0;
+}
+
+
 // PIN-GEMM-UNPIN //
 TYPED
 static int
@@ -1408,6 +1441,17 @@ static func_t funcs[] = {
         .usage =    "n\n"
                     "  -  n : vector sizes\n"
                     "  - ts : tile size\n"
+    },
+
+    {
+        .name = "SCAL",
+        .f = main_scal<PRECISION>,
+        .nargs = 3,
+        .descr = "x := alpha.x",
+        .usage =    "n\n"
+                    "  -     n : vector size\n"
+                    "  -    ts : tile size\n"
+                    "  - alpha : alpha\n"
     },
 
     {

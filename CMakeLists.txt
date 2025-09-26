@@ -47,7 +47,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
 SET(XKBLAS_KERNELS
 
     # level 1
-    axpby axpy divcopy dot fill nrm2 scalcopy scale
+    axpby axpy divcopy dot fill nrm2 scalcopy scal
 
     # level 2
     copyscale gemv

@@ -39,14 +39,25 @@
 
 XKRT_NAMESPACE_USE;
 
-TYPED
-void
-xkblas_t::task_format_create_SCALE(
-    task_format_t * format
+extern "C"
+int
+xkblas_£scal_tile_async(
+    const size_t n,
+    const TYPE * alpha,
+    TYPE * x,
+    const size_t incx,
+    xkrt_device_global_id_t device_global_id
 ) {
+    return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_global_id);
 }
 
-# define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SCALE<P>(task_format_t * format);
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE
+extern "C"
+int
+xkblas_£scal_async(
+    int n,
+    const TYPE * alpha,
+    TYPE * x,
+    int incx
+) {
+    return xkblas_get()->scal_async<xkblas_precision_t::££>(n, alpha, x, incx);
+}

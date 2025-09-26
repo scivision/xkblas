@@ -57,7 +57,7 @@ extern "C" {
 
     int xkblas_£scalcopy_async();    // TODO
 
-    int xkblas_£scale_async(int n, const TYPE s, const TYPE * x);
+    int xkblas_£scal_async(int n, const TYPE * alpha, TYPE * x, int incx);
 
     /* Level 2 */
 
