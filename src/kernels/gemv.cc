@@ -260,7 +260,7 @@ xkblas_t::gemv_async(
     return 0;
 }
 
-# if XKBLAS_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
@@ -312,10 +312,10 @@ body_cuda(
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemv);
 }
-# endif /* XKBLAS_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUBLAS */
 
 
-# ifdef XKBLAS_SUPPORT_CBLAS
+# if XKBLAS_SUPPORT_CBLAS
 
 template <xkblas_precision_t P, auto FUNC>
 static void
@@ -383,9 +383,9 @@ xkblas_t::task_format_create_GEMV(
     format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKBLAS_SUPPORT_CBLAS */
 
-    # if XKBLAS_SUPPORT_CUDA
+    # if XKBLAS_SUPPORT_CUBLAS
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUDA */
+    # endif /* XKBLAS_SUPPORT_CUBLAS */
 }
 
 /* instanciate methods for each precision */
