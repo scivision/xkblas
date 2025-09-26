@@ -42,13 +42,13 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£dot_tile_async(
-    distribution_t * d,
     const size_t n,
     const TYPE * x, const size_t incx,
     const TYPE * y, const size_t incy,
-          TYPE * r
+          TYPE * r,
+    xkrt_device_global_id_t device_global_id
 ) {
-    return xkblas_get()->dot_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, r, d);
+    return xkblas_get()->dot_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, r, device_global_id);
 }
 
 extern "C"

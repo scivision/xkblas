@@ -36,6 +36,7 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkblas/auto-tile.h>
 
 XKRT_NAMESPACE_USE;
 
@@ -45,11 +46,13 @@ struct args_t
     args_t(
         size_t n,
         int incx,
-        int incy
+        int incy,
+        TYPE * r
     ) :
         n(n),
         incx(incx),
-        incy(incy)
+        incy(incy),
+        r(r)
     {}
 
     ~args_t() {}
@@ -57,6 +60,7 @@ struct args_t
     const size_t n;
     const int incx;
     const int incy;
+    TYPE * r;
 };
 
 TYPED
@@ -65,15 +69,12 @@ xkblas_t::dot_tile_async(
     int n,
     const TYPE * x, int incx,
     const TYPE * y, int incy,
+    const TYPE * temp_r,
           TYPE * r,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
-    assert(d == NULL);
-
     thread_t * thread = thread_t::get_tls();
     assert(thread);
-
-    LOGGER_DEBUG("Submitting tile of dot");
 
     # define AC 3
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
@@ -88,23 +89,39 @@ xkblas_t::dot_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 0;
-    device_global_id_t device_global_id = UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(n, incx, incy);
+    new (args) args_t<P>(n, incx, incy, r);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
     new (accesses + 0) access_t(task, x, incx*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, y, incy*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 2) access_t(task, r, ACCESS_MODE_VW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+
+    if (temp_r)
+        new (accesses + 2) access_t(task, temp_r, ACCESS_MODE_VW, ACCESS_CONCURRENCY_CONCURRENT, ACCESS_SCOPE_NONUNIFIED);
+    else
+        new (accesses + 2) access_t(task, r,      ACCESS_MODE_VW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+
     thread->resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
 
     return 0;
+}
+
+TYPED
+int
+xkblas_t::dot_tile_async(
+    int n,
+    const TYPE * x, int incx,
+    const TYPE * y, int incy,
+          TYPE * r,
+    device_global_id_t device_global_id
+) {
+    return this->dot_tile_async<P>(n, x, incx, y, incy, NULL, r, device_global_id);
 }
 
 TYPED
@@ -121,10 +138,9 @@ xkblas_t::dot_async(
         return 0;
     }
 
-    # if 0
     // get tile size
-    xkblas_t * context = xkblas_get();
-    size_t ts = context->conf.kernels[DOT].tile;
+    xkblas_t * xkblas = xkblas_get();
+    size_t ts = xkblas->conf.kernels[DOT].tile;
     if (ts == 0)
     {
         int args[1] = { n };
@@ -132,21 +148,43 @@ xkblas_t::dot_async(
     }
     const size_t nt = NUM_OF_TILES(n, ts);
 
-    // get number of gpus
-    const int ngpus = context->runtime.get_ndevices() - 1;
-    distribution_t d;
-    distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, n, ts);
-
-    // spawn tiles
-    for (size_t tn = 0 ; tn < nt ; ++tn)
+    if (nt == 1)
     {
-        size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
-        this->dot_tile_async<P>(n, alpha, A, B, tn, bs, &d);
+        this->dot_tile_async<P>(n, x, incx, y, incy, r, UNSPECIFIED_DEVICE_GLOBAL_ID);
     }
-    # else
-    this->dot_tile_async<P>(n, x, incx, y, incy, r, NULL);
-    LOGGER_WARN("Dot is currently implemented to run on a single GPU.");
-    # endif
+    else
+    {
+        // temporary results
+        TYPE * temp_r = (TYPE *) malloc(sizeof(TYPE) * nt);
+        assert(temp_r);
+
+        // get number of gpus
+        const int ngpus = xkblas->runtime.get_ndevices() - 1;
+        distribution_t d;
+        distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, n, ts);
+
+        // spawn tiles
+        for (size_t tn = 0 ; tn < nt ; ++tn)
+        {
+            size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
+            device_global_id_t device_global_id = distribution1D_get(&d, tn);
+            this->dot_tile_async<P>(bs, x + tn*ts*incx, incx, y + tn*ts*incy, incy, temp_r, temp_r + tn, device_global_id);
+        }
+
+        xkblas->runtime.task_spawn<2>(
+            [=] (task_t * task, access_t * accesses) {
+                new (accesses + 0) access_t(task, temp_r, ACCESS_MODE_R, ACCESS_CONCURRENCY_SEQUENTIAL);
+                new (accesses + 1) access_t(task,      r, ACCESS_MODE_W, ACCESS_CONCURRENCY_SEQUENTIAL);
+            },
+
+            [=] (task_t * task) {
+                *r = 0;
+                for (size_t i = 0 ; i < nt ; ++i)
+                    *r += temp_r[i];
+                free(temp_r);
+            }
+        );
+    }
 
     return 0;
 }
@@ -172,21 +210,21 @@ body_cuda_run(
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * x   = accesses + 0;
     const access_t * y   = accesses + 1;
-    const access_t * res = accesses + 2;
 
-    assert(  x->device_view.addr % x->host_view.sizeof_type == 0);
-    assert(  y->device_view.addr % y->host_view.sizeof_type == 0);
-    assert(res->host_view.addr);
+    assert(x->device_view.addr % x->host_view.sizeof_type == 0);
+    assert(y->device_view.addr % y->host_view.sizeof_type == 0);
 
-    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
+    assert(args->r);
+
     XKBLAS_CUBLAS_CALL(
         FUNC(
             handle,
             (int) args->n,
-            (const CU_TYPE *)   x->device_view.addr, args->incx,
-            (const CU_TYPE *)   y->device_view.addr, args->incy,
-            (      CU_TYPE *) res->host_view.addr
+            (const CU_TYPE *) x->device_view.addr, args->incx,
+            (const CU_TYPE *) y->device_view.addr, args->incy,
+            (      CU_TYPE *) args->r
         )
     );
 }
@@ -211,13 +249,11 @@ body_cpu_run(task_t * task)
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * x = accesses + 0;
     const access_t * y = accesses + 1;
-    const access_t * r = accesses + 2;
 
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
 
-    TYPE * r_value = (TYPE *) r->host_view.addr;
-    *r_value = FUNC(
+    *(args->r) = FUNC(
         (int) args->n,
         (const TYPE *) x->host_view.addr, (int) args->incx,
         (const TYPE *) y->host_view.addr, (int) args->incy
@@ -251,6 +287,7 @@ xkblas_t::task_format_create_DOT(
 # define DEFINE(P)  \
         template void xkblas_t::task_format_create_DOT<P>(task_format_t * format);                                                                                         \
     template int xkblas_t::dot_async<P>(int n, const xkblas_precision_type_t<P> * x, int incx, const xkblas_precision_type_t<P> * y, int incy, xkblas_precision_type_t<P> * r);   \
-    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, int incx, const xkblas_precision_type_t<P> * y, int incy, xkblas_precision_type_t<P> * r, distribution_t * d);
+    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, int incx, const xkblas_precision_type_t<P> * y, int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);   \
+    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, int incx, const xkblas_precision_type_t<P> * y, int incy, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

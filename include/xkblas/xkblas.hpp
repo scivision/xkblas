@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/26 16:09:29 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 17:49:17 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -154,7 +154,17 @@ typedef struct  xkblas_t
         const TYPE * x, int incx,
         const TYPE * y, int incy,
               TYPE * r,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
+    );
+
+    TYPED
+    int dot_tile_async(
+        int n,
+        const TYPE * x, int incx,
+        const TYPE * y, int incy,
+        const TYPE * temp_r,
+              TYPE * r,
+        xkrt::device_global_id_t device_global_id
     );
 
     // LEVEL 2
