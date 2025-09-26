@@ -47,7 +47,7 @@ extern "C" {
 
     int xkblas_£axpy_async(int n, const TYPE alpha, const TYPE * x, TYPE * y);
 
-    int xkblas_£dot_async(const TYPE * x, const TYPE * y, TYPE * result);
+    int xkblas_£dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
 
     int xkblas_£divcopy_async();    // TODO
 

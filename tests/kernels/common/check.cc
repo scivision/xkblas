@@ -169,6 +169,20 @@ spmv_cpu(
     return r;
 }
 
+TYPED
+int
+dot_cpu(
+    int n,
+    const TYPE * x, int incx,
+    const TYPE * y, int incy,
+          TYPE * r
+) {
+    *r = 0.0;
+    for (int i = 0; i < n; ++i)
+        *r += x[i*incx] * y[i*incy];
+    return 0;
+}
+
 /**
  *  Verify the solution of the gemm 'CImpl' result.
  *      1) copy C to CRef

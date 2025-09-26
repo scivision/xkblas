@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/26 15:28:27 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/26 16:09:29 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -118,7 +118,7 @@ typedef struct  xkblas_t
     int axpy_async(int n, const TYPE alpha, const TYPE * x, TYPE * y);
 
     TYPED
-    int dot_async(const TYPE * x, const TYPE * y, TYPE * result);
+    int dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
 
     TYPED
     int divcopy_async();    // TODO
@@ -145,6 +145,15 @@ typedef struct  xkblas_t
               TYPE * y,
         const size_t tn,
         const size_t bs,
+        xkrt::distribution_t * d
+    );
+
+    TYPED
+    int dot_tile_async(
+        int n,
+        const TYPE * x, int incx,
+        const TYPE * y, int incy,
+              TYPE * r,
         xkrt::distribution_t * d
     );
 

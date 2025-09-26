@@ -171,9 +171,7 @@ xkblas_kernel_name(xkblas_kernel_t k)
 # define XKBLAS_FORALL_PRECISIONS_AND_KERNELS(F)    \
     /* LEVEL 1 */                                   \
     F(S,     DOT)                                   \
-    F(C,     DOT)                                   \
     F(D,     DOT)                                   \
-    F(Z,     DOT)                                   \
     F(S,     NRM2)                                  \
     F(C,     NRM2)                                  \
     F(D,     NRM2)                                  \

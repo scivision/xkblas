@@ -1130,6 +1130,50 @@ main_gemv(char ** args)
     return 0;
 }
 
+TYPED
+static int
+main_dot(char ** args)
+{
+    int n  = atoi(args[0]);
+    int ts = atoi(args[1]);
+    int incx = 1;
+    int incy = 1;
+
+    /* allocate vectors */
+    uintptr_t ptr[2];
+    prepare_n_vectors<P>(ptr, 2, n);
+    # define X ((TYPE *)ptr[0])
+    # define Y ((TYPE *)ptr[1])
+    dump_vector<P>("X", X, n);
+    dump_vector<P>("Y", Y, n);
+
+    TYPE r = 0.0;
+
+    set_tile_size(ts);
+
+    uint64_t t0 = get_nanotime();
+    xkblas->dot_async<P>(n, X, incx, Y, incy, &r);
+    xkblas->sync();
+    uint64_t tf = get_nanotime();
+
+    printf("r_gpu = %lf\n", r);
+    printf("GPU Took %lf s\n", (tf - t0) / 1.0e9);
+
+    if (!SKIP_CHECK)
+    {
+        TYPE r_cpu = (TYPE) 0.0;
+        uint64_t t0 = get_nanotime();
+        dot_cpu<P>(n, X, incx, Y, incy, &r_cpu);
+        uint64_t tf = get_nanotime();
+        printf("r_cpu = %lf\n", r_cpu);
+        printf("CPU Took %lf s\n", (tf - t0) / 1.0e9);
+    }
+
+    # undef X
+    # undef Y
+
+    return 0;
+}
 
 // PIN-GEMM-UNPIN //
 TYPED
@@ -1354,6 +1398,16 @@ static func_t funcs[] = {
                     "  -      ts : tile size\n"
                     "  -   alpha : alpha\n"
                     "  -    beta : beta\n"
+    },
+
+    {
+        .name = "DOT",
+        .f = main_dot<PRECISION>,
+        .nargs = 2,
+        .descr = "r := x.y",
+        .usage =    "n\n"
+                    "  -  n : vector sizes\n"
+                    "  - ts : tile size\n"
     },
 
     {
