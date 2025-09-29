@@ -40,13 +40,31 @@
 XKRT_NAMESPACE_USE;
 
 TYPED
+int
+xkblas_t::axpby_async(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+    const TYPE * beta,
+          TYPE * y,
+    const int incy
+) {
+    LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
+    this->scal_async<P>(n, beta,  y, incy);
+    this->axpy_async<P>(n, alpha, x, incx, y, incy);
+}
+
+TYPED
 void
 xkblas_t::task_format_create_AXPBY(
     task_format_t * format
 ) {
+    // nothing to do
 }
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_AXPBY<P>(task_format_t * format);
+    template void xkblas_t::task_format_create_AXPBY<P>(task_format_t * format); \
+    template int xkblas_t::axpby_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

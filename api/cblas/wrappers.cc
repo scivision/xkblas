@@ -105,7 +105,6 @@ void cblas_saxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_
     xkblas_sync();
 }
 
-
 void cblas_daxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx, double *y, OPENBLAS_CONST blasint incy) {
     xkblas_daxpy_async(n, &alpha, x, incx, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
@@ -412,6 +411,7 @@ void cblas_ztrmm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_strsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_SIDE Side, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA,
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *A, OPENBLAS_CONST blasint lda, float *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
+    assert(Diag == CblasNonUnit);
     xkblas_strsm_async(Side, Uplo, TransA, Side, M, N, &alpha, A, lda, B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(float));
     xkblas_sync();
@@ -420,6 +420,7 @@ void cblas_strsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_dtrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_SIDE Side, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA,
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *A, OPENBLAS_CONST blasint lda, double *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
+    assert(Diag == CblasNonUnit);
     xkblas_dtrsm_async(Side, Uplo, TransA, Side, M, N, &alpha, A, lda, B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(double));
     xkblas_sync();
@@ -428,6 +429,7 @@ void cblas_dtrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_ctrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_SIDE Side, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA,
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, void *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
+    assert(Diag == CblasNonUnit);
     xkblas_ctrsm_async(Side, Uplo, TransA, Diag, M, N, (const complex_float *) alpha, (const complex_float *) A, lda, (complex_float *) B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(complex_float));
     xkblas_sync();
@@ -436,6 +438,7 @@ void cblas_ctrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_ztrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_SIDE Side, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA,
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, void *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
+    assert(Diag == CblasNonUnit);
     xkblas_ztrsm_async(Side, Uplo, TransA, Diag, M, N, (const complex_double *) alpha, (const complex_double *) A, lda, (complex_double *) B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(complex_double));
     xkblas_sync();
@@ -462,12 +465,22 @@ void cblas_xerbla(blasint p, OPENBLAS_CONST char *rout, OPENBLAS_CONST char *for
 
 /*** BLAS extensions ***/
 
-void cblas_saxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST float beta, float *y, OPENBLAS_CONST blasint incy);
+# endif
 
-void cblas_daxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST double beta, double *y, OPENBLAS_CONST blasint incy);
+void cblas_saxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST float beta, float *y, OPENBLAS_CONST blasint incy) {
+    xkblas_saxpby_async(n, &alpha, x, incx, &beta, y, incy);
+    xkblas_memory_segment_coherent_async(y, n*sizeof(float)*incy);
+    xkblas_sync();
+}
 
+void cblas_daxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST double beta, double *y, OPENBLAS_CONST blasint incy) {
+    xkblas_daxpby_async(n, &alpha, x, incx, &beta, y, incy);
+    xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
+    xkblas_sync();
+}
+
+# if 0
 void cblas_caxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST void *beta, void *y, OPENBLAS_CONST blasint incy);
-
 void cblas_zaxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST void *beta, void *y, OPENBLAS_CONST blasint incy);
 
 void cblas_somatcopy(OPENBLAS_CONST enum CBLAS_ORDER CORDER, OPENBLAS_CONST enum CBLAS_TRANSPOSE CTRANS, OPENBLAS_CONST blasint crows, OPENBLAS_CONST blasint ccols, OPENBLAS_CONST float calpha, OPENBLAS_CONST float *a,

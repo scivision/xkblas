@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/29 04:24:52 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/29 05:10:14 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -111,7 +111,7 @@ typedef struct  xkblas_t
 
     /* TODO: y := a.x + b.y */
     TYPED
-    int axpby_async(int n, const TYPE alpha, const TYPE * x, const TYPE beta, TYPE * y);
+    int axpby_async(int n, const TYPE * alpha, const TYPE * x, const int incx, const TYPE * beta, TYPE * y, const int incy);
 
     /* y := a.x + y */
     TYPED
