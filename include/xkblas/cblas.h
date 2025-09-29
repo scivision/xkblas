@@ -585,5 +585,4 @@ enum CBLAS_SPARSE {
     CblasSparseDIA = 146
 };
 
-
 #endif

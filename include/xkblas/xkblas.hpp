@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/26 18:38:35 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/29 04:24:52 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -109,13 +109,13 @@ typedef struct  xkblas_t
 
     // LEVEL 1 - TODO
 
-    /* y := a.x + b.y */
+    /* TODO: y := a.x + b.y */
     TYPED
     int axpby_async(int n, const TYPE alpha, const TYPE * x, const TYPE beta, TYPE * y);
 
     /* y := a.x + y */
     TYPED
-    int axpy_async(int n, const TYPE alpha, const TYPE * x, TYPE * y);
+    int axpy_async(int n, const TYPE * alpha, const TYPE * x, const int incx, TYPE * y, const int incy);
 
     TYPED
     int dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
@@ -140,12 +140,13 @@ typedef struct  xkblas_t
     TYPED
     int axpy_tile_async(
         int n,
-        const TYPE alpha,
+        const TYPE * alpha,
         const TYPE * x,
+        const int incx,
               TYPE * y,
-        const size_t tn,
+        const int incy,
         const size_t bs,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     TYPED

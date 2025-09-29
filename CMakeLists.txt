@@ -182,7 +182,8 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 ##########
 
 # XKBLAS Lib
-add_library(${XKBLAS_NAME} SHARED ${SOURCE_FILES} ${C_SOURCE_FILES})
+add_library(${XKBLAS_NAME}       SHARED ${SOURCE_FILES} ${C_SOURCE_FILES})
+add_library(${XKBLAS_NAME}_cblas SHARED ${CMAKE_SOURCE_DIR}/api/cblas/wrappers.cc) # cblas wrappers
 
 # Include directory
 include_directories(${CMAKE_SOURCE_DIR}/include/)
@@ -206,13 +207,15 @@ install(
     DESTINATION include/xkblas
 )
 
-install(TARGETS ${XKBLAS_NAME} LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS ${XKBLAS_NAME}       LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
+install(TARGETS ${XKBLAS_NAME}_cblas LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 install(DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
     # SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
-    target_compile_options(${XKBLAS_NAME} PRIVATE ${STRICT_OPTIONS})
+    target_compile_options(${XKBLAS_NAME}       PRIVATE ${STRICT_OPTIONS})
+    target_compile_options(${XKBLAS_NAME}_cblas PRIVATE ${STRICT_OPTIONS})
 endif()
 
 ###############
@@ -221,7 +224,8 @@ endif()
 
 # XK Runtime
 find_package(XKRT REQUIRED)
-target_link_libraries(${XKBLAS_NAME} PRIVATE XKRT::xkrt)
+target_link_libraries(${XKBLAS_NAME}       PRIVATE XKRT::xkrt)
+target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE ${XKBLAS_NAME})
 
 ################
 # DEPENDENCIES #

@@ -100,6 +100,11 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 |-------------|-----|------|-----|-----------------|
 | spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
 
+# TODOS
+- Consolidate Intel implementation
+- Implement missing cblas wrappers
+- Implement missing kernels on above table
+
 # Problems on Intel GPUs
 - memcpy2D is broken
 - Deadlock / pagefaults of what seems valid transfers

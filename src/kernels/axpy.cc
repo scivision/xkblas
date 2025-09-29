@@ -45,28 +45,35 @@ struct args_t
 {
     args_t(
         size_t n,
-        const TYPE alpha
+        const TYPE * alpha,
+        const int incx,
+        const int incy
     ) :
         n(n),
+        incx(incx),
+        incy(incy),
         alpha(alpha)
     {}
 
     ~args_t() {}
 
     const size_t n;
-    const TYPE alpha;
+    const int incx;
+    const int incy;
+    const TYPE * alpha;
 };
 
 TYPED
 int
 xkblas_t::axpy_tile_async(
     int n,
-    const TYPE alpha,
-    const TYPE * A,
-          TYPE * B,
-    const size_t tn,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy,
     const size_t bs,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -86,16 +93,15 @@ xkblas_t::axpy_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    device_global_id_t device_global_id = d ? distribution1D_get(d, tn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(n, alpha);
+    new (args) args_t<P>(n, alpha, incx, incy);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
-    new (accesses + 0) access_t(task, A, bs, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 1) access_t(task, B, bs, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 0) access_t(task, x, incx*bs, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 1) access_t(task, y, incy*bs, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     thread->resolve(accesses, AC);
     # undef AC
 
@@ -108,9 +114,11 @@ TYPED
 int
 xkblas_t::axpy_async(
     int n,
-    const TYPE alpha,
-    const TYPE * A,
-          TYPE * B
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
 ) {
     if (n == 0)
         return 0;
@@ -121,15 +129,15 @@ xkblas_t::axpy_async(
         return -1;
     }
 
-    if (A == NULL)
+    if (x == NULL)
     {
-        LOGGER_FATAL("A is NULL");
+        LOGGER_FATAL("x is NULL");
         return -2;
     }
 
-    if (B == NULL)
+    if (y == NULL)
     {
-        LOGGER_FATAL("B is NULL");
+        LOGGER_FATAL("y is NULL");
         return -3;
     }
 
@@ -152,7 +160,8 @@ xkblas_t::axpy_async(
     for (size_t tn = 0 ; tn < nt ; ++tn)
     {
         size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
-        this->axpy_tile_async<P>(n, alpha, A, B, tn, bs, &d);
+        device_global_id_t device_global_id = distribution1D_get(&d, tn);
+        this->axpy_tile_async<P>(n, alpha, x, incx, y, incy, bs, device_global_id);
     }
 
     return 0;
@@ -188,9 +197,9 @@ body_cuda_run(
         FUNC(
             handle,
             (int) args->n,
-            (const CU_TYPE *) &args->alpha,
-            (const CU_TYPE *) X->device_view.addr, 1,
-            (      CU_TYPE *) Y->device_view.addr, 1
+            (const CU_TYPE *) args->alpha,
+            (const CU_TYPE *) X->device_view.addr, args->incx,
+            (      CU_TYPE *) Y->device_view.addr, args->incy
         )
     );
 }
@@ -222,7 +231,7 @@ xkblas_t::task_format_create_AXPY(
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_AXPY<P>(task_format_t * format); \
-    template int xkblas_t::axpy_async<P>(int n, const xkblas_precision_type_t<P> alpha, const xkblas_precision_type_t<P> * A, xkblas_precision_type_t<P> * B); \
-    template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> alpha, const xkblas_precision_type_t<P> * A, xkblas_precision_type_t<P> * B, const size_t tn, const size_t bs, distribution_t * d);
+    template int xkblas_t::axpy_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
+    template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, const size_t bs, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

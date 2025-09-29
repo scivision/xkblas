@@ -43,9 +43,9 @@ extern "C" {
 # endif /* __cplusplus */
 
     /* Level 1 */
-    int xkblas_£axpby_async(int n, const TYPE alpha, const TYPE * x, const TYPE beta, TYPE * y);
+    int xkblas_£axpby_async(int n, const TYPE * alpha, const TYPE * x, const int incx, const TYPE beta, TYPE * y, const int incy);
 
-    int xkblas_£axpy_async(int n, const TYPE alpha, const TYPE * x, TYPE * y);
+    int xkblas_£axpy_async(int n, const TYPE * alpha, const TYPE * x, const int incx, TYPE * y, const int incy);
 
     int xkblas_£dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
 
