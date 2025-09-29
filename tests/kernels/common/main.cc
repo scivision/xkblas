@@ -273,7 +273,7 @@ main_axpy(char ** args)
 
     uint64_t t0 = get_nanotime();
     set_tile_size(ts);
-    xkblas->axpy_async<P>(n, alpha, X, Y);
+    xkblas->axpy_async<P>(n, &alpha, X, 1, Y, 1);
     xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, n*sizeof(TYPE));
     uint64_t tt = get_nanotime();
     xkblas_sync();
@@ -677,7 +677,7 @@ main_mumps(char ** args)
 
     # define USE_WRITE_BACK     1
     # define USE_ARGS_MATRIX    1
-    # define USE_TS_TUNER       1
+    # define USE_TS_TUNER       0
     # define USE_PREALLOCATE    1
     # define NMATRICES          10
 
