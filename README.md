@@ -25,33 +25,6 @@ cd build
 CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PATH cmake -DUSE_CUDA=on -DUSE_CUBLAS=on -DUSE_SYCL=on -DUSE_MKL=on -DUSE_CLBLAST=on -DUSE_ZE=on -DCMAKE_BUILD_TYPE=Debug ../
 ```
 
-## Useful tips
-
-XKBlas is built on top of XKRT. It means every interfaces of XKRT interoperates with XKBlas.
-
-### Environment variables
-`XKAAPI_NGPUS` specifies the number of GPUs to use.
-You may want to couple it with vendor-specific variables to select specific GPUs (`CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, `ZE_AFFINITY_MASK`).
-
-### Interoperability
-For instance, that code compute a GEMM and outputs the first element of the matrix `C` - moving only a single byte from wherever it was computed, to the host.
-```C++
-xkblas_gemm_async(_, _, _, _, _, _, A, LDA, B, LDB, _, C, LDC);
-
-runtime_t * rt = xkblas_xkrt_runtime_get();
-rt.task_spawn<1>(
-    [=C] (task_t * task, access_t * accesses) {
-        new (accesses) access_t(task, &C[0], &C[1], ACCESS_MODE_R);
-    },
-
-    [=C] (task_t * task) {
-        printf("C[0] = %lf", C[0]);
-    }
-);
-
-xkblas_sync(); // or equivalently, rt.task_wait()
-```
-
 ## List of kernels supported
 Kernels are being added lazily: if you need a missing kernel for a specific hardware, add it yourself or open an issue and someone will add it on a best effort basis.
 
@@ -99,6 +72,38 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
+
+## Useful tips
+
+XKBlas is built on top of XKRT. It means every interfaces of XKRT interoperates with XKBlas.
+
+### Environment variables
+`XKAAPI_NGPUS` specifies the number of GPUs to use.
+You may want to couple it with vendor-specific variables to select specific GPUs (`CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, `ZE_AFFINITY_MASK`).
+
+### OpenBLAS wrapper
+When building XKBlas, a library named `libxkblas_cblas.so` is also built and installed.
+It implemented OpenBLAS's cblas ABI.
+By setting `LD_PRELOAD=/path/to/libxkblas_cblas.so`, any programs linked to OpenBLAS can run on XKBlas (therefore, an original CPU program will end-up running on multiple-GPUs)
+
+### Interoperability
+For instance, that code compute a GEMM and outputs the first element of the matrix `C` - moving only a single byte from wherever it was computed, to the host.
+```C++
+xkblas_gemm_async(_, _, _, _, _, _, A, LDA, B, LDB, _, C, LDC);
+
+runtime_t * rt = xkblas_xkrt_runtime_get();
+rt.task_spawn<1>(
+    [=C] (task_t * task, access_t * accesses) {
+        new (accesses) access_t(task, &C[0], &C[1], ACCESS_MODE_R);
+    },
+
+    [=C] (task_t * task) {
+        printf("C[0] = %lf", C[0]);
+    }
+);
+
+xkblas_sync(); // or equivalently, rt.task_wait()
+```
 
 # TODOS
 - Consolidate Intel implementation
