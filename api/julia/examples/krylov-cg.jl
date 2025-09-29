@@ -36,4 +36,5 @@ for FC in (Float64, ComplexF64)
     resid = norm(r) / norm(b)
     @assert resid ≤ cg_tol "Failure"
     println("Success")
+    println(resid)
 end

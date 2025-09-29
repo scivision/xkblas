@@ -441,6 +441,16 @@ void cblas_dgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
     xkblas_cblas_sync();
 }
 
+void dgemm_(const char *TRANSA, const char *TRANSB, const F_INT32 *M, const F_INT32 *N, const F_INT32 *K, const double *ALPHA, const double *A, const F_INT32 *LDA, const double *B, const F_INT32 *LDB, const double *BETA, double *C, const F_INT32 *LDC)
+{
+    cblas_dgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), *M, *N, *K, *ALPHA, A, *LDA, B, *LDB, *BETA, C, *LDC);
+}
+
+void dgemm_64_(const char *TRANSA, const char *TRANSB, const F_INT64 *M, const F_INT64 *N, const F_INT64 *K, const double *ALPHA, const double *A, const F_INT64 *LDA, const double *B, const F_INT64 *LDB, const double *BETA, double *C, const F_INT64 *LDC)
+{
+    cblas_dgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), (int)(*M), (int)(*N), (int)(*K), *ALPHA, A, (int)(*LDA), B, (int)(*LDB), *BETA, C, (int)(*LDC));
+}
+
 void cblas_cgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
@@ -450,6 +460,16 @@ void cblas_cgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
     xkblas_cblas_sync();
 }
 
+void cgemm_(const char *TRANSA, const char *TRANSB, const F_INT32 *M, const F_INT32 *N, const F_INT32 *K, const void *ALPHA, const void *A, const F_INT32 *LDA, const void *B, const F_INT32 *LDB, const void *BETA, void *C, const F_INT32 *LDC)
+{
+    cblas_cgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), *M, *N, *K, ALPHA, A, *LDA, B, *LDB, BETA, C, *LDC);
+}
+
+void cgemm_64_(const char *TRANSA, const char *TRANSB, const F_INT64 *M, const F_INT64 *N, const F_INT64 *K, const void *ALPHA, const void *A, const F_INT64 *LDA, const void *B, const F_INT64 *LDB, const void *BETA, void *C, const F_INT64 *LDC)
+{
+    cblas_cgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), (int)(*M), (int)(*N), (int)(*K), ALPHA, A, (int)(*LDA), B, (int)(*LDB), BETA, C, (int)(*LDC));
+}
+
 void cblas_zgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
@@ -457,6 +477,16 @@ void cblas_zgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
     xkblas_zgemm_async(TransA, TransB, M, N, K, (const complex_double *) alpha, (const complex_double *) A, lda, (const complex_double *) B, ldb, (const complex_double *) beta, (complex_double *) C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, N, sizeof(complex_double));
     xkblas_cblas_sync();
+}
+
+void zgemm_(const char *TRANSA, const char *TRANSB, const F_INT32 *M, const F_INT32 *N, const F_INT32 *K, const void *ALPHA, const void *A, const F_INT32 *LDA, const void *B, const F_INT32 *LDB, const void *BETA, void *C, const F_INT32 *LDC)
+{
+    cblas_zgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), *M, *N, *K, ALPHA, A, *LDA, B, *LDB, BETA, C, *LDC);
+}
+
+void zgemm_64_(const char *TRANSA, const char *TRANSB, const F_INT64 *M, const F_INT64 *N, const F_INT64 *K, const void *ALPHA, const void *A, const F_INT64 *LDA, const void *B, const F_INT64 *LDB, const void *BETA, void *C, const F_INT64 *LDC)
+{
+    cblas_zgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), (int)(*M), (int)(*N), (int)(*K), ALPHA, A, (int)(*LDA), B, (int)(*LDB), BETA, C, (int)(*LDC));
 }
 
 # if 0
