@@ -11,7 +11,12 @@
 # define openblas_complex_float  complex_float
 # define openblas_complex_double complex_double
 
+# define F_INT32 int
+# define F_INT64 long long
+
 extern "C" {
+
+# if 0
 
 __attribute__((constructor))
 void library_init() {
@@ -23,6 +28,20 @@ __attribute__((destructor))
 void library_cleanup() {
     xkblas_deinit();
 }
+
+# define xkblas_cblas_ensure(...)
+
+# else
+
+static inline void
+xkblas_cblas_ensure(void)
+{
+    static int initiated = 0;
+    if (!initiated)
+        xkblas_init();
+}
+
+# endif
 
 // TODO: maybe the programmer modify bytes on the host without telling us
 // between two calls, so invalidating cache here
@@ -48,6 +67,7 @@ double cblas_dsdot (OPENBLAS_CONST blasint n, OPENBLAS_CONST float *x, OPENBLAS_
 # endif
 
 float  cblas_sdot(OPENBLAS_CONST blasint n, OPENBLAS_CONST float  *x, OPENBLAS_CONST blasint incx, OPENBLAS_CONST float  *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     float result;
     xkblas_sdot_async(n, x, incx, y, incy, &result);
     xkblas_cblas_sync();
@@ -55,6 +75,7 @@ float  cblas_sdot(OPENBLAS_CONST blasint n, OPENBLAS_CONST float  *x, OPENBLAS_C
 }
 
 double cblas_ddot(OPENBLAS_CONST blasint n, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx, OPENBLAS_CONST double *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     double result;
     xkblas_ddot_async(n, x, incx, y, incy, &result);
     xkblas_cblas_sync();
@@ -87,7 +108,38 @@ double cblas_dnrm2 (OPENBLAS_CONST blasint N, OPENBLAS_CONST double *X, OPENBLAS
 float  cblas_scnrm2(OPENBLAS_CONST blasint N, OPENBLAS_CONST void  *X, OPENBLAS_CONST blasint incX);
 double cblas_dznrm2(OPENBLAS_CONST blasint N, OPENBLAS_CONST void *X, OPENBLAS_CONST blasint incX);
 
-CBLAS_INDEX cblas_isamax(OPENBLAS_CONST blasint n, OPENBLAS_CONST float  *x, OPENBLAS_CONST blasint incx);
+# endif
+
+CBLAS_INDEX cblas_isamax(OPENBLAS_CONST blasint n, OPENBLAS_CONST float  *x, OPENBLAS_CONST blasint incx) {
+    if (n <= 0 || incx <= 0)
+        return -1;  // BLAS typically returns 0-based index in C, but error handling can vary
+
+    CBLAS_INDEX max_index = 0;
+    float max_val = fabsf(x[0]);
+    int ix = incx;
+
+    for (int i = 1; i < n; ++i, ix += incx)
+    {
+        float val = fabsf(x[ix]);
+        if (val > max_val)
+        {
+            max_val = val;
+            max_index = i;
+        }
+    }
+
+    return max_index;  // returns 0-based index (CBLAS convention)
+}
+
+CBLAS_INDEX isamax_(const F_INT32 * n, const float * x, const F_INT32 * incx) {
+    return cblas_isamax(*n, x, *incx);
+}
+
+CBLAS_INDEX isamax_64_(const F_INT64 * n, const float * x, const F_INT64 * incx) {
+    return cblas_isamax((blasint)(*n), x, (blasint)(*incx));
+}
+
+# if 0
 CBLAS_INDEX cblas_idamax(OPENBLAS_CONST blasint n, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx);
 CBLAS_INDEX cblas_icamax(OPENBLAS_CONST blasint n, OPENBLAS_CONST void  *x, OPENBLAS_CONST blasint incx);
 CBLAS_INDEX cblas_izamax(OPENBLAS_CONST blasint n, OPENBLAS_CONST void *x, OPENBLAS_CONST blasint incx);
@@ -120,12 +172,14 @@ CBLAS_INDEX cblas_izmin(OPENBLAS_CONST blasint n, OPENBLAS_CONST void *x, OPENBL
 # endif
 
 void cblas_saxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx, float *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     xkblas_saxpy_async(n, &alpha, x, incx, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(float)*incy);
     xkblas_cblas_sync();
 }
 
 void cblas_daxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx, double *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     xkblas_daxpy_async(n, &alpha, x, incx, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
     xkblas_cblas_sync();
@@ -181,12 +235,14 @@ void cblas_drotmg(double *d1, double *d2, double *b1, OPENBLAS_CONST double b2, 
 # endif
 
 void cblas_sscal(OPENBLAS_CONST blasint N, OPENBLAS_CONST float alpha, float *X, OPENBLAS_CONST blasint incX) {
+    xkblas_cblas_ensure();
     xkblas_sscal_async(N, &alpha, X, incX);
     xkblas_memory_segment_coherent_async(X, N*sizeof(float)*incX);
     xkblas_cblas_sync();
 }
 
 void cblas_dscal(OPENBLAS_CONST blasint N, OPENBLAS_CONST double alpha, double *X, OPENBLAS_CONST blasint incX) {
+    xkblas_cblas_ensure();
     xkblas_dscal_async(N, &alpha, X, incX);
     xkblas_memory_segment_coherent_async(X, N*sizeof(double)*incX);
     xkblas_cblas_sync();
@@ -202,6 +258,7 @@ void cblas_zdscal(OPENBLAS_CONST blasint N, OPENBLAS_CONST double alpha, void *X
 void cblas_sgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBLAS_TRANSPOSE trans,  OPENBLAS_CONST blasint m, OPENBLAS_CONST blasint n,
 		 OPENBLAS_CONST float alpha, OPENBLAS_CONST float  *a, OPENBLAS_CONST blasint lda,  OPENBLAS_CONST float  *x, OPENBLAS_CONST blasint incx,  OPENBLAS_CONST float beta,  float  *y, OPENBLAS_CONST blasint incy) {
     assert(order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_sgemv_async(trans, m, n, &alpha, a, lda, x, incx, &beta, y, incy);
     xkblas_memory_segment_coherent_async(y, m*sizeof(float)*incy);
     xkblas_cblas_sync();
@@ -210,6 +267,7 @@ void cblas_sgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBL
 void cblas_dgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBLAS_TRANSPOSE trans,  OPENBLAS_CONST blasint m, OPENBLAS_CONST blasint n,
 		 OPENBLAS_CONST double alpha, OPENBLAS_CONST double  *a, OPENBLAS_CONST blasint lda,  OPENBLAS_CONST double  *x, OPENBLAS_CONST blasint incx,  OPENBLAS_CONST double beta,  double  *y, OPENBLAS_CONST blasint incy) {
     assert(order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_dgemv_async(trans, m, n, &alpha, a, lda, x, incx, &beta, y, incy);
     xkblas_memory_segment_coherent_async(y, m*sizeof(double)*incy);
     xkblas_cblas_sync();
@@ -218,6 +276,7 @@ void cblas_dgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBL
 void cblas_cgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBLAS_TRANSPOSE trans,  OPENBLAS_CONST blasint m, OPENBLAS_CONST blasint n,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void  *a, OPENBLAS_CONST blasint lda,  OPENBLAS_CONST void  *x, OPENBLAS_CONST blasint incx,  OPENBLAS_CONST void *beta,  void  *y, OPENBLAS_CONST blasint incy) {
     assert(order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_cgemv_async(trans, m, n, (const complex_float *) alpha, (const complex_float *) a, lda, (const complex_float *) x, incx, (const complex_float *) beta, (complex_float *) y, incy);
     xkblas_memory_segment_coherent_async(y, m*sizeof(complex_float)*incy);
     xkblas_cblas_sync();
@@ -226,6 +285,7 @@ void cblas_cgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBL
 void cblas_zgemv(OPENBLAS_CONST enum CBLAS_ORDER order,  OPENBLAS_CONST enum CBLAS_TRANSPOSE trans,  OPENBLAS_CONST blasint m, OPENBLAS_CONST blasint n,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void  *a, OPENBLAS_CONST blasint lda,  OPENBLAS_CONST void  *x, OPENBLAS_CONST blasint incx,  OPENBLAS_CONST void *beta,  void  *y, OPENBLAS_CONST blasint incy) {
     assert(order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_zgemv_async(trans, m, n, (const complex_double *) alpha, (const complex_double *) a, lda, (const complex_double *) x, incx, (const complex_double *) beta, (complex_double *) y, incy);
     xkblas_memory_segment_coherent_async(y, m*sizeof(complex_double)*incy);
     xkblas_cblas_sync();
@@ -356,14 +416,26 @@ void cblas_zhpmv(OPENBLAS_CONST enum CBLAS_ORDER order, OPENBLAS_CONST enum CBLA
 void cblas_sgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST float alpha, OPENBLAS_CONST float *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST float *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST float beta, float *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_sgemm_async(TransA, TransB, M, N, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, N, sizeof(float));
     xkblas_cblas_sync();
 }
 
+void sgemm_(const char *TRANSA, const char *TRANSB, const F_INT32 *M, const F_INT32 *N, const F_INT32 *K, const float *ALPHA, const float *A, const F_INT32 *LDA, const float *B, const F_INT32 *LDB, const float *BETA, float *C, const F_INT32 *LDC)
+{
+    cblas_sgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), *M, *N, *K, *ALPHA, A, *LDA, B, *LDB, *BETA, C, *LDC);
+}
+
+void sgemm_64_(const char *TRANSA, const char *TRANSB, const F_INT64 *M, const F_INT64 *N, const F_INT64 *K, const float *ALPHA, const float *A, const F_INT64 *LDA, const float *B, const F_INT64 *LDB, const float *BETA, float *C, const F_INT64 *LDC)
+{
+    cblas_sgemm(CblasColMajor, f2c_trans(TRANSA), f2c_trans(TRANSB), (int)(*M), (int)(*N), (int)(*K), *ALPHA, A, (int)(*LDA), B, (int)(*LDB), *BETA, C, (int)(*LDC));
+}
+
 void cblas_dgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST double alpha, OPENBLAS_CONST double *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST double *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST double beta, double *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_dgemm_async(TransA, TransB, M, N, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, N, sizeof(double));
     xkblas_cblas_sync();
@@ -372,6 +444,7 @@ void cblas_dgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_cgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_cgemm_async(TransA, TransB, M, N, K, (const complex_float *) alpha, (const complex_float *) A, lda, (const complex_float *) B, ldb, (const complex_float *) beta, (complex_float *) C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, N, sizeof(complex_float));
     xkblas_cblas_sync();
@@ -380,6 +453,7 @@ void cblas_cgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
 void cblas_zgemm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_zgemm_async(TransA, TransB, M, N, K, (const complex_double *) alpha, (const complex_double *) A, lda, (const complex_double *) B, ldb, (const complex_double *) beta, (complex_double *) C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, N, sizeof(complex_double));
     xkblas_cblas_sync();
@@ -397,6 +471,7 @@ void cblas_zgemm3m(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CB
 void cblas_sgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST float alpha, OPENBLAS_CONST float *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST float *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST float beta, float *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_sgemmt_async(Uplo, TransA, TransB, M, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, K, sizeof(float));
     xkblas_cblas_sync();
@@ -405,6 +480,7 @@ void cblas_sgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBL
 void cblas_dgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST double alpha, OPENBLAS_CONST double *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST double *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST double beta, double *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_dgemmt_async(Uplo, TransA, TransB, M, K, &alpha, A, lda, B, ldb, &beta, C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, K, sizeof(double));
     xkblas_cblas_sync();
@@ -413,6 +489,7 @@ void cblas_dgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBL
 void cblas_cgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_cgemm_async(Uplo, TransA, TransB, M, K, (const complex_float *) alpha, (const complex_float *) A, lda, (const complex_float *) B, ldb, (const complex_float *) beta, (complex_float *) C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, K, sizeof(complex_float));
     xkblas_cblas_sync();
@@ -421,6 +498,7 @@ void cblas_cgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBL
 void cblas_zgemmt(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLAS_UPLO Uplo, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransA, OPENBLAS_CONST enum CBLAS_TRANSPOSE TransB, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint K,
 		 OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, OPENBLAS_CONST void *B, OPENBLAS_CONST blasint ldb, OPENBLAS_CONST void *beta, void *C, OPENBLAS_CONST blasint ldc) {
     assert(Order == CblasColMajor);
+    xkblas_cblas_ensure();
     xkblas_zgemm_async(Uplo, TransA, TransB, M, K, (const complex_double *) alpha, (const complex_double *) A, lda, (const complex_double *) B, ldb, (const complex_double *) beta, (complex_double *) C, ldc);
     xkblas_memory_matrix_coherent_async(C, ldc, M, K, sizeof(complex_double));
     xkblas_cblas_sync();
@@ -470,6 +548,7 @@ void cblas_strsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *A, OPENBLAS_CONST blasint lda, float *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
     assert(Diag == CblasNonUnit);
+    xkblas_cblas_ensure();
     xkblas_strsm_async(Side, Uplo, TransA, Side, M, N, &alpha, A, lda, B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(float));
     xkblas_cblas_sync();
@@ -479,6 +558,7 @@ void cblas_dtrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *A, OPENBLAS_CONST blasint lda, double *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
     assert(Diag == CblasNonUnit);
+    xkblas_cblas_ensure();
     xkblas_dtrsm_async(Side, Uplo, TransA, Side, M, N, &alpha, A, lda, B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(double));
     xkblas_cblas_sync();
@@ -488,6 +568,7 @@ void cblas_ctrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, void *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
     assert(Diag == CblasNonUnit);
+    xkblas_cblas_ensure();
     xkblas_ctrsm_async(Side, Uplo, TransA, Diag, M, N, (const complex_float *) alpha, (const complex_float *) A, lda, (complex_float *) B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(complex_float));
     xkblas_cblas_sync();
@@ -497,6 +578,7 @@ void cblas_ztrsm(OPENBLAS_CONST enum CBLAS_ORDER Order, OPENBLAS_CONST enum CBLA
                  OPENBLAS_CONST enum CBLAS_DIAG Diag, OPENBLAS_CONST blasint M, OPENBLAS_CONST blasint N, OPENBLAS_CONST void *alpha, OPENBLAS_CONST void *A, OPENBLAS_CONST blasint lda, void *B, OPENBLAS_CONST blasint ldb) {
     assert(Order == CblasColMajor);
     assert(Diag == CblasNonUnit);
+    xkblas_cblas_ensure();
     xkblas_ztrsm_async(Side, Uplo, TransA, Diag, M, N, (const complex_double *) alpha, (const complex_double *) A, lda, (complex_double *) B, ldb);
     xkblas_memory_matrix_coherent_async(B, ldb, M, N, sizeof(complex_double));
     xkblas_cblas_sync();
@@ -526,12 +608,14 @@ void cblas_xerbla(blasint p, OPENBLAS_CONST char *rout, OPENBLAS_CONST char *for
 # endif
 
 void cblas_saxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST float beta, float *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     xkblas_saxpby_async(n, &alpha, x, incx, &beta, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(float)*incy);
     xkblas_cblas_sync();
 }
 
 void cblas_daxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST double beta, double *y, OPENBLAS_CONST blasint incy) {
+    xkblas_cblas_ensure();
     xkblas_daxpby_async(n, &alpha, x, incx, &beta, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
     xkblas_cblas_sync();

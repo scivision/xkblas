@@ -1,11 +1,11 @@
 using CEnum: CEnum, @cenum
 
-function caxpby_async(n, alpha, x, beta, y)
-    @ccall libxkblas.xkblas_caxpby_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, beta::ComplexF32, y::Ptr{ComplexF32})::Cint
+function caxpby_async(n, alpha, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_caxpby_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint, beta::Ptr{ComplexF32}, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
-function caxpy_async(n, alpha, x, y)
-    @ccall libxkblas.xkblas_caxpy_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, y::Ptr{ComplexF32})::Cint
+function caxpy_async(n, alpha, x, incx, y, incy)
+    @ccall libxkblas.xkblas_caxpy_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
 function cdot_async(n, x, incx, y, incy, result)
@@ -82,12 +82,12 @@ function cspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, f
     @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
-function daxpby_async(n, alpha, x, beta, y)
-    @ccall libxkblas.xkblas_daxpby_async(n::Cint, alpha::Cdouble, x::Ptr{Cdouble}, beta::Cdouble, y::Ptr{Cdouble})::Cint
+function daxpby_async(n, alpha, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_daxpby_async(n::Cint, alpha::Ptr{Cdouble}, x::Ptr{Cdouble}, incx::Cint, beta::Ptr{Cdouble}, y::Ptr{Cdouble}, incy::Cint)::Cint
 end
 
-function daxpy_async(n, alpha, x, y)
-    @ccall libxkblas.xkblas_daxpy_async(n::Cint, alpha::Cdouble, x::Ptr{Cdouble}, y::Ptr{Cdouble})::Cint
+function daxpy_async(n, alpha, x, incx, y, incy)
+    @ccall libxkblas.xkblas_daxpy_async(n::Cint, alpha::Ptr{Cdouble}, x::Ptr{Cdouble}, incx::Cint, y::Ptr{Cdouble}, incy::Cint)::Cint
 end
 
 function ddot_async(n, x, incx, y, incy, result)
@@ -164,12 +164,12 @@ function dspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, f
     @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
 end
 
-function saxpby_async(n, alpha, x, beta, y)
-    @ccall libxkblas.xkblas_saxpby_async(n::Cint, alpha::Cfloat, x::Ptr{Cfloat}, beta::Cfloat, y::Ptr{Cfloat})::Cint
+function saxpby_async(n, alpha, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_saxpby_async(n::Cint, alpha::Ptr{Cfloat}, x::Ptr{Cfloat}, incx::Cint, beta::Ptr{Cfloat}, y::Ptr{Cfloat}, incy::Cint)::Cint
 end
 
-function saxpy_async(n, alpha, x, y)
-    @ccall libxkblas.xkblas_saxpy_async(n::Cint, alpha::Cfloat, x::Ptr{Cfloat}, y::Ptr{Cfloat})::Cint
+function saxpy_async(n, alpha, x, incx, y, incy)
+    @ccall libxkblas.xkblas_saxpy_async(n::Cint, alpha::Ptr{Cfloat}, x::Ptr{Cfloat}, incx::Cint, y::Ptr{Cfloat}, incy::Cint)::Cint
 end
 
 function sdot_async(n, x, incx, y, incy, result)
@@ -246,12 +246,12 @@ function sspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, f
     @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
 end
 
-function zaxpby_async(n, alpha, x, beta, y)
-    @ccall libxkblas.xkblas_zaxpby_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, beta::ComplexF32, y::Ptr{ComplexF32})::Cint
+function zaxpby_async(n, alpha, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_zaxpby_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint, beta::Ptr{ComplexF32}, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
-function zaxpy_async(n, alpha, x, y)
-    @ccall libxkblas.xkblas_zaxpy_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, y::Ptr{ComplexF32})::Cint
+function zaxpy_async(n, alpha, x, incx, y, incy)
+    @ccall libxkblas.xkblas_zaxpy_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
 function zdot_async(n, x, incx, y, incy, result)

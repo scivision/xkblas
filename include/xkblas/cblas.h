@@ -585,4 +585,12 @@ enum CBLAS_SPARSE {
     CblasSparseDIA = 146
 };
 
+inline CBLAS_TRANSPOSE f2c_trans(const char *trans) {
+    if (*trans == 'N' || *trans == 'n') return CblasNoTrans;
+    if (*trans == 'T' || *trans == 't') return CblasTrans;
+    if (*trans == 'C' || *trans == 'c') return CblasConjTrans;
+    // Fallback for safety
+    return CblasNoTrans;
+}
+
 #endif
