@@ -1,15 +1,17 @@
 using LinearAlgebra, Random
 using XKBlas
 
-# Problem setup
-n = 32768
-m, n, k = n, n, n
-A = [Float32(rand()) for _ in 1:(m*k)]
-B = [Float32(rand()) for _ in 1:(k*n)]
-C = [Float32(0.0)    for _ in 1:(m*n)]
+TYPE = Float32
 
-alpha_vec = [Float32(1.0)]
-beta_vec  = [Float32(0.0)]
+# Problem setup
+n = 4
+m, n, k = n, n, n
+A = [TYPE(rand()) for _ in 1:(m*k)]
+B = [TYPE(rand()) for _ in 1:(k*n)]
+C = [TYPE(0.0)    for _ in 1:(m*n)]
+
+alpha_vec = TYPE(1.0)
+beta_vec  = TYPE(0.0)
 
 lda, ldb, ldc = m, k, m
 
@@ -19,7 +21,7 @@ transA, transB = XKBlas.CblasNoTrans, XKBlas.CblasNoTrans
 XKBlas.init()
 
 @time begin
-    XKBlas.sgemm_async(
+    XKBlas.gemm_async(
         transA, transB,
         m, n, k,
         alpha_vec,
@@ -28,7 +30,7 @@ XKBlas.init()
         beta_vec,
         C, ldc
     )
-    XKBlas.memory_matrix_coherent_async(C, ldc, m, n, sizeof(Float32))
+    XKBlas.memory_coherent_async(C, ldc, m, n)
     XKBlas.sync()
 end
 

@@ -47,17 +47,19 @@ if iter ≤ ℓ-1
     end
 end
 
+XKBlas.sync()   # do this instead
+
 # Apply the Givens reflection Qₖ.ₖ₊₁
 f = () -> begin                         # TODO NEW
-    if iter ≤ ℓ-2
-        ϵₖ      =  sₖ * βₖ₊₂
-        γbarₖ₊₁ = -cₖ * βₖ₊₂
-    end
+   if iter ≤ ℓ-2
+       ϵₖ      =  sₖ * βₖ₊₂
+       γbarₖ₊₁ = -cₖ * βₖ₊₂
+   end
 
-    if iter ≤ ℓ-1
-        γₖ      = cₖ * γbarₖ + sₖ * αₖ₊₁
-        λbarₖ₊₁ = sₖ * γbarₖ - cₖ * αₖ₊₁
-    end
+   if iter ≤ ℓ-1
+       γₖ      = cₖ * γbarₖ + sₖ * αₖ₊₁
+       λbarₖ₊₁ = sₖ * γbarₖ - cₖ * αₖ₊₁
+   end
 end                                     # TODO NEW
 XKBlas.host_async(f, reads=[sₖ, βₖ₊₂, cₖ, γbarₖ, αₖ₊₁], writes=[ϵₖ, γbarₖ₊₁, γₖ])   # TODO NEW
 

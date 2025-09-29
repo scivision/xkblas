@@ -8,11 +8,11 @@ function caxpy_async(n, alpha, x, y)
     @ccall libxkblas.xkblas_caxpy_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, y::Ptr{ComplexF32})::Cint
 end
 
-function cdot_async(x, y, result)
-    @ccall libxkblas.xkblas_cdot_async(x::Ptr{ComplexF32}, y::Ptr{ComplexF32}, result::Ptr{ComplexF32})::Cint
+function cdot_async(n, x, incx, y, incy, result)
+    @ccall libxkblas.xkblas_cdot_async(n::Cint, x::Ptr{ComplexF32}, incx::Cint, y::Ptr{ComplexF32}, incy::Cint, result::Ptr{ComplexF32})::Cint
 end
 
-# no prototype is found for this function at ckernels.h:32:9, please use with caution
+# no prototype is found for this function at ckernels.h:52:9, please use with caution
 function cdivcopy_async()
     @ccall libxkblas.xkblas_cdivcopy_async()::Cint
 end
@@ -25,17 +25,21 @@ function cnrm2_async(n, x, result)
     @ccall libxkblas.xkblas_cnrm2_async(n::Cint, x::Ptr{ComplexF32}, result::Ptr{Cfloat})::Cint
 end
 
-# no prototype is found for this function at ckernels.h:38:9, please use with caution
+# no prototype is found for this function at ckernels.h:58:9, please use with caution
 function cscalcopy_async()
     @ccall libxkblas.xkblas_cscalcopy_async()::Cint
 end
 
-function cscale_async(n, s, x)
-    @ccall libxkblas.xkblas_cscale_async(n::Cint, s::ComplexF32, x::Ptr{ComplexF32})::Cint
+function cscal_async(n, alpha, x, incx)
+    @ccall libxkblas.xkblas_cscal_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint)::Cint
 end
 
 function ccopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu)
     @ccall libxkblas.xkblas_ccopyscale_async(m::Cint, n::Cint, should_copy::Cint, IW::Ptr{Cint}, D::Ptr{ComplexF32}, ldd::Cint, L::Ptr{ComplexF32}, ldl::Cint, U::Ptr{ComplexF32}, ldu::Cint)::Cint
+end
+
+function cgemv_async(transA, m, n, alpha, A, lda, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_cgemv_async(transA::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, x::Ptr{ComplexF32}, incx::Cint, beta::Ptr{ComplexF32}, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
 function cgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
@@ -74,8 +78,8 @@ function cpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_cpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
 end
 
-function cspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
+function cspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, format, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_cspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 function daxpby_async(n, alpha, x, beta, y)
@@ -86,11 +90,11 @@ function daxpy_async(n, alpha, x, y)
     @ccall libxkblas.xkblas_daxpy_async(n::Cint, alpha::Cdouble, x::Ptr{Cdouble}, y::Ptr{Cdouble})::Cint
 end
 
-function ddot_async(x, y, result)
-    @ccall libxkblas.xkblas_ddot_async(x::Ptr{Cdouble}, y::Ptr{Cdouble}, result::Ptr{Cdouble})::Cint
+function ddot_async(n, x, incx, y, incy, result)
+    @ccall libxkblas.xkblas_ddot_async(n::Cint, x::Ptr{Cdouble}, incx::Cint, y::Ptr{Cdouble}, incy::Cint, result::Ptr{Cdouble})::Cint
 end
 
-# no prototype is found for this function at dkernels.h:32:9, please use with caution
+# no prototype is found for this function at dkernels.h:52:9, please use with caution
 function ddivcopy_async()
     @ccall libxkblas.xkblas_ddivcopy_async()::Cint
 end
@@ -103,17 +107,21 @@ function dnrm2_async(n, x, result)
     @ccall libxkblas.xkblas_dnrm2_async(n::Cint, x::Ptr{Cdouble}, result::Ptr{Cfloat})::Cint
 end
 
-# no prototype is found for this function at dkernels.h:38:9, please use with caution
+# no prototype is found for this function at dkernels.h:58:9, please use with caution
 function dscalcopy_async()
     @ccall libxkblas.xkblas_dscalcopy_async()::Cint
 end
 
-function dscale_async(n, s, x)
-    @ccall libxkblas.xkblas_dscale_async(n::Cint, s::Cdouble, x::Ptr{Cdouble})::Cint
+function dscal_async(n, alpha, x, incx)
+    @ccall libxkblas.xkblas_dscal_async(n::Cint, alpha::Ptr{Cdouble}, x::Ptr{Cdouble}, incx::Cint)::Cint
 end
 
 function dcopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu)
     @ccall libxkblas.xkblas_dcopyscale_async(m::Cint, n::Cint, should_copy::Cint, IW::Ptr{Cint}, D::Ptr{Cdouble}, ldd::Cint, L::Ptr{Cdouble}, ldl::Cint, U::Ptr{Cdouble}, ldu::Cint)::Cint
+end
+
+function dgemv_async(transA, m, n, alpha, A, lda, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_dgemv_async(transA::Cint, m::Cint, n::Cint, alpha::Ptr{Cdouble}, A::Ptr{Cdouble}, lda::Cint, x::Ptr{Cdouble}, incx::Cint, beta::Ptr{Cdouble}, y::Ptr{Cdouble}, incy::Cint)::Cint
 end
 
 function dgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
@@ -152,8 +160,8 @@ function dpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_dpotrf_async(uplo::Cint, n::Cint, A::Ptr{Cdouble}, lda::Cint)::Cint
 end
 
-function dspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
+function dspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, format, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_dspmv_async(alpha::Ptr{Cdouble}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cdouble}, X::Ptr{Cdouble}, beta::Ptr{Cdouble}, Y::Ptr{Cdouble})::Cint
 end
 
 function saxpby_async(n, alpha, x, beta, y)
@@ -164,11 +172,11 @@ function saxpy_async(n, alpha, x, y)
     @ccall libxkblas.xkblas_saxpy_async(n::Cint, alpha::Cfloat, x::Ptr{Cfloat}, y::Ptr{Cfloat})::Cint
 end
 
-function sdot_async(x, y, result)
-    @ccall libxkblas.xkblas_sdot_async(x::Ptr{Cfloat}, y::Ptr{Cfloat}, result::Ptr{Cfloat})::Cint
+function sdot_async(n, x, incx, y, incy, result)
+    @ccall libxkblas.xkblas_sdot_async(n::Cint, x::Ptr{Cfloat}, incx::Cint, y::Ptr{Cfloat}, incy::Cint, result::Ptr{Cfloat})::Cint
 end
 
-# no prototype is found for this function at skernels.h:32:9, please use with caution
+# no prototype is found for this function at skernels.h:52:9, please use with caution
 function sdivcopy_async()
     @ccall libxkblas.xkblas_sdivcopy_async()::Cint
 end
@@ -181,17 +189,21 @@ function snrm2_async(n, x, result)
     @ccall libxkblas.xkblas_snrm2_async(n::Cint, x::Ptr{Cfloat}, result::Ptr{Cfloat})::Cint
 end
 
-# no prototype is found for this function at skernels.h:38:9, please use with caution
+# no prototype is found for this function at skernels.h:58:9, please use with caution
 function sscalcopy_async()
     @ccall libxkblas.xkblas_sscalcopy_async()::Cint
 end
 
-function sscale_async(n, s, x)
-    @ccall libxkblas.xkblas_sscale_async(n::Cint, s::Cfloat, x::Ptr{Cfloat})::Cint
+function sscal_async(n, alpha, x, incx)
+    @ccall libxkblas.xkblas_sscal_async(n::Cint, alpha::Ptr{Cfloat}, x::Ptr{Cfloat}, incx::Cint)::Cint
 end
 
 function scopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu)
     @ccall libxkblas.xkblas_scopyscale_async(m::Cint, n::Cint, should_copy::Cint, IW::Ptr{Cint}, D::Ptr{Cfloat}, ldd::Cint, L::Ptr{Cfloat}, ldl::Cint, U::Ptr{Cfloat}, ldu::Cint)::Cint
+end
+
+function sgemv_async(transA, m, n, alpha, A, lda, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_sgemv_async(transA::Cint, m::Cint, n::Cint, alpha::Ptr{Cfloat}, A::Ptr{Cfloat}, lda::Cint, x::Ptr{Cfloat}, incx::Cint, beta::Ptr{Cfloat}, y::Ptr{Cfloat}, incy::Cint)::Cint
 end
 
 function sgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
@@ -230,8 +242,8 @@ function spotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_spotrf_async(uplo::Cint, n::Cint, A::Ptr{Cfloat}, lda::Cint)::Cint
 end
 
-function sspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
+function sspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, format, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_sspmv_async(alpha::Ptr{Cfloat}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{Cfloat}, X::Ptr{Cfloat}, beta::Ptr{Cfloat}, Y::Ptr{Cfloat})::Cint
 end
 
 function zaxpby_async(n, alpha, x, beta, y)
@@ -242,11 +254,11 @@ function zaxpy_async(n, alpha, x, y)
     @ccall libxkblas.xkblas_zaxpy_async(n::Cint, alpha::ComplexF32, x::Ptr{ComplexF32}, y::Ptr{ComplexF32})::Cint
 end
 
-function zdot_async(x, y, result)
-    @ccall libxkblas.xkblas_zdot_async(x::Ptr{ComplexF32}, y::Ptr{ComplexF32}, result::Ptr{ComplexF32})::Cint
+function zdot_async(n, x, incx, y, incy, result)
+    @ccall libxkblas.xkblas_zdot_async(n::Cint, x::Ptr{ComplexF32}, incx::Cint, y::Ptr{ComplexF32}, incy::Cint, result::Ptr{ComplexF32})::Cint
 end
 
-# no prototype is found for this function at zkernels.h:32:9, please use with caution
+# no prototype is found for this function at zkernels.h:52:9, please use with caution
 function zdivcopy_async()
     @ccall libxkblas.xkblas_zdivcopy_async()::Cint
 end
@@ -259,17 +271,21 @@ function znrm2_async(n, x, result)
     @ccall libxkblas.xkblas_znrm2_async(n::Cint, x::Ptr{ComplexF32}, result::Ptr{Cfloat})::Cint
 end
 
-# no prototype is found for this function at zkernels.h:38:9, please use with caution
+# no prototype is found for this function at zkernels.h:58:9, please use with caution
 function zscalcopy_async()
     @ccall libxkblas.xkblas_zscalcopy_async()::Cint
 end
 
-function zscale_async(n, s, x)
-    @ccall libxkblas.xkblas_zscale_async(n::Cint, s::ComplexF32, x::Ptr{ComplexF32})::Cint
+function zscal_async(n, alpha, x, incx)
+    @ccall libxkblas.xkblas_zscal_async(n::Cint, alpha::Ptr{ComplexF32}, x::Ptr{ComplexF32}, incx::Cint)::Cint
 end
 
 function zcopyscale_async(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu)
     @ccall libxkblas.xkblas_zcopyscale_async(m::Cint, n::Cint, should_copy::Cint, IW::Ptr{Cint}, D::Ptr{ComplexF32}, ldd::Cint, L::Ptr{ComplexF32}, ldl::Cint, U::Ptr{ComplexF32}, ldu::Cint)::Cint
+end
+
+function zgemv_async(transA, m, n, alpha, A, lda, x, incx, beta, y, incy)
+    @ccall libxkblas.xkblas_zgemv_async(transA::Cint, m::Cint, n::Cint, alpha::Ptr{ComplexF32}, A::Ptr{ComplexF32}, lda::Cint, x::Ptr{ComplexF32}, incx::Cint, beta::Ptr{ComplexF32}, y::Ptr{ComplexF32}, incy::Cint)::Cint
 end
 
 function zgemm_async(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc)
@@ -308,8 +324,8 @@ function zpotrf_async(uplo, n, A, lda)
     @ccall libxkblas.xkblas_zpotrf_async(uplo::Cint, n::Cint, A::Ptr{ComplexF32}, lda::Cint)::Cint
 end
 
-function zspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
-    @ccall libxkblas.xkblas_zspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
+function zspmv_async(alpha, transA, index_base, index_type, nrows, ncols, nnz, format, csr_row_offsets, csr_col_indices, csr_values, X, beta, Y)
+    @ccall libxkblas.xkblas_zspmv_async(alpha::Ptr{ComplexF32}, transA::Cint, index_base::Cint, index_type::Cint, nrows::Cint, ncols::Cint, nnz::Cint, format::Cint, csr_row_offsets::Ptr{Cvoid}, csr_col_indices::Ptr{Cvoid}, csr_values::Ptr{ComplexF32}, X::Ptr{ComplexF32}, beta::Ptr{ComplexF32}, Y::Ptr{ComplexF32})::Cint
 end
 
 function init()
@@ -1032,6 +1048,15 @@ end
 
 function cblas_zher2k(Order, Uplo, Trans, N, K, alpha, A, lda, B, ldb, beta, C, ldc)
     @ccall libxkblas.cblas_zher2k(Order::CBLAS_ORDER, Uplo::CBLAS_UPLO, Trans::CBLAS_TRANSPOSE, N::Cint, K::Cint, alpha::Ptr{Cvoid}, A::Ptr{Cvoid}, lda::Cint, B::Ptr{Cvoid}, ldb::Cint, beta::Cdouble, C::Ptr{Cvoid}, ldc::Cint)::Cvoid
+end
+
+@cenum CBLAS_SPARSE::UInt32 begin
+    CblasSparseCSR = 141
+    CblasSparseCSC = 142
+    CblasSparseCOO = 143
+    CblasSparseBSR = 144
+    CblasSparseELL = 145
+    CblasSparseDIA = 146
 end
 
 function blas2cblas_trans(trans)
