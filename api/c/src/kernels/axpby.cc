@@ -44,9 +44,9 @@ int
 xkblas_£axpby_async(
     int n,
     const TYPE * alpha,
-    const TYPE * x, int incx,
+    const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, int incy
+          TYPE * y, const int incy
 ) {
     return xkblas_get()->axpby_async<xkblas_precision_t::££>(n, alpha, x, incx, beta, y, incy);
 }

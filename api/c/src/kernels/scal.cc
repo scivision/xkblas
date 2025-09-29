@@ -45,7 +45,7 @@ xkblas_£scal_tile_async(
     const size_t n,
     const TYPE * alpha,
     TYPE * x,
-    const size_t incx,
+    const int incx,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_global_id);
@@ -57,7 +57,7 @@ xkblas_£scal_async(
     int n,
     const TYPE * alpha,
     TYPE * x,
-    int incx
+    const int incx
 ) {
     return xkblas_get()->scal_async<xkblas_precision_t::££>(n, alpha, x, incx);
 }

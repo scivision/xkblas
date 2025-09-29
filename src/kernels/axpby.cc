@@ -50,9 +50,10 @@ xkblas_t::axpby_async(
           TYPE * y,
     const int incy
 ) {
-    LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
+    // LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
     this->scal_async<P>(n, beta,  y, incy);
     this->axpy_async<P>(n, alpha, x, incx, y, incy);
+    return 0;
 }
 
 TYPED

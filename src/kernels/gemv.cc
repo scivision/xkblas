@@ -121,10 +121,10 @@ xkblas_t::gemv_tile_async(
     int transA,
     const size_t m, const size_t n,
     const TYPE * alpha,
-    const TYPE * A, const size_t lda,
-    const TYPE * x, const size_t incx,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, const size_t tm, const size_t mb, const size_t incy,
+          TYPE * y, const size_t tm, const size_t mb, const int incy,
     distribution_t * d
 ) {
     thread_t * thread = thread_t::get_tls();
@@ -177,9 +177,9 @@ xkblas_t::gemv_async(
     int m, int n,
     const TYPE * alpha,
     const TYPE * A, int lda,
-    const TYPE * x, int incx,
+    const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, int incy
+          TYPE * y, const int incy
 ) {
     if (m == 0 || n == 0 || (*alpha == 0.0 && *beta == 1.0))
         return 0;
@@ -392,8 +392,8 @@ xkblas_t::task_format_create_GEMV(
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_GEMV<P>(task_format_t * format); \
-    template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, int incy);    \
-    template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t lda, const xkblas_precision_type_t<P> * x, const size_t incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const size_t incy, distribution_t * d);
+    template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
+    template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const int incy, distribution_t * d);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
 

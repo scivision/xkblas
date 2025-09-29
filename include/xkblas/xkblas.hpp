@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/29 05:10:14 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/09/29 20:43:12 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -109,7 +109,7 @@ typedef struct  xkblas_t
 
     // LEVEL 1 - TODO
 
-    /* TODO: y := a.x + b.y */
+    /* y := a.x + b.y */
     TYPED
     int axpby_async(int n, const TYPE * alpha, const TYPE * x, const int incx, const TYPE * beta, TYPE * y, const int incy);
 
@@ -118,7 +118,7 @@ typedef struct  xkblas_t
     int axpy_async(int n, const TYPE * alpha, const TYPE * x, const int incx, TYPE * y, const int incy);
 
     TYPED
-    int dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
+    int dot_async(int n, const TYPE * x, const int incx, const TYPE * y, const int incy, TYPE * result);
 
     TYPED
     int divcopy_async();    // TODO
@@ -133,7 +133,7 @@ typedef struct  xkblas_t
     int scalcopy_async();    // TODO
 
     TYPED
-    int scal_async(int n, const TYPE * alpha, TYPE * x, int incx);
+    int scal_async(int n, const TYPE * alpha, TYPE * x, const int incx);
 
     // LEVEL 1 - single tile
 
@@ -152,8 +152,8 @@ typedef struct  xkblas_t
     TYPED
     int dot_tile_async(
         int n,
-        const TYPE * x, int incx,
-        const TYPE * y, int incy,
+        const TYPE * x, const int incx,
+        const TYPE * y, const int incy,
               TYPE * r,
         xkrt::device_global_id_t device_global_id
     );
@@ -161,8 +161,8 @@ typedef struct  xkblas_t
     TYPED
     int dot_tile_async(
         int n,
-        const TYPE * x, int incx,
-        const TYPE * y, int incy,
+        const TYPE * x, const int incx,
+        const TYPE * y, const int incy,
         const TYPE * temp_r,
               TYPE * r,
         xkrt::device_global_id_t device_global_id
@@ -173,7 +173,7 @@ typedef struct  xkblas_t
         int n,
         const TYPE * alpha,
         TYPE * x,
-        int incx,
+        const int incx,
         xkrt::device_global_id_t device_global_id
     );
 
@@ -195,9 +195,9 @@ typedef struct  xkblas_t
         int m, int n,
         const TYPE * alpha,
         const TYPE * A, int lda,
-        const TYPE * x, int incx,
+        const TYPE * x, const int incx,
         const TYPE * beta,
-              TYPE * y, int incy
+              TYPE * y, const int incy
     );
 
     // LEVEL 2  - single tile
@@ -218,10 +218,10 @@ typedef struct  xkblas_t
         int transA,
         const size_t m, const size_t n,
         const TYPE * alpha,
-        const TYPE * A, const size_t lda,
-        const TYPE * x, const size_t incx,
+        const TYPE * A, int lda,
+        const TYPE * x, const int incx,
         const TYPE * beta,
-              TYPE * y, const size_t tm, const size_t mb, const size_t incy,
+              TYPE * y, const size_t tm, const size_t mb, const int incy,
         xkrt::distribution_t * d
     );
 

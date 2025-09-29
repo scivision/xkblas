@@ -66,7 +66,7 @@ xkblas_t::scal_tile_async(
     int n,
     const TYPE * alpha,
     TYPE * x,
-    int incx,
+    const int incx,
     device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
@@ -107,7 +107,7 @@ xkblas_t::scal_async(
     int n,
     const TYPE * alpha,
     TYPE * x,
-    int incx
+    const int incx
 ) {
     assert(alpha);
 
@@ -233,7 +233,7 @@ xkblas_t::task_format_create_SCAL(
 
 # define DEFINE(P)  \
         template void xkblas_t::task_format_create_SCAL<P>(task_format_t * format);                                                                                         \
-    template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, int incx);   \
-    template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, int incx, device_global_id_t device_global_id);
+    template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
+    template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

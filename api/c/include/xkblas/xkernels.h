@@ -47,7 +47,7 @@ extern "C" {
 
     int xkblas_£axpy_async(int n, const TYPE * alpha, const TYPE * x, const int incx, TYPE * y, const int incy);
 
-    int xkblas_£dot_async(int n, const TYPE * x, int incx, const TYPE * y, int incy, TYPE * result);
+    int xkblas_£dot_async(int n, const TYPE * x, const int incx, const TYPE * y, const int incy, TYPE * result);
 
     int xkblas_£divcopy_async();    // TODO
 
@@ -57,7 +57,7 @@ extern "C" {
 
     int xkblas_£scalcopy_async();    // TODO
 
-    int xkblas_£scal_async(int n, const TYPE * alpha, TYPE * x, int incx);
+    int xkblas_£scal_async(int n, const TYPE * alpha, TYPE * x, const int incx);
 
     /* Level 2 */
 
@@ -76,9 +76,9 @@ extern "C" {
         int m, int n,
         const TYPE * alpha,
         const TYPE * A, int lda,
-        const TYPE * x, int incx,
+        const TYPE * x, const int incx,
         const TYPE * beta,
-              TYPE * y, int incy
+              TYPE * y, const int incy
     );
 
     /* Level 3 */

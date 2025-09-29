@@ -46,10 +46,10 @@ xkblas_£gemv_tile_async(
     int transA,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * A, const size_t lda,
-    const TYPE * x, const size_t incx,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, const size_t tm, const size_t mb, const size_t incy
+          TYPE * y, const size_t tm, const size_t mb, const int incy
 ) {
     return xkblas_get()->gemv_tile_async<xkblas_precision_t::££>(
         transA,
@@ -70,9 +70,9 @@ xkblas_£gemv_async(
     int m, int n,
     const TYPE * alpha,
     const TYPE * A, int lda,
-    const TYPE * x, int incx,
+    const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, int incy
+          TYPE * y, const int incy
 ) {
     return xkblas_get()->gemv_async<xkblas_precision_t::££>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
 }

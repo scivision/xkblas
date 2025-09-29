@@ -178,11 +178,31 @@ void cblas_saxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_
     xkblas_cblas_sync();
 }
 
+void saxpy_(const F_INT32 *N, const float *ALPHA, const float *X, const F_INT32 *incx, float *Y, const F_INT32 *incy)
+{
+    cblas_saxpy(*N, *ALPHA, X, *incx, Y, *incy);
+}
+
+void saxpy_64_(const F_INT64 *N, const float *ALPHA, const float *X, const F_INT64 *incx, float *Y, const F_INT64 *incy)
+{
+    cblas_saxpy((blasint)(*N), *ALPHA, X, (blasint)(*incx), Y, (blasint)(*incy));
+}
+
 void cblas_daxpy(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx, double *y, OPENBLAS_CONST blasint incy) {
     xkblas_cblas_ensure();
     xkblas_daxpy_async(n, &alpha, x, incx, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
     xkblas_cblas_sync();
+}
+
+void daxpy_(const F_INT32 *N, const double *ALPHA, const double *X, const F_INT32 *incx, double *Y, const F_INT32 *incy)
+{
+    cblas_daxpy(*N, *ALPHA, X, *incx, Y, *incy);
+}
+
+void daxpy_64_(const F_INT64 *N, const double *ALPHA, const double *X, const F_INT64 *incx, double *Y, const F_INT64 *incy)
+{
+    cblas_daxpy((blasint)(*N), *ALPHA, X, (blasint)(*incx), Y, (blasint)(*incy));
 }
 
 # if 0
@@ -644,11 +664,31 @@ void cblas_saxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS
     xkblas_cblas_sync();
 }
 
-void cblas_daxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx,OPENBLAS_CONST double beta, double *y, OPENBLAS_CONST blasint incy) {
+void saxpby_(const F_INT32 *N, const float *ALPHA, const float *X, const F_INT32 *incx, const float *BETA, float *Y, const F_INT32 *incy)
+{
+    cblas_saxpby(*N, *ALPHA, X, *incx, *BETA, Y, *incy);
+}
+
+void saxpby_64_(const F_INT64 *N, const float *ALPHA, const float *X, const F_INT64 *incx, const float *BETA, float *Y, const F_INT64 *incy)
+{
+    cblas_saxpby((blasint)(*N), *ALPHA, X, (blasint)(*incx), *BETA, Y, (blasint)(*incy));
+}
+
+void cblas_daxpby(OPENBLAS_CONST blasint n, OPENBLAS_CONST double alpha, OPENBLAS_CONST double *x, OPENBLAS_CONST blasint incx, OPENBLAS_CONST double beta, double *y, OPENBLAS_CONST blasint incy) {
     xkblas_cblas_ensure();
     xkblas_daxpby_async(n, &alpha, x, incx, &beta, y, incy);
     xkblas_memory_segment_coherent_async(y, n*sizeof(double)*incy);
     xkblas_cblas_sync();
+}
+
+void daxpby_(const F_INT32 *N, const double *ALPHA, const double *X, const F_INT32 *incx, const double *BETA, double *Y, const F_INT32 *incy)
+{
+    cblas_daxpby(*N, *ALPHA, X, *incx, *BETA, Y, *incy);
+}
+
+void daxpby_64_(const F_INT64 *N, const double *ALPHA, const double *X, const F_INT64 *incx, const double *BETA, double *Y, const F_INT64 *incy)
+{
+    cblas_daxpby((blasint)(*N), *ALPHA, X, (blasint)(*incx), *BETA, Y, (blasint)(*incy));
 }
 
 # if 0
