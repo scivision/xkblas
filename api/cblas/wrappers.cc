@@ -13,6 +13,17 @@
 
 extern "C" {
 
+__attribute__((constructor))
+void library_init() {
+    xkblas_init();
+}
+
+// Optional: function called when the library is unloaded
+__attribute__((destructor))
+void library_cleanup() {
+    xkblas_deinit();
+}
+
 # if 0
 float  cblas_sdsdot(OPENBLAS_CONST blasint n, OPENBLAS_CONST float alpha, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx, OPENBLAS_CONST float *y, OPENBLAS_CONST blasint incy);
 double cblas_dsdot (OPENBLAS_CONST blasint n, OPENBLAS_CONST float *x, OPENBLAS_CONST blasint incx, OPENBLAS_CONST float *y, OPENBLAS_CONST blasint incy);
