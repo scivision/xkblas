@@ -225,7 +225,7 @@ endif()
 # XK Runtime
 find_package(XKRT REQUIRED)
 target_link_libraries(${XKBLAS_NAME}       PRIVATE XKRT::xkrt)
-target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE ${XKBLAS_NAME})
+target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE XKRT::xkrt ${XKBLAS_NAME})
 
 ################
 # DEPENDENCIES #
