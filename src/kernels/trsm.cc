@@ -119,11 +119,11 @@ xkblas_t::trsm_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(side, uplo, transA, diag, m, n, *alpha);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "trsm(A=(%zu,%zu) ; B=(%zu,%zu))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     /* TODO: block size, is that correct ? */
     const size_t Am = (side == CblasLeft) ? m : n;

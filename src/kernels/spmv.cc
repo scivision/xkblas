@@ -143,9 +143,9 @@ xkblas_t::spmv_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(this, transA, index_base, T, m, n, nnz, *alpha, *beta);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "spmv");
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);

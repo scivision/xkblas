@@ -1524,6 +1524,7 @@ main(int argc, char ** argv)
                 xkblas = xkblas_get();
                 int r = func->f(args);
 
+                # if XKRT_SUPPORT_DEBUG
                 if (DUMP_GRAPH)
                 {
                     xkrt::thread_t * thread = xkrt::thread_t::get_tls();
@@ -1532,6 +1533,7 @@ main(int argc, char ** argv)
                     fclose(f);
                     printf("Graph dumped\n");
                 }
+                # endif
 
                 xkblas_deinit();
                 return r;

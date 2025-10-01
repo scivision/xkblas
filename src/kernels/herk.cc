@@ -151,11 +151,11 @@ xkblas_t::herk_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(uplo, trans, n, k, *alpha, *beta);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "herk(A=(%zd,%zd) ; C=(%zd,%zd))",
             A_offset_m, A_offset_n, C_offset_m, C_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     const size_t Am = (trans == CblasNoTrans) ? n : k;
     const size_t An = (trans == CblasNoTrans) ? k : n;

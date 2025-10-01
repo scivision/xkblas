@@ -148,11 +148,11 @@ xkblas_t::gemmt_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(uplo, transA, transB, n, k, *alpha, *beta);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "gemmt(A=(%zu,%zu) ; B=(%zu,%zu) ; C=(%zu,%zu))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     const size_t Am = (transA == CblasNoTrans) ? n : k;
     const size_t An = (transA == CblasNoTrans) ? k : n;
@@ -390,7 +390,7 @@ body_cuda_run(
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     LOGGER_DEBUG("Calling cublasGemmt(m=%zu, n=%zu, k=%zu, A=%p, lda=%zu, B=%p, ldb=%zu, C=%p, ldc=%zu) on task=`%s`",
         args->n, args->n, args->k,
         (void *) A->device_view.addr,
@@ -401,7 +401,7 @@ body_cuda_run(
         C->device_view.ld,
         task->label
     );
-    #endif /* NDEBUG */
+    #endif /* XKRT_SUPPORT_DEBUG */
 
     XKBLAS_CUBLAS_CALL(
         FUNC(

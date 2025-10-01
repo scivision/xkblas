@@ -136,9 +136,9 @@ xkblas_t::potrf_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(uplo, n);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "potrf(A=(%zd,%zd)", A_offset_m, A_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     const size_t Am = n;
     const size_t An = n;

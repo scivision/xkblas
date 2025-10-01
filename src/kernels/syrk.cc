@@ -144,11 +144,11 @@ xkblas_t::syrk_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new(args) args_t<P>(uplo, trans, n, k, *alpha, *beta);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "syrk(A=(%zu,%zu) ; C=(%zu,%zu))",
             A_offset_m, A_offset_n, C_offset_m, C_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     const size_t Am = n; // (transA == CblasNoTrans) ? m : k;
     const size_t An = k; // (transA == CblasNoTrans) ? k : m;
