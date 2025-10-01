@@ -159,11 +159,11 @@ xkblas_t::gemm_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(transA, transB, m, n, k, *alpha, *beta);
 
-    # ifndef NDEBUG
+    # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "gemm(A=(%zd,%zd) ; B=(%zd,%zd) ; C=(%zd,%zd))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
-    # endif /* NDEBUG */
+    # endif /* XKRT_SUPPORT_DEBUG */
 
     const size_t Am = (transA == CblasNoTrans) ? m : k;
     const size_t An = (transA == CblasNoTrans) ? k : m;
