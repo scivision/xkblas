@@ -9,14 +9,17 @@
 # Configuration (modify as you want, see CMakeLists.txt for all options) #
 ##########################################################################
 
+export CC=clang
+export CXX=clang++
+
+XKAAPI_BRANCH=master
+XKBLAS_BRANCH=v2.0
+
 CMAKE_BUILD_TYPE="Debug"
 CMAKE_XKAAPI_OPTS="-DUSE_CUDA=on"
 CMAKE_XKBLAS_OPTS="-DUSE_CUDA=on -DUSE_CUBLAS=on -DUSE_CUSPARSE=on "
 CMAKE_XKBLAS_OPTS+=" -DUSE_MKL=on -DUSE_CBLAS=on -DUSE_TESTS=on" # enable to build tests
 WORK_DIRECTORY="$(pwd)"
-
-export CC=clang
-export CXX=clang++
 
 ###########
 # Install #
@@ -33,7 +36,7 @@ mkdir -p $MODULES_DIRECTORY
 ##################
 # Install XKAAPI #
 ##################
-git clone https://gitlab.inria.fr/xkaapi/dev-v2.git $REPO_DIRECTORY/xkaapi
+git clone -b $XKAAPI_BRANCH https://gitlab.inria.fr/xkaapi/dev-v2.git $REPO_DIRECTORY/xkaapi
 mkdir $REPO_DIRECTORY/xkaapi/build
 cd $REPO_DIRECTORY/xkaapi/build
 CMAKE_PREFIX_PATH=$CUDA_PATH:$CMAKE_PREFIX_PATH cmake $CMAKE_XKAAPI_OPTS -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DCMAKE_INSTALL_PREFIX="$INSTALL_DIRECTORY/xkaapi" $REPO_DIRECTORY/xkaapi
@@ -42,10 +45,9 @@ make install -j
 ##################
 # Install XKBlas #
 ##################
-git clone https://gitlab.inria.fr/xkblas/dev $REPO_DIRECTORY/xkblas
+git clone -b $XKBLAS_BRANCH https://gitlab.inria.fr/xkblas/dev $REPO_DIRECTORY/xkblas
 mkdir $REPO_DIRECTORY/xkblas/build
 cd $REPO_DIRECTORY/xkblas/build
-git checkout v2.0
 CMAKE_PREFIX_PATH=$CUDA_PATH:$INSTALL_DIRECTORY/xkaapi:$CMAKE_PREFIX_PATH cmake $CMAKE_XKBLAS_OPTS -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DCMAKE_INSTALL_PREFIX="$INSTALL_DIRECTORY/xkblas" $REPO_DIRECTORY/xkblas
 make install -j
 
