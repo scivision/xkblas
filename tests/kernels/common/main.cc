@@ -677,7 +677,7 @@ main_mumps(char ** args)
 
     # define USE_WRITE_BACK     1
     # define USE_ARGS_MATRIX    1
-    # define USE_TS_TUNER       0
+    # define USE_TS_TUNER       1
     # define USE_PREALLOCATE    1
     # define NMATRICES          10
 
