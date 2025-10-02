@@ -14,8 +14,8 @@ export CXX=clang++
 
 WORK_DIRECTORY="$(pwd)"
 
-XKAAPI_BRANCH=master
-XKBLAS_BRANCH=v2.0
+XKAAPI_BRANCH=mumps-expe
+XKBLAS_BRANCH=mumps-expe
 
 XKAAPI_CMAKE_BUILD_TYPE="Release"
 XKBLAS_CMAKE_BUILD_TYPE="Release"
