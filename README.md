@@ -28,7 +28,9 @@ CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PAT
 ## List of kernels supported
 Kernels are being added lazily: if you need a missing kernel for a specific hardware, add it yourself or open an issue and someone will add it on a best effort basis.
 
-Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (~10min of coding) - while adding support for an unsupported kernel may involve more work (~3h of coding).
+Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (most likely ~10min of coding).
+
+Adding support for an unsupported kernel may involve more work.
 
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
@@ -72,6 +74,12 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
+
+## Bindings to other programming languages
+XKBlas is developed in C++ and provides three bindings:
+- C with a single context implicitly managed (`xkblas_t`) - that follows original (2016) interfaces
+- Julia that are generated automatically from C bindings
+- native C++ with explicit context management
 
 ## Useful tips
 
