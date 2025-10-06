@@ -676,10 +676,11 @@ main_mumps(char ** args)
      */
 
     # define USE_WRITE_BACK     1
-    # define USE_ARGS_MATRIX    1
-    # define USE_TS_TUNER       1
+    # define USE_ARGS_MATRIX    0
+    # define USE_TS_TUNER       0
     # define USE_PREALLOCATE    1
-    # define NMATRICES          10
+    # define NMATRICES          0
+    # define USE_CHECKER        1
 
     TYPE alpha, beta;
     FILL(&alpha, 1);
@@ -693,7 +694,11 @@ main_mumps(char ** args)
     int  Ix = atoi(args[0]);
 
     // MATRIX SIZE TO TEST
-    # if USE_ARGS_MATRIX
+    # if USE_CHECKER
+    int mn[][2] = {
+        {5000, 3000}
+    };
+    # elif USE_ARGS_MATRIX
     int mn[][2] = {
         {atoi(args[1]), atoi(args[2])}
     };
@@ -748,8 +753,17 @@ main_mumps(char ** args)
         U_matrices[k] = U;
         G_matrices[k] = G;
 
-        printf("(init) Dumping some values of G : %lf %lf %lf %lf\n",
-                G[0], G[m*m/2], G[m*m*3/4], G[3]);
+        # if USE_CHECKER
+        for (int i = 0 ; i < ld*ld ; ++i)
+        {
+            D_matrices[k][i] = (i + 1) / (double) (ld * ld);
+            L_matrices[k][i] = (i + 1) / (double) (ld * ld);
+            U_matrices[k][i] = (i + 1) / (double) (ld * ld);
+            G_matrices[k][i] = (i + 1) / (double) (ld * ld);
+        }
+        # endif
+        printf("(init) Dumping some values of G : %lf %lf %lf %lf %lf %lf\n",
+                G[0], G[m*m/2], G[m*m*3/4], G[3], G[42], G[67]);
     }
 
     // TILE SIZES TO TEST
@@ -926,7 +940,25 @@ main_mumps(char ** args)
 
         printf("Best perf obtained with ts = {%d, %d, %d} for %lf s\n",
                 ts[imin][0], ts[imin][1], ts[imin][2], (double)tmin/(double)1e9);
-        printf("(done) Dumping some values of G : %lf %lf %lf %lf\n", G[0], G[m*m/2], G[m*m*3/4], G[3]);
+        printf("(done) Dumping some values of G : %lf %lf %lf %lf %lf %lf\n",
+                G[0], G[m*m/2], G[m*m*3/4], G[3], G[42], G[67]);
+
+        # if USE_CHECKER
+        const double eps = 1e-5;
+        if (abs(G[0] - 0.0000) >= eps ||
+                abs(G[m*m/2] - 0.195313) >= eps ||
+                abs(G[m*m*3/4] - 0.292969) >= eps ||
+                abs(G[3] - 0.000179) >= eps ||
+                abs(G[42] - 0.002509) >= eps ||
+                abs(G[67] - 0.004003) >= eps)
+        {
+            LOGGER_FATAL("Compute is wrong");
+        }
+        else
+        {
+            LOGGER_INFO("Compute probably is correct");
+        }
+        # endif
 
     }
     uint64_t ttf = get_nanotime();
