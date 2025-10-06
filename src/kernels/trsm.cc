@@ -90,7 +90,7 @@ xkblas_t::trsm_tile_async(
     const TYPE * alpha,
     const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
           TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -113,7 +113,6 @@ xkblas_t::trsm_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    device_global_id_t device_global_id = d ? distribution2D_get(d, Btm, Btn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -241,27 +240,42 @@ xkblas_t::trsm_async(
     # define B(I, J) B, (I), (J), Bmb, Bnb, ldb
 
     /* CblasLeft / CblasUpper / CblasNoTrans  */
-    if (side == CblasLeft) {
-        if (uplo == CblasUpper) {
-            if (transA == CblasNoTrans) {
-                for (size_t tk = 0; tk < Bmt; tk++) {
+    if (side == CblasLeft)
+    {
+        if (uplo == CblasUpper)
+        {
+            if (transA == CblasNoTrans)
+            {
+                for (size_t tk = 0; tk < Bmt; tk++)
+                {
                     size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
                     TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (size_t tn = 0; tn < Bnt; tn++) {
-                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (size_t tn = 0; tn < Bnt; tn++)
+                    {
+                        const size_t Atm = Bmt-1-tk;
+                        const size_t Atn = Bmt-1-tk;
+                        const size_t Btm = Bmt-1-tk;
+                        const size_t Btn = tn;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_nn = (Btn == Bnt-1) ? (Bn-Btn*Bnb) : Bnb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A(Bmt-1-tk, Bmt-1-tk),
-                            B(Bmt-1-tk,       tn),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
                     }
-                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
-                        for (size_t tn = 0; tn < Bnt; ++tn) {
-                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (size_t tm = tk+1; tm < Bmt; ++tm)
+                    {
+                        for (size_t tn = 0; tn < Bnt; ++tn)
+                        {
+                            const device_global_id_t device_global_id = distribution2D_get(&d, Bmt-1-tm, tn);
+                            const size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
@@ -270,7 +284,7 @@ xkblas_t::trsm_async(
                                 B(Bmt-1-tk,       tn),
                                 &lalpha,
                                 B(Bmt-1-tm,       tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -279,26 +293,40 @@ xkblas_t::trsm_async(
             /*
              *  CblasLeft / CblasUpper / CblasTrans
              */
-            else {
-                for (size_t tk = 0; tk < Bmt; ++tk) {
-                    size_t bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
-                    TYPE lalpha = (tk == 0)     ? *alpha : one;
-                    for (size_t tn = 0; tn < Bnt; ++tn) {
-                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+            else
+            {
+                for (size_t tk = 0; tk < Bmt; ++tk)
+                {
+                    const size_t bs_km  = (tk == Bmt-1) ? Bm-tk*Bmb : Bmb;
+                    const TYPE lalpha = (tk == 0)     ? *alpha : one;
+
+                    for (size_t tn = 0; tn < Bnt; ++tn)
+                    {
+                        const size_t Atm = tk;
+                        const size_t Atn = tk;
+                        const size_t Btm = tk;
+                        const size_t Btn = tn;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_nn = (Btn == Bnt-1) ? (Bn-Btn*Bnb) : Bnb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A(tk, tk),
-                            B(tk, tn),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
                     }
-                    for (size_t tm = tk+1; tm < Bmt; tm++) {
-                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (size_t tn = 0; tn < Bnt; ++tn) {
-                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (size_t tm = tk+1; tm < Bmt; tm++)
+                    {
+                        const size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                        for (size_t tn = 0; tn < Bnt; ++tn)
+                        {
+                            const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                            const size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 transA, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
@@ -307,7 +335,7 @@ xkblas_t::trsm_async(
                                 B(tk, tn),
                                 &lalpha,
                                 B(tm, tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -317,27 +345,41 @@ xkblas_t::trsm_async(
         /*
          *  CblasLeft / CblasLower / CblasNoTrans
          */
-        else {
-            if (transA == CblasNoTrans) {
-                for (size_t tk = 0; tk < Bmt; ++tk) {
-                    size_t bs_km  = (tk == Bmt-1) ? (Bm-tk*Bmb) : Bmb;
-                    TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (size_t tn = 0; tn < Bnt; ++tn) {
-                        size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+        else
+        {
+            if (transA == CblasNoTrans)
+            {
+                for (size_t tk = 0; tk < Bmt; ++tk)
+                {
+                    const size_t bs_km  = (tk == Bmt-1) ? (Bm-tk*Bmb) : Bmb;
+                    const TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (size_t tn = 0; tn < Bnt; ++tn)
+                    {
+                        const size_t Atm = tk;
+                        const size_t Atn = tk;
+                        const size_t Btm = tk;
+                        const size_t Btn = tn;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_nn = (Btn == Bnt-1) ? (Bn-Btn*Bnb) : Bnb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A(tk, tk),
-                            B(tk, tn),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
                     }
-                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
+                    for (size_t tm = tk+1; tm < Bmt; ++tm)
+                    {
                         size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (size_t tn = 0; tn < Bnt; ++tn) {
-                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                        for (size_t tn = 0; tn < Bnt; ++tn)
+                        {
+                            const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                            const size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
@@ -346,7 +388,7 @@ xkblas_t::trsm_async(
                                 B(tk, tn),
                                 &lalpha,
                                 B(tm, tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -355,24 +397,37 @@ xkblas_t::trsm_async(
             /*
              *  CblasLeft / CblasLower / Cblas[Conj]Trans
              */
-            else {
-                for (size_t tk = 0; tk < Bmt; ++tk) {
-                    size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
-                    TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (size_t tn = 0; tn < Bnt; ++tn) {
-                        size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+            else
+            {
+                for (size_t tk = 0; tk < Bmt; ++tk)
+                {
+                    const size_t bs_km  = (tk == 0) ? Bm-(Bmt-1)*Bmb : Bmb;
+                    const TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (size_t tn = 0; tn < Bnt; ++tn)
+                    {
+                        const size_t Atm = Bmt-1-tk;
+                        const size_t Atn = Bmt-1-tk;
+                        const size_t Btm = Bmt-1-tk;
+                        const size_t Btn = tn;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_nn = (Btn == Bnt-1) ? (Bn-Btn*Bnb) : Bnb;
+
                         this->trsm_tile_async<P>(
                             side, uplo, transA, diag,
                             bs_km, bs_nn,
                             &lalpha,
-                            A(Bmt-1-tk, Bmt-1-tk),
-                            B(Bmt-1-tk,       tn),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
                     }
-                    for (size_t tm = tk+1; tm < Bmt; ++tm) {
-                        for (size_t tn = 0; tn < Bnt; ++tn) {
-                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (size_t tm = tk+1; tm < Bmt; ++tm)
+                    {
+                        for (size_t tn = 0; tn < Bnt; ++tn)
+                        {
+                            const size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                            const device_global_id_t device_global_id = distribution2D_get(&d, Bmt-1-tm, tn);
                             this->gemm_tile_async<P>(
                                 transA, CblasNoTrans,
                                 Bmb, bs_nn, bs_km,
@@ -381,7 +436,7 @@ xkblas_t::trsm_async(
                                 B(Bmt-1-tk,       tn),
                                 &lalpha,
                                 B(Bmt-1-tm,       tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -392,27 +447,42 @@ xkblas_t::trsm_async(
     /*
      *  CblasRight / CblasUpper / CblasNoTrans
      */
-    else {
-        if (uplo == CblasUpper) {
-            if (transA == CblasNoTrans) {
-                for (size_t tk = 0; tk < Bnt; ++tk) {
-                    size_t bs_kn = (tk == Bnt-1) ? (Bn-tk*Bnb) : Bnb;
-                    TYPE lalpha = (tk == 0) ? *alpha : one;
-                    for (size_t tm = 0; tm < Bmt; ++tm) {
-                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+    else
+    {
+        if (uplo == CblasUpper)
+        {
+            if (transA == CblasNoTrans)
+            {
+                for (size_t tk = 0; tk < Bnt; ++tk)
+                {
+                    const size_t bs_kn = (tk == Bnt-1) ? (Bn-tk*Bnb) : Bnb;
+                    const TYPE lalpha = (tk == 0) ? *alpha : one;
+                    for (size_t tm = 0; tm < Bmt; ++tm)
+                    {
+                        const size_t Atm = tk;
+                        const size_t Atn = tk;
+                        const size_t Btm = tm;
+                        const size_t Btn = tk;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_mm = (Btm == Bmt-1) ? (Bm-Btm*Bmb) : Bmb;
+
                         this->trsm_tile_async<P>(
                             side, uplo, transA, diag,
                             bs_mm, bs_kn,
                             &lalpha,
-                            A(tk, tk),
-                            B(tm, tk),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
                     }
-                    for (size_t tm = 0; tm < Bmt; ++tm) {
-                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
-                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
-                            size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
+                    for (size_t tm = 0; tm < Bmt; ++tm)
+                    {
+                        const size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                        for (size_t tn = tk+1; tn < Bnt; ++tn)
+                        {
+                            const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                            const size_t bs_nn = (tn == Bnt-1) ? (Bn-tn*Bnb) : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, bs_nn, Bmb,
@@ -421,7 +491,7 @@ xkblas_t::trsm_async(
                                 A(tk, tn),
                                 &lalpha,
                                 B(tm, tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -430,31 +500,42 @@ xkblas_t::trsm_async(
             /*
              *  CblasRight / CblasUpper / CblasConjTrans
              */
-            else {
-                for (size_t tk = 0; tk < Bnt; ++tk) {
-                    size_t bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
-                    for (size_t tm = 0; tm < Bmt; ++tm) {
-                        size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+            else
+            {
+                for (size_t tk = 0; tk < Bnt; ++tk)
+                {
+                    const size_t bs_kn = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+                    for (size_t tm = 0; tm < Bmt; ++tm)
+                    {
+                        const size_t Atm = Bnt-1-tk;
+                        const size_t Atn = Bnt-1-tk;
+                        const size_t Btm = tm;
+                        const size_t Btn = Bnt-1-tk;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_mm = (Btm == Bmt-1) ? (Bm-Btm*Bmb) : Bmb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
                             alpha,
-                            A(Bnt-1-tk, Bnt-1-tk),
-                            B(tm, Bnt-1-tk),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
 
-                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn)
+                        {
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, transA,
                                 bs_mm, Bnb, bs_kn,
                                 &minvalpha,
-                                B(tm, Bnt-1-tk),
+                                B(Btm, Btn),
                                 A(Bnt-1-tn, Bnt-1-tk),
                                 &one,
                                 B(tm, Bnt-1-tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -464,56 +545,78 @@ xkblas_t::trsm_async(
         /*
          *  CblasRight / CblasLower / CblasNoTrans
          */
-        else {
-            if (transA == CblasNoTrans) {
-                for (size_t tk = 0; tk < Bnt; ++tk) {
-                    size_t bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
+        else
+        {
+            if (transA == CblasNoTrans)
+            {
+                for (size_t tk = 0; tk < Bnt; ++tk)
+                {
+                    const size_t bs_kn  = tk == 0 ? Bn-(Bnt-1)*Bnb : Bnb;
                     TYPE lalpha = tk == 0 ? *alpha : one;
-                    for (size_t tm = 0; tm < Bmt; ++tm) {
-                        size_t bs_mm = (tm == Bmt-1) ? (Bm-tm*Bmb) : Bmb;
+                    for (size_t tm = 0; tm < Bmt; ++tm)
+                    {
+                        const size_t Atm = Bnt-1-tk;
+                        const size_t Atn = Bnt-1-tk;
+                        const size_t Btm = tm;
+                        const size_t Btn = Bnt-1-tk;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_mm = (Btm == Bmt-1) ? (Bm-Btm*Bmb) : Bmb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
                             &lalpha,
-                            A(Bnt-1-tk, Bnt-1-tk),
-                            B(tm, Bnt-1-tk),
-                            &d
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
 
-                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
+                        for (size_t tn = tk+1; tn < Bnt; ++tn)
+                        {
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, CblasNoTrans,
                                 bs_mm, Bnb, bs_kn,
                                 &mone,
-                                B(tm, Bnt-1-tk),
+                                B(Btm, Btn),
                                 A(Bnt-1-tk, Bnt-1-tn),
                                 &lalpha,
                                 B(tm, Bnt-1-tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
                 }
             }
-            else {
-                for (size_t tk = 0; tk < Bnt; ++tk) {
-                    size_t bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
-                    for (size_t tm = 0; tm < Bmt; ++tm) {
-                        size_t bs_mm = tm == Bmt-1 ? Bm-tm*Bmb : Bmb;
+            else
+            {
+                for (size_t tk = 0; tk < Bnt; ++tk)
+                {
+                    const size_t bs_kn = tk == Bnt-1 ? Bn-tk*Bnb : Bnb;
+                    for (size_t tm = 0; tm < Bmt; ++tm)
+                    {
+                        const size_t Atm = tk;
+                        const size_t Atn = tk;
+                        const size_t Btm = tm;
+                        const size_t Btn = tk;
+                        const device_global_id_t device_global_id = distribution2D_get(&d, Btm, Btn);
+
+                        const size_t bs_mm = (Btm == Bmt-1) ? (Bm-Btm*Bmb) : Bmb;
+
                         this->trsm_tile_async<P>(
                             side, uplo,
                             transA, diag,
                             bs_mm, bs_kn,
                             alpha,
-                            A(tk, tk),
-                            B(tm, tk),
-                            &d
-
+                            A(Atm, Atn),
+                            B(Btm, Btn),
+                            device_global_id
                         );
 
-                        for (size_t tn = tk+1; tn < Bnt; ++tn) {
-                            size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
+                        for (size_t tn = tk+1; tn < Bnt; ++tn)
+                        {
+                            const size_t bs_nn = tn == Bnt-1 ? Bn-tn*Bnb : Bnb;
                             this->gemm_tile_async<P>(
                                 CblasNoTrans, transA,
                                 bs_mm, bs_nn, Bmb,
@@ -522,7 +625,7 @@ xkblas_t::trsm_async(
                                 A(tn, tk),
                                 &one,
                                 B(tm, tn),
-                                &d
+                                device_global_id
                             );
                         }
                     }
@@ -832,7 +935,7 @@ xkblas_t::task_format_create_TRSM(
     template void xkblas_t::task_format_create_TRSM<P>(task_format_t * format); \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
-    template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, distribution_t * d);
+    template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
 

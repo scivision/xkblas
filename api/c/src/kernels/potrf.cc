@@ -3,7 +3,7 @@
 /*   potrf.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/05 20:54:41 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/10/06 23:09:43 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -22,12 +22,12 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£potrf_tile_async(
-    distribution_t * d,
     int uplo,
     int n,
-    TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, size_t lda
+    TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, size_t lda,
+    xkrt_device_global_id_t device_global_id
 ) {
-    return xkblas_get()->potrf_tile_async<xkblas_precision_t::££>(uplo, n, A, Atm, Atn, Amb, Anb, lda, d);
+    return xkblas_get()->potrf_tile_async<xkblas_precision_t::££>(uplo, n, A, Atm, Atn, Amb, Anb, lda, device_global_id);
 }
 
 extern "C"

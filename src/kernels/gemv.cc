@@ -125,7 +125,7 @@ xkblas_t::gemv_tile_async(
     const TYPE * x, const int incx,
     const TYPE * beta,
           TYPE * y, const size_t tm, const size_t mb, const int incy,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -145,7 +145,6 @@ xkblas_t::gemv_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 2;
-    device_global_id_t device_global_id = d ? distribution1D_get(d, tm) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -243,6 +242,7 @@ xkblas_t::gemv_async(
     // iterator on tiles
     for (size_t tm = 0; tm < mt; ++tm)
     {
+        device_global_id_t device_global_id = distribution1D_get(&d, tm);
         size_t bs_mm = (tm == mt-1) ? (m-tm*mb) : mb;
         this->gemv_tile_async<P>(
             transA,
@@ -252,7 +252,7 @@ xkblas_t::gemv_async(
             x, incx,
             beta,
             y, tm, mb, incy,
-            &d
+            device_global_id
         );
     }
     LOGGER_DEBUG("GEMV dependency graph submitted");
@@ -393,7 +393,7 @@ xkblas_t::task_format_create_GEMV(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_GEMV<P>(task_format_t * format); \
     template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
-    template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const int incy, distribution_t * d);
+    template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
 

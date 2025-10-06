@@ -42,14 +42,14 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£gemm_tile_async(
-    distribution_t * d,
     int transA, int transB,
     const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
     const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
     const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+    xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->gemm_tile_async<xkblas_precision_t::££>(
         transA, transB,
@@ -59,7 +59,7 @@ xkblas_£gemm_tile_async(
         B, Btm, Btn, Bmb, Bnb, ldb,
         beta,
         C, Ctm, Ctn, Cmb, Cnb, ldc,
-        d
+        device_global_id
     );
 }
 

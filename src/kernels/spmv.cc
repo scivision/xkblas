@@ -117,8 +117,7 @@ xkblas_t::spmv_tile_async(
     const TYPE * beta,
     /* vector Y (inout) */
     TYPE * Y,
-    size_t tm,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     // retrieve producer threads
     thread_t * thread = thread_t::get_tls();
@@ -137,7 +136,6 @@ xkblas_t::spmv_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 2;
-    device_global_id_t device_global_id = d ? distribution1D_get(d, tm) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -230,7 +228,9 @@ xkblas_t::spmv_async(
     // for each tile
     for (size_t tm = 0 ; tm < mt ; ++tm)
     {
-       // block size
+        const device_global_id_t device_global_id = distribution1D_get(&d, tm);
+
+        // block size
         size_t m0 = tm*ts;
         size_t m1 = (tm == mt-1) ? m : (tm+1) * ts;
         size_t bs = m1 - m0;
@@ -289,8 +289,7 @@ xkblas_t::spmv_async(
             X,
             beta,
             Y + m0,
-            tm,
-           &d
+            device_global_id
         );
     }
     LOGGER_WARN("`row_dup` is leaking");
@@ -335,9 +334,9 @@ body_cuda_run(
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * row = accesses + 0;
     const access_t * col = accesses + 1;
-    const access_t * values      = accesses + 2;
-    const access_t * X_acc           = accesses + 3;
-    const access_t * Y_acc           = accesses + 4;
+    const access_t * values  = accesses + 2;
+    const access_t * X_acc   = accesses + 3;
+    const access_t * Y_acc   = accesses + 4;
 
     const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     assert(args);
@@ -352,9 +351,9 @@ body_cuda_run(
         assert(row->device_view.addr % sizeof(int64_t) == 0);
         assert(col->device_view.addr % sizeof(int64_t) == 0);
     }
-    assert(values->device_view.addr      % sizeof(CU_TYPE) == 0);
-    assert(X_acc->device_view.addr           % sizeof(CU_TYPE) == 0);
-    assert(Y_acc->device_view.addr           % sizeof(CU_TYPE) == 0);
+    assert(values->device_view.addr % sizeof(CU_TYPE) == 0);
+    assert(X_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
+    assert(Y_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
 
     // setup matrix desc
     cusparseSpMatDescr_t A;
@@ -501,7 +500,7 @@ xkblas_t::task_format_create_SPMV(
 
 # define DEFINE(P, T)  \
     template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, size_t tm, distribution_t * d);
+    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
 # undef DEFINE
 

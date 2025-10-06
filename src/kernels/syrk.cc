@@ -113,7 +113,7 @@ xkblas_t::syrk_tile_async(
     const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
     const TYPE * beta,
           TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -138,7 +138,6 @@ xkblas_t::syrk_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    device_global_id_t device_global_id = d ? distribution2D_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -261,6 +260,7 @@ xkblas_t::syrk_async(
         {
             for (size_t tk = 0; tk < Ant; ++tk)
             {
+                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
                 const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 this->syrk_tile_async<P>(
@@ -268,7 +268,7 @@ xkblas_t::syrk_async(
                     bs_nn, bs_kn,
                     alpha,  A(tn, tk), lda,
                     &zbeta, C(tn, tn), ldc,
-                    &d
+                    device_global_id
                 );
             }
 
@@ -276,6 +276,7 @@ xkblas_t::syrk_async(
             {
                 for (size_t tm = tn+1; tm < Cmt; ++tm)
                 {
+                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Ant; ++tk)
                     {
@@ -289,7 +290,7 @@ xkblas_t::syrk_async(
                             A(tn, tk), lda,
                             &zbeta,
                             C(tm, tn), ldc,
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -301,6 +302,7 @@ xkblas_t::syrk_async(
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Ant; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
                         const size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -311,7 +313,7 @@ xkblas_t::syrk_async(
                             A(tm, tk), lda,
                             &zbeta,
                             C(tn, tm), ldc,
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -323,6 +325,7 @@ xkblas_t::syrk_async(
             {
                 const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
+                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
                 this->syrk_tile_async<P>(
                     uplo, trans,
                     bs_nn, bs_km,
@@ -331,7 +334,7 @@ xkblas_t::syrk_async(
                     &zbeta,
                     C(tn, tn),
                     ldc,
-                    &d
+                    device_global_id
                 );
             }
 
@@ -342,6 +345,7 @@ xkblas_t::syrk_async(
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Amt; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -352,7 +356,7 @@ xkblas_t::syrk_async(
                             A(tk, tn), lda,
                             &zbeta,
                             C(tm, tn), ldc,
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -364,6 +368,7 @@ xkblas_t::syrk_async(
                     const size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Amt; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
                         const size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -374,7 +379,7 @@ xkblas_t::syrk_async(
                             A(tk, tm), lda,
                             &zbeta,
                             C(tn, tm), ldc,
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -457,6 +462,6 @@ xkblas_t::task_format_create_SYRK(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_SYRK<P>(task_format_t * format); \
     template int xkblas_t::syrk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
-    template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, distribution_t * d);
+    template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

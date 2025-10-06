@@ -945,7 +945,7 @@ main_mumps(char ** args)
 
         # if USE_CHECKER
         const double eps = 1e-5;
-        if (abs(G[0] - 0.0000) >= eps ||
+        if (    abs(G[0] - 0.0000) >= eps ||
                 abs(G[m*m/2] - 0.195313) >= eps ||
                 abs(G[m*m*3/4] - 0.292969) >= eps ||
                 abs(G[3] - 0.000179) >= eps ||

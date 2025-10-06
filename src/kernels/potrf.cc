@@ -109,7 +109,7 @@ xkblas_t::potrf_tile_async(
     int uplo,
     int n,
     TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -130,7 +130,6 @@ xkblas_t::potrf_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 0;
-    device_global_id_t device_global_id = d ? distribution2D_get(d, Atm, Atn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -214,23 +213,27 @@ xkblas_t::potrf_async(
 
     # define A(I, J) A, (I), (J), Amb, Anb, lda
 
+    // TODO: double-check distribution
+
     if (uplo == CblasLower)
     {
         for (size_t tk = 0; tk < Amt; ++tk)
         {
-            size_t bs_km = (tk == Amt - 1) ? (Am-tk*Amb) : Amb;
+            const size_t bs_km = (tk == Amt - 1) ? (Am-tk*Amb) : Amb;
+            const device_global_id_t device_global_id = distribution2D_get(&d, tk, tk);
 
             //options.priority = 2*A->mt - 2*k;
             this->potrf_tile_async<P>(
                 CblasLower,
                 bs_km,
                 A(tk, tk),
-                &d
+                device_global_id
             );
 
             for (size_t tm = tk+1; tm < Amt; ++tm)
             {
-                size_t bs_mm = (tm == Amt-1) ? (Am-tm*Amb) : Amb;
+                const device_global_id_t device_global_id = distribution2D_get(&d, tm, tk);
+                const size_t bs_mm = (tm == Amt-1) ? (Am-tm*Amb) : Amb;
                 //options.priority = 2*A->mt - 2*k - m;
                 this->trsm_tile_async<P>(
                     CblasRight, CblasLower,
@@ -239,13 +242,14 @@ xkblas_t::potrf_async(
                     &one_complex,
                     A(tk, tk),
                     A(tm, tk),
-                    &d
+                    device_global_id
                 );
             }
 
             for (size_t tn = tk + 1; tn < Ant; ++tn)
             {
-                size_t bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
+                const size_t bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
+                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
 
                 //options.priority = 2*A->mt - 2*k - n;
 
@@ -259,7 +263,7 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one,
                         A(tn, tn),
-                        &d
+                        device_global_id
                     );
                 }
                 else
@@ -271,13 +275,14 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one,
                         A(tn, tn),
-                        &d
+                        device_global_id
                     );
                 }
 
                 for (size_t tm = tn + 1; tm < Amt ; ++tm)
                 {
-                    size_t bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
+                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                    const size_t bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
 
                     //options.priority = 2*A->mt - 2*k - n - m;
                     this->gemm_tile_async<P>(
@@ -288,7 +293,7 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one_complex,
                         A(tm, tn),
-                        &d
+                        device_global_id
                     );
                 }
             }
@@ -298,19 +303,21 @@ xkblas_t::potrf_async(
     {
         for (size_t tk = 0; tk < Ant; ++tk)
         {
-            size_t bs_km = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+            const device_global_id_t device_global_id = distribution2D_get(&d, tk, tk);
+            const size_t bs_km = (tk == Ant-1) ? (An-tk*Anb) : Anb;
 
             //options.priority = 2*A->nt - 2*k;
             this->potrf_tile_async<P>(
                 CblasUpper,
                 bs_km,
                 A(tk, tk),
-                &d
+                device_global_id
             );
 
             for (size_t tn = tk+1; tn < Ant; ++tn)
             {
-                size_t bs_nn = (tn == Ant-1) ? (An - tn*Anb) : Anb;
+                const device_global_id_t device_global_id = distribution2D_get(&d, tk, tn);
+                const size_t bs_nn = (tn == Ant-1) ? (An - tn*Anb) : Anb;
 
                 //options.priority = 2*A->nt - 2*k - n;
                 this->trsm_tile_async<P>(
@@ -320,13 +327,14 @@ xkblas_t::potrf_async(
                     &one_complex,
                     A(tk, tk),
                     A(tk, tn),
-                    &d
+                    device_global_id
                 );
             }
 
             for (size_t tm = tk+1; tm < Amt ; ++tm)
             {
-                size_t bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
+                const device_global_id_t device_global_id = distribution2D_get(&d, tm, tm);
+                const size_t bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
 
                 //options.priority = 2*A->nt - 2*k  - m;
 
@@ -340,7 +348,7 @@ xkblas_t::potrf_async(
                         A(tk, tm),
                         &one,
                         A(tm, tm),
-                        &d
+                        device_global_id
                     );
                 }
                 else
@@ -352,13 +360,14 @@ xkblas_t::potrf_async(
                         A(tk, tm),
                         &one,
                         A(tm, tm),
-                        &d
+                        device_global_id
                     );
                 }
 
                 for (size_t tn = tm+1; tn < Ant; ++tn)
                 {
-                    size_t bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
+                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                    const size_t bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
 
                     //options.priority = 2*A->nt - 2*k - n - m;
                     this->gemm_tile_async<P>(
@@ -369,7 +378,7 @@ xkblas_t::potrf_async(
                         A(tk, tn),
                         &one_complex,
                         A(tm, tn),
-                        &d
+                        device_global_id
                     );
                 }
             }
@@ -454,7 +463,7 @@ xkblas_t::task_format_create_POTRF(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_POTRF<P>(task_format_t * format); \
     template int xkblas_t::potrf_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
-    template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, distribution_t * d);
+    template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 
 # undef DEFINE

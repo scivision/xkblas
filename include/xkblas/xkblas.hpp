@@ -3,7 +3,7 @@
 /*   xkblas.hpp                                                   .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/29 20:43:12 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/10/06 23:06:26 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -209,8 +209,7 @@ typedef struct  xkblas_t
         const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
               TYPE * L, const size_t Lm, const size_t Ln, int ldl,
               TYPE * U, const size_t Um, const size_t Un, int ldu,
-        const size_t Ltm, const size_t Ltn,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     TYPED
@@ -222,7 +221,7 @@ typedef struct  xkblas_t
         const TYPE * x, const int incx,
         const TYPE * beta,
               TYPE * y, const size_t tm, const size_t mb, const int incy,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     // LEVEL 3
@@ -367,7 +366,7 @@ typedef struct  xkblas_t
         const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
         const TYPE * beta,
               TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     TYPED
@@ -380,7 +379,7 @@ typedef struct  xkblas_t
         const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
         const TYPE * beta,
               TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     TYPED
@@ -391,7 +390,7 @@ typedef struct  xkblas_t
         const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
         const TYPE_REAL * beta,
               TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
 
@@ -403,7 +402,7 @@ typedef struct  xkblas_t
         const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
         const TYPE * beta,
               TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     TYPED
@@ -414,7 +413,7 @@ typedef struct  xkblas_t
         const TYPE * alpha,
         const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
               TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     // LAPACKE
@@ -442,7 +441,7 @@ typedef struct  xkblas_t
         int uplo,
         int n,
         TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
     // SPARSE
@@ -486,8 +485,7 @@ typedef struct  xkblas_t
         TYPE * X,
         const TYPE * beta,
         TYPE * Y,
-        size_t tm,
-        xkrt::distribution_t * d
+        xkrt::device_global_id_t device_global_id
     );
 
 }               xkblas_t;

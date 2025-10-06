@@ -122,7 +122,7 @@ xkblas_t::herk_tile_async(
     const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
     const TYPE_REAL * beta,
           TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -145,7 +145,6 @@ xkblas_t::herk_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    device_global_id_t device_global_id = d ? distribution2D_get(d, Ctm, Ctn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -262,6 +261,8 @@ xkblas_t::herk_async(
     # define A(I, J) A, (I), (J), Amb, Anb, lda
     # define C(I, J) C, (I), (J), Cmb, Cnb, ldc
 
+    // TODO: double-check distribution
+
     for (size_t tn = 0; tn < Cnt; ++tn)
     {
         size_t bs_nn = (tn == Cnt-1) ? (Cn-tn*Cnb) : Cnb;
@@ -270,6 +271,7 @@ xkblas_t::herk_async(
         {
             for (size_t tk = 0; tk < Ant; ++tk)
             {
+                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
                 size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                 TYPE_REAL dbeta = (tk == 0) ? *beta : 1.0;
                 this->herk_tile_async<P>(
@@ -279,7 +281,7 @@ xkblas_t::herk_async(
                     A(tn, tk),
                    &dbeta,
                     C(tn, tn),
-                    &d
+                    device_global_id
                 );
             }
             if (uplo == CblasLower)
@@ -289,6 +291,7 @@ xkblas_t::herk_async(
                     size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Ant; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
                         size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE b = (tk == 0) ? complex_beta : one;
                         this->gemm_tile_async<P>(
@@ -299,7 +302,7 @@ xkblas_t::herk_async(
                             A(tn, tk),
                             &b,
                             C(tm, tn),
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -311,6 +314,7 @@ xkblas_t::herk_async(
                     size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Ant; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
                         size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE b = (tk == 0) ? complex_beta : one;
                         this->gemm_tile_async<P>(
@@ -321,7 +325,7 @@ xkblas_t::herk_async(
                             A(tm, tk),
                             &b,
                             C(tn, tm),
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -331,6 +335,7 @@ xkblas_t::herk_async(
         {
             for (size_t tk = 0; tk < Amt; ++tk)
             {
+                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
                 size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                 this->herk_tile_async<P>(
                     uplo, trans,
@@ -339,7 +344,7 @@ xkblas_t::herk_async(
                     A(tk, tn),
                     beta,
                     C(tn, tn),
-                    &d
+                    device_global_id
                 );
             }
             if (uplo == CblasLower)
@@ -349,6 +354,7 @@ xkblas_t::herk_async(
                     size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Amt; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
                         size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE b = (tk == 0) ? complex_beta : one;
                         this->gemm_tile_async<P>(
@@ -359,7 +365,7 @@ xkblas_t::herk_async(
                             A(tk, tn),
                             &b,
                             C(tm, tn),
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -371,6 +377,7 @@ xkblas_t::herk_async(
                     size_t bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (size_t tk = 0; tk < Amt; ++tk)
                     {
+                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
                         size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE b = (tk == 0) ? complex_beta : one;
                         this->gemm_tile_async<P>(
@@ -381,7 +388,7 @@ xkblas_t::herk_async(
                             A(tk, tm),
                             &b,
                             C(tn, tm),
-                            &d
+                            device_global_id
                         );
                     }
                 }
@@ -471,7 +478,7 @@ xkblas_t::task_format_create_HERK(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_HERK<P>(task_format_t * format); \
     template int xkblas_t::herk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_real_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_real_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
-    template int xkblas_t::herk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_real_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_real_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, distribution_t * d);
+    template int xkblas_t::herk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_real_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_real_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 
 // XKBLAS_FORALL_PRECISIONS(DEFINE)
 DEFINE(C);

@@ -80,8 +80,7 @@ xkblas_t::copyscale_tile_async(
     const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
           TYPE * L, const size_t Lm, const size_t Ln, int ldl,
           TYPE * U, const size_t Um, const size_t Un, int ldu,
-    const size_t Ltm, const size_t Ltn,
-    distribution_t * d
+    device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -99,7 +98,6 @@ xkblas_t::copyscale_tile_async(
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
     constexpr size_t ocr_access = 1;
-    device_global_id_t device_global_id = d ? distribution2D_get(d, Ltm, Ltn) : UNSPECIFIED_DEVICE_GLOBAL_ID;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -201,14 +199,14 @@ xkblas_t::copyscale_async(
         for (size_t tn = 0; tn < Lnt ; ++tn)
         {
             const size_t bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
+            const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
             this->copyscale_tile_async<P>(
                 bs_m, bs_n,
                 should_copy, IW,
                 D(tn, tn), ldd,
                 L(tn, tm), ldl,
                 U(tm, tn), ldu,
-                tm, tn,
-                &d
+                device_global_id
             );
         }
     }
@@ -376,6 +374,6 @@ xkblas_t::task_format_create_COPYSCALE(
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_COPYSCALE<P>(task_format_t * format);    \
     template int xkblas_t::copyscale_async<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
-    template int xkblas_t::copyscale_tile_async<P>(const size_t m, const size_t n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const size_t Dm, const size_t Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const size_t Lm, const size_t Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const size_t Um, const size_t Un, int ldu, const size_t Ltm, const size_t Ltn, distribution_t * d);
+    template int xkblas_t::copyscale_tile_async<P>(const size_t m, const size_t n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const size_t Dm, const size_t Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const size_t Lm, const size_t Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const size_t Um, const size_t Un, int ldu, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
