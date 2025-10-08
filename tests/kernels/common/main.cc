@@ -193,7 +193,7 @@ prepare_csr_matrix(
 
 TYPED
 static void
-prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
+prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n, bool fill = true)
 {
     /* allocate matrices */
     const size_t s = sizeof(TYPE);
@@ -209,7 +209,8 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
         // xkblas->memory_register((void *) mem, memsize);
     }
 
-    FILL((TYPE *)mem, memsize / sizeof(TYPE));
+    if (fill)
+        FILL((TYPE *)mem, memsize / sizeof(TYPE));
 
     for (int i = 0 ; i < nmats ; ++i)
     {
@@ -660,9 +661,190 @@ main_copyscale(char ** args)
 }
 
 TYPED
+static void
+main_mumps_checker_import_mat(TYPE ** pMat, int m, int n, size_t ld, const char * fname)
+{
+    char buffer[512];
+    snprintf(buffer, sizeof(buffer), "mat-%s-%d-%d", fname, m, n);
+
+    *pMat = (TYPE *) malloc(sizeof(TYPE) * ld * ld);
+    assert(*pMat);
+
+    FILE * f = fopen(buffer, "rb");
+    if (!f)
+    {
+        perror("fopen");
+        return;
+    }
+
+    size_t read = fread(*pMat, sizeof(TYPE), ld * ld, f);
+    if (read != ld * ld)
+    {
+        fprintf(stderr, "Error: read only %zu of %zu elements from %s\n",
+                read, ld * ld, buffer);
+    }
+    fclose(f);
+}
+
+TYPED
+static void
+main_mumps_checker_export_mat(const TYPE * mat, int m, int n, size_t ld, const char * fname)
+{
+    char buffer[512];
+    snprintf(buffer, sizeof(buffer), "mat-%s-%d-%d", fname, m, n);
+
+    FILE * f = fopen(buffer, "wb");
+    if (!f)
+    {
+        perror("fopen");
+        return;
+    }
+
+    size_t written = fwrite(mat, sizeof(TYPE), ld * ld, f);
+    if (written != ld * ld)
+    {
+        fprintf(stderr, "Error: wrote only %zu of %zu elements to %s\n",
+                written, ld * ld, buffer);
+    }
+    fclose(f);
+}
+
+TYPED
+static int
+main_mumps_checker(char ** args)
+{
+    /**
+     *           n         m
+     *      .-------.-----------.
+     *  n   |   D   |    U      |
+     *      |       |           |
+     *      .-------.-----------.
+     *      |       |           |
+     *      |       |           |
+     *   m  |  L    |     G     |
+     *      |       |           |
+     *      |       |           |
+     *      .-------.-----------.
+     */
+
+    int exprt = atoi(args[0]);
+    int m = atoi(args[1]);
+    int n = atoi(args[2]);
+    int ts0 = atoi(args[3]);
+    int ts1 = atoi(args[4]);
+    int ts2 = atoi(args[5]);
+    int ld = m+n;
+
+    if (ts0 <= 0) ts0 = m+n;
+    if (ts1 <= 0) ts1 = m+n;
+    if (ts2 <= 0) ts2 = m+n;
+
+    TYPE alpha = 0.77;
+    TYPE  beta = 0.43;
+
+    bool should_copy = true;
+    int * IW = NULL;
+    uint64_t tt0;
+
+    printf("allocating and filling matrices\n");
+
+    uintptr_t matrices[4];
+    prepare_n_matrices<P>(matrices, 4, ld, ld, false);
+
+    TYPE * D = (TYPE *) matrices[0];
+    TYPE * L = (TYPE *) matrices[1];
+    TYPE * U = (TYPE *) matrices[2];
+    TYPE * G = (TYPE *) matrices[3];
+
+    for (int i = 0 ; i < ld*ld ; ++i)
+    {
+        D[i] = ((i*55 + 1) % (ld*ld)) / (double) (ld * ld * 0.55);
+        L[i] = ((i*33 + 1) % (ld*ld)) / (double) (ld * ld * 0.33);
+        U[i] = ((i*77 + 1) % (ld*ld)) / (double) (ld * ld * 0.77);
+        G[i] = ((i*99 + 1) % (ld*ld)) / (double) (ld * ld * 0.99);
+    }
+
+    printf("running matrices with (m, n) = (%d, %d)\n", m, n);
+    printf("D=%p, L=%p, U=%p, G=%p\n", D, L, U, G);
+    dump_matrix<P>("G ", G , m, m, ld);
+
+    set_tile_size(ts0);
+    xkblas->trsm_async<P>(CblasLeft, CblasUpper, CblasTrans, CblasUnit, n, m, &alpha, D, ld, L, ld);
+
+    set_tile_size(ts1);
+    xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
+    // xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
+
+    set_tile_size(ts2);
+    xkblas->gemmt_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
+
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
+
+    xkblas_sync();
+    xkblas_memory_invalidate_caches();
+
+    if (exprt)
+    {
+        puts("Exporting matrices");
+        main_mumps_checker_export_mat<P>(D, m, n, ld, "D");
+        main_mumps_checker_export_mat<P>(L, m, n, ld, "L");
+        main_mumps_checker_export_mat<P>(U, m, n, ld, "U");
+        main_mumps_checker_export_mat<P>(G, m, n, ld, "G");
+    }
+    else
+    {
+        puts("Importing matrices");
+        TYPE * D2;
+        TYPE * L2;
+        TYPE * U2;
+        TYPE * G2;
+        main_mumps_checker_import_mat<P>(&D2, m, n, ld, "D");
+        main_mumps_checker_import_mat<P>(&L2, m, n, ld, "L");
+        main_mumps_checker_import_mat<P>(&U2, m, n, ld, "U");
+        main_mumps_checker_import_mat<P>(&G2, m, n, ld, "G");
+
+        puts("Comparing matrices");
+        bool err = false;
+        for (int i = 0 ; i < ld*ld ; ++i)
+        {
+            int x = i%ld;
+            int y = i/ld;
+
+            if (i % ((ld * ld) / 10) == 0)
+                printf("%d%%\n", (100*i)/(ld*ld));
+
+            constexpr TYPE delta = 0.1; // delta in % error tolerance
+            TYPE dD = abs((D[i] - D2[i]) / D2[i] * 100.0);
+            TYPE dL = abs((L[i] - L2[i]) / L2[i] * 100.0);
+            TYPE dU = abs((U[i] - U2[i]) / U2[i] * 100.0);
+            TYPE dG = abs((G[i] - G2[i]) / G2[i] * 100.0);
+
+            if (
+                dD > delta ||
+                dL > delta ||
+                dU > delta ||
+               (dG > delta && x<=y)
+            ) {
+                LOGGER_ERROR("Compute is erroreous at index i=%d, x=%d, y=%d, we have dD=%lf, dL=%lf, dU=%lf, dG=%lf", i, x, y, dD, dL, dU, dG);
+                err = true;
+                break ;
+            }
+        }
+        dump_matrix<P>("G ", G , m, m, ld);
+        dump_matrix<P>("G2", G2, m, m, ld);
+        if (!err)
+            LOGGER_INFO("Compute is probably correct");
+    }
+    return 0;
+}
+
+TYPED
 static int
 main_mumps(char ** args)
 {
+    // TODO: m=17,233   n=2,072
 
     /**
      *           n         m
@@ -1439,6 +1621,20 @@ static func_t funcs[] = {
                     "  - TS1 : tile size for trsm\n"
                     "  - TS2 : tile size for copyscale\n"
                     "  - TS3 : tile size for gemm\n",
+    },
+
+    {
+        .name = "MUMPS-CHECKER",
+        .f = main_mumps_checker<PRECISION>,
+        .nargs = 6,
+        .descr = "???",
+        .usage =    "EXPORT M N TS1 TS2 TS3\n"
+                    "  - EXPORT : 1 to save result, 0 to compare to a saved result\n"
+                    "  -   M : ?\n"
+                    "  -   N : ?\n"
+                    "  -    TS1 : tile size for trsm\n"
+                    "  -    TS2 : tile size for copyscale\n"
+                    "  -    TS3 : tile size for gemmt\n",
     },
 
     {
