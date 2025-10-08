@@ -897,6 +897,7 @@ body_cpu(task_t * task)
 
 # endif /* XKBLAS_SUPPORT_CBLAS */
 
+# if 0
 TYPED
 static task_format_target_t
 suggest_format(task_t * task)
@@ -906,6 +907,7 @@ suggest_format(task_t * task)
         return TASK_FORMAT_TARGET_HOST;
     return TASK_FORMAT_TARGET_NO_SUGGEST;
 }
+# endif
 
 //////////////////////////
 // TASK FORMAT REGISTER //
@@ -928,7 +930,9 @@ xkblas_t::task_format_create_TRSM(
     format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
     # endif /* XKBLAS_SUPPORT_HIP */
 
+    # if 0
     format->suggest = (task_format_suggest_t) suggest_format<P>;
+    # endif
 }
 
 # define DEFINE(P)  \
