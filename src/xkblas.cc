@@ -3,7 +3,7 @@
 /*   xkblas.cc                                                    .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/15 17:01:38 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/15 19:55:36 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/10/07 21:09:03 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -106,6 +106,22 @@ xkblas_t::memory_coherent_async(
     size_t sizeof_type
 ) {
     return this->runtime.memory_coherent_async(device_global_id, storage, ptr, ld, m, n, sizeof_type);
+}
+
+int
+xkblas_t::memory_register(
+    void * ptr,
+    size_t size
+) {
+    return this->runtime.memory_register(ptr, size);
+}
+
+int
+xkblas_t::memory_unregister(
+    void * ptr,
+    size_t size
+) {
+    return this->runtime.memory_unregister_async(ptr, size);
 }
 
 int
