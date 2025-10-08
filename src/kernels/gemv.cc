@@ -150,7 +150,7 @@ xkblas_t::gemv_tile_async(
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(transA, m, n, incx, incy, *alpha, *beta);
 
-    # ifndef XKRT_SUPPORT_DEBUG
+    # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "gemv(A ; x ; y=(%zd,))", y_offset_m);
     # endif /* XKRT_SUPPORT_DEBUG */
 

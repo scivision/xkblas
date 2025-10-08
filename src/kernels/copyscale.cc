@@ -103,7 +103,7 @@ xkblas_t::copyscale_tile_async(
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
     new (args) args_t(m, n, should_copy, IW);
 
-    # ifndef XKRT_SUPPORT_DEBUG
+    # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
             "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
     # endif /* XKRT_SUPPORT_DEBUG */

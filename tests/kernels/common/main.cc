@@ -157,7 +157,9 @@ prepare_csr_matrix(
 
     if (REGISTER_MEMORY)
     {
-        xkblas->memory_register((void *) memory, memsize);
+        xkblas_register_memory_async((void *) memory, memsize);
+        xkblas_register_memory_waitall();
+        // xkblas->memory_register((void *) memory, memsize);
     }
 
     // Temporary storage for maximum nonzeros
@@ -201,7 +203,11 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n)
     const uintptr_t mem = (const uintptr_t) malloc(memsize);
 
     if (REGISTER_MEMORY)
-        xkblas->memory_register((void *) mem, memsize);
+    {
+        xkblas_register_memory_async((void *) mem, memsize);
+        xkblas_register_memory_waitall();
+        // xkblas->memory_register((void *) mem, memsize);
+    }
 
     FILL((TYPE *)mem, memsize / sizeof(TYPE));
 
