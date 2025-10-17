@@ -39,33 +39,54 @@
 
 XKRT_NAMESPACE_USE;
 
-TYPED
+extern "C"
 int
-xkblas_t::axpby_async(
-    int n,
+xkblas_£gemm_tile_async(
+    int transA, int transB,
+    const size_t m, const size_t n, const size_t k,
     const TYPE * alpha,
-    const TYPE * x,
-    const int incx,
+    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
     const TYPE * beta,
-          TYPE * y,
-    const int incy
+          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+    xkrt_device_global_id_t device_global_id
 ) {
-    // LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
-    this->scal_async<P>(n, beta,  y, incy);
-    this->axpy_async<P>(n, alpha, x, incx, y, incy);
-    return 0;
+    return xkblas_get()->gemm_tile_async<xkblas_precision_t::££>(
+        transA, transB,
+        m, n, k,
+        alpha,
+        A, Atm, Atn, Amb, Anb, lda,
+        B, Btm, Btn, Bmb, Bnb, ldb,
+        beta,
+        C, Ctm, Ctn, Cmb, Cnb, ldc,
+        device_global_id
+    );
 }
 
-TYPED
-void
-xkblas_t::task_format_create_AXPBY(
-    task_format_t * format
+extern "C"
+int
+xkblas_£gemm_async(
+    int transA, int transB,
+    int m, int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
 ) {
-    // nothing to do
+    return xkblas_get()->gemm_async<xkblas_precision_t::££>(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
 
-# define DEFINE(P)  \
-    template void xkblas_t::task_format_create_AXPBY<P>(task_format_t * format); \
-    template int xkblas_t::axpby_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE
+extern "C"
+int
+xkblas_£gemm(
+    int transA, int transB,
+    int m, int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->gemm<xkblas_precision_t::££>(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}

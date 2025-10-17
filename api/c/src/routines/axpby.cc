@@ -35,22 +35,31 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#ifndef __XKBLAS_CONF_H__
-# define __XKBLAS_CONF_H__
+# include <xkblas/xkblas.hpp>
+# include <xkblas/xkblas.h>
 
-# include <stddef.h>
-# include <xkblas/routine.hpp>
+XKRT_NAMESPACE_USE;
 
-typedef struct  xkblas_conf_kernel_t
-{
-    size_t tile;
-}               xkblas_conf_kernel_t;
+extern "C"
+int
+xkblas_£axpby_async(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->axpby_async<xkblas_precision_t::££>(n, alpha, x, incx, beta, y, incy);
+}
 
-typedef struct  xkblas_conf_s
-{
-    xkblas_conf_kernel_t kernels[XKBLAS_ROUTINE_MAX];
-}               xkblas_conf_t;
-
-void xkblas_init_conf(xkblas_conf_t * conf);
-
-#endif /* __XKBLAS_CONF_H__ */
+extern "C"
+int
+xkblas_£axpby(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->axpby<xkblas_precision_t::££>(n, alpha, x, incx, beta, y, incy);
+}

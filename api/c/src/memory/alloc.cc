@@ -41,10 +41,6 @@
 
 # include <xkblas/xkblas.hpp>
 
-# include <xkrt/xkrt.h>
-# include <xkrt/support.h>
-# include <xkrt/logger/logger.h>
-
 XKRT_NAMESPACE_USE;
 
 extern "C"

@@ -227,7 +227,7 @@ xkblas_t::gemv_async(
     if (ts == 0)
     {
         int args[2] = {m, n};
-        xkblas_kernel_auto_tile(GEMV, args, &ts);
+        xkblas_routine_auto_tile(GEMV, args, &ts);
     }
 
     /* set tiling parameters */

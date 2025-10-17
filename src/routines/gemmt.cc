@@ -63,7 +63,6 @@
 
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
-# include <xkblas/kernel.hpp>
 # include <xkblas/cblas.h>
 
 # include <xkrt/support.h>
@@ -248,7 +247,7 @@ xkblas_t::gemmt_async(
     if (ts == 0)
     {
         int args[2] = {n, n};
-        xkblas_kernel_auto_tile(GEMMT, args, &ts);
+        xkblas_routine_auto_tile(GEMMT, args, &ts);
     }
 
     /* set tiling parameters */

@@ -208,7 +208,7 @@ xkblas_t::spmv_async(
     if (ts == 0)
     {
         int args[3] = {m, n, nnz};
-        xkblas_kernel_auto_tile(SPMV, args, &ts);
+        xkblas_routine_auto_tile(SPMV, args, &ts);
     }
     const size_t mt = NUM_OF_TILES(m, ts);
 

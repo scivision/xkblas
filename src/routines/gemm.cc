@@ -263,7 +263,7 @@ xkblas_t::gemm_async(
     if (ts == 0)
     {
         int args[3] = {m, n, k};
-        xkblas_kernel_auto_tile(GEMM, args, &ts);
+        xkblas_routine_auto_tile(GEMM, args, &ts);
     }
 
     /* set tiling parameters */
@@ -393,6 +393,23 @@ xkblas_t::gemm_async(
     LOGGER_DEBUG("GEMM dependency graph submitted");
 
     return 0;
+}
+
+TYPED
+int
+xkblas_t::gemm(
+    int transA, int transB,
+    int m, int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    this->memory_invalidate_caches();
+    int r = this->gemm_async<P>(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ldc, m, n, sizeof(TYPE));
+    return r;
 }
 
 # if XKBLAS_SUPPORT_CUBLAS
@@ -809,6 +826,7 @@ xkblas_t::task_format_create_GEMM(
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_GEMM<P>(task_format_t * format); \
+    template int xkblas_t::gemm<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_async<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_tile_async<P>(int transA, int transB, const size_t m, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

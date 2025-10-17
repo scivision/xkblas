@@ -35,29 +35,53 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+#ifndef __£XKBLAS_ROUTINES_H__
+# define __£XKBLAS_ROUTINES_H__
 
-XKRT_NAMESPACE_USE;
+# include <xkrt/consts.h>
 
-extern "C"
-int
-xkblas_£scal_tile_async(
-    const size_t n,
-    const TYPE * alpha,
-    TYPE * x,
-    const int incx,
-    xkrt_device_global_id_t device_global_id
-) {
-    return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_global_id);
-}
+# ifdef __cplusplus
+extern "C" {
+# endif /* __cplusplus */
 
-extern "C"
-int
-xkblas_£scal_async(
-    int n,
-    const TYPE * alpha,
-    TYPE * x,
-    const int incx
-) {
-    return xkblas_get()->scal_async<xkblas_precision_t::££>(n, alpha, x, incx);
-}
+    # define XKTYPE       £TYPE
+    # define XKTYPE_REAL  £TYPE_REAL
+    # define XKDEVICE     xkrt_device_global_id_t
+    # define XKDEF(RTYPE, NAME, ...)                \
+        RTYPE xkblas_£##NAME        (__VA_ARGS__);  \
+        RTYPE xkblas_£##NAME##_async(__VA_ARGS__);
+    # define XKDEFI(...)
+    #  include <xkblas/for-all-routines.h>
+
+    int
+    xkblas_£spmv_async(
+        const XKTYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        int index_base,
+        int index_type,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int format,
+        const void * csr_row_offsets,
+        const void * csr_col_indices,
+        const XKTYPE * csr_values,
+        /* vector X (in) */
+        XKTYPE * X,
+        const XKTYPE * beta,
+        /* vector Y (inout) */
+        XKTYPE * Y
+    );
+
+    # undef XKDEFI
+    # undef XKDEF
+    # undef XKTYPE
+    # undef XKTYPE_REAL
+    # undef XKDEVICE
+
+# ifdef __cplusplus
+}; /* extern "C" */
+# endif /* __cplusplus */
+
+#endif /* __£XKBLAS_ROUTINES_H__ */

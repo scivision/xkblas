@@ -185,7 +185,7 @@ xkblas_t::potrf_async(
     if (ts == 0)
     {
         int args[1] = { n };
-        xkblas_kernel_auto_tile(POTRF, args, &ts);
+        xkblas_routine_auto_tile(POTRF, args, &ts);
     }
 
     /* set tiling parameters */
@@ -403,6 +403,10 @@ body_cuda_run(
     stream_instruction_t * instr,
     stream_instruction_counter_t idx
 ) {
+    (void) stream;
+    (void) instr;
+    (void) idx;
+
     cublasHandle_t handle = stream->cu.blas.handle;
     assert(handle);
 

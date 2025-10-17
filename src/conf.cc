@@ -45,6 +45,6 @@
 void
 xkblas_init_conf(xkblas_conf_t * conf)
 {
-    for (int i = 0 ; i < XKBLAS_KERNEL_MAX ; ++i)
+    for (int i = 0 ; i < XKBLAS_ROUTINE_MAX ; ++i)
         conf->kernels[i].tile = 0;
 }

@@ -41,12 +41,34 @@ XKRT_NAMESPACE_USE;
 
 extern "C"
 int
-xkblas_£axpby_async(
-    int n,
-    const TYPE * alpha,
+xkblas_£dot_tile_async(
+    const size_t n,
     const TYPE * x, const int incx,
-    const TYPE * beta,
-          TYPE * y, const int incy
+    const TYPE * y, const int incy,
+          TYPE * r,
+    xkrt_device_global_id_t device_global_id
 ) {
-    return xkblas_get()->axpby_async<xkblas_precision_t::££>(n, alpha, x, incx, beta, y, incy);
+    return xkblas_get()->dot_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, NULL, r, device_global_id);
+}
+
+extern "C"
+int
+xkblas_£dot_async(
+    int n,
+    const TYPE * x, const int incx,
+    const TYPE * y, const int incy,
+          TYPE * r
+) {
+    return xkblas_get()->dot_async<xkblas_precision_t::££>(n, x, incx, y, incy, r);
+}
+
+extern "C"
+int
+xkblas_£dot(
+    int n,
+    const TYPE * x, const int incx,
+    const TYPE * y, const int incy,
+          TYPE * r
+) {
+    return xkblas_get()->dot<xkblas_precision_t::££>(n, x, incx, y, incy, r);
 }

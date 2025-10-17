@@ -47,7 +47,7 @@
 # include <string.h>
 
 # if 1
-# include "xkblas/skernels.h"
+# include "xkblas/sroutines.h"
 # define TYPE               float
 # define xkblas_gemm_async  xkblas_sgemm_async
 # define FLOPS(M, N, K)     FLOPS_SGEMM(M, N, K)

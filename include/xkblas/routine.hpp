@@ -1,15 +1,42 @@
-/**
- *  To add a new kernel
- *      - update the `XKBLAS_FORALL_KERNELS` macro
- *      - update the `XKBLAS_FORALL_PRECISIONS_AND_KERNELS` macro
- *      - add a `src/kernels/_.cc file implementing your kernel
- *      - update the CMakeLists.txt
- *
- * and maybe a few more steps, update this tutorial if you find something missing
- */
+/*
+** Copyright 2024,2025 INRIA
+**
+** Contributors :
+** Thierry Gautier, thierry.gautier@inrialpes.fr
+** Romain PEREIRA, romain.pereira@inria.fr + rpereira@anl.gov
+**
+** This software is a computer program whose purpose is to execute
+** blas subroutines on multi-GPUs system.
+**
+** This software is governed by the CeCILL-C license under French law and
+** abiding by the rules of distribution of free software.  You can  use,
+** modify and/ or redistribute the software under the terms of the CeCILL-C
+** license as circulated by CEA, CNRS and INRIA at the following URL
+** "http://www.cecill.info".
 
-# ifndef __KERNEL_H__
-#  define __KERNEL_H__
+** As a counterpart to the access to the source code and  rights to copy,
+** modify and redistribute granted by the license, users are provided only
+** with a limited warranty  and the software's author,  the holder of the
+** economic rights,  and the successive licensors  have only  limited
+** liability.
+
+** In this respect, the user's attention is drawn to the risks associated
+** with loading,  using,  modifying and/or developing or reproducing the
+** software by the user in light of its specific status of free software,
+** that may mean  that it is complicated to manipulate,  and  that  also
+** therefore means  that it is reserved for developers  and  experienced
+** professionals having in-depth computer knowledge. Users are therefore
+** encouraged to load and test the software's suitability as regards their
+** requirements in conditions enabling the security of their systems and/or
+** data to be ensured and,  more generally, to use and operate it in the
+** same conditions as regards security.
+
+** The fact that you are presently reading this means that you have had
+** knowledge of the CeCILL-C license and that you accept its terms.
+**/
+
+# ifndef __XKBLAS_ROUTINE_DECL_H__
+#  define __XKBLAS_ROUTINE_DECL_H__
 
 # include <stdint.h>
 
@@ -113,10 +140,11 @@ using xkblas_index_name_t = typename _xkblas_index_name_t<T>::value;
     F(Z, I64)
 
 // Define the macro list of kernels
-#define XKBLAS_FORALL_KERNELS(F) \
+#define XKBLAS_FORALL_ROUTINES(F) \
     /* LEVEL 1 */                \
     F(AXPBY)                     \
     F(AXPY)                      \
+    F(COPY)                      \
     F(DIVCOPY)                   \
     F(DOT)                       \
     F(FILL)                      \
@@ -145,30 +173,30 @@ using xkblas_index_name_t = typename _xkblas_index_name_t<T>::value;
     F(SPMV)
 
 // Now define the enum using the macro
-typedef enum    xkblas_kernel_t
+typedef enum    xkblas_routine_t
 {
     # define DEFINE_ENUM(name) name,
-    XKBLAS_FORALL_KERNELS(DEFINE_ENUM)
+    XKBLAS_FORALL_ROUTINES(DEFINE_ENUM)
     # undef DEFINE_ENUM
 
-   XKBLAS_KERNEL_MAX
+   XKBLAS_ROUTINE_MAX
 
-}               xkblas_kernel_t;
+}               xkblas_routine_t;
 
 // Optional: generate an array of string names
 constexpr const char *
-xkblas_kernel_name(xkblas_kernel_t k)
+xkblas_routine_name(xkblas_routine_t k)
 {
     switch (k)
     {
         #define CASE_NAME(name) case name: return #name;
-        XKBLAS_FORALL_KERNELS(CASE_NAME)
+        XKBLAS_FORALL_ROUTINES(CASE_NAME)
         #undef CASE_NAME
         default: return "UNKNOWN";
     }
 }
 
-# define XKBLAS_FORALL_PRECISIONS_AND_KERNELS(F)    \
+# define XKBLAS_FORALL_PRECISIONS_AND_ROUTINES(F)    \
     /* LEVEL 1 */                                   \
     F(S,     DOT)                                   \
     F(D,     DOT)                                   \
@@ -182,6 +210,10 @@ xkblas_kernel_name(xkblas_kernel_t k)
     F(C,     AXPY)                                  \
     F(D,     AXPY)                                  \
     F(Z,     AXPY)                                  \
+    F(S,     COPY)                                  \
+    F(C,     COPY)                                  \
+    F(D,     COPY)                                  \
+    F(Z,     COPY)                                  \
     F(S,     AXPBY)                                 \
     F(C,     AXPBY)                                 \
     F(D,     AXPBY)                                 \
@@ -239,4 +271,4 @@ xkblas_kernel_name(xkblas_kernel_t k)
    F(D,      SPMV)                                  \
    F(Z,      SPMV)
 
-# endif /* __KERNEL_H__ */
+# endif /* __XKBLAS_ROUTINE_DECL_H__ */
