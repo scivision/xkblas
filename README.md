@@ -84,12 +84,12 @@ Implementing a new routine includes at least the following steps:
 - update the two macros in `include/xkblas/routine.hpp`
     - `XKBLAS_FORALL_ROUTINES`
     - `XKBLAS_FORALL_PRECISIONS_AND_ROUTINES`
-- copy and modify an existing routine file, for instance
+- copy and modify an existing routine files, for instance
     - `cp src/routines/gemm.cc src/routines/custom.cc`
     - `cp api/c/src/routines/gemm.cc api/c/src/routines/custom.cc`
 
 ### Optional steps
-If your routine requires a custom kernel, you can implement it as follow:
+If your routine requires a custom kernel, you can implement it as follows:
 - update the `CMakeLists.txt` variable `XKBLAS_CUDA_KERNELS` and/or `XKBLAS_HIP_KERNELS`
 - copy and modify an existing kernel file, for instance
     - `cp src/kernels/copyscale.cu src/kernels/custom.cu`
