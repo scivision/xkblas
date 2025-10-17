@@ -134,8 +134,8 @@ xkblas_sync(); // or equivalently, rt.task_wait()
 
 # TODOS
 - Consolidate Intel implementation
-- Implement missing cblas wrappers
-- Implement missing kernels on above table
+- Implement synchronous routines, and openblas (cblas) wrappers
+- Add missing kernels on above table
 
 # Problems on Intel GPUs
 - memcpy2D is broken
