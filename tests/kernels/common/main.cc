@@ -587,7 +587,7 @@ main_trsm(char ** args)
                                 SIDE_STR[s], UPLO_STR[u], TRANS_STR[t], DIAG_STR[d]);
                         }
                         uint64_t t0 = get_nanotime();
-                        xkblas->trsm_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld, m_threshold);
+                        xkblas->trsm_rec_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld, m_threshold);
                         xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
                         uint64_t t1 = get_nanotime();
                         xkblas_sync();

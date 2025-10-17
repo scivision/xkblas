@@ -50,8 +50,8 @@ is_power_of_two(int n)
 # endif
 
 void
-xkblas_kernel_auto_tile(
-    xkblas_kernel_t kernel,
+xkblas_routine_auto_tile(
+    xkblas_routine_t kernel,
     int * args,
     size_t * ts
 ) {

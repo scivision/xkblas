@@ -147,7 +147,7 @@ xkblas_t::axpy_async(
     if (ts == 0)
     {
         int args[1] = { n };
-        xkblas_kernel_auto_tile(AXPY, args, &ts);
+        xkblas_routine_auto_tile(AXPY, args, &ts);
     }
     const size_t nt = NUM_OF_TILES(n, ts);
 
@@ -165,6 +165,23 @@ xkblas_t::axpy_async(
     }
 
     return 0;
+}
+
+TYPED
+int
+xkblas_t::axpy(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
+) {
+    this->memory_invalidate_caches();
+    int r = this->axpy_async<P>(n, alpha, x, incx, y, incy);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->sync();
+    return r;
 }
 
 # if XKBLAS_SUPPORT_CUBLAS
@@ -231,6 +248,7 @@ xkblas_t::task_format_create_AXPY(
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_AXPY<P>(task_format_t * format); \
+    template int xkblas_t::axpy<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, const size_t bs, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

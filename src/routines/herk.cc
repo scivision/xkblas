@@ -235,7 +235,7 @@ xkblas_t::herk_async(
     if (ts == 0)
     {
         int args[2] = {n, k};
-        xkblas_kernel_auto_tile(HERK, args, &ts);
+        xkblas_routine_auto_tile(HERK, args, &ts);
     }
 
     /* set tiling parameters */

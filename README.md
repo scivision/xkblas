@@ -35,7 +35,7 @@ Adding support for an unsupported kernel may involve more work.
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
-| axpby       | ✗   | ✗    | ✗   | ✗               |
+| axpby       | ✗   | ✓    | ✗   | ✗               |
 | axpy        | ✗   | ✓    | ✗   | ✗               |
 | divcopy     | ✗   | ✗    | ✗   | ✗               |
 | dot         | ✓   | ✓    | ✗   | ✗               |
@@ -74,6 +74,25 @@ Adding support for an unsupported kernel may involve more work.
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
 |-------------|-----|------|-----|-----------------|
 | spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
+
+## Add a new routine
+
+### Mandatory steps
+Implementing a new routine includes at least the following steps:
+- update the `CMakeLists.txt` variable `XKBLAS_ROUTINES`
+- declare the routine prototype in `include/xkblas/for-all-routines.h`
+- update the two macros in `include/xkblas/routine.hpp`
+    - `XKBLAS_FORALL_ROUTINES`
+    - `XKBLAS_FORALL_PRECISIONS_AND_ROUTINES`
+- copy and modify an existing routine file, for instance
+    - `cp src/routines/gemm.cc src/routines/custom.cc`
+    - `cp api/c/src/routines/gemm.cc api/c/src/routines/custom.cc`
+
+### Optional steps
+If your routine requires a custom kernel, you can implement it as follow:
+- update the `CMakeLists.txt` variable `XKBLAS_CUDA_KERNELS` and/or `XKBLAS_HIP_KERNELS`
+- copy and modify an existing kernel file, for instance
+    - `cp src/kernels/copyscale.cu src/kernels/custom.cu`
 
 ## Bindings to other programming languages
 XKBlas is developed in C++ and provides three bindings:

@@ -35,12 +35,56 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#ifndef __KERNELS_H__
-# define __KERNELS_H__
+# include <xkblas/xkblas.hpp>
 
-# include <xkblas/skernels.h>
-# include <xkblas/dkernels.h>
-# include <xkblas/ckernels.h>
-# include <xkblas/zkernels.h>
+XKRT_NAMESPACE_USE;
 
-#endif /* __KERNELS_H__ */
+TYPED
+int
+xkblas_t::axpby_async(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+    const TYPE * beta,
+          TYPE * y,
+    const int incy
+) {
+    // LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
+    this->scal_async<P>(n, beta,  y, incy);
+    this->axpy_async<P>(n, alpha, x, incx, y, incy);
+    return 0;
+}
+
+TYPED
+int
+xkblas_t::axpby(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+    const TYPE * beta,
+          TYPE * y,
+    const int incy
+) {
+    this->memory_invalidate_caches();
+    int r = this->axpby_async<P>(n, alpha, x, incx, beta, y, incy);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->sync();
+    return r;
+}
+
+TYPED
+void
+xkblas_t::task_format_create_AXPBY(
+    task_format_t * format
+) {
+    // nothing to do
+}
+
+# define DEFINE(P)  \
+    template void xkblas_t::task_format_create_AXPBY<P>(task_format_t * format); \
+    template int xkblas_t::axpby<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
+    template int xkblas_t::axpby_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);
+XKBLAS_FORALL_PRECISIONS(DEFINE);
+# undef DEFINE

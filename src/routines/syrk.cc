@@ -61,7 +61,7 @@
 
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
-# include <xkblas/kernel.hpp>
+# include <xkblas/routine.hpp>
 # include <xkblas/cblas.h>
 
 # include <xkrt/support.h>
@@ -229,7 +229,7 @@ xkblas_t::syrk_async(
     if (ts == 0)
     {
         int args[2] = {n, k};
-        xkblas_kernel_auto_tile(SYRK, args, &ts);
+        xkblas_routine_auto_tile(SYRK, args, &ts);
     }
 
     /* set tiling parameters */

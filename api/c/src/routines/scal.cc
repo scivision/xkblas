@@ -35,22 +35,40 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#ifndef __XKBLAS_CONF_H__
-# define __XKBLAS_CONF_H__
+# include <xkblas/xkblas.hpp>
 
-# include <stddef.h>
-# include <xkblas/routine.hpp>
+XKRT_NAMESPACE_USE;
 
-typedef struct  xkblas_conf_kernel_t
-{
-    size_t tile;
-}               xkblas_conf_kernel_t;
+extern "C"
+int
+xkblas_£scal_tile_async(
+    const size_t n,
+    const TYPE * alpha,
+    TYPE * x,
+    const int incx,
+    xkrt_device_global_id_t device_global_id
+) {
+    return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_global_id);
+}
 
-typedef struct  xkblas_conf_s
-{
-    xkblas_conf_kernel_t kernels[XKBLAS_ROUTINE_MAX];
-}               xkblas_conf_t;
+extern "C"
+int
+xkblas_£scal_async(
+    int n,
+    const TYPE * alpha,
+    TYPE * x,
+    const int incx
+) {
+    return xkblas_get()->scal_async<xkblas_precision_t::££>(n, alpha, x, incx);
+}
 
-void xkblas_init_conf(xkblas_conf_t * conf);
-
-#endif /* __XKBLAS_CONF_H__ */
+extern "C"
+int
+xkblas_£scal(
+    int n,
+    const TYPE * alpha,
+    TYPE * x,
+    const int incx
+) {
+    return xkblas_get()->scal<xkblas_precision_t::££>(n, alpha, x, incx);
+}

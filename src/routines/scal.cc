@@ -120,7 +120,7 @@ xkblas_t::scal_async(
     if (ts == 0)
     {
         int args[1] = { n };
-        xkblas_kernel_auto_tile(SCAL, args, &ts);
+        xkblas_routine_auto_tile(SCAL, args, &ts);
     }
     const size_t nt = NUM_OF_TILES(n, ts);
 
@@ -140,6 +140,20 @@ xkblas_t::scal_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::scal(
+    int n,
+    const TYPE * alpha,
+    TYPE * x,
+    const int incx
+) {
+    this->memory_invalidate_caches();
+    int r = this->scal_async<P>(n, alpha, x, incx);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, x, n*sizeof(TYPE)*incx);
+    this->sync();
+    return r;
+}
 
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
@@ -233,6 +247,7 @@ xkblas_t::task_format_create_SCAL(
 
 # define DEFINE(P)  \
         template void xkblas_t::task_format_create_SCAL<P>(task_format_t * format);                                                                                         \
+    template int xkblas_t::scal<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

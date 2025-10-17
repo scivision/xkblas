@@ -37,7 +37,7 @@
 
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
-# include <xkblas/kernel.hpp>
+# include <xkblas/routine.hpp>
 # include <xkblas/cblas.h>
 
 # include <xkrt/support.h>
@@ -213,7 +213,7 @@ xkblas_t::trsm_async(
     if (ts == 0)
     {
         int args[2] = {m, n};
-        xkblas_kernel_auto_tile(TRSM, args, &ts);
+        xkblas_routine_auto_tile(TRSM, args, &ts);
     }
 
     /* set tiling parameters */
@@ -642,7 +642,23 @@ xkblas_t::trsm_async(
 
 TYPED
 int
-xkblas_t::trsm_async(
+xkblas_t::trsm(
+    int side, int uplo,
+    int transA, int diag,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+          TYPE * B, int ldb
+) {
+    this->memory_invalidate_caches();
+    int r = this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, B, ldb, m, n, sizeof(TYPE));
+    return r;
+}
+
+TYPED
+int
+xkblas_t::trsm_rec_async(
     int side, int uplo,
     int transA, int diag,
     int m, int n,
@@ -678,7 +694,7 @@ xkblas_t::trsm_async(
         assert(*alpha == (TYPE) 1.0);
 
         // lower part
-        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
+        this->trsm_rec_async<P>(side, uplo, transA, diag, m2, n, alpha, A3, lda, B2, ldb, m_threshold);
 
         // middle part
         const int transB = CblasNoTrans;
@@ -687,7 +703,7 @@ xkblas_t::trsm_async(
         this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A2, lda, B2, ldb, &one, B1, ldb);
 
         // upper part
-        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
+        this->trsm_rec_async<P>(side, uplo, transA, diag, m1, n, alpha, A1, lda, B1, ldb, m_threshold);
 
     }
     else
@@ -716,7 +732,7 @@ xkblas_t::trsm_async(
         assert(*alpha == (TYPE) 1.0);
 
         // upper part
-        this->trsm_async<P>(side, uplo, transA, diag, m1, n, alpha, A11, lda, B1, ldb, m_threshold);
+        this->trsm_rec_async<P>(side, uplo, transA, diag, m1, n, alpha, A11, lda, B1, ldb, m_threshold);
 
         // middle part
         const int transB = CblasNoTrans;
@@ -725,7 +741,7 @@ xkblas_t::trsm_async(
         this->gemm_async<P>(transA, transB, m2, n, m2, &mone, A21, lda, B1, ldb, &one, B2, ldb);
 
         // lower part
-        this->trsm_async<P>(side, uplo, transA, diag, m2, n, alpha, A22, lda, B2, ldb, m_threshold);
+        this->trsm_rec_async<P>(side, uplo, transA, diag, m2, n, alpha, A22, lda, B2, ldb, m_threshold);
 
     }
 
@@ -937,8 +953,9 @@ xkblas_t::task_format_create_TRSM(
 
 # define DEFINE(P)  \
     template void xkblas_t::task_format_create_TRSM<P>(task_format_t * format); \
+    template int xkblas_t::trsm<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
-    template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
+    template int xkblas_t::trsm_rec_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
     template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

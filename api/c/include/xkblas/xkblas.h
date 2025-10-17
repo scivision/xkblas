@@ -3,7 +3,7 @@
 /*   xkblas.h                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/09/19 02:43:41 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/10/17 16:37:31 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -140,10 +140,10 @@ extern "C" {
     typedef double CFloat64_t;
     #endif
 
-    #include <xkblas/skernels.h>
-    #include <xkblas/dkernels.h>
-    #include <xkblas/ckernels.h>
-    #include <xkblas/zkernels.h>
+    #include <xkblas/sroutines.h>
+    #include <xkblas/droutines.h>
+    #include <xkblas/croutines.h>
+    #include <xkblas/zroutines.h>
 
     #include <xkblas/cblas.h>
 

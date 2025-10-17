@@ -1,23 +1,45 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*   xkblas.hpp                                                   .-*-.       */
-/*                                                              .'* *.'       */
-/*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/10/07 21:08:22 by Romain PEREIRA         / _______ \       */
-/*                                                          \_)     (_/       */
-/*   License: CeCILL-C                                                        */
-/*                                                                            */
-/*   Author: Romain PEREIRA <romain.pereira@inria.fr>                         */
-/*                                                                            */
-/*   Copyright: see AUTHORS                                                   */
-/*                                                                            */
-/* ************************************************************************** */
+/*
+** Copyright 2024,2025 INRIA
+**
+** Contributors :
+** Thierry Gautier, thierry.gautier@inrialpes.fr
+** Romain PEREIRA, romain.pereira@inria.fr + rpereira@anl.gov
+**
+** This software is a computer program whose purpose is to execute
+** blas subroutines on multi-GPUs system.
+**
+** This software is governed by the CeCILL-C license under French law and
+** abiding by the rules of distribution of free software.  You can  use,
+** modify and/ or redistribute the software under the terms of the CeCILL-C
+** license as circulated by CEA, CNRS and INRIA at the following URL
+** "http://www.cecill.info".
+
+** As a counterpart to the access to the source code and  rights to copy,
+** modify and redistribute granted by the license, users are provided only
+** with a limited warranty  and the software's author,  the holder of the
+** economic rights,  and the successive licensors  have only  limited
+** liability.
+
+** In this respect, the user's attention is drawn to the risks associated
+** with loading,  using,  modifying and/or developing or reproducing the
+** software by the user in light of its specific status of free software,
+** that may mean  that it is complicated to manipulate,  and  that  also
+** therefore means  that it is reserved for developers  and  experienced
+** professionals having in-depth computer knowledge. Users are therefore
+** encouraged to load and test the software's suitability as regards their
+** requirements in conditions enabling the security of their systems and/or
+** data to be ensured and,  more generally, to use and operate it in the
+** same conditions as regards security.
+
+** The fact that you are presently reading this means that you have had
+** knowledge of the CeCILL-C license and that you accept its terms.
+**/
 
 #ifndef __XKBLAS_HPP__
 # define __XKBLAS_HPP__
 
 # include <xkblas/conf.h>
-# include <xkblas/kernel.hpp>
+# include <xkblas/routine.hpp>
 # include <xkblas/support.h>
 
 # include <xkrt/runtime.h>
@@ -32,11 +54,11 @@ typedef enum    xkblas_state_t : uint8_t
     XKBLAS_CONTEXT_INITIALIZED,
 }               xkblas_state_t;
 
-# define TYPED              template <xkblas_precision_t P>
-# define TYPED_WITH_INDEX   template <xkblas_precision_t P, xkblas_index_t T>
-# define TYPE               xkblas_precision_type_t<P>
-# define TYPE_REAL          xkblas_precision_type_real_t<P>
-# define INDEX              xkblas_index_type_t<T>
+# define TYPED            template <xkblas_precision_t P>
+# define TYPED_WITH_INDEX template <xkblas_precision_t P, xkblas_index_t T>
+# define TYPE             xkblas_precision_type_t<P>
+# define TYPE_REAL        xkblas_precision_type_real_t<P>
+# define INDEX            xkblas_index_type_t<T>
 
 /* xkblas instance */
 typedef struct  xkblas_t
@@ -60,7 +82,7 @@ typedef struct  xkblas_t
     /* task formats */
     struct {
         # define DEFINE(K) xkrt::task_format_id_t K[XKBLAS_PRECISION_MAX];
-        XKBLAS_FORALL_KERNELS(DEFINE);
+        XKBLAS_FORALL_ROUTINES(DEFINE);
         # undef DEFINE
     } formats;
 
@@ -68,7 +90,7 @@ typedef struct  xkblas_t
     # define XKBLAS_TASK_FORMAT_GET(P, K) this->formats.K[P]
 
     # define DEFINE(K) TYPED void task_format_create_##K(xkrt::task_format_t * format);
-    XKBLAS_FORALL_KERNELS(DEFINE);
+    XKBLAS_FORALL_ROUTINES(DEFINE);
     # undef DEFINE
 
     ////////////////
@@ -85,6 +107,8 @@ typedef struct  xkblas_t
     /* spawn tasks to make the replica coherent on the passed device */
     void memory_coherent_async(xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
     void memory_coherent_async(xkrt::device_global_id_t device_global_id, matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
+
+    void memory_invalidate_caches(void);
 
     int memory_register(void * ptr, size_t size);
     int memory_unregister(void * ptr, size_t size);
@@ -108,389 +132,26 @@ typedef struct  xkblas_t
     // Kernels //
     /////////////
 
-    // TODO: add documentation on this
-
-    // LEVEL 1 - TODO
-
-    /* y := a.x + b.y */
-    TYPED
-    int axpby_async(int n, const TYPE * alpha, const TYPE * x, const int incx, const TYPE * beta, TYPE * y, const int incy);
-
-    /* y := a.x + y */
-    TYPED
-    int axpy_async(int n, const TYPE * alpha, const TYPE * x, const int incx, TYPE * y, const int incy);
-
-    TYPED
-    int dot_async(int n, const TYPE * x, const int incx, const TYPE * y, const int incy, TYPE * result);
-
-    TYPED
-    int divcopy_async();    // TODO
-
-    TYPED
-    int fill(int n, TYPE * x, const TYPE v);
-
-    TYPED
-    int nrm2_async(int n, const TYPE * x, float * result);
-
-    TYPED
-    int scalcopy_async();    // TODO
-
-    TYPED
-    int scal_async(int n, const TYPE * alpha, TYPE * x, const int incx);
-
-    // LEVEL 1 - single tile
-
-    TYPED
-    int axpy_tile_async(
-        int n,
-        const TYPE * alpha,
-        const TYPE * x,
-        const int incx,
-              TYPE * y,
-        const int incy,
-        const size_t bs,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int dot_tile_async(
-        int n,
-        const TYPE * x, const int incx,
-        const TYPE * y, const int incy,
-              TYPE * r,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int dot_tile_async(
-        int n,
-        const TYPE * x, const int incx,
-        const TYPE * y, const int incy,
-        const TYPE * temp_r,
-              TYPE * r,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int scal_tile_async(
-        int n,
-        const TYPE * alpha,
-        TYPE * x,
-        const int incx,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    // LEVEL 2
-
-    TYPED
-    int copyscale_async(
-        int m, int n,
-        int should_copy,
-        int * IW,
-        const TYPE * D, int ldd,
-              TYPE * L, int ldl,
-              TYPE * U, int ldu
-    );
-
-    TYPED
-    int gemv_async(
-        int transA,
-        int m, int n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * x, const int incx,
-        const TYPE * beta,
-              TYPE * y, const int incy
-    );
-
-    // LEVEL 2  - single tile
-    TYPED
-    int copyscale_tile_async(
-        const size_t m, const size_t n,
-        int should_copy,
-        int * IW,
-        const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
-              TYPE * L, const size_t Lm, const size_t Ln, int ldl,
-              TYPE * U, const size_t Um, const size_t Un, int ldu,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int gemv_tile_async(
-        int transA,
-        const size_t m, const size_t n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * x, const int incx,
-        const TYPE * beta,
-              TYPE * y, const size_t tm, const size_t mb, const int incy,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    // LEVEL 3
-
-    TYPED
-    int gemm_async(
-        int transA, int transB,
-        int m, int n, int k,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * B, int ldb,
-        const TYPE * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int gemmt_async(
-        int uplo,
-        int transA, int transB,
-        int n, int k,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * B, int ldb,
-        const TYPE * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int
-    herk_async(
-        int uplo, int trans,
-        int n, int k,
-        const TYPE_REAL * alpha,
-        const TYPE * A, int lda,
-        const TYPE_REAL * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int symm_async(
-        int side, int uplo,
-        int m, int n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * B, int ldb,
-        const TYPE * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int syr2k_async(
-        int uplo, int trans,
-        int n, int k,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * B, int ldb,
-        const TYPE * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int syrk_async(
-        int uplo, int trans,
-        int n, int k,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-        const TYPE * beta,
-              TYPE * C, int ldc
-    );
-
-    TYPED
-    int trmm_async(
-        int side, int uplo,
-        int transA, int diag,
-        int m, int n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-              TYPE * B, int ldb
-    );
-
-    /**
-     *
-     *  This perform a regular tiling using the TSRM tiling parameter
-     *  With sub-TSRM on the diagonal, and GEMM on the other blocks
-     *
-     *  .-------------------.
-     *  | \                 |
-     *  |___\               |
-     *  |    | \            |
-     *  |____|___\          |
-     *  |    |    | \       |
-     *  |____|____|___\     |
-     *  |    |    |    | \  |
-     *  |____|____|____|___\|
-     *
-     */
-    TYPED
-    int trsm_async(
-        int side, int uplo,
-        int transA, int diag,
-        int m, int n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-              TYPE * B, int ldb
-    );
-
-    /**
-     *
-     *  This perform a recursive tiling, recursing as long as m >= min_tile_size
-     *  GEMMs may also be re-subdivided from the GEMM tiling parameter
-     *
-     *  .-------------------.
-     *  | \                 |
-     *  |___\               |
-     *  |    | \            |
-     *  |____|___\          |
-     *  |         | \       |
-     *  |         |___\     |
-     *  |         |    | \  |
-     *  |____ ____|____|___\|
-     *
-     */
-    TYPED
-    int trsm_async(
-        int side, int uplo,
-        int transA, int diag,
-        int m, int n,
-        const TYPE * alpha,
-        const TYPE * A, int lda,
-              TYPE * B, int ldb,
-        const int m_threshold
-    );
-
-    // LEVEL 3 TILE
-
-    TYPED
-    int gemm_tile_async(
-        int transA, int transB,
-        const size_t m, const size_t n, const size_t k,
-        const TYPE * alpha,
-        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
-        const TYPE * beta,
-              TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int gemmt_tile_async(
-        int uplo,
-        int transA, int transB,
-        const size_t n, const size_t k,
-        const TYPE * alpha,
-        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
-        const TYPE * beta,
-              TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int herk_tile_async(
-        int uplo, int trans,
-        const size_t n, const size_t k,
-        const TYPE_REAL * alpha,
-        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        const TYPE_REAL * beta,
-              TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::device_global_id_t device_global_id
-    );
-
-
-    TYPED
-    int syrk_tile_async(
-        int uplo, int trans,
-        const size_t n, const size_t k,
-        const TYPE * alpha,
-        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        const TYPE * beta,
-              TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    TYPED
-    int trsm_tile_async(
-        int side, int uplo,
-        int transA, int diag,
-        const size_t m, const size_t n,
-        const TYPE * alpha,
-        const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-              TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    // LAPACKE
-    TYPED
-    int geqrf_async();
-
-    TYPED
-    int orgqr_async();
-
-    TYPED
-    int ormqr_async();
-
-    TYPED
-    int potrf_async(
-        int uplo,
-        int n,
-        TYPE * A,
-        int lda
-    );
-
-    // LAPACKE TILE
-
-    TYPED
-    int potrf_tile_async(
-        int uplo,
-        int n,
-        TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-        xkrt::device_global_id_t device_global_id
-    );
-
-    // SPARSE
-
-    /* Y = alpha . op(A) . X + beta . Y
-     * spmv of a CSR matrix with dense vectors */
-    TYPED_WITH_INDEX
-    int
-    spmv_async(
-        const TYPE * alpha,
-        /* matrix A (in) */
-        int transA,
-        int index_base,     // 0 or 1
-        const int nrows,
-        const int ncols,
-        const int nnz,
-        const int format,
-        const INDEX * row,
-        const INDEX * col,
-        const TYPE * values,
-        /* vector X (in) */
-        TYPE * X,
-        const TYPE * beta,
-        /* vector Y (inout) */
-        TYPE * Y
-    );
-
-    TYPED_WITH_INDEX
-    int
-    spmv_tile_async(
-        const TYPE * alpha,
-        int transA,
-        int index_base,
-        const int nrows,
-        const int ncols,
-        const int nnz,
-        const int format,
-        const INDEX * row,
-        const INDEX * col,
-        const TYPE * values,
-        TYPE * X,
-        const TYPE * beta,
-        TYPE * Y,
-        xkrt::device_global_id_t device_global_id
-    );
-
+    // define both sync and async version, e.g.,
+    //      sgemm
+    //      sgemm_async
+    # define DEF(TPLT, RTYPE, NAME, ...)        \
+        TPLT RTYPE NAME        (__VA_ARGS__);   \
+        TPLT RTYPE NAME##_async(__VA_ARGS__);
+    # define XKDEF(RTYPE, NAME, ...)  DEF(TYPED,            RTYPE, NAME, __VA_ARGS__)
+    # define XKDEFI(RTYPE, NAME, ...) DEF(TYPED_WITH_INDEX, RTYPE, NAME, __VA_ARGS__)
+    # define XKTYPE TYPE
+    # define XKTYPE_REAL TYPE_REAL
+    # define XKINDEX INDEX
+    # define XKDEVICE xkrt_device_global_id_t
+    #  include <xkblas/for-all-routines.h>
+    # undef XKDEVICE
+    # undef XKTYPE_REAL
+    # undef XKTYPE
+    # undef XKINDEX
+    # undef XKDEFI
+    # undef XKDEF
+    # undef DEF
 }               xkblas_t;
 
 // TODO : currently using a global variable to preserve previous 'xkblas_init'

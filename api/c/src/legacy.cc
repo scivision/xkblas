@@ -36,19 +36,80 @@
 **/
 
 # include <xkblas/xkblas.hpp>
-# include <xkblas/xkblas.h>
-
-# include <xkrt/xkrt.h>
-# include <xkrt/logger/logger.h>
-
 # include <assert.h>
 
+XKRT_NAMESPACE_USE;
+
+//////////////////////////////
+//  Runtime initialization  //
+//////////////////////////////
+
+static xkblas_t context;
+
+// singleton of runtime context
+xkblas_t *
+xkblas_get(void)
+{
+    return &context;
+}
+
+runtime_t *
+xkblas_xkrt_runtime_get(void)
+{
+    xkblas_t * context = xkblas_get();
+    return &(context->runtime);
+}
+
+extern "C"
+int
+xkblas_init(void)
+{
+    xkblas_t * context = xkblas_get();
+    assert(context);
+
+    context->init();
+    return 0;
+}
+
+extern "C"
+void
+xkblas_deinit(void)
+{
+    xkblas_t * context = xkblas_get();
+    assert(context);
+
+    context->deinit();
+}
+
+extern "C"
+uint64_t
+xkblas_get_nanotime(void)
+{
+    return get_nanotime();
+}
+
+//////////////////////////////
+//  Runtime synchronize     //
+//////////////////////////////
+
+extern "C"
+void
+xkblas_sync(void)
+{
+    xkblas_t * context = xkblas_get();
+    assert(context);
+
+    context->sync();
+}
+
+# if 0
 extern "C"
 void
 xkblas_set_modemath(xkblas_mode_math_t mode)
 {
     LOGGER_FATAL("Not implemented");
 }
+# endif
 
 extern "C"
 int
@@ -82,13 +143,13 @@ xkblas_set_param(size_t nb, size_t p)
     xkblas_t * context = xkblas_get();
     assert(context);
 
-    for (int i = 0 ; i < XKBLAS_KERNEL_MAX ; ++i)
+    for (int i = 0 ; i < XKBLAS_ROUTINE_MAX ; ++i)
         context->conf.kernels[i].tile = nb;
 }
 
 extern "C"
 void
-xkblas_set_tile_parameter(xkblas_kernel_t kernel, size_t ts)
+xkblas_set_tile_parameter(xkblas_routine_t kernel, size_t ts)
 {
     xkblas_t * context = xkblas_get();
     assert(context);

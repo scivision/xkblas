@@ -114,18 +114,6 @@ xkblas_t::dot_tile_async(
 
 TYPED
 int
-xkblas_t::dot_tile_async(
-    int n,
-    const TYPE * x, const int incx,
-    const TYPE * y, const int incy,
-          TYPE * r,
-    device_global_id_t device_global_id
-) {
-    return this->dot_tile_async<P>(n, x, incx, y, incy, NULL, r, device_global_id);
-}
-
-TYPED
-int
 xkblas_t::dot_async(
     int n,
     const TYPE * x, const int incx,
@@ -144,13 +132,13 @@ xkblas_t::dot_async(
     if (ts == 0)
     {
         int args[1] = { n };
-        xkblas_kernel_auto_tile(DOT, args, &ts);
+        xkblas_routine_auto_tile(DOT, args, &ts);
     }
     const size_t nt = NUM_OF_TILES(n, ts);
 
     if (nt == 1)
     {
-        this->dot_tile_async<P>(n, x, incx, y, incy, r, UNSPECIFIED_DEVICE_GLOBAL_ID);
+        this->dot_tile_async<P>(n, x, incx, y, incy, NULL, r, UNSPECIFIED_DEVICE_GLOBAL_ID);
     }
     else
     {
@@ -189,6 +177,19 @@ xkblas_t::dot_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::dot(
+    int n,
+    const TYPE * x, const int incx,
+    const TYPE * y, const int incy,
+          TYPE * r
+) {
+    this->memory_invalidate_caches();
+    int rc = this->dot_async<P>(n, x, incx, y, incy, r);
+    this->sync();
+    return rc;
+}
 
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
@@ -286,8 +287,8 @@ xkblas_t::task_format_create_DOT(
 
 # define DEFINE(P)  \
         template void xkblas_t::task_format_create_DOT<P>(task_format_t * format);                                                                                         \
+    template int xkblas_t::dot<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
-    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);   \
-    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);
+    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
