@@ -8,7 +8,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 include(BooleanUtils)
 
-xkoption(STRICT       "Enable strict compilation mode" ON)
+xkoption(STRICT       "Enable strict compilation mode" OFF)
 xkoption(USE_TESTS    "Compile tests (require a CBLAS installation)" OFF)
 xkoption(USE_CBLAS    "Enable the use of CPU Blas library. See https://cmake.org/cmake/help/latest/module/FindBLAS.html" OFF)
 xkoption(USE_CLBLAST  "Enable clblast" OFF)

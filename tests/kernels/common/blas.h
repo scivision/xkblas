@@ -39,17 +39,22 @@
 # define __BLAS_H__
 
 #if defined(USE_OPENBLAS) || defined(USE_CRAYBLAS)
+#  include <xkblas/cblas.h>
 #  include <cblas.h>
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM 1
 #elif defined(USE_MKL)
 #  include <mkl.h>
 #  include <mkl_types.h>
 #  include <mkl_cblas.h>
 #  include <mkl_lapacke.h>
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM 1
 #elif defined(USE_NVHPC)
 #  include <nvblas.h>
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM 1
 #else
 #  pragma message("No CPU blas libraries")
-#  include <xkblas/cblas.h>
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM 0
+# include <xkblas/cblas.h>
 #endif
 
 #endif /* __BLAS_H__ */

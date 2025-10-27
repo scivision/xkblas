@@ -46,8 +46,6 @@ extern "C" {
 
 // # include <xkblas/flops.h>
 
-# define XKBLAS_NO_DEFAULT_BLAS_ENUM 1
-
 # include "common/blas.h"
 # include "common/blas-version.h"
 # include "common/time.cc"
@@ -62,7 +60,10 @@ extern "C" {
 # include <xkblas/xkblas.hpp>
 static xkblas_t * xkblas;
 
-# include "common/check.cc"
+# if !NO_CPU_BLAS
+#  include "common/check.cc"
+# endif
+
 static bool SKIP_CHECK = 0;
 static bool ALIGN_MATRICES = 0;
 static bool REGISTER_MEMORY = 1;

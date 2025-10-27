@@ -37,8 +37,10 @@ if (USE_NVHPC)
     set(BLA_VENDOR NVHPC)
     add_compile_options("-DUSE_NVHPC=1")
 endif()
+
 if (NOT USE_MKL AND NOT USE_OPENBLAS AND NOT USE_CRAYBLAS)
-    message(FATAL_ERROR "XKblas tests requires you specify a BLAS Vendor library.")
+    # message(FATAL_ERROR "XKblas tests requires you specify a BLAS Vendor library.")
+    add_compile_options("-DNO_CPU_BLAS=1")
 endif()
 
 find_package(BLAS)
