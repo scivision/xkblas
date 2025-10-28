@@ -138,6 +138,26 @@ premove(
     xkblas->sync();
 }
 
+static uintptr_t
+xkblas_tests_alloc(const size_t size)
+{
+    # if 1
+    const uintptr_t memory = (const uintptr_t) malloc(size);
+    if (REGISTER_MEMORY)
+    {
+        xkblas_register_memory_async((void *) memory, size);
+        xkblas_register_memory_waitall();
+        // xkblas->memory_register((void *) memory, size);
+    }
+    # else
+    xkrt::runtime_t * runtime = xkblas_xkrt_runtime_get();
+    const xkrt::device_global_id_t device = 1;
+    const uintptr_t memory = (const uintptr_t) runtime->memory_unified_allocate(device, size);
+    # endif
+
+    return memory;
+}
+
 TYPED
 static void
 prepare_csr_matrix(
@@ -154,14 +174,8 @@ prepare_csr_matrix(
     size_t csr_col_indices_size = max_nnz * sizeof(int);
     size_t csr_row_offsets_size = (m + 1) * sizeof(int);
     size_t memsize = csr_values_size + csr_col_indices_size + csr_row_offsets_size;
-    const uintptr_t memory = (const uintptr_t) malloc(memsize);
 
-    if (REGISTER_MEMORY)
-    {
-        xkblas_register_memory_async((void *) memory, memsize);
-        xkblas_register_memory_waitall();
-        // xkblas->memory_register((void *) memory, memsize);
-    }
+    const uintptr_t memory = xkblas_tests_alloc(memsize);
 
     // Temporary storage for maximum nonzeros
     *csr_values         = (TYPE *) (memory + 0);
@@ -201,14 +215,7 @@ prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n, bool
     const uintptr_t alignon = s * ld;
     const uintptr_t memsize = nmats * (alignon + alignon/2 + s * ld * n);
 
-    const uintptr_t mem = (const uintptr_t) malloc(memsize);
-
-    if (REGISTER_MEMORY)
-    {
-        xkblas_register_memory_async((void *) mem, memsize);
-        xkblas_register_memory_waitall();
-        // xkblas->memory_register((void *) mem, memsize);
-    }
+    const uintptr_t mem = (const uintptr_t) xkblas_tests_alloc(memsize);
 
     if (fill)
         FILL((TYPE *)mem, memsize / sizeof(TYPE));
