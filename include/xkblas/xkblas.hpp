@@ -122,6 +122,10 @@ typedef struct  xkblas_t
     int memory_register_async  (void * ptr, size_t size, int n);
     int memory_unregister_async(void * ptr, size_t size, int n);
 
+    /* (de)allocate unified memory using the driver of the given device */
+    void * memory_unified_allocate(const xkrt::device_global_id_t device_global_id, const size_t size);
+    void memory_unified_deallocate(const xkrt::device_global_id_t device_global_id, void * mem, const size_t size);
+
     /////////////////////
     // Synchronization //
     /////////////////////

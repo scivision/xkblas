@@ -173,3 +173,16 @@ xkblas_t::memory_unregister_async(
 
     return this->runtime.memory_unregister_async(team, ptr, size, n);
 }
+
+void *
+xkblas_t::memory_unified_allocate(const device_global_id_t device_global_id, const size_t size)
+{
+    return this->runtime.memory_unified_allocate(device_global_id, size);
+}
+
+/* deallocate unified memory using the driver of the given device */
+void
+xkblas_t::memory_unified_deallocate(const device_global_id_t device_global_id, void * mem, const size_t size)
+{
+    return this->runtime.memory_unified_deallocate(device_global_id, mem, size);
+}
