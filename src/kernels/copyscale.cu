@@ -135,7 +135,7 @@ __global__ void kernel_£copyscale_1x1(
 extern "C"
 int
 cuda_£copyscale(
-	cudaStream_t cuda_stream,
+	cudaStream_t cuda_queue,
     int m, int n,
     int should_copy, int* IW,
 	const CU_TYPE * D, int ldd,
@@ -159,7 +159,7 @@ cuda_£copyscale(
 	int element_in_shared = B.x*B.y + 1*B.x;
 	size_t shared_size = sizeof(CU_TYPE) * element_in_shared; // ~16ko, all cuda GPU have 48ko available
 	//printf("Start copyscale %d %d \n", m, n);
-	kernel_£copyscale_1x1<<<G,B,shared_size,cuda_stream>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
+	kernel_£copyscale_1x1<<<G,B,shared_size,cuda_queue>>>( m, n, should_copy, D, ldd, L, ldl, U, ldu );
 	//printf("End copyscale\n");
 
     // TODO : return errors

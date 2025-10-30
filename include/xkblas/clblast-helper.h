@@ -44,7 +44,7 @@
 # include <clblast.h>
 
 # define XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, PX, T) \
-    if constexpr (P == xkblas_precision_t::PX) body_cl_run<P, CLBlast##PX##NAME, T>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::PX) body_cl_run<P, CLBlast##PX##NAME, T>(queue, instr, idx);
 
 # define XKBLAS_CLBLAST_DISPATCH_PRECISION_REAL(NAME)               \
     XKBLAS_CLBLAST_DISPATCH_PRECISION_P(NAME, S, float)             \

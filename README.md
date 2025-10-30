@@ -33,47 +33,47 @@ Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is
 Adding support for an unsupported kernel may involve more work.
 
 ### Level 1
-| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
-|-------------|-----|------|-----|-----------------|
-| axpby       | ✗   | ✓    | ✗   | ✗               |
-| axpy        | ✗   | ✓    | ✗   | ✗               |
-| divcopy     | ✗   | ✗    | ✗   | ✗               |
-| dot         | ✓   | ✓    | ✗   | ✗               |
-| fill        | ✗   | ✗    | ✗   | ✗               |
-| nrm2        | ✗   | ✗    | ✗   | ✗               |
-| scalcopy    | ✗   | ✗    | ✗   | ✗               |
-| scal        | ✓   | ✓    | ✗   | ✗               |
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| axpby       | ✗   | ✓    | ✗   | ✗               | ✗      |
+| axpy        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| divcopy     | ✗   | ✗    | ✗   | ✗               | ✗      |
+| dot         | ✓   | ✓    | ✗   | ✗               | ✗      |
+| fill        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| nrm2        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| scalcopy    | ✗   | ✗    | ✗   | ✗               | ✗      |
+| scal        | ✓   | ✓    | ✗   | ✗               | ✗      |
 
 ### Level 2
-| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
-|-------------|-----|------|-----|-----------------|
-| copyscale   | ✓   | ✓    | ✓   | ✗               |
-| gemv        | ✓   | ✓    | ✗   | ✗               |
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| copyscale   | ✓   | ✓    | ✓   | ✗               | ✗      |
+| gemv        | ✓   | ✓    | ✗   | ✗               | ✗      |
 
 ### Level 3
-| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
-|-------------|-----|------|-----|-----------------|
-| gemm        | ✓   | ✓    | ✓   | ✓               |
-| gemmt       | ✗   | ✓    | ✓   | ✗               |
-| herk        | ✗   | ✓    | ✗   | ✗               |
-| symm        | ✗   | ✗    | ✗   | ✗               |
-| syr2k       | ✗   | ✗    | ✗   | ✗               |
-| syrk        | ✗   | ✓    | ✗   | ✗               |
-| trmm        | ✗   | ✗    | ✗   | ✗               |
-| trsm        | ✓   | ✓    | ✓   | ✗               |
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| gemm        | ✓   | ✓    | ✓   | ✓               | ✓      |
+| gemmt       | ✗   | ✓    | ✓   | ✗               | ✗      |
+| herk        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| symm        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| syr2k       | ✗   | ✗    | ✗   | ✗               | ✗      |
+| syrk        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| trmm        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| trsm        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Lapacke
-| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
-|-------------|-----|------|-----|-----------------|
-| geqrf       | ✗   | ✗    | ✗   | ✗               |
-| orgqr       | ✗   | ✗    | ✗   | ✗               |
-| ormqr       | ✗   | ✗    | ✗   | ✗               |
-| potrf       | ✗   | ✗    | ✗   | ✗               |
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| geqrf       | ✗   | ✗    | ✗   | ✗               | ✗      |
+| orgqr       | ✗   | ✗    | ✗   | ✗               | ✗      |
+| ormqr       | ✗   | ✗    | ✗   | ✗               | ✗      |
+| potrf       | ✗   | ✗    | ✗   | ✗               | ✗      |
 
 ### Sparse
-| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL |
-|-------------|-----|------|-----|-----------------|
-| spmv (csr)  | ✗   | ✓    | ✗   | ✗               |
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| spmv (csr)  | ✗   | ✓    | ✗   | ✗               | ✗      |
 
 ## Add a new routine
 

@@ -267,11 +267,11 @@ xkblas_t::gemv_async(
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 body_cuda_run(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    cublasHandle_t handle = stream->cu.blas.handle;
+    cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
     task_t * task = (task_t *) instr->kern.vargs;
@@ -306,9 +306,9 @@ body_cuda_run(
 TYPED
 static void
 body_cuda(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemv);
 }

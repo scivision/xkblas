@@ -43,7 +43,7 @@
 
 #  define XKBLAS_CUBLAS_CALL_POST()                                                         \
     do {                                                                                    \
-        CU_SAFE_CALL(cuEventRecord(stream->cu.events.buffer[idx], stream->cu.handle.high)); \
+        CU_SAFE_CALL(cuEventRecord(queue->cu.events.buffer[idx], queue->cu.handle.high)); \
     } while (0)
 
 # define XKBLAS_CUBLAS_CALL(CALL)       \
@@ -53,7 +53,7 @@
     } while (0)
 
 # define XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
-    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, cublas##PX##NAME, T>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, cublas##PX##NAME, T>(queue, instr, idx);
 
 # define XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(NAME)            \
     XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, S, float)          \

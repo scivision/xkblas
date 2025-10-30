@@ -419,11 +419,11 @@ xkblas_t::gemm(
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 body_cuda_run(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    cublasHandle_t handle = stream->cu.blas.handle;
+    cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
     task_t * task = (task_t *) instr->kern.vargs;
@@ -458,9 +458,9 @@ body_cuda_run(
 TYPED
 static void
 body_cuda(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemm);
 }
@@ -474,11 +474,11 @@ body_cuda(
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 body_hip_run(
-    stream_hip_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_hip_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    hipblasHandle_t handle = stream->hip.blas.handle;
+    hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
 
     task_t * task = (task_t *) instr->kern.vargs;
@@ -513,9 +513,9 @@ body_hip_run(
 TYPED
 static void
 body_hip(
-    stream_hip_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_hip_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(gemm);
 }
@@ -530,9 +530,9 @@ body_hip(
 TYPED
 static void
 body_ze(
-    stream_ze_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_ze_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     // unpack arguments
     task_t * task = (task_t *) instr->kern.vargs;
@@ -547,7 +547,7 @@ body_ze(
 
     # if XKBLAS_SUPPORT_ZE_SYCL_INTEROP
 
-    sycl::queue & queue = stream->sycl.queue;
+    sycl::queue & queue = queue->sycl.queue;
     oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
     oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
     std::int64_t m = args->m;
@@ -576,7 +576,7 @@ body_ze(
         mode,
         dependencies
     );
-    stream->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
+    queue->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
 
     # else /* XKBLAS_SUPPORT_ZE_SYCL_INTEROP */
     LOGGER_FATAL("no blas impl for ze");
@@ -591,8 +591,8 @@ body_ze(
     // Retrieve the Level Zero context and device from the command list
     ze_context_handle_t ze_context;
     ze_device_handle_t ze_device;
-    ZE_SAFE_CALL(zeCommandListGetContextHandle(stream->ze.command.list, &ze_context));
-    ZE_SAFE_CALL(zeCommandListGetDeviceHandle(stream->ze.command.list, &ze_device));
+    ZE_SAFE_CALL(zeCommandListGetContextHandle(queue->ze.command.list, &ze_context));
+    ZE_SAFE_CALL(zeCommandListGetDeviceHandle(queue->ze.command.list, &ze_device));
 
     // Create SYCL platform and device from Level Zero context and device
     sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
@@ -616,9 +616,9 @@ body_ze(
 TYPED
 static void
 body_sycl(
-    stream_sycl_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_sycl_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     // unpack arguments
     task_t * task = (task_t *) instr->kern.vargs;
@@ -631,7 +631,7 @@ body_sycl(
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
 
-    sycl::queue & queue = stream->sycl.queue;
+    sycl::queue & queue = queue->sycl.queue;
     oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
     oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
     std::int64_t m = args->m;
@@ -648,7 +648,7 @@ body_sycl(
     oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
     const std::vector<sycl::event> dependencies = {};
 
-    stream->sycl.events.buffer[idx] = oneapi::mkl::blas::column_major::gemm(
+    queue->sycl.events.buffer[idx] = oneapi::mkl::blas::column_major::gemm(
         queue,
         transa, transb,
         m, n, k,
@@ -664,7 +664,7 @@ body_sycl(
 
 # endif /* XKBLAS_SUPPORT_SYCL */
 
-# if XKBLAS_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
+# if XKBLAS_SUPPORT_CLBLAST
 
 #  include <xkrt/driver/driver-cl.h>
 #  include <xkblas/clblast-helper.h>
@@ -672,13 +672,13 @@ body_sycl(
 template <xkblas_precision_t P, auto FUNC, typename CL_TYPE>
 static inline void
 body_cl_run(
-    stream_cl_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cl_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    assert(stream);
+    assert(queue);
 
-    device_cl_t * device = stream->device;
+    device_cl_t * device = queue->device;
     assert(device);
 
     task_t * task = (task_t *) instr->kern.vargs;
@@ -713,8 +713,8 @@ body_cl_run(
             b_buffer, b_offset, B->device_view.ld,
             *((const CL_TYPE *) &args->beta),
             c_buffer, c_offset, C->device_view.ld,
-           &stream->cl.queue,
-            stream->cl.events + idx
+           &queue->cl.queue,
+            queue->cl.events + idx
         )
     );
 }
@@ -722,14 +722,14 @@ body_cl_run(
 TYPED
 static void
 body_cl(
-    stream_cl_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cl_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     XKBLAS_CLBLAST_DISPATCH_PRECISION(gemm);
 }
 
-# endif /* XKBLAS_SUPPORT_CL */
+# endif /* XKBLAS_SUPPORT_CLBLAST */
 
 # if XKBLAS_SUPPORT_CBLAS
 
@@ -813,9 +813,9 @@ xkblas_t::task_format_create_GEMM(
     format->f[TASK_FORMAT_TARGET_ZE] = (task_format_func_t) body_ze<P>;
     # endif /* XKBLAS_SUPPORT_ZE */
 
-    # if XKBLAS_SUPPORT_CL && XKBLAS_SUPPORT_CLBLAST
+    # if XKBLAS_SUPPORT_CLBLAST
     format->f[TASK_FORMAT_TARGET_CL] = (task_format_func_t) body_cl<P>;
-    # endif /* XKBLAS_SUPPORT_CL */
+    # endif /* XKBLAS_SUPPORT_CLBLAST */
 
     # if XKBLAS_SUPPORT_SYCL
     format->f[TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) body_sycl<P>;

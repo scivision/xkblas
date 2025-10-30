@@ -43,7 +43,7 @@
 
 #  define XKBLAS_HIPBLAS_CALL_POST()                                                            \
     do {                                                                                        \
-        HIP_SAFE_CALL(hipEventRecord(stream->hip.events.buffer[idx], stream->hip.handle.high)); \
+        HIP_SAFE_CALL(hipEventRecord(queue->hip.events.buffer[idx], queue->hip.handle.high)); \
     } while (0)
 
 # define XKBLAS_HIPBLAS_CALL(CALL)          \
@@ -53,7 +53,7 @@
     } while (0)
 
 # define XKBLAS_HIPBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
-    if constexpr (P == xkblas_precision_t::PX) body_hip_run<P, hipblas##PX##NAME, T>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::PX) body_hip_run<P, hipblas##PX##NAME, T>(queue, instr, idx);
 
 # define XKBLAS_HIPBLAS_DISPATCH_PRECISION_REAL(NAME)            \
     XKBLAS_HIPBLAS_DISPATCH_PRECISION_P(NAME, S, float)          \
