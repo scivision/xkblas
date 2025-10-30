@@ -321,11 +321,11 @@ body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 template <xkblas_precision_t P, typename CU_TYPE, cudaDataType CUDA_DATA_TYPE>
 static inline void
 body_cuda_run(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    cusparseHandle_t handle = stream->cu.sparse.handle;
+    cusparseHandle_t handle = queue->cu.sparse.handle;
     assert(handle);
 
     task_t * task = (task_t *) instr->kern.vargs;
@@ -474,9 +474,9 @@ body_cuda_run(
 TYPED
 static void
 body_cuda(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();
 }

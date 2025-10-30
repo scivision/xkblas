@@ -223,23 +223,23 @@ xkblas_t::copyscale_async(
 #  include <xkrt/driver/driver-cu.h>
 
 extern "C" {
-    int cuda_scopyscale(cudaStream_t cuda_stream, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
-    int cuda_dcopyscale(cudaStream_t cuda_stream, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
-    int cuda_ccopyscale(cudaStream_t cuda_stream, int m, int n, int should_copy, int* IW, const cuComplex * D, int ldd, cuComplex * L, int ldl, cuComplex * U, int ldu);
-    int cuda_zcopyscale(cudaStream_t cuda_stream, int m, int n, int should_copy, int* IW, const cuDoubleComplex * D, int ldd, cuDoubleComplex * L, int ldl, cuDoubleComplex * U, int ldu);
+    int cuda_scopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
+    int cuda_dcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
+    int cuda_ccopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuComplex * D, int ldd, cuComplex * L, int ldl, cuComplex * U, int ldu);
+    int cuda_zcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuDoubleComplex * D, int ldd, cuDoubleComplex * L, int ldl, cuDoubleComplex * U, int ldu);
 };
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 body_cuda_run(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    assert(stream);
+    assert(queue);
 
-    cudaStream_t cuda_stream = stream->cu.handle.high;
-    assert(cuda_stream);
+    cudaStream_t cuda_queue = queue->cu.handle.high;
+    assert(cuda_queue);
 
     task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
@@ -257,7 +257,7 @@ body_cuda_run(
     assert(args);
 
     FUNC(
-        cuda_stream,
+        cuda_queue,
         (int) args->m, (int) args->n,
         args->should_copy, args->IW,
         (const CU_TYPE *) D->device_view.addr, (int) D->device_view.ld,
@@ -271,14 +271,14 @@ body_cuda_run(
 TYPED
 static void
 body_cuda(
-    stream_cu_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_cu_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cuda_scopyscale, float>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cuda_dcopyscale, double>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cuda_ccopyscale, cuComplex>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cuda_scopyscale, float>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cuda_dcopyscale, double>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cuda_ccopyscale, cuComplex>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(queue, instr, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_CUDA */
@@ -290,23 +290,23 @@ body_cuda(
 #  include <xkrt/driver/driver-hip.h>
 
 extern "C" {
-    int hip_scopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
-    int hip_dcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
-    int hip_ccopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipFloatComplex * D, int ldd, hipFloatComplex * L, int ldl, hipFloatComplex * U, int ldu);
-    int hip_zcopyscale(hipStream_t hip_stream, int m, int n, int should_copy, int* IW, const hipDoubleComplex * D, int ldd, hipDoubleComplex * L, int ldl, hipDoubleComplex * U, int ldu);
+    int hip_scopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
+    int hip_dcopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
+    int hip_ccopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const hipFloatComplex * D, int ldd, hipFloatComplex * L, int ldl, hipFloatComplex * U, int ldu);
+    int hip_zcopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const hipDoubleComplex * D, int ldd, hipDoubleComplex * L, int ldl, hipDoubleComplex * U, int ldu);
 };
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 body_hip_run(
-    stream_hip_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_hip_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    assert(stream);
+    assert(queue);
 
-    hipStream_t hip_stream = stream->hip.handle.high;
-    assert(hip_stream);
+    hipStream_t hip_queue = queue->hip.handle.high;
+    assert(hip_queue);
 
     task_t * task = (task_t *) instr->kern.vargs;
     assert(task);
@@ -324,7 +324,7 @@ body_hip_run(
     assert(args);
 
     FUNC(
-        hip_stream,
+        hip_queue,
         (int) args->m, (int) args->n,
         args->should_copy, args->IW,
         (const HIP_TYPE *) D->device_view.addr, (int) D->device_view.ld,
@@ -338,14 +338,14 @@ body_hip_run(
 TYPED
 static void
 body_hip(
-    stream_hip_t * stream,
-    stream_instruction_t * instr,
-    stream_instruction_counter_t idx
+    queue_hip_t * queue,
+    command_t * instr,
+    queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(stream, instr, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(stream, instr, idx);
+    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, instr, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_HIP */

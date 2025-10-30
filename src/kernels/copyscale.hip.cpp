@@ -120,7 +120,7 @@ __global__ void kernel_£copyscale_1x1(
 // Expose as C-linkable
 extern "C"
 int hip_£copyscale(
-    hipStream_t stream,
+    hipStream_t queue,
     int m, int n,
     int should_copy, int* IW,
     const HIP_TYPE * D, int ldd,
@@ -135,7 +135,7 @@ int hip_£copyscale(
     size_t shared_size = sizeof(HIP_TYPE) * element_in_shared;
 
     // Launch kernel using HIP
-    hipLaunchKernelGGL(kernel_£copyscale_1x1, G, B, shared_size, stream,
+    hipLaunchKernelGGL(kernel_£copyscale_1x1, G, B, shared_size, queue,
                        m, n, should_copy, D, ldd, L, ldl, U, ldu);
 
     return 0;
