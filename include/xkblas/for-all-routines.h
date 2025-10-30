@@ -55,7 +55,7 @@ XKDEF(int, axpy, int n, const XKTYPE * alpha, const XKTYPE * x, const int incx, 
 XKDEF(int, dot, int n, const XKTYPE * x, const int incx, const XKTYPE * y, const int incy, XKTYPE * result);
 
 /* y := x */
-XKDEF(int, copy, size_t n, const XKTYPE * x, XKTYPE * y);
+XKDEF(int, copy, size_t n, const XKTYPE * x, const int incx, XKTYPE * y, const int incy);
 
 XKDEF(int, divcopy); // TODO
 
@@ -268,7 +268,9 @@ XKDEF(int,
     copy_tile,
     size_t n,
     const XKTYPE * x,
+    const int incx,
           XKTYPE * y,
+    const int incy,
     XKDEVICE device_global_id
 );
 

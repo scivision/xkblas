@@ -412,13 +412,13 @@ template <xkblas_precision_t P, auto FUNC, typename CU_TYPE_REAL, typename CU_TY
 static inline void
 body_cuda_run(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -448,14 +448,14 @@ TYPED
 static void
 body_cuda(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     if constexpr (P == xkblas_precision_t::C)
-        body_cuda_run<P, cublasCherk, float, cuComplex>(queue, instr, idx);
+        body_cuda_run<P, cublasCherk, float, cuComplex>(queue, cmd, idx);
 
     if constexpr (P == xkblas_precision_t::C)
-        body_cuda_run<P, cublasZherk, double, cuDoubleComplex>(queue, instr, idx);
+        body_cuda_run<P, cublasZherk, double, cuDoubleComplex>(queue, cmd, idx);
 }
 # endif /* XKBLAS_SUPPORT_CUBLAS */
 

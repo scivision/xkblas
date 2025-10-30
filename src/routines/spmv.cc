@@ -322,13 +322,13 @@ template <xkblas_precision_t P, typename CU_TYPE, cudaDataType CUDA_DATA_TYPE>
 static inline void
 body_cuda_run(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     cusparseHandle_t handle = queue->cu.sparse.handle;
     assert(handle);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -460,7 +460,7 @@ body_cuda_run(
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(X));
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(Y));
 
-    // TODO: push callback in instr->callbacks
+    // TODO: push callback in cmd->callbacks
     assert(XKRT_CALLBACK_ARGS_MAX >= 2);
     callback_t callback;
     callback.func = body_cuda_run_async_completion;
@@ -468,14 +468,14 @@ body_cuda_run(
     callback.args[1] = chunk;
     callback.args[2] = (void *) (uintptr_t) device_global_id;
     callback.args[3] = args->xkblas;
-    instr->push_callback(callback);
+    cmd->push_callback(callback);
 }
 
 TYPED
 static void
 body_cuda(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();

@@ -233,7 +233,7 @@ template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 body_cuda_run(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     assert(queue);
@@ -241,7 +241,7 @@ body_cuda_run(
     cudaStream_t cuda_queue = queue->cu.handle.high;
     assert(cuda_queue);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -272,13 +272,13 @@ TYPED
 static void
 body_cuda(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cuda_scopyscale, float>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cuda_dcopyscale, double>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cuda_ccopyscale, cuComplex>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cuda_scopyscale, float>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cuda_dcopyscale, double>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cuda_ccopyscale, cuComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_CUDA */
@@ -300,7 +300,7 @@ template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 body_hip_run(
     queue_hip_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     assert(queue);
@@ -308,7 +308,7 @@ body_hip_run(
     hipStream_t hip_queue = queue->hip.handle.high;
     assert(hip_queue);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -339,13 +339,13 @@ TYPED
 static void
 body_hip(
     queue_hip_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, instr, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_HIP */

@@ -756,7 +756,7 @@ template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static void
 body_cuda_run(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     assert(queue);
@@ -764,7 +764,7 @@ body_cuda_run(
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -794,7 +794,7 @@ TYPED
 static void
 body_cuda(
     queue_cu_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(trsm);
@@ -811,7 +811,7 @@ template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static void
 body_hip_run(
     queue_hip_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     assert(queue);
@@ -819,7 +819,7 @@ body_hip_run(
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) instr->kern.vargs;
+    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -849,7 +849,7 @@ TYPED
 static void
 body_hip(
     queue_hip_t * queue,
-    command_t * instr,
+    command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(trsm);

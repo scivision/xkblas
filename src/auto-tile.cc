@@ -65,6 +65,7 @@ xkblas_routine_auto_tile(
     switch (kernel)
     {
         case (AXPY):
+        case (COPY):
         case (DOT):
         case (GEMV):
         case (SCAL):

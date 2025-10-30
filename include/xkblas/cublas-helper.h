@@ -53,7 +53,7 @@
     } while (0)
 
 # define XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
-    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, cublas##PX##NAME, T>(queue, instr, idx);
+    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, cublas##PX##NAME, T>(queue, cmd, idx);
 
 # define XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(NAME)            \
     XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, S, float)          \

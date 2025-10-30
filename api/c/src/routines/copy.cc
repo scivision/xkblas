@@ -44,10 +44,24 @@ int
 xkblas_£copy_tile_async(
     const size_t n,
     const TYPE * x,
+    const int incx,
           TYPE * y,
+    const int incy,
     xkrt_device_global_id_t device_global_id
 ) {
-    return xkblas_get()->copy_tile_async<xkblas_precision_t::££>(n, x, y, device_global_id);
+    return xkblas_get()->copy_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, device_global_id);
+}
+
+extern "C"
+int
+xkblas_£copy(
+    size_t n,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
+) {
+    return xkblas_get()->copy<xkblas_precision_t::££>(n, x, incx, y, incy);
 }
 
 extern "C"
@@ -55,7 +69,9 @@ int
 xkblas_£copy_async(
     size_t n,
     const TYPE * x,
-          TYPE * y
+    const int incx,
+          TYPE * y,
+    const int incy
 ) {
-    return xkblas_get()->copy_async<xkblas_precision_t::££>(n, x, y);
+    return xkblas_get()->copy_async<xkblas_precision_t::££>(n, x, incx, y, incy);
 }
