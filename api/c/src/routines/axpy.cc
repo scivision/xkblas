@@ -54,6 +54,17 @@ xkblas_£axpy_tile_async(
 
 extern "C"
 int
+xkblas_£axpy(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x, const int incx,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->axpy<xkblas_precision_t::££>(n, alpha, x, incx, y, incy);
+}
+
+extern "C"
+int
 xkblas_£axpy_async(
     int n,
     const TYPE * alpha,
