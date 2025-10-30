@@ -37,6 +37,7 @@ Adding support for an unsupported kernel may involve more work.
 |-------------|-----|------|-----|-----------------|--------|
 | axpby       | ✗   | ✓    | ✗   | ✗               | ✗      |
 | axpy        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| copy        | ✗   | ✓    | ✗   | ✗               | ✗      |
 | divcopy     | ✗   | ✗    | ✗   | ✗               | ✗      |
 | dot         | ✓   | ✓    | ✗   | ✗               | ✗      |
 | fill        | ✗   | ✗    | ✗   | ✗               | ✗      |
