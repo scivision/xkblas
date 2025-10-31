@@ -26,9 +26,9 @@ CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PAT
 ```
 
 ## List of kernels supported
-Kernels are being added lazily: if you need a missing kernel for a specific hardware, add it yourself or open an issue and someone will add it on a best effort basis.
+If you need a missing kernel for a specific hardware, please speak up.
 
-Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (most likely ~10min of coding).
+Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (most likely ~5min of coding).
 
 Adding support for an unsupported kernel may involve more work.
 
@@ -49,7 +49,7 @@ Adding support for an unsupported kernel may involve more work.
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
 | copyscale   | ✓   | ✓    | ✓   | ✗               | ✗      |
-| gemv        | ✓   | ✓    | ✗   | ✗               | ✗      |
+| gemv        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 3
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |

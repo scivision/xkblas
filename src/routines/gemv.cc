@@ -260,6 +260,60 @@ xkblas_t::gemv_async(
     return 0;
 }
 
+# if XKBLAS_SUPPORT_HIPBLAS
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
+static inline void
+body_hip_run(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    hipblasHandle_t handle = queue->hip.blas.handle;
+    assert(handle);
+
+    task_t * task = (task_t *) cmd->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * x = accesses + 1;
+    const access_t * y = accesses + 2;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(x->device_view.addr % x->host_view.sizeof_type == 0);
+    assert(y->device_view.addr % y->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    XKBLAS_HIPBLAS_CALL(
+        FUNC(
+            handle,
+            cblas2hipblas_op(args->transA),
+            (int) args->m, (int) args->n,
+            (const HIP_TYPE *) &args->alpha,
+            (const HIP_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+            (const HIP_TYPE *) x->device_view.addr, (int) args->incx,
+            (const HIP_TYPE *) &args->beta,
+            (      HIP_TYPE *) y->device_view.addr, (int) args->incy
+        )
+    );
+}
+
+TYPED
+static void
+body_hip(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    XKBLAS_HIPBLAS_DISPATCH_PRECISION(gemv);
+}
+# endif /* XKBLAS_SUPPORT_HIPBLAS */
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -382,6 +436,10 @@ xkblas_t::task_format_create_GEMV(
     # if XKBLAS_SUPPORT_CBLAS
     format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKBLAS_SUPPORT_CBLAS */
+
+    # if XKBLAS_SUPPORT_HIPBLAS
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKBLAS_SUPPORT_HIPBLAS */
 
     # if XKBLAS_SUPPORT_CUBLAS
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
