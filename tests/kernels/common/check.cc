@@ -150,6 +150,10 @@ spmv_cpu(
     TYPE * y,
     TYPE * y_gpu
 ) {
+    (void) transA;
+    (void) ncols;
+    (void) nnz;
+
     int r = 0;
 
     for (int i = 0; i < nrows; i++) {

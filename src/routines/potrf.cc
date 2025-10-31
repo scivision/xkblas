@@ -88,15 +88,18 @@ TYPED
 struct args_t
 {
     args_t(
+        xkblas_t * xkblas,
         const int uplo,
         const int n
     ) :
+        xkblas(xkblas),
         uplo(uplo),
         n(n)
     {}
 
     ~args_t() {}
 
+    xkblas_t * xkblas;
     const int uplo;
     const int n;
 };
@@ -133,9 +136,9 @@ xkblas_t::potrf_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(uplo, n);
+    new (args) args_t<P>(this, uplo, n);
 
-    # ifndef XKRT_SUPPORT_DEBUG
+    # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "potrf(A=(%zd,%zd)", A_offset_m, A_offset_n);
     # endif /* XKRT_SUPPORT_DEBUG */
 
@@ -253,7 +256,6 @@ xkblas_t::potrf_async(
 
                 //options.priority = 2*A->mt - 2*k - n;
 
-                // TODO: is it really correct replacing the herk with a syrk here ?
                 if constexpr (P == xkblas_precision_t::S || P == xkblas_precision_t::D)
                 {
                     this->syrk_tile_async<P>(
@@ -338,7 +340,6 @@ xkblas_t::potrf_async(
 
                 //options.priority = 2*A->nt - 2*k  - m;
 
-                // TODO: is it really correct replacing the herk with a syrk here ?
                 if constexpr (P == xkblas_precision_t::S || P == xkblas_precision_t::D)
                 {
                     this->syrk_tile_async<P>(
@@ -393,48 +394,88 @@ xkblas_t::potrf_async(
 }
 
 # if XKBLAS_SUPPORT_CUDA
-#  include <xkblas/cublas-helper.h>
+#  include <xkblas/cusolver-helper.h>
 #  include <xkrt/driver/driver-cu.h>
+#  include <cusolverDn.h>
 
-template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
+static void
+body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
+{
+    task_t * task = (task_t *) args[0];
+    assert(task);
+
+    area_chunk_t * chunk = (area_chunk_t *) args[1];
+    assert(chunk);
+
+    device_global_id_t device_global_id = (device_global_id_t) (uintptr_t) args[2];
+
+    xkblas_t * xkblas = (xkblas_t *) args[3];
+    assert(xkblas);
+
+    xkblas->runtime.memory_device_deallocate(device_global_id, chunk);
+}
+
+template <xkblas_precision_t P, auto FUNC_SIZE, auto FUNC, typename CU_TYPE>
 static inline void
 body_cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    (void) queue;
     (void) cmd;
     (void) idx;
 
-    cublasHandle_t handle = queue->cu.blas.handle;
+    cusolverDnHandle_t handle = queue->cu.solver.handle;
     assert(handle);
 
     task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
-    const access_t * A = accesses + 0;
-    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    const access_t * access   = accesses + 0;
+    CU_TYPE * A = (CU_TYPE *) access->device_view.addr;
+    int lda = access->device_view.ld;
+    assert((uintptr_t)A % access->host_view.sizeof_type == 0);
 
     const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     assert(args);
 
-    LOGGER_FATAL("Impl me, require cuSolver");
-    # if 0
-    XKBLAS_CUBLAS_CALL(
+    int work_size = 0;
+    FUNC_SIZE(handle, CUBLAS_FILL_MODE_LOWER, args->n, A, lda, &work_size);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    const device_global_id_t device_global_id = dev->elected_device_id;
+    const size_t buffer_size = work_size * sizeof(CU_TYPE) + sizeof(int);
+    area_chunk_t * chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
+    assert(chunk);
+
+    CU_TYPE * work = (CU_TYPE *) chunk->ptr;
+    assert(work);
+
+    int * dev_info = (int *) (chunk->ptr + work_size * sizeof(CU_TYPE));
+
+    // Perform Cholesky factorization: A = L * L^T
+    XKBLAS_CUSOLVER_CALL(
         FUNC(
             handle,
-            cblas2cublas_op(args->transA), cblas2cublas_op(args->transB),
-            (int) args->m, (int) args->n, (int) args->k,
-            (const CU_TYPE *) &args->alpha,
-            (const CU_TYPE *) A->device_view.addr, (int) A->device_view.ld,
-            (const CU_TYPE *) B->device_view.addr, (int) B->device_view.ld,
-            (const CU_TYPE *) &args->beta,
-            (      CU_TYPE *) C->device_view.addr, (int) C->device_view.ld
+            CUBLAS_FILL_MODE_LOWER,
+            args->n,
+            A, lda,
+            work,
+            work_size,
+            dev_info
         )
     );
-    # endif
+
+    // Push callback in cmd->callbacks
+    assert(XKRT_CALLBACK_ARGS_MAX >= 4);
+    callback_t callback;
+    callback.func = body_cuda_run_async_completion;
+    callback.args[0] = task;
+    callback.args[1] = chunk;
+    callback.args[2] = (void *) (uintptr_t) device_global_id;
+    callback.args[3] = args->xkblas;
+    cmd->push_callback(callback);
 }
 
 TYPED
@@ -444,7 +485,17 @@ body_cuda(
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    LOGGER_FATAL("potrf currently not supported, gotta link with cuSolver and add the kernel to XKBLas");
+    if constexpr (P == xkblas_precision_t::S)
+        body_cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>(queue, cmd, idx);
+
+    if constexpr (P == xkblas_precision_t::D)
+        body_cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>(queue, cmd, idx);
+
+    if constexpr (P == xkblas_precision_t::C)
+        body_cuda_run<P, cusolverDnCpotrf_bufferSize, cusolverDnCpotrf, cuComplex>(queue, cmd, idx);
+
+    if constexpr (P == xkblas_precision_t::Z)
+        body_cuda_run<P, cusolverDnZpotrf_bufferSize, cusolverDnZpotrf, cuDoubleComplex>(queue, cmd, idx);
 }
 # endif /* XKBLAS_SUPPORT_CUDA */
 

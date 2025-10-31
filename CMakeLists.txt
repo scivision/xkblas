@@ -14,6 +14,7 @@ xkoption(USE_CBLAS    "Enable the use of CPU Blas library. See https://cmake.org
 xkoption(USE_CLBLAST  "Enable clblast" OFF)
 xkoption(USE_CUBLAS   "Enable cublas" OFF)
 xkoption(USE_CUSPARSE "Enable cusparse" OFF)
+xkoption(USE_CUSOLVER "Enable cusolver" ON)
 xkoption(USE_CUDA     "Enable the compilation of custom cuda kernels" OFF)
 xkoption(USE_HIP      "Enable hip" OFF)
 xkoption(USE_HIPBLAS  "Enable hipblas" OFF)
@@ -231,6 +232,11 @@ endif()
 if (USE_CUSPARSE)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cusparse)
+endif()
+
+if (USE_CUSOLVER)
+    find_package(CUDAToolkit REQUIRED)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cusolver)
 endif()
 
 # Cuda custom kernels

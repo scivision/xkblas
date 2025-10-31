@@ -262,7 +262,9 @@ xkblas_routine_name(xkblas_routine_t k)
     F(Z,     TRMM)                                  \
                                                     \
    /* lapacke */                                    \
+   F(S,      POTRF)                                 \
    F(C,      POTRF)                                 \
+   F(D,      POTRF)                                 \
    F(Z,      POTRF)                                 \
                                                     \
    /* sparse */                                     \

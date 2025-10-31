@@ -460,7 +460,7 @@ body_cuda_run(
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(X));
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(Y));
 
-    // TODO: push callback in cmd->callbacks
+    // Push callback in cmd->callbacks
     assert(XKRT_CALLBACK_ARGS_MAX >= 2);
     callback_t callback;
     callback.func = body_cuda_run_async_completion;

@@ -69,7 +69,7 @@ Adding support for an unsupported kernel may involve more work.
 | geqrf       | ✗   | ✗    | ✗   | ✗               | ✗      |
 | orgqr       | ✗   | ✗    | ✗   | ✗               | ✗      |
 | ormqr       | ✗   | ✗    | ✗   | ✗               | ✗      |
-| potrf       | ✗   | ✗    | ✗   | ✗               | ✗      |
+| potrf       | ✗   | ✓    | ✗   | ✗               | ✗      |
 
 ### Sparse
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |

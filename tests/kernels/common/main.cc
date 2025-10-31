@@ -208,7 +208,7 @@ prepare_csr_matrix(
 
 TYPED
 static void
-prepare_n_matrices(uintptr_t * matrices, size_t nmats, size_t ld, size_t n, bool fill = true)
+prepare_n_matrices(uintptr_t * matrices, int nmats, size_t ld, size_t n, bool fill = true)
 {
     /* allocate matrices */
     const size_t s = sizeof(TYPE);
@@ -283,13 +283,10 @@ main_axpy(char ** args)
         memcpy(Y2, Y, n * sizeof(TYPE));
     }
 
-    uint64_t t0 = get_nanotime();
     set_tile_size(ts);
     xkblas->axpy_async<P>(n, &alpha, X, 1, Y, 1);
     xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, n*sizeof(TYPE));
-    uint64_t tt = get_nanotime();
     xkblas_sync();
-    uint64_t tf = get_nanotime();
 
     // for small vectors
     if (n <= 64)
@@ -339,9 +336,9 @@ main_gemm_gemm(char ** args)
     int t1 = 0;
     int t2 = 0;
 
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
-        for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        for (t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
         {
             xkblas_memory_invalidate_caches();
             memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
@@ -382,6 +379,46 @@ main_gemm_gemm(char ** args)
 
     return 0;
 }
+
+// potrf //
+TYPED
+static int
+main_potrf(char ** args)
+{
+    /* parse arguments */
+    int n = atoi(args[0]);
+    int ts = atoi(args[1]);
+    int uplo = args[2][0] == 'L' ? CblasLower : CblasUpper;
+    int ld = n;
+
+    /* allocate matrices */
+    uintptr_t matrices[1];
+    # define A ((TYPE *)matrices[0])
+    prepare_n_matrices<P>(matrices, 1, ld, ld);
+
+    // for small matrices
+    if (n <= 64)
+    {
+        // SPD matrix
+        // fill with base values
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i)
+                A[i + j * n] = (i == j ? 2 * n : 1);
+    }
+
+    printf("Running implementation with (%d, %c)\n", n, uplo);
+    dump_matrix<P>("A ", A, n, n, ld);
+    set_tile_size(ts);
+    xkblas->potrf_async<P>(uplo, n, A, ld);
+    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, A, ld, n, n, sizeof(TYPE));
+    xkblas_sync();
+    dump_matrix<P>("A ", A, n, n, ld);
+
+    # undef A
+
+    return 0;
+}
+
 
 // GEMM //
 TYPED
@@ -502,7 +539,7 @@ main_syrk(char ** args)
 
     /* run on impl */
     int t1 = 0;
-    for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    for (t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
     {
         if ((TRANS[t1] != CblasNoTrans) && (TRANS[t1] != CblasTrans))
             continue ;
@@ -752,7 +789,6 @@ main_mumps_checker(char ** args)
 
     bool should_copy = true;
     int * IW = NULL;
-    uint64_t tt0;
 
     printf("allocating and filling matrices\n");
 
@@ -1577,6 +1613,17 @@ static func_t funcs[] = {
                     "  - N  : n° of rows of A and C\n"
                     "  - K  : n° of cols of A\n"
                     "  - TS : tile size\n"
+    },
+
+    {
+        .name = "POTRF",
+        .f = main_potrf<PRECISION>,
+        .nargs = 3,
+        .descr = "Compute U or L facto of A",
+        .usage =    "n ts uplo\n"
+                    "  -    n : number of rows/cols of matrix A\n"
+                    "  -   ts : tile size\n"
+                    "  - uplo : 'L' or 'U'\n"
     },
 
     {
