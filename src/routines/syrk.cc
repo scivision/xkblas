@@ -391,6 +391,60 @@ xkblas_t::syrk_async(
     return 0;
 }
 
+# if XKBLAS_SUPPORT_HIPBLAS
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
+static void
+body_hip_run(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    assert(queue);
+
+    hipblasHandle_t handle = queue->hip.blas.handle;
+    assert(handle);
+
+    task_t * task = (task_t *) cmd->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * C = accesses + 1;
+
+    assert(A->device_view.addr % A->host_view.sizeof_type == 0);
+    assert(C->device_view.addr % C->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    XKBLAS_HIPBLAS_CALL(
+        FUNC(
+            handle,
+            cblas2hipblas_uplo(args->uplo), cblas2hipblas_op(args->trans),
+            (int) args->n, (int) args->k,
+            (const HIP_TYPE *) &args->alpha,
+            (const HIP_TYPE *) A->device_view.addr, (int) A->device_view.ld,
+            (const HIP_TYPE *) &args->beta,
+            (      HIP_TYPE *) C->device_view.addr, (int) C->device_view.ld
+        )
+    );
+}
+
+TYPED
+static void
+body_hip(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    XKBLAS_HIPBLAS_DISPATCH_PRECISION(syrk);
+}
+
+# endif /* XKBLAS_SUPPORT_CUBLAS */
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -454,6 +508,10 @@ void
 xkblas_t::task_format_create_SYRK(
     task_format_t * format
 ) {
+    # if XKBLAS_SUPPORT_HIPBLAS
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKBLAS_SUPPORT_HIPBLAS */
+
     # if XKBLAS_SUPPORT_CUBLAS
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
     # endif /* XKBLAS_SUPPORT_CUBLAS */

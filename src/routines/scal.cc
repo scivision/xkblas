@@ -155,6 +155,52 @@ xkblas_t::scal(
     return r;
 }
 
+# if XKBLAS_SUPPORT_HIPBLAS
+#  include <xkblas/hipblas-helper.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
+static inline void
+body_hip_run(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    hipblasHandle_t handle = queue->hip.blas.handle;
+    assert(handle);
+
+    task_t * task = (task_t *) cmd->kern.vargs;
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * x = accesses + 0;
+    assert(x->device_view.addr % x->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
+    assert(args);
+    assert(args->alpha);
+
+    XKBLAS_HIPBLAS_CALL(
+        FUNC(
+            handle,
+            (int) args->n,
+            (const HIP_TYPE *) args->alpha,
+            (      HIP_TYPE *) x->device_view.addr, args->incx
+        )
+    );
+}
+
+TYPED
+static void
+body_hip(
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    XKBLAS_HIPBLAS_DISPATCH_PRECISION_REAL(scal);
+}
+# endif /* XKBLAS_SUPPORT_HIPBLAS */
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -239,6 +285,10 @@ xkblas_t::task_format_create_SCAL(
     # if XKBLAS_SUPPORT_CBLAS
     format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
     # endif /* XKBLAS_SUPPORT_CBLAS */
+
+    # if XKBLAS_SUPPORT_HIPBLAS
+    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
+    # endif /* XKBLAS_SUPPORT_HIPBLAS */
 
     # if XKBLAS_SUPPORT_CUBLAS
     format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;

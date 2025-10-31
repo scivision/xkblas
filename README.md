@@ -35,15 +35,15 @@ Adding support for an unsupported kernel may involve more work.
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
-| axpby       | ✗   | ✓    | ✗   | ✗               | ✗      |
-| axpy        | ✗   | ✓    | ✗   | ✗               | ✗      |
-| copy        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| axpby       | ✗   | ✓    | ✓   | ✗               | ✗      |
+| axpy        | ✗   | ✓    | ✓   | ✗               | ✗      |
+| copy        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | divcopy     | ✗   | ✗    | ✗   | ✗               | ✗      |
-| dot         | ✓   | ✓    | ✗   | ✗               | ✗      |
+| dot         | ✓   | ✓    | ✓   | ✗               | ✗      |
 | fill        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | nrm2        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | scalcopy    | ✗   | ✗    | ✗   | ✗               | ✗      |
-| scal        | ✓   | ✓    | ✗   | ✗               | ✗      |
+| scal        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 2
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
@@ -56,10 +56,10 @@ Adding support for an unsupported kernel may involve more work.
 |-------------|-----|------|-----|-----------------|--------|
 | gemm        | ✓   | ✓    | ✓   | ✓               | ✓      |
 | gemmt       | ✗   | ✓    | ✓   | ✗               | ✗      |
-| herk        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| herk        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | symm        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | syr2k       | ✗   | ✗    | ✗   | ✗               | ✗      |
-| syrk        | ✗   | ✓    | ✗   | ✗               | ✗      |
+| syrk        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | trmm        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | trsm        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
