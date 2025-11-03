@@ -56,11 +56,14 @@ SET(XKBLAS_ROUTINES
 
     # sparse
     spmv
+
+    # mumps-addons
+    pfacldlt
 )
 SET(XKBLAS_ROUTINES_PRECISIONS s c d z)
 
 # custom kernels
-SET(XKBLAS_CUDA_KERNELS copyscale)
+SET(XKBLAS_CUDA_KERNELS copyscale pfacldlt)
 SET(XKBLAS_HIP_KERNELS  copyscale)
 
 # Generated C source files for bindings

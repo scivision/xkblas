@@ -246,6 +246,13 @@ XKDEFI(
     XKTYPE * Y
 );
 
+XKDEF(
+    int,
+    pfacldlt,
+    int m, int n, int k,
+    XKTYPE * A, int lda
+);
+
 //////////////////
 /// SINGLE TILE //
 //////////////////
@@ -405,5 +412,14 @@ XKDEFI(
     XKTYPE * X,
     const XKTYPE * beta,
     XKTYPE * Y,
+    XKDEVICE device_global_id
+);
+
+// MUMPS ADDONS
+XKDEF(
+    int,
+    pfacldlt_tile,
+    int m, int n, int k,
+    XKTYPE * A, int lda,
     XKDEVICE device_global_id
 );

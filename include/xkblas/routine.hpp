@@ -170,7 +170,10 @@ using xkblas_index_name_t = typename _xkblas_index_name_t<T>::value;
     F(POTRF)                     \
                                  \
     /* SPARSE */                 \
-    F(SPMV)
+    F(SPMV)                      \
+                                 \
+    /* MUMPS - ADDONS */         \
+    F(PFACLDLT)
 
 // Now define the enum using the macro
 typedef enum    xkblas_routine_t
@@ -271,6 +274,12 @@ xkblas_routine_name(xkblas_routine_t k)
    F(S,      SPMV)                                  \
    F(C,      SPMV)                                  \
    F(D,      SPMV)                                  \
-   F(Z,      SPMV)
+   F(Z,      SPMV)                                  \
+                                                    \
+   /* MUMPS - ADDONS */                             \
+   F(S,      PFACLDLT)                              \
+   F(C,      PFACLDLT)                              \
+   F(D,      PFACLDLT)                              \
+   F(Z,      PFACLDLT)
 
 # endif /* __XKBLAS_ROUTINE_DECL_H__ */
