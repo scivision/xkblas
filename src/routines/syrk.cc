@@ -126,7 +126,7 @@ xkblas_t::syrk_tile_async(
     LOGGER_INFO("Submitting tile C=(%zu,%zu) of size (%zu,%zu)", C_offset_m, C_offset_n, n, k);
 
     # define AC 2
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -397,7 +397,7 @@ xkblas_t::syrk_async(
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -435,7 +435,7 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -451,7 +451,7 @@ body_hip(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -489,7 +489,7 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -503,22 +503,18 @@ body_cuda(
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_SYRK(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_HIPBLAS
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIPBLAS */
+# define ROUTINE_NAME SYRK
 
-    # if XKBLAS_SUPPORT_CUBLAS
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUBLAS */
-}
+# define CL   0
+# define CUDA 1
+# define HIP  1
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SYRK<P>(task_format_t * format); \
     template int xkblas_t::syrk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

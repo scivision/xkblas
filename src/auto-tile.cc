@@ -67,6 +67,7 @@ xkblas_routine_auto_tile(
         case (AXPY):
         case (COPY):
         case (DOT):
+        case (FILL):
         case (GEMV):
         case (SCAL):
         {

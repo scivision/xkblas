@@ -73,7 +73,7 @@ xkblas_t::scal_tile_async(
     assert(thread);
 
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -161,7 +161,7 @@ xkblas_t::scal(
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -192,7 +192,7 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -207,7 +207,7 @@ body_hip(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -238,7 +238,7 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -251,7 +251,7 @@ body_cuda(
 
 template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu_run(task_t * task)
+host_run(task_t * task)
 {
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * x = accesses + 0;
@@ -269,34 +269,30 @@ body_cpu_run(task_t * task)
 
 TYPED
 static void
-body_cpu(task_t * task)
+host(task_t * task)
 {
-    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_sscal>(task);
-    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dscal>(task);
+    if constexpr (P == xkblas_precision_t::S) host_run<P, cblas_sscal>(task);
+    if constexpr (P == xkblas_precision_t::D) host_run<P, cblas_dscal>(task);
 }
 
 # endif /* XKBLAS_SUPPORT_CBLAS */
 
-TYPED
-void
-xkblas_t::task_format_create_SCAL(
-    task_format_t * format
-    ) {
-    # if XKBLAS_SUPPORT_CBLAS
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKBLAS_SUPPORT_CBLAS */
+//////////////////////////
+// TASK FORMAT REGISTER //
+//////////////////////////
 
-    # if XKBLAS_SUPPORT_HIPBLAS
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIPBLAS */
+# define ROUTINE_NAME SCAL
 
-    # if XKBLAS_SUPPORT_CUBLAS
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUBLAS */
-}
+# define CL   0
+# define CUDA 1
+# define HIP  1
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 # define DEFINE(P)  \
-        template void xkblas_t::task_format_create_SCAL<P>(task_format_t * format);                                                                                         \
     template int xkblas_t::scal<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_global_id_t device_global_id);

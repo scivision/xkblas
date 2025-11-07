@@ -42,7 +42,7 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£copy_tile_async(
-    const size_t n,
+    const int n,
     const TYPE * x,
     const int incx,
           TYPE * y,
@@ -55,7 +55,7 @@ xkblas_£copy_tile_async(
 extern "C"
 int
 xkblas_£copy(
-    size_t n,
+    const int n,
     const TYPE * x,
     const int incx,
           TYPE * y,

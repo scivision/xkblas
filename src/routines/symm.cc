@@ -39,14 +39,17 @@
 
 XKRT_NAMESPACE_USE;
 
-TYPED
-void
-xkblas_t::task_format_create_SYMM(
-    task_format_t * format
-) {
-}
+//////////////////////////
+// TASK FORMAT REGISTER //
+//////////////////////////
 
-# define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SYMM<P>(task_format_t * format);
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE
+# define ROUTINE_NAME SYMM
+
+# define CL   0
+# define CUDA 0
+# define HIP  0
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"

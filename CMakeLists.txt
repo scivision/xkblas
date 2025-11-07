@@ -13,8 +13,6 @@ xkoption(USE_TESTS    "Compile tests (require a CBLAS installation)" OFF)
 xkoption(USE_CBLAS    "Enable the use of CPU Blas library. See https://cmake.org/cmake/help/latest/module/FindBLAS.html" OFF)
 xkoption(USE_CLBLAST  "Enable clblast" OFF)
 xkoption(USE_CUBLAS   "Enable cublas" OFF)
-xkoption(USE_CUSPARSE "Enable cusparse" OFF)
-xkoption(USE_CUSOLVER "Enable cusolver" ON)
 xkoption(USE_CUDA     "Enable the compilation of custom cuda kernels" OFF)
 xkoption(USE_HIP      "Enable hip" OFF)
 xkoption(USE_HIPBLAS  "Enable hipblas" OFF)
@@ -43,7 +41,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
 SET(XKBLAS_ROUTINES
 
     # level 1
-    axpby axpy copy divcopy dot fill nrm2 scalcopy scal
+    axpby axpy copy divcopy dot fill nrm2 scal
 
     # level 2
     copyscale gemv
@@ -60,7 +58,7 @@ SET(XKBLAS_ROUTINES
 SET(XKBLAS_ROUTINES_PRECISIONS s c d z)
 
 # custom kernels
-SET(XKBLAS_CUDA_KERNELS copyscale)
+SET(XKBLAS_CUDA_KERNELS copyscale fill)
 SET(XKBLAS_HIP_KERNELS  copyscale)
 
 # Generated C source files for bindings
@@ -226,17 +224,7 @@ target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE XKRT::xkrt ${XKBLAS_NAME})
 
 if (USE_CUBLAS)
     find_package(CUDAToolkit REQUIRED)
-    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cublas)
-endif()
-
-if (USE_CUSPARSE)
-    find_package(CUDAToolkit REQUIRED)
-    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cusparse)
-endif()
-
-if (USE_CUSOLVER)
-    find_package(CUDAToolkit REQUIRED)
-    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cusolver)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE CUDA::cudart CUDA::cuda_driver CUDA::cublas CUDA::cusparse CUDA::cusolver)
 endif()
 
 # Cuda custom kernels

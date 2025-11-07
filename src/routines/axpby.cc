@@ -50,7 +50,7 @@ xkblas_t::axpby_async(
           TYPE * y,
     const int incy
 ) {
-    // LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance, but cublas does not provide axpby");
+    LOGGER_WARN("axpby currently implemented as scal+axpy. This is bad for performance");
     this->scal_async<P>(n, beta,  y, incy);
     this->axpy_async<P>(n, alpha, x, incx, y, incy);
     return 0;
@@ -74,16 +74,22 @@ xkblas_t::axpby(
     return r;
 }
 
-TYPED
-void
-xkblas_t::task_format_create_AXPBY(
-    task_format_t * format
-) {
-    // nothing to do
-}
+//////////////////////////
+// TASK FORMAT REGISTER //
+//////////////////////////
+
+# define ROUTINE_NAME AXPBY
+
+# define CL   0
+# define CUDA 0
+# define HIP  0
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_AXPBY<P>(task_format_t * format); \
     template int xkblas_t::axpby<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::axpby_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

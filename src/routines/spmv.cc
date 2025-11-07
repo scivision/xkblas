@@ -124,7 +124,7 @@ xkblas_t::spmv_tile_async(
     assert(thread);
 
     # define AC 5
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -297,12 +297,12 @@ xkblas_t::spmv_async(
     return 0;
 }
 
-# if XKBLAS_SUPPORT_CUSPARSE
+# if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cusparse-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
 static void
-body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
+cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 {
     task_t * task = (task_t *) args[0];
     assert(task);
@@ -320,7 +320,7 @@ body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 
 template <xkblas_precision_t P, typename CU_TYPE, cudaDataType CUDA_DATA_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -463,7 +463,7 @@ body_cuda_run(
     // Push callback in cmd->callbacks
     assert(XKRT_CALLBACK_ARGS_MAX >= 2);
     callback_t callback;
-    callback.func = body_cuda_run_async_completion;
+    callback.func = cuda_run_async_completion;
     callback.args[0] = task;
     callback.args[1] = chunk;
     callback.args[2] = (void *) (uintptr_t) device_global_id;
@@ -473,28 +473,29 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();
 }
-# endif /* XKBLAS_SUPPORT_CUSPARSE */
+# endif /* XKBLAS_SUPPORT_CUBLAS */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_SPMV(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_CUSPARSE
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUSPARSE */
-}
+# define ROUTINE_NAME SPMV
+
+# define CL   0
+# define CUDA 1
+# define HIP  0
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 /* instanciate methods for each precision */
 
@@ -502,9 +503,4 @@ xkblas_t::task_format_create_SPMV(
     template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
     template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
-# undef DEFINE
-
-# define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SPMV<P>(task_format_t * format);
-XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

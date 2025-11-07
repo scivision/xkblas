@@ -121,7 +121,7 @@ xkblas_t::potrf_tile_async(
     const size_t A_offset_n = Atn * Anb;
 
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -393,13 +393,13 @@ xkblas_t::potrf_async(
     return 0;
 }
 
-# if XKBLAS_SUPPORT_CUDA
+# if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cusolver-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 #  include <cusolverDn.h>
 
 static void
-body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
+cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 {
     task_t * task = (task_t *) args[0];
     assert(task);
@@ -417,7 +417,7 @@ body_cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 
 template <xkblas_precision_t P, auto FUNC_SIZE, auto FUNC, typename CU_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -470,7 +470,7 @@ body_cuda_run(
     // Push callback in cmd->callbacks
     assert(XKRT_CALLBACK_ARGS_MAX >= 4);
     callback_t callback;
-    callback.func = body_cuda_run_async_completion;
+    callback.func = cuda_run_async_completion;
     callback.args[0] = task;
     callback.args[1] = chunk;
     callback.args[2] = (void *) (uintptr_t) device_global_id;
@@ -480,50 +480,45 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     if constexpr (P == xkblas_precision_t::S)
-        body_cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>(queue, cmd, idx);
+        cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>(queue, cmd, idx);
 
     if constexpr (P == xkblas_precision_t::D)
-        body_cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>(queue, cmd, idx);
+        cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>(queue, cmd, idx);
 
     if constexpr (P == xkblas_precision_t::C)
-        body_cuda_run<P, cusolverDnCpotrf_bufferSize, cusolverDnCpotrf, cuComplex>(queue, cmd, idx);
+        cuda_run<P, cusolverDnCpotrf_bufferSize, cusolverDnCpotrf, cuComplex>(queue, cmd, idx);
 
     if constexpr (P == xkblas_precision_t::Z)
-        body_cuda_run<P, cusolverDnZpotrf_bufferSize, cusolverDnZpotrf, cuDoubleComplex>(queue, cmd, idx);
+        cuda_run<P, cusolverDnZpotrf_bufferSize, cusolverDnZpotrf, cuDoubleComplex>(queue, cmd, idx);
 }
-# endif /* XKBLAS_SUPPORT_CUDA */
+# endif /* XKBLAS_SUPPORT_CUBLAS */
 
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_POTRF(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_CUDA
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUDA */
-}
+# define ROUTINE_NAME POTRF
+
+# define CL   0
+# define CUDA 1
+# define HIP  0
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_POTRF<P>(task_format_t * format); \
     template int xkblas_t::potrf_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 
 # undef DEFINE
-
-# if 0
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE
-# endif

@@ -86,7 +86,7 @@ xkblas_t::copyscale_tile_async(
     assert(thread);
 
     # define AC 3
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t);
 
@@ -231,7 +231,7 @@ extern "C" {
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -270,15 +270,15 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_cuda_run<P, cuda_scopyscale, float>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_cuda_run<P, cuda_dcopyscale, double>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_cuda_run<P, cuda_ccopyscale, cuComplex>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::S)   cuda_run<P, cuda_scopyscale, float>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   cuda_run<P, cuda_dcopyscale, double>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   cuda_run<P, cuda_ccopyscale, cuComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   cuda_run<P, cuda_zcopyscale, cuDoubleComplex>(queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_CUDA */
@@ -298,7 +298,7 @@ extern "C" {
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -337,15 +337,15 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   body_hip_run<P, hip_scopyscale, float>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::D)   body_hip_run<P, hip_dcopyscale, double>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::C)   body_hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::Z)   body_hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::S)   hip_run<P, hip_scopyscale, float>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   hip_run<P, hip_dcopyscale, double>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_HIP */
@@ -355,24 +355,20 @@ body_hip(
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_COPYSCALE(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_CUDA
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUDA */
+# define ROUTINE_NAME COPYSCALE
 
-    # if XKBLAS_SUPPORT_HIP
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIP */
-}
+# define CL   0
+# define CUDA XKBLAS_SUPPORT_CUDA
+# define HIP  1
+# define HOST 0
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_COPYSCALE<P>(task_format_t * format);    \
     template int xkblas_t::copyscale_async<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
     template int xkblas_t::copyscale_tile_async<P>(const size_t m, const size_t n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const size_t Dm, const size_t Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const size_t Lm, const size_t Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const size_t Um, const size_t Un, int ldu, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
