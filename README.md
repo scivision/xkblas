@@ -2,6 +2,9 @@
 
 XKBlas is a portable multi-gpu BLAS library, with built-in coherence between host and devices memories.
 
+## Stable release
+Stable releases are available in branches `release/v2.x`
+
 ## Example
 An XKBlas program is a sequence of BLAS calls with host-memory matrices, that are automatically tiled and distributed to multiple GPUs in an asynchronous fashion.
 
