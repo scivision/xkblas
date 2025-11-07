@@ -46,10 +46,9 @@ xkblas_£axpy_tile_async(
     const TYPE * alpha,
     const TYPE * x, const int incx,
           TYPE * y, const int incy,
-    const size_t bs,
     xkrt_device_global_id_t device_global_id
 ) {
-    return xkblas_get()->axpy_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, y, incy, bs, device_global_id);
+    return xkblas_get()->axpy_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, y, incy, device_global_id);
 }
 
 extern "C"

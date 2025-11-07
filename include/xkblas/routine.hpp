@@ -204,6 +204,10 @@ xkblas_routine_name(xkblas_routine_t k)
     F(C,     NRM2)                                  \
     F(D,     NRM2)                                  \
     F(Z,     NRM2)                                  \
+    F(S,     FILL)                                  \
+    F(C,     FILL)                                  \
+    F(D,     FILL)                                  \
+    F(Z,     FILL)                                  \
     F(S,     SCAL)                                  \
     F(D,     SCAL)                                  \
     F(S,     AXPY)                                  \

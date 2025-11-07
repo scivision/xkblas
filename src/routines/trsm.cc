@@ -101,7 +101,7 @@ xkblas_t::trsm_tile_async(
     const size_t B_offset_n = Btn * Bnb;
 
     # define AC 2
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -754,7 +754,7 @@ xkblas_t::trsm_rec_async(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -792,7 +792,7 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -809,7 +809,7 @@ body_cuda(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -847,7 +847,7 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -862,7 +862,7 @@ body_hip(
 
 template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu_run(task_t * task)
+host_run(task_t * task)
 {
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * A = accesses + 0;
@@ -903,12 +903,12 @@ body_cpu_run(task_t * task)
 
 TYPED
 static void
-body_cpu(task_t * task)
+host(task_t * task)
 {
-    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_strsm>(task);
-    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dtrsm>(task);
-    if constexpr (P == xkblas_precision_t::C) body_cpu_run<P, cblas_ctrsm>(task);
-    if constexpr (P == xkblas_precision_t::Z) body_cpu_run<P, cblas_ztrsm>(task);
+    if constexpr (P == xkblas_precision_t::S) host_run<P, cblas_strsm>(task);
+    if constexpr (P == xkblas_precision_t::D) host_run<P, cblas_dtrsm>(task);
+    if constexpr (P == xkblas_precision_t::C) host_run<P, cblas_ctrsm>(task);
+    if constexpr (P == xkblas_precision_t::Z) host_run<P, cblas_ztrsm>(task);
 }
 
 # endif /* XKBLAS_SUPPORT_CBLAS */
@@ -929,34 +929,25 @@ suggest_format(task_t * task)
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_TRSM(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_CBLAS
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKBLAS_SUPPORT_CBLAS */
+# define ROUTINE_NAME TRSM
 
-    # if XKBLAS_SUPPORT_CUBLAS
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUBLAS */
+# define CL   0
+# define CUDA 1
+# define HIP  1
+# define HOST 1
+# define SYCL 0
+# define ZE   0
 
-    # if XKBLAS_SUPPORT_HIP
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIP */
+# include "task-format.cc"
 
     # if 0
     format->suggest = (task_format_suggest_t) suggest_format<P>;
     # endif
-}
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_TRSM<P>(task_format_t * format); \
     template int xkblas_t::trsm<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_rec_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
     template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
-

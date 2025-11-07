@@ -35,18 +35,56 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+# include <xkblas/xkblas.h>
+# include <xkblas/flops.h>
+# include <xkblas/cblas.h>
 
-XKRT_NAMESPACE_USE;
+# include <xkrt/logger/logger.h>
 
-TYPED
-void
-xkblas_t::task_format_create_SCALCOPY(
-    task_format_t * format
-) {
+# include <assert.h>
+# include <stdlib.h>
+# include <stdint.h>
+# include <string.h>
+
+# if 1
+# define TYPE           float
+# define xkblas_fill    xkblas_sfill
+# endif
+# if 0
+# define TYPE           double
+# define xkblas_fill    xkblas_dfill
+# endif
+# if 0
+# define TYPE           _Complex float
+# define xkblas_fill    xkblas_cfill
+# endif
+# if 0
+# define TYPE           _Complex double
+# define xkblas_fill    xkblas_zfill
+# endif
+
+int
+main(void)
+{
+    xkblas_init();
+
+    const int n = 1024;
+    TYPE * A = (TYPE *) malloc(n * sizeof(TYPE));
+    memset(A, 0, n*sizeof(TYPE));
+    const TYPE value = 42.0 + 13 * I;
+
+    xkblas_fill(n - 200, A + 100, value);
+
+    for (int i = 0 ; i < 100 ; ++i)
+        assert(A[i] == 0);
+
+    for (int i = 100 ; i < n - 100 ; ++i)
+        assert(A[i] == value);
+
+    for (int i = n - 100 ; i < n ; ++i)
+        assert(A[i] == 0);
+
+    xkblas_deinit();
+
+    return 0;
 }
-
-# define DEFINE(P)  \
-    template void xkblas_t::task_format_create_SCALCOPY<P>(task_format_t * format);
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE

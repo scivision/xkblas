@@ -43,9 +43,8 @@ Adding support for an unsupported kernel may involve more work.
 | copy        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | divcopy     | ✗   | ✗    | ✗   | ✗               | ✗      |
 | dot         | ✓   | ✓    | ✓   | ✗               | ✗      |
-| fill        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| fill        | ✗   | ✓    | ✗   | ✗               | ✗      |
 | nrm2        | ✗   | ✗    | ✗   | ✗               | ✗      |
-| scalcopy    | ✗   | ✗    | ✗   | ✗               | ✗      |
 | scal        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 2

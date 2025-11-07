@@ -6,16 +6,22 @@ project(tests)
 
 set(CMAKE_BUILD_TYPE Debug)
 
-add_executable(tests tests.c)
+# list of tests
+set(TEST_SOURCES
+    tests.c
+    fill.c
+)
 
-target_link_libraries(tests PRIVATE ${XKBLAS_NAME} XKRT::xkrt)
+# Loop over each test source file
+foreach(TEST_FILE ${TEST_SOURCES})
+    # Get the file name without the extension (e.g., "test" from "test.c")
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
 
-if (USE_CUDA)
-    target_link_libraries(tests PRIVATE ${XKBLAS_NAME}_kernels_cuda ${CUDA_DRIVER_LIBRARIES})
-endif()
+    # Create test
+    add_executable(${TEST_NAME} ${TEST_FILE})
+    target_link_libraries(${TEST_NAME} PRIVATE ${XKBLAS_NAME} XKRT::xkrt)
+    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 
-if (USE_SYCL)
-    target_link_libraries(tests PRIVATE sycl -fsycl -qmkl=parallel)
-endif()
+endforeach()
 
 add_subdirectory(kernels/)

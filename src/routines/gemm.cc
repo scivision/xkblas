@@ -141,7 +141,7 @@ xkblas_t::gemm_tile_async(
     LOGGER_DEBUG("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
 
     # define AC 3
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -418,7 +418,7 @@ xkblas_t::gemm(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -457,7 +457,7 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -473,7 +473,7 @@ body_cuda(
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -512,7 +512,7 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -529,7 +529,7 @@ body_hip(
 
 TYPED
 static void
-body_ze(
+ze(
     queue_ze_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -615,7 +615,7 @@ body_ze(
 
 TYPED
 static void
-body_sycl(
+sycl(
     queue_sycl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -671,7 +671,7 @@ body_sycl(
 
 template <xkblas_precision_t P, auto FUNC, typename CL_TYPE>
 static inline void
-body_cl_run(
+cl_run(
     queue_cl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -721,7 +721,7 @@ body_cl_run(
 
 TYPED
 static void
-body_cl(
+cl(
     queue_cl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -735,7 +735,7 @@ body_cl(
 
 template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu_run(task_t * task)
+host_run(task_t * task)
 {
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * A = accesses + 0;
@@ -777,62 +777,36 @@ body_cpu_run(task_t * task)
 
 TYPED
 static void
-body_cpu(task_t * task)
+host(task_t * task)
 {
-    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_sgemm>(task);
-    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_dgemm>(task);
-    if constexpr (P == xkblas_precision_t::C) body_cpu_run<P, cblas_cgemm>(task);
-    if constexpr (P == xkblas_precision_t::Z) body_cpu_run<P, cblas_zgemm>(task);
+    if constexpr (P == xkblas_precision_t::S) host_run<P, cblas_sgemm>(task);
+    if constexpr (P == xkblas_precision_t::D) host_run<P, cblas_dgemm>(task);
+    if constexpr (P == xkblas_precision_t::C) host_run<P, cblas_cgemm>(task);
+    if constexpr (P == xkblas_precision_t::Z) host_run<P, cblas_zgemm>(task);
 }
 
 # endif /* XKBLAS_SUPPORT_CBLAS */
-
 
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
 
-TYPED
-void
-xkblas_t::task_format_create_GEMM(
-    task_format_t * format
-) {
-    # if XKBLAS_SUPPORT_CBLAS
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKBLAS_SUPPORT_CBLAS */
+# define ROUTINE_NAME GEMM
 
-    # if XKBLAS_SUPPORT_CUBLAS
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUBLAS */
+# define CL   1
+# define CUDA 1
+# define HIP  1
+# define HOST 1
+# define SYCL 1
+# define ZE   1
 
-    # if XKBLAS_SUPPORT_HIP
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIP */
-
-    # if XKBLAS_SUPPORT_ZE
-    format->f[TASK_FORMAT_TARGET_ZE] = (task_format_func_t) body_ze<P>;
-    # endif /* XKBLAS_SUPPORT_ZE */
-
-    # if XKBLAS_SUPPORT_CLBLAST
-    format->f[TASK_FORMAT_TARGET_CL] = (task_format_func_t) body_cl<P>;
-    # endif /* XKBLAS_SUPPORT_CLBLAST */
-
-    # if XKBLAS_SUPPORT_SYCL
-    format->f[TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) body_sycl<P>;
-    # endif /* XKBLAS_SUPPORT_SYCL */
-}
+# include "task-format.cc"
 
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
-    template void xkblas_t::task_format_create_GEMM<P>(task_format_t * format); \
     template int xkblas_t::gemm<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_async<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_tile_async<P>(int transA, int transB, const size_t m, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
-
-# if 0
-XKBLAS_FORALL_PRECISIONS(DEFINE);
-# undef DEFINE
-# endif

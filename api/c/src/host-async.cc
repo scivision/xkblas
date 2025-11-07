@@ -48,5 +48,5 @@ xkblas_host_async(
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
     team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST);
-    runtime->team_task_spawn(team, [=] (task_t *) { func(args); });
+    runtime->team_task_spawn(team, [=] (runtime_t *, device_t *, task_t *) { func(args); });
 }

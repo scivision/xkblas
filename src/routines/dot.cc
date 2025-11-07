@@ -77,7 +77,7 @@ xkblas_t::dot_tile_async(
     assert(thread);
 
     # define AC 3
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT;
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
@@ -165,8 +165,8 @@ xkblas_t::dot_async(
                 new (accesses + 1) access_t(task,      r, ACCESS_MODE_W, ACCESS_CONCURRENCY_SEQUENTIAL);
             },
 
-            [=] (task_t * task) {
-                (void) task;
+            [=] (runtime_t * runtime, device_t * device, task_t * task) {
+                (void) runtime; (void) device; (void) task;
                 *r = 0;
                 for (size_t i = 0 ; i < nt ; ++i)
                     *r += temp_r[i];
@@ -198,7 +198,7 @@ xkblas_t::dot(
 
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
-body_hip_run(
+hip_run(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -233,7 +233,7 @@ body_hip_run(
 
 TYPED
 static void
-body_hip(
+hip(
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -250,7 +250,7 @@ body_hip(
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
-body_cuda_run(
+cuda_run(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -285,7 +285,7 @@ body_cuda_run(
 
 TYPED
 static void
-body_cuda(
+cuda(
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -298,7 +298,7 @@ body_cuda(
 
 template <xkblas_precision_t P, auto FUNC>
 static void
-body_cpu_run(task_t * task)
+host_run(task_t * task)
 {
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * x = accesses + 0;
@@ -316,34 +316,30 @@ body_cpu_run(task_t * task)
 
 TYPED
 static void
-body_cpu(task_t * task)
+host(task_t * task)
 {
-    if constexpr (P == xkblas_precision_t::S) body_cpu_run<P, cblas_sdot>(task);
-    if constexpr (P == xkblas_precision_t::D) body_cpu_run<P, cblas_ddot>(task);
+    if constexpr (P == xkblas_precision_t::S) host_run<P, cblas_sdot>(task);
+    if constexpr (P == xkblas_precision_t::D) host_run<P, cblas_ddot>(task);
 }
 
 # endif /* XKBLAS_SUPPORT_CBLAS */
 
-TYPED
-void
-xkblas_t::task_format_create_DOT(
-    task_format_t * format
-    ) {
-    # if XKBLAS_SUPPORT_CBLAS
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) body_cpu<P>;
-    # endif /* XKBLAS_SUPPORT_CBLAS */
+//////////////////////////
+// TASK FORMAT REGISTER //
+//////////////////////////
 
-    # if XKBLAS_SUPPORT_HIPBLAS
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) body_hip<P>;
-    # endif /* XKBLAS_SUPPORT_HIPBLAS */
+# define ROUTINE_NAME DOT
 
-    # if XKBLAS_SUPPORT_CUBLAS
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) body_cuda<P>;
-    # endif /* XKBLAS_SUPPORT_CUBLAS */
-}
+# define CL   0
+# define CUDA 1
+# define HIP  1
+# define HOST 1
+# define SYCL 0
+# define ZE   0
+
+# include "task-format.cc"
 
 # define DEFINE(P)  \
-        template void xkblas_t::task_format_create_DOT<P>(task_format_t * format);                                                                                         \
     template int xkblas_t::dot<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);

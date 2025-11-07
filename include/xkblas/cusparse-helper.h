@@ -53,7 +53,7 @@
     } while (0)
 
 # define XKBLAS_CUSPARSE_DISPATCH_PRECISION_P(PX, T, ET) \
-    if constexpr (P == xkblas_precision_t::PX) body_cuda_run<P, T, ET>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::PX) cuda_run<P, T, ET>(queue, cmd, idx);
 
 # define XKBLAS_CUSPARSE_DISPATCH_PRECISION_REAL()              \
     XKBLAS_CUSPARSE_DISPATCH_PRECISION_P(S, float,  CUDA_R_32F) \
