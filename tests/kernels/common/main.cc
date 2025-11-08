@@ -160,6 +160,55 @@ xkblas_tests_alloc(const size_t size)
 
 TYPED
 static void
+prepare_csc_matrix(
+    double density,
+    int m,
+    int n,
+    int * nnz,
+    int ** csc_col_offsets,
+    int ** csc_row_indices,
+    TYPE ** csc_values
+) {
+    int max_nnz = (int)(m * n * density) + 1;
+    size_t csc_values_size = max_nnz * sizeof(TYPE);
+    size_t csc_row_indices_size = max_nnz * sizeof(int);
+    size_t csc_col_offsets_size = (n + 1) * sizeof(int);
+    size_t memsize = csc_values_size + csc_row_indices_size + csc_col_offsets_size;
+
+    const uintptr_t memory = xkblas_tests_alloc(memsize);
+
+    // Allocate contiguous memory blocks
+    *csc_values        = (TYPE *) (memory + 0);
+    *csc_row_indices   = (int *)  (memory + csc_values_size);
+    *csc_col_offsets   = (int *)  (memory + csc_values_size + csc_row_indices_size);
+
+    *nnz = 0; // total nonzeros
+    (*csc_col_offsets)[0] = 0;
+
+    // Iterate over columns instead of rows
+    for (int j = 0; j < n; ++j)
+    {
+        if (*nnz < max_nnz)
+        {
+            for (int i = 0; i < m; ++i)
+            {
+                if ((double)rand() / RAND_MAX < density)
+                {
+                    if (*nnz >= max_nnz)
+                        break ;
+
+                    (*csc_values)[*nnz]     = (rand() % 9) + 1; // random value 1–9
+                    (*csc_row_indices)[*nnz] = i;
+                    *nnz = *nnz + 1;
+                }
+            }
+        }
+        (*csc_col_offsets)[j+1] = *nnz;
+    }
+}
+
+TYPED
+static void
 prepare_csr_matrix(
     double density,
     int m,
@@ -1311,28 +1360,31 @@ main_spmv(char ** args)
     dump_vector<P>("Y", Y, m);
     memcpy(Y_check, Y, m * sizeof(TYPE));
 
-    uint64_t t0 = get_nanotime();
-
-    /* run spmv */
     set_tile_size(ts);
+
+    const int fmt = CblasSparseCSR;
+    // int fmt = CblasSparseCSC;
+
     const int index_base = 0;
-    xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, CblasSparseCSR, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
-    xkblas->sync();
-    uint64_t tf = get_nanotime();
-    dump_vector<P>("Y := alpha.A.X + beta.Y", Y, m);
 
-
-    if (!SKIP_CHECK)
+    for (int i = 0 ; i < 5 ; ++i)
     {
-        /* run check */
-        int r = spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check, Y);
-        dump_vector<P>("CPU value of Y", Y_check, m);
-        printf("Result is %12s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+        uint64_t t0 = get_nanotime();
+        xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
+        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
+        xkblas->sync();
+        uint64_t tf = get_nanotime();
+        printf("Took %lf s\n", (tf - t0) / 1.0e9);
+        dump_vector<P>("Y := alpha.A.X + beta.Y", Y, m);
+
+        if (!SKIP_CHECK)
+        {
+            /* run check */
+            int r = spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check, Y);
+            dump_vector<P>("CPU value of Y", Y_check, m);
+            printf("Result is %12s\n", (r == 0) ? "CORRECT" : "INCORRECT");
+        }
     }
-
-
-    printf("Took %lf s\n", (tf - t0) / 1.0e9);
 
     # undef X
     # undef Y

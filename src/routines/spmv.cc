@@ -49,6 +49,8 @@
 # include <xkrt/support.h>
 
 # include <cassert>
+# include <algorithm> // for std::find_if
+# include <vector>    // for std::vector
 
 # if XKBLAS_SUPPORT_SYCL
 #  include <sycl/sycl.hpp>
@@ -72,7 +74,8 @@ struct args_t
         int n,
         int nnz,
         TYPE alpha,
-        TYPE beta
+        TYPE beta,
+        void * tile_hdl
     ) :
         xkblas(xkblas),
         transA(transA),
@@ -82,7 +85,8 @@ struct args_t
         n(n),
         nnz(nnz),
         alpha(alpha),
-        beta(beta)
+        beta(beta),
+        tile_hdl(tile_hdl)
     {}
 
     ~args_t() {}
@@ -96,6 +100,7 @@ struct args_t
     const int nnz;
     const TYPE alpha;
     const TYPE beta;
+    void * tile_hdl;
 };
 
 TYPED_WITH_INDEX
@@ -117,7 +122,9 @@ xkblas_t::spmv_tile_async(
     const TYPE * beta,
     /* vector Y (inout) */
     TYPE * Y,
-    device_global_id_t device_global_id
+    device_global_id_t device_global_id,
+    /* tile handle */
+    void * tile_hdl
 ) {
     // retrieve producer threads
     thread_t * thread = thread_t::get_tls();
@@ -139,7 +146,7 @@ xkblas_t::spmv_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(this, transA, index_base, T, m, n, nnz, *alpha, *beta);
+    new (args) args_t<P>(this, transA, index_base, T, m, n, nnz, *alpha, *beta, tile_hdl);
 
     # ifndef XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "spmv");
@@ -163,6 +170,72 @@ xkblas_t::spmv_tile_async(
 
     return 0;
 }
+
+/* caching matrices information for csr */
+TYPED
+struct xkblas_matrix_csr_t
+{
+    struct tiling_t {
+
+        /* a tile */
+        struct tile_t {
+
+            /* tile cached info */
+            device_global_id_t device_global_id;
+            size_t m0;
+            size_t m1;
+            size_t nnz;
+
+            void const * row;
+            void const * col;
+            TYPE  const * values;
+
+            /* driver-specific metadata */
+            void * metadata[XKRT_DRIVER_TYPE_MAX];
+        };
+
+        /* tiles */
+        tile_t * tiles;
+
+        /* number of tiles */
+        int mt;
+
+        /* tile sizes */
+        size_t ts;
+
+        /* dupplicated 'row' by XKBLAS to avoid polluting user row */
+        void * row_dup;
+
+        tiling_t(tile_t * tiles, int mt, size_t ts, void * row_dup) :
+            tiles(tiles), mt(mt), ts(ts), row_dup(row_dup) {}
+        ~tiling_t() {}
+
+        /* for finding */
+        bool operator==(const tiling_t & other) const { return ts == other.ts; }
+    };
+
+    /* matrix info */
+    const int m;
+    const int n;
+    const int nnz;
+    const void * row;
+    const void * col;
+    const TYPE * values;
+
+    /* list of tiling for that csr matrix */
+    std::vector<tiling_t> tilings;
+
+    xkblas_matrix_csr_t(
+        const int m, const int n, const int nnz,
+        const void * row, const void * col, const TYPE * values
+    ) :
+        m(m), n(n), nnz(nnz),
+        row(row), col(col), values(values)
+    {}
+
+    ~xkblas_matrix_csr_t() {}
+
+};
 
 TYPED_WITH_INDEX
 int
@@ -217,82 +290,135 @@ xkblas_t::spmv_async(
     distribution_t d;
     distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, m, ts);
 
-    // replicate `row` to avoid polluting user matrix if CSR format is used
-    INDEX * row_dup;
-    if (format == CblasSparseCSR)
+    //////////////////////////
+    // find cached metadata //
+    //////////////////////////
+
+    xkblas_matrix_csr_t<P> * matrix = NULL;
+
+    // Acquire read lock first for quick lookup
+    pthread_rwlock_rdlock(&this->matrices.csr.rwlock);
     {
-        row_dup = (INDEX *) malloc(sizeof(INDEX) * (m+1));
-        assert(row_dup);
+        auto it = this->matrices.csr.metadata.find(row);
+        if (it != this->matrices.csr.metadata.end())
+        {
+            // Found, return existing
+            matrix = (xkblas_matrix_csr_t<P> *) it->second;
+            pthread_rwlock_unlock(&this->matrices.csr.rwlock);
+            goto matrix_found;
+        }
     }
+    pthread_rwlock_unlock(&this->matrices.csr.rwlock);
+
+    // Not found — acquire write lock to insert
+    pthread_rwlock_wrlock(&this->matrices.csr.rwlock);
+    {
+        // Double-check (another thread might have inserted meanwhile)
+        auto it = this->matrices.csr.metadata.find(row);
+        if (it == this->matrices.csr.metadata.end())
+        {
+            matrix = (xkblas_matrix_csr_t<P> *) malloc(sizeof(xkblas_matrix_csr_t<P>));
+            this->matrices.csr.metadata.emplace(row, matrix);
+        }
+        else
+        {
+            matrix = (xkblas_matrix_csr_t<P> *) &it->second;
+        }
+    }
+    pthread_rwlock_unlock(&this->matrices.csr.rwlock);
+
+    /* construct the matrix */
+    new (matrix) xkblas_matrix_csr_t<P>(m, n, nnz, row, col, values);
+
+matrix_found:
+    assert(matrix);
+
+    using tiling_t = typename xkblas_matrix_csr_t<P>::tiling_t;
+    using tile_t = typename xkblas_matrix_csr_t<P>::tiling_t::tile_t;
+
+    /* insert and/or retrive a tiling */
+    auto it = std::find_if(
+        matrix->tilings.begin(),
+        matrix->tilings.end(),
+        [&](const xkblas_matrix_csr_t<P>::tiling_t & t) { return t.ts == ts; }
+    );
+    const bool tiling_found = (it != matrix->tilings.end());
+    tiling_t * tiling;
+    if (tiling_found)
+        tiling = &(*it);
+    else
+    {
+        uintptr_t mem = (uintptr_t) malloc(sizeof(INDEX) * (m+1) + mt * sizeof(tile_t));
+        INDEX * row_dup = (INDEX *)   mem;
+        tile_t *  tiles = (tile_t *) (mem + sizeof(INDEX) * (m+1));
+        tiling = &matrix->tilings.emplace_back(tiles, mt, ts, row_dup);
+    }
+    assert(tiling->row_dup);
+
+    /////////////////
+    // Spawn tiles //
+    /////////////////
 
     // for each tile
     for (size_t tm = 0 ; tm < mt ; ++tm)
     {
-        const device_global_id_t device_global_id = distribution1D_get(&d, tm);
-
-        // block size
-        size_t m0 = tm*ts;
-        size_t m1 = (tm == mt-1) ? m : (tm+1) * ts;
-        size_t bs = m1 - m0;
-
-        // compute number of nnz for that tile, to offset values array
-        INDEX tile_nnz = (format == CblasSparseCSR) ? (row[m1] - row[m0]) : 0;
-
-        // no elements in that tile
-        if (tile_nnz == 0)
-            continue ;
-
-        INDEX const * row_ptr;
-        INDEX const * col_ptr;
-        TYPE  const * values_ptr;
-
-        if (format == CblasSparseCSR)
+        tile_t * tile = tiling->tiles + tm;
+        if (tiling_found)
         {
-            // TODO: i dislike this nasty loop over each rows
-            // that will probably be a performance issue in iterative solvers where
-            // the matrix A does not change, we'll figure something out then
-            // maybe there exists a cuda kernel that can automatically offset to offsets[m0] ?
-
-            // adjust tile_row_ptr so first entry is 0
-            if (tm == 0)
-            {
-                row_ptr = row;
-            }
-            else
-            {
-                for (size_t i = m0 ; i <= m1 ; ++i)
-                    row_dup[i] = row[i] - row[m0] + (INDEX) index_base;
-                row_ptr = row_dup;
-            }
-
-            row_ptr    = row_ptr + m0;
-            col_ptr    = col     + row[m0] - index_base;
-            values_ptr = values  + row[m0] - index_base;
-        }
-        else if (format == CblasSparseCOO)
-        {
-            LOGGER_FATAL("Not supported");
+            if (tile->nnz == 0)
+                continue ;
         }
         else
         {
-            LOGGER_FATAL("Not supported");
+            memset(tile->metadata, 0, sizeof(tile->metadata));
+
+            tile->device_global_id = distribution1D_get(&d, tm);
+
+            // block size
+            tile->m0 = tm*ts;
+            tile->m1 = (tm == mt-1) ? m : (tm+1) * ts;
+
+            // compute number of nnz for that tile, to offset values array
+            tile->nnz = (format == CblasSparseCSR) ? (row[tile->m1] - row[tile->m0]) : 0;
+
+            // no elements in that tile
+            if (tile->nnz == 0)
+                continue ;
+
+            // adjust tile_row_ptr so first entry is 0
+            INDEX const * row_ptr;
+            if (tm == 0)
+                row_ptr = row;
+            else
+            {
+                for (size_t i = tile->m0 ; i <= tile->m1 ; ++i)
+                    ((INDEX *) tiling->row_dup)[i] = row[i] - row[tile->m0] + (INDEX) index_base;
+                row_ptr = (INDEX *) tiling->row_dup;
+            }
+
+            tile->row    = row_ptr + tile->m0;
+            tile->col    = col     + row[tile->m0] - index_base;
+            tile->values = values  + row[tile->m0] - index_base;
         }
+
+        assert(tile);
+        const size_t bs = tile->m1 - tile->m0;
 
         // tile spmv
         this->spmv_tile_async<P, T>(
             alpha,
             transA,
             index_base,
-            bs, n, tile_nnz,
+            bs, n, tile->nnz,
             format,
-            row_ptr, col_ptr, values_ptr,
+            (INDEX *) tile->row, (INDEX *) tile->col, tile->values,
             X,
             beta,
-            Y + m0,
-            device_global_id
+            Y + tile->m0,
+            tile->device_global_id,
+            tile
         );
     }
-    LOGGER_WARN("`row_dup` is leaking");
 
     return 0;
 }
@@ -301,6 +427,7 @@ xkblas_t::spmv_async(
 #  include <xkblas/cusparse-helper.h>
 #  include <xkrt/driver/driver-cu.h>
 
+# if 0
 static void
 cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 {
@@ -317,6 +444,14 @@ cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 
     xkblas->runtime.memory_device_deallocate(device_global_id, chunk);
 }
+# endif
+
+struct cuda_csr_tile_metadata_t {
+    cusparseSpMatDescr_t A;
+    cusparseDnVecDescr_t X;
+    cusparseDnVecDescr_t Y;
+    area_chunk_t * chunk;
+};
 
 template <xkblas_precision_t P, typename CU_TYPE, cudaDataType CUDA_DATA_TYPE>
 static inline void
@@ -334,9 +469,9 @@ cuda_run(
     const access_t * accesses = TASK_ACCESSES(task);
     const access_t * row = accesses + 0;
     const access_t * col = accesses + 1;
-    const access_t * values  = accesses + 2;
-    const access_t * X_acc   = accesses + 3;
-    const access_t * Y_acc   = accesses + 4;
+    const access_t * values = accesses + 2;
+    const access_t * X_acc  = accesses + 3;
+    const access_t * Y_acc  = accesses + 4;
 
     const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     assert(args);
@@ -351,111 +486,130 @@ cuda_run(
         assert(row->device_view.addr % sizeof(int64_t) == 0);
         assert(col->device_view.addr % sizeof(int64_t) == 0);
     }
+
     assert(values->device_view.addr % sizeof(CU_TYPE) == 0);
     assert(X_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
     assert(Y_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
 
-    // setup matrix desc
-    cusparseSpMatDescr_t A;
-    cusparseIndexBase_t index_base = (args->index_base == 0) ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
-    cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I : CUSPARSE_INDEX_64I;
-    CUSPARSE_SAFE_CALL(
-        cusparseCreateCsr(
-            &A,
-            (int64_t) args->m,
-            (int64_t) args->n,
-            (int64_t) args->nnz,
-            (void *) row->device_view.addr,
-            (void *) col->device_view.addr,
-            (void *) values->device_view.addr,
-            index_type,
-            index_type,
-            index_base,
-            CUDA_DATA_TYPE
-        )
-    );
+    // atm, only support if the spmv tile has its 'tiling cache'
+    assert(args->tile_hdl);
 
-    cusparseDnVecDescr_t X;
-    CUSPARSE_SAFE_CALL(
-        cusparseCreateDnVec(
-            &X,
-            (int64_t) args->n,
-            (void *) X_acc->device_view.addr,
-            CUDA_DATA_TYPE
-        )
-    );
-
-    cusparseDnVecDescr_t Y;
-    CUSPARSE_SAFE_CALL(
-        cusparseCreateDnVec(
-            &Y,
-            (int64_t) args->m,
-            (void *) Y_acc->device_view.addr,
-            CUDA_DATA_TYPE
-        )
-    );
-
+    using tile_t = typename xkblas_matrix_csr_t<P>::tiling_t::tile_t;
+    tile_t * tile = (tile_t *) args->tile_hdl;
     cusparseSpMVAlg_t alg = CUSPARSE_SPMV_ALG_DEFAULT;
+    cuda_csr_tile_metadata_t * mdt = (cuda_csr_tile_metadata_t *) tile->metadata[XKRT_DRIVER_TYPE_CUDA];
 
-    // get workspace size
-    size_t buffer_size;
-    CUSPARSE_SAFE_CALL(
-        cusparseSpMV_bufferSize(
-            handle,
-            cblas2cusparse_op(args->transA),
-           &args->alpha,
-            A,
-            X,
-           &args->beta,
-           Y,
-           CUDA_DATA_TYPE,
-           alg,
-          &buffer_size
-        )
-    );
+    if (mdt == NULL)
+    {
+        // cache spmv metadata
+        mdt = (cuda_csr_tile_metadata_t *) malloc(sizeof(cuda_csr_tile_metadata_t));
+        tile->metadata[XKRT_DRIVER_TYPE_CUDA] = mdt;
 
-    // preprocess
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    const device_global_id_t device_global_id = dev->elected_device_id;
-    area_chunk_t * chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
-    assert(chunk);
-    void * external_buffer = (void *) chunk->ptr;
+        cusparseIndexBase_t index_base = (args->index_base == 0) ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
+        cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I : CUSPARSE_INDEX_64I;
 
-    # if 0
-    CUSPARSE_SAFE_CALL(
-        cusparseSpMV_preprocess(
-            handle,
-            cblas2cusparse_op(args->transA),
-           &args->alpha,
-            A,
-            X,
-           &args->beta,
-            Y,
-            CUDA_DATA_TYPE,
-            alg,
-            external_buffer
-        )
-    );
-    # endif
+        // setup vector desc
+        CUSPARSE_SAFE_CALL(
+            cusparseCreateDnVec(
+                &mdt->X,
+                (int64_t) args->n,
+                (void *) X_acc->device_view.addr,
+                CUDA_DATA_TYPE
+            )
+        );
 
+        CUSPARSE_SAFE_CALL(
+            cusparseCreateDnVec(
+                &mdt->Y,
+                (int64_t) args->m,
+                (void *) Y_acc->device_view.addr,
+                CUDA_DATA_TYPE
+            )
+        );
+
+       // setup matrix desc
+       CUSPARSE_SAFE_CALL(
+            cusparseCreateCsr(
+                &mdt->A,
+                (int64_t) args->m,
+                (int64_t) args->n,
+                (int64_t) args->nnz,
+                (void *) row->device_view.addr,
+                (void *) col->device_view.addr,
+                (void *) values->device_view.addr,
+                index_type,
+                index_type,
+                index_base,
+                CUDA_DATA_TYPE
+            )
+        );
+
+        // get workspace size
+        size_t buffer_size;
+        CUSPARSE_SAFE_CALL(
+            cusparseSpMV_bufferSize(
+                handle,
+                cblas2cusparse_op(args->transA),
+                &args->alpha,
+                mdt->A,
+                mdt->X,
+                &args->beta,
+                mdt->Y,
+                CUDA_DATA_TYPE,
+                alg,
+                &buffer_size
+            )
+        );
+
+        // preprocess
+        task_dev_info_t * dev = TASK_DEV_INFO(task);
+        const device_global_id_t device_global_id = dev->elected_device_id;
+        mdt->chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
+        assert(mdt->chunk);
+        assert(tile->device_global_id == device_global_id);
+
+        CUSPARSE_SAFE_CALL(
+            cusparseSpMV_preprocess(
+                handle,
+                cblas2cusparse_op(args->transA),
+                &args->alpha,
+                mdt->A,
+                mdt->X,
+                &args->beta,
+                mdt->Y,
+                CUDA_DATA_TYPE,
+                alg,
+                (void *) mdt->chunk->ptr
+            )
+        );
+    }
+    else
+    {
+        // to allow different (x, y) for the same (A)
+        // I assumed the 'buffer_size' and 'preprocess' do not depend on (x, y)
+        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->X, (void *) X_acc->device_view.addr));
+        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->Y, (void *) Y_acc->device_view.addr));
+    }
+
+    // TODO: is it safe to use the same 'workspace' (tile->chunk->ptr) in parallel ?
     // run spmv
     XKBLAS_CUSPARSE_CALL(
         cusparseSpMV(
             handle,
             cblas2cusparse_op(args->transA),
-           &args->alpha,
-            A,
-            X,
-           &args->beta,
-            Y,
+            &args->alpha,
+            mdt->A,
+            mdt->X,
+            &args->beta,
+            mdt->Y,
             CUDA_DATA_TYPE,
             alg,
-            external_buffer
+            (void *) mdt->chunk->ptr
         )
     );
 
-
-    // TODO: is it safe to destroy now ?
+    // TODO: not freeing that, it is cached in the metadata
+    # if 0
     CUSPARSE_SAFE_CALL(cusparseDestroySpMat(A));
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(X));
     CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(Y));
@@ -469,6 +623,7 @@ cuda_run(
     callback.args[2] = (void *) (uintptr_t) device_global_id;
     callback.args[3] = args->xkblas;
     cmd->push_callback(callback);
+    # endif
 }
 
 TYPED
@@ -501,6 +656,6 @@ cuda(
 
 # define DEFINE(P, T)  \
     template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, device_global_id_t device_global_id);
+    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, device_global_id_t device_global_id, void * tile_hdl);
 XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
 # undef DEFINE

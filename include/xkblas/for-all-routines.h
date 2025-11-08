@@ -57,11 +57,9 @@ XKDEF(int, dot, int n, const XKTYPE * x, const int incx, const XKTYPE * y, const
 /* y := x */
 XKDEF(int, copy, int n, const XKTYPE * x, const int incx, XKTYPE * y, const int incy);
 
-XKDEF(int, divcopy); // TODO
-
 XKDEF(int, fill, int n, XKTYPE * x, const XKTYPE v);
 
-XKDEF(int, nrm2, int n, const XKTYPE * x, float * result);
+XKDEF(int, nrm2, int n, const XKTYPE * x, const int incx, XKTYPE * result);
 
 XKDEF(int, scal, int n, const XKTYPE * alpha, XKTYPE * x, const int incx);
 
@@ -410,5 +408,6 @@ XKDEFI(
     XKTYPE * X,
     const XKTYPE * beta,
     XKTYPE * Y,
-    XKDEVICE device_global_id
-);
+    XKDEVICE device_global_id,
+    void * tile_hdl
+ );

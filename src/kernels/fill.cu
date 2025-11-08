@@ -49,6 +49,10 @@ kernel_£fill_1x1(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
+    # if 1
+    for (int i = idx; i < n; i += stride)
+        x[i] = value;
+    # else
     // Vectorize global memory write
     # if defined(PRECISION_s)
     static_assert(sizeof(float2) == sizeof(double), "float2 must match double size");
@@ -85,6 +89,7 @@ kernel_£fill_1x1(
     // Handle remaining elements
     for (int i = start + idx; i < start + rem; i += stride)
         x[i] = value;
+    # endif
 }
 
 /* fill the vector 'x' of 'n' elements with the value 'v' */

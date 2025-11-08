@@ -49,18 +49,22 @@
 # if 1
 # define TYPE           float
 # define xkblas_fill    xkblas_sfill
+# define VALUE          42.0f
 # endif
 # if 0
 # define TYPE           double
 # define xkblas_fill    xkblas_dfill
+# define VALUE          42.0
 # endif
 # if 0
 # define TYPE           _Complex float
 # define xkblas_fill    xkblas_cfill
+# define VALUE          42.0f + 13.0f * I
 # endif
 # if 0
 # define TYPE           _Complex double
 # define xkblas_fill    xkblas_zfill
+# define VALUE          42.0 + 13 * I
 # endif
 
 int
@@ -71,7 +75,7 @@ main(void)
     const int n = 1024;
     TYPE * A = (TYPE *) malloc(n * sizeof(TYPE));
     memset(A, 0, n*sizeof(TYPE));
-    const TYPE value = 42.0 + 13 * I;
+    const TYPE value = VALUE;
 
     xkblas_fill(n - 200, A + 100, value);
 

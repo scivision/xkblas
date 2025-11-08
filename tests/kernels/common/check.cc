@@ -140,6 +140,7 @@ spmv_cpu(
     const int nrows,
     const int ncols,
     const int nnz,
+    int fmt,
     const int * row_ptr,
     const int * col_idx,
     const TYPE * values,

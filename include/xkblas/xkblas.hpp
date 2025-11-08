@@ -75,6 +75,14 @@ typedef struct  xkblas_t
     /* conf */
     xkblas_conf_t conf;
 
+    /* matrix metadata, to cache stuff for spmv in particular */
+    struct {
+        struct {
+            std::map<const void *, void *> metadata;
+            pthread_rwlock_t rwlock;
+        } csr;
+    } matrices;
+
     //////////////////
     // Task formats //
     //////////////////

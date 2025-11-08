@@ -39,6 +39,8 @@
 
 XKRT_NAMESPACE_USE;
 
+// TODO: until this is supported, please use dot
+
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
