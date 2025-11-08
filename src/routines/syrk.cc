@@ -391,6 +391,38 @@ xkblas_t::syrk_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::syrk_lazy(
+    int uplo, int trans,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    int r = this->syrk_async<P>(uplo, trans, n, k, alpha, A, lda, beta, C, ldc);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
+xkblas_t::syrk(
+    int uplo, int trans,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    this->memory_invalidate_caches();
+    int r = this->syrk_async<P>(uplo, trans, n, k, alpha, A, lda, beta, C, ldc);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ldc, n, n, sizeof(TYPE));
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_HIPBLAS
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
@@ -515,6 +547,8 @@ cuda(
 # include "task-format.cc"
 
 # define DEFINE(P)  \
+    template int xkblas_t::syrk<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
+    template int xkblas_t::syrk_lazy<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

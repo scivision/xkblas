@@ -260,6 +260,40 @@ xkblas_t::gemv_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::gemv_lazy(
+    int transA,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    int r = this->gemv_async<P>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
+xkblas_t::gemv(
+    int transA,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    this->memory_invalidate_caches();
+    int r = this->gemv_async<P>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_HIPBLAS
 #  include <xkblas/hipblas-helper.h>
 #  include <xkrt/driver/driver-hip.h>
@@ -442,6 +476,8 @@ host(task_t * task)
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
+    template int xkblas_t::gemv<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
+    template int xkblas_t::gemv_lazy<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

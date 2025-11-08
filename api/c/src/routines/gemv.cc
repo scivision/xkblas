@@ -65,6 +65,34 @@ xkblas_£gemv_tile_async(
 
 extern "C"
 int
+xkblas_£gemv(
+    int transA,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->gemv<xkblas_precision_t::££>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
+}
+
+extern "C"
+int
+xkblas_£gemv_lazy(
+    int transA,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * x, const int incx,
+    const TYPE * beta,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->gemv_lazy<xkblas_precision_t::££>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
+}
+
+extern "C"
+int
 xkblas_£gemv_async(
     int transA,
     int m, int n,

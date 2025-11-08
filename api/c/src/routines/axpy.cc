@@ -64,6 +64,17 @@ xkblas_£axpy(
 
 extern "C"
 int
+xkblas_£axpy_lazy(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x, const int incx,
+          TYPE * y, const int incy
+) {
+    return xkblas_get()->axpy_lazy<xkblas_precision_t::££>(n, alpha, x, incx, y, incy);
+}
+
+extern "C"
+int
 xkblas_£axpy_async(
     int n,
     const TYPE * alpha,

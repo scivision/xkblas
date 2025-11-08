@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/10/11 03:30:16 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/11/08 04:26:31 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -47,6 +47,19 @@ xkblas_£trsm_async(
           TYPE * B, int ldb
 ) {
     return xkblas_get()->trsm_async<xkblas_precision_t::££>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
+}
+
+extern "C"
+int
+xkblas_£trsm_lazy(
+    int side, int uplo,
+    int transA, int diag,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+          TYPE * B, int ldb
+) {
+    return xkblas_get()->trsm_lazy<xkblas_precision_t::££>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
 }
 
 extern "C"

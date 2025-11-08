@@ -167,6 +167,20 @@ xkblas_t::copy_async(
 
 TYPED
 int
+xkblas_t::copy_lazy(
+    int n,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
+) {
+    int r = this->copy_async<P>(n, x, incx, y, incy);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
 xkblas_t::copy(
     int n,
     const TYPE * x,
@@ -296,6 +310,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::copy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
+    template int xkblas_t::copy_lazy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

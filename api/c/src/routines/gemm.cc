@@ -79,6 +79,20 @@ xkblas_£gemm_async(
 
 extern "C"
 int
+xkblas_£gemm_lazy(
+    int transA, int transB,
+    int m, int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->gemm_lazy<xkblas_precision_t::££>(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+extern "C"
+int
 xkblas_£gemm(
     int transA, int transB,
     int m, int n, int k,

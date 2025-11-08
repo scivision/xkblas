@@ -145,10 +145,12 @@ typedef struct  xkblas_t
     /////////////
 
     // define both sync and async version, e.g.,
-    //      sgemm
-    //      sgemm_async
+    //      sgemm - invalidate caches, spawn gemm tasks, spawn coherent task, wait, return
+    //      sgemm_lazy - spawn gemm tasks, wait, and return
+    //      sgemm_async - spawn gemm tasks, and return
     # define DEF(TPLT, RTYPE, NAME, ...)        \
         TPLT RTYPE NAME        (__VA_ARGS__);   \
+        TPLT RTYPE NAME##_lazy (__VA_ARGS__);   \
         TPLT RTYPE NAME##_async(__VA_ARGS__);
     # define XKDEF(RTYPE, NAME, ...)  DEF(TYPED,            RTYPE, NAME, __VA_ARGS__)
     # define XKDEFI(RTYPE, NAME, ...) DEF(TYPED_WITH_INDEX, RTYPE, NAME, __VA_ARGS__)

@@ -54,6 +54,18 @@ xkblas_£copy_tile_async(
 
 extern "C"
 int
+xkblas_£copy_lazy(
+    const int n,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
+) {
+    return xkblas_get()->copy_lazy<xkblas_precision_t::££>(n, x, incx, y, incy);
+}
+
+extern "C"
+int
 xkblas_£copy(
     const int n,
     const TYPE * x,

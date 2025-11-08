@@ -642,6 +642,21 @@ xkblas_t::trsm_async(
 
 TYPED
 int
+xkblas_t::trsm_lazy(
+    int side, int uplo,
+    int transA, int diag,
+    int m, int n,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+          TYPE * B, int ldb
+) {
+    int r = this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
 xkblas_t::trsm(
     int side, int uplo,
     int transA, int diag,
@@ -653,6 +668,7 @@ xkblas_t::trsm(
     this->memory_invalidate_caches();
     int r = this->trsm_async<P>(side, uplo, transA, diag, m, n, alpha, A, lda, B, ldb);
     this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, B, ldb, m, n, sizeof(TYPE));
+    this->sync();
     return r;
 }
 
@@ -946,6 +962,7 @@ suggest_format(task_t * task)
 
 # define DEFINE(P)  \
     template int xkblas_t::trsm<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
+    template int xkblas_t::trsm_lazy<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb);    \
     template int xkblas_t::trsm_rec_async<P>(int side, int uplo, int transA, int diag, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, xkblas_precision_type_t<P> * B, int ldb, const int m_threshold);    \
     template int xkblas_t::trsm_tile_async<P>(int side, int uplo, int transA, int diag, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, device_global_id_t device_global_id);

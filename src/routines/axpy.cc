@@ -168,6 +168,21 @@ xkblas_t::axpy_async(
 
 TYPED
 int
+xkblas_t::axpy_lazy(
+    int n,
+    const TYPE * alpha,
+    const TYPE * x,
+    const int incx,
+          TYPE * y,
+    const int incy
+) {
+    int r = this->axpy_async<P>(n, alpha, x, incx, y, incy);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
 xkblas_t::axpy(
     int n,
     const TYPE * alpha,
@@ -297,6 +312,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::axpy<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
+    template int xkblas_t::axpy_lazy<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

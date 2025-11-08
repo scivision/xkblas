@@ -3,7 +3,7 @@
 /*   potrf.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/10/06 23:09:43 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/11/08 04:25:04 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -28,6 +28,28 @@ xkblas_£potrf_tile_async(
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->potrf_tile_async<xkblas_precision_t::££>(uplo, n, A, Atm, Atn, Amb, Anb, lda, device_global_id);
+}
+
+extern "C"
+int
+xkblas_£potrf(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    return xkblas_get()->potrf<xkblas_precision_t::££>(uplo, n, A, lda);
+}
+
+extern "C"
+int
+xkblas_£potrf_lazy(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    return xkblas_get()->potrf_lazy<xkblas_precision_t::££>(uplo, n, A, lda);
 }
 
 extern "C"

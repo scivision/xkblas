@@ -423,6 +423,58 @@ matrix_found:
     return 0;
 }
 
+TYPED_WITH_INDEX
+int
+xkblas_t::spmv_lazy(
+    const TYPE * alpha,
+    /* matrix A (in) */
+    int transA,
+    int index_base,
+    const int m,
+    const int n,
+    const int nnz,
+    const int format,
+    const INDEX * row,
+    const INDEX * col,
+    const TYPE * values,
+    /* vector X (in) */
+    TYPE * X,
+    const TYPE * beta,
+    /* vector Y (inout) */
+    TYPE * Y
+) {
+    int r = this->spmv_async<P>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
+    this->sync();
+    return r;
+}
+
+TYPED_WITH_INDEX
+int
+xkblas_t::spmv(
+    const TYPE * alpha,
+    /* matrix A (in) */
+    int transA,
+    int index_base,
+    const int m,
+    const int n,
+    const int nnz,
+    const int format,
+    const INDEX * row,
+    const INDEX * col,
+    const TYPE * values,
+    /* vector X (in) */
+    TYPE * X,
+    const TYPE * beta,
+    /* vector Y (inout) */
+    TYPE * Y
+) {
+    this->memory_invalidate_caches();
+    int r = this->spmv_async<P>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m*sizeof(TYPE));
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cusparse-helper.h>
 #  include <xkrt/driver/driver-cu.h>

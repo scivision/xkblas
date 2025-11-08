@@ -3,7 +3,7 @@
 /*   herk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/10/06 23:12:20 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/11/08 04:24:34 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -39,6 +39,32 @@ xkblas_£herk_tile_async(
         C, Ctm, Ctn, Cmb, Cnb, ldc,
         device_global_id
     );
+}
+
+extern "C"
+int
+xkblas_£herk(
+    int uplo, int transA,
+    int n, int k,
+    const TYPE_REAL * alpha,
+    const TYPE * A, int lda,
+    const TYPE_REAL * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->herk<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
+}
+
+extern "C"
+int
+xkblas_£herk_lazy(
+    int uplo, int transA,
+    int n, int k,
+    const TYPE_REAL * alpha,
+    const TYPE * A, int lda,
+    const TYPE_REAL * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->herk_lazy<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
 }
 
 extern "C"

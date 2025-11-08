@@ -64,6 +64,17 @@ xkblas_£scal_async(
 
 extern "C"
 int
+xkblas_£scal_lazy(
+    int n,
+    const TYPE * alpha,
+    TYPE * x,
+    const int incx
+) {
+    return xkblas_get()->scal_lazy<xkblas_precision_t::££>(n, alpha, x, incx);
+}
+
+extern "C"
+int
 xkblas_£scal(
     int n,
     const TYPE * alpha,

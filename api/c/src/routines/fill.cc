@@ -62,6 +62,16 @@ xkblas_£fill(
 
 extern "C"
 int
+xkblas_£fill_lazy(
+    int n,
+    TYPE * x,
+    const TYPE value
+) {
+    return xkblas_get()->fill_lazy<xkblas_precision_t::££>(n, x, value);
+}
+
+extern "C"
+int
 xkblas_£fill_async(
     int n,
     TYPE * x,

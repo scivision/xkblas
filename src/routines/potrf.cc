@@ -393,6 +393,34 @@ xkblas_t::potrf_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::potrf_lazy(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    int r = this->potrf_async<P>(uplo, n, A, lda);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
+xkblas_t::potrf(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    this->memory_invalidate_caches();
+    int r = this->potrf_async<P>(uplo, n, A, lda);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, A, lda, n, n, sizeof(TYPE));
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cusolver-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -517,6 +545,8 @@ cuda(
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
+    template int xkblas_t::potrf<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
+    template int xkblas_t::potrf_lazy<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

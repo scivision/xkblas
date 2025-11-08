@@ -143,6 +143,18 @@ xkblas_t::fill_async(
 
 TYPED
 int
+xkblas_t::fill_lazy(
+    int n,
+    TYPE * x,
+    const TYPE value
+) {
+    int r = this->fill_async<P>(n, x, value);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
 xkblas_t::fill(
     int n,
     TYPE * x,
@@ -233,6 +245,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::fill<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
+    template int xkblas_t::fill_lazy<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_tile_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

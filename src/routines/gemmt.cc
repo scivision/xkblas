@@ -358,6 +358,42 @@ xkblas_t::gemmt_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::gemmt_lazy(
+    int uplo,
+    int transA, int transB,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    int r = this->gemmt_async<P>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
+xkblas_t::gemmt(
+    int uplo,
+    int transA, int transB,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    this->memory_invalidate_caches();
+    int r = this->gemmt_async<P>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ldc, n, n, sizeof(TYPE));
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
@@ -502,6 +538,8 @@ hip(
 # include "task-format.cc"
 
 # define DEFINE(P)  \
+    template int xkblas_t::gemmt<P>(int uplo, int transA, int transB, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
+    template int xkblas_t::gemmt_lazy<P>(int uplo, int transA, int transB, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemmt_async<P>(int uplo, int transA, int transB, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemmt_tile_async<P>(int uplo, int transA, int transB, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

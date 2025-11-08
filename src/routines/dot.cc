@@ -180,6 +180,19 @@ xkblas_t::dot_async(
 
 TYPED
 int
+xkblas_t::dot_lazy(
+    int n,
+    const TYPE * x, const int incx,
+    const TYPE * y, const int incy,
+          TYPE * r
+) {
+    int rc = this->dot_async<P>(n, x, incx, y, incy, r);
+    this->sync();
+    return rc;
+}
+
+TYPED
+int
 xkblas_t::dot(
     int n,
     const TYPE * x, const int incx,
@@ -341,6 +354,7 @@ host(task_t * task)
 
 # define DEFINE(P)  \
     template int xkblas_t::dot<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
+    template int xkblas_t::dot_lazy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
