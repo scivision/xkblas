@@ -49,6 +49,7 @@ extern "C" {
     # define XKDEVICE     xkrt_device_global_id_t
     # define XKDEF(RTYPE, NAME, ...)                \
         RTYPE xkblas_£##NAME        (__VA_ARGS__);  \
+        RTYPE xkblas_£##NAME##_lazy (__VA_ARGS__);  \
         RTYPE xkblas_£##NAME##_async(__VA_ARGS__);
     # define XKDEFI(...)
     #  include <xkblas/for-all-routines.h>
