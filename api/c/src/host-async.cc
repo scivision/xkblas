@@ -58,6 +58,7 @@ xkblas_host_func_launch(
     assert(launcher);
 
     launcher->func(launcher->args);
+    free(launcher);
 }
 
 extern "C"
@@ -68,8 +69,11 @@ xkblas_host_async(
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
     team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
-    xkblas_host_launcher_t launcher = { .func = func, .args = args };
-    xkrt_team_task_spawn((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, &launcher);
+    xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) malloc(sizeof(xkblas_host_launcher_t));
+    assert(launcher);
+    launcher->func = func;
+    launcher->args = args;
+    xkrt_team_task_spawn((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher);
 }
 
 extern "C"
@@ -82,6 +86,9 @@ xkblas_host_with_accesses_async(
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
     team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
-    xkblas_host_launcher_t launcher = { .func = func, .args = args };
-    xkrt_team_task_spawn_with_accesses((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, &launcher, accesses, naccesses);
+    xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) malloc(sizeof(xkblas_host_launcher_t));
+    assert(launcher);
+    launcher->func = func;
+    launcher->args = args;
+    xkrt_team_task_spawn_with_accesses((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher, accesses, naccesses);
 }
