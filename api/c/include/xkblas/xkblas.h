@@ -73,6 +73,9 @@ extern "C" {
     /* run a host function in a task */
     void xkblas_host_async(void (*func)(void *), void * args);
 
+    /* run a host function in a task */
+    void xkblas_host_with_accesses_async(void (*func)(void *), void * args, const xkrt_access_t * accesses, const int naccesses);
+
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);
 

@@ -36,9 +36,29 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkrt/xkrt.h>
 # include <assert.h>
 
 XKRT_NAMESPACE_USE;
+
+typedef struct  xkblas_host_launcher_t
+{
+    void (*func)(void *);
+    void * args;
+}               xkblas_host_launcher_t;
+
+static void
+xkblas_host_func_launch(
+    xkrt_runtime_t * runtime,
+    xkrt_device_t * device,
+    xkrt_task_t * task,
+    void * user_data
+) {
+    xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) user_data;
+    assert(launcher);
+
+    launcher->func(launcher->args);
+}
 
 extern "C"
 void
@@ -48,5 +68,20 @@ xkblas_host_async(
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
     team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
-    runtime->team_task_spawn(team, [=] (runtime_t *, device_t *, task_t *) { func(args); });
+    xkblas_host_launcher_t launcher = { .func = func, .args = args };
+    xkrt_team_task_spawn((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, &launcher);
+}
+
+extern "C"
+void
+xkblas_host_with_accesses_async(
+    void (*func)(void *),
+    void * args,
+    const xkrt_access_t * accesses,
+    const int naccesses
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
+    xkblas_host_launcher_t launcher = { .func = func, .args = args };
+    xkrt_team_task_spawn_with_accesses((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, &launcher, accesses, naccesses);
 }
