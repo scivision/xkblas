@@ -41,6 +41,8 @@
 # include <stddef.h>
 # include <stdint.h>
 
+# include <xkrt/xkrt.h>
+
 /* XKBLAS LEGACY C INTERFACES */
 
 # ifdef __cplusplus
