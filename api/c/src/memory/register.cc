@@ -43,23 +43,12 @@
 
 XKRT_NAMESPACE_USE;
 
-static inline team_t *
-__get_registering_team(runtime_t * runtime)
-{
-    team_t * team = runtime->team_get_any(~(1 << XKRT_DRIVER_TYPE_HOST));
-    if (team == NULL)
-        team = runtime->team_get(XKRT_DRIVER_TYPE_HOST);
-    assert(team);
-    return team;
-}
-
 extern "C"
 int
 xkblas_memory_register_tiled_async(void * ptr, size_t size, int n)
 {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    team_t * team = __get_registering_team(runtime);
-    return runtime->memory_register_async(team, ptr, size, n);
+    return runtime->memory_register_async(ptr, size, n);
 }
 
 extern "C"
@@ -67,8 +56,7 @@ int
 xkblas_memory_unregister_tiled_async(void * ptr, size_t size, int n)
 {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    team_t * team = __get_registering_team(runtime);
-    return runtime->memory_unregister_async(team, ptr, size, n);
+    return runtime->memory_unregister_async(ptr, size, n);
 }
 
 extern "C"
@@ -76,8 +64,7 @@ int
 xkblas_memory_touch_tiled_async(void * ptr, size_t size, int n)
 {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    team_t * team = __get_registering_team(runtime);
-    return runtime->memory_touch_async(team, ptr, size, n);
+    return runtime->memory_touch_async(ptr, size, n);
 }
 
 extern "C"

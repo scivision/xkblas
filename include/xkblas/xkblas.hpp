@@ -114,7 +114,7 @@ typedef struct  xkblas_t
 
     /* spawn tasks to make the replica coherent on the passed device */
     void memory_coherent_async(xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
-    void memory_coherent_async(xkrt::device_global_id_t device_global_id, matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
+    void memory_coherent_async(xkrt::device_global_id_t device_global_id, xkrt::matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
 
     void memory_invalidate_caches(void);
 

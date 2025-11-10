@@ -156,10 +156,7 @@ xkblas_t::memory_register_async(
     size_t size,
     int n
 ) {
-    xkrt::team_t * team = this->runtime.team_get(XKRT_DRIVER_TYPE_HOST);
-    assert(team);
-
-    return this->runtime.memory_register_async(team, ptr, size, n);
+    return this->runtime.memory_register_async(ptr, size, n);
 }
 
 int
@@ -168,10 +165,7 @@ xkblas_t::memory_unregister_async(
     size_t size,
     int n
 ) {
-    xkrt::team_t * team = this->runtime.team_get(XKRT_DRIVER_TYPE_HOST);
-    assert(team);
-
-    return this->runtime.memory_unregister_async(team, ptr, size, n);
+    return this->runtime.memory_unregister_async(ptr, size, n);
 }
 
 void *
