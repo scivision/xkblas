@@ -35,8 +35,8 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#ifndef __XKBLAS_TASK_FORMAT_HPP__
-# define __XKBLAS_TASK_FORMAT_HPP__
+#ifndef __XKBLAS_XKRT_TASK_FORMAT_HPP__
+# define __XKBLAS_XKRT_TASK_FORMAT_HPP__
 
 # ifndef ROUTINE_NAME
 #  error "Must define `ROUTINE_NAME` before including " __FILE__
@@ -108,7 +108,7 @@ xkblas_routine_host_task(
 
 # define CONCAT2(a, b) a##b
 # define CONCAT(a, b) CONCAT2(a, b)
-# define REGISTER_FORMAT_NAME CONCAT(xkblas_t::task_format_create_, ROUTINE_NAME)
+# define REGISTER_FORMAT_NAME CONCAT(xkblas_t::xkrt_task_format_create_, ROUTINE_NAME)
 
 TYPED
 void
@@ -117,27 +117,27 @@ REGISTER_FORMAT_NAME(task_format_t * format)
     format->suggest = NULL;
 
     # if XKBLAS_SUPPORT_CLBLAST && CL
-    format->f[TASK_FORMAT_TARGET_CL] = (task_format_func_t) xkblas_routine_device_task<cl<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_CL] = (task_format_func_t) xkblas_routine_device_task<cl<P>>;
     # endif /* XKBLAS_SUPPORT_CLBLAST */
 
     # if XKBLAS_SUPPORT_CUBLAS && CUDA
-    format->f[TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) xkblas_routine_device_task<cuda<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_CUDA] = (task_format_func_t) xkblas_routine_device_task<cuda<P>>;
     # endif /* XKBLAS_SUPPORT_CUBLAS */
 
     # if XKBLAS_SUPPORT_HIP && HIP
-    format->f[TASK_FORMAT_TARGET_HIP] = (task_format_func_t) xkblas_routine_device_task<hip<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_HIP] = (task_format_func_t) xkblas_routine_device_task<hip<P>>;
     # endif /* XKBLAS_SUPPORT_HIP */
 
     # if XKBLAS_SUPPORT_CBLAS && HOST
-    format->f[TASK_FORMAT_TARGET_HOST] = (task_format_func_t) xkblas_routine_host_task<host<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_HOST] = (task_format_func_t) xkblas_routine_host_task<host<P>>;
     # endif /* XKBLAS_SUPPORT_CBLAS */
 
     # if XKBLAS_SUPPORT_SYCL && SYCL
-    format->f[TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) xkblas_routine_device_task<sycl<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) xkblas_routine_device_task<sycl<P>>;
     # endif /* XKBLAS_SUPPORT_SYCL */
 
     # if XKBLAS_SUPPORT_ZE && ZE
-    format->f[TASK_FORMAT_TARGET_ZE] = (task_format_func_t) xkblas_routine_device_task<ze<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_ZE] = (task_format_func_t) xkblas_routine_device_task<ze<P>>;
     # endif /* XKBLAS_SUPPORT_ZE */
 }
 
@@ -151,4 +151,4 @@ XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef CONCAT2
 # undef REGISTER_FORMAT_NAME
 
-#endif /* __XKBLAS_TASK_FORMAT_HPP__ */
+#endif /* __XKBLAS_XKRT_TASK_FORMAT_HPP__ */

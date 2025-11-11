@@ -134,7 +134,7 @@ xkblas_t::gemmt_tile_async(
     constexpr size_t args_size = sizeof(args_t<P>);
 
     task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_TASK_FORMAT_GET(P, GEMMT), flags);
+    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, GEMMT), flags);
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);

@@ -106,7 +106,7 @@ xkblas_t::trsm_tile_async(
     constexpr size_t args_size = sizeof(args_t<P>);
 
     task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_TASK_FORMAT_GET(P, TRSM), flags);
+    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, TRSM), flags);
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
@@ -936,8 +936,8 @@ suggest_format(task_t * task)
 {
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     if (args->m < 32)
-        return TASK_FORMAT_TARGET_HOST;
-    return TASK_FORMAT_TARGET_NO_SUGGEST;
+        return XKRT_TASK_FORMAT_TARGET_HOST;
+    return XKRT_TASK_FORMAT_TARGET_NO_SUGGEST;
 }
 # endif
 
