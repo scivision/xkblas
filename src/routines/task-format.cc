@@ -108,7 +108,7 @@ xkblas_routine_host_task(
 
 # define CONCAT2(a, b) a##b
 # define CONCAT(a, b) CONCAT2(a, b)
-# define REGISTER_FORMAT_NAME CONCAT(xkblas_t::xkrt_task_format_create_, ROUTINE_NAME)
+# define REGISTER_FORMAT_NAME CONCAT(xkblas_t::task_format_create_, ROUTINE_NAME)
 
 TYPED
 void

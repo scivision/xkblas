@@ -114,6 +114,15 @@ extern "C" {
     /* get time in nanoseconds */
     uint64_t xkblas_get_nanotime(void);
 
+    /* task formats */
+    xkrt_task_format_id_t xkblas_task_format_put(const char * label);
+
+    int xkblas_task_format_set(
+        xkrt_task_format_id_t fmtid,
+        xkrt_task_format_target_t target,
+        xkrt_task_format_func_t func
+    );
+
     //////////////////////////////////
     // //DEPRECATED LEGACY INTERFACES //
     //////////////////////////////////

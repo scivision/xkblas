@@ -63,13 +63,13 @@ xkblas_t::init(void)
                 this->runtime.init();
 
                 // create task formats
-                # define CREATE(P, K)                                                                   \
-                    do {                                                                                \
-                        task_format_t format;                                                           \
-                        memset(&format, 0, sizeof(task_format_t));                                      \
-                        this->xkrt_task_format_create_##K<P>(&format);                                       \
-                        snprintf(format.label, sizeof(format.label), #P#K);                             \
-                        this->formats.K[P] = xkrt_task_format_create(&this->runtime.formats.list, &format);  \
+                # define CREATE(P, K)                                                   \
+                    do {                                                                \
+                        task_format_t format;                                           \
+                        memset(&format, 0, sizeof(task_format_t));                      \
+                        this->task_format_create_##K<P>(&format);                       \
+                        snprintf(format.label, sizeof(format.label), #P#K);             \
+                        this->formats.K[P] = this->runtime.task_format_create(&format); \
                     } while (0);
                 memset(&this->formats, 0, sizeof(this->formats));
                 XKBLAS_FORALL_PRECISIONS_AND_ROUTINES(CREATE);

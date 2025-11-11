@@ -97,7 +97,7 @@ typedef struct  xkblas_t
     // Utilities to set / get task formats
     # define XKBLAS_XKRT_TASK_FORMAT_GET(P, K) this->formats.K[P]
 
-    # define DEFINE(K) TYPED void xkrt_task_format_create_##K(xkrt::task_format_t * format);
+    # define DEFINE(K) TYPED void task_format_create_##K(xkrt::task_format_t * format);
     XKBLAS_FORALL_ROUTINES(DEFINE);
     # undef DEFINE
 
