@@ -436,6 +436,9 @@ xkblas_t::gemm(
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 cuda_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -443,7 +446,6 @@ cuda_run(
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -475,6 +477,9 @@ cuda_run(
 TYPED
 static void
 cuda(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -491,6 +496,9 @@ cuda(
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 hip_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -498,7 +506,6 @@ hip_run(
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -530,6 +537,9 @@ hip_run(
 TYPED
 static void
 hip(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -547,12 +557,14 @@ hip(
 TYPED
 static void
 ze(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_ze_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     // unpack arguments
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -633,12 +645,14 @@ ze(
 TYPED
 static void
 sycl(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_sycl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
     // unpack arguments
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -689,6 +703,9 @@ sycl(
 template <xkblas_precision_t P, auto FUNC, typename CL_TYPE>
 static inline void
 cl_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -698,7 +715,6 @@ cl_run(
     device_cl_t * device = queue->device;
     assert(device);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -739,6 +755,9 @@ cl_run(
 TYPED
 static void
 cl(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cl_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx

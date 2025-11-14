@@ -446,17 +446,16 @@ cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
 template <xkblas_precision_t P, auto FUNC_SIZE, auto FUNC, typename CU_TYPE>
 static inline void
 cuda_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    (void) cmd;
-    (void) idx;
-
     cusolverDnHandle_t handle = queue->cu.solver.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -509,21 +508,17 @@ cuda_run(
 TYPED
 static void
 cuda(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)
-        cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>(queue, cmd, idx);
-
-    if constexpr (P == xkblas_precision_t::D)
-        cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>(queue, cmd, idx);
-
-    if constexpr (P == xkblas_precision_t::C)
-        cuda_run<P, cusolverDnCpotrf_bufferSize, cusolverDnCpotrf, cuComplex>(queue, cmd, idx);
-
-    if constexpr (P == xkblas_precision_t::Z)
-        cuda_run<P, cusolverDnZpotrf_bufferSize, cusolverDnZpotrf, cuDoubleComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::S)   cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>          (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>         (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   cuda_run<P, cusolverDnCpotrf_bufferSize, cusolverDnCpotrf, cuComplex>      (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   cuda_run<P, cusolverDnZpotrf_bufferSize, cusolverDnZpotrf, cuDoubleComplex>(runtime, device, task, queue, cmd, idx);
 }
 # endif /* XKBLAS_SUPPORT_CUBLAS */
 

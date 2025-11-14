@@ -70,11 +70,47 @@ extern "C" {
         size_t sizeof_type
     );
 
-    /* run a host function in a task */
-    void xkblas_host_async(void (*func)(void *), void * args);
+    void xkblas_async(
+        xkrt_device_global_id_t device_global_id,
+        void (*func)(void *),
+        void * args
+    );
 
-    /* run a host function in a task */
-    void xkblas_host_with_accesses_async(void (*func)(void *), void * args, const xkrt_access_t * accesses, const int naccesses);
+    void xkblas_host_async(
+        void (*func)(void *),
+        void * args
+    );
+
+    void xkblas_async_with_accesses(
+        xkrt_device_global_id_t device_global_id,
+        void (*func)(void *),
+        void * args,
+        const xkrt_access_t * accesses,
+        const int naccesses
+    );
+
+    void xkblas_async_with_format(
+        const xkrt_device_global_id_t device_global_id,
+        const xkrt_task_format_id_t fmtid,
+        const void * args,
+        const size_t args_size
+    );
+
+    void xkblas_async_with_format_with_accesses(
+        const xkrt_device_global_id_t device_global_id,
+        const xkrt_task_format_id_t fmtid,
+        const void * args,
+        const size_t args_size,
+        const xkrt_access_t * accesses,
+        const int naccesses
+    );
+
+    void xkblas_host_async_with_accesses(
+        void (*func)(void *),
+        void * args,
+        const xkrt_access_t * accesses,
+        const int naccesses
+    );
 
     /* alloc unified memory */
     void * xkblas_unified_alloc(size_t size);

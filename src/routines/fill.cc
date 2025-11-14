@@ -182,6 +182,9 @@ extern "C" {
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 cuda_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -191,7 +194,6 @@ cuda_run(
     cudaStream_t cuda_queue = queue->cu.handle.high;
     assert(cuda_queue);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -214,14 +216,17 @@ cuda_run(
 TYPED
 static void
 cuda(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S) cuda_run<P, cuda_sfill, float>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::D) cuda_run<P, cuda_dfill, double>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::C) cuda_run<P, cuda_cfill, cuComplex>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::Z) cuda_run<P, cuda_zfill, cuDoubleComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::S) cuda_run<P, cuda_sfill, float>          (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D) cuda_run<P, cuda_dfill, double>         (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C) cuda_run<P, cuda_cfill, cuComplex>      (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z) cuda_run<P, cuda_zfill, cuDoubleComplex>(runtime, device, task, queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_CUDA */
