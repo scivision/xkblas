@@ -508,6 +508,9 @@ struct cuda_csr_tile_metadata_t {
 template <xkblas_precision_t P, typename CU_TYPE, cudaDataType CUDA_DATA_TYPE>
 static inline void
 cuda_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -515,7 +518,6 @@ cuda_run(
     cusparseHandle_t handle = queue->cu.sparse.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -681,6 +683,9 @@ cuda_run(
 TYPED
 static void
 cuda(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx

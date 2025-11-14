@@ -212,6 +212,9 @@ xkblas_t::dot(
 template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
 static inline void
 hip_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -219,7 +222,6 @@ hip_run(
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -247,6 +249,9 @@ hip_run(
 TYPED
 static void
 hip(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -264,6 +269,9 @@ hip(
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
 cuda_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx
@@ -271,7 +279,6 @@ cuda_run(
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
 
-    task_t * task = (task_t *) cmd->kern.vargs;
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
@@ -299,6 +306,9 @@ cuda_run(
 TYPED
 static void
 cuda(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
     queue_command_list_counter_t idx

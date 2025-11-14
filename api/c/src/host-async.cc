@@ -41,6 +41,10 @@
 
 XKRT_NAMESPACE_USE;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct  xkblas_host_launcher_t
 {
     void (*func)(void *);
@@ -57,38 +61,103 @@ xkblas_host_func_launch(
     xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) user_data;
     assert(launcher);
 
+    (void) runtime;
+    (void) device;
+    (void) task;
+
     launcher->func(launcher->args);
     free(launcher);
 }
 
-extern "C"
+void
+xkblas_async(
+    xkrt_device_global_id_t device_global_id,
+    void (*func)(void *),
+    void * args
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    assert(runtime);
+
+    device_t * device = runtime->device_get(device_global_id);
+    assert(device);
+
+    team_t * team = runtime->team_get(device->driver_type, device->driver_id);
+    assert(team);
+
+    xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) malloc(sizeof(xkblas_host_launcher_t));
+    assert(launcher);
+    launcher->func = func;
+    launcher->args = args;
+    xkrt_team_task_spawn((xkrt_runtime_t *) runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher);
+}
+
+void
+xkblas_async_with_format_with_accesses(
+    const xkrt_device_global_id_t device_global_id,
+    const xkrt_task_format_id_t fmtid,
+    const void * args,
+    const size_t args_size,
+    const xkrt_access_t * accesses,
+    const int naccesses
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    assert(runtime);
+
+    xkrt_task_spawn_with_format_with_accesses((xkrt_runtime_t *) runtime, device_global_id, fmtid, args, args_size, accesses, naccesses);
+}
+
+void
+xkblas_async_with_format(
+    const xkrt_device_global_id_t device_global_id,
+    const xkrt_task_format_id_t fmtid,
+    const void * args,
+    const size_t args_size
+) {
+    return xkblas_async_with_format_with_accesses(device_global_id, fmtid, args, args_size, NULL, 0);
+}
+
 void
 xkblas_host_async(
     void (*func)(void *),
     void * args
 ) {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
-    team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
-    xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) malloc(sizeof(xkblas_host_launcher_t));
-    assert(launcher);
-    launcher->func = func;
-    launcher->args = args;
-    xkrt_team_task_spawn((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher);
+    return xkblas_async(HOST_DEVICE_GLOBAL_ID, func, args);
 }
 
-extern "C"
 void
-xkblas_host_with_accesses_async(
+xkblas_async_with_accesses(
+    xkrt_device_global_id_t device_global_id,
     void (*func)(void *),
     void * args,
     const xkrt_access_t * accesses,
     const int naccesses
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime_get();
-    team_t * team = runtime->team_get(XKRT_DRIVER_TYPE_HOST, 0);
+    assert(runtime);
+
+    device_t * device = runtime->device_get(device_global_id);
+    assert(device);
+
+    team_t * team = runtime->team_get(device->driver_type, device->driver_id);
+    assert(team);
+
     xkblas_host_launcher_t * launcher = (xkblas_host_launcher_t *) malloc(sizeof(xkblas_host_launcher_t));
     assert(launcher);
     launcher->func = func;
     launcher->args = args;
-    xkrt_team_task_spawn_with_accesses((xkrt_runtime_t *) &runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher, accesses, naccesses);
+    xkrt_team_task_spawn_with_accesses((xkrt_runtime_t *) runtime, (xkrt_team_t *) team, xkblas_host_func_launch, launcher, accesses, naccesses);
 }
+
+void
+xkblas_host_async_with_accesses(
+    void (*func)(void *),
+    void * args,
+    const xkrt_access_t * accesses,
+    const int naccesses
+) {
+    return xkblas_async_with_accesses(HOST_DEVICE_GLOBAL_ID, func, args, accesses, naccesses);
+}
+
+#ifdef __cplusplus
+}
+#endif

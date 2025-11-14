@@ -45,24 +45,7 @@
 # include <xkblas/routine.hpp>
 # include <xkblas/support.h>
 # include <xkrt/runtime.h>
-
-/**
- *  Register a task format for the given device type.  It set the task routine
- *  to `xkblas_routine_device_task` - which executes within the task routine and
- *  submits 1 kernel launch command, using `cpu`, `hip`, ... to
- *  launch the kernel */
-
-static inline void
-xkblas_routine_device_task_detachable_decr(void * args[XKRT_CALLBACK_ARGS_MAX])
-{
-    runtime_t * runtime = (runtime_t *) args[0];
-    assert(runtime);
-
-    task_t * task = (task_t *) args[1];
-    assert(task);
-
-    runtime->task_detachable_decr(task);
-}
+# include <xkrt/xkrt.h>
 
 template<auto F>
 static inline void
@@ -71,24 +54,11 @@ xkblas_routine_device_task(
     device_t * device,
     task_t * task
 ) {
-    /* if targetting a device, submit a kernel launch command */
-    assert(task->flags & TASK_FLAG_DETACHABLE);
-
-    /* increase event counter */
-    runtime->task_detachable_incr(task);
-
-    /* the task may complete in the callback on kernel completion */
-    callback_t callback;
-    callback.func    = xkblas_routine_device_task_detachable_decr;
-    callback.args[0] = runtime;
-    callback.args[1] = task;
-    assert(XKRT_CALLBACK_ARGS_MAX >= 2);
-
-    /* submit kernel launch command */
-    device->offloader_queue_command_submit_kernel(
-        (kernel_launcher_t) F,
-        task,
-        callback
+    return xkrt_task_detachable_kernel_launch(
+        (xkrt_runtime_t *) runtime,
+        (xkrt_device_t *) device,
+        (xkrt_task_t * ) task,
+        (xkrt_kernel_launcher_t) F
     );
 }
 
