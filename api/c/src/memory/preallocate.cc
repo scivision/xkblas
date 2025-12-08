@@ -47,7 +47,7 @@ xkblas_memory_preallocate(
     int m, int n,
     unsigned int sizeof_type
 ) {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     for (device_global_id_t device_global_id = 0; device_global_id < runtime->drivers.devices.n ; ++device_global_id)
         if (device_global_id != HOST_DEVICE_GLOBAL_ID)
             runtime->incoherent_allocate_2D(runtime, device_global_id, MATRIX_COLMAJOR, ptr, (size_t) ld, (size_t) m, (size_t) n, sizeof_type);

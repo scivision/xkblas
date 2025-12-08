@@ -47,7 +47,7 @@ extern "C"
 int
 xkblas_memory_register_tiled_async(void * ptr, size_t size, int n)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_register_async(ptr, size, n);
 }
 
@@ -55,7 +55,7 @@ extern "C"
 int
 xkblas_memory_unregister_tiled_async(void * ptr, size_t size, int n)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_unregister_async(ptr, size, n);
 }
 
@@ -63,7 +63,7 @@ extern "C"
 int
 xkblas_memory_touch_tiled_async(void * ptr, size_t size, int n)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_touch_async(ptr, size, n);
 }
 
@@ -71,7 +71,7 @@ extern "C"
 int
 xkblas_register_memory(void * ptr, uint64_t size)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_register(ptr, size);
 }
 
@@ -79,7 +79,7 @@ extern "C"
 int
 xkblas_unregister_memory(void * ptr, uint64_t size)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_unregister(ptr, size);
 }
 
@@ -87,7 +87,7 @@ extern "C"
 uint64_t
 xkblas_register_memory_async(void * ptr, uint64_t size)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_register_async(ptr, size);
 }
 
@@ -95,7 +95,7 @@ extern "C"
 int
 xkblas_unregister_memory_async(void * ptr, uint64_t size)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_unregister_async(ptr, size);
 }
 
@@ -103,7 +103,7 @@ extern "C"
 int
 xkblas_register_memory_waitall(void)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     runtime->task_wait();
     return 0;
 }

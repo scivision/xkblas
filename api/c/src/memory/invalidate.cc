@@ -43,6 +43,6 @@ extern "C"
 void
 xkblas_memory_invalidate_caches(void)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->reset();
 }

@@ -173,6 +173,6 @@ typedef struct  xkblas_t
 // have them taking an 'xkblas_t' argument that the user must keep
 // track of
 xkblas_t * xkblas_get(void);
-xkrt::runtime_t * xkblas_xkrt_runtime_get(void);
+xkrt::runtime_t * xkblas_xkrt_runtime(void);
 
 #endif /* __XKBLAS_HPP__ */

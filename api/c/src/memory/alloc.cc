@@ -51,7 +51,7 @@ xkblas_host_alloc(size_t size)
     if (ptr == NULL)
         return NULL;
 
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     runtime->memory_register(ptr, size);
 
     return ptr;
@@ -61,7 +61,7 @@ extern "C"
 void
 xkblas_host_free(void * ptr, size_t size)
 {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     runtime->memory_unregister(ptr, size);
     free(ptr);
 }
@@ -71,7 +71,7 @@ void *
 xkblas_unified_alloc(size_t size)
 {
     // TODO
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_unified_allocate(1, size);
 }
 
@@ -80,7 +80,7 @@ void
 xkblas_unified_free(void * ptr, size_t size)
 {
     // TODO
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     return runtime->memory_unified_deallocate(1, ptr, size);
 }
 

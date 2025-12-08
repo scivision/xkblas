@@ -150,7 +150,7 @@ xkblas_tests_alloc(const size_t size)
         // xkblas->memory_register((void *) memory, size);
     }
     # else
-    xkrt::runtime_t * runtime = xkblas_xkrt_runtime_get();
+    xkrt::runtime_t * runtime = xkblas_xkrt_runtime();
     const xkrt::device_global_id_t device = 1;
     const uintptr_t memory = (const uintptr_t) runtime->memory_unified_allocate(device, size);
     # endif

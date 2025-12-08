@@ -49,6 +49,9 @@
 extern "C" {
 # endif /* __cplusplus */
 
+    /* return the xkrt runtime */
+    xkrt_runtime_t * xkblas_xkrt_runtime_get(void);
+
     /* initialize the runtime (must be called by the main thread) */
     int xkblas_init(void);
 
@@ -70,13 +73,9 @@ extern "C" {
         size_t sizeof_type
     );
 
+    /* generic taks spawning routines */
     void xkblas_async(
         xkrt_device_global_id_t device_global_id,
-        void (*func)(void *),
-        void * args
-    );
-
-    void xkblas_host_async(
         void (*func)(void *),
         void * args
     );
@@ -105,9 +104,33 @@ extern "C" {
         const int naccesses
     );
 
-    void xkblas_host_async_with_accesses(
+    /* Julia versions, that require special flags */
+    void xkblas_detachable_async(
+        xkrt_device_global_id_t device_global_id,
+        void (*func)(void *),
+        void * args
+    );
+
+    void xkblas_detachable_async_with_accesses(
+        xkrt_device_global_id_t device_global_id,
         void (*func)(void *),
         void * args,
+        const xkrt_access_t * accesses,
+        const int naccesses
+    );
+
+    void xkblas_detachable_async_with_format(
+        const xkrt_device_global_id_t device_global_id,
+        const xkrt_task_format_id_t fmtid,
+        const void * args,
+        const size_t args_size
+    );
+
+    void xkblas_detachable_async_with_format_with_accesses(
+        const xkrt_device_global_id_t device_global_id,
+        const xkrt_task_format_id_t fmtid,
+        const void * args,
+        const size_t args_size,
         const xkrt_access_t * accesses,
         const int naccesses
     );

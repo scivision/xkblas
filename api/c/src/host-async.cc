@@ -75,7 +75,7 @@ xkblas_async(
     void (*func)(void *),
     void * args
 ) {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     assert(runtime);
 
     device_t * device = runtime->device_get(device_global_id);
@@ -92,39 +92,6 @@ xkblas_async(
 }
 
 void
-xkblas_async_with_format_with_accesses(
-    const xkrt_device_global_id_t device_global_id,
-    const xkrt_task_format_id_t fmtid,
-    const void * args,
-    const size_t args_size,
-    const xkrt_access_t * accesses,
-    const int naccesses
-) {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
-    assert(runtime);
-
-    xkrt_task_spawn_with_format_with_accesses((xkrt_runtime_t *) runtime, device_global_id, fmtid, args, args_size, accesses, naccesses);
-}
-
-void
-xkblas_async_with_format(
-    const xkrt_device_global_id_t device_global_id,
-    const xkrt_task_format_id_t fmtid,
-    const void * args,
-    const size_t args_size
-) {
-    return xkblas_async_with_format_with_accesses(device_global_id, fmtid, args, args_size, NULL, 0);
-}
-
-void
-xkblas_host_async(
-    void (*func)(void *),
-    void * args
-) {
-    return xkblas_async(HOST_DEVICE_GLOBAL_ID, func, args);
-}
-
-void
 xkblas_async_with_accesses(
     xkrt_device_global_id_t device_global_id,
     void (*func)(void *),
@@ -132,7 +99,7 @@ xkblas_async_with_accesses(
     const xkrt_access_t * accesses,
     const int naccesses
 ) {
-    runtime_t * runtime = xkblas_xkrt_runtime_get();
+    runtime_t * runtime = xkblas_xkrt_runtime();
     assert(runtime);
 
     device_t * device = runtime->device_get(device_global_id);
@@ -149,13 +116,28 @@ xkblas_async_with_accesses(
 }
 
 void
-xkblas_host_async_with_accesses(
-    void (*func)(void *),
-    void * args,
+xkblas_async_with_format_with_accesses(
+    const xkrt_device_global_id_t device_global_id,
+    const xkrt_task_format_id_t fmtid,
+    const void * args,
+    const size_t args_size,
     const xkrt_access_t * accesses,
     const int naccesses
 ) {
-    return xkblas_async_with_accesses(HOST_DEVICE_GLOBAL_ID, func, args, accesses, naccesses);
+    runtime_t * runtime = xkblas_xkrt_runtime();
+    assert(runtime);
+
+    xkrt_task_spawn_with_format_with_accesses((xkrt_runtime_t *) runtime, device_global_id, fmtid, args, args_size, accesses, naccesses);
+}
+
+void
+xkblas_async_with_format(
+    const xkrt_device_global_id_t device_global_id,
+    const xkrt_task_format_id_t fmtid,
+    const void * args,
+    const size_t args_size
+) {
+    return xkblas_async_with_format_with_accesses(device_global_id, fmtid, args, args_size, NULL, 0);
 }
 
 #ifdef __cplusplus

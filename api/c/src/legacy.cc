@@ -36,6 +36,7 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkrt/xkrt.h>
 # include <assert.h>
 
 XKRT_NAMESPACE_USE;
@@ -54,10 +55,18 @@ xkblas_get(void)
 }
 
 runtime_t *
-xkblas_xkrt_runtime_get(void)
+xkblas_xkrt_runtime(void)
 {
     xkblas_t * context = xkblas_get();
     return &(context->runtime);
+}
+
+extern "C"
+xkrt_runtime_t *
+xkblas_xkrt_runtime_get(void)
+{
+    xkblas_t * context = xkblas_get();
+    return (xkrt_runtime_t *) &(context->runtime);
 }
 
 extern "C"
