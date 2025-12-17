@@ -49,13 +49,55 @@ extern "C" {
     # define XKDEVICE     xkrt_device_global_id_t
     # define XKDEF(RTYPE, NAME, ...)                \
         RTYPE xkblas_£##NAME        (__VA_ARGS__);  \
-        RTYPE xkblas_£##NAME##_lazy (__VA_ARGS__);  \
+        RTYPE xkblas_£##NAME##_sync (__VA_ARGS__);  \
         RTYPE xkblas_£##NAME##_async(__VA_ARGS__);
     # define XKDEFI(...)
     #  include <xkblas/for-all-routines.h>
 
     int
     xkblas_£spmv_async(
+        const XKTYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        int index_base,
+        int index_type,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int format,
+        const void * csr_row_offsets,
+        const void * csr_col_indices,
+        const XKTYPE * csr_values,
+        /* vector X (in) */
+        XKTYPE * X,
+        const XKTYPE * beta,
+        /* vector Y (inout) */
+        XKTYPE * Y
+    );
+
+    int
+    xkblas_£spmv_sync(
+        const XKTYPE * alpha,
+        /* matrix A (in) */
+        int transA,
+        int index_base,
+        int index_type,
+        const int nrows,
+        const int ncols,
+        const int nnz,
+        const int format,
+        const void * csr_row_offsets,
+        const void * csr_col_indices,
+        const XKTYPE * csr_values,
+        /* vector X (in) */
+        XKTYPE * X,
+        const XKTYPE * beta,
+        /* vector Y (inout) */
+        XKTYPE * Y
+    );
+
+    int
+    xkblas_£spmv(
         const XKTYPE * alpha,
         /* matrix A (in) */
         int transA,

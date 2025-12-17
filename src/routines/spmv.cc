@@ -62,115 +62,6 @@
 
 XKRT_NAMESPACE_USE;
 
-TYPED
-struct args_t
-{
-    args_t(
-        xkblas_t * xkblas,
-        int transA,
-        int index_base,
-        xkblas_index_t index_type,
-        int m,
-        int n,
-        int nnz,
-        TYPE alpha,
-        TYPE beta,
-        void * tile_hdl
-    ) :
-        xkblas(xkblas),
-        transA(transA),
-        index_base(index_base),
-        index_type(index_type),
-        m(m),
-        n(n),
-        nnz(nnz),
-        alpha(alpha),
-        beta(beta),
-        tile_hdl(tile_hdl)
-    {}
-
-    ~args_t() {}
-
-    xkblas_t * xkblas;
-    const int transA;
-    const int index_base;
-    const xkblas_index_t index_type;
-    const int m;
-    const int n;
-    const int nnz;
-    const TYPE alpha;
-    const TYPE beta;
-    void * tile_hdl;
-};
-
-TYPED_WITH_INDEX
-int
-xkblas_t::spmv_tile_async(
-    const TYPE * alpha,
-    /* matrix A (in) */
-    int transA,
-    int index_base,
-    const int m,
-    const int n,
-    const int nnz,
-    const int format,
-    const INDEX * row,
-    const INDEX * col,
-    const TYPE * values,
-    /* vector X (in) */
-    TYPE * X,
-    const TYPE * beta,
-    /* vector Y (inout) */
-    TYPE * Y,
-    device_global_id_t device_global_id,
-    /* tile handle */
-    void * tile_hdl
-) {
-    // retrieve producer threads
-    thread_t * thread = thread_t::get_tls();
-    assert(thread);
-
-    # define AC 5
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, SPMV), flags);
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 2;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(this, transA, index_base, T, m, n, nnz, *alpha, *beta, tile_hdl);
-
-    # ifndef XKRT_SUPPORT_DEBUG
-    snprintf(task->label, sizeof(task->label), "spmv");
-    # endif /* XKRT_SUPPORT_DEBUG */
-
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
-    access_mode_t A_X_mode = (*alpha == (const TYPE) 0.0) ? ACCESS_MODE_V : ACCESS_MODE_R;
-    access_mode_t Ymode    = (*beta  == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
-
-    const int nrows = (format == CblasSparseCSR) ? m+1 : 0;
-    new (accesses + 0) access_t(task, row,  nrows, sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 1) access_t(task, col,    nnz, sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 2) access_t(task, values, nnz, sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 3) access_t(task, X,      n,   sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 4) access_t(task, Y,      m,   sizeof(TYPE),  Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
-    # undef AC
-
-    this->runtime.task_commit(task);
-
-    return 0;
-}
-
 /* caching matrices information for csr */
 TYPED
 struct xkblas_matrix_csr_t
@@ -185,10 +76,7 @@ struct xkblas_matrix_csr_t
             size_t m0;
             size_t m1;
             size_t nnz;
-
-            void const * row;
-            void const * col;
-            TYPE  const * values;
+            size_t nnz_offset;
 
             /* driver-specific metadata */
             void * metadata[XKRT_DRIVER_TYPE_MAX];
@@ -203,11 +91,8 @@ struct xkblas_matrix_csr_t
         /* tile sizes */
         size_t ts;
 
-        /* dupplicated 'row' by XKBLAS to avoid polluting user row */
-        void * row_dup;
-
-        tiling_t(tile_t * tiles, int mt, size_t ts, void * row_dup) :
-            tiles(tiles), mt(mt), ts(ts), row_dup(row_dup) {}
+        tiling_t(tile_t * tiles, int mt, size_t ts) :
+            tiles(tiles), mt(mt), ts(ts) {}
         ~tiling_t() {}
 
         /* for finding */
@@ -217,7 +102,7 @@ struct xkblas_matrix_csr_t
     /* matrix info */
     const int m;
     const int n;
-    const int nnz;
+    const size_t nnz;
     const void * row;
     const void * col;
     const TYPE * values;
@@ -226,7 +111,7 @@ struct xkblas_matrix_csr_t
     std::vector<tiling_t> tilings;
 
     xkblas_matrix_csr_t(
-        const int m, const int n, const int nnz,
+        const int m, const int n, const size_t nnz,
         const void * row, const void * col, const TYPE * values
     ) :
         m(m), n(n), nnz(nnz),
@@ -236,6 +121,118 @@ struct xkblas_matrix_csr_t
     ~xkblas_matrix_csr_t() {}
 
 };
+
+# define MATRIX_T xkblas_matrix_csr_t<P>
+# define TILING_T typename xkblas_matrix_csr_t<P>::tiling_t
+# define TILE_T   typename xkblas_matrix_csr_t<P>::tiling_t::tile_t
+# define ARGS_T   args_t<P>
+
+TYPED
+struct args_t
+{
+    args_t(
+        xkblas_t * xkblas,
+        int transA,
+        int index_base,
+        xkblas_index_t index_type,
+        int n,
+        TYPE alpha,
+        TYPE beta,
+        TILE_T * tile
+    ) :
+        xkblas(xkblas),
+        transA(transA),
+        index_base(index_base),
+        index_type(index_type),
+        n(n),
+        alpha(alpha),
+        beta(beta),
+        tile(tile)
+    {}
+
+    ~args_t() {}
+
+    xkblas_t * xkblas;
+    const int transA;
+    const int index_base;
+    const xkblas_index_t index_type;
+    const int n;
+    const TYPE alpha;
+    const TYPE beta;
+    TILE_T * tile;
+};
+
+TYPED_WITH_INDEX
+int
+xkblas_t::spmv_tile_async(
+    const TYPE * alpha,
+    /* matrix A (in) */
+    int transA,
+    int index_base,
+    const int n,
+    const int format,
+    const INDEX * row,
+    const INDEX * col,
+    const TYPE  * values,
+    /* vector X (in) */
+    TYPE * X,
+    const TYPE * beta,
+    /* vector Y (inout) */
+    TYPE * Y,
+    /* tile handle */
+    void * tile_hdl
+) {
+    TILE_T * tile = (TILE_T *) tile_hdl;
+    assert(tile);
+    assert(tile->nnz);
+
+    const int m = (tile->m1 - tile->m0);
+
+    // retrieve producer threads
+    thread_t * thread = thread_t::get_tls();
+    assert(thread);
+
+    # define AC 5
+    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
+    constexpr size_t task_size = task_compute_size(flags, AC);
+    constexpr size_t args_size = sizeof(ARGS_T);
+
+    task_t * task = thread->allocate_task(task_size + args_size);
+    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, SPMV), flags);
+
+    task_dep_info_t * dep = TASK_DEP_INFO(task);
+    new (dep) task_dep_info_t(AC);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    constexpr size_t ocr_access = 2;
+    new (dev) task_dev_info_t(tile->device_global_id, ocr_access);
+
+    ARGS_T * args = (ARGS_T *) TASK_ARGS(task, task_size);
+    new (args) ARGS_T(this, transA, index_base, T, n, *alpha, *beta, tile);
+
+    # ifndef XKRT_SUPPORT_DEBUG
+    snprintf(task->label, sizeof(task->label), "spmv");
+    # endif /* XKRT_SUPPORT_DEBUG */
+
+    static_assert(AC <= TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task, flags);
+    access_mode_t A_X_mode = (*alpha == (const TYPE) 0.0) ? ACCESS_MODE_V : ACCESS_MODE_R;
+    access_mode_t Ymode    = (*beta  == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
+
+    assert(index_base == 0 || index_base == 1);
+
+    new (accesses + 0) access_t(task, row    + tile->m0,         m+1,       sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 1) access_t(task, col    + tile->nnz_offset, tile->nnz, sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 2) access_t(task, values + tile->nnz_offset, tile->nnz, sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 3) access_t(task, X,                         n,         sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 4) access_t(task, Y      + tile->m0,         m,         sizeof(TYPE),  Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    thread->resolve(accesses, AC);
+    # undef AC
+
+    this->runtime.task_commit(task);
+
+    return 0;
+}
 
 TYPED_WITH_INDEX
 int
@@ -294,7 +291,7 @@ xkblas_t::spmv_async(
     // find cached metadata //
     //////////////////////////
 
-    xkblas_matrix_csr_t<P> * matrix = NULL;
+    MATRIX_T * matrix = NULL;
 
     // Acquire read lock first for quick lookup
     pthread_rwlock_rdlock(&this->matrices.csr.rwlock);
@@ -303,57 +300,52 @@ xkblas_t::spmv_async(
         if (it != this->matrices.csr.metadata.end())
         {
             // Found, return existing
-            matrix = (xkblas_matrix_csr_t<P> *) it->second;
+            matrix = (MATRIX_T *) it->second;
             pthread_rwlock_unlock(&this->matrices.csr.rwlock);
             goto matrix_found;
         }
     }
     pthread_rwlock_unlock(&this->matrices.csr.rwlock);
 
-    // Not found — acquire write lock to insert
+    // Not found - acquire write lock to insert
     pthread_rwlock_wrlock(&this->matrices.csr.rwlock);
     {
         // Double-check (another thread might have inserted meanwhile)
         auto it = this->matrices.csr.metadata.find(row);
         if (it == this->matrices.csr.metadata.end())
         {
-            matrix = (xkblas_matrix_csr_t<P> *) malloc(sizeof(xkblas_matrix_csr_t<P>));
+            matrix = (MATRIX_T *) malloc(sizeof(MATRIX_T));
             this->matrices.csr.metadata.emplace(row, matrix);
         }
         else
         {
-            matrix = (xkblas_matrix_csr_t<P> *) &it->second;
+            matrix = (MATRIX_T *) &it->second;
+            goto matrix_found;
         }
     }
     pthread_rwlock_unlock(&this->matrices.csr.rwlock);
 
     /* construct the matrix */
-    new (matrix) xkblas_matrix_csr_t<P>(m, n, nnz, row, col, values);
+    new (matrix) MATRIX_T(m, n, nnz, row, col, values);
 
 matrix_found:
     assert(matrix);
-
-    using tiling_t = typename xkblas_matrix_csr_t<P>::tiling_t;
-    using tile_t = typename xkblas_matrix_csr_t<P>::tiling_t::tile_t;
 
     /* insert and/or retrive a tiling */
     auto it = std::find_if(
         matrix->tilings.begin(),
         matrix->tilings.end(),
-        [&](const xkblas_matrix_csr_t<P>::tiling_t & t) { return t.ts == ts; }
+        [&](const TILING_T & t) { return t.ts == ts; }
     );
     const bool tiling_found = (it != matrix->tilings.end());
-    tiling_t * tiling;
+    TILING_T * tiling;
     if (tiling_found)
         tiling = &(*it);
     else
     {
-        uintptr_t mem = (uintptr_t) malloc(sizeof(INDEX) * (m+1) + mt * sizeof(tile_t));
-        INDEX * row_dup = (INDEX *)   mem;
-        tile_t *  tiles = (tile_t *) (mem + sizeof(INDEX) * (m+1));
-        tiling = &matrix->tilings.emplace_back(tiles, mt, ts, row_dup);
+        TILE_T *  tiles = (TILE_T *) malloc(mt * sizeof(TILE_T));
+        tiling = &matrix->tilings.emplace_back(tiles, mt, ts);
     }
-    assert(tiling->row_dup);
 
     /////////////////
     // Spawn tiles //
@@ -362,62 +354,20 @@ matrix_found:
     // for each tile
     for (size_t tm = 0 ; tm < mt ; ++tm)
     {
-        tile_t * tile = tiling->tiles + tm;
-        if (tiling_found)
-        {
-            if (tile->nnz == 0)
-                continue ;
-        }
-        else
+        TILE_T * tile = tiling->tiles + tm;
+        if (!tiling_found)
         {
             memset(tile->metadata, 0, sizeof(tile->metadata));
-
             tile->device_global_id = distribution1D_get(&d, tm);
-
-            // block size
             tile->m0 = tm*ts;
             tile->m1 = (tm == mt-1) ? m : (tm+1) * ts;
-
-            // compute number of nnz for that tile, to offset values array
-            tile->nnz = (format == CblasSparseCSR) ? (row[tile->m1] - row[tile->m0]) : 0;
-
-            // no elements in that tile
-            if (tile->nnz == 0)
-                continue ;
-
-            // adjust tile_row_ptr so first entry is 0
-            INDEX const * row_ptr;
-            if (tm == 0)
-                row_ptr = row;
-            else
-            {
-                for (size_t i = tile->m0 ; i <= tile->m1 ; ++i)
-                    ((INDEX *) tiling->row_dup)[i] = row[i] - row[tile->m0] + (INDEX) index_base;
-                row_ptr = (INDEX *) tiling->row_dup;
-            }
-
-            tile->row    = row_ptr + tile->m0;
-            tile->col    = col     + row[tile->m0] - index_base;
-            tile->values = values  + row[tile->m0] - index_base;
+            tile->nnz = row[tile->m1] - row[tile->m0];
+            tile->nnz_offset = row[tile->m0] - index_base;
         }
-
         assert(tile);
-        const size_t bs = tile->m1 - tile->m0;
 
         // tile spmv
-        this->spmv_tile_async<P, T>(
-            alpha,
-            transA,
-            index_base,
-            bs, n, tile->nnz,
-            format,
-            (INDEX *) tile->row, (INDEX *) tile->col, tile->values,
-            X,
-            beta,
-            Y + tile->m0,
-            tile->device_global_id,
-            tile
-        );
+        this->spmv_tile_async<P, T>(alpha, transA, index_base, n, format, row, col, values, X, beta, Y, tile);
     }
 
     return 0;
@@ -425,7 +375,7 @@ matrix_found:
 
 TYPED_WITH_INDEX
 int
-xkblas_t::spmv_lazy(
+xkblas_t::spmv_sync(
     const TYPE * alpha,
     /* matrix A (in) */
     int transA,
@@ -443,7 +393,7 @@ xkblas_t::spmv_lazy(
     /* vector Y (inout) */
     TYPE * Y
 ) {
-    int r = this->spmv_async<P>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
+    int r = this->spmv_async<P, T>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
     this->sync();
     return r;
 }
@@ -469,7 +419,7 @@ xkblas_t::spmv(
     TYPE * Y
 ) {
     this->memory_invalidate_caches();
-    int r = this->spmv_async<P>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
+    int r = this->spmv_async<P, T>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
     this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m*sizeof(TYPE));
     this->sync();
     return r;
@@ -477,6 +427,7 @@ xkblas_t::spmv(
 
 # if XKBLAS_SUPPORT_CUBLAS
 #  include <xkblas/cusparse-helper.h>
+#  include <xkblas/cuda-kernels.h>
 #  include <xkrt/driver/driver-cu.h>
 
 # if 0
@@ -521,46 +472,54 @@ cuda_run(
     assert(task);
 
     const access_t * accesses = TASK_ACCESSES(task);
-    const access_t * row = accesses + 0;
-    const access_t * col = accesses + 1;
+    const access_t * row    = accesses + 0;
+    const access_t * col    = accesses + 1;
     const access_t * values = accesses + 2;
     const access_t * X_acc  = accesses + 3;
     const access_t * Y_acc  = accesses + 4;
 
-    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    const ARGS_T * args = (ARGS_T *) TASK_ARGS(task);
     assert(args);
 
-    if (args->index_type == I32)
-    {
-        assert(row->device_view.addr % sizeof(int32_t) == 0);
-        assert(col->device_view.addr % sizeof(int32_t) == 0);
-    }
-    else
-    {
-        assert(row->device_view.addr % sizeof(int64_t) == 0);
-        assert(col->device_view.addr % sizeof(int64_t) == 0);
-    }
+    TILE_T * tile = (TILE_T *) args->tile;
+    assert(tile);
 
     assert(values->device_view.addr % sizeof(CU_TYPE) == 0);
-    assert(X_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
-    assert(Y_acc->device_view.addr  % sizeof(CU_TYPE) == 0);
+    assert( X_acc->device_view.addr % sizeof(CU_TYPE) == 0);
+    assert( Y_acc->device_view.addr % sizeof(CU_TYPE) == 0);
 
     // atm, only support if the spmv tile has its 'tiling cache'
-    assert(args->tile_hdl);
-
-    using tile_t = typename xkblas_matrix_csr_t<P>::tiling_t::tile_t;
-    tile_t * tile = (tile_t *) args->tile_hdl;
     cusparseSpMVAlg_t alg = CUSPARSE_SPMV_ALG_DEFAULT;
     cuda_csr_tile_metadata_t * mdt = (cuda_csr_tile_metadata_t *) tile->metadata[XKRT_DRIVER_TYPE_CUDA];
 
+    int64_t m = (tile->m1 - tile->m0);
+    assert(m > 0);
+
     if (mdt == NULL)
     {
+        // offset row indices, pushing a kernel into the same cuda stream
+        // that ensures proper synchronization
+        if (args->index_type == I32)
+        {
+            assert(row->device_view.addr % sizeof(int32_t) == 0);
+            assert(col->device_view.addr % sizeof(int32_t) == 0);
+            cuda_offset_vector_i32(queue->cu.handle.high, m+1, (int32_t *) row->device_view.addr, -((const int32_t) tile->nnz_offset));
+        }
+        else if (args->index_type == I64)
+        {
+            assert(row->device_view.addr % sizeof(int64_t) == 0);
+            assert(col->device_view.addr % sizeof(int64_t) == 0);
+            cuda_offset_vector_i64(queue->cu.handle.high, m+1, (int64_t *) row->device_view.addr, -((const int64_t) tile->nnz_offset));
+        }
+        else
+            LOGGER_FATAL("Invalid index_type");
+
         // cache spmv metadata
         mdt = (cuda_csr_tile_metadata_t *) malloc(sizeof(cuda_csr_tile_metadata_t));
         tile->metadata[XKRT_DRIVER_TYPE_CUDA] = mdt;
 
-        cusparseIndexBase_t index_base = (args->index_base == 0) ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
-        cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I : CUSPARSE_INDEX_64I;
+        cusparseIndexBase_t index_base = (args->index_base == 0)   ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
+        cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I       : CUSPARSE_INDEX_64I;
 
         // setup vector desc
         CUSPARSE_SAFE_CALL(
@@ -575,21 +534,22 @@ cuda_run(
         CUSPARSE_SAFE_CALL(
             cusparseCreateDnVec(
                 &mdt->Y,
-                (int64_t) args->m,
+                (int64_t) m,
                 (void *) Y_acc->device_view.addr,
                 CUDA_DATA_TYPE
             )
         );
 
-       // setup matrix desc
-       CUSPARSE_SAFE_CALL(
+        // setup matrix desc
+        static_assert(sizeof(TYPE) == sizeof(CU_TYPE));
+        CUSPARSE_SAFE_CALL(
             cusparseCreateCsr(
                 &mdt->A,
-                (int64_t) args->m,
+                (int64_t) m,
                 (int64_t) args->n,
-                (int64_t) args->nnz,
-                (void *) row->device_view.addr,
-                (void *) col->device_view.addr,
+                (int64_t) tile->nnz,
+                (void *)    row->device_view.addr,
+                (void *)    col->device_view.addr,
                 (void *) values->device_view.addr,
                 index_type,
                 index_type,
@@ -713,6 +673,8 @@ cuda(
 
 # define DEFINE(P, T)  \
     template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, device_global_id_t device_global_id, void * tile_hdl);
+    template int xkblas_t::spmv_sync<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int n, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, void * tile_hdl);
 XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
 # undef DEFINE

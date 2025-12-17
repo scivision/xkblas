@@ -57,7 +57,7 @@ SET(XKBLAS_ROUTINES
 )
 SET(XKBLAS_ROUTINES_PRECISIONS s c d z)
 
-# custom kernels
+# custom LAS kernels for all precisions
 SET(XKBLAS_CUDA_KERNELS copyscale fill)
 SET(XKBLAS_HIP_KERNELS  copyscale)
 
@@ -66,6 +66,11 @@ SET(XKBLAS_ROUTINES_SOURCE_FILES)
 SET(XKBLAS_ROUTINES_C_SOURCE_FILES)
 SET(XKBLAS_CUDA_KERNELS_SOURCE_FILES)
 SET(XKBLAS_HIP_KERNELS_SOURCE_FILES)
+
+# Custom cuda sources
+list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES
+    ${CMAKE_SOURCE_DIR}/src/kernels/offset_vector.cu
+)
 
 # ensure C api directory exists
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/xkblas)

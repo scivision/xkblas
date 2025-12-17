@@ -69,3 +69,34 @@ xkblas_memory_coherent_async(
     xkblas_memory_matrix_coherent_async(A, LD, M, N, eltsize);
     return 0;
 }
+
+extern "C"
+void
+xkblas_memory_segment_coherent_sync(
+    void * ptr, size_t size
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime();
+    return runtime->memory_coherent_sync(HOST_DEVICE_GLOBAL_ID, ptr, size);
+}
+
+extern "C"
+void
+xkblas_memory_matrix_coherent_sync(
+    void * ptr, size_t ld,
+    size_t m, size_t n,
+    size_t sizeof_type
+) {
+    runtime_t * runtime = xkblas_xkrt_runtime();
+    return runtime->memory_coherent_sync(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
+}
+
+extern "C"
+int
+xkblas_memory_coherent_sync(
+    int uplo, int memflag,
+    size_t M, size_t N,
+    void* A, size_t LD, size_t eltsize
+) {
+    xkblas_memory_matrix_coherent_sync(A, LD, M, N, eltsize);
+    return 0;
+}

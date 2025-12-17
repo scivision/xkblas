@@ -42,6 +42,7 @@
 # include <stdint.h>
 
 # include <xkrt/xkrt.h>
+# include <xkblas/routine.h>
 
 /* XKBLAS LEGACY C INTERFACES */
 
@@ -68,6 +69,14 @@ extern "C" {
     void xkblas_memory_segment_coherent_async(void * ptr, size_t size);
 
     void xkblas_memory_matrix_coherent_async(
+        void * ptr, size_t ld,
+        size_t m, size_t n,
+        size_t sizeof_type
+    );
+
+    void xkblas_memory_segment_coherent_sync(void * ptr, size_t size);
+
+    void xkblas_memory_matrix_coherent_sync(
         void * ptr, size_t ld,
         size_t m, size_t n,
         size_t sizeof_type
@@ -182,6 +191,8 @@ extern "C" {
         xkrt_task_format_func_t func
     );
 
+    void xkblas_set_tile_parameter(xkblas_routine_t kernel, size_t ts);
+
     //////////////////////////////////
     // //DEPRECATED LEGACY INTERFACES //
     //////////////////////////////////
@@ -219,6 +230,12 @@ extern "C" {
     /* see xkblas_sync() */
     //DEPRECATED("Use `xkblas_memory_natrix_coherent_async` instead")
         int xkblas_memory_coherent_async(
+            int uplo, int memflag,
+            size_t M, size_t N,
+            void* A, size_t LD, size_t eltsize
+        );
+
+        int xkblas_memory_coherent_sync(
             int uplo, int memflag,
             size_t M, size_t N,
             void* A, size_t LD, size_t eltsize

@@ -2,7 +2,6 @@
 ** Copyright 2024,2025 INRIA
 **
 ** Contributors :
-** Thierry Gautier, thierry.gautier@inrialpes.fr
 ** Romain PEREIRA, romain.pereira@inria.fr + rpereira@anl.gov
 **
 ** This software is a computer program whose purpose is to execute
@@ -35,47 +34,44 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+#include <stdio.h>
+#include <cuComplex.h>
 
-XKRT_NAMESPACE_USE;
-
-extern "C"
-int
-xkblas_£fill_tile_async(
-    int n,
-    TYPE * x,
-    const TYPE value,
-    xkrt_device_global_id_t device_global_id
-) {
-    return xkblas_get()->fill_tile_async<xkblas_precision_t::££>(n, x, value, device_global_id);
+template <typename T>
+__global__
+void
+kernel_offset_vector_1x1(int n, T * x, const T value)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = idx; i < n; i += stride)
+        x[i] += value;
 }
 
-extern "C"
+template <typename T>
 int
-xkblas_£fill_async(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill_async<xkblas_precision_t::££>(n, x, value);
+cuda_offset_vector(cudaStream_t cuda_queue, int n, T * x, const T v)
+{
+    int blockSize = 256;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    kernel_offset_vector_1x1<T><<<numBlocks, blockSize, 0, cuda_queue>>>(n, x, v);
+    return 0;
 }
 
+# define T int32_t
 extern "C"
 int
-xkblas_£fill_sync(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill_sync<xkblas_precision_t::££>(n, x, value);
+cuda_offset_vector_i32(cudaStream_t cuda_queue, int n, T * x, const T v)
+{
+    return cuda_offset_vector<T>(cuda_queue, n, x, v);
 }
+# undef T
 
+# define T int64_t
 extern "C"
 int
-xkblas_£fill(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill<xkblas_precision_t::££>(n, x, value);
+cuda_offset_vector_i64(cudaStream_t cuda_queue, int n, T * x, const T v)
+{
+    return cuda_offset_vector<T>(cuda_queue, n, x, v);
 }
+# undef T

@@ -143,7 +143,7 @@ xkblas_t::fill_async(
 
 TYPED
 int
-xkblas_t::fill_lazy(
+xkblas_t::fill_sync(
     int n,
     TYPE * x,
     const TYPE value
@@ -170,14 +170,8 @@ xkblas_t::fill(
 # if XKBLAS_SUPPORT_CUDA
 
 #  include <xkblas/cublas-helper.h>
+#  include <xkblas/cuda-kernels.h>
 #  include <xkrt/driver/driver-cu.h>
-
-extern "C" {
-    int cuda_sfill(cudaStream_t cuda_queue, int n, float * x,           const float           value);
-    int cuda_dfill(cudaStream_t cuda_queue, int n, double * x,          const double          value);
-    int cuda_cfill(cudaStream_t cuda_queue, int n, cuComplex * x,       const cuComplex       value);
-    int cuda_zfill(cudaStream_t cuda_queue, int n, cuDoubleComplex * x, const cuDoubleComplex value);
-};
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
@@ -250,7 +244,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::fill<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
-    template int xkblas_t::fill_lazy<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
+    template int xkblas_t::fill_sync<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_tile_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

@@ -134,6 +134,28 @@ xkblas_t::memory_coherent_async(
     return this->runtime.memory_coherent_async(device_global_id, storage, ptr, ld, m, n, sizeof_type);
 }
 
+void
+xkblas_t::memory_coherent_sync(
+    device_global_id_t device_global_id,
+    void * ptr,
+    size_t size
+) {
+    return this->runtime.memory_coherent_sync(device_global_id, ptr, size);
+}
+
+void
+xkblas_t::memory_coherent_sync(
+    device_global_id_t device_global_id,
+    matrix_storage_t storage,
+    void * ptr,
+    size_t ld,
+    size_t m,
+    size_t n,
+    size_t sizeof_type
+) {
+    return this->runtime.memory_coherent_sync(device_global_id, storage, ptr, ld, m, n, sizeof_type);
+}
+
 int
 xkblas_t::memory_register(
     void * ptr,

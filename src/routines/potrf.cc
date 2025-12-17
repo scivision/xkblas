@@ -395,7 +395,7 @@ xkblas_t::potrf_async(
 
 TYPED
 int
-xkblas_t::potrf_lazy(
+xkblas_t::potrf_sync(
     int uplo,
     int n,
     TYPE * A,
@@ -541,7 +541,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::potrf<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
-    template int xkblas_t::potrf_lazy<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
+    template int xkblas_t::potrf_sync<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

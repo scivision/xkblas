@@ -262,7 +262,7 @@ xkblas_t::gemv_async(
 
 TYPED
 int
-xkblas_t::gemv_lazy(
+xkblas_t::gemv_sync(
     int transA,
     int m, int n,
     const TYPE * alpha,
@@ -487,7 +487,7 @@ host(task_t * task)
 
 # define DEFINE(P)  \
     template int xkblas_t::gemv<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
-    template int xkblas_t::gemv_lazy<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
+    template int xkblas_t::gemv_sync<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_tile_async<P>(int transA, const size_t m, const size_t n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const size_t ytm, const size_t ymb, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

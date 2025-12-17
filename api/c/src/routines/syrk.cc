@@ -3,7 +3,7 @@
 /*   syrk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/03 15:23:28 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/11/08 04:26:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/12/15 19:16:41 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -48,7 +48,7 @@ xkblas_£syrk_async(
 
 extern "C"
 int
-xkblas_£syrk_lazy(
+xkblas_£syrk_sync(
     int uplo, int trans,
     int n, int k,
     const TYPE * alpha,
@@ -56,7 +56,7 @@ xkblas_£syrk_lazy(
     const TYPE * beta,
           TYPE * C, int ldc
 ) {
-    return xkblas_get()->syrk_lazy<xkblas_precision_t::££>(uplo, trans, n, k, alpha, A, lda, beta, C, ldc);
+    return xkblas_get()->syrk_sync<xkblas_precision_t::££>(uplo, trans, n, k, alpha, A, lda, beta, C, ldc);
 }
 
 extern "C"

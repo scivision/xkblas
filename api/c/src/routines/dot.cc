@@ -64,13 +64,13 @@ xkblas_£dot_async(
 
 extern "C"
 int
-xkblas_£dot_lazy(
+xkblas_£dot_sync(
     int n,
     const TYPE * x, const int incx,
     const TYPE * y, const int incy,
           TYPE * r
 ) {
-    return xkblas_get()->dot_lazy<xkblas_precision_t::££>(n, x, incx, y, incy, r);
+    return xkblas_get()->dot_sync<xkblas_precision_t::££>(n, x, incx, y, incy, r);
 }
 
 extern "C"

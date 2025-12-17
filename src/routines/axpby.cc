@@ -64,7 +64,7 @@ xkblas_t::axpby_async(
 
 TYPED
 int
-xkblas_t::axpby_lazy(
+xkblas_t::axpby_sync(
     int n,
     const TYPE * alpha,
     const TYPE * x,
@@ -113,7 +113,7 @@ xkblas_t::axpby(
 
 # define DEFINE(P)  \
     template int xkblas_t::axpby<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
-    template int xkblas_t::axpby_lazy<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
+    template int xkblas_t::axpby_sync<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::axpby_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

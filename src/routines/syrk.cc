@@ -393,7 +393,7 @@ xkblas_t::syrk_async(
 
 TYPED
 int
-xkblas_t::syrk_lazy(
+xkblas_t::syrk_sync(
     int uplo, int trans,
     int n, int k,
     const TYPE * alpha,
@@ -558,7 +558,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::syrk<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
-    template int xkblas_t::syrk_lazy<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
+    template int xkblas_t::syrk_sync<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
