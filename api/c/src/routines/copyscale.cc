@@ -65,3 +65,29 @@ xkblas_£copyscale_async(
 ) {
     return xkblas_get()->copyscale_async<xkblas_precision_t::££>(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
 }
+
+extern "C"
+int
+xkblas_£copyscale_sync(
+    int m, int n,
+    int should_copy,
+    int * IW,
+    const TYPE * D, int ldd,
+          TYPE * L, int ldl,
+          TYPE * U, int ldu
+) {
+    return xkblas_get()->copyscale_sync<xkblas_precision_t::££>(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+}
+
+extern "C"
+int
+xkblas_£copyscale(
+    int m, int n,
+    int should_copy,
+    int * IW,
+    const TYPE * D, int ldd,
+          TYPE * L, int ldl,
+          TYPE * U, int ldu
+) {
+    return xkblas_get()->copyscale<xkblas_precision_t::££>(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+}

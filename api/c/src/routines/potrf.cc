@@ -3,7 +3,7 @@
 /*   potrf.cc                                                     .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/11/08 04:25:04 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/12/15 19:15:30 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -32,28 +32,6 @@ xkblas_£potrf_tile_async(
 
 extern "C"
 int
-xkblas_£potrf(
-    int uplo,
-    int n,
-    TYPE * A,
-    int lda
-) {
-    return xkblas_get()->potrf<xkblas_precision_t::££>(uplo, n, A, lda);
-}
-
-extern "C"
-int
-xkblas_£potrf_lazy(
-    int uplo,
-    int n,
-    TYPE * A,
-    int lda
-) {
-    return xkblas_get()->potrf_lazy<xkblas_precision_t::££>(uplo, n, A, lda);
-}
-
-extern "C"
-int
 xkblas_£potrf_async(
     int uplo,
     int n,
@@ -61,4 +39,26 @@ xkblas_£potrf_async(
     int lda
 ) {
     return xkblas_get()->potrf_async<xkblas_precision_t::££>(uplo, n, A, lda);
+}
+
+extern "C"
+int
+xkblas_£potrf_sync(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    return xkblas_get()->potrf_sync<xkblas_precision_t::££>(uplo, n, A, lda);
+}
+
+extern "C"
+int
+xkblas_£potrf(
+    int uplo,
+    int n,
+    TYPE * A,
+    int lda
+) {
+    return xkblas_get()->potrf<xkblas_precision_t::££>(uplo, n, A, lda);
 }

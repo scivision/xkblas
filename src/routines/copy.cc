@@ -157,9 +157,10 @@ xkblas_t::copy_async(
     // spawn tiles
     for (size_t tn = 0 ; tn < nt ; ++tn)
     {
-        size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
+        size_t offset = tn*ts;
+        size_t bs     = (tn == nt-1) ? (n - offset) : ts;
         device_global_id_t device_global_id = distribution1D_get(&d, tn);
-        this->copy_tile_async<P>(bs, x, incx, y, incy, device_global_id);
+        this->copy_tile_async<P>(bs, x + offset, incx, y + offset, incy, device_global_id);
     }
 
     return 0;
@@ -167,7 +168,7 @@ xkblas_t::copy_async(
 
 TYPED
 int
-xkblas_t::copy_lazy(
+xkblas_t::copy_sync(
     int n,
     const TYPE * x,
     const int incx,
@@ -320,7 +321,7 @@ cuda(
 
 # define DEFINE(P)  \
     template int xkblas_t::copy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
-    template int xkblas_t::copy_lazy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
+    template int xkblas_t::copy_sync<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

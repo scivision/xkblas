@@ -41,36 +41,6 @@ XKRT_NAMESPACE_USE;
 
 extern "C"
 int
-xkblas_£gemmt(
-    int uplo,
-    int transA, int transB,
-    int n, int k,
-    const TYPE * alpha,
-    const TYPE * A, int lda,
-    const TYPE * B, int ldb,
-    const TYPE * beta,
-          TYPE * C, int ldc
-) {
-    return xkblas_get()->gemmt<xkblas_precision_t::££>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
-}
-
-extern "C"
-int
-xkblas_£gemmt_lazy(
-    int uplo,
-    int transA, int transB,
-    int n, int k,
-    const TYPE * alpha,
-    const TYPE * A, int lda,
-    const TYPE * B, int ldb,
-    const TYPE * beta,
-          TYPE * C, int ldc
-) {
-    return xkblas_get()->gemmt_lazy<xkblas_precision_t::££>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
-}
-
-extern "C"
-int
 xkblas_£gemmt_async(
     int uplo,
     int transA, int transB,
@@ -82,4 +52,34 @@ xkblas_£gemmt_async(
           TYPE * C, int ldc
 ) {
     return xkblas_get()->gemmt_async<xkblas_precision_t::££>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+extern "C"
+int
+xkblas_£gemmt_sync(
+    int uplo,
+    int transA, int transB,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->gemmt_sync<xkblas_precision_t::££>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
+
+extern "C"
+int
+xkblas_£gemmt(
+    int uplo,
+    int transA, int transB,
+    int n, int k,
+    const TYPE * alpha,
+    const TYPE * A, int lda,
+    const TYPE * B, int ldb,
+    const TYPE * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->gemmt<xkblas_precision_t::££>(uplo, transA, transB, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }

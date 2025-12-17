@@ -3,7 +3,7 @@
 /*   herk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/11/08 04:24:34 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2025/12/15 19:15:10 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -43,32 +43,6 @@ xkblas_£herk_tile_async(
 
 extern "C"
 int
-xkblas_£herk(
-    int uplo, int transA,
-    int n, int k,
-    const TYPE_REAL * alpha,
-    const TYPE * A, int lda,
-    const TYPE_REAL * beta,
-          TYPE * C, int ldc
-) {
-    return xkblas_get()->herk<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
-}
-
-extern "C"
-int
-xkblas_£herk_lazy(
-    int uplo, int transA,
-    int n, int k,
-    const TYPE_REAL * alpha,
-    const TYPE * A, int lda,
-    const TYPE_REAL * beta,
-          TYPE * C, int ldc
-) {
-    return xkblas_get()->herk_lazy<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
-}
-
-extern "C"
-int
 xkblas_£herk_async(
     int uplo, int transA,
     int n, int k,
@@ -78,4 +52,30 @@ xkblas_£herk_async(
           TYPE * C, int ldc
 ) {
     return xkblas_get()->herk_async<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
+}
+
+extern "C"
+int
+xkblas_£herk_sync(
+    int uplo, int transA,
+    int n, int k,
+    const TYPE_REAL * alpha,
+    const TYPE * A, int lda,
+    const TYPE_REAL * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->herk_sync<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
+}
+
+extern "C"
+int
+xkblas_£herk(
+    int uplo, int transA,
+    int n, int k,
+    const TYPE_REAL * alpha,
+    const TYPE * A, int lda,
+    const TYPE_REAL * beta,
+          TYPE * C, int ldc
+) {
+    return xkblas_get()->herk<xkblas_precision_t::££>(uplo, transA, n, k, alpha, A, lda, beta, C, ldc);
 }

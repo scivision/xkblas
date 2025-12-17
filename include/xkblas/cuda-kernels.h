@@ -35,47 +35,30 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+#ifndef __CUDA_KERNELS_H__
+# define __CUDA_KERNELS_H__
 
-XKRT_NAMESPACE_USE;
+# include <stdint.h>
 
-extern "C"
-int
-xkblas_£fill_tile_async(
-    int n,
-    TYPE * x,
-    const TYPE value,
-    xkrt_device_global_id_t device_global_id
-) {
-    return xkblas_get()->fill_tile_async<xkblas_precision_t::££>(n, x, value, device_global_id);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int cuda_scopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const float           * D, int ldd, float           * L, int ldl, float           * U, int ldu);
+int cuda_dcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const double          * D, int ldd, double          * L, int ldl, double          * U, int ldu);
+int cuda_ccopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuComplex       * D, int ldd, cuComplex       * L, int ldl, cuComplex       * U, int ldu);
+int cuda_zcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuDoubleComplex * D, int ldd, cuDoubleComplex * L, int ldl, cuDoubleComplex * U, int ldu);
+
+int cuda_sfill(cudaStream_t cuda_queue, int n, float * x,           const float           value);
+int cuda_dfill(cudaStream_t cuda_queue, int n, double * x,          const double          value);
+int cuda_cfill(cudaStream_t cuda_queue, int n, cuComplex * x,       const cuComplex       value);
+int cuda_zfill(cudaStream_t cuda_queue, int n, cuDoubleComplex * x, const cuDoubleComplex value);
+
+int cuda_offset_vector_i32(cudaStream_t cuda_queue, int n, int32_t * x, const int32_t v);
+int cuda_offset_vector_i64(cudaStream_t cuda_queue, int n, int64_t * x, const int64_t v);
+
+#ifdef __cplusplus
 }
+#endif
 
-extern "C"
-int
-xkblas_£fill_async(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill_async<xkblas_precision_t::££>(n, x, value);
-}
-
-extern "C"
-int
-xkblas_£fill_sync(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill_sync<xkblas_precision_t::££>(n, x, value);
-}
-
-extern "C"
-int
-xkblas_£fill(
-    int n,
-    TYPE * x,
-    const TYPE value
-) {
-    return xkblas_get()->fill<xkblas_precision_t::££>(n, x, value);
-}
+#endif /* __CUDA_KERNELS_H__ */

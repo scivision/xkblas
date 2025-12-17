@@ -54,10 +54,12 @@ xkblas_routine_device_task(
     device_t * device,
     task_t * task
 ) {
-    return xkrt_task_detachable_kernel_launch(
+    int synchronous = 0;
+    return xkrt_task_kernel_launch(
         (xkrt_runtime_t *) runtime,
         (xkrt_device_t *) device,
         (xkrt_task_t * ) task,
+        synchronous,
         (xkrt_kernel_launcher_t) F
     );
 }

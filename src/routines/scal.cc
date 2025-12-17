@@ -142,7 +142,7 @@ xkblas_t::scal_async(
 
 TYPED
 int
-xkblas_t::scal_lazy(
+xkblas_t::scal_sync(
     int n,
     const TYPE * alpha,
     TYPE * x,
@@ -317,7 +317,7 @@ host(task_t * task)
 
 # define DEFINE(P)  \
     template int xkblas_t::scal<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
-    template int xkblas_t::scal_lazy<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
+    template int xkblas_t::scal_sync<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

@@ -218,16 +218,43 @@ xkblas_t::copyscale_async(
     return 0;
 }
 
+TYPED
+int
+xkblas_t::copyscale_sync(
+    int m, int n,
+    int should_copy,
+    int * IW,
+    const TYPE * D, int ldd,
+          TYPE * L, int ldl,
+          TYPE * U, int ldu
+) {
+    int r = this->copyscale_async<P>(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+    this->sync();
+    return r;
+}
+
+TYPED
+int
+xkblas_t::copyscale(
+    int m, int n,
+    int should_copy,
+    int * IW,
+    const TYPE * D, int ldd,
+          TYPE * L, int ldl,
+          TYPE * U, int ldu
+) {
+    this->memory_invalidate_caches();
+    int r = this->copyscale_async<P>(m, n, should_copy, IW, D, ldd, L, ldl, U, ldu);
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ldl, n, m, sizeof(TYPE));
+    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ldu, m, n, sizeof(TYPE));
+    this->sync();
+    return r;
+}
+
 # if XKBLAS_SUPPORT_CUDA
 #  include <xkblas/cublas-helper.h>
+#  include <xkblas/cuda-kernels.h>
 #  include <xkrt/driver/driver-cu.h>
-
-extern "C" {
-    int cuda_scopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const float * D, int ldd, float * L, int ldl, float * U, int ldu);
-    int cuda_dcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const double * D, int ldd, double * L, int ldl, double * U, int ldu);
-    int cuda_ccopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuComplex * D, int ldd, cuComplex * L, int ldl, cuComplex * U, int ldu);
-    int cuda_zcopyscale(cudaStream_t cuda_queue, int m, int n, int should_copy, int* IW, const cuDoubleComplex * D, int ldd, cuDoubleComplex * L, int ldl, cuDoubleComplex * U, int ldu);
-};
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
@@ -379,6 +406,8 @@ hip(
 /* instanciate methods for each precision */
 
 # define DEFINE(P)  \
+    template int xkblas_t::copyscale<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
+    template int xkblas_t::copyscale_sync<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
     template int xkblas_t::copyscale_async<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
     template int xkblas_t::copyscale_tile_async<P>(const size_t m, const size_t n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const size_t Dm, const size_t Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const size_t Lm, const size_t Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const size_t Um, const size_t Un, int ldu, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);

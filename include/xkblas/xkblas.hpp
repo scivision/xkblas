@@ -56,6 +56,7 @@ typedef enum    xkblas_state_t : uint8_t
 
 # define TYPED            template <xkblas_precision_t P>
 # define TYPED_WITH_INDEX template <xkblas_precision_t P, xkblas_index_t T>
+# define INDEXED          template <xkblas_index_t T>
 # define TYPE             xkblas_precision_type_t<P>
 # define TYPE_REAL        xkblas_precision_type_real_t<P>
 # define INDEX            xkblas_index_type_t<T>
@@ -114,7 +115,9 @@ typedef struct  xkblas_t
 
     /* spawn tasks to make the replica coherent on the passed device */
     void memory_coherent_async(xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
+    void memory_coherent_sync( xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
     void memory_coherent_async(xkrt::device_global_id_t device_global_id, xkrt::matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
+    void memory_coherent_sync( xkrt::device_global_id_t device_global_id, xkrt::matrix_storage_t storage, void * ptr, size_t ld, size_t m, size_t n, size_t sizeof_type);
 
     void memory_invalidate_caches(void);
 
@@ -145,13 +148,13 @@ typedef struct  xkblas_t
     /////////////
 
     // define both sync and async version, e.g.,
-    //      sgemm - invalidate caches, spawn gemm tasks, spawn coherent task, wait, return
-    //      sgemm_lazy - spawn gemm tasks, wait, and return
     //      sgemm_async - spawn gemm tasks, and return
+    //      sgemm_sync  - spawn gemm tasks, wait, and return
+    //      sgemm       - invalidate caches, spawn gemm tasks, spawn coherent task, wait, return
     # define DEF(TPLT, RTYPE, NAME, ...)        \
-        TPLT RTYPE NAME        (__VA_ARGS__);   \
-        TPLT RTYPE NAME##_lazy (__VA_ARGS__);   \
-        TPLT RTYPE NAME##_async(__VA_ARGS__);
+        TPLT RTYPE NAME##_async(__VA_ARGS__);   \
+        TPLT RTYPE NAME##_sync (__VA_ARGS__);   \
+        TPLT RTYPE NAME        (__VA_ARGS__);
     # define XKDEF(RTYPE, NAME, ...)  DEF(TYPED,            RTYPE, NAME, __VA_ARGS__)
     # define XKDEFI(RTYPE, NAME, ...) DEF(TYPED_WITH_INDEX, RTYPE, NAME, __VA_ARGS__)
     # define XKTYPE TYPE

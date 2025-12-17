@@ -398,9 +398,7 @@ XKDEFI(
     const XKTYPE * alpha,
     int transA,
     int index_base,
-    const int nrows,
-    const int ncols,
-    const int nnz,
+    const int n,
     const int format,
     const XKINDEX * row,
     const XKINDEX * col,
@@ -408,6 +406,5 @@ XKDEFI(
     XKTYPE * X,
     const XKTYPE * beta,
     XKTYPE * Y,
-    XKDEVICE device_global_id,
     void * tile_hdl
  );

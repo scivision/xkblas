@@ -35,27 +35,10 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# ifndef __XKBLAS_ROUTINE_DECL_H__
-#  define __XKBLAS_ROUTINE_DECL_H__
+# ifndef __XKBLAS_ROUTINE_DECL_HPP__
+#  define __XKBLAS_ROUTINE_DECL_HPP__
 
-# include <stdint.h>
-
-// Define the macro list of precisions
-# define XKBLAS_FORALL_PRECISIONS(F) \
-    F(S)                             \
-    F(C)                             \
-    F(D)                             \
-    F(Z)
-
-typedef enum    xkblas_precision_t
-{
-    # define DEFINE_ENUM(name) name,
-    XKBLAS_FORALL_PRECISIONS(DEFINE_ENUM)
-    # undef DEFINE_ENUM
-
-    XKBLAS_PRECISION_MAX
-
-}               xkblas_precision_t;
+# include <xkblas/routine.h>
 
 // Precision type
 template <xkblas_precision_t P>
@@ -93,21 +76,6 @@ template <> struct _xkblas_precision_name_t<Z>  { static constexpr const char* v
 template <xkblas_precision_t P>
 using xkblas_precision_name_t = typename _xkblas_precision_name_t<P>::value;
 
-// Define the macro list of index type
-# define XKBLAS_FORALL_INDEX(F) \
-    F(I32)                      \
-    F(I64)
-
-typedef enum    xkblas_index_t
-{
-    # define DEFINE_ENUM(name) name,
-    XKBLAS_FORALL_INDEX(DEFINE_ENUM)
-    # undef DEFINE_ENUM
-
-    XKBLAS_INDEX_MAX
-
-}               xkblas_index_t;
-
 // Index type
 template <xkblas_index_t T>
 struct _xkblas_index_type_t;
@@ -128,61 +96,6 @@ template <> struct _xkblas_index_name_t<I64> { static constexpr const char* valu
 template <xkblas_index_t T>
 using xkblas_index_name_t = typename _xkblas_index_name_t<T>::value;
 
-/* for all precisions and index types */
-# define XKBLAS_FORALL_PRECISIONS_AND_INDEX(F)  \
-    F(S, I32)                                   \
-    F(C, I32)                                   \
-    F(D, I32)                                   \
-    F(Z, I32)                                   \
-    F(S, I64)                                   \
-    F(C, I64)                                   \
-    F(D, I64)                                   \
-    F(Z, I64)
-
-// Define the macro list of kernels
-#define XKBLAS_FORALL_ROUTINES(F) \
-    /* LEVEL 1 */                \
-    F(AXPBY)                     \
-    F(AXPY)                      \
-    F(COPY)                      \
-    F(DIVCOPY)                   \
-    F(DOT)                       \
-    F(FILL)                      \
-    F(NRM2)                      \
-    F(SCALCOPY)                  \
-    F(SCAL)                      \
-                                 \
-    /* LEVEL 2 */                \
-    F(COPYSCALE)                 \
-    F(GEMV)                      \
-                                 \
-    /* LEVEL 3 */                \
-    F(GEMM)                      \
-    F(GEMMT)                     \
-    F(HERK)                      \
-    F(SYMM)                      \
-    F(SYR2K)                     \
-    F(SYRK)                      \
-    F(TRSM)                      \
-    F(TRMM)                      \
-                                 \
-    /* LAPACKE */                \
-    F(POTRF)                     \
-                                 \
-    /* SPARSE */                 \
-    F(SPMV)
-
-// Now define the enum using the macro
-typedef enum    xkblas_routine_t
-{
-    # define DEFINE_ENUM(name) name,
-    XKBLAS_FORALL_ROUTINES(DEFINE_ENUM)
-    # undef DEFINE_ENUM
-
-   XKBLAS_ROUTINE_MAX
-
-}               xkblas_routine_t;
-
 // Optional: generate an array of string names
 constexpr const char *
 xkblas_routine_name(xkblas_routine_t k)
@@ -196,85 +109,4 @@ xkblas_routine_name(xkblas_routine_t k)
     }
 }
 
-# define XKBLAS_FORALL_PRECISIONS_AND_ROUTINES(F)    \
-    /* LEVEL 1 */                                   \
-    F(S,     DOT)                                   \
-    F(D,     DOT)                                   \
-    F(S,     NRM2)                                  \
-    F(C,     NRM2)                                  \
-    F(D,     NRM2)                                  \
-    F(Z,     NRM2)                                  \
-    F(S,     FILL)                                  \
-    F(C,     FILL)                                  \
-    F(D,     FILL)                                  \
-    F(Z,     FILL)                                  \
-    F(S,     SCAL)                                  \
-    F(D,     SCAL)                                  \
-    F(S,     AXPY)                                  \
-    F(C,     AXPY)                                  \
-    F(D,     AXPY)                                  \
-    F(Z,     AXPY)                                  \
-    F(S,     COPY)                                  \
-    F(C,     COPY)                                  \
-    F(D,     COPY)                                  \
-    F(Z,     COPY)                                  \
-    F(S,     AXPBY)                                 \
-    F(C,     AXPBY)                                 \
-    F(D,     AXPBY)                                 \
-    F(Z,     AXPBY)                                 \
-                                                    \
-    /* LEVEL 2 */                                   \
-    F(S,     COPYSCALE)                             \
-    F(C,     COPYSCALE)                             \
-    F(D,     COPYSCALE)                             \
-    F(Z,     COPYSCALE)                             \
-    F(S,     GEMV)                                  \
-    F(C,     GEMV)                                  \
-    F(D,     GEMV)                                  \
-    F(Z,     GEMV)                                  \
-                                                    \
-    /* LEVEL 3 */                                   \
-    F(S,     GEMM)                                  \
-    F(C,     GEMM)                                  \
-    F(D,     GEMM)                                  \
-    F(Z,     GEMM)                                  \
-    F(S,     GEMMT)                                 \
-    F(C,     GEMMT)                                 \
-    F(D,     GEMMT)                                 \
-    F(Z,     GEMMT)                                 \
-    F(C,     HERK)                                  \
-    F(Z,     HERK)                                  \
-    F(S,     SYMM)                                  \
-    F(C,     SYMM)                                  \
-    F(D,     SYMM)                                  \
-    F(Z,     SYMM)                                  \
-    F(S,     SYR2K)                                 \
-    F(C,     SYR2K)                                 \
-    F(D,     SYR2K)                                 \
-    F(Z,     SYR2K)                                 \
-    F(S,     SYRK)                                  \
-    F(C,     SYRK)                                  \
-    F(D,     SYRK)                                  \
-    F(Z,     SYRK)                                  \
-    F(S,     TRSM)                                  \
-    F(C,     TRSM)                                  \
-    F(D,     TRSM)                                  \
-    F(Z,     TRSM)                                  \
-    F(S,     TRMM)                                  \
-    F(C,     TRMM)                                  \
-    F(D,     TRMM)                                  \
-    F(Z,     TRMM)                                  \
-                                                    \
-   /* lapacke */                                    \
-   F(S,      POTRF)                                 \
-   F(C,      POTRF)                                 \
-   F(D,      POTRF)                                 \
-   F(Z,      POTRF)                                 \
-                                                    \
-   /* sparse */                                     \
-   F(S,      SPMV)                                  \
-   F(C,      SPMV)                                  \
-   F(D,      SPMV)                                  \
-   F(Z,      SPMV)
-
-# endif /* __XKBLAS_ROUTINE_DECL_H__ */
+# endif /* __XKBLAS_ROUTINE_DECL_HPP__ */
