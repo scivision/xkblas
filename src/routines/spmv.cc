@@ -654,6 +654,29 @@ cuda(
 }
 # endif /* XKBLAS_SUPPORT_CUBLAS */
 
+void
+xkblas_t::matrices_reset(void)
+{
+    # if 0
+    // TODO: deallocate correctly
+    pthread_rwlock_wrlock(&this->matrices.csr.rwlock);
+    {
+        for (const auto & pair : this->matrices.csr.metadata)
+        {
+            const void * row = pair.first;
+            MATRIX_T * matrix = (MATRIX_T *) pair.second;
+            for (const & tiling : matrix->tilings)
+            {
+                // Use element
+            }
+            free(matrix);
+        }
+    }
+    pthread_rwlock_unlock(&this->matrices.csr.rwlock);
+    # endif
+    this->matrices.csr.metadata.clear();
+}
+
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////

@@ -109,7 +109,8 @@ xkblas_t::sync(void)
 void
 xkblas_t::memory_invalidate_caches(void)
 {
-    return this->runtime.reset();
+    this->matrices_reset();
+    this->runtime.reset();
 }
 
 void

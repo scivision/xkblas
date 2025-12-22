@@ -108,6 +108,7 @@ typedef struct  xkblas_t
 
     void init(void);
     void deinit(void);
+    void matrices_reset(void);
 
     ////////////
     // Memory //
