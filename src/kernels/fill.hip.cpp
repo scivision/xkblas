@@ -2,7 +2,6 @@
 ** Copyright 2024,2025 INRIA
 **
 ** Contributors :
-** Thierry Gautier, thierry.gautier@inrialpes.fr
 ** Romain PEREIRA, romain.pereira@inria.fr + rpereira@anl.gov
 **
 ** This software is a computer program whose purpose is to execute
@@ -35,21 +34,39 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+#define __HIP_PLATFORM_AMD__
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+#include <stdio.h>
 
-XKRT_NAMESPACE_USE;
+# define PRECISION_£
 
-//////////////////////////
-// TASK FORMAT REGISTER //
-//////////////////////////
+__global__
+void
+kernel_£fill_1x1(
+    int n,
+    HIP_TYPE * x,
+    const HIP_TYPE value
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = idx; i < n; i += stride)
+        x[i] = value;
+}
 
-# define ROUTINE_NAME DIVCOPY
-
-# define CL   0
-# define CUDA 0
-# define HIP  0
-# define HOST 0
-# define SYCL 0
-# define ZE   0
-
-# include "task-format.cc"
+/* fill the vector 'x' of 'n' elements with the value 'v' */
+extern "C"
+int
+hip_£fill(
+	hipStream_t queue,
+    int n,
+    HIP_TYPE * x,
+	const HIP_TYPE v
+) {
+    dim3 T = { (unsigned int) n, (unsigned int) 1, 1 };
+    dim3 B = { 256, 1, 1 };
+    dim3 G = { (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z };
+    size_t shared_size = 0;
+    hipLaunchKernelGGL(kernel_£fill_1x1, G, B, shared_size, queue, n, x, v);
+    return 0;
+}

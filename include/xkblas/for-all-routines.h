@@ -59,8 +59,6 @@ XKDEF(int, copy, int n, const XKTYPE * x, const int incx, XKTYPE * y, const int 
 
 XKDEF(int, fill, int n, XKTYPE * x, const XKTYPE v);
 
-XKDEF(int, nrm2, int n, const XKTYPE * x, const int incx, XKTYPE * result);
-
 XKDEF(int, scal, int n, const XKTYPE * alpha, XKTYPE * x, const int incx);
 
 // LEVEL 2

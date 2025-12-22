@@ -379,10 +379,10 @@ hip(
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    if constexpr (P == xkblas_precision_t::S)   hip_run<P, hip_scopyscale, float>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::D)   hip_run<P, hip_dcopyscale, double>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::C)   hip_run<P, hip_ccopyscale, hipFloatComplex>(queue, cmd, idx);
-    if constexpr (P == xkblas_precision_t::Z)   hip_run<P, hip_zcopyscale, hipDoubleComplex>(queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::S)   hip_run<P, hip_scopyscale, float>           (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D)   hip_run<P, hip_dcopyscale, double>          (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C)   hip_run<P, hip_ccopyscale, hipFloatComplex> (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z)   hip_run<P, hip_zcopyscale, hipDoubleComplex>(runtime, device, task, queue, cmd, idx);
 }
 
 # endif /* XKBLAS_SUPPORT_HIP */

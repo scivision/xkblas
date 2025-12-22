@@ -167,6 +167,64 @@ xkblas_t::fill(
     return r;
 }
 
+# if XKBLAS_SUPPORT_HIP
+
+#  include <xkblas/hipblas-helper.h>
+#  include <xkblas/hip-kernels.h>
+#  include <xkrt/driver/driver-hip.h>
+
+template <xkblas_precision_t P, auto FUNC, typename HIP_TYPE>
+static inline void
+hip_run(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    assert(queue);
+
+    hipStream_t hip_queue = queue->hip.handle.high;
+    assert(hip_queue);
+
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * x = accesses + 0;
+    assert(x->device_view.addr % x->host_view.sizeof_type == 0);
+
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    FUNC(
+        hip_queue,
+        (int) args->n,
+        (HIP_TYPE *) x->device_view.addr,
+        *reinterpret_cast<const HIP_TYPE*>(&args->value)
+    );
+
+    XKBLAS_HIPBLAS_CALL_POST();
+}
+
+TYPED
+static void
+hip(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    queue_hip_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    if constexpr (P == xkblas_precision_t::S) hip_run<P, hip_sfill, float>           (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::D) hip_run<P, hip_dfill, double>          (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::C) hip_run<P, hip_cfill, hipFloatComplex> (runtime, device, task, queue, cmd, idx);
+    if constexpr (P == xkblas_precision_t::Z) hip_run<P, hip_zfill, hipDoubleComplex>(runtime, device, task, queue, cmd, idx);
+}
+
+# endif /* XKBLAS_SUPPORT_HIP */
+
 # if XKBLAS_SUPPORT_CUDA
 
 #  include <xkblas/cublas-helper.h>
@@ -233,7 +291,7 @@ cuda(
 
 # define CL   0
 # define CUDA XKBLAS_SUPPORT_CUDA
-# define HIP  0
+# define HIP  1
 # define HOST 0
 # define SYCL 0
 # define ZE   0

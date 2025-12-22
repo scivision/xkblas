@@ -41,10 +41,8 @@ Adding support for an unsupported kernel may involve more work.
 | axpby       | ✗   | ✓    | ✓   | ✗               | ✗      |
 | axpy        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | copy        | ✗   | ✓    | ✓   | ✗               | ✗      |
-| divcopy     | ✗   | ✗    | ✗   | ✗               | ✗      |
 | dot         | ✓   | ✓    | ✓   | ✗               | ✗      |
-| fill        | ✗   | ✓    | ✗   | ✗               | ✗      |
-| nrm2        | ✗   | ✗    | ✗   | ✗               | ✗      |
+| fill        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | scal        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 2

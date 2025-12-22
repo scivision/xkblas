@@ -621,23 +621,6 @@ cuda_run(
             (void *) mdt->chunk->ptr
         )
     );
-
-    // TODO: not freeing that, it is cached in the metadata
-    # if 0
-    CUSPARSE_SAFE_CALL(cusparseDestroySpMat(A));
-    CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(X));
-    CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(Y));
-
-    // Push callback in cmd->callbacks
-    assert(XKRT_CALLBACK_ARGS_MAX >= 2);
-    callback_t callback;
-    callback.func = cuda_run_async_completion;
-    callback.args[0] = task;
-    callback.args[1] = chunk;
-    callback.args[2] = (void *) (uintptr_t) device_global_id;
-    callback.args[3] = args->xkblas;
-    cmd->push_callback(callback);
-    # endif
 }
 
 TYPED
@@ -672,6 +655,24 @@ xkblas_t::matrices_reset(void)
             free(matrix);
         }
     }
+
+    // TODO: not freeing that, it is cached in the metadata
+    # if 0
+    CUSPARSE_SAFE_CALL(cusparseDestroySpMat(A));
+    CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(X));
+    CUSPARSE_SAFE_CALL(cusparseDestroyDnVec(Y));
+
+    // Push callback in cmd->callbacks
+    assert(XKRT_CALLBACK_ARGS_MAX >= 2);
+    callback_t callback;
+    callback.func = cuda_run_async_completion;
+    callback.args[0] = task;
+    callback.args[1] = chunk;
+    callback.args[2] = (void *) (uintptr_t) device_global_id;
+    callback.args[3] = args->xkblas;
+    cmd->push_callback(callback);
+    # endif
+
     pthread_rwlock_unlock(&this->matrices.csr.rwlock);
     # endif
     this->matrices.csr.metadata.clear();

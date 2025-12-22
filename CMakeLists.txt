@@ -41,7 +41,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)  # Optional: disables compiler-specific extensions
 SET(XKBLAS_ROUTINES
 
     # level 1
-    axpby axpy copy divcopy dot fill nrm2 scal
+    axpby axpy copy dot fill scal
 
     # level 2
     copyscale gemv
@@ -59,7 +59,7 @@ SET(XKBLAS_ROUTINES_PRECISIONS s c d z)
 
 # custom LAS kernels for all precisions
 SET(XKBLAS_CUDA_KERNELS copyscale fill)
-SET(XKBLAS_HIP_KERNELS  copyscale)
+SET(XKBLAS_HIP_KERNELS  copyscale fill)
 
 # Generated C source files for bindings
 SET(XKBLAS_ROUTINES_SOURCE_FILES)
@@ -67,7 +67,7 @@ SET(XKBLAS_ROUTINES_C_SOURCE_FILES)
 SET(XKBLAS_CUDA_KERNELS_SOURCE_FILES)
 SET(XKBLAS_HIP_KERNELS_SOURCE_FILES)
 
-# Custom cuda sources
+# Custom cuda/hip sources
 list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES
     ${CMAKE_SOURCE_DIR}/src/kernels/offset_vector.cu
 )

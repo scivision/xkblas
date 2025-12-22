@@ -35,23 +35,30 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.hpp>
+#ifndef __HIP_KERNELS_H__
+# define __HIP_KERNELS_H__
 
-XKRT_NAMESPACE_USE;
+# include <stdint.h>
 
-// TODO: until this is supported, please use dot
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-//////////////////////////
-// TASK FORMAT REGISTER //
-//////////////////////////
+int hip_scopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const float            * D, int ldd, float            * L, int ldl, float            * U, int ldu);
+int hip_dcopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const double           * D, int ldd, double           * L, int ldl, double           * U, int ldu);
+int hip_ccopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const hipFloatComplex  * D, int ldd, hipFloatComplex  * L, int ldl, hipFloatComplex  * U, int ldu);
+int hip_zcopyscale(hipStream_t hip_queue, int m, int n, int should_copy, int* IW, const hipDoubleComplex * D, int ldd, hipDoubleComplex * L, int ldl, hipDoubleComplex * U, int ldu);
 
-# define ROUTINE_NAME NRM2
+int hip_sfill(hipStream_t hip_queue, int n, float  * x,           const float            value);
+int hip_dfill(hipStream_t hip_queue, int n, double * x,           const double           value);
+int hip_cfill(hipStream_t hip_queue, int n, hipFloatComplex * x,  const hipFloatComplex  value);
+int hip_zfill(hipStream_t hip_queue, int n, hipDoubleComplex * x, const hipDoubleComplex value);
 
-# define CL   0
-# define CUDA 0
-# define HIP  0
-# define HOST 0
-# define SYCL 0
-# define ZE   0
+int hip_offset_vector_i32(hipStream_t hip_queue, int n, int32_t * x, const int32_t v);
+int hip_offset_vector_i64(hipStream_t hip_queue, int n, int64_t * x, const int64_t v);
 
-# include "task-format.cc"
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __HIP_KERNELS_H__ */

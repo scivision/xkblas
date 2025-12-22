@@ -89,10 +89,8 @@ typedef enum    xkblas_index_t
     F(AXPBY)                      \
     F(AXPY)                       \
     F(COPY)                       \
-    F(DIVCOPY)                    \
     F(DOT)                        \
     F(FILL)                       \
-    F(NRM2)                       \
     F(SCALCOPY)                   \
     F(SCAL)                       \
                                   \
@@ -131,10 +129,6 @@ typedef enum    xkblas_routine_t
     /* LEVEL 1 */                                   \
     F(S,     DOT)                                   \
     F(D,     DOT)                                   \
-    F(S,     NRM2)                                  \
-    F(C,     NRM2)                                  \
-    F(D,     NRM2)                                  \
-    F(Z,     NRM2)                                  \
     F(S,     FILL)                                  \
     F(C,     FILL)                                  \
     F(D,     FILL)                                  \
