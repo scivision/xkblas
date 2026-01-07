@@ -59,7 +59,7 @@
  * support natively 2D memory view.
  */
 
-# include <xkrt/support.h>
+# include <xkblas/support.h>
 
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
@@ -73,14 +73,6 @@
 # include <xkrt/support.h>
 
 # include <cassert>
-
-# if XKBLAS_SUPPORT_SYCL
-#  include <sycl/sycl.hpp>
-#  include <oneapi/mkl.hpp>
-#  include <sycl/ext/oneapi/backend/level_zero.hpp>
-#  include <xkblas/oneapi-mkl-helper.h>
-#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
-# endif
 
 XKRT_NAMESPACE_USE;
 

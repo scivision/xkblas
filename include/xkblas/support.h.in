@@ -61,4 +61,8 @@
 #  pragma error "XKBlas build with HIP support while XKRT was not"
 # endif
 
+# if XKBLAS_SUPPORT_ZE && !XKRT_SUPPORT_ZE_SYCL_INTEROP
+#  error "XKRT must be build with ZE_SYCL_INTEROP interop if using ZE backend for XKBlas"
+# endif
+
 #endif /* __XKBLAS_SUPPORT_H__ */

@@ -105,7 +105,7 @@ REGISTER_FORMAT_NAME(task_format_t * format)
     # endif /* XKBLAS_SUPPORT_CBLAS */
 
     # if XKBLAS_SUPPORT_SYCL && SYCL
-    format->f[XKRT_TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) xkblas_routine_device_task<sycl<P>>;
+    format->f[XKRT_TASK_FORMAT_TARGET_SYCL] = (task_format_func_t) xkblas_routine_device_task<sycl_launch<P>>;
     # endif /* XKBLAS_SUPPORT_SYCL */
 
     # if XKBLAS_SUPPORT_ZE && ZE

@@ -74,14 +74,6 @@
 
 # include <cassert>
 
-# if XKBLAS_SUPPORT_SYCL
-#  include <sycl/sycl.hpp>
-#  include <oneapi/mkl.hpp>
-#  include <sycl/ext/oneapi/backend/level_zero.hpp>
-#  include <xkblas/oneapi-mkl-helper.h>
-#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
-# endif
-
 XKRT_NAMESPACE_USE;
 
 TYPED

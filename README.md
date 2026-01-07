@@ -38,24 +38,19 @@ Adding support for an unsupported kernel may involve more work.
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
-| axpby       | ✗   | ✓    | ✓   | ✗               | ✗      |
-| axpy        | ✗   | ✓    | ✓   | ✗               | ✗      |
-| copy        | ✗   | ✓    | ✓   | ✗               | ✗      |
+| axpy        | ✗   | ✓    | ✓   | ✓               | ✗      |
 | dot         | ✓   | ✓    | ✓   | ✗               | ✗      |
-| fill        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | scal        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 2
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
-| copyscale   | ✓   | ✓    | ✓   | ✗               | ✗      |
 | gemv        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
 ### Level 3
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
 | gemm        | ✓   | ✓    | ✓   | ✓               | ✓      |
-| gemmt       | ✗   | ✓    | ✓   | ✗               | ✗      |
 | herk        | ✗   | ✓    | ✓   | ✗               | ✗      |
 | symm        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | syr2k       | ✗   | ✗    | ✗   | ✗               | ✗      |
@@ -75,6 +70,15 @@ Adding support for an unsupported kernel may involve more work.
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
 | spmv (csr)  | ✗   | ✓    | ✗   | ✗               | ✗      |
+
+### Extensions
+| Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
+|-------------|-----|------|-----|-----------------|--------|
+| axpby       | ✗   | ✓    | ✓   | ✗               | ✗      |
+| copy        | ✗   | ✓    | ✓   | ✗               | ✗      |
+| copyscale   | ✓   | ✓    | ✓   | ✗               | ✗      |
+| fill        | ✗   | ✓    | ✓   | ✗               | ✗      |
+| gemmt       | ✗   | ✓    | ✓   | ✗               | ✗      |
 
 ## Add a new routine
 
