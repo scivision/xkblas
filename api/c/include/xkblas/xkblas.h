@@ -178,6 +178,7 @@ extern "C" {
 
     /* get number of gpus */
     int xkblas_get_ngpus(void);
+    int xkblas_get_ngpus_max(void);
 
     /* get time in nanoseconds */
     uint64_t xkblas_get_nanotime(void);

@@ -126,7 +126,15 @@ xkblas_get_ngpus(void)
 {
     xkblas_t * context = xkblas_get();
     assert(context);
+    return context->runtime.get_ndevices() - 1;
+}
 
+extern "C"
+int
+xkblas_get_ngpus_max(void)
+{
+    xkblas_t * context = xkblas_get();
+    assert(context);
     return context->runtime.get_ndevices_max() - 1;
 }
 
