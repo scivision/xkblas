@@ -243,7 +243,7 @@ xkblas_t::spmv_async(
     int index_base,
     const int m,
     const int n,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const INDEX * row,
     const INDEX * col,
@@ -277,8 +277,14 @@ xkblas_t::spmv_async(
     size_t ts = this->conf.kernels[SPMV].tile;
     if (ts == 0)
     {
-        int args[3] = {m, n, nnz};
-        xkblas_routine_auto_tile(SPMV, args, &ts);
+        struct {
+            int m, n;
+            size_t nnz;
+        } args;
+        args.m = m;
+        args.n = n;
+        args.nnz = nnz;
+        xkblas_routine_auto_tile(SPMV, (int *) &args, &ts);
     }
     const size_t mt = NUM_OF_TILES(m, ts);
 
@@ -382,7 +388,7 @@ xkblas_t::spmv_sync(
     int index_base,
     const int m,
     const int n,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const INDEX * row,
     const INDEX * col,
@@ -407,7 +413,7 @@ xkblas_t::spmv(
     int index_base,
     const int m,
     const int n,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const INDEX * row,
     const INDEX * col,
@@ -696,9 +702,9 @@ xkblas_t::matrices_reset(void)
 /* instanciate methods for each precision */
 
 # define DEFINE(P, T)  \
-    template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv_sync<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
-    template int xkblas_t::spmv<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const int nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const size_t nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv_sync<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const size_t nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
+    template int xkblas_t::spmv<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, int m, const int n, const size_t nnz, const int format, const xkblas_index_type_t<T> * row, const  xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y);  \
     template int xkblas_t::spmv_tile_async<P, T>(const xkblas_precision_type_t<P> * alpha, int transA, int index_base, const int n, const int format, const xkblas_index_type_t<T> * row, const xkblas_index_type_t<T> * col, const xkblas_precision_type_t<P> * values, xkblas_precision_type_t<P> * X, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * Y, void * tile_hdl);
 XKBLAS_FORALL_PRECISIONS_AND_INDEX(DEFINE);
 # undef DEFINE

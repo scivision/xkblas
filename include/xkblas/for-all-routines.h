@@ -230,7 +230,7 @@ XKDEFI(
     int index_base,
     const int nrows,
     const int ncols,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const XKINDEX * row,
     const XKINDEX * col,

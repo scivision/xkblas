@@ -3,7 +3,7 @@
 /*   spmv.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/12/15 19:16:03 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2026/01/07 05:17:25 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -29,7 +29,7 @@ xkblas_£spmv_async(
     int index_type,
     const int nrows,
     const int ncols,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const void * row,
     const void * col,
@@ -59,7 +59,7 @@ xkblas_£spmv_sync(
     int index_type,
     const int nrows,
     const int ncols,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const void * row,
     const void * col,
@@ -89,7 +89,7 @@ xkblas_£spmv(
     int index_type,
     const int nrows,
     const int ncols,
-    const int nnz,
+    const size_t nnz,
     const int format,
     const void * row,
     const void * col,
