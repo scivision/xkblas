@@ -59,7 +59,15 @@
  * support natively 2D memory view.
  */
 
-# include <xkrt/support.h>
+# include <xkblas/support.h>
+
+# if XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
+#  include <sycl/sycl.hpp>
+#  include <oneapi/mkl.hpp>
+#  include <sycl/ext/oneapi/backend/level_zero.hpp>
+#  include <xkblas/oneapi-mkl-helper.h>
+# endif
 
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
@@ -73,14 +81,6 @@
 # include <xkrt/support.h>
 
 # include <cassert>
-
-# if XKBLAS_SUPPORT_SYCL
-#  include <sycl/sycl.hpp>
-#  include <oneapi/mkl.hpp>
-#  include <sycl/ext/oneapi/backend/level_zero.hpp>
-#  include <xkblas/oneapi-mkl-helper.h>
-#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
-# endif
 
 XKRT_NAMESPACE_USE;
 
@@ -548,6 +548,79 @@ hip(
 }
 # endif /* XKBLAS_SUPPORT_HIP */
 
+# if XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE
+
+TYPED
+static sycl::event
+sycl_queue_launch(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    sycl::queue & queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    // unpack arguments
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * A = accesses + 0;
+    const access_t * B = accesses + 1;
+    const access_t * C = accesses + 2;
+
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+
+    using mkl_type_t = typename mkl_type<TYPE>::type;
+
+    oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
+    oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
+    std::int64_t m = args->m;
+    std::int64_t n = args->n;
+    std::int64_t k = args->k;
+    const mkl_type_t alpha = *reinterpret_cast<const mkl_type_t *>(&args->alpha);
+    const mkl_type_t beta  = *reinterpret_cast<const mkl_type_t *>(&args->beta);
+    const mkl_type_t * a   =  reinterpret_cast<const mkl_type_t *>(A->device_view.addr);
+    const mkl_type_t * b   =  reinterpret_cast<const mkl_type_t *>(B->device_view.addr);
+          mkl_type_t * c   =  reinterpret_cast<      mkl_type_t *>(C->device_view.addr);
+    std::int64_t lda = (std::int64_t) A->device_view.ld;
+    std::int64_t ldb = (std::int64_t) B->device_view.ld;
+    std::int64_t ldc = (std::int64_t) C->device_view.ld;
+    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
+    const std::vector<sycl::event> dependencies = {};
+
+    return oneapi::mkl::blas::column_major::gemm(
+        queue,
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc,
+        mode,
+        dependencies
+    );
+}
+
+# endif /* XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE */
+
+# if XKBLAS_SUPPORT_SYCL
+#  include <xkrt/driver/driver-sycl.h>
+
+TYPED
+static void
+sycl_launch(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    queue_sycl_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    queue->sycl.events.buffer[idx] = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
+}
+
+# endif /* XKBLAS_SUPPORT_SYCL */
 
 # if XKBLAS_SUPPORT_ZE
 
@@ -564,136 +637,11 @@ ze(
     command_t * cmd,
     queue_command_list_counter_t idx
 ) {
-    // unpack arguments
-    assert(task);
-
-    const access_t * accesses = TASK_ACCESSES(task);
-    const access_t * A = accesses + 0;
-    const access_t * B = accesses + 1;
-    const access_t * C = accesses + 2;
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
-
-    # if XKBLAS_SUPPORT_ZE_SYCL_INTEROP
-
-    sycl::queue & queue = queue->sycl.queue;
-    oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
-    oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
-    std::int64_t m = args->m;
-    std::int64_t n = args->n;
-    std::int64_t k = args->k;
-    oneapi::mkl::value_or_pointer<TYPE> alpha = args->alpha;
-    oneapi::mkl::value_or_pointer<TYPE> beta = args->beta;
-    const TYPE * a   = (const TYPE *) A->device_view.addr;
-    const TYPE * b   = (const TYPE *) B->device_view.addr;
-          TYPE * c   = (      TYPE *) C->device_view.addr;
-    std::int64_t lda = (std::int64_t) A->device_view.ld;
-    std::int64_t ldb = (std::int64_t) B->device_view.ld;
-    std::int64_t ldc = (std::int64_t) C->device_view.ld;
-    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
-    const std::vector<sycl::event> dependencies = {};
-
-    sycl::event event = oneapi::mkl::blas::column_major::gemm(
-        queue,
-        transa, transb,
-        m, n, k,
-        alpha,
-        a, lda,
-        b, ldb,
-        beta,
-        c, ldc,
-        mode,
-        dependencies
-    );
+    sycl::event event = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
     queue->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
-
-    # else /* XKBLAS_SUPPORT_ZE_SYCL_INTEROP */
-    LOGGER_FATAL("no blas impl for ze");
-    # endif /* XKBLAS_SUPPORT_ZE_SYCL_INTEROP */
-
-    # if 0
-
-    // TODO : Intel do not provides provide the kernels direcly or similar interface to cuBlas,
-    // so we could pass them via a zeCommandListAdKernelLaunch - or even to
-    // simply call a gemm with a command list/queue
-
-    // Retrieve the Level Zero context and device from the command list
-    ze_context_handle_t ze_context;
-    ze_device_handle_t ze_device;
-    ZE_SAFE_CALL(zeCommandListGetContextHandle(queue->ze.command.list, &ze_context));
-    ZE_SAFE_CALL(zeCommandListGetDeviceHandle(queue->ze.command.list, &ze_device));
-
-    // Create SYCL platform and device from Level Zero context and device
-    sycl::platform sycl_platform = sycl::platform::ext_oneapi_from_ze_context(ze_context);
-    sycl::device sycl_device = sycl::device::ext_oneapi_from_ze_device(ze_device);
-
-    // Create SYCL context from SYCL device
-    sycl::context sycl_context(sycl_device);
-
-    // Create SYCL queue from SYCL context and Level Zero command list
-    sycl::queue sycl_queue(sycl_context, sycl::ext::oneapi::level_zero::command_list(ze_command_list));
-
-    # endif
 }
 
 # endif
-
-# if XKBLAS_SUPPORT_SYCL
-
-#  include <xkrt/driver/driver-sycl.h>
-
-TYPED
-static void
-sycl(
-    runtime_t * runtime,
-    device_t * device,
-    task_t * task,
-    queue_sycl_t * queue,
-    command_t * cmd,
-    queue_command_list_counter_t idx
-) {
-    // unpack arguments
-    assert(task);
-
-    const access_t * accesses = TASK_ACCESSES(task);
-    const access_t * A = accesses + 0;
-    const access_t * B = accesses + 1;
-    const access_t * C = accesses + 2;
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
-
-    sycl::queue & queue = queue->sycl.queue;
-    oneapi::mkl::transpose transa = cblas2mkl_op(args->transA);
-    oneapi::mkl::transpose transb = cblas2mkl_op(args->transB);
-    std::int64_t m = args->m;
-    std::int64_t n = args->n;
-    std::int64_t k = args->k;
-    oneapi::mkl::value_or_pointer<TYPE> alpha = args->alpha;
-    oneapi::mkl::value_or_pointer<TYPE> beta = args->beta;
-    const TYPE * a   = (const TYPE *) A->device_view.addr;
-    const TYPE * b   = (const TYPE *) B->device_view.addr;
-          TYPE * c   = (      TYPE *) C->device_view.addr;
-    std::int64_t lda = (std::int64_t) A->device_view.ld;
-    std::int64_t ldb = (std::int64_t) B->device_view.ld;
-    std::int64_t ldc = (std::int64_t) C->device_view.ld;
-    oneapi::mkl::blas::compute_mode mode = oneapi::mkl::blas::compute_mode::unset;
-    const std::vector<sycl::event> dependencies = {};
-
-    queue->sycl.events.buffer[idx] = oneapi::mkl::blas::column_major::gemm(
-        queue,
-        transa, transb,
-        m, n, k,
-        alpha,
-        a, lda,
-        b, ldb,
-        beta,
-        c, ldc,
-        mode,
-        dependencies
-    );
-}
-
-# endif /* XKBLAS_SUPPORT_SYCL */
 
 # if XKBLAS_SUPPORT_CLBLAST
 

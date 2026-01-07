@@ -244,10 +244,9 @@ if (USE_CUDA)
 endif()
 
 if (USE_HIPBLAS)
-    find_package(HIP REQUIRED)
-    find_package(HIPBLAS REQUIRED)
-    include_directories("${HIP_INCLUDE_DIRS}")
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
+    find_package(hip     REQUIRED)
+    find_package(hipblas REQUIRED)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE hip::host roc::hipblas)
 endif()
 
 # HIP custom kernels
@@ -272,9 +271,11 @@ if (USE_ZE)
     include_directories("${ZE_INCLUDE_DIRS}")
 endif()
 
-if (USE_SYCL)
+if (USE_SYCL OR USE_ZE)
     target_link_libraries( ${XKBLAS_NAME} PRIVATE ${SYCL_LIBRARIES} -fsycl)
     target_compile_options(${XKBLAS_NAME} PRIVATE -fsycl)
+    find_package(MKL CONFIG REQUIRED)
+    target_link_libraries(${XKBLAS_NAME} PRIVATE MKL::MKL_DPCPP)
 endif()
 
 if (USE_CBLAS)

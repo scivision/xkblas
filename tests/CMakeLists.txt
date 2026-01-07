@@ -9,6 +9,7 @@ set(CMAKE_BUILD_TYPE Debug)
 # list of tests
 set(TEST_SOURCES
     tests.c
+    axpy.c
     fill.c
 )
 

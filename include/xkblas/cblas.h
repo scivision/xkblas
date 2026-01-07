@@ -7,7 +7,7 @@
  */
 #define CBLAS_INDEX size_t  /* this may vary between platforms */
 
-#if !defined(KAAPI_NO_DEFAULT_BLAS_ENUM) && !XKBLAS_NO_DEFAULT_BLAS_ENUM
+#if !defined(KAAPI_NO_DEFAULT_BLAS_ENUM) && !defined(XKBLAS_NO_DEFAULT_BLAS_ENUM)
 enum CBLAS_ORDER {CblasRowMajor=101, CblasColMajor=102};
 enum CBLAS_TRANSPOSE {CblasNoTrans=111, CblasTrans=112, CblasConjTrans=113};
 enum CBLAS_UPLO {CblasUpper=121, CblasLower=122};

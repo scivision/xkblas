@@ -35,34 +35,67 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-#ifndef __ONEAPI_MKL_HELPER_H__
-# define __ONEAPI_MKL_HELPER_H__
+# include <xkblas/xkblas.h>
+# include <xkblas/flops.h>
+# include <xkblas/cblas.h>
 
-# include "xkblas/cblas.h"
-# include <oneapi/mkl.hpp>
 # include <xkrt/logger/logger.h>
 
-static inline oneapi::mkl::transpose
-cblas2mkl_op(int trans)
+# include <assert.h>
+# include <stdlib.h>
+# include <stdint.h>
+# include <string.h>
+
+# if 1
+# define TYPE           float
+# define xkblas_axpy    xkblas_saxpy
+# define VALUE          42.0f
+# endif
+# if 0
+# define TYPE           double
+# define xkblas_axpy    xkblas_daxpy
+# define VALUE          42.0
+# endif
+# if 0
+# define TYPE           _Complex float
+# define xkblas_axpy    xkblas_caxpy
+# define VALUE          42.0f + 13.0f * I
+# endif
+# if 0
+# define TYPE           _Complex double
+# define xkblas_axpy    xkblas_zaxpy
+# define VALUE          42.0 + 13 * I
+# endif
+
+int
+main(void)
 {
-    switch (trans)
+    xkblas_init();
+
+    const int n = 1024;
+
+    TYPE * X = (TYPE *) malloc(n * sizeof(TYPE));
+    TYPE * Y = (TYPE *) malloc(n * sizeof(TYPE));
+
+    for (int i = 0 ; i < n ; ++i)
     {
-        case CblasNoTrans:      return oneapi::mkl::transpose::N;
-        case CblasTrans:        return oneapi::mkl::transpose::T;
-        case CblasConjTrans:    return oneapi::mkl::transpose::C;
+        X[i] = (TYPE) i;
+        Y[i] = (TYPE) (2 * i);
     }
-    LOGGER_FATAL("Unknown trans code");
-    abort();
+
+    const TYPE alpha = 1.0f;
+    const int incx = 1;
+    const int incy = 1;
+    xkblas_axpy(n, &alpha, X, incx, Y, incy);
+
+    for (int i = 0 ; i < n ; ++i)
+    {
+        TYPE x = (TYPE) i;
+        TYPE y = (TYPE) (2 * i);
+        assert(Y[i] == alpha * x + y);
+    }
+
+    xkblas_deinit();
+
+    return 0;
 }
-
-// Add this at the top of your file or in a header
-template<typename T>
-struct mkl_type { using type = T; };
-
-template<>
-struct mkl_type<float _Complex> { using type = std::complex<float>; };
-
-template<>
-struct mkl_type<double _Complex> { using type = std::complex<double>; };
-
-#endif /* __ONEAPI_MKL_HELPER_H__ */

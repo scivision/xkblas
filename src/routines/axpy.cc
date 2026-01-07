@@ -35,6 +35,16 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
+# include <xkblas/support.h>
+
+# if XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE
+#  define XKBLAS_NO_DEFAULT_BLAS_ENUM
+#  include <sycl/sycl.hpp>
+#  include <oneapi/mkl.hpp>
+#  include <sycl/ext/oneapi/backend/level_zero.hpp>
+#  include <xkblas/oneapi-mkl-helper.h>
+# endif /* XKBLAS_SUPPORT_SYCL */
+
 # include <xkblas/auto-tile.h>
 # include <xkblas/xkblas.hpp>
 
@@ -45,7 +55,7 @@ struct args_t
 {
     args_t(
         size_t n,
-        const TYPE * alpha,
+        const TYPE alpha,
         const int incx,
         const int incy
     ) :
@@ -60,7 +70,7 @@ struct args_t
     const size_t n;
     const int incx;
     const int incy;
-    const TYPE * alpha;
+    const TYPE alpha;
 };
 
 TYPED
@@ -95,7 +105,7 @@ xkblas_t::axpy_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(n, alpha, incx, incy);
+    new (args) args_t<P>(n, *alpha, incx, incy);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
@@ -230,7 +240,7 @@ hip_run(
         FUNC(
             handle,
             (int) args->n,
-            (const HIP_TYPE *) args->alpha,
+            (const HIP_TYPE *) &args->alpha,
             (const HIP_TYPE *) X->device_view.addr, args->incx,
             (      HIP_TYPE *) Y->device_view.addr, args->incy
         )
@@ -280,11 +290,12 @@ cuda_run(
 
     const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     assert(args);
+
     XKBLAS_CUBLAS_CALL(
         FUNC(
             handle,
             (int) args->n,
-            (const CU_TYPE *) args->alpha,
+            (const CU_TYPE *) &args->alpha,
             (const CU_TYPE *) X->device_view.addr, args->incx,
             (      CU_TYPE *) Y->device_view.addr, args->incy
         )
@@ -305,6 +316,91 @@ cuda(
 }
 # endif /* XKBLAS_SUPPORT_CUBLAS */
 
+# if XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE
+TYPED
+static sycl::event
+sycl_queue_launch(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    sycl::queue & queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    // unpack arguments
+    assert(task);
+
+    const access_t * accesses = TASK_ACCESSES(task);
+    const access_t * X = accesses + 0;
+    const access_t * Y = accesses + 1;
+
+    assert(X->device_view.addr % X->host_view.sizeof_type == 0);
+    assert(Y->device_view.addr % Y->host_view.sizeof_type == 0);
+
+    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    assert(args);
+
+    using mkl_type_t = typename mkl_type<TYPE>::type;
+
+    std::int64_t n = args->n;
+    const mkl_type_t alpha = *reinterpret_cast<const mkl_type_t *>(&args->alpha);
+    const mkl_type_t * x = reinterpret_cast<const mkl_type_t *>(X->device_view.addr);
+    std::int64_t incx = args->incx;
+    mkl_type_t * y = reinterpret_cast<mkl_type_t *>(Y->device_view.addr);
+    std::int64_t incy = args->incy;
+
+    const std::vector<sycl::event> dependencies = {};
+
+    return oneapi::mkl::blas::column_major::axpy(
+        queue,
+        n,
+        alpha,
+        x,
+        incx,
+        y,
+        incy,
+        dependencies
+    );
+}
+# endif /* XKBLAS_SUPPORT_SYCL || XKBLAS_SUPPORT_ZE */
+
+# if XKBLAS_SUPPORT_SYCL
+#  include <xkrt/driver/driver-sycl.h>
+
+TYPED
+static void
+sycl_launch(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    queue_sycl_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    queue->sycl.events.buffer[idx] = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
+}
+
+# endif /* XKBLAS_SUPPORT_SYCL */
+
+# if XKBLAS_SUPPORT_ZE
+#  include <xkrt/driver/driver-ze.h>
+
+TYPED
+static void
+ze(
+    runtime_t * runtime,
+    device_t * device,
+    task_t * task,
+    queue_ze_t * queue,
+    command_t * cmd,
+    queue_command_list_counter_t idx
+) {
+    sycl::event event = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
+    queue->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
+}
+
+# endif /* XKBLAS_SUPPORT_ZE */
+
 //////////////////////////
 // TASK FORMAT REGISTER //
 //////////////////////////
@@ -315,8 +411,8 @@ cuda(
 # define CUDA 1
 # define HIP  1
 # define HOST 0
-# define SYCL 0
-# define ZE   0
+# define SYCL 1
+# define ZE   1
 
 # include "task-format.cc"
 
