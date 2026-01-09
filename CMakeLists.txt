@@ -210,7 +210,39 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHIN
 install(DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
-    # SET(STRICT_OPTIONS -Wfatal-errors -Werror=conversion -ftrapv -Wno-sign-conversion)
+    SET(STRICT_OPTIONS
+        -Wall          # Common warnings
+        -Wextra        # Extra warnings
+        -Werror        # Treat warnings as errors
+        -Wshadow       # Warn if a variable hides another
+        -Wconversion   # Implicit type conversions
+        -Wsign-conversion
+        -Wformat=2     # Strict format checking
+        -Wfloat-equal  # Detect floating point equality checks
+        -Wundef        # Warn on undefined macros
+        #-Wcast-align   # Warn about pointer alignment
+        -Wpointer-arith
+        -Wstrict-overflow=5
+        -fno-common
+        -ftrapv
+        -Werror=conversion
+        -fstack-protector-strong
+        -fstrict-aliasing
+        -Wstack-protector
+        -Wundef
+        #-Wpedantic     # Enforce strict ISO compliance
+        #-Wfatal-errors
+        -Wmissing-declarations
+        -Wmissing-prototypes
+        -Wold-style-definition
+        -Wno-gnu-anonymous-struct
+        -Wno-shadow
+        -Wno-nested-anon-types
+        -Wno-sign-conversion
+        -Wno-unused-parameter
+        -Wno-float-equal
+        -Wno-missing-prototypes
+    )
     target_compile_options(${XKBLAS_NAME}       PRIVATE ${STRICT_OPTIONS})
     target_compile_options(${XKBLAS_NAME}_cblas PRIVATE ${STRICT_OPTIONS})
 endif()
@@ -312,8 +344,9 @@ if (USE_CBLAS)
     endif()
 
     find_package(BLAS)
-    if (${BLAS_FOUND})
+    if (BLAS_FOUND)
         message(STATUS "Found BLAS library.")
+        target_link_libraries(${XKBLAS_NAME} PRIVATE ${BLAS_LIBRARIES})
     else()
         add_compile_options("-DNO_CPU_BLAS=1")
         message(STATUS "Testing correctness requires a BLAS library, and none were found.")
@@ -334,7 +367,6 @@ if (USE_CBLAS)
     endif()
 
     include_directories(${BLAS_INCLUDE_DIRS})
-    target_link_libraries(${XKBLAS_NAME} PRIVATE ${BLAS_LIBRARIES})
 
 endif()
 

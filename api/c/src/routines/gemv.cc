@@ -43,12 +43,12 @@ extern "C"
 int
 xkblas_£gemv_tile_async(
     int transA,
-    const size_t m, const size_t n,
+    const int m, const int n,
     const TYPE * alpha,
     const TYPE * A, int lda,
     const TYPE * x, const int incx,
     const TYPE * beta,
-          TYPE * y, const size_t tm, const size_t mb, const int incy,
+          TYPE * y, const int tm, const int mb, const int incy,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->gemv_tile_async<xkblas_precision_t::££>(

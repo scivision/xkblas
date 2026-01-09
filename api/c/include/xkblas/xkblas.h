@@ -69,16 +69,16 @@ extern "C" {
     void xkblas_memory_segment_coherent_async(void * ptr, size_t size);
 
     void xkblas_memory_matrix_coherent_async(
-        void * ptr, size_t ld,
-        size_t m, size_t n,
+        void * ptr, int ld,
+        int m, int n,
         size_t sizeof_type
     );
 
     void xkblas_memory_segment_coherent_sync(void * ptr, size_t size);
 
     void xkblas_memory_matrix_coherent_sync(
-        void * ptr, size_t ld,
-        size_t m, size_t n,
+        void * ptr, int ld,
+        int m, int n,
         size_t sizeof_type
     );
 
@@ -232,14 +232,14 @@ extern "C" {
     //DEPRECATED("Use `xkblas_memory_natrix_coherent_async` instead")
         int xkblas_memory_coherent_async(
             int uplo, int memflag,
-            size_t M, size_t N,
-            void* A, size_t LD, size_t eltsize
+            int m, int n,
+            void * A, int ld, size_t eltsize
         );
 
         int xkblas_memory_coherent_sync(
             int uplo, int memflag,
-            size_t M, size_t N,
-            void* A, size_t LD, size_t eltsize
+            int m, int n,
+            void * A, int ld, size_t eltsize
         );
 
     #if defined(__STDC_NO_COMPLEX__)

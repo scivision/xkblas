@@ -3,7 +3,7 @@
 /*   trsm.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/09/19 10:41:41 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/12/15 19:16:51 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2026/01/08 16:32:55 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -24,10 +24,10 @@ int
 xkblas_£trsm_tile_async(
     int side, int uplo,
     int transA, int diag,
-    const size_t m, const size_t n,
+    const int m, const int n,
     const TYPE * alpha,
-    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-          TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+          TYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->trsm_tile_async<xkblas_precision_t::££>(side, uplo, transA, diag, m, n, alpha, A, Atm, Atn, Amb, Anb, lda, B, Btm, Btn, Bmb, Bnb, ldb, device_global_id);

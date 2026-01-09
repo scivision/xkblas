@@ -43,12 +43,12 @@ extern "C"
 int
 xkblas_£gemm_tile_async(
     int transA, int transB,
-    const size_t m, const size_t n, const size_t k,
+    const int m, const int n, const int k,
     const TYPE * alpha,
-    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+    const TYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const TYPE * beta,
-          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->gemm_tile_async<xkblas_precision_t::££>(

@@ -45,7 +45,7 @@ void
 xkblas_routine_auto_tile(
     xkblas_routine_t kernel,
     int * args,
-    size_t * bs
+    int * bs
 );
 
 #endif /* __AUTO_TILE_H__ */

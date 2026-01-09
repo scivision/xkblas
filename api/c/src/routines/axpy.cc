@@ -42,7 +42,7 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£axpy_tile_async(
-    const size_t n,
+    const int n,
     const TYPE * alpha,
     const TYPE * x, const int incx,
           TYPE * y, const int incy,

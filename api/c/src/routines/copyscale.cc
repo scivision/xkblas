@@ -42,12 +42,12 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£copyscale_tile_async(
-    size_t m, size_t n,
+    int m, int n,
     int should_copy,
     int * IW,
-    const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
-          TYPE * L, const size_t Lm, const size_t Ln, int ldl,
-          TYPE * U, const size_t Um, const size_t Un, int ldu,
+    const TYPE * D, const int Dm, const int Dn, int ldd,
+          TYPE * L, const int Lm, const int Ln, int ldl,
+          TYPE * U, const int Um, const int Un, int ldu,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->copyscale_tile_async<xkblas_precision_t::££>(m, n, should_copy, IW, D, Dm, Dn, ldd, L, Lm, Ln, ldl, U, Um, Un, ldu, device_global_id);

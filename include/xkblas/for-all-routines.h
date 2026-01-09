@@ -297,24 +297,24 @@ XKDEF(int,
 // LEVEL 2  - single tile
 XKDEF(int,
     copyscale_tile,
-    const size_t m, const size_t n,
+    const int m, const int n,
     int should_copy,
     int * IW,
-    const XKTYPE * D, const size_t Dm, const size_t Dn, int ldd,
-          XKTYPE * L, const size_t Lm, const size_t Ln, int ldl,
-          XKTYPE * U, const size_t Um, const size_t Un, int ldu,
+    const XKTYPE * D, const int Dm, const int Dn, int ldd,
+          XKTYPE * L, const int Lm, const int Ln, int ldl,
+          XKTYPE * U, const int Um, const int Un, int ldu,
     XKDEVICE device_global_id
 );
 
 XKDEF(int,
     gemv_tile,
     int transA,
-    const size_t m, const size_t n,
+    const int m, const int n,
     const XKTYPE * alpha,
     const XKTYPE * A, int lda,
     const XKTYPE * x, const int incx,
     const XKTYPE * beta,
-          XKTYPE * y, const size_t tm, const size_t mb, const int incy,
+          XKTYPE * y, const int tm, const int mb, const int incy,
     XKDEVICE device_global_id
 );
 
@@ -323,12 +323,12 @@ XKDEF(int,
 XKDEF(int,
     gemm_tile,
     int transA, int transB,
-    const size_t m, const size_t n, const size_t k,
+    const int m, const int n, const int k,
     const XKTYPE * alpha,
-    const XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-    const XKTYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+    const XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const XKTYPE * beta,
-          XKTYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     XKDEVICE device_global_id
 );
 
@@ -336,34 +336,34 @@ XKDEF(int,
     gemmt_tile,
     int uplo,
     int transA, int transB,
-    const size_t n, const size_t k,
+    const int n, const int k,
     const XKTYPE * alpha,
-    const XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-    const XKTYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+    const XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const XKTYPE * beta,
-          XKTYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     XKDEVICE device_global_id
 );
 
 XKDEF(int,
     herk_tile,
     int uplo, int trans,
-    const size_t n, const size_t k,
+    const int n, const int k,
     const XKTYPE_REAL * alpha,
-    const XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const XKTYPE_REAL * beta,
-          XKTYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     XKDEVICE device_global_id
 );
 
 XKDEF(int,
     syrk_tile,
     int uplo, int trans,
-    const size_t n, const size_t k,
+    const int n, const int k,
     const XKTYPE * alpha,
-    const XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const XKTYPE * beta,
-          XKTYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     XKDEVICE device_global_id
 );
 
@@ -371,10 +371,10 @@ XKDEF(int,
     trsm_tile,
     int side, int uplo,
     int transA, int diag,
-    const size_t m, const size_t n,
+    const int m, const int n,
     const XKTYPE * alpha,
-    const XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-          XKTYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+          XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     XKDEVICE device_global_id
 );
 
@@ -384,7 +384,7 @@ XKDEF(int,
     potrf_tile,
     int uplo,
     int n,
-    XKTYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     XKDEVICE device_global_id
 );
 

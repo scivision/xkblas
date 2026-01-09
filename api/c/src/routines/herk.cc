@@ -3,7 +3,7 @@
 /*   herk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/07/09 11:22:22 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/12/15 19:15:10 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2026/01/08 16:32:29 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,11 +23,11 @@ extern "C"
 int
 xkblas_£herk_tile_async(
     int uplo, int transA,
-    const size_t n, const size_t k,
+    const int n, const int k,
     const TYPE_REAL * alpha,
-    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const TYPE_REAL * beta,
-          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->herk_tile_async<xkblas_precision_t::££>(

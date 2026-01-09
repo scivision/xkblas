@@ -36,6 +36,7 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkblas/xkblas.h>
 
 XKRT_NAMESPACE_USE;
 

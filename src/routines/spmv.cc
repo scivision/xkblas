@@ -65,8 +65,8 @@ struct xkblas_matrix_csr_t
 
             /* tile cached info */
             device_global_id_t device_global_id;
-            size_t m0;
-            size_t m1;
+            int m0;
+            int m1;
             size_t nnz;
             size_t nnz_offset;
 
@@ -81,9 +81,9 @@ struct xkblas_matrix_csr_t
         int mt;
 
         /* tile sizes */
-        size_t ts;
+        int ts;
 
-        tiling_t(tile_t * tiles, int mt, size_t ts) :
+        tiling_t(tile_t * tiles, int mt, int ts) :
             tiles(tiles), mt(mt), ts(ts) {}
         ~tiling_t() {}
 
@@ -196,13 +196,13 @@ xkblas_t::spmv_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 2;
+    constexpr int ocr_access = 2;
     new (dev) task_dev_info_t(tile->device_global_id, ocr_access);
 
     ARGS_T * args = (ARGS_T *) TASK_ARGS(task, task_size);
     new (args) ARGS_T(this, transA, index_base, T, n, *alpha, *beta, tile);
 
-    # ifndef XKRT_SUPPORT_DEBUG
+    # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "spmv");
     # endif /* XKRT_SUPPORT_DEBUG */
 
@@ -266,19 +266,17 @@ xkblas_t::spmv_async(
 
     // retrieve tile size
     // The tile size is the number of rows `ts` (m) to use per task
-    size_t ts = this->conf.kernels[SPMV].tile;
+    int ts = this->conf.kernels[SPMV].tile;
     if (ts == 0)
     {
         struct {
             int m, n;
-            size_t nnz;
         } args;
         args.m = m;
         args.n = n;
-        args.nnz = nnz;
         xkblas_routine_auto_tile(SPMV, (int *) &args, &ts);
     }
-    const size_t mt = NUM_OF_TILES(m, ts);
+    const int mt = NUM_OF_TILES(m, ts);
 
     // distribution: cyclic
     const int ngpus = this->runtime.get_ndevices() - 1;
@@ -350,7 +348,7 @@ matrix_found:
     /////////////////
 
     // for each tile
-    for (size_t tm = 0 ; tm < mt ; ++tm)
+    for (int tm = 0 ; tm < mt ; ++tm)
     {
         TILE_T * tile = tiling->tiles + tm;
         if (!tiling_found)
@@ -490,13 +488,12 @@ cuda_run(
     cusparseSpMVAlg_t alg = CUSPARSE_SPMV_ALG_DEFAULT;
     cuda_csr_tile_metadata_t * mdt = (cuda_csr_tile_metadata_t *) tile->metadata[XKRT_DRIVER_TYPE_CUDA];
 
-    int64_t m = (tile->m1 - tile->m0);
+    int m = (tile->m1 - tile->m0);
     assert(m > 0);
 
     if (mdt == NULL)
     {
-        // offset row indices, pushing a kernel into the same cuda stream
-        // that ensures proper synchronization
+        // offset row indices, pushing a kernel into the a cuda stream
         if (args->index_type == I32)
         {
             assert(row->device_view.addr % sizeof(int32_t) == 0);
@@ -505,8 +502,8 @@ cuda_run(
         }
         else if (args->index_type == I64)
         {
-            assert(row->device_view.addr % sizeof(int64_t) == 0);
-            assert(col->device_view.addr % sizeof(int64_t) == 0);
+            assert(row->device_view.addr % sizeof(size_t) == 0);
+            assert(col->device_view.addr % sizeof(size_t) == 0);
             cuda_offset_vector_i64(queue->cu.handle.high, m+1, (int64_t *) row->device_view.addr, -((const int64_t) tile->nnz_offset));
         }
         else
@@ -523,7 +520,7 @@ cuda_run(
         CUSPARSE_SAFE_CALL(
             cusparseCreateDnVec(
                 &mdt->X,
-                (int64_t) args->n,
+                (size_t) args->n,
                 (void *) X_acc->device_view.addr,
                 CUDA_DATA_TYPE
             )
@@ -532,7 +529,7 @@ cuda_run(
         CUSPARSE_SAFE_CALL(
             cusparseCreateDnVec(
                 &mdt->Y,
-                (int64_t) m,
+                (size_t) m,
                 (void *) Y_acc->device_view.addr,
                 CUDA_DATA_TYPE
             )
@@ -543,9 +540,9 @@ cuda_run(
         CUSPARSE_SAFE_CALL(
             cusparseCreateCsr(
                 &mdt->A,
-                (int64_t) m,
-                (int64_t) args->n,
-                (int64_t) tile->nnz,
+                (size_t) m,
+                (size_t) args->n,
+                (size_t) tile->nnz,
                 (void *)    row->device_view.addr,
                 (void *)    col->device_view.addr,
                 (void *) values->device_view.addr,
@@ -580,6 +577,10 @@ cuda_run(
         assert(mdt->chunk);
         assert(tile->device_global_id == device_global_id);
 
+        // wait for offset kernel to complete
+        CU_SAFE_CALL(cuStreamSynchronize(queue->cu.handle.high));
+
+        // run preprocess
         CUSPARSE_SAFE_CALL(
             cusparseSpMV_preprocess(
                 handle,
