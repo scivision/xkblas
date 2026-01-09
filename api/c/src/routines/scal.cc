@@ -42,7 +42,7 @@ XKRT_NAMESPACE_USE;
 extern "C"
 int
 xkblas_£scal_tile_async(
-    const size_t n,
+    const int n,
     const TYPE * alpha,
     TYPE * x,
     const int incx,

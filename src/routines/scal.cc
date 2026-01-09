@@ -44,7 +44,7 @@ TYPED
 struct args_t
 {
     args_t(
-        size_t n,
+        int n,
         int incx,
         const TYPE * alpha
     ) :
@@ -55,7 +55,7 @@ struct args_t
 
     ~args_t() {}
 
-    const size_t n;
+    const int n;
     const int incx;
     const TYPE * alpha;
 };
@@ -84,7 +84,7 @@ xkblas_t::scal_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 0;
+    constexpr int ocr_access = 0;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -116,13 +116,13 @@ xkblas_t::scal_async(
 
     // get tile size
     xkblas_t * xkblas = xkblas_get();
-    size_t ts = xkblas->conf.kernels[SCAL].tile;
+    int ts = xkblas->conf.kernels[SCAL].tile;
     if (ts == 0)
     {
         int args[1] = { n };
         xkblas_routine_auto_tile(SCAL, args, &ts);
     }
-    const size_t nt = NUM_OF_TILES(n, ts);
+    const int nt = NUM_OF_TILES(n, ts);
 
     // get number of gpus
     const int ngpus = xkblas->runtime.get_ndevices() - 1;
@@ -130,9 +130,9 @@ xkblas_t::scal_async(
     distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, n, ts);
 
     // spawn tiles
-    for (size_t tn = 0 ; tn < nt ; ++tn)
+    for (int tn = 0 ; tn < nt ; ++tn)
     {
-        size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
+        int bs = (tn == nt-1) ? (n - tn*ts) : ts;
         device_global_id_t device_global_id = distribution1D_get(&d, tn);
         this->scal_tile_async<P>(bs, alpha, x + tn*ts*incx, incx, device_global_id);
     }

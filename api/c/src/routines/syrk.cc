@@ -3,7 +3,7 @@
 /*   syrk.cc                                                      .-*-.       */
 /*                                                              .'* *.'       */
 /*   Created: 2024/10/03 15:23:28 by Romain Pereira          __/_*_*(_        */
-/*   Updated: 2025/12/15 19:16:41 by Romain PEREIRA         / _______ \       */
+/*   Updated: 2026/01/08 16:32:51 by Romain PEREIRA         / _______ \       */
 /*                                                          \_)     (_/       */
 /*   License: CeCILL-C                                                        */
 /*                                                                            */
@@ -23,11 +23,11 @@ extern "C"
 int
 xkblas_£syrk_tile_async(
     int uplo, int trans,
-    const size_t n, const size_t k,
+    const int n, const int k,
     const TYPE * alpha,
-    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
+    const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const TYPE * beta,
-          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     xkrt_device_global_id_t device_global_id
 ) {
     return xkblas_get()->syrk_tile_async<xkblas_precision_t::££>(uplo, trans, n, k, alpha, A, Atm, Atn, Amb, Anb, lda, beta, C, Ctm, Ctn, Cmb, Cnb, ldc, device_global_id);

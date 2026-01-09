@@ -53,7 +53,7 @@ void
 xkblas_routine_auto_tile(
     xkblas_routine_t kernel,
     int * args,
-    size_t * ts
+    int * ts
 ) {
     xkblas_t * context = xkblas_get();
     assert(context);
@@ -61,7 +61,7 @@ xkblas_routine_auto_tile(
     const int ngpus = context->runtime.drivers.devices.n - 1;
     const double factor = 64.0;
 
-    size_t ts_auto = 0;
+    int ts_auto = 0;
     switch (kernel)
     {
         case (AXPY):
@@ -82,7 +82,7 @@ xkblas_routine_auto_tile(
             int m = args[0];
             int n = args[1];
 
-            ts_auto = (size_t) ceil(sqrt((double)m*(double)n / (factor * (double)ngpus)));
+            ts_auto = (int) ceil(sqrt((double)m*(double)n / (factor * (double)ngpus)));
             # define MIN_BS 2048
             if (ts_auto < MIN_BS)
                 ts_auto = MIN_BS;
@@ -92,10 +92,8 @@ xkblas_routine_auto_tile(
 
         case (SPMV):
         {
-            int m   = args[0];
-            int n   = args[1];
-            int nnz = args[2];
-            ts_auto = (size_t) m;
+            int m = args[0];
+            ts_auto = m;
             break ;
         }
 
@@ -108,5 +106,5 @@ xkblas_routine_auto_tile(
 
     *ts = ts_auto;
 
-    LOGGER_DEBUG("Return tile size = %lu", *ts);
+    LOGGER_DEBUG("Return tile size = %d", *ts);
 }

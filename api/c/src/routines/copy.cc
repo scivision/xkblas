@@ -55,7 +55,7 @@ xkblas_£copy_tile_async(
 extern "C"
 int
 xkblas_£copy_async(
-    size_t n,
+    int n,
     const TYPE * x,
     const int incx,
           TYPE * y,

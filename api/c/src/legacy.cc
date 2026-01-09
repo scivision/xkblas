@@ -37,6 +37,7 @@
 
 # include <xkblas/xkblas.hpp>
 # include <xkrt/xkrt.h>
+# include <xkblas/xkblas.h>
 # include <assert.h>
 
 XKRT_NAMESPACE_USE;
@@ -160,8 +161,9 @@ xkblas_set_param(size_t nb, size_t p)
     xkblas_t * context = xkblas_get();
     assert(context);
 
+    assert(nb < INT_MAX);
     for (int i = 0 ; i < XKBLAS_ROUTINE_MAX ; ++i)
-        context->conf.kernels[i].tile = nb;
+        context->conf.kernels[i].tile = (int)nb;
 }
 
 extern "C"
@@ -171,7 +173,8 @@ xkblas_set_tile_parameter(xkblas_routine_t kernel, size_t ts)
     xkblas_t * context = xkblas_get();
     assert(context);
 
-    context->conf.kernels[kernel].tile = ts;
+    assert(ts < INT_MAX);
+    context->conf.kernels[kernel].tile = (int)ts;
 }
 
 extern "C"

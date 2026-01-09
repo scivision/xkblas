@@ -43,7 +43,7 @@
 
 typedef struct  xkblas_conf_kernel_t
 {
-    size_t tile;
+    int tile;
 }               xkblas_conf_kernel_t;
 
 typedef struct  xkblas_conf_s

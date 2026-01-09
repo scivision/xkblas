@@ -89,7 +89,7 @@ struct args_t
 {
     args_t(
         int transA, int transB,
-        size_t m, size_t n, size_t k,
+        int m, int n, int k,
         const TYPE alpha,
         const TYPE beta
     ) :
@@ -106,9 +106,9 @@ struct args_t
 
     const int transA;
     const int transB;
-    const size_t m;
-    const size_t n;
-    const size_t k;
+    const int m;
+    const int n;
+    const int k;
     const TYPE alpha;
     const TYPE beta;
 
@@ -120,25 +120,25 @@ TYPED
 int
 xkblas_t::gemm_tile_async(
     int transA, int transB,
-    const size_t m, const size_t n, const size_t k,
+    const int m, const int n, const int k,
     const TYPE * alpha,
-    const TYPE * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda,
-    const TYPE * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb,
+    const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
+    const TYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const TYPE * beta,
-          TYPE * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc,
+          TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
     device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
 
-    const size_t A_offset_m = Atm * Amb;
-    const size_t A_offset_n = Atn * Anb;
-    const size_t B_offset_m = Btm * Bmb;
-    const size_t B_offset_n = Btn * Bnb;
-    const size_t C_offset_m = Ctm * Cmb;
-    const size_t C_offset_n = Ctn * Cnb;
+    const int A_offset_m = Atm * Amb;
+    const int A_offset_n = Atn * Anb;
+    const int B_offset_m = Btm * Bmb;
+    const int B_offset_n = Btn * Bnb;
+    const int C_offset_m = Ctm * Cmb;
+    const int C_offset_n = Ctn * Cnb;
 
-    LOGGER_DEBUG("Submitting tile C=(%zd,%zd) of size (%zd,%zd)", C_offset_m, C_offset_n, m, n);
+    LOGGER_DEBUG("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, m, n);
 
     # define AC 3
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
@@ -152,7 +152,7 @@ xkblas_t::gemm_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 2;
+    constexpr int ocr_access = 2;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -160,16 +160,16 @@ xkblas_t::gemm_tile_async(
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
-            "gemm(A=(%zd,%zd) ; B=(%zd,%zd) ; C=(%zd,%zd))",
+            "gemm(A=(%d,%d) ; B=(%d,%d) ; C=(%d,%d))",
             A_offset_m, A_offset_n, B_offset_m, B_offset_n, C_offset_m, C_offset_n);
     # endif /* XKRT_SUPPORT_DEBUG */
 
-    const size_t Am = (transA == CblasNoTrans) ? m : k;
-    const size_t An = (transA == CblasNoTrans) ? k : m;
-    const size_t Bm = (transB == CblasNoTrans) ? k : n;
-    const size_t Bn = (transB == CblasNoTrans) ? n : k;
-    const size_t Cm = m;
-    const size_t Cn = n;
+    const int Am = (transA == CblasNoTrans) ? m : k;
+    const int An = (transA == CblasNoTrans) ? k : m;
+    const int Bm = (transB == CblasNoTrans) ? k : n;
+    const int Bn = (transB == CblasNoTrans) ? n : k;
+    const int Cm = m;
+    const int Cn = n;
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
@@ -232,26 +232,26 @@ xkblas_t::gemm_async(
         return -5;
     }
 
-    const size_t Am = (transA == CblasNoTrans) ? m : k;
-    const size_t An = (transA == CblasNoTrans) ? k : m;
-    const size_t Bm = (transB == CblasNoTrans) ? k : n;
-    // const size_t Bn = (transB == CblasNoTrans) ? n : k;
-    const size_t Cm = m;
-    const size_t Cn = n;
+    const int Am = (transA == CblasNoTrans) ? m : k;
+    const int An = (transA == CblasNoTrans) ? k : m;
+    const int Bm = (transB == CblasNoTrans) ? k : n;
+    // const int Bn = (transB == CblasNoTrans) ? n : k;
+    const int Cm = m;
+    const int Cn = n;
 
-    if ((size_t)lda < MAX(1, Am))
+    if ((int)lda < MAX(1, Am))
     {
         LOGGER_FATAL("illegal value of lda");
         return -8;
     }
 
-    if ((size_t)ldb < MAX(1, Bm))
+    if ((int)ldb < MAX(1, Bm))
     {
         LOGGER_FATAL("illegal value of ldb");
         return -10;
     }
 
-    if ((size_t)ldc < MAX(1, Cm))
+    if ((int)ldc < MAX(1, Cm))
     {
         LOGGER_FATAL("illegal value of ldc");
         return -13;
@@ -259,7 +259,7 @@ xkblas_t::gemm_async(
 
     xkblas_t * context = xkblas_get();
 
-    size_t ts = context->conf.kernels[GEMM].tile;
+    int ts = context->conf.kernels[GEMM].tile;
     if (ts == 0)
     {
         int args[3] = {m, n, k};
@@ -267,19 +267,19 @@ xkblas_t::gemm_async(
     }
 
     /* set tiling parameters */
-    const size_t Amb = ts;
-    const size_t Anb = ts;
-    const size_t Bmb = ts;
-    const size_t Bnb = ts;
-    const size_t Cmb = ts;
-    const size_t Cnb = ts;
+    const int Amb = ts;
+    const int Anb = ts;
+    const int Bmb = ts;
+    const int Bnb = ts;
+    const int Cmb = ts;
+    const int Cnb = ts;
 
-    const size_t Amt = NUM_OF_TILES(Am, Amb);
-    const size_t Ant = NUM_OF_TILES(An, Anb);
-    // const size_t Bmt = NUM_OF_TILES(Bm, Bmb);
-    // const size_t Bnt = NUM_OF_TILES(Bn, Bnb);
-    const size_t Cmt = NUM_OF_TILES(Cm, Cmb);
-    const size_t Cnt = NUM_OF_TILES(Cn, Cnb);
+    const int Amt = NUM_OF_TILES(Am, Amb);
+    const int Ant = NUM_OF_TILES(An, Anb);
+    // const int Bmt = NUM_OF_TILES(Bm, Bmb);
+    // const int Bnt = NUM_OF_TILES(Bn, Bnb);
+    const int Cmt = NUM_OF_TILES(Cm, Cmb);
+    const int Cnt = NUM_OF_TILES(Cn, Cnb);
 
     /* distribute C in a cyclic-block manner */
     const int ngpus = context->runtime.get_ndevices() - 1;
@@ -293,22 +293,22 @@ xkblas_t::gemm_async(
     # define C(I, J) C, (I), (J), Cmb, Cnb, ldc
 
     // iterator on tiles
-    for (size_t tm = 0; tm < Cmt; ++tm)
+    for (int tm = 0; tm < Cmt; ++tm)
     {
-        size_t bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
-        for (size_t tn = 0; tn < Cnt; tn++)
+        int bs_mm = (tm == Cmt-1) ? (m-tm*Cmb) : Cmb;
+        for (int tn = 0; tn < Cnt; tn++)
         {
             const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
 
-            size_t bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
+            int bs_nn = (tn == Cnt-1) ? (n-tn*Cnb) : Cnb;
             // A: CblasNoTrans / B: CblasNoTrans
             if (transA == CblasNoTrans)
             {
                 if (transB == CblasNoTrans)
                 {
-                    for (size_t tk = 0; tk < Ant; ++tk)
+                    for (int tk = 0; tk < Ant; ++tk)
                     {
-                        size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
                                 transA, transB,
@@ -325,9 +325,9 @@ xkblas_t::gemm_async(
                 // A: CblasNoTrans / B: CBlasTrans
                 else
                 {
-                    for (size_t tk = 0; tk < Ant; ++tk)
+                    for (int tk = 0; tk < Ant; ++tk)
                     {
-                        size_t bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
+                        int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
                                 transA, transB,
@@ -347,9 +347,9 @@ xkblas_t::gemm_async(
             {
                 if (transB == CblasNoTrans)
                 {
-                    for (size_t tk = 0; tk < Amt; ++tk)
+                    for (int tk = 0; tk < Amt; ++tk)
                     {
-                        size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
                                 transA, transB,
@@ -366,9 +366,9 @@ xkblas_t::gemm_async(
                 // A: CblasTrans / B: CBlasTrans
                 else
                 {
-                    for (size_t tk = 0; tk < Amt; ++tk)
+                    for (int tk = 0; tk < Amt; ++tk)
                     {
-                        size_t bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
+                        int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
                                 transA, transB,
@@ -674,7 +674,7 @@ cl_run(
 
     // using offsets
     cl_mem a_buffer, b_buffer, c_buffer;
-    size_t a_offset, b_offset, c_offset;
+    int a_offset, b_offset, c_offset;
     driver_cl_get_buffer_and_offset_1D(device, A->device_view.addr, &a_buffer, &a_offset);
     driver_cl_get_buffer_and_offset_1D(device, B->device_view.addr, &b_buffer, &b_offset);
     driver_cl_get_buffer_and_offset_1D(device, C->device_view.addr, &c_buffer, &c_offset);
@@ -792,6 +792,6 @@ host(task_t * task)
     template int xkblas_t::gemm<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_sync<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::gemm_async<P>(int transA, int transB, int m, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * B, int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
-    template int xkblas_t::gemm_tile_async<P>(int transA, int transB, const size_t m, const size_t n, const size_t k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const size_t Atm, const size_t Atn, const size_t Amb, const size_t Anb, const size_t lda, const xkblas_precision_type_t<P> * B, const size_t Btm, const size_t Btn, const size_t Bmb, const size_t Bnb, const size_t ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const size_t Ctm, const size_t Ctn, const size_t Cmb, const size_t Cnb, const size_t ldc, device_global_id_t device_global_id);
+    template int xkblas_t::gemm_tile_async<P>(int transA, int transB, const int m, const int n, const int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda, const xkblas_precision_type_t<P> * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

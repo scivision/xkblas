@@ -36,6 +36,7 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkblas/xkblas.h>
 
 XKRT_NAMESPACE_USE;
 
@@ -51,8 +52,8 @@ xkblas_memory_segment_coherent_async(
 extern "C"
 void
 xkblas_memory_matrix_coherent_async(
-    void * ptr, size_t ld,
-    size_t m, size_t n,
+    void * ptr, int ld,
+    int m, int n,
     size_t sizeof_type
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
@@ -63,10 +64,10 @@ extern "C"
 int
 xkblas_memory_coherent_async(
     int uplo, int memflag,
-    size_t M, size_t N,
-    void* A, size_t LD, size_t eltsize
+    int m, int n,
+    void* A, int ld, size_t eltsize
 ) {
-    xkblas_memory_matrix_coherent_async(A, LD, M, N, eltsize);
+    xkblas_memory_matrix_coherent_async(A, ld, m, n, eltsize);
     return 0;
 }
 
@@ -82,8 +83,8 @@ xkblas_memory_segment_coherent_sync(
 extern "C"
 void
 xkblas_memory_matrix_coherent_sync(
-    void * ptr, size_t ld,
-    size_t m, size_t n,
+    void * ptr, int ld,
+    int m, int n,
     size_t sizeof_type
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
@@ -94,9 +95,9 @@ extern "C"
 int
 xkblas_memory_coherent_sync(
     int uplo, int memflag,
-    size_t M, size_t N,
-    void* A, size_t LD, size_t eltsize
+    int m, int n,
+    void* A, int ld, size_t eltsize
 ) {
-    xkblas_memory_matrix_coherent_sync(A, LD, M, N, eltsize);
+    xkblas_memory_matrix_coherent_sync(A, ld, m, n, eltsize);
     return 0;
 }

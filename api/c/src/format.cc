@@ -38,6 +38,7 @@
 # include <assert.h>
 # include <xkblas/xkblas.hpp>
 # include <xkrt/xkrt.h>
+# include <xkblas/xkblas.h>
 
 extern "C"
 xkrt_task_format_id_t

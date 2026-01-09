@@ -77,8 +77,8 @@ xkblas_t::fill_tile_async(
 
     # define AC 1
     constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr int task_size = task_compute_size(flags, AC);
+    constexpr int args_size = sizeof(args_t<P>);
 
     task_t * task = thread->allocate_task(task_size + args_size);
     new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, FILL), flags);
@@ -87,7 +87,7 @@ xkblas_t::fill_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 0;
+    constexpr int ocr_access = 0;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
@@ -118,22 +118,22 @@ xkblas_t::fill_async(
     xkblas_t * xkblas = xkblas_get();
     assert(xkblas);
 
-    size_t ts = xkblas->conf.kernels[FILL].tile;
+    int ts = xkblas->conf.kernels[FILL].tile;
     if (ts == 0)
     {
         int args[1] = {n};
         xkblas_routine_auto_tile(FILL, args, &ts);
     }
-    const size_t nt = NUM_OF_TILES(n, ts);
+    const int nt = NUM_OF_TILES(n, ts);
 
     const int ngpus = xkblas->runtime.get_ndevices() - 1;
     distribution_t d;
     distribution1D_init(&d, XKRT_DISTRIBUTION_TYPE_CYCLIC1D, ngpus, n, ts);
 
     // spawn tiles
-    for (size_t tn = 0 ; tn < nt ; ++tn)
+    for (int tn = 0 ; tn < nt ; ++tn)
     {
-        const size_t bs = (tn == nt-1) ? (n - tn*ts) : ts;
+        const int bs = (tn == nt-1) ? (n - tn*ts) : ts;
         const device_global_id_t device_global_id = distribution1D_get(&d, tn);
         this->fill_tile_async<P>(bs, x+tn*ts, value, device_global_id);
     }

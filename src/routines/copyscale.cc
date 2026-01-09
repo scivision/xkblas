@@ -53,13 +53,13 @@ XKRT_NAMESPACE_USE;
 typedef struct args_t
 {
     public:
-        const size_t m;
-        const size_t n;
+        const int m;
+        const int n;
         const int should_copy;
         int * IW;
 
         args_t(
-            size_t m, size_t n,
+            int m, int n,
             int should_copy, int * IW
         ) :
             m(m), n(n),
@@ -74,12 +74,12 @@ typedef struct args_t
 TYPED
 int
 xkblas_t::copyscale_tile_async(
-    const size_t m, const size_t n,
+    const int m, const int n,
     int should_copy,
     int * IW,
-    const TYPE * D, const size_t Dm, const size_t Dn, int ldd,
-          TYPE * L, const size_t Lm, const size_t Ln, int ldl,
-          TYPE * U, const size_t Um, const size_t Un, int ldu,
+    const TYPE * D, const int Dm, const int Dn, int ldd,
+          TYPE * L, const int Lm, const int Ln, int ldl,
+          TYPE * U, const int Um, const int Un, int ldu,
     device_global_id_t device_global_id
 ) {
     thread_t * thread = thread_t::get_tls();
@@ -97,7 +97,7 @@ xkblas_t::copyscale_tile_async(
     new (dep) task_dep_info_t(AC);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr size_t ocr_access = 1;
+    constexpr int ocr_access = 1;
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t * args = (args_t *) TASK_ARGS(task, task_size);
@@ -105,7 +105,7 @@ xkblas_t::copyscale_tile_async(
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label),
-            "copyscale(D=(%zu,%zu) ; L=(%zu,%zu) ; U=(%zu,%zu))", Dm, Dn, Lm, Ln, Um, Un);
+            "copyscale(D=(%d,%d) ; L=(%d,%d) ; U=(%d,%d))", Dm, Dn, Lm, Ln, Um, Un);
     # endif /* XKRT_SUPPORT_DEBUG */
 
     static_assert(AC <= TASK_MAX_ACCESSES);
@@ -155,7 +155,7 @@ xkblas_t::copyscale_async(
     xkblas_t * context = xkblas_get();
     assert(context);
 
-    size_t ts = context->conf.kernels[COPYSCALE].tile;
+    int ts = context->conf.kernels[COPYSCALE].tile;
     if (ts == 0)
     {
         int args[2] = {m, n};
@@ -163,26 +163,26 @@ xkblas_t::copyscale_async(
     }
 
     /* set tiling parameters */
-    const size_t Dmb = ts;
-    const size_t Dnb = ts;
-    const size_t Lmb = ts;
-    const size_t Lnb = ts;
-    const size_t Umb = ts;
-    const size_t Unb = ts;
+    const int Dmb = ts;
+    const int Dnb = ts;
+    const int Lmb = ts;
+    const int Lnb = ts;
+    const int Umb = ts;
+    const int Unb = ts;
 
-//  const size_t Dm  = n;
-//  const size_t Dn  = n;
-    const size_t Lm  = m;
-    const size_t Ln  = n;
-//  const size_t Um  = n;
-//  const size_t Un  = m;
+//  const int Dm  = n;
+//  const int Dn  = n;
+    const int Lm  = m;
+    const int Ln  = n;
+//  const int Um  = n;
+//  const int Un  = m;
 
- // const size_t Dmt = NUM_OF_TILES(Dm, Dmb);
- // const size_t Dnt = NUM_OF_TILES(Dn, Dnb);
-    const size_t Lmt = NUM_OF_TILES(Lm, Lmb);
-    const size_t Lnt = NUM_OF_TILES(Ln, Lnb);
-//  const size_t Umt = NUM_OF_TILES(Um, Umb);
-//  const size_t Unt = NUM_OF_TILES(Un, Unb);
+ // const int Dmt = NUM_OF_TILES(Dm, Dmb);
+ // const int Dnt = NUM_OF_TILES(Dn, Dnb);
+    const int Lmt = NUM_OF_TILES(Lm, Lmb);
+    const int Lnt = NUM_OF_TILES(Ln, Lnb);
+//  const int Umt = NUM_OF_TILES(Um, Umb);
+//  const int Unt = NUM_OF_TILES(Un, Unb);
 
     /* distribute C in a cyclic-block manner */
     const int ngpus = context->runtime.drivers.devices.n - 1;
@@ -193,12 +193,12 @@ xkblas_t::copyscale_async(
     # define L(i, j) L, i*Lmb, j*Lnb
     # define U(i, j) U, i*Umb, j*Unb
 
-    for (size_t tm = 0; tm < Lmt ; ++tm)
+    for (int tm = 0; tm < Lmt ; ++tm)
     {
-        const size_t bs_m = (tm == Lmt-1) ? (m-tm*Lnb) : Lnb;
-        for (size_t tn = 0; tn < Lnt ; ++tn)
+        const int bs_m = (tm == Lmt-1) ? (m-tm*Lnb) : Lnb;
+        for (int tn = 0; tn < Lnt ; ++tn)
         {
-            const size_t bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
+            const int bs_n = (tn == Lnt-1) ? (n-tn*Lmb) : Lmb;
             const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
             this->copyscale_tile_async<P>(
                 bs_m, bs_n,
@@ -409,6 +409,6 @@ hip(
     template int xkblas_t::copyscale<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
     template int xkblas_t::copyscale_sync<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
     template int xkblas_t::copyscale_async<P>(int m, int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, int ldu);    \
-    template int xkblas_t::copyscale_tile_async<P>(const size_t m, const size_t n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const size_t Dm, const size_t Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const size_t Lm, const size_t Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const size_t Um, const size_t Un, int ldu, device_global_id_t device_global_id);
+    template int xkblas_t::copyscale_tile_async<P>(const int m, const int n, int should_copy, int * IW, const xkblas_precision_type_t<xkblas_precision_t::P> * D, const int Dm, const int Dn, int ldd, xkblas_precision_type_t<xkblas_precision_t::P> * L, const int Lm, const int Ln, int ldl, xkblas_precision_type_t<xkblas_precision_t::P> * U, const int Um, const int Un, int ldu, device_global_id_t device_global_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
