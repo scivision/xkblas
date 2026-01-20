@@ -69,6 +69,8 @@ struct xkblas_matrix_csr_t
             int m1;
             size_t nnz;
             size_t nnz_offset;
+            int n_nnz_lower;
+            int n_nnz_upper;
 
             /* driver-specific metadata */
             void * metadata[XKRT_DRIVER_TYPE_MAX];
@@ -178,8 +180,6 @@ xkblas_t::spmv_tile_async(
     assert(tile);
     assert(tile->nnz);
 
-    const int m = (tile->m1 - tile->m0);
-
     // retrieve producer threads
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -189,8 +189,11 @@ xkblas_t::spmv_tile_async(
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(ARGS_T);
 
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, SPMV), flags);
+    const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SPMV);
+    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
@@ -213,11 +216,17 @@ xkblas_t::spmv_tile_async(
 
     assert(index_base == 0 || index_base == 1);
 
+    const int m   = tile->m1 - tile->m0;
+    const int x0  = tile->n_nnz_lower;                      // >= 0
+    const int x_n = tile->n_nnz_upper - tile->n_nnz_lower;  // <  n
+    const int y0  = tile->m0;
+    const int y_n = m;
+
     new (accesses + 0) access_t(task, row    + tile->m0,         m+1,       sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, col    + tile->nnz_offset, tile->nnz, sizeof(INDEX), A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 2) access_t(task, values + tile->nnz_offset, tile->nnz, sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 3) access_t(task, X,                         n,         sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    new (accesses + 4) access_t(task, Y      + tile->m0,         m,         sizeof(TYPE),  Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 3) access_t(task, X      + x0,               x_n,       sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
+    new (accesses + 4) access_t(task, Y      + y0,               y_n,       sizeof(TYPE),  Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     thread->resolve(accesses, AC);
     # undef AC
 
@@ -251,6 +260,14 @@ xkblas_t::spmv_async(
 
     if (*alpha == (TYPE) 0 && *beta == (TYPE) 0)
         return 0;
+
+    //  Y := alpha * op(A) * X + beta * Y
+    //  if alpha is 0, then it becomes a scal
+    if (*alpha == (TYPE) 0)
+    {
+        constexpr int incY = 1;
+        return this->scal_async<P>(m, beta, Y, incY);
+    }
 
     if (index_base != 0 && index_base != 1)
     {
@@ -351,19 +368,71 @@ matrix_found:
     for (int tm = 0 ; tm < mt ; ++tm)
     {
         TILE_T * tile = tiling->tiles + tm;
+
+        /* if the tiling was just created, initialize it */
         if (!tiling_found)
         {
             memset(tile->metadata, 0, sizeof(tile->metadata));
+
+            /* target device */
             tile->device_global_id = distribution1D_get(&d, tm);
+
+            /* tile start/end */
             tile->m0 = tm*ts;
             tile->m1 = (tm == mt-1) ? m : (tm+1) * ts;
+
+            /* number of nnz in the tile */
             tile->nnz = row[tile->m1] - row[tile->m0];
-            tile->nnz_offset = row[tile->m0] - index_base;
+
+            if (tile->nnz)
+            {
+                /* nnz_offset, so the tile indices start at 0 or 1 (depending on the index_base) on the GPU */
+                tile->nnz_offset = row[tile->m0] - index_base;
+
+                # if 1
+                /* find first and last column with nnz element, to minize data motion of 'x' and 'y' */
+                tile->n_nnz_lower = INT_MAX;
+                tile->n_nnz_upper = INT_MIN;
+
+                assert(tile->m0 < tile->m1);
+                for (int m = tile->m0 ; m < tile->m1 ; ++m)
+                {
+                    /* if row is not empty */
+                    if (row[m+0] != row[m+1])
+                    {
+                        tile->n_nnz_lower = (int) MIN(tile->n_nnz_lower, col[row[m+0] - index_base + 0] - index_base);
+                        tile->n_nnz_upper = (int) MAX(tile->n_nnz_upper, col[row[m+1] - index_base - 1] - index_base + 1);
+                    }
+                }
+
+                LOGGER_DEBUG("SPMV tile %d has nnz columns in indices [%d..%d[\n",
+                        tm, tile->n_nnz_lower, tile->n_nnz_upper);
+
+                assert(tile->n_nnz_lower != INT_MAX);
+                assert(tile->n_nnz_upper != INT_MIN);
+
+                # else
+                tile->n_nnz_lower = 0;
+                tile->n_nnz_upper = n;
+                # endif
+            }
         }
         assert(tile);
 
-        // tile spmv
-        this->spmv_tile_async<P, T>(alpha, transA, index_base, n, format, row, col, values, X, beta, Y, tile);
+        //  Y := alpha * op(A) * X + beta * Y
+        //
+        //  Submit the tile
+        //      If there is some nnz elements, run a 'normal' spmv tile
+        //      else, 'alpha * op(A) * X' become '0' and it becomes a scal
+        if (tile->nnz)
+        {
+            this->spmv_tile_async<P, T>(alpha, transA, index_base, n, format, row, col, values, X, beta, Y, tile);
+        }
+        else
+        {
+            constexpr int incY = 1;
+            this->scal_tile_async<P>(tile->m1 - tile->m0, beta, Y + tile->m0, incY, tile->device_global_id);
+        }
     }
 
     return 0;
@@ -479,6 +548,7 @@ cuda_run(
 
     TILE_T * tile = (TILE_T *) args->tile;
     assert(tile);
+    assert(tile->nnz);
 
     assert(values->device_view.addr % sizeof(CU_TYPE) == 0);
     assert( X_acc->device_view.addr % sizeof(CU_TYPE) == 0);
@@ -491,20 +561,33 @@ cuda_run(
     int m = (tile->m1 - tile->m0);
     assert(m > 0);
 
+    //  - X has to be offset, since the access points to the first nnz row.
+    //  'args->n' may be greater than 'tile->n_nnz_upper -
+    //  tile->n_nnz_lower' but it should be fine, since cusparse shouldnt
+    //  try to access it, as it is rows for which there is zeroes in the
+    //  matrix columns
+    //
+    //  - Y is all good
+    void * x_dev_ptr = (void *) (X_acc->device_view.addr - tile->n_nnz_lower * sizeof(TYPE));
+    void * y_dev_ptr = (void *) (Y_acc->device_view.addr);
+
     if (mdt == NULL)
     {
         // offset row indices, pushing a kernel into the a cuda stream
+        CUstream stream;
+        CUSPARSE_SAFE_CALL(cusparseGetStream(handle, &stream));
+
         if (args->index_type == I32)
         {
             assert(row->device_view.addr % sizeof(int32_t) == 0);
             assert(col->device_view.addr % sizeof(int32_t) == 0);
-            cuda_offset_vector_i32(queue->cu.handle.high, m+1, (int32_t *) row->device_view.addr, -((const int32_t) tile->nnz_offset));
+            cuda_offset_vector_i32(stream, m+1, (int32_t *) row->device_view.addr, -((const int32_t) tile->nnz_offset));
         }
         else if (args->index_type == I64)
         {
             assert(row->device_view.addr % sizeof(size_t) == 0);
             assert(col->device_view.addr % sizeof(size_t) == 0);
-            cuda_offset_vector_i64(queue->cu.handle.high, m+1, (int64_t *) row->device_view.addr, -((const int64_t) tile->nnz_offset));
+            cuda_offset_vector_i64(stream, m+1, (int64_t *) row->device_view.addr, -((const int64_t) tile->nnz_offset));
         }
         else
             LOGGER_FATAL("Invalid index_type");
@@ -516,12 +599,13 @@ cuda_run(
         cusparseIndexBase_t index_base = (args->index_base == 0)   ? CUSPARSE_INDEX_BASE_ZERO : CUSPARSE_INDEX_BASE_ONE;
         cusparseIndexType_t index_type = (args->index_type == I32) ? CUSPARSE_INDEX_32I       : CUSPARSE_INDEX_64I;
 
-        // setup vector desc
+        // setup vector descriptors
+
         CUSPARSE_SAFE_CALL(
             cusparseCreateDnVec(
                 &mdt->X,
                 (size_t) args->n,
-                (void *) X_acc->device_view.addr,
+                x_dev_ptr,
                 CUDA_DATA_TYPE
             )
         );
@@ -530,7 +614,7 @@ cuda_run(
             cusparseCreateDnVec(
                 &mdt->Y,
                 (size_t) m,
-                (void *) Y_acc->device_view.addr,
+                (void *) y_dev_ptr,
                 CUDA_DATA_TYPE
             )
         );
@@ -570,15 +654,12 @@ cuda_run(
             )
         );
 
-        // preprocess
+        // allocate workspace
         task_dev_info_t * dev = TASK_DEV_INFO(task);
         const device_global_id_t device_global_id = dev->elected_device_id;
         mdt->chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
         assert(mdt->chunk);
         assert(tile->device_global_id == device_global_id);
-
-        // wait for offset kernel to complete
-        CU_SAFE_CALL(cuStreamSynchronize(queue->cu.handle.high));
 
         // run preprocess
         CUSPARSE_SAFE_CALL(
@@ -600,8 +681,8 @@ cuda_run(
     {
         // to allow different (x, y) for the same (A)
         // I assumed the 'buffer_size' and 'preprocess' do not depend on (x, y)
-        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->X, (void *) X_acc->device_view.addr));
-        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->Y, (void *) Y_acc->device_view.addr));
+        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->X, x_dev_ptr));
+        CUSPARSE_SAFE_CALL(cusparseDnVecSetValues(mdt->Y, y_dev_ptr));
     }
 
     // TODO: is it safe to use the same 'workspace' (tile->chunk->ptr) in parallel ?

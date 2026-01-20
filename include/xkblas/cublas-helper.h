@@ -69,6 +69,82 @@
 
 # include "xkblas/cblas.h"
 
+/* device pointer to constant, to avoid copy parameters from host to device */
+# define XKBLAS_CUBLAS_FOREACH_CONST(F)  \
+    F(-2.0,  MTWO)                       \
+    F(-1.0,  MONE)                       \
+    F(-0.5, MHALF)                       \
+    F(-0.0, MZERO)                       \
+    F( 0.0,  ZERO)                       \
+    F( 0.5,  HALF)                       \
+    F( 1.0,   ONE)                       \
+    F( 2.0,   TWO)
+
+# include <xkblas/routine.h>
+
+typedef enum    xkblas_cublas_const_t
+{
+    # define F(VALUE, NAME) XKBLAS_CUBLAS_CONST_##NAME,
+    XKBLAS_CUBLAS_FOREACH_CONST(F)
+    # undef F
+    XKBLAS_CUBLAS_CONST_MAX
+}               xkblas_cublas_const_t;
+
+extern float            XKBLAS_CUBLAS_HOST_CONST_S[XKBLAS_CUBLAS_CONST_MAX];
+extern double           XKBLAS_CUBLAS_HOST_CONST_D[XKBLAS_CUBLAS_CONST_MAX];
+extern cuComplex        XKBLAS_CUBLAS_HOST_CONST_C[XKBLAS_CUBLAS_CONST_MAX];
+extern cuDoubleComplex  XKBLAS_CUBLAS_HOST_CONST_Z[XKBLAS_CUBLAS_CONST_MAX];
+
+extern float            * XKBLAS_CUBLAS_DEVICE_CONST_S[XKRT_DEVICES_MAX];
+extern double           * XKBLAS_CUBLAS_DEVICE_CONST_D[XKRT_DEVICES_MAX];
+extern cuComplex        * XKBLAS_CUBLAS_DEVICE_CONST_C[XKRT_DEVICES_MAX];
+extern cuDoubleComplex  * XKBLAS_CUBLAS_DEVICE_CONST_Z[XKRT_DEVICES_MAX];
+
+# include <xkblas/xkblas.hpp>
+# include <xkrt/consts.h>
+
+template <xkblas_precision_t P>
+static inline const TYPE * xkblas_cublas_pointer_mode(
+    xkblas_t * xkblas,
+    const xkrt::device_global_id_t device_global_id,
+    cublasHandle_t handle,
+    const TYPE * value
+) {
+    assert(device_global_id >= 0 && device_global_id < XKRT_DEVICES_MAX);
+    static std::mutex mtxs[XKRT_DEVICES_MAX];
+
+    volatile TYPE ** p_dst;
+    TYPE  * src;
+    # define FUNC(PX) if constexpr(P == xkblas_precision_t::PX) { p_dst = (volatile TYPE **) &XKBLAS_CUBLAS_DEVICE_CONST_##PX[device_global_id] ; src = (TYPE *) &XKBLAS_CUBLAS_HOST_CONST_##PX[0]; }
+    XKBLAS_FORALL_PRECISIONS(FUNC)
+    # undef FUNC
+
+    # define FUNC(VALUE, NAME)                                                                                          \
+        if (*value == (TYPE) VALUE)                                                                                     \
+        {                                                                                                               \
+            std::mutex * mtx = mtxs + device_global_id;                                                                 \
+            mtx->lock();                                                                                                \
+            if (*p_dst == NULL)                                                                                         \
+            {                                                                                                           \
+                const size_t buffer_size = sizeof(TYPE) * XKBLAS_CUBLAS_CONST_MAX;                                      \
+                *p_dst = (volatile TYPE *) xkblas->runtime.memory_device_allocate(device_global_id, buffer_size)->ptr;  \
+                assert(*p_dst);                                                                                         \
+                CUstream stream;                                                                                        \
+                CUBLAS_SAFE_CALL(cublasGetStream(handle, &stream));                                                     \
+                CU_SAFE_CALL(cuMemcpyHtoDAsync((CUdeviceptr) *p_dst, src, buffer_size, stream));                        \
+            }                                                                                                           \
+            mtx->unlock();                                                                                              \
+            cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE);                                                   \
+            return (const TYPE *) ((*p_dst) + XKBLAS_CUBLAS_CONST_##NAME);                                              \
+        }
+    XKBLAS_CUBLAS_FOREACH_CONST(FUNC)
+    # undef FUNC
+
+    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
+    return value;
+}
+
+
 static inline cublasOperation_t
 cblas2cublas_op(int trans)
 {

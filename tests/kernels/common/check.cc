@@ -99,6 +99,7 @@ TYPED
 static void
 dump_csr_matrix(
     const char * label,
+    int index_base,
     int m,
     int n,
     int * csr_row_offsets,
@@ -111,13 +112,13 @@ dump_csr_matrix(
     printf("---- %s ----\n", label);
     for (int i = 0; i < n; ++i)
     {
-        int start = csr_row_offsets[i];
-        int end = csr_row_offsets[i + 1];
+        int start = csr_row_offsets[i]   - index_base;
+        int end = csr_row_offsets[i + 1] - index_base;
         int idx = start;
 
         for (int j = 0; j < m; ++j)
         {
-            if (idx < end && csr_col_indices[idx] == j)
+            if (idx < end && csr_col_indices[idx] - index_base == j)
             {
                 printf("%4.4f ", csr_values[idx]);
                 ++idx;
@@ -134,6 +135,7 @@ dump_csr_matrix(
 TYPED
 int
 spmv_cpu(
+    int index_base,
     const TYPE * alpha,
     /* matrix A (in) */
     int transA,
@@ -159,8 +161,8 @@ spmv_cpu(
 
     for (int i = 0; i < nrows; i++) {
         double sum = 0.0;
-        for (int jj = row_ptr[i]; jj < row_ptr[i+1]; jj++) {
-            sum += values[jj] * x[col_idx[jj]];
+        for (int jj = row_ptr[i] - index_base; jj < row_ptr[i+1] - index_base; jj++) {
+            sum += values[jj] * x[col_idx[jj]-index_base];
         }
         y[i] = *alpha * sum + *beta * y[i];
 

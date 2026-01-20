@@ -44,10 +44,12 @@ TYPED
 struct args_t
 {
     args_t(
+        xkblas_t * xkblas,
         int n,
         int incx,
-        const TYPE * alpha
+        const TYPE alpha
     ) :
+        xkblas(xkblas),
         n(n),
         incx(incx),
         alpha(alpha)
@@ -55,9 +57,10 @@ struct args_t
 
     ~args_t() {}
 
+    xkblas_t * xkblas;
     const int n;
     const int incx;
-    const TYPE * alpha;
+    const TYPE alpha;
 };
 
 TYPED
@@ -77,8 +80,11 @@ xkblas_t::scal_tile_async(
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, SCAL), flags);
+    const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SCAL);
+    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
@@ -88,7 +94,7 @@ xkblas_t::scal_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(n, incx, alpha);
+    new (args) args_t<P>(this, n, incx, *alpha);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
@@ -110,6 +116,8 @@ xkblas_t::scal_async(
     const int incx
 ) {
     assert(alpha);
+
+    // TODO: if *alpha == (TYPE) 0.0, can we accelerate with a custom kernel ?
 
     if (n == 0 || *alpha == (TYPE) 1.0)
         return 0;
@@ -193,7 +201,6 @@ hip_run(
 
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
-    assert(args->alpha);
 
     XKBLAS_HIPBLAS_CALL(
         FUNC(
@@ -244,13 +251,16 @@ cuda_run(
 
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
-    assert(args->alpha);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    const device_global_id_t device_global_id = dev->elected_device_id;
+    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_global_id, handle, &args->alpha);
 
     XKBLAS_CUBLAS_CALL(
         FUNC(
             handle,
             (int) args->n,
-            (const CU_TYPE *) args->alpha,
+            (const CU_TYPE *) alpha,
             (      CU_TYPE *) x->device_view.addr, args->incx
         )
     );
@@ -281,7 +291,6 @@ host_run(task_t * task)
 
     const args_t<P> * args = (const args_t<P> *) TASK_ARGS(task);
     assert(args);
-    assert(args->alpha);
 
     FUNC(
         (int) args->n,
