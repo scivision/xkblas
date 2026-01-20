@@ -54,11 +54,13 @@ TYPED
 struct args_t
 {
     args_t(
+        xkblas_t * xkblas,
         int n,
-        const TYPE * alpha,
+        const TYPE alpha,
         const int incx,
         const int incy
     ) :
+        xkblas(xkblas),
         n(n),
         incx(incx),
         incy(incy),
@@ -67,10 +69,11 @@ struct args_t
 
     ~args_t() {}
 
+    xkblas_t * xkblas;
     const int n;
     const int incx;
     const int incy;
-    const TYPE alpha;
+    TYPE alpha;
 };
 
 TYPED
@@ -94,8 +97,11 @@ xkblas_t::axpy_tile_async(
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, AXPY), flags);
+    const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, AXPY);
+    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
@@ -105,7 +111,7 @@ xkblas_t::axpy_tile_async(
     new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
-    new (args) args_t<P>(n, *alpha, incx, incy);
+    new (args) args_t<P>(this, n, *alpha, incx, incy);
 
     static_assert(AC <= TASK_MAX_ACCESSES);
     access_t * accesses = TASK_ACCESSES(task, flags);
@@ -263,8 +269,8 @@ hip(
 # endif /* XKBLAS_SUPPORT_HIPBLAS */
 
 # if XKBLAS_SUPPORT_CUBLAS
-#  include <xkblas/cublas-helper.h>
 #  include <xkrt/driver/driver-cu.h>
+#  include <xkblas/cublas-helper.h>
 
 template <xkblas_precision_t P, auto FUNC, typename CU_TYPE>
 static inline void
@@ -288,14 +294,18 @@ cuda_run(
     assert(X->device_view.addr % X->host_view.sizeof_type == 0);
     assert(Y->device_view.addr % Y->host_view.sizeof_type == 0);
 
-    const args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     assert(args);
+
+    task_dev_info_t * dev = TASK_DEV_INFO(task);
+    const device_global_id_t device_global_id = dev->elected_device_id;
+    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_global_id, handle, &args->alpha);
 
     XKBLAS_CUBLAS_CALL(
         FUNC(
             handle,
             (int) args->n,
-            (const CU_TYPE *) &args->alpha,
+            (const CU_TYPE *) alpha,
             (const CU_TYPE *) X->device_view.addr, args->incx,
             (      CU_TYPE *) Y->device_view.addr, args->incy
         )

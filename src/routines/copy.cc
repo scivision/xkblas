@@ -80,8 +80,11 @@ xkblas_t::copy_tile_async(
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new (task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, COPY), flags);
+    const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, COPY);
+    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
 
     args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
     new (args) args_t<P>(n, incx, incy);

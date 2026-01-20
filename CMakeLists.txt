@@ -166,6 +166,10 @@ SET(C_SOURCE_FILES
     ${XKBLAS_ROUTINES_C_SOURCE_FILES}
 )
 
+if (USE_CUBLAS)
+    LIST(APPEND C_SOURCE_FILES src/routines/cublas-helper.cc)
+endif()
+
 #########
 # RPATH #
 #########
@@ -270,7 +274,7 @@ if (USE_CUDA)
     enable_language(CUDA)
     set_source_files_properties(${XKBLAS_CUDA_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
     add_library(${XKBLAS_NAME}_kernels_cuda SHARED ${XKBLAS_CUDA_KERNELS_SOURCE_FILES})
-    set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
+    set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "75")
     install(TARGETS ${XKBLAS_NAME}_kernels_cuda LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_cuda)
 endif()
@@ -286,7 +290,6 @@ if (USE_HIP)
     enable_language(HIP)
     set_source_files_properties(${XKBLAS_HIP_KERNELS_SOURCE_FILES} PROPERTIES LANGUAGE HIP)
     add_library(${XKBLAS_NAME}_kernels_hip SHARED ${XKBLAS_HIP_KERNELS_SOURCE_FILES})
-    # set_target_properties(${XKBLAS_NAME}_kernels_cuda PROPERTIES CUDA_ARCHITECTURES "50;72")
     install(TARGETS ${XKBLAS_NAME}_kernels_hip LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
     target_link_libraries(${XKBLAS_NAME} PRIVATE ${XKBLAS_NAME}_kernels_hip)
 endif()

@@ -35,69 +35,34 @@
 ** knowledge of the CeCILL-C license and that you accept its terms.
 **/
 
-# include <xkblas/xkblas.h>
-# include <xkblas/flops.h>
-# include <xkblas/cblas.h>
+# include <xkrt/consts.h>
+# include <xkblas/cublas-helper.h>
 
-# include <xkrt/logger/logger.h>
+XKRT_NAMESPACE_USE;
 
-# include <assert.h>
-# include <stdlib.h>
-# include <stdint.h>
-# include <string.h>
+/** Device pointers to constants */
+//    XKBLAS_CUBLAS_CONST_ZERO    = 0,
+//    XKBLAS_CUBLAS_CONST_HALF    = 1,
+//    XKBLAS_CUBLAS_CONST_ONE     = 2,
+//    XKBLAS_CUBLAS_CONST_TWO     = 3
 
-# if 1
-# define TYPE           float
-# define xkblas_axpy    xkblas_saxpy
-# define VALUE          42.0f
-# endif
-# if 0
-# define TYPE           double
-# define xkblas_axpy    xkblas_daxpy
-# define VALUE          42.0
-# endif
-# if 0
-# define TYPE           _Complex float
-# define xkblas_axpy    xkblas_caxpy
-# define VALUE          42.0f + 13.0f * I
-# endif
-# if 0
-# define TYPE           _Complex double
-# define xkblas_axpy    xkblas_zaxpy
-# define VALUE          42.0 + 13 * I
-# endif
+# define F(VALUE, NAME) (float) VALUE,
+float XKBLAS_CUBLAS_HOST_CONST_S[XKBLAS_CUBLAS_CONST_MAX] = { XKBLAS_CUBLAS_FOREACH_CONST(F) };
+# undef F
 
-int
-main(void)
-{
-    xkblas_init();
+# define F(VALUE, NAME) (double) VALUE,
+double XKBLAS_CUBLAS_HOST_CONST_D[XKBLAS_CUBLAS_CONST_MAX] = { XKBLAS_CUBLAS_FOREACH_CONST(F) };
+# undef F
 
-    const int n = 1024;
+# define F(VALUE, NAME) (cuComplex) VALUE,
+cuComplex XKBLAS_CUBLAS_HOST_CONST_C[XKBLAS_CUBLAS_CONST_MAX] = { XKBLAS_CUBLAS_FOREACH_CONST(F) };
+# undef F
 
-    TYPE * X = (TYPE *) malloc(n * sizeof(TYPE));
-    TYPE * Y = (TYPE *) malloc(n * sizeof(TYPE));
+# define F(VALUE, NAME) (cuDoubleComplex) VALUE,
+cuDoubleComplex XKBLAS_CUBLAS_HOST_CONST_Z[XKBLAS_CUBLAS_CONST_MAX] = { XKBLAS_CUBLAS_FOREACH_CONST(F) };
+# undef F
 
-    for (int i = 0 ; i < n ; ++i)
-    {
-        X[i] = (TYPE) i;
-        Y[i] = (TYPE) (2 * i);
-    }
-
-    const TYPE alpha = (TYPE) 1.0;
-    const int incx = 1;
-    const int incy = 1;
-    xkblas_axpy(n, &alpha, X, incx, Y, incy);
-
-    for (int i = 0 ; i < n ; ++i)
-    {
-        TYPE x = (TYPE) i;
-        TYPE y = (TYPE) (2 * i);
-        assert(Y[i] == alpha * x + y);
-        if (i < 5)
-            printf("Y[%d] = %f\n", i, Y[i]);
-    }
-
-    xkblas_deinit();
-
-    return 0;
-}
+float            * XKBLAS_CUBLAS_DEVICE_CONST_S[XKRT_DEVICES_MAX];
+double           * XKBLAS_CUBLAS_DEVICE_CONST_D[XKRT_DEVICES_MAX];
+cuComplex        * XKBLAS_CUBLAS_DEVICE_CONST_C[XKRT_DEVICES_MAX];
+cuDoubleComplex  * XKBLAS_CUBLAS_DEVICE_CONST_Z[XKRT_DEVICES_MAX];

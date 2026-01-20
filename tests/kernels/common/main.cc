@@ -36,7 +36,6 @@
 **/
 
 extern "C" {
-
     # include <stdio.h>
     # include <stdlib.h>
     # include <stdint.h>
@@ -210,6 +209,7 @@ prepare_csc_matrix(
 TYPED
 static void
 prepare_csr_matrix(
+    int index_base,
     double density,
     int m,
     int n,
@@ -232,7 +232,7 @@ prepare_csr_matrix(
     *csr_row_offsets    = (int *)  (memory + csr_values_size + csr_col_indices_size);
 
     *nnz = 0; // total nonzeros
-    (*csr_row_offsets)[0] = 0;
+    (*csr_row_offsets)[0] = index_base;
 
     for (int i = 0; i < m; ++i)
     {
@@ -246,12 +246,12 @@ prepare_csr_matrix(
                         break ;
 
                     (*csr_values)[*nnz]      = (rand() % 9) + 1; // random value 1–9
-                    (*csr_col_indices)[*nnz] = j;
+                    (*csr_col_indices)[*nnz] = j + index_base;
                     *nnz = *nnz + 1;
                 }
             }
         }
-        (*csr_row_offsets)[i+1] = *nnz;
+        (*csr_row_offsets)[i+1] = *nnz + index_base;
     }
 }
 
@@ -1346,8 +1346,9 @@ main_spmv(char ** args)
     int * csr_row_offsets, * csr_col_indices;
     TYPE * csr_values;
     const double density = (double) atof(args[5]);
-    prepare_csr_matrix<P>(density, m, n, &nnz, &csr_row_offsets, &csr_col_indices, &csr_values);
-    dump_csr_matrix<P>("A", m, n, csr_row_offsets, csr_col_indices, csr_values);
+    const int index_base = 1;
+    prepare_csr_matrix<P>(index_base, density, m, n, &nnz, &csr_row_offsets, &csr_col_indices, &csr_values);
+    dump_csr_matrix<P>("A", index_base, m, n, csr_row_offsets, csr_col_indices, csr_values);
 
     /* generate vectors X and Y */
     /* allocate vectors */
@@ -1365,9 +1366,7 @@ main_spmv(char ** args)
     const int fmt = CblasSparseCSR;
     // int fmt = CblasSparseCSC;
 
-    const int index_base = 0;
-
-    for (int i = 0 ; i < 5 ; ++i)
+    for (int i = 0 ; i < 1 ; ++i)
     {
         uint64_t t0 = get_nanotime();
         xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
@@ -1375,12 +1374,12 @@ main_spmv(char ** args)
         xkblas->sync();
         uint64_t tf = get_nanotime();
         printf("Took %lf s\n", (tf - t0) / 1.0e9);
-        dump_vector<P>("Y := alpha.A.X + beta.Y", Y, m);
+        dump_vector<P>("(GPU) Y := alpha.A.X + beta.Y", Y, m);
 
         if (!SKIP_CHECK)
         {
             /* run check */
-            int r = spmv_cpu<P>(&alpha, CblasNoTrans, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check, Y);
+            int r = spmv_cpu<P>(index_base, &alpha, CblasNoTrans, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y_check, Y);
             dump_vector<P>("CPU value of Y", Y_check, m);
             printf("Result is %12s\n", (r == 0) ? "CORRECT" : "INCORRECT");
         }
@@ -1755,7 +1754,7 @@ static func_t funcs[] = {
                     "  -      TS : tile size\n"
                     "  -   alpha : alpha\n"
                     "  -    beta : beta\n"
-                    "  - density : beta\n"
+                    "  - density : percentage of nnz (m*n/nnz)\n"
     },
 
     {

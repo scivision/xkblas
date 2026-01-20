@@ -139,6 +139,12 @@ typedef struct  xkblas_t
     void * memory_unified_allocate(const xkrt::device_global_id_t device_global_id, const size_t size);
     void memory_unified_deallocate(const xkrt::device_global_id_t device_global_id, void * mem, const size_t size);
 
+    // task allocation wrapper
+    inline xkrt::task_t * task_new(const xkrt::task_format_id_t fmtid, const xkrt::task_flag_bitfield_t flags, const size_t size)
+    {
+        return this->runtime.task_new(fmtid, flags, size);
+    }
+
     /////////////////////
     // Synchronization //
     /////////////////////

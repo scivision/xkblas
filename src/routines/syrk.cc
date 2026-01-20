@@ -130,8 +130,11 @@ xkblas_t::syrk_tile_async(
     constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
 
-    task_t * task = thread->allocate_task(task_size + args_size);
-    new(task) task_t(XKBLAS_XKRT_TASK_FORMAT_GET(P, SYRK), flags);
+    const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SYRK);
+    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+
+    task_det_info_t * det = TASK_DET_INFO(task);
+    new (det) task_det_info_t();
 
     task_dep_info_t * dep = TASK_DEP_INFO(task);
     new (dep) task_dep_info_t(AC);
