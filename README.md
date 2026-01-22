@@ -5,7 +5,7 @@ It implements API for C/C++/Julia with three flavors:
 
 | Name          | Example         | Calling Thread Behavior                          | Write-back to Host                        | Notes                                                                                                                                 |
 |---------------|-----------------|--------------------------------------------------|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-|| Drop-in      | gemm(...)       | Blocks until tasks complete                      | Automatic write-back of all device writes | Acts like a traditional blocking BLAS call; fully host-coherent on return. Device caches are invalidated on return.                   |
+| Drop-in       | gemm(...)       | Blocks until tasks complete                      | Automatic write-back of all device writes | Acts like a traditional blocking BLAS call; fully host-coherent on return. Device caches are invalidated on return.                   |
 | Synchronous   | gemm_sync(...)  | Blocks until tasks complete                      | No automatic write-back                   | Write-back must be explicitly requested via `XK.BLAS.memory_host_coherent_async`; data may remain coherent on devices                 |
 | Asynchronous  | gemm_async(...) | Spawns tasks and returns immediately             | No automatic write-back                   | Maximum overlap and composition; completion and write-back are fully programmer-controlled                                            |
 
