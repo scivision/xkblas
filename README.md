@@ -36,12 +36,12 @@ cd build
 CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PATH cmake -DUSE_CUDA=on -DUSE_CUBLAS=on -DUSE_SYCL=on -DUSE_MKL=on -DUSE_CLBLAST=on -DUSE_ZE=on -DCMAKE_BUILD_TYPE=Debug ../
 ```
 
-## List of kernels supported
+## List of routines supported
 If you need a missing kernel for a specific hardware, please speak up.
 
-Note that adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward (most likely ~5min of coding).
+Adding support for a new API (CUDA/HIP/Level Zero) on a kernel that is already supported by another API is rather straightforward.
 
-Adding support for an unsupported kernel may involve more work.
+Adding support for an unsupported routine may involve more work (i.e., define a multi-GPU distribution strategy).
 
 ### Level 1
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
