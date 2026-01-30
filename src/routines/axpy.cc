@@ -120,6 +120,10 @@ xkblas_t::axpy_tile_async(
     thread->resolve(accesses, AC);
     # undef AC
 
+    # if XKRT_SUPPORT_DEBUG
+    snprintf(task->label, sizeof(task->label), "axpy(n=%d)", n);
+    # endif /* XKRT_SUPPORT_DEBUG */
+
     this->runtime.task_commit(task);
 
     return 0;

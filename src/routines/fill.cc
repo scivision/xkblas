@@ -97,7 +97,7 @@ xkblas_t::fill_tile_async(
     new (args) args_t<P>(n, value);
 
     # if XKRT_SUPPORT_DEBUG
-    snprintf(task->label, sizeof(task->label), "fill(x)");
+    snprintf(task->label, sizeof(task->label), "fill(n=%d)", n);
     # endif /* XKRT_SUPPORT_DEBUG */
 
     static_assert(AC <= TASK_MAX_ACCESSES);

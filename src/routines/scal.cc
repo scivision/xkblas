@@ -102,6 +102,10 @@ xkblas_t::scal_tile_async(
     thread->resolve(accesses, AC);
     # undef AC
 
+    # if XKRT_SUPPORT_DEBUG
+    snprintf(task->label, sizeof(task->label), "scale(n=%d)", n);
+    # endif /* XKRT_SUPPORT_DEBUG */
+
     this->runtime.task_commit(task);
 
     return 0;

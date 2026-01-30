@@ -110,6 +110,10 @@ xkblas_t::dot_tile_async(
     thread->resolve(accesses, AC);
     # undef AC
 
+    # if XKRT_SUPPORT_DEBUG
+    snprintf(task->label, sizeof(task->label), "dot(n=%d)", n);
+    # endif /* XKRT_SUPPORT_DEBUG */
+
     this->runtime.task_commit(task);
 
     return 0;
