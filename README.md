@@ -66,7 +66,7 @@ Adding support for an unsupported routine may involve more work (i.e., define a 
 | trmm        | ✗   | ✗    | ✗   | ✗               | ✗      |
 | trsm        | ✓   | ✓    | ✓   | ✗               | ✗      |
 
-### Lapacke
+### Lapack
 | Kernel      | CPU | CUDA | HIP | Level Zero/SYCL | OpenCL |
 |-------------|-----|------|-----|-----------------|--------|
 | geqrf       | ✗   | ✗    | ✗   | ✗               | ✗      |
