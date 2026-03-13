@@ -17,6 +17,7 @@
 #include <cooperative_groups.h>
 #include <cuComplex.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include<ztask_internal.h>
@@ -109,9 +110,9 @@ void cuda_zcopyscale(
 	 *	- ...
 	 */
 
-	dim3 T = { (unsigned int) n, (unsigned int) m, 1 }; // How many threads we need
-	dim3 B = { 32, 32, 1 }; // Bloc shape
-	dim3 G = { (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z }; // Grid
+	dim3 T( (unsigned int) n, (unsigned int) m, 1 ); // How many threads we need
+	dim3 B( 32, 32, 1 ); // Bloc shape
+	dim3 G( (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z ); // Grid
 
 	// We will store L and D-1 (as a vector)
 	int element_in_shared = B.x*B.y + 1*B.x;
@@ -245,9 +246,9 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 	IW = iw_gpu;	
 #define niv12_B
 #ifdef niv12_A 
-	dim3 T = { (unsigned int) nrows, (unsigned int) nrows, 1 }; // How many threads we need
-	dim3 B = { 32, 32, 1 }; // Bloc shape
-	dim3 G = { (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z }; // Grid
+	dim3 T( (unsigned int) nrows, (unsigned int) nrows, 1 ); // How many threads we need
+	dim3 B( 32, 32, 1 ); // Bloc shape
+	dim3 G( (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z ); // Grid
 	kernel_zniv12<<<G,B,0,cuda_stream>>>( A, A_SON, IW, nrows, ncols, nass1, nelim, nfront, cb_compressed );
 #endif	
 	//printf("nrows %d ncols %d nfront %d\n", nrows, ncols, nfront);
@@ -259,9 +260,9 @@ void cuda_zniv12( cudaStream_t cuda_stream, cuDoubleComplex* A, cuDoubleComplex*
 	*/
 #ifdef niv12_B
 	struct timespec t2;
-	dim3 T = { (unsigned int) nfront, (unsigned int) nrows, 1 }; // How many threads we need
-	dim3 B = { 512, 1, 1 }; // Bloc shape
-	dim3 G = { (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z }; // Grid
+	dim3 T( (unsigned int) nfront, (unsigned int) nrows, 1 ); // How many threads we need
+	dim3 B( 512, 1, 1 ); // Bloc shape
+	dim3 G( (T.x + B.x - 1)/B.x,  (T.y + B.y - 1)/B.y, (T.z + B.z - 1)/B.z ); // Grid
 	
 	int* starts = (int*) alloca( G.x * sizeof(int) );
 	int* stops  = (int*) alloca( G.x * sizeof(int) );
