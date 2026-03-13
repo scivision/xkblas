@@ -955,6 +955,7 @@ void* kaapi_cuda_register_thread(void* dummy )
           /* TG: todo if we want to have perdevice use_unified.
              this global test should be changed.
           */
+#if defined(KAAPI_UNIFIED)
           if (kaapi_default_param.use_unified)
           {
             // We need to prefetch the data
@@ -963,7 +964,9 @@ void* kaapi_cuda_register_thread(void* dummy )
             loc.id = 0;
             err = cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc );
       //err = cudaMemPrefetchAsync( req.ptr, req.size, 0, NULL );
-          } else {
+          } else
+#endif
+	  {
             err = cudaHostRegister(req.ptr, req.size, cudaHostRegisterPortable);
             if (!( (cudaSuccess == err) || (cudaErrorHostMemoryAlreadyRegistered == err)))
             {
@@ -974,6 +977,7 @@ void* kaapi_cuda_register_thread(void* dummy )
         }
         else if (req.op == DEVICE_UNREGISTER_REQUEST)
         {
+#if defined(KAAPI_UNIFIED)
           if (kaapi_default_param.use_unified)
           {
             /* TG: todo if we want to have perdevice use_unified.
@@ -985,7 +989,9 @@ void* kaapi_cuda_register_thread(void* dummy )
             cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseUnsetPreferredLocation, loc);
       //cudaMemAdvise_v2(req.ptr, req.size, cudaMemAdviseSetPreferredLocation, loc);
       //err = cudaMemPrefetchAsync( req.ptr, req.size, cudaCpuDeviceId, NULL );
-          } else {
+          } else
+#endif
+	  {
             err = cudaHostUnregister(req.ptr);
             if (!( (cudaSuccess == err) || (cudaErrorHostMemoryNotRegistered == err)))
             {

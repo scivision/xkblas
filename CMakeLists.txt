@@ -37,7 +37,7 @@ option(KAAPI_BUILD_TESTING "Compile /testing files" OFF)
 option(KAAPI_USE_HWLOC "To set if Kaapi should be compiled with support for HWLOC." ON)
 
 option(XKBLAS_BUILD_COPYSCALE "Build the copyscale function" OFF)
-option(ENABLE_KAAPI_UNIFIED "Enable KAAPI_UNIFIED_MACRO" OFF)
+option(ENABLE_KAAPI_UNIFIED "Enable KAAPI_UNIFIED_MACRO" ON)
 option(ENABLE_KAAPI_NVTX "Enable NVTX profiling for the CPU threads" OFF)
 
 
@@ -59,7 +59,6 @@ endif()
 #--- Unified
 if(ENABLE_KAAPI_UNIFIED)
   add_definitions(-DKAAPI_UNIFIED)
-  #add_definitions(-DKAAPI_UNIFIED_PARTIAL)
 endif()
 
 if(ENABLE_KAAPI_NVTX)
