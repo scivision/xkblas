@@ -282,6 +282,7 @@ typedef struct kaapi_driver {
 		void (*f_free_unified)(void*);
 #endif //defined(KAAPI_UNIFIED)
 
+#if defined(KAAPI_DIRECT_MEMORY_MANAGEMENT)
     /* direct access to some specific functions */
     void (*f_memset)(void*,int,size_t);
     void (*f_memcpy)(void*,void*,size_t);
@@ -289,7 +290,7 @@ typedef struct kaapi_driver {
     void (*f_advise_cpu)(void*,size_t);
     void (*f_host_register_direct)(void*,size_t);
     void (*f_host_unregister_direct)(void*);
-
+#endif
 		void (*f_sniv12_sync)(int,int,int,int*,float*,int,float*,int,int);
 		void (*f_dniv12_sync)(int,int,int,int*,double*,int,double*,int,int);
 		void (*f_cniv12_sync)(int,int,int,int*,Complex32_t*,int,Complex32_t*,int,int);

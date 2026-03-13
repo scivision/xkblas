@@ -101,6 +101,7 @@ static size_t NB = 0;
 void xkblas_activate_custom_alloc(){}
 void xkblas_deactivate_custom_alloc(){}
 
+#if defined(KAAPI_DIRECT_MEMORY_MANAGEMENT)
 void xkblas_host_register_direct(void* ptr,size_t size)
 {
 #if KAAPI_USE_CUDA
@@ -144,6 +145,7 @@ void xkblas_memcpy(void* dst, void* src, size_t count)
 #endif
 	driver->f_memcpy( dst, src, count );
 }
+#endif
 
 #if defined(KAAPI_UNIFIED)
 //kaapi_driver_t* _last_used_driver; // Used to allow free after malloc... not clean but current MUMPS version finalize xkblas before freeing TODO FIX
@@ -2713,6 +2715,7 @@ const char* get_xkblas_info(void)
 /*
  * Unified work buffer implementation (should be moved in kaapi)
  */
+#if defined(KAAPI_DIRECT_MEMORY_MANAGEMENT)
 pthread_mutex_t work_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  work_buffer_cond  = PTHREAD_COND_INITIALIZER;
 struct memory_segment {
@@ -3156,7 +3159,6 @@ void xkblas_register_work_buffer( void* ptr, size_t size )
 
 
 
-
 void xkblas_bind_cpu( void* ptr, size_t size )
 {
 #if KAAPI_USE_CUDA
@@ -3190,5 +3192,6 @@ void xkblas_unregister_work_buffer( void* ptr )
 
 	pthread_mutex_unlock( &work_buffer_mutex );
 }
+#endif
 
 

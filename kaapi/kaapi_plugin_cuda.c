@@ -2532,6 +2532,7 @@ void init_local_thread_stream()
 	cudaStreamCreateWithFlags( &local_thread_stream, cudaStreamNonBlocking );
 }
 
+#if defined(KAAPI_DIRECT_MEMORY_MANAGEMENT)
 KAAPI_CLASS_ENTRYPOINT void
 KAAPI_PLUGIN_ENTRYPOINT(memset)( void* ptr, int val, size_t count )
 {
@@ -2583,6 +2584,7 @@ KAAPI_PLUGIN_ENTRYPOINT(host_unregister_direct)(void* ptr)
 {
         cudaHostUnregister(ptr);
 }
+#endif
 
 #if 0
 // TODO clean this, temporary
@@ -2678,8 +2680,10 @@ void KAAPI_PLUGIN_ENTRYPOINT(get_cuda_driver)(kaapi_driver_t* driver)
 #if defined(KAAPI_UNIFIED)
   EP (malloc_unified);
   EP (free_unified);
+#if defined(KAAPI_DIRECT_MEMORY_MANAGEMENT)
   EP (advise_gpu);
   EP (advise_cpu);
+#endif
 #endif //defined(KAAPI_UNIFIED)
 }
 #endif
