@@ -2431,19 +2431,18 @@ KAAPI_CLASS_ENTRYPOINT int KAAPI_PLUGIN_ENTRYPOINT(device_commit)(kaapi_device_t
       if (access)
       {
         res = hipDeviceEnablePeerAccess(kaapi_device_ids[kaapi_device_list[j]->inherited.device_id], 0 );
-        kaapi_hip_CheckError(res);
-//#warning
-//printf("Device %i enable Peer Access with device %i\n", device->inherited.device_id, kaapi_device_list[j]->inherited.device_id);
-        verboseok = 1;
-      }
-      int device1 = kaapi_device_ids[device->inherited.device_id];
-      int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
-      int rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*hip_device_count+device2]);
-      kaapi_assert_debug(rank !=0);
-      if (hip_perf_device[ device1*hip_count_perfrank+ rank] & (1<<device2))
-      {
-        device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
-        ld->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+        if ((res == hipSuccess)||(res == hipErrorPeerAccessAlreadyEnabled))
+        {
+          int device1 = kaapi_device_ids[device->inherited.device_id];
+          int device2 = kaapi_device_ids[kaapi_device_list[j]->inherited.device_id];
+          int rank = find_perfrank(hip_count_perfrank, hip_perf_topo[device1*hip_device_count+device2]);
+          kaapi_assert_debug(rank !=0);
+          if (hip_perf_device[ device1*hip_count_perfrank+ rank] & (1<<device2))
+          {
+            device->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+            ld->affinity[rank-1] |= (1UL<<kaapi_memory_asid_get_lid(kaapi_device_list[j]->inherited.memdev.asid));
+          }
+	}
       }
     }
     else
