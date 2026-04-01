@@ -254,7 +254,7 @@ XKDEF(int,
     const int incx,
           XKTYPE * y,
     const int incy,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -264,7 +264,7 @@ XKDEF(int,
     const int incx,
           XKTYPE * y,
     const int incy,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -274,7 +274,7 @@ XKDEF(int,
     const XKTYPE * y, const int incy,
     const XKTYPE * temp_r,
           XKTYPE * r,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -282,7 +282,7 @@ XKDEF(int,
     int n,
     XKTYPE * x,
     const XKTYPE value,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -291,7 +291,7 @@ XKDEF(int,
     const XKTYPE * alpha,
     XKTYPE * x,
     const int incx,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 // LEVEL 2  - single tile
@@ -303,7 +303,7 @@ XKDEF(int,
     const XKTYPE * D, const int Dm, const int Dn, int ldd,
           XKTYPE * L, const int Lm, const int Ln, int ldl,
           XKTYPE * U, const int Um, const int Un, int ldu,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -315,7 +315,7 @@ XKDEF(int,
     const XKTYPE * x, const int incx,
     const XKTYPE * beta,
           XKTYPE * y, const int tm, const int mb, const int incy,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 // LEVEL 3 TILE
@@ -329,7 +329,7 @@ XKDEF(int,
     const XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const XKTYPE * beta,
           XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -342,7 +342,7 @@ XKDEF(int,
     const XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const XKTYPE * beta,
           XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -353,7 +353,7 @@ XKDEF(int,
     const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const XKTYPE_REAL * beta,
           XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -364,7 +364,7 @@ XKDEF(int,
     const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const XKTYPE * beta,
           XKTYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 XKDEF(int,
@@ -375,7 +375,7 @@ XKDEF(int,
     const XKTYPE * alpha,
     const XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
           XKTYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 // LAPACKE TILE
@@ -385,7 +385,7 @@ XKDEF(int,
     int uplo,
     int n,
     XKTYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
-    XKDEVICE device_global_id
+    XKDEVICE device_unique_id
 );
 
 // SPARSE

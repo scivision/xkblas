@@ -45,9 +45,9 @@ xkblas_£fill_tile_async(
     int n,
     TYPE * x,
     const TYPE value,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->fill_tile_async<xkblas_precision_t::££>(n, x, value, device_global_id);
+    return xkblas_get()->fill_tile_async<xkblas_precision_t::££>(n, x, value, device_unique_id);
 }
 
 extern "C"

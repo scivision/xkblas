@@ -117,7 +117,7 @@ xkblas_t::gemv_tile_async(
     const TYPE * x, const int incx,
     const TYPE * beta,
           TYPE * y, const int tm, const int mb, const int incy,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -125,38 +125,26 @@ xkblas_t::gemv_tile_async(
     const int y_offset_m = tm * mb ;
 
     # define AC 3
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, GEMV);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 2;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 2;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(transA, m, n, incx, incy, *alpha, *beta);
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "gemv(A ; x ; y=(%d,))", y_offset_m);
     # endif /* XKRT_SUPPORT_DEBUG */
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     access_mode_t Axmode = (*alpha == (const TYPE) 0.0) ? ACCESS_MODE_V : ACCESS_MODE_R;
     access_mode_t  ymode = ( *beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
     new (accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, m, n, sizeof(TYPE), Axmode, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, x +     0, incx*n, sizeof(TYPE), Axmode, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 2) access_t(task, y + tm*mb, incy*m, sizeof(TYPE), ymode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -237,7 +225,7 @@ xkblas_t::gemv_async(
     // iterator on tiles
     for (int tm = 0; tm < mt; ++tm)
     {
-        device_global_id_t device_global_id = distribution1D_get(&d, tm);
+        device_unique_id_t device_unique_id = distribution1D_get(&d, tm);
         int bs_mm = (tm == mt-1) ? (m-tm*mb) : mb;
         this->gemv_tile_async<P>(
             transA,
@@ -247,7 +235,7 @@ xkblas_t::gemv_async(
             x, incx,
             beta,
             y, tm, mb, incy,
-            device_global_id
+            device_unique_id
         );
     }
     LOGGER_DEBUG("GEMV dependency graph submitted");
@@ -284,7 +272,7 @@ xkblas_t::gemv(
 ) {
     this->memory_invalidate_caches();
     int r = this->gemv_async<P>(transA, m, n, alpha, A, lda, x, incx, beta, y, incy);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, y, n*sizeof(TYPE)*incy);
     this->sync();
     return r;
 }
@@ -301,7 +289,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
@@ -342,7 +330,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(gemv);
 }
@@ -360,7 +348,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
@@ -401,7 +389,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(gemv);
 }
@@ -484,6 +472,6 @@ host(task_t * task)
     template int xkblas_t::gemv<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_sync<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
     template int xkblas_t::gemv_async<P>(int transA, int m, int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int incy);    \
-    template int xkblas_t::gemv_tile_async<P>(int transA, const int m, const int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int ytm, const int ymb, const int incy, device_global_id_t device_global_id);
+    template int xkblas_t::gemv_tile_async<P>(int transA, const int m, const int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * y, const int ytm, const int ymb, const int incy, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

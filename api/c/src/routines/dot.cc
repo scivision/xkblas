@@ -46,9 +46,9 @@ xkblas_£dot_tile_async(
     const TYPE * x, const int incx,
     const TYPE * y, const int incy,
           TYPE * r,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->dot_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, NULL, r, device_global_id);
+    return xkblas_get()->dot_tile_async<xkblas_precision_t::££>(n, x, incx, y, incy, NULL, r, device_unique_id);
 }
 
 extern "C"

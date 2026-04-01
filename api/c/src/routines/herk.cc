@@ -28,7 +28,7 @@ xkblas_£herk_tile_async(
     const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const TYPE_REAL * beta,
           TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
     return xkblas_get()->herk_tile_async<xkblas_precision_t::££>(
         uplo, transA,
@@ -37,7 +37,7 @@ xkblas_£herk_tile_async(
         A, Atm, Atn, Amb, Anb, lda,
         beta,
         C, Ctm, Ctn, Cmb, Cnb, ldc,
-        device_global_id
+        device_unique_id
     );
 }
 

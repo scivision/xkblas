@@ -49,7 +49,7 @@ xkblas_£gemm_tile_async(
     const TYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
     const TYPE * beta,
           TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
     return xkblas_get()->gemm_tile_async<xkblas_precision_t::££>(
         transA, transB,
@@ -59,7 +59,7 @@ xkblas_£gemm_tile_async(
         B, Btm, Btn, Bmb, Bnb, ldb,
         beta,
         C, Ctm, Ctn, Cmb, Cnb, ldc,
-        device_global_id
+        device_unique_id
     );
 }
 

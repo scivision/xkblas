@@ -57,6 +57,7 @@ extern "C" {
 # include <xkblas/xkblas.h>
 # include <xkblas/cblas.h>
 # include <xkblas/xkblas.hpp>
+# include <xkblas/flops.h>
 static xkblas_t * xkblas;
 
 # if !NO_CPU_BLAS
@@ -67,6 +68,9 @@ static bool SKIP_CHECK = 0;
 static bool ALIGN_MATRICES = 0;
 static bool REGISTER_MEMORY = 1;
 static bool DUMP_GRAPH = 0;
+static bool RECORD = 0;
+static bool REPLAY = 0;
+static bool EXECUTE_COMMANDS = 1;
 static int MUMPS_AUTOTUNE_FROM = 0;
 
 /////////////////////////
@@ -107,13 +111,13 @@ preallocate(
     int m, int n,
     int ld
 ) {
-    for (xkrt::device_global_id_t device_global_id = 0 ; device_global_id < xkblas->runtime.get_ndevices() ; ++device_global_id)
+    for (xkrt::device_unique_id_t device_unique_id = 0 ; device_unique_id < xkblas->runtime.get_ndevices() ; ++device_unique_id)
     {
-        if (device_global_id == HOST_DEVICE_GLOBAL_ID)
+        if (device_unique_id == XKRT_HOST_DEVICE_UNIQUE_ID)
             continue ;
 
         xkblas->runtime.memory_noncoherent_alloc(
-            device_global_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
+            device_unique_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
         );
     }
 }
@@ -125,13 +129,13 @@ premove(
     int m, int n,
     int ld
 ) {
-    for (xkrt::device_global_id_t device_global_id = 0 ; device_global_id < xkblas->runtime.get_ndevices() ; ++device_global_id)
+    for (xkrt::device_unique_id_t device_unique_id = 0 ; device_unique_id < xkblas->runtime.get_ndevices() ; ++device_unique_id)
     {
-        if (device_global_id == HOST_DEVICE_GLOBAL_ID)
+        if (device_unique_id == XKRT_HOST_DEVICE_UNIQUE_ID)
             continue ;
 
         xkblas->memory_coherent_async(
-            device_global_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
+            device_unique_id, MATRIX_COLMAJOR, M, ld, m, n, sizeof(TYPE)
         );
     }
     xkblas->sync();
@@ -150,7 +154,7 @@ xkblas_tests_alloc(const size_t size)
     }
     # else
     xkrt::runtime_t * runtime = xkblas_xkrt_runtime();
-    const xkrt::device_global_id_t device = 1;
+    const xkrt::device_unique_id_t device = 1;
     const uintptr_t memory = (const uintptr_t) runtime->memory_unified_allocate(device, size);
     # endif
 
@@ -334,7 +338,7 @@ main_axpy(char ** args)
 
     set_tile_size(ts);
     xkblas->axpy_async<P>(n, &alpha, X, 1, Y, 1);
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, n*sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, Y, n*sizeof(TYPE));
     xkblas_sync();
 
     // for small vectors
@@ -402,7 +406,7 @@ main_gemm_gemm(char ** args)
                 set_tile_size(ts2);
                 xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
 
-                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
+                xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
 
                 uint64_t tt = get_nanotime();
                 xkblas_sync();
@@ -459,7 +463,7 @@ main_potrf(char ** args)
     dump_matrix<P>("A ", A, n, n, ld);
     set_tile_size(ts);
     xkblas->potrf_async<P>(uplo, n, A, ld);
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, A, ld, n, n, sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, A, ld, n, n, sizeof(TYPE));
     xkblas_sync();
     dump_matrix<P>("A ", A, n, n, ld);
 
@@ -519,35 +523,54 @@ main_gemm(char ** args)
         }
     }
 
+    set_tile_size(ts);
+
     int t1 = 0;
     int t2 = 0;
+   //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+       //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
 
-    //for (int t1 = 0 ; t1 < N_CBLAS_TRANSPOSE ; ++t1)
+    //constexpr bool execute_commands = false;
+    xkblas_record_t record;
+    int max_iter = REPLAY ? 5 : 1;
+    uint64_t t0, tt, tf;
+    for (int i = 0 ; i < max_iter ; ++i)
     {
-        //for (int t2 = 0 ; t2 < N_CBLAS_TRANSPOSE ; ++t2)
+        printf("[iter=%d] Running implementation with (%s, %s)\n", i, TRANS_STR[t1], TRANS_STR[t2]);
+        memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
+
+        if (i == 0)
         {
-            memcpy(CImpl, C, sizeof(TYPE) * (ld * ld));
-
-            printf("Running implementation with (%s, %s)\n", TRANS_STR[t1], TRANS_STR[t2]);
-            uint64_t t0 = get_nanotime();
-            set_tile_size(ts);
+            t0 = get_nanotime();
+            if (RECORD) xkblas->record_start(&record, EXECUTE_COMMANDS);
             xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, A, ld, B, ld, &beta, CImpl, ld);
-            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
-            uint64_t tt = get_nanotime();
-            xkblas_sync();
-            uint64_t tf = get_nanotime();
-
-            printf("Implementation took %lf s. (graph construction took %lf s.)\n", // - %.2lf TFlop/s\n",
-                    (tf-t0)/1e9, (tt-t0)/1e9 //, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
-            );
-            if (!SKIP_CHECK)
-            {
-                memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
-                int r = gemm_cmp<P>(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
-                printf("Result is %12s with trans (%s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", TRANS_STR[t1], TRANS_STR[t2]);
-            }
-            xkblas_memory_invalidate_caches();
+            xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, CImpl, ld, m, n, sizeof(TYPE));
+            tt = get_nanotime();
+            if (RECORD) xkblas->record_stop();
+            else        xkblas->sync();
+            tf = get_nanotime();
         }
+        else
+        {
+            t0 = get_nanotime();
+            tt = get_nanotime();
+            xkblas->record_replay(&record);
+            tf = get_nanotime();
+        }
+
+        printf("[iter=%d] Implementation took %lf s. (graph construction took %lf s.) - %.2lf TFlop/s (single precision)\n",
+            i, (tf-t0)/1e9, (tt-t0)/1e9, FLOPS_SGEMM(m, n, k) / ((tf-t0)/1e9) / 1e12
+        );
+
+        if (!SKIP_CHECK)
+        {
+            printf("Checking result...\n");
+            memcpy(CRef,  C, sizeof(TYPE) * (ld * ld));
+            int r = gemm_cmp<P>(TRANS[t1], TRANS[t2], m, n, k, alpha, A, ld, B, ld, beta, C, CRef, CImpl, ld, 1);
+            printf("Result is %12s with trans (%s, %s)\n", (r == 0) ? "CORRECT" : "INCORRECT", TRANS_STR[t1], TRANS_STR[t2]);
+        }
+
+        // xkblas_memory_invalidate_caches();
     }
 
     # undef A
@@ -600,7 +623,7 @@ main_syrk(char ** args)
         uint64_t t0 = get_nanotime();
         set_tile_size(ts);
         xkblas->syrk_async<P>(uplo, TRANS[t1], n, k, &alpha, A, ld, &beta, CImpl, ld);
-        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, CImpl, ld, n, n, sizeof(TYPE));
+        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, CImpl, ld, n, n, sizeof(TYPE));
         uint64_t tt = get_nanotime();
         xkblas_sync();
         uint64_t tf = get_nanotime();
@@ -682,7 +705,7 @@ main_trsm(char ** args)
                         }
                         uint64_t t0 = get_nanotime();
                         xkblas->trsm_rec_async<P>(SIDE[s], UPLO[u], TRANS[t], DIAG[d], m, n, &alpha, A, ld, BImpl, ld, m_threshold);
-                        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
+                        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, BImpl, ld, m, n, sizeof(TYPE));
                         uint64_t t1 = get_nanotime();
                         xkblas_sync();
                         uint64_t tf = get_nanotime();
@@ -738,8 +761,8 @@ main_copyscale(char ** args)
         int * IW = NULL;
         set_tile_size(ts);
         xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
-        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, m, n, sizeof(TYPE));
-        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, n, m, sizeof(TYPE));
+        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, L, ld, m, n, sizeof(TYPE));
+        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, U, ld, n, m, sizeof(TYPE));
         xkblas_sync();
         uint64_t tf = get_nanotime();
         printf("Implementation took %lf s.\n", (tf - t0) / (double)1e9);
@@ -866,14 +889,14 @@ main_mumps_checker(char ** args)
 
     set_tile_size(ts1);
     xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
-    // xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
+    // xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
 
     set_tile_size(ts2);
     xkblas->gemmt_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
 
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
 
     xkblas_sync();
     xkblas_memory_invalidate_caches();
@@ -1186,15 +1209,15 @@ main_mumps(char ** args)
                 xkblas->copyscale_async<P>(m, n, should_copy, IW, D, ld, L, ld, U, ld);
 
                 # if USE_WRITE_BACK
-                // xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
-                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
-                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
+                // xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, D, ld, m, m, sizeof(TYPE));
+                xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, L, ld, n, m, sizeof(TYPE));
+                xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, U, ld, m, n, sizeof(TYPE));
                 # endif
                 set_tile_size(ts[i][2]);
                 xkblas->gemmt_async<P>(CblasUpper, CblasNoTrans, CblasNoTrans, m, n, &alpha, U, ld, L, ld, &beta, G, ld);
 
                 # if USE_WRITE_BACK
-                xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
+                xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, G, ld, m, m, sizeof(TYPE));
                 # endif
 
                 uint64_t tt = get_nanotime();
@@ -1293,10 +1316,10 @@ main_trsm_copyscale_gemm(char ** args)
             xkblas->copyscale_async<P>(m, k, should_copy, IW, D, ld, L, ld, U, ld);
             xkblas->gemm_async<P>(TRANS[t1], TRANS[t2], m, n, k, &alpha, L, ld, U, ld, &beta, G, ld);
 
-            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, D, ld, k, k, sizeof(TYPE));
-            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, L, ld, m, k, sizeof(TYPE));
-            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, U, ld, k, n, sizeof(TYPE));
-            xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, G, ld, m, n, sizeof(TYPE));
+            xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, D, ld, k, k, sizeof(TYPE));
+            xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, L, ld, m, k, sizeof(TYPE));
+            xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, U, ld, k, n, sizeof(TYPE));
+            xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, G, ld, m, n, sizeof(TYPE));
 
             uint64_t tt = get_nanotime();
             xkblas_sync();
@@ -1370,7 +1393,7 @@ main_spmv(char ** args)
     {
         uint64_t t0 = get_nanotime();
         xkblas->spmv_async<P, I32>(&alpha, CblasNoTrans, index_base, m, n, nnz, fmt, csr_row_offsets, csr_col_indices, csr_values, X, &beta, Y);
-        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
+        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, Y, m * sizeof(TYPE));
         xkblas->sync();
         uint64_t tf = get_nanotime();
         printf("Took %lf s\n", (tf - t0) / 1.0e9);
@@ -1428,7 +1451,7 @@ main_gemv(char ** args)
     /* run spmv */
     set_tile_size(ts);
     xkblas->gemv_async<P>(CblasNoTrans, m, n, &alpha, A, ld, X, 1, &beta, Y, 1);
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m * sizeof(TYPE));
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, Y, m * sizeof(TYPE));
     xkblas->sync();
     uint64_t tf = get_nanotime();
     dump_vector<P>("y := alpha.A.X + beta.y", Y, m);
@@ -1507,7 +1530,7 @@ main_scal(char ** args)
 
     uint64_t t0 = get_nanotime();
     xkblas->scal_async<P>(n, &alpha, X, incx);
-    xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, X, sizeof(TYPE) * n);
+    xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, X, sizeof(TYPE) * n);
     xkblas->sync();
     uint64_t tf = get_nanotime();
 
@@ -1571,7 +1594,7 @@ main_pin_gemm_unpin(char ** args)
         printf("Gemm took %lf s\n", (t2-t1)/1e9);
         # endif
 
-        xkblas->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ld, n, n, sizeof(TYPE));
+        xkblas->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, C, ld, n, n, sizeof(TYPE));
 
         # if SYNC
         xkblas->sync();
@@ -1835,10 +1858,29 @@ main(int argc, char ** argv)
     REGISTER_MEMORY = getenv("REGISTER_MEMORY") ? atoi(getenv("REGISTER_MEMORY")) : REGISTER_MEMORY;
     DUMP_GRAPH = getenv("DUMP_GRAPH") ? atoi(getenv("DUMP_GRAPH")) : DUMP_GRAPH;
     MUMPS_AUTOTUNE_FROM = getenv("MUMPS_AUTOTUNE_FROM") ? atoi(getenv("MUMPS_AUTOTUNE_FROM")) : MUMPS_AUTOTUNE_FROM;
+    RECORD = getenv("RECORD") ? atoi(getenv("RECORD")) : RECORD;
+    REPLAY = getenv("REPLAY") ? atoi(getenv("REPLAY")) : REPLAY;
+    EXECUTE_COMMANDS = getenv("EXECUTE_COMMANDS") ? atoi(getenv("EXECUTE_COMMANDS")) : EXECUTE_COMMANDS;
+
     printf("Skipping checks (SKIP_CHECK) %s\n", SKIP_CHECK ? "enabled" : "disabled");
     printf("Align matrices (ALIGN_MATRICES) %s\n", ALIGN_MATRICES ? "enabled" : "disabled");
     printf("Register memory (REGISTER_MEMORY) %s\n", REGISTER_MEMORY ? "enabled" : "disabled");
     printf("Dumping graph (DUMP_GRAPH) %s\n", DUMP_GRAPH ? "enabled" : "disabled");
+    printf("Recording graph (RECORD) %s\n", RECORD ? "enabled" : "disabled");
+    printf("Replaying graph (REPLAY) %s\n", REPLAY ? "enabled" : "disabled");
+    printf("Execute commands when recording (EXECUTE_COMMANDS) %s\n", EXECUTE_COMMANDS ? "enabled" : "disabled");
+
+    if (!RECORD && REPLAY)
+    {
+        LOGGER_FATAL("Cannot use RECORD=0 and REPLAY=1");
+        return 0;
+    }
+
+    if (!RECORD && EXECUTE_COMMANDS)
+    {
+        LOGGER_FATAL("Cannot use RECORD=0 and EXECUTE_COMMANDS=1");
+        return 0;
+    }
 
     srand(0x16112003);
 
@@ -1861,6 +1903,7 @@ main(int argc, char ** argv)
                 xkblas = xkblas_get();
                 int r = func->f(args);
 
+                # if 0
                 # if XKRT_SUPPORT_DEBUG
                 if (DUMP_GRAPH)
                 {
@@ -1870,6 +1913,7 @@ main(int argc, char ** argv)
                     fclose(f);
                     printf("Graph dumped\n");
                 }
+                # endif
                 # endif
 
                 xkblas_deinit();

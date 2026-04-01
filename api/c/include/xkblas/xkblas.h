@@ -65,6 +65,15 @@ extern "C" {
     /* deinitialize the runtime (must be called by the main thread) */
     void xkblas_deinit(void);
 
+    /* start record an xkblas sequence for later replay -- return the record */
+    void * xkblas_record_start(int execute_commands);
+
+    /* replay a finalized record */
+    void xkblas_record_replay(void * record);
+
+    /* finalize a record -- takes the record as parameter */
+    void xkblas_record_stop(void * record);
+
     /* make memory coherent on some physical memory */
     void xkblas_memory_segment_coherent_async(void * ptr, size_t size);
 
@@ -84,13 +93,13 @@ extern "C" {
 
     /* generic taks spawning routines */
     void xkblas_async(
-        xkrt_device_global_id_t device_global_id,
+        xkrt_device_unique_id_t device_unique_id,
         void (*func)(void *),
         void * args
     );
 
     void xkblas_async_with_accesses(
-        xkrt_device_global_id_t device_global_id,
+        xkrt_device_unique_id_t device_unique_id,
         void (*func)(void *),
         void * args,
         const xkrt_access_t * accesses,
@@ -98,14 +107,14 @@ extern "C" {
     );
 
     void xkblas_async_with_format(
-        const xkrt_device_global_id_t device_global_id,
+        const xkrt_device_unique_id_t device_unique_id,
         const xkrt_task_format_id_t fmtid,
         const void * args,
         const size_t args_size
     );
 
     void xkblas_async_with_format_with_accesses(
-        const xkrt_device_global_id_t device_global_id,
+        const xkrt_device_unique_id_t device_unique_id,
         const xkrt_task_format_id_t fmtid,
         const void * args,
         const size_t args_size,
@@ -115,13 +124,13 @@ extern "C" {
 
     /* Julia versions, that require special flags */
     void xkblas_detachable_async(
-        xkrt_device_global_id_t device_global_id,
+        xkrt_device_unique_id_t device_unique_id,
         void (*func)(void *),
         void * args
     );
 
     void xkblas_detachable_async_with_accesses(
-        xkrt_device_global_id_t device_global_id,
+        xkrt_device_unique_id_t device_unique_id,
         void (*func)(void *),
         void * args,
         const xkrt_access_t * accesses,
@@ -129,14 +138,14 @@ extern "C" {
     );
 
     void xkblas_detachable_async_with_format(
-        const xkrt_device_global_id_t device_global_id,
+        const xkrt_device_unique_id_t device_unique_id,
         const xkrt_task_format_id_t fmtid,
         const void * args,
         const size_t args_size
     );
 
     void xkblas_detachable_async_with_format_with_accesses(
-        const xkrt_device_global_id_t device_global_id,
+        const xkrt_device_unique_id_t device_unique_id,
         const xkrt_task_format_id_t fmtid,
         const void * args,
         const size_t args_size,

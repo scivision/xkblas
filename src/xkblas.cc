@@ -115,16 +115,16 @@ xkblas_t::memory_invalidate_caches(void)
 
 void
 xkblas_t::memory_coherent_async(
-    device_global_id_t device_global_id,
+    device_unique_id_t device_unique_id,
     void * ptr,
     size_t size
 ) {
-    return this->runtime.memory_coherent_async(device_global_id, ptr, size);
+    return this->runtime.memory_coherent_async(device_unique_id, ptr, size);
 }
 
 void
 xkblas_t::memory_coherent_async(
-    device_global_id_t device_global_id,
+    device_unique_id_t device_unique_id,
     matrix_storage_t storage,
     void * ptr,
     int ld,
@@ -132,21 +132,21 @@ xkblas_t::memory_coherent_async(
     int n,
     size_t sizeof_type
 ) {
-    return this->runtime.memory_coherent_async(device_global_id, storage, ptr, ld, m, n, sizeof_type);
+    return this->runtime.memory_coherent_async(device_unique_id, storage, ptr, ld, m, n, sizeof_type);
 }
 
 void
 xkblas_t::memory_coherent_sync(
-    device_global_id_t device_global_id,
+    device_unique_id_t device_unique_id,
     void * ptr,
     size_t size
 ) {
-    return this->runtime.memory_coherent_sync(device_global_id, ptr, size);
+    return this->runtime.memory_coherent_sync(device_unique_id, ptr, size);
 }
 
 void
 xkblas_t::memory_coherent_sync(
-    device_global_id_t device_global_id,
+    device_unique_id_t device_unique_id,
     matrix_storage_t storage,
     void * ptr,
     int ld,
@@ -154,7 +154,7 @@ xkblas_t::memory_coherent_sync(
     int n,
     size_t sizeof_type
 ) {
-    return this->runtime.memory_coherent_sync(device_global_id, storage, ptr, ld, m, n, sizeof_type);
+    return this->runtime.memory_coherent_sync(device_unique_id, storage, ptr, ld, m, n, sizeof_type);
 }
 
 int
@@ -192,14 +192,49 @@ xkblas_t::memory_unregister_async(
 }
 
 void *
-xkblas_t::memory_unified_allocate(const device_global_id_t device_global_id, const size_t size)
+xkblas_t::memory_unified_allocate(const device_unique_id_t device_unique_id, const size_t size)
 {
-    return this->runtime.memory_unified_allocate(device_global_id, size);
+    return this->runtime.memory_unified_allocate(device_unique_id, size);
 }
 
 /* deallocate unified memory using the driver of the given device */
 void
-xkblas_t::memory_unified_deallocate(const device_global_id_t device_global_id, void * mem, const size_t size)
+xkblas_t::memory_unified_deallocate(const device_unique_id_t device_unique_id, void * mem, const size_t size)
 {
-    return this->runtime.memory_unified_deallocate(device_global_id, mem, size);
+    return this->runtime.memory_unified_deallocate(device_unique_id, mem, size);
+}
+
+/***********
+ * RECORDS *
+ ***********/
+
+void
+xkblas_t::record_start(
+    xkblas_record_t * record,
+    bool execute_commands
+) {
+    record->rc = 0;
+    this->runtime.task_dependency_graph_record_start(&record->tdg, execute_commands);
+}
+
+void
+xkblas_t::record_replay(xkblas_record_t * record)
+{
+    /* on first replay, generate command graph and optimize it */
+    if (++record->rc == 1)
+    {
+        this->runtime.command_graph_from_task_dependency_graph(&record->tdg, &record->cg);
+        record->cg.optimize(ocg::COMMAND_GRAPH_PASS_REDUCE_NODE);
+        record->cg.optimize(ocg::COMMAND_GRAPH_PASS_REDUCE_EDGE);
+        record->cg.optimize(ocg::COMMAND_GRAPH_PASS_BATCH);
+    }
+
+    /* replay */
+    this->runtime.command_graph_replay(&record->cg);
+}
+
+void
+xkblas_t::record_stop(void)
+{
+    this->runtime.task_dependency_graph_record_stop();
 }

@@ -28,9 +28,9 @@ xkblas_£trsm_tile_async(
     const TYPE * alpha,
     const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
           TYPE * B, const int Btm, const int Btn, const int Bmb, const int Bnb, const int ldb,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->trsm_tile_async<xkblas_precision_t::££>(side, uplo, transA, diag, m, n, alpha, A, Atm, Atn, Amb, Anb, lda, B, Btm, Btn, Bmb, Bnb, ldb, device_global_id);
+    return xkblas_get()->trsm_tile_async<xkblas_precision_t::££>(side, uplo, transA, diag, m, n, alpha, A, Atm, Atn, Amb, Anb, lda, B, Btm, Btn, Bmb, Bnb, ldb, device_unique_id);
 }
 
 // A*X = B or X*A = B

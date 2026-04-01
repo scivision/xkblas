@@ -49,7 +49,7 @@ xkblas_£gemv_tile_async(
     const TYPE * x, const int incx,
     const TYPE * beta,
           TYPE * y, const int tm, const int mb, const int incy,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
     return xkblas_get()->gemv_tile_async<xkblas_precision_t::££>(
         transA,
@@ -59,7 +59,7 @@ xkblas_£gemv_tile_async(
         x, incx,
         beta,
         y, tm, mb, incy,
-        device_global_id
+        device_unique_id
     );
 }
 

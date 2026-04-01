@@ -41,7 +41,7 @@
 # include <xkrt/logger/logger-hip.h>
 # include <xkrt/logger/logger-hipblas.h>
 
-#  define XKBLAS_HIPBLAS_CALL_POST()                                                            \
+#  define XKBLAS_HIP_RECORD_EVENT()                                                             \
     do {                                                                                        \
         HIP_SAFE_CALL(hipEventRecord(queue->hip.events.buffer[idx], queue->hip.handle.high));   \
     } while (0)
@@ -49,7 +49,7 @@
 # define XKBLAS_HIPBLAS_CALL(CALL)          \
     do {                                    \
         HIPBLAS_SAFE_CALL(CALL);            \
-        XKBLAS_HIPBLAS_CALL_POST();         \
+        XKBLAS_HIP_RECORD_EVENT();          \
     } while (0)
 
 # define XKBLAS_HIPBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
