@@ -70,6 +70,16 @@ xkblas_t::copy_tile_async(
     const int incy,
     device_unique_id_t device_unique_id
 ) {
+    assert(n > 0);
+    assert(x);
+    assert(y);
+
+    if (x == y && incx == incy)
+    {
+        this->memory_coherent_async(device_unique_id, y, incy*n*sizeof(TYPE));
+        return 0;
+    }
+
     thread_t * thread = thread_t::get_tls();
     assert(thread);
 
