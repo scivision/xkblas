@@ -144,6 +144,15 @@ static inline const TYPE * xkblas_cublas_pointer_mode(
     cublasHandle_t handle,
     const TYPE * value
 ) {
+    // TODO: fix this.
+    //
+    // Currently, issues would appear if:
+    //  - an axpy/scal falls to 'CUBLAS_POINTER_MODE_DEVICE'
+    //  - another call follows (for instance, a gemm) - which do not call this routine. Then, the pointer mode is not reset.
+    //
+    // We should instead ensure that all cublas kernels that depends on pointerMode have it properly set before executing...
+    //
+    # if 0
     assert(device_unique_id >= 0 && device_unique_id < XKRT_DEVICES_MAX);
     static std::mutex mtxs[XKRT_DEVICES_MAX];
 
@@ -173,7 +182,7 @@ static inline const TYPE * xkblas_cublas_pointer_mode(
         }
     XKBLAS_CUBLAS_FOREACH_CONST(FUNC)
     # undef FUNC
-
+    # endif
     cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
     return value;
 }

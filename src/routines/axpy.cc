@@ -90,11 +90,8 @@ xkblas_t::axpy_tile_async(
     assert(alpha);
     assert(y);
 
-    if (*alpha == (TYPE) 0)
-    {
-        this->memory_coherent_async(device_unique_id, y, incy*n*sizeof(TYPE));
+    if (*alpha == 0)
         return 0;
-    }
 
     thread_t * thread = thread_t::get_tls();
     assert(thread);
