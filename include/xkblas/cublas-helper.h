@@ -41,15 +41,48 @@
 # include <xkrt/logger/logger-cu.h>
 # include <xkrt/logger/logger-cublas.h>
 
-#  define XKBLAS_CUBLAS_CALL_POST()                                                         \
-    do {                                                                                    \
+#  define XKBLAS_CUDA_RECORD_EVENT()                                                      \
+    do {                                                                                  \
         CU_SAFE_CALL(cuEventRecord(queue->cu.events.buffer[idx], queue->cu.handle.high)); \
     } while (0)
 
-# define XKBLAS_CUBLAS_CALL(CALL)       \
-    do {                                \
-        CUBLAS_SAFE_CALL(CALL);         \
-        XKBLAS_CUBLAS_CALL_POST();      \
+// TODO: batch is probably leaking
+
+# define XKBLAS_CUBLAS_CALL(CALL)                                                                                               \
+    do {                                                                                                                        \
+        if (task->flags & TASK_FLAG_RECORD)                                                                                     \
+        {                                                                                                                       \
+            assert(task->parent && (task->parent->flags & TASK_FLAG_GRAPH));                                                    \
+                                                                                                                                \
+            /* Emit XKRT command so its recorded for later replay */                                                            \
+            command_t * command = task_put_command_record(task);                                                                \
+            new (command) command_t(ocg::COMMAND_TYPE_BATCH, COMMAND_FLAG_NONE);                                                \
+                                                                                                                                \
+            command_batch_cu_handle_t * _handle = (command_batch_cu_handle_t *) malloc(sizeof(command_batch_cu_handle_t));      \
+            command->batch.cg = NULL;   /* TODO: we could convert the cuGraph to a cg to optimize it... */                      \
+            command->batch.driver_handle = _handle;                                                                             \
+                                                                                                                                \
+            /* Record the cublas call to a cuda graph */                                                                        \
+            CU_SAFE_CALL(cuStreamBeginCapture(queue->cu.handle.high, CU_STREAM_CAPTURE_MODE_THREAD_LOCAL));                     \
+            CUBLAS_SAFE_CALL(CALL);                                                                                             \
+            CU_SAFE_CALL(cuStreamEndCapture(queue->cu.handle.high, &_handle->graph));                                           \
+                                                                                                                                \
+            /* Instantiate the graph */                                                                                         \
+            CU_SAFE_CALL(cuGraphInstantiate(&_handle->graph_exec, _handle->graph, 0));                                          \
+                                                                                                                                \
+            /* If not skipping, execute the cublas graph */                                                                     \
+            if (task->parent->flags & TASK_FLAG_GRAPH_EXECUTE_COMMAND)                                                          \
+            {                                                                                                                   \
+                CU_SAFE_CALL(cuGraphLaunch(_handle->graph_exec, queue->cu.handle.high));                                        \
+                XKBLAS_CUDA_RECORD_EVENT();                                                                                     \
+            }                                                                                                                   \
+                                                                                                                                \
+        }                                                                                                                       \
+        else                                                                                                                    \
+        {                                                                                                                       \
+            CUBLAS_SAFE_CALL(CALL);                                                                                             \
+            XKBLAS_CUDA_RECORD_EVENT();                                                                                         \
+        }                                                                                                                       \
     } while (0)
 
 # define XKBLAS_CUBLAS_DISPATCH_PRECISION_P(NAME, PX, T) \
@@ -103,31 +136,32 @@ extern cuDoubleComplex  * XKBLAS_CUBLAS_DEVICE_CONST_Z[XKRT_DEVICES_MAX];
 # include <xkblas/xkblas.hpp>
 # include <xkrt/consts.h>
 
+/* Used to pre-move constants to device global memory */
 template <xkblas_precision_t P>
 static inline const TYPE * xkblas_cublas_pointer_mode(
     xkblas_t * xkblas,
-    const xkrt::device_global_id_t device_global_id,
+    const xkrt::device_unique_id_t device_unique_id,
     cublasHandle_t handle,
     const TYPE * value
 ) {
-    assert(device_global_id >= 0 && device_global_id < XKRT_DEVICES_MAX);
+    assert(device_unique_id >= 0 && device_unique_id < XKRT_DEVICES_MAX);
     static std::mutex mtxs[XKRT_DEVICES_MAX];
 
     volatile TYPE ** p_dst;
     TYPE  * src;
-    # define FUNC(PX) if constexpr(P == xkblas_precision_t::PX) { p_dst = (volatile TYPE **) &XKBLAS_CUBLAS_DEVICE_CONST_##PX[device_global_id] ; src = (TYPE *) &XKBLAS_CUBLAS_HOST_CONST_##PX[0]; }
+    # define FUNC(PX) if constexpr(P == xkblas_precision_t::PX) { p_dst = (volatile TYPE **) &XKBLAS_CUBLAS_DEVICE_CONST_##PX[device_unique_id] ; src = (TYPE *) &XKBLAS_CUBLAS_HOST_CONST_##PX[0]; }
     XKBLAS_FORALL_PRECISIONS(FUNC)
     # undef FUNC
 
     # define FUNC(VALUE, NAME)                                                                                          \
         if (*value == (TYPE) VALUE)                                                                                     \
         {                                                                                                               \
-            std::mutex * mtx = mtxs + device_global_id;                                                                 \
+            std::mutex * mtx = mtxs + device_unique_id;                                                                 \
             mtx->lock();                                                                                                \
             if (*p_dst == NULL)                                                                                         \
             {                                                                                                           \
                 const size_t buffer_size = sizeof(TYPE) * XKBLAS_CUBLAS_CONST_MAX;                                      \
-                *p_dst = (volatile TYPE *) xkblas->runtime.memory_device_allocate(device_global_id, buffer_size)->ptr;  \
+                *p_dst = (volatile TYPE *) xkblas->runtime.memory_device_allocate(device_unique_id, buffer_size)->ptr;  \
                 assert(*p_dst);                                                                                         \
                 CUstream stream;                                                                                        \
                 CUBLAS_SAFE_CALL(cublasGetStream(handle, &stream));                                                     \

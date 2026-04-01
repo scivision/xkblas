@@ -48,9 +48,9 @@ xkblas_£copyscale_tile_async(
     const TYPE * D, const int Dm, const int Dn, int ldd,
           TYPE * L, const int Lm, const int Ln, int ldl,
           TYPE * U, const int Um, const int Un, int ldu,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->copyscale_tile_async<xkblas_precision_t::££>(m, n, should_copy, IW, D, Dm, Dn, ldd, L, Lm, Ln, ldl, U, Um, Un, ldu, device_global_id);
+    return xkblas_get()->copyscale_tile_async<xkblas_precision_t::££>(m, n, should_copy, IW, D, Dm, Dn, ldd, L, Lm, Ln, ldl, U, Um, Un, ldu, device_unique_id);
 }
 
 extern "C"

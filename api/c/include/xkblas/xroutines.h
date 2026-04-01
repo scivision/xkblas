@@ -46,7 +46,7 @@ extern "C" {
 
     # define XKTYPE       £TYPE
     # define XKTYPE_REAL  £TYPE_REAL
-    # define XKDEVICE     xkrt_device_global_id_t
+    # define XKDEVICE     xkrt_device_unique_id_t
     # define XKDEF(RTYPE, NAME, ...)                \
         RTYPE xkblas_£##NAME        (__VA_ARGS__);  \
         RTYPE xkblas_£##NAME##_sync (__VA_ARGS__);  \

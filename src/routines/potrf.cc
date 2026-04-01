@@ -104,7 +104,7 @@ xkblas_t::potrf_tile_async(
     int uplo,
     int n,
     TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -113,24 +113,12 @@ xkblas_t::potrf_tile_async(
     const int A_offset_n = Atn * Anb;
 
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, POTRF);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 0;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 0;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(this, uplo, n);
 
     # if XKRT_SUPPORT_DEBUG
@@ -140,10 +128,10 @@ xkblas_t::potrf_tile_async(
     const int Am = n;
     const int An = n;
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -218,19 +206,19 @@ xkblas_t::potrf_async(
         for (int tk = 0; tk < Amt; ++tk)
         {
             const int bs_km = (tk == Amt - 1) ? (Am-tk*Amb) : Amb;
-            const device_global_id_t device_global_id = distribution2D_get(&d, tk, tk);
+            const device_unique_id_t device_unique_id = distribution2D_get(&d, tk, tk);
 
             //options.priority = 2*A->mt - 2*k;
             this->potrf_tile_async<P>(
                 CblasLower,
                 bs_km,
                 A(tk, tk),
-                device_global_id
+                device_unique_id
             );
 
             for (int tm = tk+1; tm < Amt; ++tm)
             {
-                const device_global_id_t device_global_id = distribution2D_get(&d, tm, tk);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tk);
                 const int bs_mm = (tm == Amt-1) ? (Am-tm*Amb) : Amb;
                 //options.priority = 2*A->mt - 2*k - m;
                 this->trsm_tile_async<P>(
@@ -240,14 +228,14 @@ xkblas_t::potrf_async(
                     &one_complex,
                     A(tk, tk),
                     A(tm, tk),
-                    device_global_id
+                    device_unique_id
                 );
             }
 
             for (int tn = tk + 1; tn < Ant; ++tn)
             {
                 const int bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
-                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tn, tn);
 
                 //options.priority = 2*A->mt - 2*k - n;
 
@@ -260,7 +248,7 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one,
                         A(tn, tn),
-                        device_global_id
+                        device_unique_id
                     );
                 }
                 else
@@ -272,13 +260,13 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one,
                         A(tn, tn),
-                        device_global_id
+                        device_unique_id
                     );
                 }
 
                 for (int tm = tn + 1; tm < Amt ; ++tm)
                 {
-                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                    const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tn);
                     const int bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
 
                     //options.priority = 2*A->mt - 2*k - n - m;
@@ -290,7 +278,7 @@ xkblas_t::potrf_async(
                         A(tn, tk),
                         &one_complex,
                         A(tm, tn),
-                        device_global_id
+                        device_unique_id
                     );
                 }
             }
@@ -300,7 +288,7 @@ xkblas_t::potrf_async(
     {
         for (int tk = 0; tk < Ant; ++tk)
         {
-            const device_global_id_t device_global_id = distribution2D_get(&d, tk, tk);
+            const device_unique_id_t device_unique_id = distribution2D_get(&d, tk, tk);
             const int bs_km = (tk == Ant-1) ? (An-tk*Anb) : Anb;
 
             //options.priority = 2*A->nt - 2*k;
@@ -308,12 +296,12 @@ xkblas_t::potrf_async(
                 CblasUpper,
                 bs_km,
                 A(tk, tk),
-                device_global_id
+                device_unique_id
             );
 
             for (int tn = tk+1; tn < Ant; ++tn)
             {
-                const device_global_id_t device_global_id = distribution2D_get(&d, tk, tn);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tk, tn);
                 const int bs_nn = (tn == Ant-1) ? (An - tn*Anb) : Anb;
 
                 //options.priority = 2*A->nt - 2*k - n;
@@ -324,13 +312,13 @@ xkblas_t::potrf_async(
                     &one_complex,
                     A(tk, tk),
                     A(tk, tn),
-                    device_global_id
+                    device_unique_id
                 );
             }
 
             for (int tm = tk+1; tm < Amt ; ++tm)
             {
-                const device_global_id_t device_global_id = distribution2D_get(&d, tm, tm);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tm);
                 const int bs_mm = (tm == Amt-1) ? (Am - tm*Amb) : Amb;
 
                 //options.priority = 2*A->nt - 2*k  - m;
@@ -344,7 +332,7 @@ xkblas_t::potrf_async(
                         A(tk, tm),
                         &one,
                         A(tm, tm),
-                        device_global_id
+                        device_unique_id
                     );
                 }
                 else
@@ -356,13 +344,13 @@ xkblas_t::potrf_async(
                         A(tk, tm),
                         &one,
                         A(tm, tm),
-                        device_global_id
+                        device_unique_id
                     );
                 }
 
                 for (int tn = tm+1; tn < Ant; ++tn)
                 {
-                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                    const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tn);
                     const int bs_nn = (tn == Ant-1) ? (An-tn*Anb) : Anb;
 
                     //options.priority = 2*A->nt - 2*k - n - m;
@@ -374,7 +362,7 @@ xkblas_t::potrf_async(
                         A(tk, tn),
                         &one_complex,
                         A(tm, tn),
-                        device_global_id
+                        device_unique_id
                     );
                 }
             }
@@ -411,7 +399,7 @@ xkblas_t::potrf(
 ) {
     this->memory_invalidate_caches();
     int r = this->potrf_async<P>(uplo, n, A, lda);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, A, lda, n, n, sizeof(TYPE));
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, A, lda, n, n, sizeof(TYPE));
     this->sync();
     return r;
 }
@@ -430,12 +418,12 @@ cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
     area_chunk_t * chunk = (area_chunk_t *) args[1];
     assert(chunk);
 
-    device_global_id_t device_global_id = (device_global_id_t) (uintptr_t) args[2];
+    device_unique_id_t device_unique_id = (device_unique_id_t) (uintptr_t) args[2];
 
     xkblas_t * xkblas = (xkblas_t *) args[3];
     assert(xkblas);
 
-    xkblas->runtime.memory_device_deallocate(device_global_id, chunk);
+    xkblas->runtime.memory_device_deallocate(device_unique_id, chunk);
 }
 
 template <xkblas_precision_t P, auto FUNC_SIZE, auto FUNC, typename CU_TYPE>
@@ -446,7 +434,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cusolverDnHandle_t handle = queue->cu.solver.handle;
     assert(handle);
@@ -466,9 +454,9 @@ cuda_run(
     FUNC_SIZE(handle, CUBLAS_FILL_MODE_LOWER, args->n, A, lda, &work_size);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    const device_global_id_t device_global_id = dev->elected_device_id;
+    const device_unique_id_t device_unique_id = dev->elected_device_unique_id;
     const int buffer_size = work_size * sizeof(CU_TYPE) + sizeof(int);
-    area_chunk_t * chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
+    area_chunk_t * chunk = args->xkblas->runtime.memory_device_allocate(device_unique_id, buffer_size);
     assert(chunk);
 
     CU_TYPE * work = (CU_TYPE *) chunk->ptr;
@@ -495,9 +483,9 @@ cuda_run(
     callback.func = cuda_run_async_completion;
     callback.args[0] = task;
     callback.args[1] = chunk;
-    callback.args[2] = (void *) (uintptr_t) device_global_id;
+    callback.args[2] = (void *) (uintptr_t) device_unique_id;
     callback.args[3] = args->xkblas;
-    cmd->push_callback(callback);
+    cmd->completion_callback_push(callback);
 }
 
 TYPED
@@ -508,7 +496,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     if constexpr (P == xkblas_precision_t::S)   cuda_run<P, cusolverDnSpotrf_bufferSize, cusolverDnSpotrf, float>          (runtime, device, task, queue, cmd, idx);
     if constexpr (P == xkblas_precision_t::D)   cuda_run<P, cusolverDnDpotrf_bufferSize, cusolverDnDpotrf, double>         (runtime, device, task, queue, cmd, idx);
@@ -538,7 +526,7 @@ cuda(
     template int xkblas_t::potrf<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_sync<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
     template int xkblas_t::potrf_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, int lda);  \
-    template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda, device_global_id_t device_global_id);
+    template int xkblas_t::potrf_tile_async<P>(int uplo, int n, xkblas_precision_type_t<P> * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 
 # undef DEFINE

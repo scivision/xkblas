@@ -68,7 +68,7 @@ xkblas_t::copy_tile_async(
     const int incx,
           TYPE * y,
     const int incy,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -76,35 +76,23 @@ xkblas_t::copy_tile_async(
     LOGGER_DEBUG("Submitting tile of copy");
 
     # define AC 2
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, COPY);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 1;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(n, incx, incy);
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 1;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "copy(x=%p ; y=%p ; n=%d)", x, y, n);
     # endif /* XKRT_SUPPORT_DEBUG */
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, x, incx*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, y, incy*n, sizeof(TYPE), ACCESS_MODE_W, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -162,8 +150,8 @@ xkblas_t::copy_async(
     {
         int offset = tn*ts;
         int bs     = (tn == nt-1) ? (n - offset) : ts;
-        device_global_id_t device_global_id = distribution1D_get(&d, tn);
-        this->copy_tile_async<P>(bs, x + offset, incx, y + offset, incy, device_global_id);
+        device_unique_id_t device_unique_id = distribution1D_get(&d, tn);
+        this->copy_tile_async<P>(bs, x + offset, incx, y + offset, incy, device_unique_id);
     }
 
     return 0;
@@ -194,7 +182,7 @@ xkblas_t::copy(
 ) {
     this->memory_invalidate_caches();
     int r = this->copy_async<P>(n, x, incx, y, incy);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, y, n*sizeof(TYPE)*incy);
     this->sync();
     return r;
 }
@@ -211,7 +199,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
@@ -246,7 +234,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(copy);
 }
@@ -266,7 +254,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
@@ -301,7 +289,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(copy);
 }
@@ -326,6 +314,6 @@ cuda(
     template int xkblas_t::copy<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_sync<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::copy_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
-    template int xkblas_t::copy_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_global_id_t device_global_id);
+    template int xkblas_t::copy_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

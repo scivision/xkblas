@@ -55,6 +55,19 @@ typedef enum    xkblas_state_t : uint8_t
     XKBLAS_CONTEXT_INITIALIZED,
 }               xkblas_state_t;
 
+typedef struct  xkblas_record_t
+{
+    /* XKRT tdg */
+    xkrt::task_dependency_graph_t tdg;
+
+    /* XKRT cg */
+    xkrt::command_graph_t cg;
+
+    /* replay counter */
+    int rc;
+
+}               xkblas_record_t;
+
 # define TYPED            template <xkblas_precision_t P>
 # define TYPED_WITH_INDEX template <xkblas_precision_t P, xkblas_index_t T>
 # define INDEXED          template <xkblas_index_t T>
@@ -116,10 +129,10 @@ typedef struct  xkblas_t
     ////////////
 
     /* spawn tasks to make the replica coherent on the passed device */
-    void memory_coherent_async(xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
-    void memory_coherent_async(xkrt::device_global_id_t device_global_id, xkrt::matrix_storage_t storage, void * ptr, int ld, int m, int n, size_t sizeof_type);
-    void memory_coherent_sync( xkrt::device_global_id_t device_global_id, void * ptr, size_t size);
-    void memory_coherent_sync( xkrt::device_global_id_t device_global_id, xkrt::matrix_storage_t storage, void * ptr, int ld, int m, int n, size_t sizeof_type);
+    void memory_coherent_async(xkrt::device_unique_id_t device_unique_id, void * ptr, size_t size);
+    void memory_coherent_async(xkrt::device_unique_id_t device_unique_id, xkrt::matrix_storage_t storage, void * ptr, int ld, int m, int n, size_t sizeof_type);
+    void memory_coherent_sync( xkrt::device_unique_id_t device_unique_id, void * ptr, size_t size);
+    void memory_coherent_sync( xkrt::device_unique_id_t device_unique_id, xkrt::matrix_storage_t storage, void * ptr, int ld, int m, int n, size_t sizeof_type);
 
     void memory_invalidate_caches(void);
 
@@ -136,14 +149,54 @@ typedef struct  xkblas_t
     int memory_unregister_async(void * ptr, size_t size, int n);
 
     /* (de)allocate unified memory using the driver of the given device */
-    void * memory_unified_allocate(const xkrt::device_global_id_t device_global_id, const size_t size);
-    void memory_unified_deallocate(const xkrt::device_global_id_t device_global_id, void * mem, const size_t size);
+    void * memory_unified_allocate(const xkrt::device_unique_id_t device_unique_id, const size_t size);
+    void memory_unified_deallocate(const xkrt::device_unique_id_t device_unique_id, void * mem, const size_t size);
 
-    // task allocation wrapper
-    inline xkrt::task_t * task_new(const xkrt::task_format_id_t fmtid, const xkrt::task_flag_bitfield_t flags, const size_t size)
-    {
-        return this->runtime.task_new(fmtid, flags, size);
+    /* task allocation wrapper */
+    inline xkrt::task_t *
+    task_new(
+        const xkrt::task_format_id_t fmtid,
+        const size_t args_size,
+        const xkrt::task_access_counter_t n_accesses,
+        const xkrt::task_access_counter_t ocr_access_idx,
+        const xkrt::device_unique_id_t device_unique_id
+    ) {
+        constexpr xkrt::task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_ACCESSES | TASK_FLAG_DETACHABLE;
+
+        xkrt::thread_t * thread = xkrt::thread_t::get_tls();
+        assert(thread);
+        assert(thread->current_task);
+
+        xkrt::task_t * task = this->runtime.task_new(fmtid, flags, NULL, args_size, n_accesses);
+
+        xkrt::task_det_info_t * det = TASK_DET_INFO(task);
+        new (det) xkrt::task_det_info_t();
+
+        xkrt::task_acs_info_t * dep = TASK_ACS_INFO(task);
+        new (dep) xkrt::task_acs_info_t(n_accesses);
+
+        xkrt::task_dev_info_t * dev = TASK_DEV_INFO(task);
+        new (dev) xkrt::task_dev_info_t(device_unique_id, ocr_access_idx);
+
+        return task;
     }
+
+    /**
+     *  Record an xkblas sequence
+     *      - record: the output record
+     *      - execute_commands: either recorded commands must be executed
+     */
+    void record_start(xkblas_record_t * record, bool execute_commands);
+
+    /**
+     *  Replay a previously recorded sequence
+     */
+    void record_replay(xkblas_record_t * record);
+
+    /**
+     *  Stop recording
+     */
+    void record_stop(void);
 
     /////////////////////
     // Synchronization //
@@ -168,7 +221,7 @@ typedef struct  xkblas_t
     # define XKTYPE TYPE
     # define XKTYPE_REAL TYPE_REAL
     # define XKINDEX INDEX
-    # define XKDEVICE xkrt_device_global_id_t
+    # define XKDEVICE xkrt_device_unique_id_t
     #  include <xkblas/for-all-routines.h>
     # undef XKDEVICE
     # undef XKTYPE_REAL

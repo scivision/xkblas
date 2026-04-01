@@ -36,50 +36,49 @@
 **/
 
 # include <xkblas/xkblas.hpp>
+# include <xkrt/xkrt.h>
+# include <xkblas/xkblas.h>
+# include <assert.h>
 
 XKRT_NAMESPACE_USE;
 
 extern "C"
-int
-xkblas_£axpy_tile_async(
-    const int n,
-    const TYPE * alpha,
-    const TYPE * x, const int incx,
-          TYPE * y, const int incy,
-    xkrt_device_unique_id_t device_unique_id
-) {
-    return xkblas_get()->axpy_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, y, incy, device_unique_id);
+void *
+xkblas_record_start(int execute_commands)
+{
+    xkblas_t * xkblas = xkblas_get();
+    assert(xkblas);
+
+    xkblas_record_t * record = (xkblas_record_t *) malloc(sizeof(xkblas_record_t));
+    assert(record);
+
+    xkblas->record_start(record, execute_commands);
+
+    return record;
 }
 
 extern "C"
-int
-xkblas_£axpy_async(
-    int n,
-    const TYPE * alpha,
-    const TYPE * x, const int incx,
-          TYPE * y, const int incy
-) {
-    return xkblas_get()->axpy_async<xkblas_precision_t::££>(n, alpha, x, incx, y, incy);
+void
+xkblas_record_replay(void * vrecord)
+{
+    xkblas_record_t * record = (xkblas_record_t *) vrecord;
+    assert(record);
+
+    xkblas_t * xkblas = xkblas_get();
+    assert(xkblas);
+
+    return xkblas->record_replay(record);
 }
 
 extern "C"
-int
-xkblas_£axpy_sync(
-    int n,
-    const TYPE * alpha,
-    const TYPE * x, const int incx,
-          TYPE * y, const int incy
-) {
-    return xkblas_get()->axpy_sync<xkblas_precision_t::££>(n, alpha, x, incx, y, incy);
-}
+void
+xkblas_record_stop(void * vrecord)
+{
+    xkblas_record_t * record = (xkblas_record_t *) vrecord;
+    assert(record);
 
-extern "C"
-int
-xkblas_£axpy(
-    int n,
-    const TYPE * alpha,
-    const TYPE * x, const int incx,
-          TYPE * y, const int incy
-) {
-    return xkblas_get()->axpy<xkblas_precision_t::££>(n, alpha, x, incx, y, incy);
+    xkblas_t * xkblas = xkblas_get();
+    assert(xkblas);
+
+    return xkblas->record_stop();
 }

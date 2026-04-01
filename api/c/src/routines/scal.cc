@@ -46,9 +46,9 @@ xkblas_£scal_tile_async(
     const TYPE * alpha,
     TYPE * x,
     const int incx,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_global_id);
+    return xkblas_get()->scal_tile_async<xkblas_precision_t::££>(n, alpha, x, incx, device_unique_id);
 }
 
 extern "C"

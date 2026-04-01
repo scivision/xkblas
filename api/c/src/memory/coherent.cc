@@ -46,7 +46,7 @@ xkblas_memory_segment_coherent_async(
     void * ptr, size_t size
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
-    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, ptr, size);
+    return runtime->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, ptr, size);
 }
 
 extern "C"
@@ -57,7 +57,7 @@ xkblas_memory_matrix_coherent_async(
     size_t sizeof_type
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
-    return runtime->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
+    return runtime->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
 }
 
 extern "C"
@@ -77,7 +77,7 @@ xkblas_memory_segment_coherent_sync(
     void * ptr, size_t size
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
-    return runtime->memory_coherent_sync(HOST_DEVICE_GLOBAL_ID, ptr, size);
+    return runtime->memory_coherent_sync(XKRT_HOST_DEVICE_UNIQUE_ID, ptr, size);
 }
 
 extern "C"
@@ -88,7 +88,7 @@ xkblas_memory_matrix_coherent_sync(
     size_t sizeof_type
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
-    return runtime->memory_coherent_sync(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
+    return runtime->memory_coherent_sync(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, ptr, ld, m, n, sizeof_type);
 }
 
 extern "C"

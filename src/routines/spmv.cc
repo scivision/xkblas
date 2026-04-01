@@ -64,7 +64,7 @@ struct xkblas_matrix_csr_t
         struct tile_t {
 
             /* tile cached info */
-            device_global_id_t device_global_id;
+            device_unique_id_t device_unique_id;
             int m0;
             int m1;
             size_t nnz;
@@ -185,32 +185,20 @@ xkblas_t::spmv_tile_async(
     assert(thread);
 
     # define AC 5
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(ARGS_T);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SPMV);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(ARGS_T);
+    constexpr task_access_counter_t ocr_access_idx = 2;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, tile->device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 2;
-    new (dev) task_dev_info_t(tile->device_global_id, ocr_access);
-
-    ARGS_T * args = (ARGS_T *) TASK_ARGS(task, task_size);
+    ARGS_T * args = (ARGS_T *) TASK_ARGS(task);
     new (args) ARGS_T(this, transA, index_base, T, n, *alpha, *beta, tile);
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "spmv");
     # endif /* XKRT_SUPPORT_DEBUG */
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     access_mode_t A_X_mode = (*alpha == (const TYPE) 0.0) ? ACCESS_MODE_V : ACCESS_MODE_R;
     access_mode_t Ymode    = (*beta  == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
 
@@ -227,7 +215,7 @@ xkblas_t::spmv_tile_async(
     new (accesses + 2) access_t(task, values + tile->nnz_offset, tile->nnz, sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 3) access_t(task, X      + x0,               x_n,       sizeof(TYPE),  A_X_mode,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 4) access_t(task, Y      + y0,               y_n,       sizeof(TYPE),  Ymode,     ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -375,7 +363,7 @@ matrix_found:
             memset(tile->metadata, 0, sizeof(tile->metadata));
 
             /* target device */
-            tile->device_global_id = distribution1D_get(&d, tm);
+            tile->device_unique_id = distribution1D_get(&d, tm);
 
             /* tile start/end */
             tile->m0 = tm*ts;
@@ -431,7 +419,7 @@ matrix_found:
         else
         {
             constexpr int incY = 1;
-            this->scal_tile_async<P>(tile->m1 - tile->m0, beta, Y + tile->m0, incY, tile->device_global_id);
+            this->scal_tile_async<P>(tile->m1 - tile->m0, beta, Y + tile->m0, incY, tile->device_unique_id);
         }
     }
 
@@ -485,7 +473,7 @@ xkblas_t::spmv(
 ) {
     this->memory_invalidate_caches();
     int r = this->spmv_async<P, T>(alpha, transA, index_base, m, n, nnz, format, row, col, values, X, beta, Y);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, Y, m*sizeof(TYPE));
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, Y, m*sizeof(TYPE));
     this->sync();
     return r;
 }
@@ -505,12 +493,12 @@ cuda_run_async_completion(void * args[XKRT_CALLBACK_ARGS_MAX])
     area_chunk_t * chunk = (area_chunk_t *) args[1];
     assert(chunk);
 
-    device_global_id_t device_global_id = (device_global_id_t) (uintptr_t) args[2];
+    device_unique_id_t device_unique_id = (device_unique_id_t) (uintptr_t) args[2];
 
     xkblas_t * xkblas = (xkblas_t *) args[3];
     assert(xkblas);
 
-    xkblas->runtime.memory_device_deallocate(device_global_id, chunk);
+    xkblas->runtime.memory_device_deallocate(device_unique_id, chunk);
 }
 # endif
 
@@ -529,7 +517,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cusparseHandle_t handle = queue->cu.sparse.handle;
     assert(handle);
@@ -656,10 +644,10 @@ cuda_run(
 
         // allocate workspace
         task_dev_info_t * dev = TASK_DEV_INFO(task);
-        const device_global_id_t device_global_id = dev->elected_device_id;
-        mdt->chunk = args->xkblas->runtime.memory_device_allocate(device_global_id, buffer_size);
+        const device_unique_id_t device_unique_id = dev->elected_device_unique_id;
+        mdt->chunk = args->xkblas->runtime.memory_device_allocate(device_unique_id, buffer_size);
         assert(mdt->chunk);
-        assert(tile->device_global_id == device_global_id);
+        assert(tile->device_unique_id == device_unique_id);
 
         // run preprocess
         CUSPARSE_SAFE_CALL(
@@ -711,7 +699,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUSPARSE_DISPATCH_PRECISION();
 }
@@ -748,7 +736,7 @@ xkblas_t::matrices_reset(void)
     callback.func = cuda_run_async_completion;
     callback.args[0] = task;
     callback.args[1] = chunk;
-    callback.args[2] = (void *) (uintptr_t) device_global_id;
+    callback.args[2] = (void *) (uintptr_t) device_unique_id;
     callback.args[3] = args->xkblas;
     cmd->push_callback(callback);
     # endif

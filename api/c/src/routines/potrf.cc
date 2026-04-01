@@ -25,9 +25,9 @@ xkblas_£potrf_tile_async(
     int uplo,
     int n,
     TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, int lda,
-    xkrt_device_global_id_t device_global_id
+    xkrt_device_unique_id_t device_unique_id
 ) {
-    return xkblas_get()->potrf_tile_async<xkblas_precision_t::££>(uplo, n, A, Atm, Atn, Amb, Anb, lda, device_global_id);
+    return xkblas_get()->potrf_tile_async<xkblas_precision_t::££>(uplo, n, A, Atm, Atn, Amb, Anb, lda, device_unique_id);
 }
 
 extern "C"

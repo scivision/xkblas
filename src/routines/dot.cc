@@ -71,34 +71,22 @@ xkblas_t::dot_tile_async(
     const TYPE * y, const int incy,
     const TYPE * temp_r,
           TYPE * r,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
 
     # define AC 3
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
     constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, DOT);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr task_access_counter_t ocr_access_idx = 0;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 0;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(n, incx, incy, r);
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, x, incx*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, y, incy*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
 
@@ -107,7 +95,7 @@ xkblas_t::dot_tile_async(
     else
         new (accesses + 2) access_t(task, r,      ACCESS_MODE_VW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
 
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     # if XKRT_SUPPORT_DEBUG
@@ -145,7 +133,7 @@ xkblas_t::dot_async(
 
     if (nt == 1)
     {
-        this->dot_tile_async<P>(n, x, incx, y, incy, NULL, r, UNSPECIFIED_DEVICE_GLOBAL_ID);
+        this->dot_tile_async<P>(n, x, incx, y, incy, NULL, r, XKRT_UNSPECIFIED_DEVICE_UNIQUE_ID);
     }
     else
     {
@@ -162,8 +150,8 @@ xkblas_t::dot_async(
         for (int tn = 0 ; tn < nt ; ++tn)
         {
             int bs = (tn == nt-1) ? (n - tn*ts) : ts;
-            device_global_id_t device_global_id = distribution1D_get(&d, tn);
-            this->dot_tile_async<P>(bs, x + tn*ts*incx, incx, y + tn*ts*incy, incy, temp_r, temp_r + tn, device_global_id);
+            device_unique_id_t device_unique_id = distribution1D_get(&d, tn);
+            this->dot_tile_async<P>(bs, x + tn*ts*incx, incx, y + tn*ts*incy, incy, temp_r, temp_r + tn, device_unique_id);
         }
 
         xkblas->runtime.task_spawn<2>(
@@ -224,7 +212,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
@@ -261,7 +249,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION_REAL(dot);
 }
@@ -281,7 +269,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
@@ -318,7 +306,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(dot);
 }
@@ -373,6 +361,6 @@ host(task_t * task)
     template int xkblas_t::dot<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_sync<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
     template int xkblas_t::dot_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, xkblas_precision_type_t<P> * r);   \
-    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_global_id_t device_global_id);
+    template int xkblas_t::dot_tile_async<P>(int n, const xkblas_precision_type_t<P> * x, const int incx, const xkblas_precision_type_t<P> * y, const int incy, const xkblas_precision_type_t<P> * temp_r, xkblas_precision_type_t<P> * r, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

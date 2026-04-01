@@ -72,14 +72,14 @@ xkblas_host_func_launch(
 
 void
 xkblas_async(
-    xkrt_device_global_id_t device_global_id,
+    xkrt_device_unique_id_t device_unique_id,
     void (*func)(void *),
     void * args
 ) {
     runtime_t * runtime = xkblas_xkrt_runtime();
     assert(runtime);
 
-    device_t * device = runtime->device_get(device_global_id);
+    device_t * device = runtime->device_get(device_unique_id);
     assert(device);
 
     team_t * team = runtime->team_get(device->driver_type, device->driver_id);
@@ -94,7 +94,7 @@ xkblas_async(
 
 void
 xkblas_async_with_accesses(
-    xkrt_device_global_id_t device_global_id,
+    xkrt_device_unique_id_t device_unique_id,
     void (*func)(void *),
     void * args,
     const xkrt_access_t * accesses,
@@ -103,7 +103,7 @@ xkblas_async_with_accesses(
     runtime_t * runtime = xkblas_xkrt_runtime();
     assert(runtime);
 
-    device_t * device = runtime->device_get(device_global_id);
+    device_t * device = runtime->device_get(device_unique_id);
     assert(device);
 
     team_t * team = runtime->team_get(device->driver_type, device->driver_id);
@@ -118,7 +118,7 @@ xkblas_async_with_accesses(
 
 void
 xkblas_async_with_format_with_accesses(
-    const xkrt_device_global_id_t device_global_id,
+    const xkrt_device_unique_id_t device_unique_id,
     const xkrt_task_format_id_t fmtid,
     const void * args,
     const size_t args_size,
@@ -128,17 +128,17 @@ xkblas_async_with_format_with_accesses(
     runtime_t * runtime = xkblas_xkrt_runtime();
     assert(runtime);
 
-    xkrt_task_spawn_with_format_with_accesses((xkrt_runtime_t *) runtime, device_global_id, fmtid, args, args_size, accesses, naccesses);
+    xkrt_task_spawn_with_format_with_accesses((xkrt_runtime_t *) runtime, device_unique_id, fmtid, args, args_size, accesses, naccesses);
 }
 
 void
 xkblas_async_with_format(
-    const xkrt_device_global_id_t device_global_id,
+    const xkrt_device_unique_id_t device_unique_id,
     const xkrt_task_format_id_t fmtid,
     const void * args,
     const size_t args_size
 ) {
-    return xkblas_async_with_format_with_accesses(device_global_id, fmtid, args, args_size, NULL, 0);
+    return xkblas_async_with_format_with_accesses(device_unique_id, fmtid, args, args_size, NULL, 0);
 }
 
 #ifdef __cplusplus

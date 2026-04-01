@@ -70,36 +70,24 @@ xkblas_t::scal_tile_async(
     const TYPE * alpha,
     TYPE * x,
     const int incx,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
 
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SCAL);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 0;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 0;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(this, n, incx, *alpha);
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, x, incx*n, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     # if XKRT_SUPPORT_DEBUG
@@ -145,8 +133,8 @@ xkblas_t::scal_async(
     for (int tn = 0 ; tn < nt ; ++tn)
     {
         int bs = (tn == nt-1) ? (n - tn*ts) : ts;
-        device_global_id_t device_global_id = distribution1D_get(&d, tn);
-        this->scal_tile_async<P>(bs, alpha, x + tn*ts*incx, incx, device_global_id);
+        device_unique_id_t device_unique_id = distribution1D_get(&d, tn);
+        this->scal_tile_async<P>(bs, alpha, x + tn*ts*incx, incx, device_unique_id);
     }
 
     return 0;
@@ -175,7 +163,7 @@ xkblas_t::scal(
 ) {
     this->memory_invalidate_caches();
     int r = this->scal_async<P>(n, alpha, x, incx);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, x, n*sizeof(TYPE)*incx);
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, x, n*sizeof(TYPE)*incx);
     this->sync();
     return r;
 }
@@ -192,7 +180,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
@@ -224,7 +212,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION_REAL(scal);
 }
@@ -242,7 +230,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
@@ -257,8 +245,8 @@ cuda_run(
     assert(args);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    const device_global_id_t device_global_id = dev->elected_device_id;
-    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_global_id, handle, &args->alpha);
+    const device_unique_id_t device_unique_id = dev->elected_device_unique_id;
+    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_unique_id, handle, &args->alpha);
 
     XKBLAS_CUBLAS_CALL(
         FUNC(
@@ -278,7 +266,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION_REAL(scal);
 }
@@ -332,6 +320,6 @@ host(task_t * task)
     template int xkblas_t::scal<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_sync<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
     template int xkblas_t::scal_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx);   \
-    template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_global_id_t device_global_id);
+    template int xkblas_t::scal_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, xkblas_precision_type_t<P> * x, const int incx, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

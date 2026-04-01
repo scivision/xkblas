@@ -70,40 +70,28 @@ xkblas_t::fill_tile_async(
     int n,
     TYPE * x,
     const TYPE value,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
 
     # define AC 1
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr int task_size = task_compute_size(flags, AC);
     constexpr int args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, FILL);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr task_access_counter_t ocr_access_idx = 0;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 0;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(n, value);
 
     # if XKRT_SUPPORT_DEBUG
     snprintf(task->label, sizeof(task->label), "fill(n=%d)", n);
     # endif /* XKRT_SUPPORT_DEBUG */
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, x, n, sizeof(TYPE), ACCESS_MODE_W, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -137,8 +125,8 @@ xkblas_t::fill_async(
     for (int tn = 0 ; tn < nt ; ++tn)
     {
         const int bs = (tn == nt-1) ? (n - tn*ts) : ts;
-        const device_global_id_t device_global_id = distribution1D_get(&d, tn);
-        this->fill_tile_async<P>(bs, x+tn*ts, value, device_global_id);
+        const device_unique_id_t device_unique_id = distribution1D_get(&d, tn);
+        this->fill_tile_async<P>(bs, x+tn*ts, value, device_unique_id);
     }
 
     return 0;
@@ -165,7 +153,7 @@ xkblas_t::fill(
 ) {
     this->memory_invalidate_caches();
     int r = this->fill_async<P>(n, x, value);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, x, n*sizeof(TYPE));
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, x, n*sizeof(TYPE));
     this->sync();
     return r;
 }
@@ -184,7 +172,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     assert(queue);
 
@@ -206,8 +194,7 @@ hip_run(
         (HIP_TYPE *) x->device_view.addr,
         *reinterpret_cast<const HIP_TYPE*>(&args->value)
     );
-
-    XKBLAS_HIPBLAS_CALL_POST();
+    XKBLAS_HIP_RECORD_EVENT();
 }
 
 TYPED
@@ -218,7 +205,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     if constexpr (P == xkblas_precision_t::S) hip_run<P, hip_sfill, float>           (runtime, device, task, queue, cmd, idx);
     if constexpr (P == xkblas_precision_t::D) hip_run<P, hip_dfill, double>          (runtime, device, task, queue, cmd, idx);
@@ -242,7 +229,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     assert(queue);
 
@@ -265,7 +252,7 @@ cuda_run(
         *reinterpret_cast<const CU_TYPE*>(&args->value)
     );
 
-    XKBLAS_CUBLAS_CALL_POST();
+    XKBLAS_CUDA_RECORD_EVENT();
 }
 
 TYPED
@@ -276,7 +263,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     if constexpr (P == xkblas_precision_t::S) cuda_run<P, cuda_sfill, float>          (runtime, device, task, queue, cmd, idx);
     if constexpr (P == xkblas_precision_t::D) cuda_run<P, cuda_dfill, double>         (runtime, device, task, queue, cmd, idx);
@@ -307,6 +294,6 @@ cuda(
     template int xkblas_t::fill<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_sync<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
     template int xkblas_t::fill_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value);  \
-    template int xkblas_t::fill_tile_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value, device_global_id_t device_global_id);
+    template int xkblas_t::fill_tile_async<P>(int n, xkblas_precision_type_t<xkblas_precision_t::P> * x, const xkblas_precision_type_t<xkblas_precision_t::P> value, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

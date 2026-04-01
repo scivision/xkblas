@@ -113,7 +113,7 @@ xkblas_t::syrk_tile_async(
     const TYPE * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda,
     const TYPE * beta,
           TYPE * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -126,24 +126,12 @@ xkblas_t::syrk_tile_async(
     LOGGER_INFO("Submitting tile C=(%d,%d) of size (%d,%d)", C_offset_m, C_offset_n, n, k);
 
     # define AC 2
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, SYRK);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 1;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 1;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new(args) args_t<P>(uplo, trans, n, k, *alpha, *beta);
 
     # if XKRT_SUPPORT_DEBUG
@@ -158,12 +146,12 @@ xkblas_t::syrk_tile_async(
     const int Cn = n;
 
     # define AC 2
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     access_mode_t Cmode = (*beta == (const TYPE) 0.0) ? ACCESS_MODE_W : ACCESS_MODE_RW;
     new (accesses + 0) access_t(task, MATRIX_COLMAJOR, A, lda, A_offset_m, A_offset_n, Am, An, sizeof(TYPE), ACCESS_MODE_R, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, MATRIX_COLMAJOR, C, ldc, C_offset_m, C_offset_n, Cm, Cn, sizeof(TYPE), Cmode        , ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     this->runtime.task_commit(task);
@@ -263,7 +251,7 @@ xkblas_t::syrk_async(
         {
             for (int tk = 0; tk < Ant; ++tk)
             {
-                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tn, tn);
                 const int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
                 this->syrk_tile_async<P>(
@@ -271,7 +259,7 @@ xkblas_t::syrk_async(
                     bs_nn, bs_kn,
                     alpha,  A(tn, tk), lda,
                     &zbeta, C(tn, tn), ldc,
-                    device_global_id
+                    device_unique_id
                 );
             }
 
@@ -279,7 +267,7 @@ xkblas_t::syrk_async(
             {
                 for (int tm = tn+1; tm < Cmt; ++tm)
                 {
-                    const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                    const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tn);
                     const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Ant; ++tk)
                     {
@@ -293,7 +281,7 @@ xkblas_t::syrk_async(
                             A(tn, tk), lda,
                             &zbeta,
                             C(tm, tn), ldc,
-                            device_global_id
+                            device_unique_id
                         );
                     }
                 }
@@ -305,7 +293,7 @@ xkblas_t::syrk_async(
                     const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Ant; ++tk)
                     {
-                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
+                        const device_unique_id_t device_unique_id = distribution2D_get(&d, tn, tm);
                         const int bs_kn = (tk == Ant-1) ? (An-tk*Anb) : Anb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -316,7 +304,7 @@ xkblas_t::syrk_async(
                             A(tm, tk), lda,
                             &zbeta,
                             C(tn, tm), ldc,
-                            device_global_id
+                            device_unique_id
                         );
                     }
                 }
@@ -328,7 +316,7 @@ xkblas_t::syrk_async(
             {
                 const int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                 const TYPE zbeta = (tk == 0) ? *beta : one;
-                const device_global_id_t device_global_id = distribution2D_get(&d, tn, tn);
+                const device_unique_id_t device_unique_id = distribution2D_get(&d, tn, tn);
                 this->syrk_tile_async<P>(
                     uplo, trans,
                     bs_nn, bs_km,
@@ -337,7 +325,7 @@ xkblas_t::syrk_async(
                     &zbeta,
                     C(tn, tn),
                     ldc,
-                    device_global_id
+                    device_unique_id
                 );
             }
 
@@ -348,7 +336,7 @@ xkblas_t::syrk_async(
                     const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        const device_global_id_t device_global_id = distribution2D_get(&d, tm, tn);
+                        const device_unique_id_t device_unique_id = distribution2D_get(&d, tm, tn);
                         const int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -359,7 +347,7 @@ xkblas_t::syrk_async(
                             A(tk, tn), lda,
                             &zbeta,
                             C(tm, tn), ldc,
-                            device_global_id
+                            device_unique_id
                         );
                     }
                 }
@@ -371,7 +359,7 @@ xkblas_t::syrk_async(
                     const int bs_mm = (tm == Cmt-1) ? (Cm-tm*Cmb) : Cmb;
                     for (int tk = 0; tk < Amt; ++tk)
                     {
-                        const device_global_id_t device_global_id = distribution2D_get(&d, tn, tm);
+                        const device_unique_id_t device_unique_id = distribution2D_get(&d, tn, tm);
                         const int bs_km = (tk == Amt-1) ? (Am-tk*Amb) : Amb;
                         const TYPE zbeta = (tk == 0) ? *beta : one;
                         this->gemm_tile_async<P>(
@@ -382,7 +370,7 @@ xkblas_t::syrk_async(
                             A(tk, tm), lda,
                             &zbeta,
                             C(tn, tm), ldc,
-                            device_global_id
+                            device_unique_id
                         );
                     }
                 }
@@ -421,7 +409,7 @@ xkblas_t::syrk(
 ) {
     this->memory_invalidate_caches();
     int r = this->syrk_async<P>(uplo, trans, n, k, alpha, A, lda, beta, C, ldc);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, MATRIX_COLMAJOR, C, ldc, n, n, sizeof(TYPE));
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, MATRIX_COLMAJOR, C, ldc, n, n, sizeof(TYPE));
     this->sync();
     return r;
 }
@@ -438,7 +426,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     assert(queue);
 
@@ -478,7 +466,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(syrk);
 }
@@ -497,7 +485,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     assert(queue);
 
@@ -537,7 +525,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(syrk);
 }
@@ -563,6 +551,6 @@ cuda(
     template int xkblas_t::syrk<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_sync<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
     template int xkblas_t::syrk_async<P>(int uplo, int trans, int n, int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, int ldc);    \
-    template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const int n, const int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc, device_global_id_t device_global_id);
+    template int xkblas_t::syrk_tile_async<P>(int uplo, int trans, const int n, const int k, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * A, const int Atm, const int Atn, const int Amb, const int Anb, const int lda, const xkblas_precision_type_t<P> * beta, xkblas_precision_type_t<P> * C, const int Ctm, const int Ctn, const int Cmb, const int Cnb, const int ldc, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE

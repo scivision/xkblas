@@ -91,7 +91,7 @@ xkblas_t::axpby(
 ) {
     this->memory_invalidate_caches();
     int r = this->axpby_async<P>(n, alpha, x, incx, beta, y, incy);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, y, n*sizeof(TYPE)*incy);
     this->sync();
     return r;
 }

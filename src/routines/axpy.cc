@@ -85,7 +85,7 @@ xkblas_t::axpy_tile_async(
     const int incx,
           TYPE * y,
     const int incy,
-    device_global_id_t device_global_id
+    device_unique_id_t device_unique_id
 ) {
     thread_t * thread = thread_t::get_tls();
     assert(thread);
@@ -93,31 +93,19 @@ xkblas_t::axpy_tile_async(
     LOGGER_DEBUG("Submitting tile of axpy");
 
     # define AC 2
-    constexpr task_flag_bitfield_t flags = TASK_FLAG_DEVICE | TASK_FLAG_DEPENDENT | TASK_FLAG_DETACHABLE;
-    constexpr size_t task_size = task_compute_size(flags, AC);
-    constexpr size_t args_size = sizeof(args_t<P>);
-
     const task_format_id_t fmtid = XKBLAS_XKRT_TASK_FORMAT_GET(P, AXPY);
-    task_t * task = this->task_new(fmtid, flags, task_size + args_size);
+    constexpr size_t args_size = sizeof(args_t<P>);
+    constexpr task_access_counter_t ocr_access_idx = 1;
+    task_t * task = this->task_new(fmtid, args_size, AC, ocr_access_idx, device_unique_id);
 
-    task_det_info_t * det = TASK_DET_INFO(task);
-    new (det) task_det_info_t();
-
-    task_dep_info_t * dep = TASK_DEP_INFO(task);
-    new (dep) task_dep_info_t(AC);
-
-    task_dev_info_t * dev = TASK_DEV_INFO(task);
-    constexpr int ocr_access = 1;
-    new (dev) task_dev_info_t(device_global_id, ocr_access);
-
-    args_t<P> * args = (args_t<P> *) TASK_ARGS(task, task_size);
+    args_t<P> * args = (args_t<P> *) TASK_ARGS(task);
     new (args) args_t<P>(this, n, *alpha, incx, incy);
 
-    static_assert(AC <= TASK_MAX_ACCESSES);
-    access_t * accesses = TASK_ACCESSES(task, flags);
+    static_assert(AC <= XKRT_TASK_MAX_ACCESSES);
+    access_t * accesses = TASK_ACCESSES(task);
     new (accesses + 0) access_t(task, x, incx*n, sizeof(TYPE), ACCESS_MODE_R,  ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
     new (accesses + 1) access_t(task, y, incy*n, sizeof(TYPE), ACCESS_MODE_RW, ACCESS_CONCURRENCY_SEQUENTIAL, ACCESS_SCOPE_NONUNIFIED);
-    thread->resolve(accesses, AC);
+    this->runtime.task_accesses_resolve(accesses, AC);
     # undef AC
 
     # if XKRT_SUPPORT_DEBUG
@@ -179,8 +167,8 @@ xkblas_t::axpy_async(
     for (int tn = 0 ; tn < nt ; ++tn)
     {
         int bs = (tn == nt-1) ? (n - tn*ts) : ts;
-        device_global_id_t device_global_id = distribution1D_get(&d, tn);
-        this->axpy_tile_async<P>(bs, alpha, x + tn*ts*incx, incx, y + tn*ts*incy, incy, device_global_id);
+        device_unique_id_t device_unique_id = distribution1D_get(&d, tn);
+        this->axpy_tile_async<P>(bs, alpha, x + tn*ts*incx, incx, y + tn*ts*incy, incy, device_unique_id);
     }
 
     return 0;
@@ -213,7 +201,7 @@ xkblas_t::axpy(
 ) {
     this->memory_invalidate_caches();
     int r = this->axpy_async<P>(n, alpha, x, incx, y, incy);
-    this->memory_coherent_async(HOST_DEVICE_GLOBAL_ID, y, n*sizeof(TYPE)*incy);
+    this->memory_coherent_async(XKRT_HOST_DEVICE_UNIQUE_ID, y, n*sizeof(TYPE)*incy);
     this->sync();
     return r;
 }
@@ -230,7 +218,7 @@ hip_run(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     hipblasHandle_t handle = queue->hip.blas.handle;
     assert(handle);
@@ -265,7 +253,7 @@ hip(
     task_t * task,
     queue_hip_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_HIPBLAS_DISPATCH_PRECISION(axpy);
 }
@@ -284,7 +272,7 @@ cuda_run(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     cublasHandle_t handle = queue->cu.blas.handle;
     assert(handle);
@@ -302,8 +290,8 @@ cuda_run(
     assert(args);
 
     task_dev_info_t * dev = TASK_DEV_INFO(task);
-    const device_global_id_t device_global_id = dev->elected_device_id;
-    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_global_id, handle, &args->alpha);
+    const device_unique_id_t device_unique_id = dev->elected_device_unique_id;
+    const TYPE * alpha = xkblas_cublas_pointer_mode<P>(args->xkblas, device_unique_id, handle, &args->alpha);
 
     XKBLAS_CUBLAS_CALL(
         FUNC(
@@ -324,7 +312,7 @@ cuda(
     task_t * task,
     queue_cu_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     XKBLAS_CUBLAS_DISPATCH_PRECISION(axpy);
 }
@@ -339,7 +327,7 @@ sycl_queue_launch(
     task_t * task,
     sycl::queue & queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     // unpack arguments
     assert(task);
@@ -389,7 +377,7 @@ sycl_launch(
     task_t * task,
     queue_sycl_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     queue->sycl.events.buffer[idx] = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
 }
@@ -407,7 +395,7 @@ ze(
     task_t * task,
     queue_ze_t * queue,
     command_t * cmd,
-    queue_command_list_counter_t idx
+    command_queue_list_counter_t idx
 ) {
     sycl::event event = sycl_queue_launch<P>(runtime, device, task, queue->sycl.queue, cmd, idx);
     queue->ze.events.list[idx] = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event);
@@ -434,6 +422,6 @@ ze(
     template int xkblas_t::axpy<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_sync<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
     template int xkblas_t::axpy_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy); \
-    template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_global_id_t device_global_id);
+    template int xkblas_t::axpy_tile_async<P>(int n, const xkblas_precision_type_t<P> * alpha, const xkblas_precision_type_t<P> * x, const int incx, xkblas_precision_type_t<P> * y, const int incy, device_unique_id_t device_unique_id);
 XKBLAS_FORALL_PRECISIONS(DEFINE);
 # undef DEFINE
