@@ -1,23 +1,25 @@
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../blas ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/kaapi ${CMAKE_SOURCE_DIR}/blas ${BLAS_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../blas
+${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/kaapi ${CMAKE_SOURCE_DIR}/blas
+${BLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 if (OPENMP_FOUND)
   add_compile_options("${OpenMP_C_FLAGS}")
   add_link_options("${OpenMP_C_FLAGS}")
 endif()
 
-list(APPEND GENERATED_SOURCES 
+list(APPEND GENERATED_SOURCES
   stesting_gemm.c stesting_trsm.c stesting_trmm.c stesting_symm.c stesting_syrk.c stesting_syr2k.c splgsy.c stesting_auxiliary.h stesting_auxiliary.c
   dtesting_gemm.c dtesting_trsm.c dtesting_trmm.c dtesting_symm.c dtesting_syrk.c dtesting_syr2k.c dplgsy.c dtesting_auxiliary.h dtesting_auxiliary.c
   ctesting_gemm.c ctesting_trsm.c ctesting_trmm.c ctesting_hemm.c ctesting_symm.c ctesting_syrk.c ctesting_syr2k.c ctesting_herk.c ctesting_her2k.c cplghe.c cplgsy.c ctesting_auxiliary.h ctesting_auxiliary.c
 )
 
 if(XKBLAS_BUILD_COPYSCALE)
-	list(APPEND GENERATED_SOURCES 
+	list(APPEND GENERATED_SOURCES
   	stesting_copyscale.c dtesting_copyscale.c ctesting_copyscale.c
-  	stesting_mumps_like.c dtesting_mumps_like.c ctesting_mumps_like.c 
+  	stesting_mumps_like.c dtesting_mumps_like.c ctesting_mumps_like.c
 	)
-endif()	
+endif()
 
 
 foreach(file IN LISTS GENERATED_SOURCES)
@@ -26,7 +28,7 @@ foreach(file IN LISTS GENERATED_SOURCES)
   add_custom_command(
       OUTPUT  ${file}
       COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh ${precision} ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_SOURCE_DIR}/gen_precision_one.sh 
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
   )
   #message(STATUS "Gen precision ${precision} from ${source}")
   #message(STATUS "Include dir for BLAS: ${BLAS_INCLUDE_DIRS}")
@@ -54,8 +56,10 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(ztesting ${SOURCES_TESTING_Z})
-target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z=1 -UPRECISION_c) 
-target_link_libraries(ztesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
+target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z=1 -UPRECISION_c)
+target_link_libraries(ztesting xkblas kaapi ${BLAS_LIBRARIES}
+"$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+m)
 install(TARGETS ztesting DESTINATION testing)
 
 #--- Testing_c
@@ -79,8 +83,10 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(ctesting ${SOURCES_TESTING_C})
-target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c=1) 
-target_link_libraries(ctesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
+target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c=1)
+target_link_libraries(ctesting xkblas kaapi ${BLAS_LIBRARIES}
+"$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+m)
 install(TARGETS ctesting DESTINATION testing)
 
 #--- Testing_d
@@ -100,8 +106,11 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(dtesting ${SOURCES_TESTING_D})
-target_compile_options(dtesting PUBLIC -DPRECISION_d=1 -UPRECISION_s -UPRECISION_z -UPRECISION_c) 
-target_link_libraries(dtesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} ${HIP_LIBRARIES} m)
+target_compile_options(dtesting PUBLIC -DPRECISION_d=1 -UPRECISION_s -UPRECISION_z -UPRECISION_c)
+target_link_libraries(dtesting xkblas kaapi ${BLAS_LIBRARIES}
+"$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+"$<$<BOOL:${KAAPI_USE_HIP}>:${HIP_LIBRARIES}>"
+m)
 install(TARGETS dtesting DESTINATION testing)
 
 
@@ -122,8 +131,10 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(stesting ${SOURCES_TESTING_S})
-target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION_z -UPRECISION_c) 
-target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES} ${CUBLAS_LIBRARIES} m)
+target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION_z -UPRECISION_c)
+target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES}
+"$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+m)
 install(TARGETS stesting DESTINATION testing)
 
 # - Do not install run_tests in the installation directory

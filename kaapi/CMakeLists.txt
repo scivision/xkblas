@@ -14,12 +14,12 @@ find_package(Threads REQUIRED)
 
 find_package(Threads REQUIRED)
 
-if (${HWLOC_FOUND})
+if (HWLOC_FOUND)
   add_compile_options("-DKAAPI_USE_HWLOC=1")
   message(STATUS "Kaapi configured with HWLOC")
 endif()
 
-if (${HIP_FOUND})
+if (KAAPI_USE_HIP)
   message(STATUS "Kaapi configured with HIP")
 endif()
 
@@ -27,7 +27,7 @@ if (KAAPI_USE_ROCSMI)
   message(STATUS "Kaapi configured with ROCMSMI")
 endif()
 
-if (${PAPI_FOUND})
+if (PAPI_FOUND)
   add_compile_options("-DKAAPI_USE_PAPI=1")
   message(STATUS "Kaapi configured with PAPI")
 else()
@@ -90,7 +90,7 @@ endif()
 
 # use, i.e. don't skip the full RPATH for the build tree
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
- 
+
 # when building, use the install RPATH already
 # (but later on when installing)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -103,7 +103,7 @@ add_library(kaapi SHARED  ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h kaapi.h kaapi_e
 target_link_libraries(kaapi PRIVATE Threads::Threads)
 
 if (KAAPI_USE_HWLOC)
-  if (${HWLOC_FOUND})
+  if (HWLOC_FOUND)
     include_directories(${HWLOC_INCLUDE_DIRS})
     message(STATUS "Found HWLOC_INCLUDE_DIRS: ${HWLOC_INCLUDE_DIRS}")
     target_link_libraries(kaapi PRIVATE ${HWLOC_LIBRARIES})
@@ -119,23 +119,21 @@ if (KAAPI_USE_ROCSMI)
 endif()
 
 if (KAAPI_USE_LIBNUMA)
-  include_directories(${LIBNUMA_INCLUDE_DIRS})
+  target_include_directories(kaapi PRIVATE ${LIBNUMA_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${LIBNUMA_LIBRARIES})
   message(STATUS "Kaapi configured with LIBNUMA")
 endif()
 
-if (${CUDA_DRIVER_FOUND})
-  include_directories(${CUDA_DRIVER_INCLUDE_DIRS})
-  target_link_libraries(kaapi PRIVATE ${CUDA_DRIVER_LIBRARIES} ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+if (KAAPI_USE_CUDA_RT)
+  target_link_libraries(kaapi PRIVATE CUDA::cuda_driver CUDA::cudart CUDA::cublas)
 endif()
 
-if (${CUDA_RT_FOUND})
-  include_directories(${CUDA_RT_INCLUDE_DIRS} ${CUBLAS_INCLUDE_DIRS})
-  target_link_libraries(kaapi PRIVATE ${CUDA_RT_LIBRARIES} ${CUBLAS_LIBRARIES})
+if (KAAPI_USE_CUDA_RT)
+  target_link_libraries(kaapi PRIVATE CUDA::cudart CUDA::cublas)
 endif()
 
-if (${HIP_FOUND})
-	include_directories(${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
+if (KAAPI_USE_HIP)
+	target_include_directories(kaapi PRIVATE ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
 	#include_directories(${HIPBLAS_INCLUDE_DIRS} ${ROCBLAS_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${HIP_LIBRARIES} ${HIPBLAS_LIBRARIES})
 endif()
@@ -144,11 +142,10 @@ if (ENABLE_KAAPI_UNIFIED)
   message(STATUS "Kaapi configured with support for UVM")
 endif()
 
-if (${PAPI_FOUND})
+if (PAPI_FOUND)
   include_directories(${PAPI_INCLUDE_DIRS})
   target_link_libraries(kaapi PRIVATE ${PAPI_LIBRARIES})
 endif()
 
 install(TARGETS kaapi DESTINATION lib)
 install(FILES kaapi.h kaapi_atomic.h kaapi_error.h DESTINATION include)
-

@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.7)
+cmake_minimum_required (VERSION 3.27)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
@@ -14,7 +14,7 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 -Wfatal-errors ")
 #set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 -D_OFFLOAD_DEBUG=1")
 
 #
-project (XKblas)
+project (XKblas LANGUAGES C)
 
 # More detailled information to know what we are doing
 message( STATUS "C Compiler:   ${CMAKE_C_COMPILER}" )
@@ -49,7 +49,7 @@ if (KAAPI_USE_HIP AND KAAPI_USE_CUDA_RT)
   message(FATAL_ERROR "Current implementation of Kaapi does not support HIP pluging and CUDA plugin compiled together.")
 endif()
 if (NOT (KAAPI_USE_HIP OR KAAPI_USE_CUDA_RT))
-  message(FATAL_ERROR "You should provide a runtime implementation: use either -DKAAPI_USE_HIP=on or -DKAAPI_USE_CUDA_RT=on")
+  message(FATAL_ERROR "You must provide a runtime implementation: use either -DKAAPI_USE_HIP=on or -DKAAPI_USE_CUDA_RT=on")
 endif()
 
 #--- OpenMP
@@ -71,37 +71,27 @@ endif()
 
 #--- CUDA
 if (KAAPI_USE_CUDA_RT)
-  find_package(CUDA REQUIRED) # TODO deal with HIP/NO GPU
-  find_package(CUDA_RT)
-  if (NOT ${CUDA_RT_FOUND})
+  enable_language(CUDA)
+
+  find_package(CUDAToolkit)
+  if (NOT CUDAToolkit_FOUND)
     message(FATAL_ERROR "Kaapi is configured with CUDA Runtime API but library could not be found.")
   endif()
-  find_package(CUBLAS)
-  if (NOT ${CUBLAS_FOUND})
-    message(FATAL_ERROR "Kaapi is configured with CUDA API but CUBLAS is not found for XKblas !")
-  endif()
-
-#  find_path(BLAS_INCLUDE_DIRS cblas.h
-#    /usr/include
-#    /usr/local/include
-#    $ENV{BLAS_HOME}/include)
 endif()
 
 #Hip
 if (KAAPI_USE_HIP)
-  # Cannot use find_package HIP that imply unknown package on neowise (or I do not read all the documentation)
-  #
   find_package(HIP)
-  if (NOT ${HIP_FOUND})
+  if (NOT HIP_FOUND)
     message(FATAL_ERROR "Kaapi is configured with HIP, but hip installation could not be found!")
   endif()
 
   find_package(ROCBLAS)
-  if (NOT ${ROCBLAS_FOUND})
+  if (NOT ROCBLAS_FOUND)
     message(FATAL_ERROR "Kaapi is configured with HIP, but rocblas could not be found!")
   endif()
   find_package(HIPBLAS)
-  if (NOT ${HIPBLAS_FOUND})
+  if (NOT HIPBLAS_FOUND)
     message(FATAL_ERROR "Kaapi is configured with HIP, but hipblas could not be found!")
   endif()
 
@@ -112,7 +102,7 @@ if (KAAPI_USE_HIP)
   message(STATUS "Found ROCBLAS_INCLUDE_DIRS: ${ROCBLAS_INCLUDE_DIRS}")
   message(STATUS "Found ROCBLAS_LIBRARIES: ${ROCBLAS_LIBRARIES}")
 else()
-  set(HIP_FOUND FALSE)
+  set(HIP_FOUND false)
 endif()
 
 #--- PAPI
@@ -134,17 +124,17 @@ if (KAAPI_USE_HWLOC)
   find_package(HWLOC)
 endif()
 
-if (${HIP_FOUND})
+if (KAAPI_USE_HIP)
   find_path(ROCSMI_INCLUDE_DIRS
     NAMES rocm_smi/rocm_smi.h
     HINTS ${ROCM_PATH}/include
-    HINTS ${ROCSMI_PREFIX}/include  
+    HINTS ${ROCSMI_PREFIX}/include
   )
   find_library(ROCSMI_LIBRARIES
     # Pick the static library first for easier run-time linking.
-    NAMES librocm_smi64.so 
+    NAMES librocm_smi64.so
     HINTS ${ROCM_PATH}/lib
-    HINTS ${ROCSMI_PREFIX}/lib  
+    HINTS ${ROCSMI_PREFIX}/lib
   )
   if (ROCSMI_INCLUDE_DIRS STREQUAL "ROCSMI_INCLUDE_DIRS-NOTFOUND")
     message(STATUS "ROCSMI_INCLUDE_DIRS not defined:" ${ROCSMI_INCLUDE_DIRS})
@@ -211,7 +201,7 @@ endif()
 #if (KAAPI_USE_NVPL)
 #  set(BLA_VENDOR NVHPC)
 #endif()
-if (KAAPI_USE_OPENBLAS)
+if (KAAPI_USE_AOCL)
   set(BLA_VENDOR AOCL)
 endif()
 if (NOT KAAPI_USE_MKL AND NOT KAAPI_USE_OPENBLAS AND NOT KAAPI_USE_CRAYBLAS AND NOT KAAPI_USE_NVPL AND NOT KAAPI_USE_AOCL)
@@ -235,15 +225,15 @@ else()
   find_package(BLAS REQUIRED)
   if (KAAPI_USE_MKL)
     find_path(BLAS_INCLUDE_DIRS mkl_lapacke.h $ENV{MKLROOT}/include)
-  endif()
-  if (KAAPI_USE_CRAYBLAS)
+  elseif (KAAPI_USE_CRAYBLAS)
     find_path(BLAS_INCLUDE_DIRS lapacke.h ${CRAY_LIBSCI_PREFIX_DIR}/include)
-  endif()
-  if (KAAPI_USE_AOCL)
+  elseif (KAAPI_USE_AOCL)
+    find_path(BLAS_INCLUDE_DIRS lapacke.h)
+  else()
     find_path(BLAS_INCLUDE_DIRS lapacke.h)
   endif()
 endif()
-if (NOT ${BLAS_FOUND})
+if (NOT BLAS_FOUND)
   message(FATAL_ERROR "XKblas requires a BLAS library.")
 endif()
 message("BLAS_INCLUDE_DIRS : ${BLAS_INCLUDE_DIRS}")
@@ -260,7 +250,7 @@ endif()
 if (KAAPI_USE_HIP)
   add_compile_options("-DKAAPI_USE_HIP=1")
   add_compile_options("-D__HIP_PLATFORM_AMD__=1")
-  add_compile_options("-DROCBLAS_V3") 
+  add_compile_options("-DROCBLAS_V3")
   message(STATUS "Configuring Kaapi with HIP plugin")
 endif()
 
@@ -279,7 +269,7 @@ else()
 endif()
 
 if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
-  if (${PAPI_FOUND})
+  if (PAPI_FOUND)
     add_compile_options("-DKAAPI_USE_PAPI=1")
   else()
     add_compile_options("-DKAAPI_USE_PAPI=0")
@@ -293,7 +283,7 @@ else()
 endif()
 
 if (KAAPI_USE_HWLOC)
-  if (${HWLOC_FOUND})
+  if (HWLOC_FOUND)
     add_compile_options("-DKAAPI_USE_HWLOC=1")
   else()
     add_compile_options("-DKAAPI_USE_HWLOC=0")
@@ -338,4 +328,3 @@ add_subdirectory(blas)
 if (KAAPI_BUILD_TESTING)
   add_subdirectory(testing)
 endif()
-

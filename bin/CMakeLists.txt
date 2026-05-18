@@ -19,7 +19,7 @@ else()
 endif()
 
 if (KAAPI_USE_TRACE AND KAAPI_USE_PERFCTR)
-  if (${PAPI_FOUND})
+  if (PAPI_FOUND)
     add_compile_options("-DKAAPI_USE_PAPI=1")
   else()
     add_compile_options("-DKAAPI_USE_PAPI=0")
