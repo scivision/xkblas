@@ -260,8 +260,9 @@ endif()
 # XK Runtime
 FetchContent_Declare(
     xkrt
-    GIT_REPOSITORY https://gitlab.inria.fr/xkaapi/dev-v2.git
+    GIT_REPOSITORY https://github.com/scivision/xkrt.git
     GIT_TAG        master
+    GIT_SHALLOW    true
     FIND_PACKAGE_ARGS
 )
 FetchContent_MakeAvailable(xkrt)
