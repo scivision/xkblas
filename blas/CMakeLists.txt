@@ -212,22 +212,23 @@ if (KAAPI_USE_HIP)
 else()
 
   if (KAAPI_USE_CUDA_RT AND XKBLAS_BUILD_COPYSCALE)
-    # TODO cuda compile, make generic
     set(CUDA_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/zcopyscale.cu
       ${CMAKE_CURRENT_BINARY_DIR}/scopyscale.cu
       ${CMAKE_CURRENT_BINARY_DIR}/dcopyscale.cu
       ${CMAKE_CURRENT_BINARY_DIR}/ccopyscale.cu
     )
-	  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch=native --ptxas-options=\"-v\"") #-G -g")
-          set_source_files_properties( CUDA_SOURCES, PROPERTIES LANGUAGE CUDA )
-          cuda_compile(cuda_objects ${CUDA_SOURCES} MODULE )
+
+    add_library(xkblas_cuda_objects OBJECT ${CUDA_SOURCES})
+    target_compile_options(xkblas_cuda_objects PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>
+    )
   endif()
 
 	add_library(xkblas SHARED internal_register.h common.h xkblas.h xkblas.c dbg_blas.c
 		${SOURCES_Z}
 		${GENERATED_SOURCES}
-		${cuda_objects}
+    $<$<TARGET_EXISTS:xkblas_cuda_objects>:xkblas_cuda_objects>
 	)
 	set_source_files_properties(${SOURCES_Z} ${GENERATED_SOURCES} PROPERTIES COMPILE_FLAGS "-fPIC" )
 	add_dependencies(xkblas task_internal_headers)
