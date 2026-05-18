@@ -1,6 +1,6 @@
 # XKBlas
 
-XKBlas is a portable multi-gpu BLAS library, with built-in software-based unified shared memory between host and devices memories.    
+XKBlas is a portable multi-gpu BLAS library, with built-in software-based unified shared memory between host and devices memories.
 It implements API for C/C++/Julia with three flavors:
 
 | Name          | Example         | Calling Thread Behavior                          | Write-back to Host                        | Notes                                                                                                                                 |
@@ -31,9 +31,8 @@ An XKBlas program is a sequence of task-spawning BLAS routines call over host-me
 ### Build command example
 See the `CMakeLists.txt` file for all available options.
 ```bash
-mkdir build
-cd build
-CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PATH cmake -DUSE_CUDA=on -DUSE_CUBLAS=on -DUSE_SYCL=on -DUSE_MKL=on -DUSE_CLBLAST=on -DUSE_ZE=on -DCMAKE_BUILD_TYPE=Debug ../
+CC=clang CXX=clang++ CMAKE_PREFIX_PATH=$ONEAPI_ROOT:$CUDA_PATH:$CMAKE_PREFIX_PATH cmake -B build \
+    -DUSE_CUDA=on -DUSE_CUBLAS=on -DUSE_SYCL=on -DUSE_MKL=on -DUSE_CLBLAST=on -DUSE_ZE=on -DCMAKE_BUILD_TYPE=Debug
 ```
 
 ## List of routines supported

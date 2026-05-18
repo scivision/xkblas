@@ -29,7 +29,7 @@ add_compile_options(-Wall -Wextra -Wreturn-type)
 
 # Project name
 SET(XKBLAS_NAME xkblas)
-project(${XKBLAS_NAME})
+project(${XKBLAS_NAME} LANGUAGES CXX)
 
 ###############
 # C++ version #
@@ -69,16 +69,16 @@ SET(XKBLAS_HIP_KERNELS_SOURCE_FILES)
 
 # Custom cuda/hip sources
 list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/src/kernels/offset_vector.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/offset_vector.cu
 )
 
 # ensure C api directory exists
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/xkblas)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/api/c/src/routines)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/kernels)
-configure_file(${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/xkblas.h COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/api/c/include/xkblas/routines.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/routines.h COPYONLY)
-add_custom_target(link_target ALL COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_BINARY_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas.h)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/api/c/src/routines)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src/kernels)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/xkblas.h COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/api/c/include/xkblas/routines.h ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/routines.h COPYONLY)
+add_custom_target(link_target ALL COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas.h)
 
 # for each precision
 foreach(precision IN LISTS XKBLAS_ROUTINES_PRECISIONS)
@@ -92,52 +92,52 @@ foreach(precision IN LISTS XKBLAS_ROUTINES_PRECISIONS)
         endif()
 
         # generate c bindings
-        list(APPEND XKBLAS_ROUTINES_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/routines/${routine}.cc)
-        list(APPEND XKBLAS_ROUTINES_C_SOURCE_FILES ${CMAKE_BINARY_DIR}/api/c/src/routines/${precision}${routine}.cc)
+        list(APPEND XKBLAS_ROUTINES_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/routines/${routine}.cc)
+        list(APPEND XKBLAS_ROUTINES_C_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/api/c/src/routines/${precision}${routine}.cc)
         add_custom_command(
             OUTPUT
-                ${CMAKE_BINARY_DIR}/api/c/src/routines/${precision}${routine}.cc
+                ${CMAKE_CURRENT_BINARY_DIR}/api/c/src/routines/${precision}${routine}.cc
             COMMAND
-                python3 ${CMAKE_SOURCE_DIR}/generators/generate-cc.py ${CMAKE_SOURCE_DIR}/api/c/src/routines ${CMAKE_BINARY_DIR}/api/c/src/routines ${routine} ${precision}
+                python3 ${CMAKE_CURRENT_SOURCE_DIR}/generators/generate-cc.py ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/routines ${CMAKE_CURRENT_BINARY_DIR}/api/c/src/routines ${routine} ${precision}
             DEPENDS
-                ${CMAKE_SOURCE_DIR}/api/c/src/routines/${routine}.cc
+                ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/routines/${routine}.cc
         )
     endforeach()
 
     # header files for each precision
-    list(APPEND XKBLAS_ROUTINES_C_SOURCE_FILES ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h)
+    list(APPEND XKBLAS_ROUTINES_C_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h)
     add_custom_command(
         OUTPUT
-            ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h
+            ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h
         COMMAND
-            python3 ${CMAKE_SOURCE_DIR}/generators/generate-h.py ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xroutines.h ${CMAKE_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h ${precision}
+            python3 ${CMAKE_CURRENT_SOURCE_DIR}/generators/generate-h.py ${CMAKE_CURRENT_SOURCE_DIR}/api/c/include/xkblas/xroutines.h ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/xkblas/${precision}routines.h ${precision}
         DEPENDS
-            ${CMAKE_SOURCE_DIR}/api/c/include/xkblas/xroutines.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/api/c/include/xkblas/xroutines.h
     )
 
     # custom cuda kernels
     foreach(kernel IN LISTS XKBLAS_CUDA_KERNELS)
-        list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES ${CMAKE_BINARY_DIR}/src/kernels/${precision}${kernel}.cu)
+        list(APPEND XKBLAS_CUDA_KERNELS_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/src/kernels/${precision}${kernel}.cu)
         add_custom_command(
             OUTPUT
-                ${CMAKE_BINARY_DIR}/src/kernels/${precision}${kernel}.cu
+                ${CMAKE_CURRENT_BINARY_DIR}/src/kernels/${precision}${kernel}.cu
             COMMAND
-                python3 ${CMAKE_SOURCE_DIR}/generators/generate-cu.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_BINARY_DIR}/src/kernels ${kernel} ${precision}
+                python3 ${CMAKE_CURRENT_SOURCE_DIR}/generators/generate-cu.py ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels ${CMAKE_CURRENT_BINARY_DIR}/src/kernels ${kernel} ${precision}
             DEPENDS
-                ${CMAKE_SOURCE_DIR}/src/kernels/${kernel}.cu
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/${kernel}.cu
         )
     endforeach()
 
     # custom hip kernels
     foreach(kernel IN LISTS XKBLAS_HIP_KERNELS)
-        list(APPEND XKBLAS_HIP_KERNELS_SOURCE_FILES ${CMAKE_BINARY_DIR}/src/kernels/${precision}${kernel}.hip.cpp)
+        list(APPEND XKBLAS_HIP_KERNELS_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/src/kernels/${precision}${kernel}.hip.cpp)
         add_custom_command(
             OUTPUT
-                ${CMAKE_BINARY_DIR}/src/kernels/${precision}${kernel}.hip.cpp
+                ${CMAKE_CURRENT_BINARY_DIR}/src/kernels/${precision}${kernel}.hip.cpp
             COMMAND
-                python3 ${CMAKE_SOURCE_DIR}/generators/generate-hip.py ${CMAKE_SOURCE_DIR}/src/kernels ${CMAKE_BINARY_DIR}/src/kernels ${kernel} ${precision}
+                python3 ${CMAKE_CURRENT_SOURCE_DIR}/generators/generate-hip.py ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels ${CMAKE_CURRENT_BINARY_DIR}/src/kernels ${kernel} ${precision}
             DEPENDS
-                ${CMAKE_SOURCE_DIR}/src/kernels/${kernel}.hip.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/${kernel}.hip.cpp
         )
     endforeach()
 
@@ -146,24 +146,24 @@ endforeach()
 
 SET(SOURCE_FILES
     # XKBlas core
-    ${CMAKE_SOURCE_DIR}/src/auto-tile.cc
-    ${CMAKE_SOURCE_DIR}/src/conf.cc
-    ${CMAKE_SOURCE_DIR}/src/xkblas.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/auto-tile.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/conf.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/xkblas.cc
     ${XKBLAS_ROUTINES_SOURCE_FILES}
 )
 
 # C bindings to its own custom lib that link with xkblas-core
 SET(C_SOURCE_FILES
-    ${CMAKE_SOURCE_DIR}/api/c/src/format.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/host-async.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/legacy.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/record.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/alloc.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/coherent.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/invalidate.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/preallocate.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/register.cc
-    ${CMAKE_SOURCE_DIR}/api/c/src/memory/replicate.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/format.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/host-async.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/legacy.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/record.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/alloc.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/coherent.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/invalidate.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/preallocate.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/register.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/c/src/memory/replicate.cc
     ${XKBLAS_ROUTINES_C_SOURCE_FILES}
 )
 
@@ -185,19 +185,19 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 # XKBLAS Lib
 add_library(${XKBLAS_NAME}       SHARED ${SOURCE_FILES} ${C_SOURCE_FILES})
-add_library(${XKBLAS_NAME}_cblas SHARED ${CMAKE_SOURCE_DIR}/api/cblas/wrappers.cc) # cblas wrappers
+add_library(${XKBLAS_NAME}_cblas SHARED ${CMAKE_CURRENT_SOURCE_DIR}/api/cblas/wrappers.cc) # cblas wrappers
 
 # Include directory
-include_directories(${CMAKE_SOURCE_DIR}/include/)
-include_directories(${CMAKE_SOURCE_DIR}/src/)
-include_directories(${CMAKE_BINARY_DIR}/include/)
-include_directories(${CMAKE_BINARY_DIR}/api/c/include/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/api/c/include/)
 
 # Support header file generated
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/include/xkblas")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/xkblas")
 configure_file(
-    ${CMAKE_SOURCE_DIR}/include/xkblas/support.h.in
-    ${CMAKE_BINARY_DIR}/include/xkblas/support.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/xkblas/support.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/xkblas/support.h
 )
 
 ################
@@ -205,14 +205,14 @@ configure_file(
 ################
 
 install(
-    FILES "${CMAKE_BINARY_DIR}/include/xkblas/support.h"
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/include/xkblas/support.h"
     DESTINATION include/xkblas
 )
 
 install(TARGETS ${XKBLAS_NAME}       LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 install(TARGETS ${XKBLAS_NAME}_cblas LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
-install(DIRECTORY ${CMAKE_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/api/c/include/ DESTINATION include FILES_MATCHING PATTERN "*.h*")
 
 if (STRICT)
     SET(STRICT_OPTIONS
