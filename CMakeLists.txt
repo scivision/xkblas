@@ -266,6 +266,9 @@ FetchContent_Declare(
     FIND_PACKAGE_ARGS
 )
 FetchContent_MakeAvailable(xkrt)
+if(NOT TARGET XKRT::xkrt)
+  add_library(XKRT::xkrt ALIAS xkrt)
+endif()
 
 target_link_libraries(${XKBLAS_NAME}       PRIVATE XKRT::xkrt)
 target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE XKRT::xkrt ${XKBLAS_NAME})
