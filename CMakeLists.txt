@@ -317,6 +317,8 @@ include_directories ("kaapi")
 add_subdirectory(kaapi)
 add_subdirectory(bin)
 add_subdirectory(blas)
+
 if (KAAPI_BUILD_TESTING)
+  enable_testing()
   add_subdirectory(testing)
 endif()

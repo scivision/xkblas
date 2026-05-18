@@ -57,7 +57,7 @@ target_link_libraries(ztesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
 "$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
-install(TARGETS ztesting DESTINATION testing)
+install(TARGETS ztesting RUNTIME DESTINATION testing)
 
 #--- Testing_c
 set(SOURCES_TESTING_C
@@ -86,7 +86,7 @@ target_link_libraries(ctesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
 "$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
-install(TARGETS ctesting DESTINATION testing)
+install(TARGETS ctesting RUNTIME DESTINATION testing)
 
 #--- Testing_d
 set(SOURCES_TESTING_D
@@ -112,7 +112,7 @@ target_link_libraries(dtesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_HIP}>:${HIP_LIBRARIES}>"
 "$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
-install(TARGETS dtesting DESTINATION testing)
+install(TARGETS dtesting RUNTIME DESTINATION testing)
 
 
 #--- Testing_s
@@ -138,9 +138,14 @@ target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
 "$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
-install(TARGETS stesting DESTINATION testing)
+install(TARGETS stesting RUNTIME DESTINATION testing)
 
 # - Do not install run_tests in the installation directory
 configure_file(run_tests run_tests COPYONLY)
 
 add_custom_target( testing DEPENDS stesting dtesting ctesting ztesting ${CMAKE_CURRENT_BINARY_DIR}/run_tests )
+
+add_test(NAME ${PROJECT_NAME}_testing
+COMMAND ${CMAKE_CURRENT_BINARY_DIR}/run_tests
+WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)

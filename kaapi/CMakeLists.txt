@@ -145,5 +145,5 @@ if (PAPI_FOUND)
   target_link_libraries(kaapi PRIVATE ${PAPI_LIBRARIES})
 endif()
 
-install(TARGETS kaapi DESTINATION lib)
-install(FILES kaapi.h kaapi_atomic.h kaapi_error.h DESTINATION include)
+install(TARGETS kaapi)
+install(FILES kaapi.h kaapi_atomic.h kaapi_error.h TYPE INCLUDE)

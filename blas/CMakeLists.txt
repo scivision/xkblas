@@ -256,5 +256,6 @@ stdc++
 )
 set_target_properties(xkblas PROPERTIES LINKER_LANGUAGE C)
 
-install(TARGETS xkblas DESTINATION lib)
-install(FILES xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/sxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/dxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/cxkblas.h zxkblas.h DESTINATION include)
+install(TARGETS xkblas)
+install(FILES xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/sxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/dxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/cxkblas.h zxkblas.h
+TYPE INCLUDE)
