@@ -55,6 +55,8 @@ if (NOT (KAAPI_USE_HIP OR KAAPI_USE_CUDA_RT))
   message(FATAL_ERROR "You must provide a runtime implementation: use either -DKAAPI_USE_HIP=on or -DKAAPI_USE_CUDA_RT=on")
 endif()
 
+include(GNUInstallDirs)
+
 #--- OpenMP
 find_package(OpenMP)
 

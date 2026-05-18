@@ -14,11 +14,6 @@ if (KAAPI_USE_HIP)
   add_compile_definitions(HIPBLAS_V1)
 endif()
 
-
-
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${BLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
-
-
 #message(STATUS "----------- INCLUDE DIR: BLAS_INCLUDE_DIRS:" ${BLAS_INCLUDE_DIRS})
 #message(STATUS "----------- INCLUDE DIR: HIPBLAS_INCLUDE_DIRS:" ${HIPBLAS_INCLUDE_DIRS})
 #message(STATUS "----------- INCLUDE DIR: HIP_INCLUDE_DIRS:" ${HIP_INCLUDE_DIRS})
@@ -255,6 +250,11 @@ target_link_libraries(xkblas PRIVATE
 stdc++
 )
 set_target_properties(xkblas PROPERTIES LINKER_LANGUAGE C)
+
+target_include_directories(xkblas PUBLIC
+"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR};${CMAKE_CURRENT_BINARY_DIR};${BLAS_INCLUDE_DIRS};${HIP_INCLUDE_DIRS};${HIPBLAS_INCLUDE_DIRS}>"
+$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 install(TARGETS xkblas)
 install(FILES xkblas.h ${CMAKE_CURRENT_BINARY_DIR}/sxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/dxkblas.h ${CMAKE_CURRENT_BINARY_DIR}/cxkblas.h zxkblas.h
