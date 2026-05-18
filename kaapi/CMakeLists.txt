@@ -1,11 +1,11 @@
 add_custom_command (
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h
-  COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/config/git_hash.sh ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h
+  COMMAND ${XKblas_SOURCE_DIR}/config/git_hash.sh ${XKblas_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/git_hash.h
   )
 
 add_custom_command (
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/hw_count.h
-  COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/config/hw_count.sh ${CMAKE_CURRENT_BINARY_DIR}/hw_count.h
+  COMMAND ${XKblas_SOURCE_DIR}/config/hw_count.sh ${CMAKE_CURRENT_BINARY_DIR}/hw_count.h
   )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)

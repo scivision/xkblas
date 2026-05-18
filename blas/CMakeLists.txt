@@ -1,15 +1,11 @@
 
 if (KAAPI_USE_CUDA_DRIVER OR KAAPI_USE_CUDA_RT)
-  add_custom_command (
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/common.h
-    COMMAND ${SHELL_EXECUTABLE} cp ${CMAKE_SOURCE_DIR}/blas/common.gen ${CMAKE_CURRENT_BINARY_DIR}/common.h
-    DEPENDS ${CMAKE_SOURCE_DIR}/blas/common.gen
-  )
+  configure_file(common.gen common.h COPYONLY)
 else()
   add_custom_command (
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/common.h
-    COMMAND ${SHELL_EXECUTABLE} hipify-perl ${CMAKE_SOURCE_DIR}/blas/common.gen > ${CMAKE_CURRENT_BINARY_DIR}/common.h
-    DEPENDS ${CMAKE_SOURCE_DIR}/blas/common.gen
+    COMMAND hipify-perl ${CMAKE_CURRENT_SOURCE_DIR}/common.gen > ${CMAKE_CURRENT_BINARY_DIR}/common.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/common.gen
   )
 endif()
 
@@ -41,29 +37,29 @@ endif()
 # Current implementation generates explicit call to register function for each known task.
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/internal_register.h
-		COMMAND ${SHELL_EXECUTABLE} ${CMAKE_SOURCE_DIR}/gen_internal_register.sh ${BLAS_FUNCTION_LIST}
-    DEPENDS ${CMAKE_SOURCE_DIR}/gen_internal_register.sh ${CMAKE_CURRENT_SOURCE_DIR}/task_format.h
+		COMMAND ${XKblas_SOURCE_DIR}/gen_internal_register.sh ${BLAS_FUNCTION_LIST}
+    DEPENDS ${XKblas_SOURCE_DIR}/gen_internal_register.sh ${CMAKE_CURRENT_SOURCE_DIR}/task_format.h
 )
 
 add_custom_command(
   OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/ztask_internal.h
-  COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh z ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+  COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh z ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${XKblas_SOURCE_DIR}/gen_precision_one.sh
 )
 add_custom_command(
   OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/ctask_internal.h
-  COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh c ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+  COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh c ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${XKblas_SOURCE_DIR}/gen_precision_one.sh
 )
 add_custom_command(
   OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/dtask_internal.h
-  COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh d ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+  COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh d ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${XKblas_SOURCE_DIR}/gen_precision_one.sh
 )
 add_custom_command(
   OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/stask_internal.h
-  COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh s ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+  COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh s ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ztask_internal.h ${XKblas_SOURCE_DIR}/gen_precision_one.sh
 )
 
 
@@ -104,8 +100,8 @@ foreach(file IN LISTS GENERATED_SOURCES)
   string(REGEX REPLACE "^([sdc]).*$" "\\1" precision "${file}")
   add_custom_command(
       OUTPUT  ${file}
-      COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh ${precision} ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+      COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh ${precision} ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${XKblas_SOURCE_DIR}/gen_precision_one.sh
   )
   #message(STATUS "Gen file ${file} == precision ${precision} from ${source}")
 endforeach()
@@ -170,8 +166,8 @@ if (KAAPI_USE_HIP)
      string(REGEX REPLACE "^([sdc]).*$" "\\1" precision "${file}")
      add_custom_command (
        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${file_hip}
-       #COMMAND ${SHELL_EXECUTABLE} hipify-perl ${file}|sed -e 's+hipComplex+hipblasComplex+g' -e 's+hipDoubleComplex+hipblasDoubleComplex+g' -e 's+cublasChemm+hipblasChemm+g' -e 's+cublasCher2k+hipblasCher2k+g' -e 's+cublasCherk+hipblasCherk+g' -e 's+cublasCsymm+hipblasCsymm+g' -e 's+cublasCsyr2k+hipblasCsyr2k+g' -e 's+cublasCsyrk+hipblasCsyrk+g' -e 's+cublasCtrmm+hipblasCtrmm+g' -e 's+cublasCtrsm+hipblasCtrsm+g' -e 's+cublasDsymm+hipblasDsymm+g' -e 's+cublasDsyr2k+hipblasDsyr2k+g' -e 's+cublasDsyrk+hipblasDsyrk+g' -e 's+cublasDtrmm+hipblasDtrmm+g' -e 's+cublasSsymm+hipblasSsymm+g' -e 's+cublasSsyr2k+hipblasSsyr2k+g' -e 's+cublasSsyrk+hipblasSsyrk+g' -e 's+cublasStrmm+hipblasStrmm+g' -e 's+cublasZhemm+hipblasZhemm+g' -e 's+cublasZher2k+hipblasZher2k+g' -e 's+cublasZherk+hipblasZherk+g' -e 's+cublasZsymm+hipblasZsymm+g' -e 's+cublasZsyr2k+hipblasZsyr2k+g' -e 's+cublasZsyrk+hipblasZsyrk+g' -e 's+cublasZtrmm+hipblasZtrmm+g' -e 's+cublasZtrsm+hipblasZtrsm+g' > ${file_hip}
-       COMMAND ${SHELL_EXECUTABLE} hipify-perl ${file}|sed -e 's+hipComplex+hipComplex+g' -e 's+hipDoubleComplex+hipDoubleComplex+g' -e 's+cublasChemm+hipblasChemm+g' -e 's+cublasCher2k+hipblasCher2k+g' -e 's+cublasCherk+hipblasCherk+g' -e 's+cublasCsymm+hipblasCsymm+g' -e 's+cublasCsyr2k+hipblasCsyr2k+g' -e 's+cublasCsyrk+hipblasCsyrk+g' -e 's+cublasCtrmm+hipblasCtrmm+g' -e 's+cublasCtrsm+hipblasCtrsm+g' -e 's+cublasDsymm+hipblasDsymm+g' -e 's+cublasDsyr2k+hipblasDsyr2k+g' -e 's+cublasDsyrk+hipblasDsyrk+g' -e 's+cublasDtrmm+hipblasDtrmm+g' -e 's+cublasSsymm+hipblasSsymm+g' -e 's+cublasSsyr2k+hipblasSsyr2k+g' -e 's+cublasSsyrk+hipblasSsyrk+g' -e 's+cublasStrmm+hipblasStrmm+g' -e 's+cublasZhemm+hipblasZhemm+g' -e 's+cublasZher2k+hipblasZher2k+g' -e 's+cublasZherk+hipblasZherk+g' -e 's+cublasZsymm+hipblasZsymm+g' -e 's+cublasZsyr2k+hipblasZsyr2k+g' -e 's+cublasZsyrk+hipblasZsyrk+g' -e 's+cublasZtrmm+hipblasZtrmm+g' -e 's+cublasZtrsm+hipblasZtrsm+g' > ${file_hip}
+       #COMMAND hipify-perl ${file}|sed -e 's+hipComplex+hipblasComplex+g' -e 's+hipDoubleComplex+hipblasDoubleComplex+g' -e 's+cublasChemm+hipblasChemm+g' -e 's+cublasCher2k+hipblasCher2k+g' -e 's+cublasCherk+hipblasCherk+g' -e 's+cublasCsymm+hipblasCsymm+g' -e 's+cublasCsyr2k+hipblasCsyr2k+g' -e 's+cublasCsyrk+hipblasCsyrk+g' -e 's+cublasCtrmm+hipblasCtrmm+g' -e 's+cublasCtrsm+hipblasCtrsm+g' -e 's+cublasDsymm+hipblasDsymm+g' -e 's+cublasDsyr2k+hipblasDsyr2k+g' -e 's+cublasDsyrk+hipblasDsyrk+g' -e 's+cublasDtrmm+hipblasDtrmm+g' -e 's+cublasSsymm+hipblasSsymm+g' -e 's+cublasSsyr2k+hipblasSsyr2k+g' -e 's+cublasSsyrk+hipblasSsyrk+g' -e 's+cublasStrmm+hipblasStrmm+g' -e 's+cublasZhemm+hipblasZhemm+g' -e 's+cublasZher2k+hipblasZher2k+g' -e 's+cublasZherk+hipblasZherk+g' -e 's+cublasZsymm+hipblasZsymm+g' -e 's+cublasZsyr2k+hipblasZsyr2k+g' -e 's+cublasZsyrk+hipblasZsyrk+g' -e 's+cublasZtrmm+hipblasZtrmm+g' -e 's+cublasZtrsm+hipblasZtrsm+g' > ${file_hip}
+       COMMAND hipify-perl ${file}|sed -e 's+hipComplex+hipComplex+g' -e 's+hipDoubleComplex+hipDoubleComplex+g' -e 's+cublasChemm+hipblasChemm+g' -e 's+cublasCher2k+hipblasCher2k+g' -e 's+cublasCherk+hipblasCherk+g' -e 's+cublasCsymm+hipblasCsymm+g' -e 's+cublasCsyr2k+hipblasCsyr2k+g' -e 's+cublasCsyrk+hipblasCsyrk+g' -e 's+cublasCtrmm+hipblasCtrmm+g' -e 's+cublasCtrsm+hipblasCtrsm+g' -e 's+cublasDsymm+hipblasDsymm+g' -e 's+cublasDsyr2k+hipblasDsyr2k+g' -e 's+cublasDsyrk+hipblasDsyrk+g' -e 's+cublasDtrmm+hipblasDtrmm+g' -e 's+cublasSsymm+hipblasSsymm+g' -e 's+cublasSsyr2k+hipblasSsyr2k+g' -e 's+cublasSsyrk+hipblasSsyrk+g' -e 's+cublasStrmm+hipblasStrmm+g' -e 's+cublasZhemm+hipblasZhemm+g' -e 's+cublasZher2k+hipblasZher2k+g' -e 's+cublasZherk+hipblasZherk+g' -e 's+cublasZsymm+hipblasZsymm+g' -e 's+cublasZsyr2k+hipblasZsyr2k+g' -e 's+cublasZsyrk+hipblasZsyrk+g' -e 's+cublasZtrmm+hipblasZtrmm+g' -e 's+cublasZtrsm+hipblasZtrsm+g' > ${file_hip}
        DEPENDS ${file}
        DEPENDS zxkblas.h cxkblas.h dxkblas.h sxkblas.h ctask.h dtask.h stask.h
      )
@@ -195,7 +191,7 @@ if (KAAPI_USE_HIP)
 			OUTPUT ${hip_file}
 			COMMAND hipify-perl ${source_file} > ${hip_file}
 			DEPENDS ${source_file}
-			COMMENT "Convertig CUDA sources to HIP sources"
+			COMMENT "Converting CUDA sources to HIP sources"
 		)
 
 		add_custom_command(

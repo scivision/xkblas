@@ -61,11 +61,11 @@ endif()
 
 #--- Unified
 if(ENABLE_KAAPI_UNIFIED)
-  add_definitions(-DKAAPI_UNIFIED)
+  add_compile_definitions(KAAPI_UNIFIED)
 endif()
 
 if(ENABLE_KAAPI_NVTX)
-  add_definitions(-DKAAPI_NVTX)
+  add_compile_definitions(KAAPI_NVTX)
 endif()
 
 

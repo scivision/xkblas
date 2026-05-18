@@ -1,6 +1,6 @@
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../blas
-${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/kaapi ${CMAKE_SOURCE_DIR}/blas
+${CMAKE_CURRENT_SOURCE_DIR} ${XKblas_SOURCE_DIR}/kaapi ${XKblas_SOURCE_DIR}/blas
 ${BLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
 if (OPENMP_FOUND)
@@ -27,8 +27,8 @@ foreach(file IN LISTS GENERATED_SOURCES)
   string(REGEX REPLACE "^([sdc]).*$" "\\1" precision "${file}")
   add_custom_command(
       OUTPUT  ${file}
-      COMMAND ${CMAKE_SOURCE_DIR}/gen_precision_one.sh ${precision} ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_SOURCE_DIR}/gen_precision_one.sh
+      COMMAND ${XKblas_SOURCE_DIR}/gen_precision_one.sh ${precision} ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${XKblas_SOURCE_DIR}/gen_precision_one.sh
   )
   #message(STATUS "Gen precision ${precision} from ${source}")
   #message(STATUS "Include dir for BLAS: ${BLAS_INCLUDE_DIRS}")
@@ -138,10 +138,6 @@ m)
 install(TARGETS stesting DESTINATION testing)
 
 # - Do not install run_tests in the installation directory
-add_custom_command(
-  OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/run_tests
-  COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/run_tests ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/run_tests
-)
+configure_file(run_tests run_tests COPYONLY)
 
 add_custom_target( testing DEPENDS stesting dtesting ctesting ztesting ${CMAKE_CURRENT_BINARY_DIR}/run_tests )
