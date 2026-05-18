@@ -3,11 +3,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../b
 ${CMAKE_CURRENT_SOURCE_DIR} ${XKblas_SOURCE_DIR}/kaapi ${XKblas_SOURCE_DIR}/blas
 ${BLAS_INCLUDE_DIRS} ${HIP_INCLUDE_DIRS} ${HIPBLAS_INCLUDE_DIRS})
 
-if (OPENMP_FOUND)
-  add_compile_options("${OpenMP_C_FLAGS}")
-  add_link_options("${OpenMP_C_FLAGS}")
-endif()
-
 list(APPEND GENERATED_SOURCES
   stesting_gemm.c stesting_trsm.c stesting_trmm.c stesting_symm.c stesting_syrk.c stesting_syr2k.c splgsy.c stesting_auxiliary.h stesting_auxiliary.c
   dtesting_gemm.c dtesting_trsm.c dtesting_trmm.c dtesting_symm.c dtesting_syrk.c dtesting_syr2k.c dplgsy.c dtesting_auxiliary.h dtesting_auxiliary.c
@@ -56,9 +51,11 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(ztesting ${SOURCES_TESTING_Z})
-target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -DPRECISION_z=1 -UPRECISION_c)
+target_compile_options(ztesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_c)
+target_compile_definitions(ztesting PUBLIC PRECISION_z=1)
 target_link_libraries(ztesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+"$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
 install(TARGETS ztesting DESTINATION testing)
 
@@ -83,9 +80,11 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(ctesting ${SOURCES_TESTING_C})
-target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z -DPRECISION_c=1)
+target_compile_options(ctesting PUBLIC -UPRECISION_d -UPRECISION_s -UPRECISION_z)
+target_compile_definitions(ctesting PUBLIC PRECISION_c=1)
 target_link_libraries(ctesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+"$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
 install(TARGETS ctesting DESTINATION testing)
 
@@ -106,10 +105,12 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(dtesting ${SOURCES_TESTING_D})
-target_compile_options(dtesting PUBLIC -DPRECISION_d=1 -UPRECISION_s -UPRECISION_z -UPRECISION_c)
+target_compile_options(dtesting PUBLIC -UPRECISION_s -UPRECISION_z -UPRECISION_c)
+target_compile_definitions(dtesting PUBLIC PRECISION_d=1)
 target_link_libraries(dtesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
 "$<$<BOOL:${KAAPI_USE_HIP}>:${HIP_LIBRARIES}>"
+"$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
 install(TARGETS dtesting DESTINATION testing)
 
@@ -131,9 +132,11 @@ if(XKBLAS_BUILD_COPYSCALE)
 endif()
 
 add_executable(stesting ${SOURCES_TESTING_S})
-target_compile_options(stesting PUBLIC -UPRECISION_d -DPRECISION_s=1 -UPRECISION_z -UPRECISION_c)
+target_compile_options(stesting PUBLIC -UPRECISION_d -UPRECISION_z -UPRECISION_c)
+target_compile_definitions(stesting PUBLIC PRECISION_s=1)
 target_link_libraries(stesting xkblas kaapi ${BLAS_LIBRARIES}
 "$<$<BOOL:${KAAPI_USE_CUDA_RT}>:CUDA::cublas>"
+"$<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>"
 m)
 install(TARGETS stesting DESTINATION testing)
 

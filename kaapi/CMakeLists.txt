@@ -15,7 +15,7 @@ find_package(Threads REQUIRED)
 find_package(Threads REQUIRED)
 
 if (HWLOC_FOUND)
-  add_compile_options("-DKAAPI_USE_HWLOC=1")
+  add_compile_definitions(KAAPI_USE_HWLOC=1)
   message(STATUS "Kaapi configured with HWLOC")
 endif()
 
@@ -28,10 +28,10 @@ if (KAAPI_USE_ROCSMI)
 endif()
 
 if (PAPI_FOUND)
-  add_compile_options("-DKAAPI_USE_PAPI=1")
+  add_compile_definitions(KAAPI_USE_PAPI=1)
   message(STATUS "Kaapi configured with PAPI")
 else()
-  add_compile_options("-DKAAPI_USE_PAPI=0")
+  add_compile_definitions(KAAPI_USE_PAPI=0)
 endif()
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -69,23 +69,23 @@ endif()
 #
 
 if (KAAPI_USE_ROCSMI)
-  add_compile_options("-DKAAPI_USE_ROCSMI=1")
+  add_compile_definitions(KAAPI_USE_ROCSMI=1)
   message(STATUS "Kaapi configured with ROCSMI")
 else()
-  add_compile_options("-DKAAPI_USE_ROCSMI=0")
+  add_compile_definitions(KAAPI_USE_ROCSMI=0)
 endif()
 
 if (KAAPI_USE_HWLOCROCSMI)
-  add_compile_options("-DKAAPI_USE_HWLOCROCSMI=1")
+  add_compile_definitions(KAAPI_USE_HWLOCROCSMI=1)
 else()
-  add_compile_options("-DKAAPI_USE_HWLOCROCSMI=0")
+  add_compile_definitions(KAAPI_USE_HWLOCROCSMI=0)
 endif()
 
 if (KAAPI_USE_LIBNUMA)
-  add_compile_options("-DKAAPI_USE_LIBNUMA=1")
+  add_compile_definitions(KAAPI_USE_LIBNUMA=1)
   message(STATUS "Kaapi configured with LIBNUMA")
 else()
-  add_compile_options("-DKAAPI_USE_LIBNUMA=0")
+  add_compile_definitions(KAAPI_USE_LIBNUMA=0)
 endif()
 
 # use, i.e. don't skip the full RPATH for the build tree

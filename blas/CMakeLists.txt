@@ -9,13 +9,9 @@ else()
   )
 endif()
 
-if (OPENMP_FOUND)
-  add_compile_options("${OpenMP_C_FLAGS}")
-endif()
-
 
 if (KAAPI_USE_HIP)
-  add_compile_options("-DHIPBLAS_V1")
+  add_compile_definitions(HIPBLAS_V1)
 endif()
 
 
@@ -84,7 +80,7 @@ list(APPEND SOURCES_Z
 )
 
 if (XKBLAS_BUILD_COPYSCALE)
-	add_compile_options("-DXKBLAS_BUILD_COPYSCALE=1")
+	add_compile_definitions(XKBLAS_BUILD_COPYSCALE=1)
 	list(APPEND SOURCES_S scopyscale.c stask_copyscale.c scopyscale.cu)
 	list(APPEND SOURCES_D dcopyscale.c dtask_copyscale.c dcopyscale.cu)
 	list(APPEND SOURCES_C ccopyscale.c ctask_copyscale.c ccopyscale.cu)
@@ -249,9 +245,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set_target_properties(xkblas PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-if (OPENMP_FOUND)
-    target_link_libraries(xkblas PRIVATE ${OPENMP_LIBRARIES})
-endif()
+target_link_libraries(xkblas PRIVATE $<$<BOOL:${OpenMP_C_FOUND}>:OpenMP::OpenMP_C>)
 
 target_link_libraries(xkblas PUBLIC kaapi)
 target_link_libraries(xkblas PRIVATE
