@@ -12,8 +12,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 find_package(Threads REQUIRED)
 
-find_package(Threads REQUIRED)
-
 if (HWLOC_FOUND)
   add_compile_definitions(KAAPI_USE_HWLOC=1)
   message(STATUS "Kaapi configured with HWLOC")

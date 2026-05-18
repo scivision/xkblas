@@ -310,10 +310,6 @@ if (KAAPI_USE_NVPL)
   add_compile_definitions(KAAPI_BLAS_USE_NVPL=1)
   add_compile_definitions(XKBLAS_BLASLIB=\"libnvpl_blas_ilp64.so\")
 endif()
-#find_package(BLAS REQUIRED)
-#if (NOT ${BLAS_FOUND})
-#  message(FATAL_ERROR "XKblas requires a BLAS library.")
-#endif()
 
 #--- Subdirectories
 include_directories ("kaapi")
