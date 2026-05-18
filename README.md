@@ -1,6 +1,6 @@
 # XKBlas v0.6 beta RC
 
-XKBlas is a BLAS library for multi-GPUs servers similar to CUBLASXt but with 
+XKBlas is a BLAS library for multi-GPUs servers similar to CUBLASXt but with
 higher performances especially when matrix dimensions becomes smaller.
 
 XKBlas was only developped and tested on Linux plateform with CUDA >= 8.0 on machine with up to 8 GPUs (DGX-1).
@@ -10,7 +10,7 @@ It was ported on AMD GPU with HIP/ROCM enviroment = 4.5, 5.X., 6.X Note:
 
 XKBlas was successfully port on top of :
 * P100, V100, A100, H100 and GraceHopper. Other NVIDIA GPUs where not tested.
-* MI50, MI100 GPU and MI250x GPU, MI300A. Other AMD GPUs were not tested. 
+* MI50, MI100 GPU and MI250x GPU, MI300A. Other AMD GPUs were not tested.
 
 XKBlas is built from 2 components:
 *  the multi-GPU module of the XKaapi[1,2] runtime that has low overhead in task management.
@@ -38,21 +38,21 @@ You can clone the projet or get the tarball [here](https://gitlab.inria.fr/xkbla
 XKBlas needs: a CPU blas library (*e.g.* MKL or OpenBLAS or CrayBLAS) and an a CUDA toolkit; or ROCM environment (runtime + hipBLAS/rocBlas).
 XKBlas was successfully port on CUDA from version 8 until 11 and on HIP/ROCM 4.5.0 to HIP/ROCM 6.2.X
 
-Previous version of XKBlas where based on updating make.inc to local installation. 
+Previous version of XKBlas where based on updating make.inc to local installation.
 Since version 0.4, XKBlas switches to use CMake in order to simplify configuration.
 
 ## Selection of the GPU environment
 The two exclusive choices are:
 * -DKAAPI_USE_CUDA_RT=ON, default value is OFF. Switch to ON if you want to compile for NVidia environment.
-    XKBlas requires: Runtime API and cuBLAS library. 
-* -DKAAPI_USE_HIP=ON, default value is OFF. 
-    XKBlas requires: rocblas, hipblas, and hip environment.   
+    XKBlas requires: Runtime API and cuBLAS library.
+* -DKAAPI_USE_HIP=ON, default value is OFF.
+    XKBlas requires: rocblas, hipblas, and hip environment.
 
 ## Selection of the CPU BLAS library
 Exclusive choices are:
 * -DKAAPI_USE_MKL=ON
 * -DKAAPI_USE_OPENBLAS=ON
-* -DKAAPI_USE_CRAYBLAS=ON. Used to link agains libSCI available with Cray PE. 
+* -DKAAPI_USE_CRAYBLAS=ON. Used to link agains libSCI available with Cray PE.
 * -DKAAPI_USE_NVPL=ON
 * -DKAAPI_USE_AOCL=ON
 
@@ -78,9 +78,10 @@ This option is to active the compilation of the files in testing subdirectory.
 
 ## Compilation and installation
 Then enter
-```
-> make -j 
-> make install 
+
+```sh
+> cmake --build build -j
+> cmake --install build
 ```
 
 ## Examples of command line arguments
@@ -88,17 +89,18 @@ Following commands assume to be in a 'build' directory inside the xkblas source 
 
 On Linux with NVidia CUDA environment and MKL BLAS library:
 ```
-cmake .. -DKAAPI_USE_CUDA_RT=ON -DKAAPI_USE_MKL=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DKAAPI_USE_CUDA_RT=ON -DKAAPI_USE_MKL=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF -DCMAKE_BUILD_TYPE=Release
 ```
 
 On Linux with HIP and MKL BLAS library:
 ```
-cmake .. -DKAAPI_USE_CUDA_RT=ON -DKAAPI_USE_MKL=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DKAAPI_USE_HIP=ON -DKAAPI_USE_MKL=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF -DCMAKE_BUILD_TYPE=Release
 ```
 
 The blas may be difficult to found, so its can be specified on the cmake commande line. For instance with CRAY PE environment:
 ```
-cmake .. -DKAAPI_USE_HIP=ON -DKAAPI_USE_CRAYBLAS=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF -DBLAS_LIBRARIES=${CRAY_LIBSCI_DIR}/CRAY/9.0/x86_64/lib/libsci_cray.so -DBLAS_INCLUDE_DIRS=${CRAY_LIBSCI_DIR}/CRAY/9.0/x86_64/include
+cmake -B build -DKAAPI_USE_HIP=ON -DKAAPI_USE_CRAYBLAS=ON -DCMAKE_INSTALL_PREFIX=/tmp/xkblas -DKAAPI_USE_TRACE=OFF -DKAAPI_USE_PERFCTR=OFF \
+    -DBLAS_ROOT=${CRAY_LIBSCI_DIR}/CRAY/9.0/x86_64/
 ```
 
 where ${CRAY_LIBSCI_DIR} is defined when Cray PE module is loaded.
@@ -107,8 +109,15 @@ where ${CRAY_LIBSCI_DIR} is defined when Cray PE module is loaded.
 # Testing the installation
 XKBlas has testing programs ported from PLASMA/Chameleon.
 If configuration option -DKAAPI_BUILD_TESTING=ON was set, the files have to be compiled. Thus, enter
+
+```sh
+ctest --test-dir build -V
 ```
-> ./testing/run_test
+
+or
+
+```sh
+> build/testing/run_test
 ```
 All BLAS routines, for each precision and all possible values of trans/side/uplo/diag parameters,
 are tested against 3 matrix sizes (1024, 2048, 8192) using all the numbers of GPUs
@@ -121,7 +130,7 @@ The installation generates 3 libraries in  `<install directory>/lib`:
 * `libkaapi.so`: the low level XKaapi runtime
 * `libXKBlas.so`: the XKBlas library which is linked against libkaapi.so
 
-The XKBlas API is defined in `<install directory>/include` repository and the user that want to 
+The XKBlas API is defined in `<install directory>/include` repository and the user that want to
 compile XKBlas program with its API should includes `XKBlas.h`.
 
 # Running with XKBlas
@@ -141,12 +150,10 @@ Please contact us or fill an [issue here](https://gitlab.inria.fr/xkblas/version
 
 
 # References
-* [1] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020, 
-* [2] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020, 
+* [1] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020,
+* [2] Thierry Gautier, João V. F. Lima: XKBlas: a High Performance Implementation of BLAS-3 Kernels on Multi-GPU Server. PDP 2020, Västerås, Sweden, March 11-13, 2020. IEEE 2020,
 * [3] João V. F. Lima, Thierry Gautier, Vincent Danjean, Bruno Raffin, Nicolas Maillard. Design and analysis of scheduling strategies for multi-CPU and multi-GPU architectures. Parallel Computing 44: 37-52 (2015)
 * [4] Thierry Gautier, Joao Vicente Ferreira Lima, Nicolas Maillard, Bruno Raffin. XKaapi: A Runtime System for Data-Flow Task Programming on Heterogeneous Architectures. In Proc. of the 27-th IEEE International Parallel and Distributed Processing Symposium (IPDPS), Boston, USA, jun 2013.
 * [5] João V. F. Lima, Thierry Gautier, Nicolas Maillard, Vincent Danjean. Exploiting Concurrent GPU Operations for Efficient Work Stealing on Multi-GPUs. 24rd International Symposium on Computer Architecture and High Performance Computing (SBAC-PAD), Columbia University, New York, USA, oct 2012.
 * [6] http://icl.cs.utk.edu/plasma/software/
 * [7] https://solverstack.gitlabpages.inria.fr/chameleon/doxygen/index.html
-
-

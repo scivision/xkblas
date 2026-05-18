@@ -13,7 +13,10 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 -Wfatal-errors ")
 #set(CMAKE_CC_FLAGS_DEBUG_INIT "-DKAAPI_DEBUG=1 -D_OFFLOAD_DEBUG=1")
 #set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DKAAPI_DEBUG=1 -D_OFFLOAD_DEBUG=1")
 
-#
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE AND NOT DEFINED ENV{CMAKE_BUILD_TYPE})
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 project (XKblas LANGUAGES C)
 
 # More detailled information to know what we are doing
