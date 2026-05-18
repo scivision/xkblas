@@ -1,5 +1,5 @@
 # CMake Minimum version
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.25)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
 ###########
@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 ###########
 
 include(BooleanUtils)
+include(FetchContent)
 
 xkoption(STRICT       "Enable strict compilation mode" OFF)
 xkoption(USE_TESTS    "Compile tests (require a CBLAS installation)" OFF)
@@ -257,7 +258,14 @@ endif()
 ###############
 
 # XK Runtime
-find_package(XKRT REQUIRED)
+FetchContent_Declare(
+    xkrt
+    GIT_REPOSITORY https://gitlab.inria.fr/xkaapi/dev-v2.git
+    GIT_TAG        master
+    FIND_PACKAGE_ARGS
+)
+FetchContent_MakeAvailable(xkrt)
+
 target_link_libraries(${XKBLAS_NAME}       PRIVATE XKRT::xkrt)
 target_link_libraries(${XKBLAS_NAME}_cblas PRIVATE XKRT::xkrt ${XKBLAS_NAME})
 
